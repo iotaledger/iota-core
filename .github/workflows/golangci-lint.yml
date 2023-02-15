@@ -1,0 +1,26 @@
+name: GolangCIlint
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'documentation/**'
+      - 'scripts/**'
+      - 'tools/**'
+
+jobs:
+  golangci-lint:
+    name: GolangCI-Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
+
+      - name: golangci-lint
+        uses: reviewdog/action-golangci-lint@v2
+        with:
+          version: v1.51.0
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          golangci_lint_flags: "--timeout=10m"
+          reporter: github-pr-check
+          filter_mode: nofilter
+          fail_on_error: true
