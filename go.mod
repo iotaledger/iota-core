@@ -5,7 +5,8 @@ go 1.19
 require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/iotaledger/go-ds-kvstore v1.0.0-rc.1
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3
+	github.com/iotaledger/hive.go/app v0.0.0-20230215114502-38144ed5567f
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230215114502-38144ed5567f
 	github.com/iotaledger/inx-app v1.0.0-rc.3
 	github.com/labstack/echo/v4 v4.10.0
 	github.com/libp2p/go-libp2p v0.25.1

@@ -16,7 +16,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/core/configuration"
+	"github.com/iotaledger/hive.go/app/configuration"
+	appLogger "github.com/iotaledger/hive.go/app/logger"
 	"github.com/iotaledger/hive.go/core/events"
 	"github.com/iotaledger/hive.go/core/logger"
 	"github.com/iotaledger/iota-core/pkg/p2p"
@@ -54,7 +55,7 @@ func TestManager(t *testing.T) {
 	require.NoError(t, err)
 
 	// no need to check the error, since the global logger could already be initialized
-	_ = logger.InitGlobalLogger(cfg)
+	_ = appLogger.InitGlobalLogger(cfg)
 
 	node1 := newNode(t)
 	node1Logger := logger.NewLogger(fmt.Sprintf("node1/%s", node1.ID().ShortString()))
@@ -224,7 +225,7 @@ func TestManagerEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	// no need to check the error, since the global logger could already be initialized
-	_ = logger.InitGlobalLogger(cfg)
+	_ = appLogger.InitGlobalLogger(cfg)
 
 	reconnectOpt := p2p.WithManagerReconnectInterval(1*time.Second, 500*time.Millisecond)
 
