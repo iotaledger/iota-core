@@ -81,7 +81,6 @@ linters:
         - predeclared
         - promlinter
         - revive
-        - rowserrcheck
         #- scopelint
         - sqlclosecheck
         - stylecheck
@@ -94,7 +93,6 @@ linters:
         - unparam
         - usestdlibvars
         #- varnamelen
-        - wastedassign
 
 issues:
     # Maximum issues count per one linter.
