@@ -8,11 +8,11 @@ import (
 	"github.com/pkg/errors"
 
 	hivedb "github.com/iotaledger/hive.go/core/database"
-	"github.com/iotaledger/hive.go/core/events"
 	"github.com/iotaledger/hive.go/core/ioutils"
-	"github.com/iotaledger/hive.go/core/kvstore"
-	"github.com/iotaledger/hive.go/core/kvstore/mapdb"
-	"github.com/iotaledger/hive.go/core/kvstore/rocksdb"
+	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/kvstore/rocksdb"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/metrics"
 )
 
@@ -41,7 +41,6 @@ type Cleanup struct {
 }
 
 func (c *Cleanup) MarshalJSON() ([]byte, error) {
-
 	cleanup := struct {
 		Start int64 `json:"start"`
 		End   int64 `json:"end"`
@@ -61,14 +60,9 @@ func (c *Cleanup) MarshalJSON() ([]byte, error) {
 	return json.Marshal(cleanup)
 }
 
-func CleanupCaller(handler interface{}, params ...interface{}) {
-	//nolint:forcetypeassert // we will replace that with generic events anyway
-	handler.(func(*Cleanup))(params[0].(*Cleanup))
-}
-
 type Events struct {
-	Cleanup    *events.Event
-	Compaction *events.Event
+	Cleanup    *event.Event1[*Cleanup]
+	Compaction *event.Event1[bool]
 }
 
 // Database holds the underlying KVStore and database specific functions.
