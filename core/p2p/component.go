@@ -16,8 +16,8 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/app/configuration"
-	hivedb "github.com/iotaledger/hive.go/core/database"
-	hivep2p "github.com/iotaledger/hive.go/core/p2p"
+	hivep2p "github.com/iotaledger/hive.go/crypto/p2p"
+	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/database"
 	"github.com/iotaledger/iota-core/pkg/p2p"
