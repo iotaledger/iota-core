@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+option go_package = "github.com/iotaledger/iota-core/pkg/network/protocols/core";
+
+package models;
+
+message Packet {
+  oneof body {
+    Block block = 1;
+    BlockRequest blockRequest = 2;
+    SlotCommitment slotCommitment = 3;
+    SlotCommitmentRequest slotCommitmentRequest = 4;
+    Attestations attestations = 5;
+    AttestationsRequest attestationsRequest = 6;
+  }
+}
+
+message Block {
+  bytes bytes = 1;
+}
+
+message BlockRequest {
+  bytes id = 1;
+}
+
+message SlotCommitment {
+  bytes bytes = 1;
+}
+
+message SlotCommitmentRequest {
+  bytes id = 1;
+}
+
+message Attestations {
+  bytes commitment = 1;
+  bytes blocks_ids = 2;
+  bytes attestations = 3;
+}
+
+message AttestationsRequest {
+  bytes commitment = 1;
+  bytes end_index = 2;
+}
