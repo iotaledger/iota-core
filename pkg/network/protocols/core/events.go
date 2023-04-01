@@ -1,10 +1,7 @@
 package core
 
 import (
-	"github.com/iotaledger/goshimmer/packages/protocol/engine/notarization"
 	"github.com/iotaledger/hive.go/crypto/identity"
-	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/commitment"
 	"github.com/iotaledger/iota-core/pkg/models"
@@ -79,10 +76,10 @@ type SlotCommitmentRequestReceivedEvent struct {
 // region AttestationsReceivedEvent ////////////////////////////////////////////////////////////////////////////////////
 
 type AttestationsReceivedEvent struct {
-	Commitment   *commitment.Commitment
-	BlockIDs     models.BlockIDs
-	Attestations *orderedmap.OrderedMap[slot.Index, *advancedset.AdvancedSet[*notarization.Attestation]]
-	Source       identity.ID
+	Commitment *commitment.Commitment
+	BlockIDs   models.BlockIDs
+	//Attestations *orderedmap.OrderedMap[slot.Index, *advancedset.AdvancedSet[*notarization.Attestation]]
+	Source identity.ID
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

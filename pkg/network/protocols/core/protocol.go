@@ -6,11 +6,8 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/iotaledger/goshimmer/packages/protocol/engine/notarization"
 	"github.com/iotaledger/hive.go/crypto/identity"
-	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/bytesfilter"
-	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
@@ -76,13 +73,13 @@ func (p *Protocol) SendSlotCommitment(cm *commitment.Commitment, to ...identity.
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) SendAttestations(cm *commitment.Commitment, blockIDs models.BlockIDs, attestations *orderedmap.OrderedMap[slot.Index, *advancedset.AdvancedSet[*notarization.Attestation]], to ...identity.ID) {
-	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
-		Commitment:   lo.PanicOnErr(cm.Bytes()),
-		BlocksIds:    lo.PanicOnErr(blockIDs.Bytes()),
-		Attestations: lo.PanicOnErr(attestations.Encode()),
-	}}}, protocolID, to...)
-}
+//func (p *Protocol) SendAttestations(cm *commitment.Commitment, blockIDs models.BlockIDs, attestations *orderedmap.OrderedMap[slot.Index, *advancedset.AdvancedSet[*notarization.Attestation]], to ...identity.ID) {
+//	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
+//		Commitment:   lo.PanicOnErr(cm.Bytes()),
+//		BlocksIds:    lo.PanicOnErr(blockIDs.Bytes()),
+//		Attestations: lo.PanicOnErr(attestations.Encode()),
+//	}}}, protocolID, to...)
+//}
 
 func (p *Protocol) RequestCommitment(id commitment.ID, to ...identity.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitmentRequest{SlotCommitmentRequest: &nwmodels.SlotCommitmentRequest{
@@ -112,9 +109,9 @@ func (p *Protocol) handlePacket(nbr identity.ID, packet proto.Message) (err erro
 	case *nwmodels.Packet_SlotCommitmentRequest:
 		p.workerPool.Submit(func() { p.onSlotCommitmentRequest(packetBody.SlotCommitmentRequest.GetId(), nbr) })
 	case *nwmodels.Packet_Attestations:
-		p.workerPool.Submit(func() {
-			p.onAttestations(packetBody.Attestations.GetCommitment(), packetBody.Attestations.GetBlocksIds(), packetBody.Attestations.GetAttestations(), nbr)
-		})
+		//p.workerPool.Submit(func() {
+		//	p.onAttestations(packetBody.Attestations.GetCommitment(), packetBody.Attestations.GetBlocksIds(), packetBody.Attestations.GetAttestations(), nbr)
+		//})
 	case *nwmodels.Packet_AttestationsRequest:
 		p.workerPool.Submit(func() {
 			p.onAttestationsRequest(packetBody.AttestationsRequest.GetCommitment(), packetBody.AttestationsRequest.GetEndIndex(), nbr)
@@ -215,44 +212,44 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id identity.ID) {
 	})
 }
 
-func (p *Protocol) onAttestations(commitmentBytes []byte, blockIDBytes []byte, attestationsBytes []byte, id identity.ID) {
-	cm := &commitment.Commitment{}
-	if _, err := cm.FromBytes(commitmentBytes); err != nil {
-		p.Events.Error.Trigger(&ErrorEvent{
-			Error:  errors.Wrap(err, "failed to deserialize commitment"),
-			Source: id,
-		})
-
-		return
-	}
-
-	blockIDs := models.NewBlockIDs()
-	if _, err := blockIDs.FromBytes(blockIDBytes); err != nil {
-		p.Events.Error.Trigger(&ErrorEvent{
-			Error:  errors.Wrap(err, "failed to deserialize blockIDs"),
-			Source: id,
-		})
-
-		return
-	}
-
-	attestations := orderedmap.New[slot.Index, *advancedset.AdvancedSet[*notarization.Attestation]]()
-	if _, err := attestations.Decode(attestationsBytes); err != nil {
-		p.Events.Error.Trigger(&ErrorEvent{
-			Error:  errors.Wrap(err, "failed to deserialize attestations"),
-			Source: id,
-		})
-
-		return
-	}
-
-	p.Events.AttestationsReceived.Trigger(&AttestationsReceivedEvent{
-		Commitment:   cm,
-		BlockIDs:     blockIDs,
-		Attestations: attestations,
-		Source:       id,
-	})
-}
+//func (p *Protocol) onAttestations(commitmentBytes []byte, blockIDBytes []byte, attestationsBytes []byte, id identity.ID) {
+//	cm := &commitment.Commitment{}
+//	if _, err := cm.FromBytes(commitmentBytes); err != nil {
+//		p.Events.Error.Trigger(&ErrorEvent{
+//			Error:  errors.Wrap(err, "failed to deserialize commitment"),
+//			Source: id,
+//		})
+//
+//		return
+//	}
+//
+//	blockIDs := models.NewBlockIDs()
+//	if _, err := blockIDs.FromBytes(blockIDBytes); err != nil {
+//		p.Events.Error.Trigger(&ErrorEvent{
+//			Error:  errors.Wrap(err, "failed to deserialize blockIDs"),
+//			Source: id,
+//		})
+//
+//		return
+//	}
+//
+//	attestations := orderedmap.New[slot.Index, *advancedset.AdvancedSet[*notarization.Attestation]]()
+//	if _, err := attestations.Decode(attestationsBytes); err != nil {
+//		p.Events.Error.Trigger(&ErrorEvent{
+//			Error:  errors.Wrap(err, "failed to deserialize attestations"),
+//			Source: id,
+//		})
+//
+//		return
+//	}
+//
+//	p.Events.AttestationsReceived.Trigger(&AttestationsReceivedEvent{
+//		Commitment:   cm,
+//		BlockIDs:     blockIDs,
+//		Attestations: attestations,
+//		Source:       id,
+//	})
+//}
 
 func (p *Protocol) onAttestationsRequest(commitmentBytes []byte, slotIndexBytes []byte, id identity.ID) {
 	cm := &commitment.Commitment{}

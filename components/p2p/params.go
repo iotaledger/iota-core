@@ -4,7 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 )
 
-// ParametersDefinition contains the definition of configuration parameters used by the p2p plugin.
+// ParametersP2P contains the definition of configuration parameters used by the p2p plugin.
 type ParametersP2P struct {
 	// BindAddress defines on which address the p2p service should listen.
 	BindAddress string `default:"0.0.0.0:14666" usage:"the bind address for p2p connections"`
