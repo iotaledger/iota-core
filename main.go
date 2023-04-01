@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/iotaledger/iota-core/core/app"
+	"github.com/iotaledger/iota-core/components/app"
 )
 
 func main() {

@@ -4,8 +4,8 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/app/components/profiling"
 	"github.com/iotaledger/hive.go/app/components/shutdown"
-	"github.com/iotaledger/iota-core/core/p2p"
-	"github.com/iotaledger/iota-core/plugins/restapi"
+	"github.com/iotaledger/iota-core/components/p2p"
+	"github.com/iotaledger/iota-core/components/restapi"
 )
 
 var (
