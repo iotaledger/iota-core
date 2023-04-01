@@ -18,16 +18,14 @@ var (
 
 func App() *app.App {
 	return app.New(Name, Version,
-		app.WithVersionCheck("iotaledger", "iota-core"),
+		//app.WithVersionCheck("iotaledger", "iota-core"),
 		app.WithInitComponent(InitComponent),
-		app.WithCoreComponents([]*app.CoreComponent{
-			shutdown.CoreComponent,
-			p2p.CoreComponent,
-		}...),
-		app.WithPlugins([]*app.Plugin{
-			profiling.Plugin,
-			restapi.Plugin,
-		}...),
+		app.WithComponents(
+			shutdown.Component,
+			p2p.Component,
+			profiling.Component,
+			restapi.Component,
+		),
 	)
 }
 
