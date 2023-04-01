@@ -19,9 +19,9 @@ import (
 	"go.uber.org/atomic"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/iotaledger/goshimmer/packages/core/libp2putil"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
+	"github.com/iotaledger/iota-core/pkg/libp2putil"
 	pp "github.com/iotaledger/iota-core/pkg/network/p2p/proto"
 )
 

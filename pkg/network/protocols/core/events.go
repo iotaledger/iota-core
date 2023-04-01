@@ -2,12 +2,12 @@ package core
 
 import (
 	"github.com/iotaledger/goshimmer/packages/protocol/engine/notarization"
-	"github.com/iotaledger/goshimmer/packages/protocol/models"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/commitment"
+	"github.com/iotaledger/iota-core/pkg/models"
 	"github.com/iotaledger/iota-core/pkg/slot"
 )
 

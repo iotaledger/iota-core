@@ -1,50 +1,30 @@
 package p2p
 
 import (
-	"time"
-
 	"github.com/iotaledger/hive.go/app"
 )
 
-const (
-	// CfgPeers defines the static peers this node should retain a connection to (CLI).
-	CfgPeers = "peers"
-)
-
-// ParametersP2P contains the definition of the parameters used by p2p.
+// ParametersDefinition contains the definition of configuration parameters used by the p2p plugin.
 type ParametersP2P struct {
-	// Defines the bind addresses of this node.
-	BindMultiAddresses []string `default:"/ip4/0.0.0.0/tcp/15600,/ip6/::/tcp/15600" usage:"the bind addresses for this node"`
-
-	ConnectionManager struct {
-		// Defines the high watermark to use within the connection manager.
-		HighWatermark int `default:"10" usage:"the threshold up on which connections count truncates to the lower watermark"`
-		// Defines the low watermark to use within the connection manager.
-		LowWatermark int `default:"5" usage:"the minimum connections count to hold after the high watermark was reached"`
-	}
-
-	// Defines the private key used to derive the node identity (optional).
-	IdentityPrivateKey string `default:"" usage:"private key used to derive the node identity (optional)"`
-
-	Database struct {
-		// Engine defines the used database engine (rocksdb/mapdb).
-		Engine string `default:"rocksdb" usage:"the used database engine (rocksdb/mapdb)"`
-		// Defines the path to the p2p database.
-		Path string `default:"data/p2pstore" usage:"the path to the p2p database"`
-	} `name:"db"`
-
-	// Defines the time to wait before trying to reconnect to a disconnected peer.
-	ReconnectInterval time.Duration `default:"30s" usage:"the time to wait before trying to reconnect to a disconnected peer"`
+	// BindAddress defines on which address the p2p service should listen.
+	BindAddress string `default:"0.0.0.0:14666" usage:"the bind address for p2p connections"`
+	// Seed defines the config flag of the autopeering private key seed.
+	Seed string `usage:"private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively"`
+	// OverwriteStoredSeed defines whether the private key stored in an existing peerdb should be overwritten.
+	OverwriteStoredSeed bool `default:"false" usage:"whether to overwrite the private key if an existing peerdb exists"`
+	// ExternalAddress defines the config flag of the network external address.
+	ExternalAddress string `default:"auto" usage:"external IP address under which the node is reachable; or 'auto' to determine it automatically"`
+	// PeerDBDirectory defines the path to the peer database.
+	PeerDBDirectory string `default:"peerdb" usage:"path to the peer database directory"`
 }
 
-// ParametersPeers contains the definition of the parameters used by peers.
+// ParametersPeers contains the definition of the parameters used by the manualPeering plugin.
 type ParametersPeers struct {
-	// Defines the static peers this node should retain a connection to (CLI).
-	Peers []string `default:"" usage:"the static peers this node should retain a connection to (CLI)"`
-	// Defines the aliases of the static peers (must be the same length like CfgP2PPeers) (CLI).
-	PeerAliases []string `default:"" usage:"the aliases of the static peers (must be the same amount like \"p2p.peers\""`
+	// KnownPeers defines the map of peers to be used as known peers.
+	KnownPeers string `usage:"map of peers that will be used as known peers"`
 }
 
+// ParamsP2P contains the configuration used by the manualPeering plugin.
 var ParamsP2P = &ParametersP2P{}
 var ParamsPeers = &ParametersPeers{}
 
@@ -57,5 +37,4 @@ var params = &app.ComponentParams{
 			"p2p": ParamsPeers,
 		},
 	},
-	Masked: []string{"p2p.identityPrivateKey"},
 }

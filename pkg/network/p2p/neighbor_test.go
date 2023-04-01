@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/iotaledger/goshimmer/packages/core/libp2putil/libp2ptesting"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/iota-core/pkg/libp2putil/libp2ptesting"
 	p2pproto "github.com/iotaledger/iota-core/pkg/network/p2p/proto"
 )
 
