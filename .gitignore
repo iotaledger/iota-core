@@ -14,6 +14,7 @@
 # IDE related files
 .vscode/
 .idea/
+go.work
 
 # dist packages
 dist/
