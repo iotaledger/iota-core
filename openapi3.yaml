@@ -16,14 +16,14 @@ servers:
 tags:
   - name: node
     description: Everything about the node itself.
-  - name: tangle
-    description: Everything about the tangle itself.
   - name: blocks
     description: Everything about blocks.
   - name: UTXO
     description: Everything about UTXOs.
   - name: commitments
     description: Everything about commitments.
+  - name: account
+    description: Everything about accounts. - TO BE FINISHED
   - name: peers
     description: Everything about the peers of the node.
   - name: control
@@ -35,11 +35,8 @@ paths:
         - node
       summary: Returns the health of the node.
       description: >-
-        Returns the health of the node. A node considers itself healthy if it's solid
-        milestone is at most two delta away from the latest known milestone, has at
-        least one ongoing gossip stream and the latest known milestone is newer
-        than 5 minutes. This information might be useful for load-balancing
-        or uptime monitoring.
+        Returns the health of the node. A node considers itself healthy if its bootstrapped and his Accepted Tangle Time (ATT) is not further behind his local clock tha BootstrapWindow. 
+        This information might be useful for load-balancing or uptime monitoring.
       responses:
         '200':
           description: "Successful operation: indicates that the node is healthy."
@@ -105,10 +102,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-  /api/core/v3/blockBuilding:
+  /api/core/v3/issuance/block-header:
     get:
       tags:
-        - tangle
+        - blocks
       summary: Returns information that are ideal for attaching a block.
       description: >-
         Returns information that are ideal for attaching a block.
@@ -118,7 +115,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BlockBuildingResponse'
+                $ref: '#/components/schemas/IssuanceBlockHeaderResponse'
               examples:
                 default:
                   $ref: '#/components/examples/get-buildingBlock-response-example'
@@ -147,7 +144,7 @@ paths:
         - blocks
       summary: Submit a block.
       description: >-
-        Submit a block. This endpoint will return the identifier of the built block. `protocolVersion` is always required!
+        Submit a block or transaction. This endpoint will return the identifier of the built block. `protocolVersion` is always required!
       requestBody:
         content:
           application/json:
@@ -162,6 +159,9 @@ paths:
               Minimal Block with Transaction Payload:
                 $ref: >-
                   #/components/examples/post-transaction-block-request-example-minimal
+              Only Transaction payload:
+                $ref: >-
+                  #/components/examples/post-transaction-block-transaction-request-example
           application/vnd.iota.serializer-v1:
             schema:
               type: string
@@ -237,9 +237,6 @@ paths:
                 Transaction Payload:
                   $ref: >-
                     #/components/examples/get-block-by-id-transaction-response-example
-                Milestone Payload:
-                  $ref: >-
-                    #/components/examples/get-block-by-id-milestone-response-example
                 Tagged Data Payload:
                   $ref: >-
                     #/components/examples/get-block-by-id-tagged-data-response-example
@@ -510,7 +507,7 @@ paths:
   '/api/core/v3/transactions/{transactionId}/included-block/metadata':
     get:
       tags:
-        - UTXO
+      - UTXO
       summary: Find the metadata of the included block of a transaction.
       description: >-
         Find the metadata of the included block of a transaction.
@@ -564,40 +561,131 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceUnavailableResponse'
 
-  '/api/core/v3/commitment/{commitmentId}':
+  '/api/core/v3/account/{accountId}':
     get:
       tags:
-        - commitments
-      summary: Look up a milestone by a given milestone ID.
-      description: Look up a milestone by a given milestone ID.
-      parameters:
-        - in: path
-          name: milestoneId
-          schema:
-            type: string
-          example: "0x7a09324557e9200f39bf493fc8fd6ac43e9ca750c6f6d884cc72386ddcb7d695"
-          required: true
-          description: Milestone ID of the milestone to look up.
+        - account
+      summary: Get the current state of the account.
+      description: Get the current state of the account.
       responses:
         '200':
           description: "Successful operation."
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MilestonePayload'
+                $ref: '#/components/schemas/AccountResponse'
               examples:
                 default:
                   $ref: >-
-                    #/components/examples/get-milestone-response-example
+                    #/components/examples/get-account-response-example
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '404':
+          description: "Unsuccessful operation: indicates that the requested data was not found."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+  '/api/core/v3/account/{accountId}/mana':
+    get:
+      tags:
+        - account
+      summary: Get the mana of the account.
+      description: Get the mana of the account.
+      parameters:
+          - in: path
+            name: accountId
+            schema:
+              type: string
+            example: "0x7a09324557e9200f39bf493fc8fd6ac43e9ca750c6f6d884cc72386ddcb7d695"
+            required: true
+            description: Identifier of the account to look up.
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountManaResponse'
+              examples:
+                default:
+                  $ref: >-
+                    #/components/examples/get-account-mana-response-example
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '404':
+          description: "Unsuccessful operation: indicates that the requested data was not found."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+
+  '/api/core/v3/commitment/{commitmentId}':
+    get:
+      tags:
+        - commitments
+      summary: Look up a commitment by a given commitment ID.
+      description: Look up a commitment by a given commitment ID.
+      parameters:
+        - in: path
+          name: commitmentId
+          schema:
+            type: string
+          example: "0x7a09324557e9200f39bf493fc8fd6ac43e9ca750c6f6d884cc72386ddcb7d695"
+          required: true
+          description: Commitment ID of the commitment to look up.
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Commitment'
+              examples:
+                default:
+                  $ref: >-
+                    #/components/examples/get-commitment-response-example
             application/vnd.iota.serializer-v1:
               schema:
                 type: string
                 format: binary
-                description: Milestone payload in raw binary format
+                description: Commitment in raw binary format
               examples:
                 default:
                   $ref: >-
-                    #/components/examples/get-milestone-response-binary-example
+                    #/components/examples/get-commitment-response-binary-example
         '400':
           description: "Unsuccessful operation: indicates that the provided data is invalid."
           content:
@@ -626,16 +714,16 @@ paths:
     get:
       tags:
         - commitments
-      summary: Get all UTXO changes of a given milestone by milestone ID.
-      description: Get all UTXO changes of a given milestone by Milestone ID.
+      summary: Get all UTXO changes of a given slot by commitment ID.
+      description: Get all UTXO changes of a given slot by Commitment ID.
       parameters:
         - in: path
-          name: milestoneId
+          name: commitmentId
           schema:
             type: string
           example: "0x7a09324557e9200f39bf493fc8fd6ac43e9ca750c6f6d884cc72386ddcb7d695"
           required: true
-          description: Milestone ID of the milestone to look up.
+          description: Commitment ID of the commitment to look up.
       responses:
         '200':
           description: "Successful operation."
@@ -675,8 +763,8 @@ paths:
     get:
       tags:
         - commitments
-      summary: Look up a milestone by a given milestone index.
-      description: Look up a milestone by a given milestone index.
+      summary: Look up a commitment by a given commitment index.
+      description: Look up a commitment by a given commitment index.
       parameters:
         - in: path
           name: index
@@ -684,27 +772,27 @@ paths:
             type: number
           example: 154862
           required: true
-          description: Index of the milestone to look up.
+          description: Index of the commitment to look up.
       responses:
         '200':
           description: "Successful operation."
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MilestonePayload'
+                $ref: '#/components/schemas/Commitment'
               examples:
                 default:
                   $ref: >-
-                    #/components/examples/get-milestone-response-example
+                    #/components/examples/get-commitment-response-example
             application/vnd.iota.serializer-v1:
               schema:
                 type: string
                 format: binary
-                description: Milestone payload in raw binary format
+                description: Commitment in raw binary format
               examples:
                 default:
                   $ref: >-
-                    #/components/examples/get-milestone-response-binary-example
+                    #/components/examples/get-commitment-response-binary-example
         '400':
           description: "Unsuccessful operation: indicates that the provided data is invalid."
           content:
@@ -733,8 +821,8 @@ paths:
     get:
       tags:
         - commitments
-      summary: Get all UTXO changes of a given milestone by milestone index.
-      description: Get all UTXO changes of a given milestone by milestone index.
+      summary: Get all UTXO changes of a given slot by commitment index.
+      description: Get all UTXO changes of a given slot by commitment index.
       parameters:
         - in: path
           name: index
@@ -742,7 +830,7 @@ paths:
             type: number
           example: 154862
           required: true
-          description: Index of the milestone to look up.
+          description: Index of the commitment to look up.
       responses:
         '200':
           description: "Successful operation."
@@ -1041,14 +1129,14 @@ components:
         version: 0.6.0-alpha
         status:
           isHealthy: true
-          latestMilestone:
+          latestCommitment:
             index: 480
             timestamp: 1617802102
-            milestoneId: "0xb59ff329113b0da14343707450cb28d41fa18b295deabc4beb3fc1b6e70f9d9e"
-          confirmedMilestone:
+            commitmentId: "0xb59ff329113b0da14343707450cb28d41fa18b295deabc4beb3fc1b6e70f9d9e"
+          confirmedCommitment:
             index: 480
             timestamp: 1617802102
-            milestoneId: "0xb59ff329113b0da14343707450cb28d41fa18b295deabc4beb3fc1b6e70f9d9e"
+            commitmentId: "0xb59ff329113b0da14343707450cb28d41fa18b295deabc4beb3fc1b6e70f9d9e"
           pruningIndex: 0
         metrics:
           blocksPerSecond: 17
@@ -1245,6 +1333,9 @@ components:
             - type: 1
               reference: 0
         nonce: '1020884'
+
+    post-transaction-block-transaction-request-example:
+      value:
 
     post-transaction-block-request-example-full:
       value:
@@ -1477,30 +1568,6 @@ components:
         milestoneTimestampBooked: 1643207146
         ledgerIndex: 946704
 
-    get-receipts-response-example:
-      value:
-        receipts:
-          - migratedAt: 1000
-            final: false
-            funds:
-              - tailTransactionHash: "0xe0ce1933a900d02e0a43e2ba4e922d1a706a36a117ce1eb9ad0a74d39ee722c41b00cd227232efd76f5997e91bf8000000"
-                address:
-                  type: 0
-                  pubKeyHash: "0x5eec99d6ee4ba21aa536c3364bbf2b587cb98a7f2565b75d948b10083e2143f8"
-                deposit: "1702000000"
-            transaction:
-              input:
-                type: 1
-                milestoneId: "0x733ed2810f2333e9d6cd702c7d5c8264cd9f1ae454b61e75cf702c451f68611d"
-              output:
-                type: 2
-                amount: "1702000000"
-
-    get-treasury-response-example:
-      value:
-        milestoneId: "0x733ed2810f2333e9d6cd702c7d5c8264cd9f1ae454b61e75cf702c451f68611d"
-        amount: "133713371337"
-
     get-included-block-of-transaction-example-json:
       value:
         protocolVersion: 2
@@ -1539,31 +1606,10 @@ components:
                 signature: "0x0492a353f96883c472e2686a640e77eda30be8fcc417aa9fc1c15eae854661e0253287be6ea68f649f19ca590de0a6c57fb88635ef0e013310e0be2b83609503"
         nonce: '17293822569102719312'
 
-    get-milestone-response-example:
+    get-commitment-response-example:
       value:
-        type: 7
-        index: 15465
-        timestamp: 1602227215
-        protocolVersion: 2
-        previousMilestoneId: "0x7ad3d67fc7b619e72e588f51fef2379e43e6e9a856635843b3f29aa3a3f1f006"
-        parents:
-         - "0x7ed3d67fc7b619e72e588f51fef2379e43e6e9a856635843b3f29aa3a3f1f006"
-         - "0x7a09324557e9200f39bf493fc8fd6ac43e9ca750c6f6d884cc72386ddcb7d695"
-         - "0xde9e9d780ba7ebeebc38da16cb53b2a8991d38eee94bcdc3f3ef99aa8c345652"
-        inclusionMerkleRoot: "0xa18996d96163405e3c0eb13fa3459a07f68a89e8cf7cc239c89e7192344daa5b"
-        appliedMerkleRoot: "0xee26ac07834c603c22130fced361ca58552b0dbfc63e4b73ba24b3b59d9f4050"
-        options:
-         - type: 1
-           targetMilestoneIndex: 15468
-           protocolVersion: 3
-           params: "0x27d0ca22753f76ef32d1e9e8fcc417aa9fc1c15eae854661e0253287be6ea68f649493fc8fd6ac43e9ca750c6f6d884cc72386ddcb7d6"
-        metadata: "0xd6ac43e9ca750"
-        signatures:
-          - type: 0
-            publickKey: "0xee26ac07834c603c22130fced361ca58552b0dbfc63e4b73ba24b3b59d9f4050"
-            signature: "0x0492a353f96883c472e2686a640e77eda30be8fcc417aa9fc1c15eae854661e0253287be6ea68f649f19ca590de0a6c57fb88635ef0e013310e0be2b83609503"
 
-    get-milestone-response-binary-example:
+    get-commitment-response-binary-example:
       value: "070000000a1a0000977c626276b19ef8b3c445709f2f0f2ccc4abb98d97617f421f240c0d1ee066d4306e67a0321889ef8ec89b7eff1378049e058f0fa87a78c2452ae72631a5a99d913d1cbb3525b8faa1800e28dfcb28154bcba10154c39ef87ceda793cb44f58ae1549c88ea13fe4a9695bb6f0aba6cb756522209e5066a96039ae12b398b975693bdc21e222997c86ff9bfc5844f0372d58ff6fa510688e53c181bbdf4db41f9b627540a70e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a80000000300d85e5b1590d898d1e0cdebb2e3b5337c8b76270142663d78811683ba47c17c989ad7a8f0ff2c6438bf435786d4a5b0125a5caf7367061b49a739389d5ebea234c0466c86f88a3f8add03bff04c2e34b214683f2f6983641e1d1185da7e2c3e0200d9922819a39e94ddf3907f4b9c8df93f39f026244fcb609205b9a879022599f218be2536d8b7b8547faa3dbdfe98339ebe9e2b2417a8a03eee02b2a8312b9e026dd0a33261a58a240cd0a1b06cdf1775d98d316f162d3eec402f4bf08bea2a0700f9d9656a60049083eef61487632187b351294c1fa23d118060d813db6d03e8b6ca8180d435708e826bc2042ccd667babb59c5cc461ff29dba966359fcd6fc511cdfdf10d6576f36ac2a6e5cb691e13968c13947ffbd9239939d3802b2fbe0f06"
 
     get-utxo-changes-response-example:
@@ -1575,6 +1621,12 @@ components:
           - "0xf8bdbfb0f57ade7fbb95d31b11e2dbda9b2a35e9dc0cd3e11cb324e8a6bedc260100"
         consumedOutputs:
           - "0x3d36ec4afb2d634b9313f84606b98b69675a3ef6f44dcdecb18c30945b57221e0100"
+
+    get-account-response-example:
+      value:
+
+    get-account-mana-response-example:
+      value:
 
     get-peers-response-example:
       value:
@@ -1691,16 +1743,6 @@ components:
             sentHeartbeats: 9
             droppedPackets: 0
 
-    compute-whiteflag-request-example:
-      value:
-        index: 1560
-        timestamp: 1602227215
-        parents:
-          - "0x174e3151f6ce2cfb7f00829ac4a96a35caa2078cc20eba99359867cd21aad0d6"
-          - "0x5807bb4ad068e6cdadd103218e4e24ed55b62c985d4f64e97808d9f09180f89c"
-          - "0x7a09324557e9200f39bf493fc8fd6ac43e9ca750c6f6d884cc72386ddcb7d695"
-          - "0xde9e9d780ba7ebeebc38da16cb53b2a8991d38eee94bcdc3f3ef99aa8c345652"
-        previousMilestoneId: "0x733ed2810f2333e9d6cd702c7d5c8264cd9f1ae454b61e75cf702c451f68611d"
 
     compute-whiteflag-response-example:
       value:
@@ -1771,9 +1813,7 @@ components:
           description: The inner payload of the block. Can be nil.
           oneOf:
             - $ref: '#/components/schemas/TransactionPayload'
-            - $ref: '#/components/schemas/MilestonePayload'
             - $ref: '#/components/schemas/TaggedDataPayload'
-            - $ref: '#/components/schemas/ReceiptPayload'
         nonce:
           type: string
           description: The nonce which lets this block fulfill the Proof-of-Work requirement. Plain string encoded number.
@@ -1781,9 +1821,7 @@ components:
           type: string
       required:
         - protocolVersion
-        - parents
-        - nonce
-
+        - payload
     TransactionPayload:
       description: The Transaction Payload to be embedded into a block.
       properties:
@@ -2153,7 +2191,7 @@ components:
         - returnAmount
 
     TimelockUnlockCondition:
-      description: Can be unlocked if the confirming milestone has a >= Unix Timestamp.
+      description: Can be unlocked if the CTT has a >= Unix Timestamp.
       properties:
         type:
           type: integer
@@ -2365,61 +2403,6 @@ components:
         - type
         - reference
 
-    MilestonePayload:
-      description: The Milestone Payload to be embedded into a block.
-      properties:
-        type:
-          type: integer
-          description: Set to value 7 to denote a Milestone Payload.
-        index:
-          type: integer
-          description: The index of the milestone.
-        timestamp:
-          type: integer
-          description: The Unix timestamp at which the milestone was issued. The unix timestamp is specified in seconds.
-        protocolVersion:
-          type: integer
-          description: Protocol version of the Milestone Payload and its encapsulating block.
-        previousMilestoneId:
-          type: string
-          description: The Milestone ID of the milestone with Index Number - 1.
-        parents:
-          description: The identifiers of the blocks this milestone references. Hex-encoded values with 0x prefix.
-          type: array
-          items:
-            type: string
-        inclusionMerkleRoot:
-          type: string
-          description: The merkle root of all directly/indirectly referenced blocks (their IDs) which are newly confirmed by this milestone. Hex-encoded with 0x prefix.
-        appliedMerkleRoot:
-          type: string
-          description: The merkle root of all blocks (their IDs) carrying ledger state mutating transactions. Hex-encoded with 0x prefix.
-        options:
-          type: array
-          items:
-            anyOf:
-              - $ref: '#/components/schemas/ReceiptPayload'
-              - $ref: '#/components/schemas/ProtocolParamsMilestoneOpt'
-        metadata:
-          type: string
-          description: Hex-encoded binary data with 0x prefix.
-        signatures:
-          type: array
-          items:
-            anyOf:
-              - $ref: '#/components/schemas/Ed25519Signature'
-          description: An array of signatures signing the serialized Milestone Essence. Hex-encoded with 0x prefix.
-      required:
-        - type
-        - index
-        - timestamp
-        - protocolVersion
-        - previousMilestoneId
-        - parents
-        - inclusionMerkleRoot
-        - appliedMerkleRoot
-        - signatures
-
     TaggedDataPayload:
       description: The Tagged Data Payload to be embedded into a block.
       properties:
@@ -2485,15 +2468,15 @@ components:
 
     Heartbeat:
       properties:
-        solidMilestoneIndex:
+        latestCommittedSlotIndex:
           type: integer
-          description: The most recent milestone that has been solidified by the node.
-        prunedMilestoneIndex:
+          description: The most recent slot that has been committed by the node.
+        prunedSlotIndex:
           type: integer
           description: Tells from which starting point the node holds data.
-        latestMilestoneIndex:
+        latestConfirmedSlotIndex:
           type: integer
-          description: The most recent milestone known to the node.
+          description: The most recent confirmed slot known to the node.
         connectedNeighbors:
           type: integer
           description: Tells how many connected peers the node has.
@@ -2501,9 +2484,9 @@ components:
           type: integer
           description: Tells how many synced peers the node has.
       required:
-        - solidMilestoneIndex
-        - prunedMilestoneIndex
-        - latestMilestoneIndex
+        - latestCommittedSlotIndex
+        - prunedSlotIndex
+        - latestConfirmedSlotIndex
         - connectedNeighbors
         - syncedNeighbors
 
@@ -2521,9 +2504,6 @@ components:
         receivedBlockRequests:
           type: integer
           description: The number of received block requests from the peer.
-        receivedMilestoneRequests:
-          type: integer
-          description: The number of received milestone requests from the peer.
         receivedHeartbeats:
           type: integer
           description: The number of received heartbeats from the peer.
@@ -2533,9 +2513,6 @@ components:
         sentBlockRequests:
           type: integer
           description: The number of sent block requests to the peer.
-        sentMilestoneRequests:
-          type: integer
-          description: The number of sent milestone requests to the peer.
         sentHeartbeats:
           type: integer
           description: The number of sent heartbeats to the peer.
@@ -2547,68 +2524,11 @@ components:
         - knownBlocks
         - receivedBlocks
         - receivedBlockRequests
-        - receivedMilestoneRequests
         - receivedHeartbeats
         - sentBlocks
         - sentBlockRequests
-        - sentMilestoneRequests
         - sentHeartbeats
         - droppedPackets
-
-    ProtocolParamsMilestoneOpt:
-      description: Defines changing protocol parameters in a milestone.
-      properties:
-        type:
-          type: integer
-          description: Defines the type of MilestoneOpt.
-        targetMilestoneIndex:
-          type: integer
-          description: The milestone index at which these protocol parameters become active.
-        protocolVersion:
-          type: integer
-          description: The to be applied protocol version.
-        params:
-          type: string
-          description: The protocol parameters in binary form. Hex-encoded with 0x prefix.
-      required:
-        - type
-        - targetMilestoneIndex
-        - protocolVersion
-        - params
-
-    ReceiptTuple:
-      description: Contains a receipt and the index of the milestone which contained the receipt.
-      properties:
-        receipt:
-          $ref: '#/components/schemas/ReceiptPayload'
-        milestoneIndex:
-          type: integer
-      required:
-        - receipt
-        - milestoneIndex
-
-    ReceiptPayload:
-      description: Contains a receipt and the index of the milestone which contained the receipt.
-      properties:
-        type:
-          type: integer
-          description: Type identifier of a receipt payload (3).
-        migratedAt:
-          type: integer
-        final:
-          type: boolean
-        funds:
-          type: array
-          items:
-            $ref: '#/components/schemas/MigratedFundsEntry'
-        transaction:
-          $ref: '#/components/schemas/TreasuryTransactionPayload'
-      required:
-        - migratedAt
-        - final
-        - funds
-        - transaction
-        - type
 
     MigratedFundsEntry:
       properties:
@@ -2742,16 +2662,16 @@ components:
             bootstrapped:
               description: Whether the node has bootstrapped with the network
               type: boolean
-            lastCommittedSlot:
+            latestCommittedSlot:
               type: object
-              description: Information about the latest seen milestone.
+              description: Information about the latest seen commitment slot ID.
             pruningSlot:
               type: integer
-              description: The index of the milestone before which the tangle history is pruned.
+              description: The index of the slot before which the tangle history is pruned.
           required:
             - isHealthy
-            - latestMilestone
-            - confirmedMilestone
+            - latestCommittedSlot
+            - confirmedSlot
             - pruningIndex
         metrics:
           description: Node metrics.
@@ -2765,7 +2685,7 @@ components:
               type: number
               format: float
             referencedRate:
-              description: The ratio of referenced blocks in relation to new blocks of the last confirmed milestone.
+              description: The ratio of referenced blocks in relation to new blocks of the last confirmed slot.
               type: number
               format: float
           required:
@@ -2796,9 +2716,6 @@ components:
               description: The Proof-of-Work difficulty for a block to be sent over the network to mitigate spam.
               type: number
               format: float
-            belowMaxDepth:
-              description: The below max depth parameter of the network. New blocks can not reference parents that are more than belowMaxDepth old wrt the current milestone index. belowMaxDepth is the maximum allowed delta value between Oldest Cone Root Index (OCRI) of a given block in relation to the current Confirmed Milestone Index (CMI) before it gets lazy.
-              type: integer
             rentStructure:
               description: The rent structure according to TIP-19.
               properties:
@@ -2815,6 +2732,8 @@ components:
                 - vByteCost
                 - vByteFactorData
                 - vByteFactoKey
+            genesisSlotIndex:
+              type: integer
           required:
             - networkName
             - bech32Hrp
@@ -2824,11 +2743,6 @@ components:
             - belowMaxDepth
             - rentStructure
             - version
-        pendingProtocolParameters:
-          description: Pending protocol parameters.
-          type: array
-          items:
-            $ref: '#/components/schemas/ProtocolParamsMilestoneOpt'
         baseToken:
           description: Gives info about the base token the network uses.
           properties:
@@ -2868,11 +2782,10 @@ components:
         - metrics
         - supportedProtocolVersions
         - protocol
-        - pendingProtocolParameters
         - baseToken
         - features
 
-    BlockBuildingResponse:
+    IssuanceBlockHeaderResponse:
       description: Returns tips that are ideal for attaching a block.
       properties:
         strongParents:
@@ -2894,8 +2807,6 @@ components:
           type: integer
         commitment:
           type: string
-        genesisSlotIndex: 
-          type: integer
 
     Commitment:
       description: struct of a commitment.
@@ -2918,10 +2829,7 @@ components:
         payload:
           oneOf:
             - $ref: '#/components/schemas/TransactionPayload'
-            - $ref: '#/components/schemas/MilestonePayload'
             - $ref: '#/components/schemas/TaggedDataPayload'
-            - $ref: '#/components/schemas/TreasuryTransactionPayload'
-            - $ref: '#/components/schemas/ReceiptPayload'
       required:
         - protocolVersion
 
@@ -2940,22 +2848,36 @@ components:
         blockId:
           type: string
           description: The identifier of the block. Hex-encoded with 0x prefix.
-        confirmed:
-          type: boolean
-        ledgerInclusionState:
+        blockState:
           type: string
           enum:
-            - included
-            - conflicting
-            - noTransaction
-          description: If `included`, the block contains a transaction that has been included in the ledger. If `conflicitng`, the block contains a transaction that has not been included in the ledger because it conflicts with another transaction. If the block does not contain a transaction, `ledgerInclusionState` is set to `noTransaction`.
-        conflictReason:
+            - pending
+            - confirmed
+            - finalized
+          description: If `pending`, the block is still waiting for the inclusion. If `confirmed`, the block contains a transaction that has not been included in the ledger because it conflicts with another transaction. If the block does not contain a transaction, `ledgerInclusionState` is set to `noTransaction`.
+        txState:
+          type: string
+          enum:
+            - pending
+            - confirmed
+            - finalized
+          description: If 'pending', the block contains not yet included transaction. If 'confirmed' means transaction is confirmed with the first level of knowledge. If 'finalized' means transaction is included and cannot be reverted anymore.
+        blockError:
+          type: integer
+          enum: [1,2,3]
+          description: >
+            Values:
+              * `1` - denotes that the block is invalid.
+              * `2` - denotes that the block is orphaned due to congestion control.
+              * `3` - denotes that the block is orphaned due to negative mana balance.
+              * `4` - denotes that ...
+        txError:
           type: integer
           enum: [1,2,3,4,5,6,7,8,9,10,11,12,255]
           description: >
             Values:
               * `1` - denotes that the referenced UTXO was already spent.
-              * `2` - denotes that the referenced UTXO was already spent while confirming this milestone.
+              * `2` - denotes that the transaction is conflicting with another transaction.
               * `3` - denotes that the referenced UTXO cannot be found.
               * `4` - denotes that the sum of the inputs and output values does not match.
               * `5` - denotes that the unlock block signature is invalid.
@@ -2966,10 +2888,11 @@ components:
               * `10` - denotes that the inputs commitment is invalid.
               * `11` - denotes that an output contains a Sender with an ident (address) which is not unlocked.
               * `12` - denotes that the chain state transition is invalid.
+              * `13` - denotes that ...
               * `255` - denotes that the semantic validation failed.
-        shouldReattach:
+        reissuePayload:
           type: boolean
-          description: Tells if the block should be reattached.
+          description: Tells if the block should be issued again.
       required:
         - blockId
         - parents
@@ -3004,67 +2927,40 @@ components:
         isSpent:
           type: boolean
           description: Tells if the output is spent or not.
-        milestoneIndexSpent:
-          type: integer
-          description: The milestone index at which this output was spent.
-        milestoneTimestampSpent:
-          type: integer
-          description: The milestone timestamp this output was spent.
+        commitmentIdSpent:
+          type: string
+          description: The commitment index of the slot at which this output was spent.
         transactionIdSpent:
           type: string
           description: The transaction this output was spent with. Hex-encoded with 0x prefix.
-        milestoneIndexBooked:
-          type: integer
-          description: The milestone index at which the output was booked.
-        milestoneTimestampBooked:
-          type: integer
-          description: The milestone unix timestamp at which the output was booked.
-        ledgerIndex:
-          type: integer
-          description: The current ledger index for which the request was made.
+        includedCommitmentId:
+          type: string
+          description: The commitment index at which the output was included into the ledger.
+        latestCommitmentId:
+          type: string
+          description: The current latest commitment id for which the request was made.
       required:
         - blockId
         - transactionId
         - outputIndex
         - isSpent
-        - milestoneIndexBooked
-        - milestoneTimestampBooked
-        - ledgerIndex
-
-    ReceiptsResponse:
-      properties:
-        receipts:
-          type: array
-          items:
-            $ref: '#/components/schemas/ReceiptTuple'
-      required:
-        - receipts
-
-    TreasuryResponse:
-      properties:
-        milestoneId:
-          type: string
-        amount:
-          type: string
-          description: Plain string encoded number.
-      required:
-        - milestoneId
-        - amount
+        - includedCommitmentId
+        - latestCommitmentId
 
     UTXOChangesResponse:
-      description: Returns all UTXO changes of the given milestone.
+      description: Returns all UTXO changes of the given slot.
       properties:
         index:
           type: integer
-          description: The index number of the milestone.
+          description: The index number of the slot.
         createdOutputs:
-          description: The created outputs of the given milestone.
+          description: The created outputs of the given slot.
           type: array
           items:
             type: string
             description: Hex-encoded with 0x prefix.
         consumedOutputs:
-          description: The consumed outputs of the given milestone.
+          description: The consumed outputs of the given slot.
           type: array
           items:
             type: string
@@ -3073,6 +2969,29 @@ components:
         - index
         - createdOutputs
         - consumedOutputs
+
+    AccountResponse:
+      description: Returns the account data of a given AccountId.
+
+
+    AccountManaResponse:
+      description: Returns the mana of the account.
+      properties:
+        mana:
+          type: integer
+          description: The mana of the account.
+        stake:
+          type: integer
+          description: The total stake of the account.
+        delegated:
+          type: integer
+          description: Total delegated mana of the node.
+        AccountId:
+          type: string
+          description: The account ID of the node.
+      required:
+        - AccountId
+        - mana
 
     PeersResponse:
       description: Returns all peers of the node.
@@ -3101,42 +3020,6 @@ components:
       properties:
         allOf:
           $ref: '#/components/schemas/Peer'
-
-    ComputeWhiteFlagRequest:
-      description: Milestone info and parents to start the computation from.
-      properties:
-        index:
-          type: integer
-          description: The index of the milestone.
-        timestamp:
-          type: integer
-          description: The timestamp of the milestone.
-        parents:
-          type: array
-          description: The hex encoded block IDs of the parents the milestone references.
-          items:
-            type: string
-        previousMilestoneId:
-          type: string
-          description: The hex encoded milestone ID of the previous milestone.
-      required:
-        - index
-        - timestamp
-        - parents
-        - previousMilestoneId
-
-    ComputeWhiteFlagResponse:
-      description: Returns the computed InclusionMerkleRoot and AppliedMerkleRoot
-      properties:
-        inclusionMerkleRoot:
-          type: string
-          description: The hex encoded inclusion merkle tree root as a result of the white flag computation.
-        appliedMerkleRoot:
-          type: string
-          description: The hex encoded applied merkle tree root as a result of the white flag computation.
-      required:
-        - inclusionMerkleRoot
-        - appliedMerkleRoot
 
     PruneDatabaseRequest:
       description:  Defines the request of a prune database REST API call
