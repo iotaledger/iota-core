@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -15,12 +13,9 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/slot"
 )
-
-// region Manager //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Manager struct {
 	permanentStorage kvstore.KVStore
@@ -380,116 +375,7 @@ func (m *Manager) removeBucket(bucket kvstore.KVStore) {
 	}
 }
 
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// region Options //////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// WithGranularity sets the granularity of the DB instances (i.e. how many buckets/slots are stored in one DB).
-// It thus also has an impact on how fine-grained buckets/slots can be pruned.
-func WithGranularity(granularity int64) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsGranularity = granularity
-	}
-}
-
-// WithBaseDir sets the base directory to store the DB to disk.
-func WithBaseDir(baseDir string) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsBaseDir = baseDir
-	}
-}
-
-// WithMaxOpenDBs sets the maximum concurrently open DBs.
-func WithMaxOpenDBs(optsMaxOpenDBs int) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsMaxOpenDBs = optsMaxOpenDBs
-	}
-}
-
-func WithDBEngine(optsDBEngine hivedb.Engine) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsDBEngine = optsDBEngine
-	}
-}
-
-func WithAllowedDBEngines(optsAllowedDBEngines []hivedb.Engine) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsAllowedDBEngines = optsAllowedDBEngines
-	}
-}
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// types ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 type dbInstance struct {
 	index slot.Index
 	store kvstore.KVStore // KVStore that is used to access the DB instance
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// utils ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-var healthKey = []byte("bucket_health")
-
-var dbVersionKey = []byte("db_version")
-
-// indexToRealm converts an baseIndex to a realm with some shifting magic.
-func indexToRealm(index slot.Index) kvstore.Realm {
-	return []byte{
-		byte(0xff & index),
-		byte(0xff & (index >> 8)),
-		byte(0xff & (index >> 16)),
-		byte(0xff & (index >> 24)),
-		byte(0xff & (index >> 32)),
-		byte(0xff & (index >> 40)),
-		byte(0xff & (index >> 48)),
-		byte(0xff & (index >> 54)),
-	}
-}
-
-func dbPathFromIndex(base string, index slot.Index) string {
-	return filepath.Join(base, strconv.FormatInt(int64(index), 10))
-}
-
-type dbInstanceFileInfo struct {
-	baseIndex slot.Index
-	path      string
-}
-
-func getSortedDBInstancesFromDisk(baseDir string) (dbInfos []*dbInstanceFileInfo) {
-	files, err := os.ReadDir(baseDir)
-	if err != nil {
-		panic(err)
-	}
-
-	files = lo.Filter(files, func(e os.DirEntry) bool { return e.IsDir() })
-	dbInfos = lo.Map(files, func(e os.DirEntry) *dbInstanceFileInfo {
-		atoi, convErr := strconv.Atoi(e.Name())
-		if convErr != nil {
-			return nil
-		}
-		return &dbInstanceFileInfo{
-			baseIndex: slot.Index(atoi),
-			path:      filepath.Join(baseDir, e.Name()),
-		}
-	})
-	dbInfos = lo.Filter(dbInfos, func(info *dbInstanceFileInfo) bool { return info != nil })
-
-	sort.Slice(dbInfos, func(i, j int) bool {
-		return dbInfos[i].baseIndex > dbInfos[j].baseIndex
-	})
-
-	return dbInfos
-}
-
-func dbPrunableDirectorySize(base string, index slot.Index) (int64, error) {
-	return dbDirectorySize(dbPathFromIndex(base, index))
-}
-
-func dbDirectorySize(path string) (int64, error) {
-	return ioutils.FolderSize(path)
-}
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
