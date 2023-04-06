@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -19,16 +19,19 @@ type TestFramework struct {
 	Test             *testing.T
 	SlotTimeProvider *iotago.SlotTimeProvider
 	Filter           *Filter
+	api              iotago.API
 }
 
 func NewTestFramework(t *testing.T, slotTimeProvider *iotago.SlotTimeProvider, optsFilter ...options.Option[Filter]) *TestFramework {
 	tf := &TestFramework{
 		Test:             t,
 		SlotTimeProvider: slotTimeProvider,
-		Filter:           New(optsFilter...),
+
+		Filter: New(optsFilter...),
+		api:    iotago.V3API(&iotago.ProtocolParameters{}),
 	}
 
-	tf.Filter.Events().BlockAllowed.Hook(func(block *core.Block) {
+	tf.Filter.Events().BlockAllowed.Hook(func(block *model.Block) {
 		t.Logf("BlockAllowed: %s", block.BlockID)
 	})
 
@@ -40,11 +43,11 @@ func NewTestFramework(t *testing.T, slotTimeProvider *iotago.SlotTimeProvider, o
 }
 
 func (t *TestFramework) processBlock(alias string, block *iotago.Block) {
-	blockID, err := block.ID(t.SlotTimeProvider)
+	modelBlock, err := model.BlockFromBlock(block, t.api, t.SlotTimeProvider)
 	require.NoError(t.Test, err)
 
-	blockID.RegisterAlias(alias)
-	t.Filter.ProcessReceivedBlock(&core.Block{BlockID: blockID, Block: block}, identity.NewID(ed25519.PublicKey{}))
+	modelBlock.BlockID().RegisterAlias(alias)
+	t.Filter.ProcessReceivedBlock(modelBlock, identity.NewID(ed25519.PublicKey{}))
 }
 
 func (t *TestFramework) IssueUnsignedBlockAtTime(alias string, issuingTime time.Time) {
