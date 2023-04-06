@@ -1,7 +1,6 @@
 package database
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/slot"
 )
@@ -29,6 +29,8 @@ type Manager struct {
 	maxPruned      slot.Index
 	maxPrunedMutex sync.RWMutex
 
+	logger *logger.WrappedLogger
+
 	// The granularity of the DB instances (i.e. how many buckets/slots are stored in one DB).
 	optsGranularity int64
 	optsBaseDir     string
@@ -36,6 +38,7 @@ type Manager struct {
 
 	optsDBEngine         hivedb.Engine
 	optsAllowedDBEngines []hivedb.Engine
+	optsLogger           *logger.Logger
 }
 
 func NewManager(version Version, opts ...options.Option[Manager]) *Manager {
@@ -46,6 +49,7 @@ func NewManager(version Version, opts ...options.Option[Manager]) *Manager {
 		optsMaxOpenDBs:  10,
 		optsDBEngine:    hivedb.EngineMapDB,
 	}, opts, func(m *Manager) {
+		m.logger = logger.NewWrappedLogger(m.optsLogger)
 		m.bucketedBaseDir = filepath.Join(m.optsBaseDir, "pruned")
 		m.permanentBaseDir = filepath.Join(m.optsBaseDir, "permanent")
 
@@ -63,7 +67,7 @@ func NewManager(version Version, opts ...options.Option[Manager]) *Manager {
 			}
 			size, err := dbPrunableDirectorySize(m.bucketedBaseDir, baseIndex)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				m.logger.LogError("failed to get size of prunable directory for base index %d: %w", baseIndex, err)
 			}
 
 			m.dbSizes.Set(baseIndex, size)
@@ -241,7 +245,7 @@ func (m *Manager) TotalStorageSize() int64 {
 func (m *Manager) PermanentStorageSize() int64 {
 	size, err := dbDirectorySize(m.permanentBaseDir)
 	if err != nil {
-		fmt.Println("dbDirectorySize failed for", m.permanentBaseDir, ":", err)
+		m.logger.LogError("dbDirectorySize failed for %s: %w", m.permanentBaseDir, err)
 		return 0
 	}
 	return size
@@ -263,7 +267,7 @@ func (m *Manager) PrunableStorageSize() int64 {
 	m.openDBs.Each(func(key slot.Index, val *dbInstance) {
 		size, err := dbPrunableDirectorySize(m.bucketedBaseDir, key)
 		if err != nil {
-			fmt.Println("dbPrunableDirectorySize failed for", m.bucketedBaseDir, key, ":", err)
+			m.logger.LogError("dbPrunableDirectorySize failed for %s%s: %w", m.bucketedBaseDir, key, err)
 			return
 		}
 		sum += size

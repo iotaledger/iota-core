@@ -2,6 +2,7 @@ package database
 
 import (
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
+	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 )
 
@@ -36,5 +37,11 @@ func WithDBEngine(optsDBEngine hivedb.Engine) options.Option[Manager] {
 func WithAllowedDBEngines(optsAllowedDBEngines []hivedb.Engine) options.Option[Manager] {
 	return func(m *Manager) {
 		m.optsAllowedDBEngines = optsAllowedDBEngines
+	}
+}
+
+func WithLogger(log *logger.Logger) options.Option[Manager] {
+	return func(m *Manager) {
+		m.optsLogger = log
 	}
 }
