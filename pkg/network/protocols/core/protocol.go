@@ -13,11 +13,10 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/commitment"
-	"github.com/iotaledger/iota-core/pkg/models"
+	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/network"
 	nwmodels "github.com/iotaledger/iota-core/pkg/network/protocols/core/models"
-	"github.com/iotaledger/iota-core/pkg/slot"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
@@ -27,7 +26,8 @@ const (
 type Protocol struct {
 	Events *Events
 
-	slotTimeProvider *slot.TimeProvider
+	api              iotago.API
+	slotTimeProvider *iotago.SlotTimeProvider
 
 	network                   network.Endpoint
 	workerPool                *workerpool.WorkerPool
@@ -37,12 +37,13 @@ type Protocol struct {
 	requestedBlockHashesMutex sync.Mutex
 }
 
-func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, slotTimeProvider *slot.TimeProvider, opts ...options.Option[Protocol]) (protocol *Protocol) {
+func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, protocolParams *iotago.ProtocolParameters, slotTimeProvider *iotago.SlotTimeProvider, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
 		Events: NewEvents(),
 
 		network:                   network,
 		workerPool:                workerPool,
+		api:                       iotago.V3API(protocolParams),
 		slotTimeProvider:          slotTimeProvider,
 		duplicateBlockBytesFilter: bytesfilter.New(10000),
 		requestedBlockHashes:      shrinkingmap.New[types.Identifier, types.Empty](shrinkingmap.WithShrinkingThresholdCount(1000)),
@@ -51,25 +52,25 @@ func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, sl
 	})
 }
 
-func (p *Protocol) SendBlock(block *models.Block, to ...identity.ID) {
+func (p *Protocol) SendBlock(block *iotago.Block, to ...identity.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Block{Block: &nwmodels.Block{
-		Bytes: lo.PanicOnErr(block.Bytes()),
+		Bytes: lo.PanicOnErr(p.api.Encode(block)),
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) RequestBlock(id models.BlockID, to ...identity.ID) {
+func (p *Protocol) RequestBlock(id iotago.BlockID, to ...identity.ID) {
 	p.requestedBlockHashesMutex.Lock()
-	p.requestedBlockHashes.Set(id.Identifier, types.Void)
+	p.requestedBlockHashes.Set(types.Identifier(id.Identifier()), types.Void)
 	p.requestedBlockHashesMutex.Unlock()
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_BlockRequest{BlockRequest: &nwmodels.BlockRequest{
-		Id: lo.PanicOnErr(id.Bytes()),
+		Id: id[:],
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) SendSlotCommitment(cm *commitment.Commitment, to ...identity.ID) {
+func (p *Protocol) SendSlotCommitment(cm *iotago.Commitment, to ...identity.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitment{SlotCommitment: &nwmodels.SlotCommitment{
-		Bytes: lo.PanicOnErr(cm.Bytes()),
+		Bytes: lo.PanicOnErr(p.api.Encode(cm)),
 	}}}, protocolID, to...)
 }
 
@@ -81,15 +82,15 @@ func (p *Protocol) SendSlotCommitment(cm *commitment.Commitment, to ...identity.
 //	}}}, protocolID, to...)
 //}
 
-func (p *Protocol) RequestCommitment(id commitment.ID, to ...identity.ID) {
+func (p *Protocol) RequestCommitment(id iotago.CommitmentID, to ...identity.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitmentRequest{SlotCommitmentRequest: &nwmodels.SlotCommitmentRequest{
-		Id: lo.PanicOnErr(id.Bytes()),
+		Id: id[:],
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) RequestAttestations(cm *commitment.Commitment, endIndex slot.Index, to ...identity.ID) {
+func (p *Protocol) RequestAttestations(cm *iotago.Commitment, endIndex iotago.SlotIndex, to ...identity.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_AttestationsRequest{AttestationsRequest: &nwmodels.AttestationsRequest{
-		Commitment: lo.PanicOnErr(cm.Bytes()),
+		Commitment: lo.PanicOnErr(p.api.Encode(cm)),
 		EndIndex:   endIndex.Bytes(),
 	}}}, protocolID, to...)
 }
@@ -124,92 +125,62 @@ func (p *Protocol) handlePacket(nbr identity.ID, packet proto.Message) (err erro
 }
 
 func (p *Protocol) onBlock(blockData []byte, id identity.ID) {
-	blockIdentifier := models.DetermineID(blockData, 0).Identifier
+	blockIdentifier, err := iotago.BlockIdentifierFromBlockBytes(blockData)
+	if err != nil {
+		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize block"), id)
 
-	isNew := p.duplicateBlockBytesFilter.AddIdentifier(blockIdentifier)
+	}
+
+	isNew := p.duplicateBlockBytesFilter.AddIdentifier(types.Identifier(blockIdentifier))
 
 	p.requestedBlockHashesMutex.Lock()
-	requested := p.requestedBlockHashes.Delete(blockIdentifier)
+	requested := p.requestedBlockHashes.Delete(types.Identifier(blockIdentifier))
 	p.requestedBlockHashesMutex.Unlock()
 
 	if !isNew && !requested {
 		return
 	}
 
-	block := new(models.Block)
-	if _, err := block.FromBytes(blockData); err != nil {
-		p.Events.Error.Trigger(&ErrorEvent{
-			Error:  errors.Wrap(err, "failed to deserialize block"),
-			Source: id,
-		})
-
-		return
-	}
-	err := block.DetermineID(p.slotTimeProvider, blockIdentifier)
-	if err != nil {
-		p.Events.Error.Trigger(&ErrorEvent{
-			Error:  errors.Wrap(err, "error while determining received block's ID"),
-			Source: id,
-		})
-
-		return
+	block := new(iotago.Block)
+	if _, err := p.api.Decode(blockData, block, serix.WithValidation()); err != nil {
+		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize block"), id)
 	}
 
-	p.Events.BlockReceived.Trigger(&BlockReceivedEvent{
-		Block:  block,
-		Source: id,
-	})
+	slotIndex := p.slotTimeProvider.IndexFromTime(block.IssuingTime)
+	blockID := iotago.NewSlotIdentifier(slotIndex, blockIdentifier)
+
+	p.Events.BlockReceived.Trigger(&Block{BlockID: blockID, Block: block}, id)
 }
 
 func (p *Protocol) onBlockRequest(idBytes []byte, id identity.ID) {
-	var blockID models.BlockID
-	if _, err := blockID.FromBytes(idBytes); err != nil {
-		p.Events.Error.Trigger(&ErrorEvent{
-			Error:  errors.Wrap(err, "failed to deserialize block request"),
-			Source: id,
-		})
+	if len(idBytes) != iotago.BlockIDLength {
+		p.Events.Error.Trigger(errors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize block request"), id)
 
 		return
 	}
 
-	p.Events.BlockRequestReceived.Trigger(&BlockRequestReceivedEvent{
-		BlockID: blockID,
-		Source:  id,
-	})
+	p.Events.BlockRequestReceived.Trigger(iotago.BlockID(idBytes), id)
 }
 
 func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id identity.ID) {
-	var receivedCommitment commitment.Commitment
-	if _, err := receivedCommitment.FromBytes(commitmentBytes); err != nil {
-		p.Events.Error.Trigger(&ErrorEvent{
-			Error:  errors.Wrap(err, "failed to deserialize slot commitment"),
-			Source: id,
-		})
+	var receivedCommitment *iotago.Commitment
+	if _, err := p.api.Decode(commitmentBytes, receivedCommitment, serix.WithValidation()); err != nil {
+		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize slot commitment"), id)
 
 		return
 	}
 
-	p.Events.SlotCommitmentReceived.Trigger(&SlotCommitmentReceivedEvent{
-		Commitment: &receivedCommitment,
-		Source:     id,
-	})
+	p.Events.SlotCommitmentReceived.Trigger(receivedCommitment, id)
 }
 
 func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id identity.ID) {
-	var receivedCommitmentID commitment.ID
-	if _, err := receivedCommitmentID.FromBytes(idBytes); err != nil {
-		p.Events.Error.Trigger(&ErrorEvent{
-			Error:  errors.Wrap(err, "failed to deserialize slot commitment request"),
-			Source: id,
-		})
+	if len(idBytes) != iotago.CommitmentIDLength {
+		p.Events.Error.Trigger(errors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize slot commitment request"), id)
 
 		return
 	}
 
-	p.Events.SlotCommitmentRequestReceived.Trigger(&SlotCommitmentRequestReceivedEvent{
-		CommitmentID: receivedCommitmentID,
-		Source:       id,
-	})
+	p.Events.SlotCommitmentRequestReceived.Trigger(iotago.CommitmentID(idBytes), id)
 }
 
 //func (p *Protocol) onAttestations(commitmentBytes []byte, blockIDBytes []byte, attestationsBytes []byte, id identity.ID) {
@@ -252,22 +223,16 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id identity.ID) {
 //}
 
 func (p *Protocol) onAttestationsRequest(commitmentBytes []byte, slotIndexBytes []byte, id identity.ID) {
-	cm := &commitment.Commitment{}
-	if _, err := cm.FromBytes(commitmentBytes); err != nil {
-		p.Events.Error.Trigger(&ErrorEvent{
-			Error:  errors.Wrap(err, "failed to deserialize commitment"),
-			Source: id,
-		})
+	cm := new(iotago.Commitment)
+	if _, err := p.api.Decode(commitmentBytes, cm, serix.WithValidation()); err != nil {
+		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize commitment"), id)
 
 		return
 	}
 
-	endSlotIndex, _, err := slot.IndexFromBytes(slotIndexBytes)
+	endSlotIndex, err := iotago.SlotIndexFromBytes(slotIndexBytes)
 	if err != nil {
-		p.Events.Error.Trigger(&ErrorEvent{
-			Error:  errors.Wrap(err, "failed to deserialize end slot index"),
-			Source: id,
-		})
+		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize end slot index"), id)
 
 		return
 	}
