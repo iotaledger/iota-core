@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	nwmodels "github.com/iotaledger/iota-core/pkg/network/protocols/core/models"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -74,7 +75,7 @@ func (p *Protocol) SendSlotCommitment(cm *iotago.Commitment, to ...identity.ID) 
 	}}}, protocolID, to...)
 }
 
-//func (p *Protocol) SendAttestations(cm *commitment.Commitment, blockIDs models.BlockIDs, attestations *orderedmap.OrderedMap[slot.Index, *advancedset.AdvancedSet[*notarization.Attestation]], to ...identity.ID) {
+//func (p *Protocol) SendAttestations(cm *commitment.Commitment, blockIDs models.BlockIDs, attestations *orderedmap.OrderedMap[iotago.SlotIndex, *advancedset.AdvancedSet[*notarization.Attestation]], to ...identity.ID) {
 //	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
 //		Commitment:   lo.PanicOnErr(cm.Bytes()),
 //		BlocksIds:    lo.PanicOnErr(blockIDs.Bytes()),
@@ -141,15 +142,12 @@ func (p *Protocol) onBlock(blockData []byte, id identity.ID) {
 		return
 	}
 
-	block := new(iotago.Block)
-	if _, err := p.api.Decode(blockData, block, serix.WithValidation()); err != nil {
+	block, err := model.BlockFromBytes(blockData, p.api, p.slotTimeProvider, serix.WithValidation())
+	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize block"), id)
 	}
 
-	slotIndex := p.slotTimeProvider.IndexFromTime(block.IssuingTime)
-	blockID := iotago.NewSlotIdentifier(slotIndex, blockIdentifier)
-
-	p.Events.BlockReceived.Trigger(&Block{BlockID: blockID, Block: block}, id)
+	p.Events.BlockReceived.Trigger(block, id)
 }
 
 func (p *Protocol) onBlockRequest(idBytes []byte, id identity.ID) {
@@ -204,7 +202,7 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id identity.ID) {
 //		return
 //	}
 //
-//	attestations := orderedmap.New[slot.Index, *advancedset.AdvancedSet[*notarization.Attestation]]()
+//	attestations := orderedmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[*notarization.Attestation]]()
 //	if _, err := attestations.Decode(attestationsBytes); err != nil {
 //		p.Events.Error.Trigger(&ErrorEvent{
 //			Error:  errors.Wrap(err, "failed to deserialize attestations"),
@@ -232,7 +230,7 @@ func (p *Protocol) onAttestationsRequest(commitmentBytes []byte, slotIndexBytes 
 
 	endSlotIndex, err := iotago.SlotIndexFromBytes(slotIndexBytes)
 	if err != nil {
-		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize end slot index"), id)
+		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize end iotago.SlotIndex"), id)
 
 		return
 	}

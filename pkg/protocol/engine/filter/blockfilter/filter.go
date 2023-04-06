@@ -9,10 +9,10 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/models"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
-	"github.com/iotaledger/iota-core/pkg/slot"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 var (
@@ -27,7 +27,7 @@ type Filter struct {
 	events *filter.Events
 
 	optsMaxAllowedWallClockDrift time.Duration
-	optsMinCommittableSlotAge    slot.Index
+	optsMinCommittableSlotAge    iotago.SlotIndex
 	optsSignatureValidation      bool
 
 	module.Module
@@ -67,7 +67,7 @@ func (f *Filter) Events() *filter.Events {
 }
 
 // ProcessReceivedBlock processes block from the given source.
-func (f *Filter) ProcessReceivedBlock(block *models.Block, source identity.ID) {
+func (f *Filter) ProcessReceivedBlock(block *model.Block, source identity.ID) {
 	// TODO: if TX add check for TX timestamp
 
 	// Check if the block is trying to commit to a slot that is not yet committable
@@ -112,7 +112,7 @@ func (f *Filter) ProcessReceivedBlock(block *models.Block, source identity.ID) {
 }
 
 // WithMinCommittableSlotAge specifies how old a slot has to be for it to be committable.
-func WithMinCommittableSlotAge(age slot.Index) options.Option[Filter] {
+func WithMinCommittableSlotAge(age iotago.SlotIndex) options.Option[Filter] {
 	return func(filter *Filter) {
 		filter.optsMinCommittableSlotAge = age
 	}

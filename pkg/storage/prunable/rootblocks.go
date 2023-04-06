@@ -5,14 +5,12 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/commitment"
 	"github.com/iotaledger/iota-core/pkg/database"
-	"github.com/iotaledger/iota-core/pkg/models"
-	"github.com/iotaledger/iota-core/pkg/slot"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type RootBlocks struct {
-	Storage func(index slot.Index) kvstore.KVStore
+	Storage func(index iotago.SlotIndex) kvstore.KVStore
 }
 
 // NewRootBlocks creates a new RootBlocks instance.
@@ -23,8 +21,8 @@ func NewRootBlocks(databaseInstance *database.Manager, storagePrefix byte) (newR
 }
 
 // Store stores the given blockID as a root block.
-func (r *RootBlocks) Store(id models.BlockID, commitmentID commitment.ID) (err error) {
-	if err = r.Storage(id.Index()).Set(lo.PanicOnErr(id.Bytes()), lo.PanicOnErr(commitmentID.Bytes())); err != nil {
+func (r *RootBlocks) Store(id iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
+	if err = r.Storage(id.Slot()).Set(id[:], commitmentID[:]); err != nil {
 		return errors.Wrapf(err, "failed to store solid entry point block %s with commitment %s", id, commitmentID)
 	}
 
@@ -32,8 +30,8 @@ func (r *RootBlocks) Store(id models.BlockID, commitmentID commitment.ID) (err e
 }
 
 // Has returns true if the given blockID is a root block.
-func (r *RootBlocks) Has(blockID models.BlockID) (has bool, err error) {
-	has, err = r.Storage(blockID.Index()).Has(lo.PanicOnErr(blockID.Bytes()))
+func (r *RootBlocks) Has(blockID iotago.BlockID) (has bool, err error) {
+	has, err = r.Storage(blockID.Slot()).Has(blockID[:])
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to delete solid entry point block %s", blockID)
 	}
@@ -42,25 +40,25 @@ func (r *RootBlocks) Has(blockID models.BlockID) (has bool, err error) {
 }
 
 // Delete deletes the given blockID from the root blocks.
-func (r *RootBlocks) Delete(blockID models.BlockID) (err error) {
-	if err = r.Storage(blockID.Index()).Delete(lo.PanicOnErr(blockID.Bytes())); err != nil {
+func (r *RootBlocks) Delete(blockID iotago.BlockID) (err error) {
+	if err = r.Storage(blockID.Slot()).Delete(blockID[:]); err != nil {
 		return errors.Wrapf(err, "failed to delete solid entry point block %s", blockID)
 	}
 
 	return nil
 }
 
-// Stream streams all root blocks for a slot index.
-func (r *RootBlocks) Stream(index slot.Index, processor func(id models.BlockID, commitmentID commitment.ID) error) (err error) {
+// Stream streams all root blocks for a slot index
+func (r *RootBlocks) Stream(index iotago.SlotIndex, processor func(id iotago.BlockID, commitmentID iotago.CommitmentID) error) (err error) {
 	if storageErr := r.Storage(index).Iterate([]byte{}, func(blockIDBytes kvstore.Key, commitmentIDBytes kvstore.Value) bool {
-		id := new(models.BlockID)
-		commitmentID := new(commitment.ID)
-		if _, err = id.FromBytes(blockIDBytes); err != nil {
+		var id iotago.BlockID
+		var commitmentID iotago.CommitmentID
+		if id, err = iotago.SlotIdentifierFromBytes(blockIDBytes); err != nil {
 			err = errors.Wrapf(err, "failed to parse blockID %s", blockIDBytes)
-		} else if _, err = commitmentID.FromBytes(commitmentIDBytes); err != nil {
+		} else if commitmentID, err = iotago.SlotIdentifierFromBytes(commitmentIDBytes); err != nil {
 			err = errors.Wrapf(err, "failed to parse commitmentID %s", commitmentIDBytes)
-		} else if err = processor(*id, *commitmentID); err != nil {
-			err = errors.Wrapf(err, "failed to process root block %s with commitment %s", *id, *commitmentID)
+		} else if err = processor(id, commitmentID); err != nil {
+			err = errors.Wrapf(err, "failed to process root block %s with commitment %s", id, commitmentID)
 		}
 
 		return err == nil
