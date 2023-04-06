@@ -1,0 +1,45 @@
+name: Unit tests
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'documentation/**'
+
+jobs:
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: 'go.sum'
+
+      - name: Print Go version
+        run: go version
+
+      - name: Run Tests
+        run: go test ./... -tags rocksdb -count=1 -timeout 10m
+
+
+  unit-tests-race:
+    name: Unit tests -race
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: 'go.sum'
+
+      - name: Print Go version
+        run: go version
+
+      - name: Run Tests with -race
+        run: go test ./... -tags rocksdb -count=1 -race -short -timeout 20m
