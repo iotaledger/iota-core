@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/iotaledger/iota-core/pkg/models"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // UvarintWriter writes protobuf blocks.
@@ -55,7 +55,7 @@ func (ur *UvarintReader) ReadBlk(blk proto.Message) error {
 	if err != nil {
 		return err
 	}
-	if length64 > models.MaxBlockSize {
+	if length64 > iotago.MaxBlockSize {
 		return errors.Errorf("max block size exceeded: %d", length64)
 	}
 	buf := make([]byte, length64)

@@ -8,13 +8,14 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
+	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/iota-core/pkg/daemon"
-	"github.com/iotaledger/iota-core/pkg/models"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
-	"github.com/iotaledger/iota-core/pkg/slot"
+	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 func init() {
@@ -45,20 +46,21 @@ type dependencies struct {
 
 func provide(c *dig.Container) error {
 
-	if err := c.Provide(func() *slot.TimeProvider {
-		return slot.NewTimeProvider(1680370391, 10)
+	if err := c.Provide(func() *iotago.SlotTimeProvider {
+		return iotago.NewSlotTimeProvider(1680370391, 10)
 	}); err != nil {
 		return nil
 	}
 
-	return c.Provide(func(p2pManager *p2p.Manager, provider *slot.TimeProvider) *core.Protocol {
-		return core.NewProtocol(p2pManager, Component.WorkerPool, provider)
+	return c.Provide(func(p2pManager *p2p.Manager, provider *iotago.SlotTimeProvider) *core.Protocol {
+		//TODO: fill up protocol params
+		return core.NewProtocol(p2pManager, Component.WorkerPool, &iotago.ProtocolParameters{}, provider)
 	})
 }
 
 func configure() error {
-	deps.CoreProtocol.Events.BlockReceived.Hook(func(event *core.BlockReceivedEvent) {
-		Component.LogInfof("BlockReceived: %s", event.Block.ID())
+	deps.CoreProtocol.Events.BlockReceived.Hook(func(block *core.Block, source identity.ID) {
+		Component.LogInfof("BlockReceived: %s", block.BlockID)
 	})
 
 	return nil
@@ -67,12 +69,18 @@ func configure() error {
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
+		pubKey := issuerKey.Public()
+		addr := iotago.Ed25519AddressFromPubKey(pubKey[:])
 
 		ticker := timeutil.NewTicker(func() {
-			block := models.NewBlock(
-				models.WithStrongParents(models.NewBlockIDs(models.BlockID{})),
-				models.WithIssuer(issuerKey.Public()),
-			)
+			block, err := builder.NewBlockBuilder().
+				StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
+				Sign(&addr, issuerKey[:]).
+				Build()
+			if err != nil {
+				Component.LogWarnf("Error building block: %s", err.Error())
+				return
+			}
 			deps.CoreProtocol.SendBlock(block)
 		}, 1*time.Second, ctx)
 		ticker.WaitForGracefulShutdown()
