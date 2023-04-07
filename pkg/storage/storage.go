@@ -3,14 +3,12 @@ package storage
 import (
 	"sync"
 
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/commitment"
 	"github.com/iotaledger/iota-core/pkg/database"
-	"github.com/iotaledger/iota-core/pkg/slot"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Storage is an abstraction around the storage layer of the node.
@@ -41,7 +39,7 @@ func New(directory string, version database.Version, opts ...options.Option[data
 		Directory:       directory,
 	}
 
-	if err := newStorage.Commitments.Store(commitment.New(0, commitment.ID{}, types.Identifier{}, 0)); err != nil {
+	if err := newStorage.Commitments.Store(iotago.NewEmptyCommitment()); err != nil {
 		panic(err)
 	}
 
@@ -49,7 +47,7 @@ func New(directory string, version database.Version, opts ...options.Option[data
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.
-func (s *Storage) PruneUntilSlot(index slot.Index) {
+func (s *Storage) PruneUntilSlot(index iotago.SlotIndex) {
 	s.databaseManager.PruneUntilSlot(index)
 }
 

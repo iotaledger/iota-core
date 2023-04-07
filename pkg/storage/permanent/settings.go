@@ -8,13 +8,11 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/hive.go/stringify"
-	"github.com/iotaledger/iota-core/pkg/commitment"
-	"github.com/iotaledger/iota-core/pkg/slot"
 	"github.com/iotaledger/iota-core/pkg/storage/storable"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // region Settings /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,7 +21,7 @@ type Settings struct {
 	*settingsModel
 	mutex sync.RWMutex
 
-	slotTimeProvider *slot.TimeProvider
+	slotTimeProvider *iotago.SlotTimeProvider
 
 	module.Module
 }
@@ -34,10 +32,10 @@ func NewSettings(path string) (settings *Settings) {
 			SnapshotImported:        false,
 			GenesisUnixTime:         0,
 			SlotDuration:            0,
-			LatestCommitment:        commitment.New(0, commitment.ID{}, types.Identifier{}, 0),
+			LatestCommitment:        iotago.NewEmptyCommitment(),
 			LatestStateMutationSlot: 0,
 			LatestConfirmedSlot:     0,
-			ChainID:                 commitment.ID{},
+			ChainID:                 iotago.CommitmentID{},
 		}, path),
 	}
 
@@ -46,7 +44,7 @@ func NewSettings(path string) (settings *Settings) {
 	return s
 }
 
-func (s *Settings) SlotTimeProvider() *slot.TimeProvider {
+func (s *Settings) SlotTimeProvider() *iotago.SlotTimeProvider {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -119,14 +117,14 @@ func (s *Settings) SetSlotDuration(duration int64) (err error) {
 	return nil
 }
 
-func (s *Settings) LatestCommitment() (latestCommitment *commitment.Commitment) {
+func (s *Settings) LatestCommitment() (latestCommitment *iotago.Commitment) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	return s.settingsModel.LatestCommitment
 }
 
-func (s *Settings) SetLatestCommitment(latestCommitment *commitment.Commitment) (err error) {
+func (s *Settings) SetLatestCommitment(latestCommitment *iotago.Commitment) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -139,14 +137,14 @@ func (s *Settings) SetLatestCommitment(latestCommitment *commitment.Commitment) 
 	return nil
 }
 
-func (s *Settings) LatestStateMutationSlot() slot.Index {
+func (s *Settings) LatestStateMutationSlot() iotago.SlotIndex {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	return s.settingsModel.LatestStateMutationSlot
 }
 
-func (s *Settings) SetLatestStateMutationSlot(latestStateMutationSlot slot.Index) (err error) {
+func (s *Settings) SetLatestStateMutationSlot(latestStateMutationSlot iotago.SlotIndex) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -159,14 +157,14 @@ func (s *Settings) SetLatestStateMutationSlot(latestStateMutationSlot slot.Index
 	return nil
 }
 
-func (s *Settings) LatestConfirmedSlot() slot.Index {
+func (s *Settings) LatestConfirmedSlot() iotago.SlotIndex {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	return s.settingsModel.LatestConfirmedSlot
 }
 
-func (s *Settings) SetLatestConfirmedSlot(latestConfirmedSlot slot.Index) (err error) {
+func (s *Settings) SetLatestConfirmedSlot(latestConfirmedSlot iotago.SlotIndex) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -179,14 +177,14 @@ func (s *Settings) SetLatestConfirmedSlot(latestConfirmedSlot slot.Index) (err e
 	return nil
 }
 
-func (s *Settings) ChainID() commitment.ID {
+func (s *Settings) ChainID() iotago.CommitmentID {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	return s.settingsModel.ChainID
 }
 
-func (s *Settings) SetChainID(id commitment.ID) (err error) {
+func (s *Settings) SetChainID(id iotago.CommitmentID) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -277,7 +275,7 @@ func (s *Settings) tryImport(reader io.ReadSeeker) (err error) {
 }
 
 func (s *Settings) UpdateSlotTimeProvider() {
-	s.slotTimeProvider = slot.NewTimeProvider(s.settingsModel.GenesisUnixTime, s.settingsModel.SlotDuration)
+	s.slotTimeProvider = iotago.NewSlotTimeProvider(s.settingsModel.GenesisUnixTime, s.settingsModel.SlotDuration)
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -285,13 +283,13 @@ func (s *Settings) UpdateSlotTimeProvider() {
 // region settingsModel ////////////////////////////////////////////////////////////////////////////////////////////////
 
 type settingsModel struct {
-	SnapshotImported        bool                   `serix:"0"`
-	GenesisUnixTime         int64                  `serix:"1"`
-	SlotDuration            int64                  `serix:"2"`
-	LatestCommitment        *commitment.Commitment `serix:"3"`
-	LatestStateMutationSlot slot.Index             `serix:"4"`
-	LatestConfirmedSlot     slot.Index             `serix:"5"`
-	ChainID                 commitment.ID          `serix:"6"`
+	SnapshotImported        bool                `serix:"0"`
+	GenesisUnixTime         int64               `serix:"1"`
+	SlotDuration            int64               `serix:"2"`
+	LatestCommitment        *iotago.Commitment  `serix:"3"`
+	LatestStateMutationSlot iotago.SlotIndex    `serix:"4"`
+	LatestConfirmedSlot     iotago.SlotIndex    `serix:"5"`
+	ChainID                 iotago.CommitmentID `serix:"6"`
 
 	storable.Struct[settingsModel, *settingsModel]
 }

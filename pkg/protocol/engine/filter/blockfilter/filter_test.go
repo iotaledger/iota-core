@@ -8,68 +8,77 @@ import (
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/crypto/identity"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/commitment"
-	"github.com/iotaledger/iota-core/pkg/models"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
-	"github.com/iotaledger/iota-core/pkg/slot"
+	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 type TestFramework struct {
 	Test             *testing.T
-	SlotTimeProvider *slot.TimeProvider
+	SlotTimeProvider *iotago.SlotTimeProvider
 	Filter           *Filter
+	api              iotago.API
 }
 
-func NewTestFramework(t *testing.T, slotTimeProvider *slot.TimeProvider, optsFilter ...options.Option[Filter]) *TestFramework {
+func NewTestFramework(t *testing.T, slotTimeProvider *iotago.SlotTimeProvider, optsFilter ...options.Option[Filter]) *TestFramework {
 	tf := &TestFramework{
 		Test:             t,
 		SlotTimeProvider: slotTimeProvider,
-		Filter:           New(optsFilter...),
+
+		Filter: New(optsFilter...),
+		api:    iotago.V3API(&iotago.ProtocolParameters{}),
 	}
 
-	tf.Filter.Events().BlockAllowed.Hook(func(block *models.Block) {
-		t.Logf("BlockAllowed: %s", block.ID())
+	tf.Filter.Events().BlockAllowed.Hook(func(block *model.Block) {
+		t.Logf("BlockAllowed: %s", block.BlockID)
 	})
 
 	tf.Filter.Events().BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
-		t.Logf("BlockFiltered: %s - %s", event.Block.ID(), event.Reason)
+		t.Logf("BlockFiltered: %s - %s", event.Block.BlockID, event.Reason)
 	})
 
 	return tf
 }
 
-func (t *TestFramework) processBlock(alias string, block *models.Block) {
-	require.NoError(t.Test, block.DetermineID(t.SlotTimeProvider))
-	block.ID().RegisterAlias(alias)
-	t.Filter.ProcessReceivedBlock(block, identity.NewID(ed25519.PublicKey{}))
+func (t *TestFramework) processBlock(alias string, block *iotago.Block) {
+	modelBlock, err := model.BlockFromBlock(block, t.api, t.SlotTimeProvider)
+	require.NoError(t.Test, err)
+
+	modelBlock.BlockID().RegisterAlias(alias)
+	t.Filter.ProcessReceivedBlock(modelBlock, identity.NewID(ed25519.PublicKey{}))
 }
 
 func (t *TestFramework) IssueUnsignedBlockAtTime(alias string, issuingTime time.Time) {
-	block := models.NewBlock(
-		models.WithStrongParents(models.NewBlockIDs(models.EmptyBlockID)),
-		models.WithIssuingTime(issuingTime),
-	)
+	block, err := builder.NewBlockBuilder().
+		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
+		IssuingTime(issuingTime).
+		Build()
+	require.NoError(t.Test, err)
+
 	t.processBlock(alias, block)
 }
 
-func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index slot.Index, committing slot.Index) {
-	block := models.NewBlock(
-		models.WithStrongParents(models.NewBlockIDs(models.EmptyBlockID)),
-		models.WithIssuingTime(t.SlotTimeProvider.StartTime(index)),
-		models.WithCommitment(commitment.New(committing, commitment.ID{}, types.Identifier{}, 0)),
-	)
+func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index iotago.SlotIndex, committing iotago.SlotIndex) {
+	block, err := builder.NewBlockBuilder().
+		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
+		IssuingTime(t.SlotTimeProvider.StartTime(index)).
+		Build()
+	require.NoError(t.Test, err)
+
 	t.processBlock(alias, block)
 }
 
 func (t *TestFramework) IssueSigned(alias string) {
-	block := models.NewBlock(
-		models.WithStrongParents(models.NewBlockIDs(models.EmptyBlockID)),
-		models.WithIssuingTime(time.Now()),
-	)
 	keyPair := ed25519.GenerateKeyPair()
-	require.NoError(t.Test, block.Sign(&keyPair))
+	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
+	block, err := builder.NewBlockBuilder().
+		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
+		IssuingTime(time.Now()).
+		Sign(&addr, keyPair.PrivateKey[:]).
+		Build()
+	require.NoError(t.Test, err)
 
 	t.processBlock(alias, block)
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/iota-core/pkg/daemon"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -59,7 +60,7 @@ func provide(c *dig.Container) error {
 }
 
 func configure() error {
-	deps.CoreProtocol.Events.BlockReceived.Hook(func(block *core.Block, source identity.ID) {
+	deps.CoreProtocol.Events.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
 		Component.LogInfof("BlockReceived: %s", block.BlockID)
 	})
 

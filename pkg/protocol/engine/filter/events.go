@@ -2,12 +2,12 @@ package filter
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/iota-core/pkg/models"
+	"github.com/iotaledger/iota-core/pkg/model"
 )
 
 type Events struct {
 	BlockFiltered *event.Event1[*BlockFilteredEvent]
-	BlockAllowed  *event.Event1[*models.Block]
+	BlockAllowed  *event.Event1[*model.Block]
 
 	event.Group[Events, *Events]
 }
@@ -15,11 +15,11 @@ type Events struct {
 var NewEvents = event.CreateGroupConstructor(func() *Events {
 	return &Events{
 		BlockFiltered: event.New1[*BlockFilteredEvent](),
-		BlockAllowed:  event.New1[*models.Block](),
+		BlockAllowed:  event.New1[*model.Block](),
 	}
 })
 
 type BlockFilteredEvent struct {
-	Block  *models.Block
+	Block  *model.Block
 	Reason error
 }

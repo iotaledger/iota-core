@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
-	"github.com/iotaledger/iota-core/pkg/slot"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 var healthKey = []byte("bucket_health")
@@ -17,7 +17,7 @@ var healthKey = []byte("bucket_health")
 var dbVersionKey = []byte("db_version")
 
 // indexToRealm converts an baseIndex to a realm with some shifting magic.
-func indexToRealm(index slot.Index) kvstore.Realm {
+func indexToRealm(index iotago.SlotIndex) kvstore.Realm {
 	return []byte{
 		byte(0xff & index),
 		byte(0xff & (index >> 8)),
@@ -30,12 +30,12 @@ func indexToRealm(index slot.Index) kvstore.Realm {
 	}
 }
 
-func dbPathFromIndex(base string, index slot.Index) string {
+func dbPathFromIndex(base string, index iotago.SlotIndex) string {
 	return filepath.Join(base, strconv.FormatInt(int64(index), 10))
 }
 
 type dbInstanceFileInfo struct {
-	baseIndex slot.Index
+	baseIndex iotago.SlotIndex
 	path      string
 }
 
@@ -52,7 +52,7 @@ func getSortedDBInstancesFromDisk(baseDir string) (dbInfos []*dbInstanceFileInfo
 			return nil
 		}
 		return &dbInstanceFileInfo{
-			baseIndex: slot.Index(atoi),
+			baseIndex: iotago.SlotIndex(atoi),
 			path:      filepath.Join(baseDir, e.Name()),
 		}
 	})
@@ -65,7 +65,7 @@ func getSortedDBInstancesFromDisk(baseDir string) (dbInfos []*dbInstanceFileInfo
 	return dbInfos
 }
 
-func dbPrunableDirectorySize(base string, index slot.Index) (int64, error) {
+func dbPrunableDirectorySize(base string, index iotago.SlotIndex) (int64, error) {
 	return dbDirectorySize(dbPathFromIndex(base, index))
 }
 

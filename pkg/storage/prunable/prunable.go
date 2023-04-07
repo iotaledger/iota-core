@@ -4,7 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/database"
-	"github.com/iotaledger/iota-core/pkg/slot"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
@@ -17,8 +17,8 @@ const (
 type Prunable struct {
 	Blocks           *Blocks
 	RootBlocks       *RootBlocks
-	Attestations     func(index slot.Index) kvstore.KVStore
-	LedgerStateDiffs func(index slot.Index) kvstore.KVStore
+	Attestations     func(index iotago.SlotIndex) kvstore.KVStore
+	LedgerStateDiffs func(index iotago.SlotIndex) kvstore.KVStore
 }
 
 func New(dbManager *database.Manager) (newPrunable *Prunable) {

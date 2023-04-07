@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
-	"github.com/iotaledger/iota-core/pkg/slot"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestManager_Get(t *testing.T) {
@@ -28,7 +28,7 @@ func TestManager_Get(t *testing.T) {
 	// Create and write data to buckets.
 	{
 		for i := granularity; i < bucketsCount; i++ {
-			bucket := m.Get(slot.Index(i), getRealm(i))
+			bucket := m.Get(iotago.SlotIndex(i), getRealm(i))
 			assert.NoError(t, bucket.Set(getKey(i), getValue(i)))
 		}
 
@@ -50,7 +50,7 @@ func TestManager_Get(t *testing.T) {
 	// Read data from buckets.
 	{
 		for i := granularity; i < bucketsCount; i++ {
-			bucket := m.Get(slot.Index(i), getRealm(i))
+			bucket := m.Get(iotago.SlotIndex(i), getRealm(i))
 			value, err := bucket.Get(getKey(i))
 			assert.NoError(t, err)
 			assert.Equal(t, getValue(i), value)
@@ -60,8 +60,8 @@ func TestManager_Get(t *testing.T) {
 	// Flush buckets and check that they are marked healthy.
 	{
 		for i := granularity; i < bucketsCount; i++ {
-			m.Flush(slot.Index(i))
-			bucket := m.getBucket(slot.Index(i))
+			m.Flush(iotago.SlotIndex(i))
+			bucket := m.getBucket(iotago.SlotIndex(i))
 			setHealthy, err := bucket.Has(healthKey)
 			assert.NoError(t, err)
 			assert.True(t, setHealthy)
@@ -79,7 +79,7 @@ func TestManager_Get(t *testing.T) {
 
 		actual := make([][]byte, 0)
 		for i := granularity; i < bucketsCount; i += granularity {
-			db := m.getDBInstance(slot.Index(i))
+			db := m.getDBInstance(iotago.SlotIndex(i))
 			require.NoError(t, db.store.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
 				actual = append(actual, byteutils.ConcatBytes(key, value))
 				return true
@@ -92,7 +92,7 @@ func TestManager_Get(t *testing.T) {
 	dbSize = m.PrunableStorageSize()
 
 	// Prune some stuff.
-	expectedFirstBucket := slot.Index(5) + 1
+	expectedFirstBucket := iotago.SlotIndex(5) + 1
 	{
 		// Pruning a slot that is not dividable by granularity does not actually prune.
 		m.PruneUntilSlot(4)
@@ -122,7 +122,7 @@ func TestManager_Get(t *testing.T) {
 	// deleted.
 	totalBucketCount := bucketsCount + 10
 	for i := bucketsCount; i < totalBucketCount; i++ {
-		bucket := m.Get(slot.Index(i), getRealm(i))
+		bucket := m.Get(iotago.SlotIndex(i), getRealm(i))
 		assert.NoError(t, bucket.Set(getKey(i), getValue(i)))
 	}
 
@@ -134,7 +134,7 @@ func TestManager_Get(t *testing.T) {
 	// Read data from buckets after shutdown (needs to be properly reconstructed from disk).
 	{
 		for i := int(expectedFirstBucket); i < bucketsCount; i++ {
-			bucket := m.Get(slot.Index(i), getRealm(i))
+			bucket := m.Get(iotago.SlotIndex(i), getRealm(i))
 			value, err := bucket.Get(getKey(i))
 			assert.NoError(t, err)
 			assert.Equal(t, getValue(i), value, "slot %d: expected %+v but got %+v", i, getValue(i), value)
@@ -188,7 +188,7 @@ func TestManager_Get(t *testing.T) {
 }
 
 func getRealm(i int) kvstore.Realm {
-	return indexToRealm(slot.Index(i))
+	return indexToRealm(iotago.SlotIndex(i))
 }
 
 func getKey(i int) []byte {
