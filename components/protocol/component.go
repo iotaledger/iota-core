@@ -54,14 +54,14 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(p2pManager *p2p.Manager, provider *iotago.SlotTimeProvider) *core.Protocol {
-		//TODO: fill up protocol params
+		// TODO: fill up protocol params
 		return core.NewProtocol(p2pManager, Component.WorkerPool, &iotago.ProtocolParameters{}, provider)
 	})
 }
 
 func configure() error {
 	deps.CoreProtocol.Events.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
-		Component.LogInfof("BlockReceived: %s", block.BlockID)
+		Component.LogInfof("BlockReceived: %s", block.ID)
 	})
 
 	return nil

@@ -19,14 +19,14 @@ type Blocks struct {
 func NewBlocks(dbManager *database.Manager, storagePrefix byte) (newBlocks *Blocks) {
 	return &Blocks{
 		Storage: lo.Bind([]byte{storagePrefix}, dbManager.Get),
-		api:     iotago.V3API(&iotago.ProtocolParameters{}), //TODO: do we need the protocol parameters for the storage?
+		api:     iotago.V3API(&iotago.ProtocolParameters{}), // TODO: do we need the protocol parameters for the storage?
 	}
 }
 
 func (b *Blocks) Load(id iotago.BlockID) (*model.Block, error) {
-	storage := b.Storage(id.Slot())
+	storage := b.Storage(id.Index())
 	if storage == nil {
-		return nil, errors.Errorf("storage does not exist for slot %s", id.Slot())
+		return nil, errors.Errorf("storage does not exist for slot %s", id.Index())
 	}
 
 	blockBytes, err := storage.Get(id[:])
@@ -42,23 +42,23 @@ func (b *Blocks) Load(id iotago.BlockID) (*model.Block, error) {
 }
 
 func (b *Blocks) Store(block *model.Block) error {
-	blockID := block.BlockID()
-	storage := b.Storage(blockID.Slot())
+	blockID := block.ID()
+	storage := b.Storage(blockID.Index())
 	if storage == nil {
-		return errors.Errorf("storage does not exist for slot %s", blockID.Slot())
+		return errors.Errorf("storage does not exist for slot %s", blockID.Index())
 	}
 
 	if err := storage.Set(blockID[:], block.Data()); err != nil {
-		return errors.Wrapf(err, "failed to store block %s", block.BlockID)
+		return errors.Wrapf(err, "failed to store block %s", block.ID)
 	}
 
 	return nil
 }
 
 func (b *Blocks) Delete(id iotago.BlockID) (err error) {
-	storage := b.Storage(id.Slot())
+	storage := b.Storage(id.Index())
 	if storage == nil {
-		return errors.Errorf("storage does not exist for slot %s", id.Slot())
+		return errors.Errorf("storage does not exist for slot %s", id.Index())
 	}
 
 	if err = storage.Delete(id[:]); err != nil {
