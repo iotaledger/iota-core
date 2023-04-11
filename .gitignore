@@ -26,3 +26,7 @@ dist/
 # Data directory 
 /data
 /peerdb
+/db
+
+# snapshot and settings file
+*.bin
