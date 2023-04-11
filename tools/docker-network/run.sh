@@ -22,7 +22,7 @@ fi
 
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
-echo "Build GoShimmer"
+echo "Build iota-core"
 # Allow docker compose to build and cache an image
 docker compose -f $DOCKER_COMPOSE_FILE build
 
@@ -43,9 +43,9 @@ else
 fi
 
 
-echo "Run GoShimmer network with ${DOCKER_COMPOSE_FILE}"
-# GOSHIMMER_PEER_REPLICAS is used in docker-compose.yml to determine how many replicas to create
-export GOSHIMMER_PEER_REPLICAS=$REPLICAS
+echo "Run iota-core network with ${DOCKER_COMPOSE_FILE}"
+# IOTA_CORE_PEER_REPLICAS is used in docker-compose.yml to determine how many replicas to create
+export IOTA_CORE_PEER_REPLICAS=$REPLICAS
 # Profiles is created to set which docker profiles to run
 # https://docs.docker.com/compose/profiles/
 PROFILES=()
@@ -59,4 +59,4 @@ docker compose -f $DOCKER_COMPOSE_FILE up
 
 echo "Clean up docker resources"
 docker compose down -v
-rm *.snapshot
+#rm *.snapshot
