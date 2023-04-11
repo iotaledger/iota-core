@@ -24,12 +24,9 @@ dist/
 # OSX related files
 .DS_Store
 
-# Data directory 
+# Data directories
 /data
 /peerdb
-
-go.work
-go.work.sum
 /db
 
 # snapshot and settings file
