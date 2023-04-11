@@ -32,11 +32,11 @@ func NewTestFramework(t *testing.T, slotTimeProvider *iotago.SlotTimeProvider, o
 	}
 
 	tf.Filter.Events().BlockAllowed.Hook(func(block *model.Block) {
-		t.Logf("BlockAllowed: %s", block.BlockID)
+		t.Logf("BlockAllowed: %s", block.ID)
 	})
 
 	tf.Filter.Events().BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
-		t.Logf("BlockFiltered: %s - %s", event.Block.BlockID, event.Reason)
+		t.Logf("BlockFiltered: %s - %s", event.Block.ID, event.Reason)
 	})
 
 	return tf
@@ -46,7 +46,7 @@ func (t *TestFramework) processBlock(alias string, block *iotago.Block) {
 	modelBlock, err := model.BlockFromBlock(block, t.api, t.SlotTimeProvider)
 	require.NoError(t.Test, err)
 
-	modelBlock.BlockID().RegisterAlias(alias)
+	modelBlock.ID().RegisterAlias(alias)
 	t.Filter.ProcessReceivedBlock(modelBlock, identity.NewID(ed25519.PublicKey{}))
 }
 

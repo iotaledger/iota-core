@@ -22,7 +22,7 @@ func NewRootBlocks(databaseInstance *database.Manager, storagePrefix byte) (newR
 
 // Store stores the given blockID as a root block.
 func (r *RootBlocks) Store(id iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
-	if err = r.Storage(id.Slot()).Set(id[:], commitmentID[:]); err != nil {
+	if err = r.Storage(id.Index()).Set(id[:], commitmentID[:]); err != nil {
 		return errors.Wrapf(err, "failed to store solid entry point block %s with commitment %s", id, commitmentID)
 	}
 
@@ -31,7 +31,7 @@ func (r *RootBlocks) Store(id iotago.BlockID, commitmentID iotago.CommitmentID) 
 
 // Has returns true if the given blockID is a root block.
 func (r *RootBlocks) Has(blockID iotago.BlockID) (has bool, err error) {
-	has, err = r.Storage(blockID.Slot()).Has(blockID[:])
+	has, err = r.Storage(blockID.Index()).Has(blockID[:])
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to delete solid entry point block %s", blockID)
 	}
@@ -41,7 +41,7 @@ func (r *RootBlocks) Has(blockID iotago.BlockID) (has bool, err error) {
 
 // Delete deletes the given blockID from the root blocks.
 func (r *RootBlocks) Delete(blockID iotago.BlockID) (err error) {
-	if err = r.Storage(blockID.Slot()).Delete(blockID[:]); err != nil {
+	if err = r.Storage(blockID.Index()).Delete(blockID[:]); err != nil {
 		return errors.Wrapf(err, "failed to delete solid entry point block %s", blockID)
 	}
 

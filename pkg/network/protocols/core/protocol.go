@@ -38,13 +38,13 @@ type Protocol struct {
 	requestedBlockHashesMutex sync.Mutex
 }
 
-func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, protocolParams *iotago.ProtocolParameters, slotTimeProvider *iotago.SlotTimeProvider, opts ...options.Option[Protocol]) (protocol *Protocol) {
+func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, api iotago.API, slotTimeProvider *iotago.SlotTimeProvider, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
 		Events: NewEvents(),
 
 		network:                   network,
 		workerPool:                workerPool,
-		api:                       iotago.V3API(protocolParams),
+		api:                       api,
 		slotTimeProvider:          slotTimeProvider,
 		duplicateBlockBytesFilter: bytesfilter.New(10000),
 		requestedBlockHashes:      shrinkingmap.New[types.Identifier, types.Empty](shrinkingmap.WithShrinkingThresholdCount(1000)),
@@ -75,13 +75,13 @@ func (p *Protocol) SendSlotCommitment(cm *iotago.Commitment, to ...identity.ID) 
 	}}}, protocolID, to...)
 }
 
-//func (p *Protocol) SendAttestations(cm *commitment.Commitment, blockIDs models.BlockIDs, attestations *orderedmap.OrderedMap[iotago.SlotIndex, *advancedset.AdvancedSet[*notarization.Attestation]], to ...identity.ID) {
+// func (p *Protocol) SendAttestations(cm *commitment.Commitment, blockIDs models.BlockIDs, attestations *orderedmap.OrderedMap[iotago.SlotIndex, *advancedset.AdvancedSet[*notarization.Attestation]], to ...identity.ID) {
 //	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
 //		Commitment:   lo.PanicOnErr(cm.Bytes()),
 //		BlocksIds:    lo.PanicOnErr(blockIDs.Bytes()),
 //		Attestations: lo.PanicOnErr(attestations.Encode()),
 //	}}}, protocolID, to...)
-//}
+// }
 
 func (p *Protocol) RequestCommitment(id iotago.CommitmentID, to ...identity.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitmentRequest{SlotCommitmentRequest: &nwmodels.SlotCommitmentRequest{
@@ -111,9 +111,9 @@ func (p *Protocol) handlePacket(nbr identity.ID, packet proto.Message) (err erro
 	case *nwmodels.Packet_SlotCommitmentRequest:
 		p.workerPool.Submit(func() { p.onSlotCommitmentRequest(packetBody.SlotCommitmentRequest.GetId(), nbr) })
 	case *nwmodels.Packet_Attestations:
-		//p.workerPool.Submit(func() {
+		// p.workerPool.Submit(func() {
 		//	p.onAttestations(packetBody.Attestations.GetCommitment(), packetBody.Attestations.GetBlocksIds(), packetBody.Attestations.GetAttestations(), nbr)
-		//})
+		// })
 	case *nwmodels.Packet_AttestationsRequest:
 		p.workerPool.Submit(func() {
 			p.onAttestationsRequest(packetBody.AttestationsRequest.GetCommitment(), packetBody.AttestationsRequest.GetEndIndex(), nbr)
@@ -181,7 +181,7 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id identity.ID) {
 	p.Events.SlotCommitmentRequestReceived.Trigger(iotago.CommitmentID(idBytes), id)
 }
 
-//func (p *Protocol) onAttestations(commitmentBytes []byte, blockIDBytes []byte, attestationsBytes []byte, id identity.ID) {
+// func (p *Protocol) onAttestations(commitmentBytes []byte, blockIDBytes []byte, attestationsBytes []byte, id identity.ID) {
 //	cm := &commitment.Commitment{}
 //	if _, err := cm.FromBytes(commitmentBytes); err != nil {
 //		p.Events.Error.Trigger(&ErrorEvent{
@@ -218,7 +218,7 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id identity.ID) {
 //		Attestations: attestations,
 //		Source:       id,
 //	})
-//}
+// }
 
 func (p *Protocol) onAttestationsRequest(commitmentBytes []byte, slotIndexBytes []byte, id identity.ID) {
 	cm := new(iotago.Commitment)

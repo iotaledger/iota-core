@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -77,7 +78,7 @@ func BlockFromBytes(data []byte, api iotago.API, timeProvider *iotago.SlotTimePr
 	return BlockFromBlockIDAndBytes(blockID, data, api, opts...)
 }
 
-func (blk *Block) BlockID() iotago.BlockID {
+func (blk *Block) ID() iotago.BlockID {
 	return blk.blockID
 }
 
@@ -97,4 +98,40 @@ func (blk *Block) Block() *iotago.Block {
 	})
 
 	return blk.block
+}
+
+// TODO: maybe move to iota.go and introduce parent type
+func (blk *Block) Parents() (parents []iotago.BlockID) {
+	blk.ForEachParent(func(parent Parent) {
+		parents = append(parents, parent.ID)
+	})
+
+	return parents
+}
+
+// ForEachParent executes a consumer func for each parent.
+func (blk *Block) ForEachParent(consumer func(parent Parent)) {
+	seenBlockIDs := make(map[iotago.BlockID]types.Empty)
+	block := blk.Block()
+
+	for _, parentBlockID := range block.StrongParents {
+		if _, exists := seenBlockIDs[parentBlockID]; !exists {
+			seenBlockIDs[parentBlockID] = types.Void
+			consumer(Parent{parentBlockID, StrongParentType})
+		}
+	}
+
+	for _, parentBlockID := range block.WeakParents {
+		if _, exists := seenBlockIDs[parentBlockID]; !exists {
+			seenBlockIDs[parentBlockID] = types.Void
+			consumer(Parent{parentBlockID, WeakParentType})
+		}
+	}
+
+	for _, parentBlockID := range block.ShallowLikeParents {
+		if _, exists := seenBlockIDs[parentBlockID]; !exists {
+			seenBlockIDs[parentBlockID] = types.Void
+			consumer(Parent{parentBlockID, ShallowLikeParentType})
+		}
+	}
 }
