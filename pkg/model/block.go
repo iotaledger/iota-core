@@ -101,7 +101,7 @@ func (blk *Block) Block() *iotago.Block {
 }
 
 // TODO: maybe move to iota.go and introduce parent type
-func (blk *Block) Parents() (parents iotago.BlockIDs) {
+func (blk *Block) Parents() (parents []iotago.BlockID) {
 	blk.ForEachParent(func(parent Parent) {
 		parents = append(parents, parent.ID)
 	})

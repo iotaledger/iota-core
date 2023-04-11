@@ -138,9 +138,10 @@ func (s *State) RemoveRootBlock(id iotago.BlockID) {
 
 // IsRootBlock returns true if the given block is a root block.
 func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
-	if id == iotago.EmptyBlockID() {
-		return true
-	}
+	// TODO: shouldn't this be just included in the snapshot and not hardcoded here?
+	// if id == iotago.EmptyBlockID() {
+	// 	return true
+	// }
 
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
