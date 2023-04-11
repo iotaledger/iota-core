@@ -12,22 +12,20 @@ import (
 type Block struct {
 	api iotago.API
 
-	// Key
 	blockID iotago.BlockID
 
-	// Value
 	data      []byte
 	blockOnce sync.Once
 	block     *iotago.Block
 }
 
-func BlockFromBlock(iotaBlock *iotago.Block, api iotago.API, timeProvider *iotago.SlotTimeProvider, opts ...serix.Option) (*Block, error) {
+func BlockFromBlock(iotaBlock *iotago.Block, api iotago.API, opts ...serix.Option) (*Block, error) {
 	data, err := api.Encode(iotaBlock, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	blockID, err := iotaBlock.ID(timeProvider)
+	blockID, err := iotaBlock.ID(api.SlotTimeProvider())
 	if err != nil {
 		return nil, err
 	}
@@ -64,13 +62,13 @@ func BlockFromBlockIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.AP
 	return block, nil
 }
 
-func BlockFromBytes(data []byte, api iotago.API, timeProvider *iotago.SlotTimeProvider, opts ...serix.Option) (*Block, error) {
+func BlockFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
 	iotaBlock := new(iotago.Block)
 	if _, err := api.Decode(data, iotaBlock, opts...); err != nil {
 		return nil, err
 	}
 
-	blockID, err := iotaBlock.ID(timeProvider)
+	blockID, err := iotaBlock.ID(api.SlotTimeProvider())
 	if err != nil {
 		return nil, err
 	}

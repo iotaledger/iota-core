@@ -68,7 +68,7 @@ type BlockDAG struct {
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.SlotTimeProvider, func(index iotago.SlotIndex) (*iotago.Commitment, error) {
+		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.API().SlotTimeProvider, func(index iotago.SlotIndex) (*iotago.Commitment, error) {
 			// TODO: replace with e.Storage.Commitments.Load
 			return nil, nil
 		}, opts...)
