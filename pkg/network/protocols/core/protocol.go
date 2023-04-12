@@ -27,8 +27,7 @@ const (
 type Protocol struct {
 	Events *Events
 
-	api              iotago.API
-	slotTimeProvider *iotago.SlotTimeProvider
+	api iotago.API
 
 	network                   network.Endpoint
 	workerPool                *workerpool.WorkerPool
@@ -38,14 +37,13 @@ type Protocol struct {
 	requestedBlockHashesMutex sync.Mutex
 }
 
-func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, api iotago.API, slotTimeProvider *iotago.SlotTimeProvider, opts ...options.Option[Protocol]) (protocol *Protocol) {
+func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, api iotago.API, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
 		Events: NewEvents(),
 
 		network:                   network,
 		workerPool:                workerPool,
 		api:                       api,
-		slotTimeProvider:          slotTimeProvider,
 		duplicateBlockBytesFilter: bytesfilter.New(10000),
 		requestedBlockHashes:      shrinkingmap.New[types.Identifier, types.Empty](shrinkingmap.WithShrinkingThresholdCount(1000)),
 	}, opts, func(p *Protocol) {
@@ -142,7 +140,7 @@ func (p *Protocol) onBlock(blockData []byte, id identity.ID) {
 		return
 	}
 
-	block, err := model.BlockFromBytes(blockData, p.api, p.slotTimeProvider, serix.WithValidation())
+	block, err := model.BlockFromBytes(blockData, p.api, serix.WithValidation())
 	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize block"), id)
 	}
