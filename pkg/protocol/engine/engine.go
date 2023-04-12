@@ -136,8 +136,8 @@ func (e *Engine) IsSynced() (isBootstrapped bool) {
 	return e.IsBootstrapped() // && time.Since(e.Clock.Accepted().Time()) < e.optsBootstrappedThreshold
 }
 
-func (e *Engine) SlotTimeProvider() *iotago.SlotTimeProvider {
-	return e.Storage.Settings.SlotTimeProvider()
+func (e *Engine) API() iotago.API {
+	return e.Storage.Settings.API()
 }
 
 func (e *Engine) Initialize(snapshot ...string) (err error) {
@@ -149,7 +149,7 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 			return errors.Wrapf(err, "failed to read snapshot from file '%s'", snapshot)
 		}
 	} else {
-		e.Storage.Settings.UpdateSlotTimeProvider()
+		e.Storage.Settings.UpdateAPI()
 		e.Storage.Settings.TriggerInitialized()
 		e.Storage.Commitments.TriggerInitialized()
 		e.EvictionState.PopulateFromStorage(e.Storage.Settings.LatestCommitment().Index)
@@ -204,8 +204,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export commitments")
 		// } else if err = e.Ledger.Export(writer, targetSlot); err != nil {
 		// 	return errors.Wrap(err, "failed to export ledger")
-		// } else if err = e.EvictionState.Export(writer, targetSlot); err != nil {
-		// 	return errors.Wrap(err, "failed to export eviction state")
+	} else if err = e.EvictionState.Export(writer, targetSlot); err != nil {
+		return errors.Wrap(err, "failed to export eviction state")
 		// } else if err = e.Notarization.Export(writer, targetSlot); err != nil {
 		// 	return errors.Wrap(err, "failed to export notarization state")
 	}

@@ -33,7 +33,6 @@ type Protocol struct {
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
 	networkProtocol *core.Protocol
-	api             iotago.API
 
 	mainEngine *engine.Engine
 
@@ -49,12 +48,11 @@ type Protocol struct {
 	optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]
 }
 
-func New(workers *workerpool.Group, dispatcher network.Endpoint, api iotago.API, opts ...options.Option[Protocol]) (protocol *Protocol) {
+func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
 		Events:                 NewEvents(),
 		Workers:                workers,
 		dispatcher:             dispatcher,
-		api:                    api,
 		optsFilterProvider:     blockfilter.NewProvider(),
 		optsBlockDAGProvider:   inmemoryblockdag.NewProvider(),
 		optsTipManagerProvider: trivialtipmanager.NewProvider(),
@@ -79,7 +77,7 @@ func (p *Protocol) Run() {
 	// p.linkTo(p.mainEngine) -> CC and TipManager
 	// TODO: why do we create a protocol only when running?
 	// TODO: fill up protocol params
-	p.networkProtocol = core.NewProtocol(p.dispatcher, p.Workers.CreatePool("NetworkProtocol"), p.api, p.SlotTimeProvider()) // Use max amount of workers for networking
+	p.networkProtocol = core.NewProtocol(p.dispatcher, p.Workers.CreatePool("NetworkProtocol"), p.API()) // Use max amount of workers for networking
 	p.Events.Network.LinkTo(p.networkProtocol.Events)
 }
 
@@ -137,10 +135,6 @@ func (p *Protocol) initTipManager() {
 	p.tipManager = p.optsTipManagerProvider(p.mainEngine)
 }
 
-func (p *Protocol) API() iotago.API {
-	return p.api
-}
-
 func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
 	mainEngine := p.MainEngineInstance()
 
@@ -158,8 +152,8 @@ func (p *Protocol) Network() *core.Protocol {
 	return p.networkProtocol
 }
 
-func (p *Protocol) SlotTimeProvider() *iotago.SlotTimeProvider {
-	return p.MainEngineInstance().SlotTimeProvider()
+func (p *Protocol) API() iotago.API {
+	return p.MainEngineInstance().API()
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

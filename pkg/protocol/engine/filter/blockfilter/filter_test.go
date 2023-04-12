@@ -16,19 +16,17 @@ import (
 )
 
 type TestFramework struct {
-	Test             *testing.T
-	SlotTimeProvider *iotago.SlotTimeProvider
-	Filter           *Filter
-	api              iotago.API
+	Test   *testing.T
+	Filter *Filter
+	api    iotago.API
 }
 
-func NewTestFramework(t *testing.T, slotTimeProvider *iotago.SlotTimeProvider, optsFilter ...options.Option[Filter]) *TestFramework {
+func NewTestFramework(t *testing.T, api iotago.API, optsFilter ...options.Option[Filter]) *TestFramework {
 	tf := &TestFramework{
-		Test:             t,
-		SlotTimeProvider: slotTimeProvider,
+		Test: t,
+		api:  api,
 
 		Filter: New(optsFilter...),
-		api:    iotago.V3API(&iotago.ProtocolParameters{}),
 	}
 
 	tf.Filter.Events().BlockAllowed.Hook(func(block *model.Block) {
@@ -43,7 +41,7 @@ func NewTestFramework(t *testing.T, slotTimeProvider *iotago.SlotTimeProvider, o
 }
 
 func (t *TestFramework) processBlock(alias string, block *iotago.Block) {
-	modelBlock, err := model.BlockFromBlock(block, t.api, t.SlotTimeProvider)
+	modelBlock, err := model.BlockFromBlock(block, t.api)
 	require.NoError(t.Test, err)
 
 	modelBlock.ID().RegisterAlias(alias)
@@ -63,7 +61,7 @@ func (t *TestFramework) IssueUnsignedBlockAtTime(alias string, issuingTime time.
 func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index iotago.SlotIndex, committing iotago.SlotIndex) {
 	block, err := builder.NewBlockBuilder().
 		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
-		IssuingTime(t.SlotTimeProvider.StartTime(index)).
+		IssuingTime(t.api.SlotTimeProvider().StartTime(index)).
 		Build()
 	require.NoError(t.Test, err)
 

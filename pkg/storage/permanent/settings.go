@@ -21,6 +21,7 @@ type Settings struct {
 	*settingsModel
 	mutex sync.RWMutex
 
+	api              iotago.API
 	slotTimeProvider *iotago.SlotTimeProvider
 
 	module.Module
@@ -30,8 +31,7 @@ func NewSettings(path string) (settings *Settings) {
 	s := &Settings{
 		settingsModel: storable.InitStruct(&settingsModel{
 			SnapshotImported:        false,
-			GenesisUnixTime:         0,
-			SlotDuration:            0,
+			ProtocolParameters:      iotago.ProtocolParameters{},
 			LatestCommitment:        iotago.NewEmptyCommitment(),
 			LatestStateMutationSlot: 0,
 			LatestConfirmedSlot:     0,
@@ -39,20 +39,20 @@ func NewSettings(path string) (settings *Settings) {
 		}, path),
 	}
 
-	s.UpdateSlotTimeProvider()
+	s.UpdateAPI()
 
 	return s
 }
 
-func (s *Settings) SlotTimeProvider() *iotago.SlotTimeProvider {
+func (s *Settings) API() iotago.API {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	if s.settingsModel.SlotDuration == 0 || s.settingsModel.GenesisUnixTime == 0 {
-		panic("SlotTimeProvider not initialized yet")
+	if s.settingsModel.ProtocolParameters.Version == 0 {
+		panic("API not initialized yet")
 	}
 
-	return s.slotTimeProvider
+	return s.api
 }
 
 func (s *Settings) SnapshotImported() (initialized bool) {
@@ -75,40 +75,19 @@ func (s *Settings) SetSnapshotImported(initialized bool) (err error) {
 	return nil
 }
 
-func (s *Settings) GenesisUnixTime() int64 {
+func (s *Settings) ProtocolParameters() iotago.ProtocolParameters {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return s.settingsModel.GenesisUnixTime
+	return s.settingsModel.ProtocolParameters
 }
 
-func (s *Settings) SetGenesisUnixTime(unixTime int64) (err error) {
+func (s *Settings) SetProtocolParameters(params iotago.ProtocolParameters) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.settingsModel.GenesisUnixTime = unixTime
-	s.UpdateSlotTimeProvider()
-
-	if err = s.ToFile(); err != nil {
-		return errors.Wrap(err, "failed to persist initialized flag")
-	}
-
-	return nil
-}
-
-func (s *Settings) SlotDuration() int64 {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	return s.settingsModel.SlotDuration
-}
-
-func (s *Settings) SetSlotDuration(duration int64) (err error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.settingsModel.SlotDuration = duration
-	s.UpdateSlotTimeProvider()
+	s.settingsModel.ProtocolParameters = params
+	s.UpdateAPI()
 
 	if err = s.ToFile(); err != nil {
 		return errors.Wrap(err, "failed to persist initialized flag")
@@ -233,8 +212,7 @@ func (s *Settings) String() string {
 
 	builder := stringify.NewStructBuilder("Settings", stringify.NewStructField("path", s.FilePath()))
 	builder.AddField(stringify.NewStructField("SnapshotImported", s.settingsModel.SnapshotImported))
-	builder.AddField(stringify.NewStructField("GenesisUnixTime", s.settingsModel.GenesisUnixTime))
-	builder.AddField(stringify.NewStructField("SlotDuration", s.settingsModel.SlotDuration))
+	builder.AddField(stringify.NewStructField("ProtocolParameters", s.settingsModel.ProtocolParameters))
 	builder.AddField(stringify.NewStructField("LatestCommitment", s.settingsModel.LatestCommitment))
 	builder.AddField(stringify.NewStructField("LatestStateMutationSlot", s.settingsModel.LatestStateMutationSlot))
 	builder.AddField(stringify.NewStructField("LatestConfirmedSlot", s.settingsModel.LatestConfirmedSlot))
@@ -265,7 +243,7 @@ func (s *Settings) tryImport(reader io.ReadSeeker) (err error) {
 
 	s.settingsModel.SnapshotImported = true
 
-	s.UpdateSlotTimeProvider()
+	s.UpdateAPI()
 
 	if err = s.settingsModel.ToFile(); err != nil {
 		return errors.Wrap(err, "failed to persist chain ID")
@@ -274,8 +252,9 @@ func (s *Settings) tryImport(reader io.ReadSeeker) (err error) {
 	return
 }
 
-func (s *Settings) UpdateSlotTimeProvider() {
-	s.slotTimeProvider = iotago.NewSlotTimeProvider(s.settingsModel.GenesisUnixTime, s.settingsModel.SlotDuration)
+func (s *Settings) UpdateAPI() {
+	s.api = iotago.V3API(&s.settingsModel.ProtocolParameters)
+	iotago.SwapInternalAPI(s.api)
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -283,13 +262,12 @@ func (s *Settings) UpdateSlotTimeProvider() {
 // region settingsModel ////////////////////////////////////////////////////////////////////////////////////////////////
 
 type settingsModel struct {
-	SnapshotImported        bool                `serix:"0"`
-	GenesisUnixTime         int64               `serix:"1"`
-	SlotDuration            int64               `serix:"2"`
-	LatestCommitment        *iotago.Commitment  `serix:"3"`
-	LatestStateMutationSlot iotago.SlotIndex    `serix:"4"`
-	LatestConfirmedSlot     iotago.SlotIndex    `serix:"5"`
-	ChainID                 iotago.CommitmentID `serix:"6"`
+	SnapshotImported        bool                      `serix:"0"`
+	ProtocolParameters      iotago.ProtocolParameters `serix:"1"`
+	LatestCommitment        *iotago.Commitment        `serix:"2"`
+	LatestStateMutationSlot iotago.SlotIndex          `serix:"3"`
+	LatestConfirmedSlot     iotago.SlotIndex          `serix:"4"`
+	ChainID                 iotago.CommitmentID       `serix:"5"`
 
 	storable.Struct[settingsModel, *settingsModel]
 }

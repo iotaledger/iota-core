@@ -49,11 +49,9 @@ type dependencies struct {
 
 func provide(c *dig.Container) error {
 	return c.Provide(func(p2pManager *p2p.Manager) *protocol.Protocol {
-		// TODO: fill up protocol params and initialize properly
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
 			p2pManager,
-			iotago.V3API(&iotago.ProtocolParameters{}),
 
 			protocol.WithBaseDirectory(ParamsDatabase.Directory),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
@@ -103,7 +101,7 @@ func run() error {
 				Component.LogWarnf("Error building block: %s", err.Error())
 				return
 			}
-			modelBlock, err := model.BlockFromBlock(block, deps.Protocol.API(), deps.Protocol.SlotTimeProvider())
+			modelBlock, err := model.BlockFromBlock(block, deps.Protocol.API())
 			if err != nil {
 				Component.LogWarnf("Error creating model.Block from block: %s", err.Error())
 			}

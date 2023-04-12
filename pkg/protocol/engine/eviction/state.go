@@ -11,8 +11,8 @@ import (
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/storage"
-	"github.com/iotaledger/iota-core/pkg/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
