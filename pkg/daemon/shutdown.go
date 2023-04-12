@@ -10,4 +10,5 @@ const (
 	PriorityManualPeering
 	PriorityProtocol
 	PriorityRestAPI // depends on PriorityPoWHandler
+	PriorityDashboard
 )

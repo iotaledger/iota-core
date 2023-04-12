@@ -122,6 +122,8 @@ var (
 type dependencies struct {
 	dig.In
 	*restapi.RestRouteManager
+
+	AppInfo *app.Info
 }
 
 func configure() error {
@@ -135,4 +137,5 @@ func configure() error {
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
+	return nil
 }

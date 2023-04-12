@@ -23,7 +23,7 @@ type slotInfoResponse struct {
 type infoResponse struct {
 	// The name of the node software.
 	Name string `json:"name"`
-	// The semver version of the node software.
+	// The server version of the node software.
 	Version string `json:"version"`
 	// The current status of this node.
 	Status nodeStatus `json:"status"`
@@ -31,8 +31,8 @@ type infoResponse struct {
 	SupportedProtocolVersions protocol.Versions `json:"supportedProtocolVersions"`
 	// The protocol parameters used by this node.
 	ProtocolParameters *iotago.ProtocolParameters `json:"protocol"`
-	// The base token of the network.
-	BaseToken *protocfg.BaseToken `json:"baseToken"`
+	// todo The base token of the network.
+	//BaseToken *protocfg.BaseToken `json:"baseToken"`
 	// The metrics of this node.
 	Metrics nodeMetrics `json:"metrics"`
 	// The features this node exposes.
