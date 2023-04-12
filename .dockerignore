@@ -4,7 +4,6 @@
 docs/
 .idea/
 .vscode/
-go.work*
 
 LICENSE
 README.md
