@@ -53,15 +53,13 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
 		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.Block, e.IsBootstrapped, opts...)
 
-		e.HookConstructed(func() {
-			e.Events.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
-				_ = t.AddTip(block)
-			}, event.WithWorkerPool(t.workers.CreatePool("AddTip", 2)))
+		e.Events.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
+			_ = t.AddTip(block)
+		}, event.WithWorkerPool(t.workers.CreatePool("AddTip", 2)))
 
-			e.Events.EvictionState.SlotEvicted.Hook(t.evict, event.WithWorkerPool(t.workers.CreatePool("SlotEvicted", 1)))
+		e.Events.EvictionState.SlotEvicted.Hook(t.evict, event.WithWorkerPool(t.workers.CreatePool("SlotEvicted", 1)))
 
-			t.TriggerInitialized()
-		})
+		t.TriggerInitialized()
 
 		return t
 	})
@@ -172,6 +170,11 @@ func (t *TipManager) TipCount() int {
 	defer t.mutex.RUnlock()
 
 	return t.tips.Size()
+}
+
+func (t *TipManager) Shutdown() {
+	t.workers.Shutdown()
+	t.TriggerStopped()
 }
 
 func (t *TipManager) addTip(block *blockdag.Block) (added bool) {

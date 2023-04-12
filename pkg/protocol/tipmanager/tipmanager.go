@@ -24,5 +24,8 @@ type TipManager interface {
 	// TipCount returns the total number of tips in the tip pool.
 	TipCount() (count int)
 
+	// Shutdown shuts down the TipManager.
+	Shutdown()
+
 	module.Interface
 }

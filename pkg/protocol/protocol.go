@@ -62,13 +62,14 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	}, opts,
 		(*Protocol).initNetworkEvents,
 		(*Protocol).initEngineManager,
-		(*Protocol).initTipManager,
 	)
 }
 
 // Run runs the protocol.
 func (p *Protocol) Run() {
 	p.Events.Engine.LinkTo(p.mainEngine.Events)
+	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
+	p.Events.TipManager.LinkTo(p.TipManager.Events())
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
 		panic(err)
@@ -85,6 +86,8 @@ func (p *Protocol) Shutdown() {
 	if p.networkProtocol != nil {
 		p.networkProtocol.Unregister()
 	}
+
+	p.TipManager.Shutdown()
 
 	p.mainEngine.Shutdown()
 
@@ -129,10 +132,6 @@ func (p *Protocol) initEngineManager() {
 		panic(err)
 	}
 	p.mainEngine = mainEngine
-}
-
-func (p *Protocol) initTipManager() {
-	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
 }
 
 func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
