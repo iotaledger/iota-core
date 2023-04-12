@@ -18,6 +18,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -26,6 +28,7 @@ import (
 type Protocol struct {
 	Events        *Events
 	engineManager *enginemanager.EngineManager
+	tipManager    tipmanager.TipManager
 
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
@@ -41,24 +44,27 @@ type Protocol struct {
 	optsEngineOptions                 []options.Option[engine.Engine]
 	optsStorageDatabaseManagerOptions []options.Option[database.Manager]
 
-	optsFilterProvider   module.Provider[*engine.Engine, filter.Filter]
-	optsBlockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG]
+	optsFilterProvider     module.Provider[*engine.Engine, filter.Filter]
+	optsBlockDAGProvider   module.Provider[*engine.Engine, blockdag.BlockDAG]
+	optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, api iotago.API, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
-		Events:               NewEvents(),
-		Workers:              workers,
-		dispatcher:           dispatcher,
-		api:                  api,
-		optsFilterProvider:   blockfilter.NewProvider(),
-		optsBlockDAGProvider: inmemoryblockdag.NewProvider(),
+		Events:                 NewEvents(),
+		Workers:                workers,
+		dispatcher:             dispatcher,
+		api:                    api,
+		optsFilterProvider:     blockfilter.NewProvider(),
+		optsBlockDAGProvider:   inmemoryblockdag.NewProvider(),
+		optsTipManagerProvider: trivialtipmanager.NewProvider(),
 
 		optsBaseDirectory:    "",
 		optsPruningThreshold: 6 * 60, // 1 hour given that slot duration is 10 seconds
 	}, opts,
 		(*Protocol).initNetworkEvents,
 		(*Protocol).initEngineManager,
+		(*Protocol).initTipManager,
 	)
 }
 
@@ -127,6 +133,10 @@ func (p *Protocol) initEngineManager() {
 	p.mainEngine = mainEngine
 }
 
+func (p *Protocol) initTipManager() {
+	p.tipManager = p.optsTipManagerProvider(p.mainEngine)
+}
+
 func (p *Protocol) API() iotago.API {
 	return p.api
 }
@@ -183,6 +193,12 @@ func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, filte
 func WithBlockDAGProvider(optsBlockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG]) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsBlockDAGProvider = optsBlockDAGProvider
+	}
+}
+
+func WithTipManagerProvider(optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsTipManagerProvider = optsTipManagerProvider
 	}
 }
 
