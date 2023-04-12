@@ -24,7 +24,7 @@ export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 echo "Build iota-core"
 # Allow docker compose to build and cache an image
-docker compose -f $DOCKER_COMPOSE_FILE build
+docker compose -f $DOCKER_COMPOSE_FILE build --build-arg WITH_GO_WORK=${WITH_GO_WORK:-0}
 
 # check exit code of builder
 if [ $? -ne 0 ]

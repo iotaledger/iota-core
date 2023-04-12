@@ -36,6 +36,7 @@ RUN update-ca-certificates
 
 # Download go modules
 RUN go mod download
+# Do not verify modules if we have local modules coming from go.work
 RUN if [ "${WITH_GO_WORK}" = "0" ]; then go mod verify; fi
 
 # Build the binary
