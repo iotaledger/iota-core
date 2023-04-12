@@ -41,6 +41,7 @@ then
 else
   go run ../genesis-snapshot/. --config docker
 fi
+chmod o+r *.snapshot
 
 
 echo "Run iota-core network with ${DOCKER_COMPOSE_FILE}"
@@ -59,4 +60,4 @@ docker compose -f $DOCKER_COMPOSE_FILE up
 
 echo "Clean up docker resources"
 docker compose down -v
-#rm *.snapshot
+rm *.snapshot
