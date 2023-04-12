@@ -127,20 +127,6 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	s.latestRootBlocks.Add(id)
 }
 
-func (s *State) AddRootBlockWithoutCheck(id iotago.BlockID, commitmentID iotago.CommitmentID) {
-	s.evictionMutex.RLock()
-	defer s.evictionMutex.RUnlock()
-
-	if s.rootBlocks.Get(id.Index(), true).Set(id, commitmentID) {
-		fmt.Println("AddRootBlock", id, commitmentID, "2")
-		if err := s.storage.RootBlocks.Store(id, commitmentID); err != nil {
-			panic(errors.Wrapf(err, "failed to store root block %s", id))
-		}
-	}
-
-	s.latestRootBlocks.Add(id)
-}
-
 // RemoveRootBlock removes a solid entry points from the map.
 func (s *State) RemoveRootBlock(id iotago.BlockID) {
 	s.evictionMutex.RLock()
@@ -155,11 +141,6 @@ func (s *State) RemoveRootBlock(id iotago.BlockID) {
 
 // IsRootBlock returns true if the given block is a root block.
 func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
-	// TODO: shouldn't this be just included in the snapshot and not hardcoded here?
-	// if id == iotago.EmptyBlockID() {
-	// 	return true
-	// }
-
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
@@ -186,7 +167,7 @@ func (s *State) Export(writer io.WriteSeeker, evictedSlot iotago.SlotIndex) (err
 	fmt.Println("exporting root blocks")
 	return stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		fmt.Println("exporting root blocks 2", s.delayedBlockEvictionThreshold(evictedSlot), evictedSlot)
-		for currentSlot := s.delayedBlockEvictionThreshold(evictedSlot); currentSlot <= evictedSlot; currentSlot++ {
+		for currentSlot := s.delayedBlockEvictionThreshold(evictedSlot) + 1; currentSlot <= evictedSlot; currentSlot++ {
 			fmt.Println(currentSlot, s.rootBlocks.Get(currentSlot, false).Size())
 			if err = s.storage.RootBlocks.Stream(currentSlot, func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
 				fmt.Println("exporting root block", rootBlockID, commitmentID)
