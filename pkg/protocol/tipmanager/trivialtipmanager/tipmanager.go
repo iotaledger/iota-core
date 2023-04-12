@@ -44,7 +44,6 @@ type TipManager struct {
 	// TipsConflictTracker *TipsConflictTracker
 
 	optsTimeSinceConfirmationThreshold time.Duration
-	optsWidth                          int
 
 	module.Module
 }
@@ -55,11 +54,11 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.Block, e.IsBootstrapped, opts...)
 
 		e.HookConstructed(func() {
-			e.Events.BlockDAG.BlockAttached.Hook(func(block *blockdag.Block) {
+			e.Events.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
 				_ = t.AddTip(block)
-			}, event.WithWorkerPool(e.Workers.CreatePool("TipManager.AddTip", 2)))
+			}, event.WithWorkerPool(t.workers.CreatePool("AddTip", 2)))
 
-			e.Events.EvictionState.SlotEvicted.Hook(t.evict, event.WithWorkerPool(e.Workers.CreatePool("TipManager.SlotEvicted", 1)))
+			e.Events.EvictionState.SlotEvicted.Hook(t.evict, event.WithWorkerPool(t.workers.CreatePool("SlotEvicted", 1)))
 
 			t.TriggerInitialized()
 		})
@@ -79,7 +78,6 @@ func New(workers *workerpool.Group, evictionState *eviction.State, blockRetrieve
 		tips:                               randommap.New[iotago.BlockID, *blockdag.Block](),
 		walkerCache:                        memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, types.Empty](),
 		optsTimeSinceConfirmationThreshold: time.Minute,
-		optsWidth:                          0,
 	}, opts)
 
 	return
@@ -179,13 +177,9 @@ func (t *TipManager) TipCount() int {
 func (t *TipManager) addTip(block *blockdag.Block) (added bool) {
 	if !t.tips.Has(block.ID()) {
 		t.tips.Set(block.ID(), block)
+		// TODO: add when we have conflict tracking
 		// t.tipsConflictTracker.AddTip(block)
 		t.events.TipAdded.Trigger(block)
-
-		// skip removing tips if a width is set -> allows to artificially create a wide Tangle.
-		if t.tips.Size() <= t.optsWidth {
-			return true
-		}
 
 		// a tip loses its tip status if it is referenced by another block
 		t.removeStrongParents(block)
