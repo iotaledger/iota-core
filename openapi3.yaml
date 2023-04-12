@@ -2656,12 +2656,6 @@ components:
             RCTT:
               description: The recent confirmation time threshold
               type: integer
-            synced:
-              description: Whether the node is synced with the network
-              type: boolean
-            bootstrapped:
-              description: Whether the node has bootstrapped with the network
-              type: boolean
             latestCommittedSlot:
               type: object
               description: Information about the latest seen commitment slot ID.
@@ -2740,7 +2734,6 @@ components:
             - tokenSupply
             - protocolVersion
             - minPowScore
-            - belowMaxDepth
             - rentStructure
             - version
         baseToken:
