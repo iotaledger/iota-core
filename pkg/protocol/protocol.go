@@ -28,7 +28,7 @@ import (
 type Protocol struct {
 	Events        *Events
 	engineManager *enginemanager.EngineManager
-	tipManager    tipmanager.TipManager
+	TipManager    tipmanager.TipManager
 
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
@@ -132,7 +132,7 @@ func (p *Protocol) initEngineManager() {
 }
 
 func (p *Protocol) initTipManager() {
-	p.tipManager = p.optsTipManagerProvider(p.mainEngine)
+	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
 }
 
 func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
