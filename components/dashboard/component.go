@@ -90,12 +90,6 @@ func configureServer() {
 	setupRoutes(server)
 }
 
-func setupRoutes(e *echo.Echo) {
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, World!")
-	})
-}
-
 const (
 	// MsgTypeNodeStatus is the type of the NodeStatus block.
 	MsgTypeNodeStatus byte = iota
