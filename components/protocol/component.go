@@ -94,7 +94,7 @@ func run() error {
 
 		ticker := timeutil.NewTicker(func() {
 			block, err := builder.NewBlockBuilder().
-				StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
+				StrongParents(deps.Protocol.TipManager.Tips(iotago.BlockMaxParents)).
 				Sign(&addr, issuerKey[:]).
 				Build()
 			if err != nil {
