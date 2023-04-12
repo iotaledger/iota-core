@@ -27,6 +27,7 @@ COPY ./iota-core/go.work ./iota-core/
 COPY ./iota-core/go.work.sum ./iota-core/
 
 FROM env-with-go-work-${WITH_GO_WORK} AS build
+ARG WITH_GO_WORK=0
 
 WORKDIR /scratch/iota-core
 
@@ -35,7 +36,7 @@ RUN update-ca-certificates
 
 # Download go modules
 RUN go mod download
-RUN go mod verify
+RUN if [ "${WITH_GO_WORK}" = "0" ]; then go mod verify; fi
 
 # Build the binary
 RUN go build -o /app/iota-core -a -tags="$BUILD_TAGS" -ldflags='-w -s'
