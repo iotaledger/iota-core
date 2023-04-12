@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -161,6 +162,8 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 	}
 
 	e.TriggerInitialized()
+
+	fmt.Println("Engine Settings", e.Storage.Settings.String())
 
 	return
 }

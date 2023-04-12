@@ -68,23 +68,20 @@ type BlockDAG struct {
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.API().SlotTimeProvider, func(index iotago.SlotIndex) (*iotago.Commitment, error) {
-			// TODO: replace with e.Storage.Commitments.Load
-			return nil, nil
-		}, opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.Storage.Commitments.Load, opts...)
 
 		e.HookConstructed(func() {
 			e.Events.Filter.BlockAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
 					e.Events.Error.Trigger(errors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.Block().IssuerID))
 				}
-			}, event.WithWorkerPool(e.Workers.CreatePool("Tangle.Attach", 2)))
+			}, event.WithWorkerPool(e.Workers.CreatePool("BlockDAG.Attach", 2)))
 
-			// TODO: enable once notarization is implemented
-			// e.events.Notarization.SlotCommitted.Hook(func(evt *notarization.SlotCommittedDetails) {
-			// 	b.PromoteFutureBlocksUntil(evt.Commitment.Index())
-			// }, event.WithWorkerPool(e.Workers.CreatePool("Tangle.PromoteFutureBlocksUntil", 1)))
+			e.Storage.Settings.HookInitialized(func() {
+				b.slotTimeProviderFunc = e.Storage.Settings.API().SlotTimeProvider
+			})
 
+			e.Events.BlockDAG.LinkTo(b.events)
 			b.TriggerInitialized()
 		})
 
@@ -93,16 +90,15 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, evictionState *eviction.State, slotTimeProviderFunc func() *iotago.SlotTimeProvider, latestCommitmentFunc func(iotago.SlotIndex) (*iotago.Commitment, error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, evictionState *eviction.State, latestCommitmentFunc func(iotago.SlotIndex) (*iotago.Commitment, error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
-		events:               blockdag.NewEvents(),
-		evictionState:        evictionState,
-		slotTimeProviderFunc: slotTimeProviderFunc,
-		memStorage:           memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blockdag.Block](),
-		commitmentFunc:       latestCommitmentFunc,
-		futureBlocks:         memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*blockdag.Block]](),
-		Workers:              workers,
-		workerPool:           workers.CreatePool("Solidifier", 2),
+		events:         blockdag.NewEvents(),
+		evictionState:  evictionState,
+		memStorage:     memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blockdag.Block](),
+		commitmentFunc: latestCommitmentFunc,
+		futureBlocks:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*blockdag.Block]](),
+		Workers:        workers,
+		workerPool:     workers.CreatePool("Solidifier", 2),
 	}, opts,
 		func(b *BlockDAG) {
 			b.solidifier = causalorder.New[iotago.SlotIndex](
@@ -126,10 +122,6 @@ var _ blockdag.BlockDAG = new(BlockDAG)
 
 func (b *BlockDAG) Events() *blockdag.Events {
 	return b.events
-}
-
-func (b *BlockDAG) SlotTimeProvider() *iotago.SlotTimeProvider {
-	return b.slotTimeProviderFunc()
 }
 
 func (b *BlockDAG) EvictionState() *eviction.State {
@@ -246,6 +238,7 @@ func (b *BlockDAG) markSolid(block *blockdag.Block) (err error) {
 			return
 		}
 	}
+	fmt.Println("markSolid", block.ID())
 
 	// It is important to only set the block as solid when it was not "parked" as a future block.
 	// Future blocks are queued for solidification again when the slot is committed.
@@ -281,15 +274,17 @@ func (b *BlockDAG) checkParents(block *blockdag.Block) (err error) {
 			panic(fmt.Sprintf("parent %s of block %s should exist as block was marked ordered by the solidifier", parentID, block.ID()))
 		}
 
+		// TODO: we should have getters for all properties?
 		// check timestamp monotonicity
-		if parent.Block().IssuingTime.After(block.Block().IssuingTime) {
+		if parent.IssuingTime().After(block.IssuingTime()) {
 			return errors.Errorf("timestamp monotonicity check failed for parent %s with timestamp %s. block timestamp %s", parent.ID(), parent.Block().IssuingTime, block.Block().IssuingTime)
 		}
 
 		// check commitment monotonicity
-		if parent.Block().SlotCommitment.Index > block.Block().SlotCommitment.Index {
-			return errors.Errorf("commitment monotonicity check failed for parent %s with commitment index %d. block commitment index %d", parentID, parent.Block().SlotCommitment.Index, block.Block().SlotCommitment.Index)
-		}
+		// TODO: enable after slotcommitment is part of rootblock
+		// if parent.Block().SlotCommitment.Index > block.Block().SlotCommitment.Index {
+		// 	return errors.Errorf("commitment monotonicity check failed for parent %s with commitment index %d. block commitment index %d", parentID, parent.Block().SlotCommitment.Index, block.Block().SlotCommitment.Index)
+		// }
 	}
 
 	return nil
@@ -374,6 +369,7 @@ func (b *BlockDAG) registerChild(child *blockdag.Block, parent model.Parent) {
 // block retrieves the Block with given id from the mem-storage.
 func (b *BlockDAG) block(id iotago.BlockID) (block *blockdag.Block, exists bool) {
 	if b.evictionState.IsRootBlock(id) {
+		// TODO: we need to get the slotcommitment from the rootblock to be able to check for the monotonicity
 		return blockdag.NewRootBlock(id, b.slotTimeProviderFunc()), true
 	}
 

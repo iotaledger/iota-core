@@ -3,6 +3,7 @@ package blockdag
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
@@ -21,12 +22,30 @@ type Block struct {
 	invalid             bool
 	orphaned            bool
 	future              bool
+	issuingTime         *time.Time
+	blockID             *iotago.BlockID
 	strongChildren      []*Block
 	weakChildren        []*Block
 	shallowLikeChildren []*Block
 	mutex               sync.RWMutex
 
 	*ModelsBlock
+}
+
+func (b *Block) IssuingTime() time.Time {
+	if b.issuingTime != nil {
+		return *b.issuingTime
+	}
+
+	return b.Block().IssuingTime
+}
+
+func (b *Block) ID() iotago.BlockID {
+	if b.blockID != nil {
+		return *b.blockID
+	}
+
+	return b.ModelsBlock.ID()
 }
 
 type ModelsBlock = model.Block
@@ -42,15 +61,12 @@ func NewBlock(data *model.Block, opts ...options.Option[Block]) (newBlock *Block
 }
 
 func NewRootBlock(id iotago.BlockID, slotTimeProvider *iotago.SlotTimeProvider, opts ...options.Option[model.Block]) (rootBlock *Block) {
-	// issuingTime := time.Unix(slotTimeProvider.GenesisUnixTime(), 0)
-	// if id.Index() > 0 {
-	// 	issuingTime = slotTimeProvider.EndTime(id.Index())
-	// }
 	return NewBlock(
-		// TODO: model.NewEmptyBlock(id, append([]options.Option[model.Block]{models.WithIssuingTime(issuingTime)}, opts...)...),
-		&model.Block{},
+		nil,
+		WithBlockID(id),
 		WithSolid(true),
 		WithMissing(false),
+		WithIssuingTime(slotTimeProvider.EndTime(id.Index())),
 	)
 }
 
@@ -250,9 +266,15 @@ func (b *Block) String() string {
 
 // region Options //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func WithModelOptions(opts ...options.Option[model.Block]) options.Option[Block] {
+func WithIssuingTime(issuingTime time.Time) options.Option[Block] {
 	return func(block *Block) {
-		options.Apply(block.ModelsBlock, opts)
+		block.issuingTime = &issuingTime
+	}
+}
+
+func WithBlockID(blockID iotago.BlockID) options.Option[Block] {
+	return func(block *Block) {
+		block.blockID = &blockID
 	}
 }
 

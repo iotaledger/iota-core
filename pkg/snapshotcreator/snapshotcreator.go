@@ -49,6 +49,8 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	)
 	defer engineInstance.Shutdown()
 
+	engineInstance.EvictionState.AddRootBlockWithoutCheck(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID())
+
 	if err := engineInstance.WriteSnapshot(opt.FilePath); err != nil {
 		return err
 	}
