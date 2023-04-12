@@ -69,11 +69,11 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
-		Component.LogInfof("BlockReceived: %s", block.ID)
+		Component.LogInfof("BlockReceived: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
-		Component.LogInfof("BlockSolid: %s", block.ID)
+		Component.LogInfof("BlockSolid: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(event *blockdag.BlockInvalidEvent) {

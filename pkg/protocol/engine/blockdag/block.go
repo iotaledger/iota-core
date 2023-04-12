@@ -3,20 +3,20 @@ package blockdag
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// region Block ////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // Block represents a Block annotated with Tangle related metadata.
 type Block struct {
-	missing             bool
+	missing        bool
+	missingBlockID iotago.BlockID
+
 	solid               bool
 	invalid             bool
 	orphaned            bool
@@ -26,32 +26,86 @@ type Block struct {
 	shallowLikeChildren []*Block
 	mutex               sync.RWMutex
 
+	*rootBlock
 	*ModelsBlock
+}
+
+type rootBlock struct {
+	blockID      iotago.BlockID
+	commitmentID iotago.CommitmentID
+	issuingTime  time.Time
 }
 
 type ModelsBlock = model.Block
 
 // NewBlock creates a new Block with the given options.
-func NewBlock(data *model.Block, opts ...options.Option[Block]) (newBlock *Block) {
-	return options.Apply(&Block{
-		strongChildren:      make([]*Block, 0),
-		weakChildren:        make([]*Block, 0),
-		shallowLikeChildren: make([]*Block, 0),
-		ModelsBlock:         data,
-	}, opts)
+func NewBlock(data *model.Block) *Block {
+	return &Block{
+		ModelsBlock: data,
+	}
 }
 
-func NewRootBlock(id iotago.BlockID, slotTimeProvider *iotago.SlotTimeProvider, opts ...options.Option[model.Block]) (rootBlock *Block) {
-	// issuingTime := time.Unix(slotTimeProvider.GenesisUnixTime(), 0)
-	// if id.Index() > 0 {
-	// 	issuingTime = slotTimeProvider.EndTime(id.Index())
-	// }
-	return NewBlock(
-		// TODO: model.NewEmptyBlock(id, append([]options.Option[model.Block]{models.WithIssuingTime(issuingTime)}, opts...)...),
-		&model.Block{},
-		WithSolid(true),
-		WithMissing(false),
-	)
+func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
+	return &Block{
+		rootBlock: &rootBlock{
+			blockID:      blockID,
+			commitmentID: commitmentID,
+			issuingTime:  issuingTime,
+		},
+		solid: true,
+	}
+}
+
+func NewMissingBlock(blockID iotago.BlockID) *Block {
+	return &Block{
+		missing:        true,
+		missingBlockID: blockID,
+	}
+}
+
+func (b *Block) ID() iotago.BlockID {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	if b.missing {
+		return b.missingBlockID
+	}
+
+	if b.rootBlock != nil {
+		return b.rootBlock.blockID
+	}
+
+	return b.ModelsBlock.ID()
+}
+
+func (b *Block) IssuingTime() time.Time {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	if b.missing {
+		return time.Time{}
+	}
+
+	if b.rootBlock != nil {
+		return b.rootBlock.issuingTime
+	}
+
+	return b.ModelsBlock.IssuingTime()
+}
+
+func (b *Block) SlotCommitmentID() iotago.CommitmentID {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	if b.missing {
+		return iotago.CommitmentID{}
+	}
+
+	if b.rootBlock != nil {
+		return b.rootBlock.commitmentID
+	}
+
+	return b.ModelsBlock.SlotCommitmentID()
 }
 
 // IsMissing returns a flag that indicates if the underlying Block data hasn't been stored, yet.
@@ -245,36 +299,3 @@ func (b *Block) String() string {
 
 	return builder.String()
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// region Options //////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func WithModelOptions(opts ...options.Option[model.Block]) options.Option[Block] {
-	return func(block *Block) {
-		options.Apply(block.ModelsBlock, opts)
-	}
-}
-
-// WithMissing is a constructor Option for Blocks that initializes the given block with a specific missing flag.
-func WithMissing(missing bool) options.Option[Block] {
-	return func(block *Block) {
-		block.missing = missing
-	}
-}
-
-// WithSolid is a constructor Option for Blocks that initializes the given block with a specific solid flag.
-func WithSolid(solid bool) options.Option[Block] {
-	return func(block *Block) {
-		block.solid = solid
-	}
-}
-
-// WithOrphaned is a constructor Option for Blocks that initializes the given block with a specific orphaned flag.
-func WithOrphaned(markedOrphaned bool) options.Option[Block] {
-	return func(block *Block) {
-		block.orphaned = markedOrphaned
-	}
-}
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
