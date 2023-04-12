@@ -274,17 +274,15 @@ func (b *BlockDAG) checkParents(block *blockdag.Block) (err error) {
 			panic(fmt.Sprintf("parent %s of block %s should exist as block was marked ordered by the solidifier", parentID, block.ID()))
 		}
 
-		// TODO: we should have getters for all properties?
 		// check timestamp monotonicity
 		if parent.IssuingTime().After(block.IssuingTime()) {
-			return errors.Errorf("timestamp monotonicity check failed for parent %s with timestamp %s. block timestamp %s", parent.ID(), parent.Block().IssuingTime, block.Block().IssuingTime)
+			return errors.Errorf("timestamp monotonicity check failed for parent %s with timestamp %s. block timestamp %s", parent.ID(), parent.IssuingTime(), block.IssuingTime())
 		}
 
 		// check commitment monotonicity
-		// TODO: enable after slotcommitment is part of rootblock
-		// if parent.Block().SlotCommitment.Index > block.Block().SlotCommitment.Index {
-		// 	return errors.Errorf("commitment monotonicity check failed for parent %s with commitment index %d. block commitment index %d", parentID, parent.Block().SlotCommitment.Index, block.Block().SlotCommitment.Index)
-		// }
+		if parent.SlotCommitmentID().Index() > block.SlotCommitmentID().Index() {
+			return errors.Errorf("commitment monotonicity check failed for parent %s with commitment index %d. block commitment index %d", parentID, parent.SlotCommitmentID().Index(), block.SlotCommitmentID().Index())
+		}
 	}
 
 	return nil
@@ -356,9 +354,8 @@ func (b *BlockDAG) registerChild(child *blockdag.Block, parent model.Parent) {
 	}
 
 	parentBlock, _ := b.memStorage.Get(parent.ID.Index(), true).GetOrCreate(parent.ID, func() (newBlock *blockdag.Block) {
-		// TODO: define missing block
-		// newBlock = blockdag.NewBlock(models.NewEmptyBlock(parent.ID), blockdag.WithMissing(true))
-		// b.events.BlockMissing.Trigger(newBlock)
+		newBlock = blockdag.NewMissingBlock(parent.ID)
+		b.events.BlockMissing.Trigger(newBlock)
 
 		return newBlock
 	})
@@ -368,9 +365,8 @@ func (b *BlockDAG) registerChild(child *blockdag.Block, parent model.Parent) {
 
 // block retrieves the Block with given id from the mem-storage.
 func (b *BlockDAG) block(id iotago.BlockID) (block *blockdag.Block, exists bool) {
-	if b.evictionState.IsRootBlock(id) {
-		// TODO: we need to get the slotcommitment from the rootblock to be able to check for the monotonicity
-		return blockdag.NewRootBlock(id, b.slotTimeProviderFunc()), true
+	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
+		return blockdag.NewRootBlock(id, commitmentID, b.slotTimeProviderFunc().EndTime(id.Index())), true
 	}
 
 	storage := b.memStorage.Get(id.Index(), false)

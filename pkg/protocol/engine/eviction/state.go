@@ -153,6 +153,23 @@ func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
 	return slotBlocks != nil && slotBlocks.Has(id)
 }
 
+// RootBlockCommitmentID returns the commitmentID if it is a known root block.
+func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.CommitmentID, exists bool) {
+	s.evictionMutex.RLock()
+	defer s.evictionMutex.RUnlock()
+
+	if id.Index() <= s.delayedBlockEvictionThreshold(s.lastEvictedSlot) || id.Index() > s.lastEvictedSlot {
+		return iotago.CommitmentID{}, false
+	}
+
+	slotBlocks := s.rootBlocks.Get(id.Index(), false)
+	if slotBlocks == nil {
+		return iotago.CommitmentID{}, false
+	}
+
+	return slotBlocks.Get(id)
+}
+
 // LatestRootBlocks returns the latest root blocks.
 func (s *State) LatestRootBlocks() iotago.BlockIDs {
 	rootBlocks := s.latestRootBlocks.Elements()
