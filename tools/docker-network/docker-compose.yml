@@ -29,7 +29,6 @@ services:
       --p2p.seed=0xf739eea09eb0f4820f26504a3135131a075089b4c901c19c2099513ee016f516
     volumes:
       - ./docker-network.snapshot:/app/snapshot.bin
-
     ports:
       - "8070:8080/tcp" # web API
       - "8071:8081/tcp" # dashboard
@@ -52,6 +51,9 @@ services:
       - "6041:6061/tcp" # pprof
     networks:
       - iota-core
+    depends_on:
+      - peer_master
+      - faucet
 
   peer_nomana2:
     image: docker-network-peer_master:latest
@@ -68,7 +70,10 @@ services:
       - "6031:6061/tcp" # pprof
     networks:
       - iota-core
-
+    depends_on:
+      - peer_master
+      - faucet
+      
   faucet:
     image: docker-network-peer_master:latest
     stop_grace_period: 1m
@@ -84,6 +89,8 @@ services:
       - "6091:6061/tcp" # pprof
     networks:
       - iota-core
+    depends_on:
+      - peer_master
 
   prometheus:
     image: prom/prometheus:latest
