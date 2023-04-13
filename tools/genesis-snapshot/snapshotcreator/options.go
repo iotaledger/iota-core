@@ -14,6 +14,9 @@ type Options struct {
 	// ProtocolParameters provides the protocol parameters used for the network.
 	ProtocolParameters iotago.ProtocolParameters
 
+	// RootBlocks define the initial blocks to which new blocks can attach to.
+	RootBlocks map[iotago.BlockID]iotago.CommitmentID
+
 	DataBaseVersion database.Version
 }
 
@@ -41,5 +44,12 @@ func WithFilePath(filePath string) options.Option[Options] {
 func WithProtocolParameters(params iotago.ProtocolParameters) options.Option[Options] {
 	return func(m *Options) {
 		m.ProtocolParameters = params
+	}
+}
+
+// WithRootBlocks define the initial blocks to which new blocks can attach to.
+func WithRootBlocks(rootBlocks map[iotago.BlockID]iotago.CommitmentID) options.Option[Options] {
+	return func(m *Options) {
+		m.RootBlocks = rootBlocks
 	}
 }

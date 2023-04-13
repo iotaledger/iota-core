@@ -26,6 +26,9 @@ var Base = []options.Option[snapshotcreator.Options]{
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
 	}),
+	snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
+		iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
+	}),
 }
 
 var Docker = []options.Option[snapshotcreator.Options]{
@@ -50,7 +53,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithFilePath("docker-network.snapshot"),
 	snapshotcreator.WithProtocolParameters(iotago.ProtocolParameters{
 		Version:     3,
-		NetworkName: "docker",
+		NetworkName: "feature",
 		Bech32HRP:   "rms",
 		MinPoWScore: 10,
 		RentStructure: iotago.RentStructure{
