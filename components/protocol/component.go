@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
@@ -74,6 +75,9 @@ func configure() error {
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
 		Component.LogInfof("BlockSolid: %s", block.ID())
+	})
+	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *booker.Block) {
+		Component.LogInfof("BlockBooked: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(event *blockdag.BlockInvalidEvent) {

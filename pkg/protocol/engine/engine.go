@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -33,7 +34,8 @@ type Engine struct {
 	Filter         filter.Filter
 	EvictionState  *eviction.State
 	BlockRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
-	blockDAG       blockdag.BlockDAG
+	BlockDAG       blockdag.BlockDAG
+	Booker         booker.Booker
 
 	Workers *workerpool.Group
 
@@ -53,6 +55,7 @@ func New(
 	storageInstance *storage.Storage,
 	filterProvider module.Provider[*Engine, filter.Filter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
+	bookerProvider module.Provider[*Engine, booker.Booker],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -65,9 +68,11 @@ func New(
 			optsBootstrappedThreshold: 10 * time.Second,
 			optsSnapshotDepth:         5,
 		}, opts, func(e *Engine) {
-			e.blockDAG = blockDAGProvider(e)
-			e.Filter = filterProvider(e)
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
+
+			e.BlockDAG = blockDAGProvider(e)
+			e.Filter = filterProvider(e)
+			e.Booker = bookerProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings.TriggerInitialized,
@@ -115,7 +120,7 @@ func (e *Engine) Block(id iotago.BlockID) (block *blockdag.Block, exists bool) {
 	// block, err = e.Storage.Blocks.Load(id)
 	// exists = block != nil && err == nil
 
-	return e.blockDAG.Block(id)
+	return e.BlockDAG.Block(id)
 }
 
 func (e *Engine) IsBootstrapped() (isBootstrapped bool) {

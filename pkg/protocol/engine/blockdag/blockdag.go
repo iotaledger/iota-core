@@ -7,8 +7,6 @@ import (
 )
 
 type BlockDAG interface {
-	Events() *Events
-
 	// Attach is used to attach new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
 	Attach(data *model.Block) (block *Block, wasAttached bool, err error)
 

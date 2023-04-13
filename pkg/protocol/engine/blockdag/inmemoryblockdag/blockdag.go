@@ -158,6 +158,10 @@ func (b *BlockDAG) SetInvalid(block *blockdag.Block, reason error) (wasUpdated b
 			Reason: reason,
 		})
 
+		// TODO: is it really necessary to walk the future cone here?
+		//  Booking/tracking votes is atomic now, therefore a block can't be further processed before its parents are booked.
+		//  A block can only be determined as invalid during solidification/booking.
+		//  Therefore, it should be sufficient to check on solidification/booking for the status of the parents.
 		b.walkFutureCone(block.Children(), func(currentBlock *blockdag.Block) []*blockdag.Block {
 			if !currentBlock.SetInvalid() {
 				return nil
@@ -238,7 +242,6 @@ func (b *BlockDAG) markSolid(block *blockdag.Block) (err error) {
 			return
 		}
 	}
-	fmt.Println("markSolid", block.ID())
 
 	// It is important to only set the block as solid when it was not "parked" as a future block.
 	// Future blocks are queued for solidification again when the slot is committed.

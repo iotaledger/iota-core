@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -53,8 +54,8 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
 		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.Block, e.IsBootstrapped, opts...)
 
-		e.Events.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
-			_ = t.AddTip(block)
+		e.Events.Booker.BlockBooked.Hook(func(block *booker.Block) {
+			_ = t.AddTip(block.Block)
 		}, event.WithWorkerPool(t.workers.CreatePool("AddTip", 2)))
 
 		e.Events.EvictionState.SlotEvicted.Hook(t.evict, event.WithWorkerPool(t.workers.CreatePool("SlotEvicted", 1)))
@@ -76,7 +77,9 @@ func New(workers *workerpool.Group, evictionState *eviction.State, blockRetrieve
 		tips:                               randommap.New[iotago.BlockID, *blockdag.Block](),
 		walkerCache:                        memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, types.Empty](),
 		optsTimeSinceConfirmationThreshold: time.Minute,
-	}, opts)
+	}, opts,
+		(*TipManager).TriggerConstructed,
+	)
 
 	return
 }
