@@ -24,7 +24,6 @@ func init() {
 		Name:      "Dashboard",
 		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
 		Params:    params,
-		Provide:   provide,
 		Configure: configure,
 		Run:       run,
 		IsEnabled: func() bool {
@@ -47,11 +46,6 @@ type dependencies struct {
 	LocalPeer  *peer.Local
 	AppInfo    *app.Info
 	P2PManager *p2p.Manager
-}
-
-func provide(c *dig.Container) error {
-	// nothing to provide here
-	return nil
 }
 
 func configure() error {
