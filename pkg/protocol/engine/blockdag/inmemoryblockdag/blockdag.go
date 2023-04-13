@@ -68,23 +68,20 @@ type BlockDAG struct {
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.API().SlotTimeProvider, func(index iotago.SlotIndex) (*iotago.Commitment, error) {
-			// TODO: replace with e.Storage.Commitments.Load
-			return nil, nil
-		}, opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.Storage.Commitments.Load, opts...)
 
 		e.HookConstructed(func() {
 			e.Events.Filter.BlockAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
 					e.Events.Error.Trigger(errors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.Block().IssuerID))
 				}
-			}, event.WithWorkerPool(e.Workers.CreatePool("Tangle.Attach", 2)))
+			}, event.WithWorkerPool(e.Workers.CreatePool("BlockDAG.Attach", 2)))
 
-			// TODO: enable once notarization is implemented
-			// e.events.Notarization.SlotCommitted.Hook(func(evt *notarization.SlotCommittedDetails) {
-			// 	b.PromoteFutureBlocksUntil(evt.Commitment.Index())
-			// }, event.WithWorkerPool(e.Workers.CreatePool("Tangle.PromoteFutureBlocksUntil", 1)))
+			e.Storage.Settings.HookInitialized(func() {
+				b.slotTimeProviderFunc = e.Storage.Settings.API().SlotTimeProvider
+			})
 
+			e.Events.BlockDAG.LinkTo(b.events)
 			b.TriggerInitialized()
 		})
 
@@ -93,16 +90,15 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, evictionState *eviction.State, slotTimeProviderFunc func() *iotago.SlotTimeProvider, latestCommitmentFunc func(iotago.SlotIndex) (*iotago.Commitment, error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, evictionState *eviction.State, latestCommitmentFunc func(iotago.SlotIndex) (*iotago.Commitment, error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
-		events:               blockdag.NewEvents(),
-		evictionState:        evictionState,
-		slotTimeProviderFunc: slotTimeProviderFunc,
-		memStorage:           memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blockdag.Block](),
-		commitmentFunc:       latestCommitmentFunc,
-		futureBlocks:         memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*blockdag.Block]](),
-		Workers:              workers,
-		workerPool:           workers.CreatePool("Solidifier", 2),
+		events:         blockdag.NewEvents(),
+		evictionState:  evictionState,
+		memStorage:     memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blockdag.Block](),
+		commitmentFunc: latestCommitmentFunc,
+		futureBlocks:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*blockdag.Block]](),
+		Workers:        workers,
+		workerPool:     workers.CreatePool("Solidifier", 2),
 	}, opts,
 		func(b *BlockDAG) {
 			b.solidifier = causalorder.New[iotago.SlotIndex](
@@ -126,10 +122,6 @@ var _ blockdag.BlockDAG = new(BlockDAG)
 
 func (b *BlockDAG) Events() *blockdag.Events {
 	return b.events
-}
-
-func (b *BlockDAG) SlotTimeProvider() *iotago.SlotTimeProvider {
-	return b.slotTimeProviderFunc()
 }
 
 func (b *BlockDAG) EvictionState() *eviction.State {
@@ -246,6 +238,7 @@ func (b *BlockDAG) markSolid(block *blockdag.Block) (err error) {
 			return
 		}
 	}
+	fmt.Println("markSolid", block.ID())
 
 	// It is important to only set the block as solid when it was not "parked" as a future block.
 	// Future blocks are queued for solidification again when the slot is committed.
@@ -282,13 +275,13 @@ func (b *BlockDAG) checkParents(block *blockdag.Block) (err error) {
 		}
 
 		// check timestamp monotonicity
-		if parent.Block().IssuingTime.After(block.Block().IssuingTime) {
-			return errors.Errorf("timestamp monotonicity check failed for parent %s with timestamp %s. block timestamp %s", parent.ID(), parent.Block().IssuingTime, block.Block().IssuingTime)
+		if parent.IssuingTime().After(block.IssuingTime()) {
+			return errors.Errorf("timestamp monotonicity check failed for parent %s with timestamp %s. block timestamp %s", parent.ID(), parent.IssuingTime(), block.IssuingTime())
 		}
 
 		// check commitment monotonicity
-		if parent.Block().SlotCommitment.Index > block.Block().SlotCommitment.Index {
-			return errors.Errorf("commitment monotonicity check failed for parent %s with commitment index %d. block commitment index %d", parentID, parent.Block().SlotCommitment.Index, block.Block().SlotCommitment.Index)
+		if parent.SlotCommitmentID().Index() > block.SlotCommitmentID().Index() {
+			return errors.Errorf("commitment monotonicity check failed for parent %s with commitment index %d. block commitment index %d", parentID, parent.SlotCommitmentID().Index(), block.SlotCommitmentID().Index())
 		}
 	}
 
@@ -361,9 +354,8 @@ func (b *BlockDAG) registerChild(child *blockdag.Block, parent model.Parent) {
 	}
 
 	parentBlock, _ := b.memStorage.Get(parent.ID.Index(), true).GetOrCreate(parent.ID, func() (newBlock *blockdag.Block) {
-		// TODO: define missing block
-		// newBlock = blockdag.NewBlock(models.NewEmptyBlock(parent.ID), blockdag.WithMissing(true))
-		// b.events.BlockMissing.Trigger(newBlock)
+		newBlock = blockdag.NewMissingBlock(parent.ID)
+		b.events.BlockMissing.Trigger(newBlock)
 
 		return newBlock
 	})
@@ -373,8 +365,8 @@ func (b *BlockDAG) registerChild(child *blockdag.Block, parent model.Parent) {
 
 // block retrieves the Block with given id from the mem-storage.
 func (b *BlockDAG) block(id iotago.BlockID) (block *blockdag.Block, exists bool) {
-	if b.evictionState.IsRootBlock(id) {
-		return blockdag.NewRootBlock(id, b.slotTimeProviderFunc()), true
+	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
+		return blockdag.NewRootBlock(id, commitmentID, b.slotTimeProviderFunc().EndTime(id.Index())), true
 	}
 
 	storage := b.memStorage.Get(id.Index(), false)

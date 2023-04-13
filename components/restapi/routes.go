@@ -21,6 +21,7 @@ type RoutesResponse struct {
 func setupRoutes() {
 
 	deps.Echo.GET(nodeAPIHealthRoute, func(c echo.Context) error {
+		// TODO: health check
 		return c.NoContent(http.StatusOK)
 	})
 

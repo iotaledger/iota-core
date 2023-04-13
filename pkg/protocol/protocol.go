@@ -18,6 +18,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -26,6 +28,7 @@ import (
 type Protocol struct {
 	Events        *Events
 	engineManager *enginemanager.EngineManager
+	TipManager    tipmanager.TipManager
 
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
@@ -40,17 +43,19 @@ type Protocol struct {
 	optsEngineOptions                 []options.Option[engine.Engine]
 	optsStorageDatabaseManagerOptions []options.Option[database.Manager]
 
-	optsFilterProvider   module.Provider[*engine.Engine, filter.Filter]
-	optsBlockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG]
+	optsFilterProvider     module.Provider[*engine.Engine, filter.Filter]
+	optsBlockDAGProvider   module.Provider[*engine.Engine, blockdag.BlockDAG]
+	optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
-		Events:               NewEvents(),
-		Workers:              workers,
-		dispatcher:           dispatcher,
-		optsFilterProvider:   blockfilter.NewProvider(),
-		optsBlockDAGProvider: inmemoryblockdag.NewProvider(),
+		Events:                 NewEvents(),
+		Workers:                workers,
+		dispatcher:             dispatcher,
+		optsFilterProvider:     blockfilter.NewProvider(),
+		optsBlockDAGProvider:   inmemoryblockdag.NewProvider(),
+		optsTipManagerProvider: trivialtipmanager.NewProvider(),
 
 		optsBaseDirectory:    "",
 		optsPruningThreshold: 6 * 60, // 1 hour given that slot duration is 10 seconds
@@ -63,6 +68,8 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 // Run runs the protocol.
 func (p *Protocol) Run() {
 	p.Events.Engine.LinkTo(p.mainEngine.Events)
+	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
+	p.Events.TipManager.LinkTo(p.TipManager.Events())
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
 		panic(err)
@@ -79,6 +86,8 @@ func (p *Protocol) Shutdown() {
 	if p.networkProtocol != nil {
 		p.networkProtocol.Unregister()
 	}
+
+	p.TipManager.Shutdown()
 
 	p.mainEngine.Shutdown()
 
@@ -177,6 +186,12 @@ func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, filte
 func WithBlockDAGProvider(optsBlockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG]) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsBlockDAGProvider = optsBlockDAGProvider
+	}
+}
+
+func WithTipManagerProvider(optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsTipManagerProvider = optsTipManagerProvider
 	}
 }
 

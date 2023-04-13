@@ -112,6 +112,9 @@ func init() {
 		Name:      "CoreAPIV3",
 		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
 		Configure: configure,
+		IsEnabled: func() bool {
+			return restapi.ParamsRestAPI.Enabled
+		},
 	}
 }
 
@@ -122,10 +125,10 @@ var (
 
 type dependencies struct {
 	dig.In
-	*restapi.RestRouteManager
 
 	Protocol *protocol.Protocol
 	AppInfo  *app.Info
+	RestRouteManager *restapi.RestRouteManager
 }
 
 func configure() error {
