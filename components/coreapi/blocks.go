@@ -36,3 +36,32 @@ func blockByID(c echo.Context) (*iotago.Block, error) {
 
 	return block.Block(), nil
 }
+
+func blockMetadataByID(c echo.Context) (*blockMetadataResponse, error) {
+	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+	if err != nil {
+		return nil, err
+	}
+	bmResponse := &blockMetadataResponse{
+		BlockID:    blockID.ToHex(),
+		BlockState: blockStatePending.String(),
+	}
+	_, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	if !exists {
+		bmResponse.BlockError = "block not found"
+	}
+
+	// todo set states and error types
+
+	return bmResponse, nil
+}
+
+func blockIssuance(c echo.Context) (*blockIssuanceResponse, error) {
+	// todo
+	return nil, nil
+}
+
+func sendBlock(c echo.Context) (*blockCreatedResponse, error) {
+	// todo
+	return nil, nil
+}

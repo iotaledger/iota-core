@@ -126,8 +126,8 @@ var (
 type dependencies struct {
 	dig.In
 
-	Protocol *protocol.Protocol
-	AppInfo  *app.Info
+	Protocol         *protocol.Protocol
+	AppInfo          *app.Info
 	RestRouteManager *restapi.RestRouteManager
 }
 
@@ -168,5 +168,58 @@ func configure() error {
 			return httpserver.JSONResponse(c, http.StatusOK, resp)
 		}
 	})
+
+	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
+		resp, err := blockMetadataByID(c)
+		if err != nil {
+			return err
+		}
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeAlmostSynced())
+
+	routeGroup.POST(RouteBlocks, func(c echo.Context) error {
+		resp, err := sendBlock(c)
+		if err != nil {
+			return err
+		}
+		c.Response().Header().Set(echo.HeaderLocation, resp.BlockID)
+
+		return httpserver.JSONResponse(c, http.StatusCreated, resp)
+	}, checkNodeAlmostSynced(), checkUpcomingUnsupportedProtocolVersion())
+
+	routeGroup.GET(RouteBlockIssuance, func(c echo.Context) error {
+		resp, err := blockIssuance(c)
+		if err != nil {
+			return err
+		}
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	})
+
 	return nil
+}
+
+func checkNodeAlmostSynced() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// todo update with sync status
+			//if !deps.SyncManager.IsNodeAlmostSynced() {
+			//	return errors.WithMessage(echo.ErrServiceUnavailable, "node is not synced")
+			//}
+
+			return next(c)
+		}
+	}
+}
+
+func checkUpcomingUnsupportedProtocolVersion() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// todo update with protocol upgrades support
+			//if !deps.ProtocolManager.NextPendingSupported() {
+			//	return errors.WithMessage(echo.ErrServiceUnavailable, "node does not support the upcoming protocol upgrade")
+			//}
+
+			return next(c)
+		}
+	}
 }

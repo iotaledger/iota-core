@@ -5,6 +5,54 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+type txState int
+
+const (
+	txStatePending txState = iota
+	txStateConfirmed
+	txStateFinalized
+	txStateRejected
+	txStateConflicting
+)
+
+func (t txState) String() string {
+	switch t {
+	case txStatePending:
+		return "pending"
+	case txStateConfirmed:
+		return "confirmed"
+	case txStateFinalized:
+		return "finalized"
+	case txStateRejected:
+		return "rejected"
+	case txStateConflicting:
+		return "conflicting"
+	default:
+		return "unknown"
+	}
+}
+
+type blockState int
+
+const (
+	blockStatePending blockState = iota
+	blockStateConfirmed
+	blockStateFinalized
+)
+
+func (b blockState) String() string {
+	switch b {
+	case blockStatePending:
+		return "pending"
+	case blockStateConfirmed:
+		return "confirmed"
+	case blockStateFinalized:
+		return "finalized"
+	default:
+		return "unknown"
+	}
+}
+
 // slotInfoResponse defines the slot info response.
 type slotInfoResponse struct {
 	// The index of the latest commitment.
@@ -57,4 +105,34 @@ type nodeMetrics struct {
 	ReferencedBlocksPerSecond float64 `json:"referencedBlocksPerSecond"`
 	// The ratio of referenced blocks in relation to new blocks of the last confirmed milestone.
 	ReferencedRate float64 `json:"referencedRate"`
+}
+
+// blockMetadataResponse defines the response of a GET block metadata REST API call.
+type blockMetadataResponse struct {
+	// The hex encoded block ID of the block.
+	BlockID string `json:"blockId"`
+	// BlockState might be pending, confirmed, finalized.
+	BlockState string `json:"blockState"`
+	// TxState might be pending, conflicting, confirmed, finalized, rejected.
+	TxState string `json:"txState,omitempty"`
+	// BlockError if applicable indicates the error that occurred during the block processing.
+	BlockError string `json:"blockError,omitempty"`
+	// TxError if applicable indicates the error that occurred during the transaction processing.
+	TxError string `json:"txError,omitempty"`
+	// Whether the block should be reissued.
+	ShouldReissue *bool `json:"shouldReattach,omitempty"`
+}
+
+type blockIssuanceResponse struct {
+	StrongParents       iotago.StrongParentsIDs     `json:"strongParents"`
+	WeakParents         iotago.WeakParentsIDs       `json:"weakParents"`
+	ShallowParents      iotago.ShallowLikeParentIDs `json:"shallowParents"`
+	LatestConfirmedSlot iotago.SlotIndex            `json:"latestConfirmedSlot"`
+	Commitment          iotago.Commitment           `json:"commitment"`
+}
+
+// blockCreatedResponse defines the response of a POST blocks REST API call.
+type blockCreatedResponse struct {
+	// The hex encoded block ID of the block.
+	BlockID string `json:"blockId"`
 }
