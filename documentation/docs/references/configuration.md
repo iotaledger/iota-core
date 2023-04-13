@@ -69,15 +69,22 @@ Example:
 
 ## <a id="logger"></a> 2. Logger
 
-| Name              | Description                                                                 | Type    | Default value |
-| ----------------- | --------------------------------------------------------------------------- | ------- | ------------- |
-| level             | The minimum enabled logging level                                           | string  | "info"        |
-| disableCaller     | Stops annotating logs with the calling function's file name and line number | boolean | true          |
-| disableStacktrace | Disables automatic stacktrace capturing                                     | boolean | false         |
-| stacktraceLevel   | The level stacktraces are captured and above                                | string  | "panic"       |
-| encoding          | The logger's encoding (options: "json", "console")                          | string  | "console"     |
-| outputPaths       | A list of URLs, file paths or stdout/stderr to write logging output to      | array   | stdout        |
-| disableEvents     | Prevents log messages from being raced as events                            | boolean | true          |
+| Name                                     | Description                                                                 | Type    | Default value |
+| ---------------------------------------- | --------------------------------------------------------------------------- | ------- | ------------- |
+| level                                    | The minimum enabled logging level                                           | string  | "info"        |
+| disableCaller                            | Stops annotating logs with the calling function's file name and line number | boolean | true          |
+| disableStacktrace                        | Disables automatic stacktrace capturing                                     | boolean | false         |
+| stacktraceLevel                          | The level stacktraces are captured and above                                | string  | "panic"       |
+| encoding                                 | The logger's encoding (options: "json", "console")                          | string  | "console"     |
+| [encodingConfig](#logger_encodingconfig) | Configuration for encodingConfig                                            | object  |               |
+| outputPaths                              | A list of URLs, file paths or stdout/stderr to write logging output to      | array   | stdout        |
+| disableEvents                            | Prevents log messages from being raced as events                            | boolean | true          |
+
+### <a id="logger_encodingconfig"></a> EncodingConfig
+
+| Name        | Description                                                                                                | Type   | Default value |
+| ----------- | ---------------------------------------------------------------------------------------------------------- | ------ | ------------- |
+| timeEncoder | Sets the logger's timestamp encoding. (options: "nanos", "millis", "iso8601", "rfc3339" and "rfc3339nano") | string | "rfc3339"     |
 
 Example:
 
@@ -89,6 +96,9 @@ Example:
       "disableStacktrace": false,
       "stacktraceLevel": "panic",
       "encoding": "console",
+      "encodingConfig": {
+        "timeEncoder": "rfc3339"
+      },
       "outputPaths": [
         "stdout"
       ],
@@ -99,47 +109,24 @@ Example:
 
 ## <a id="p2p"></a> 3. P2p
 
-| Name                                        | Description                                                        | Type   | Default value                                |
-| ------------------------------------------- | ------------------------------------------------------------------ | ------ | -------------------------------------------- |
-| bindMultiAddresses                          | The bind addresses for this node                                   | array  | /ip4/0.0.0.0/tcp/15600<br/>/ip6/::/tcp/15600 |
-| [connectionManager](#p2p_connectionmanager) | Configuration for connectionManager                                | object |                                              |
-| identityPrivateKey                          | Private key used to derive the node identity (optional)            | string | ""                                           |
-| [db](#p2p_db)                               | Configuration for db                                               | object |                                              |
-| reconnectInterval                           | The time to wait before trying to reconnect to a disconnected peer | string | "30s"                                        |
-
-### <a id="p2p_connectionmanager"></a> ConnectionManager
-
-| Name          | Description                                                                  | Type | Default value |
-| ------------- | ---------------------------------------------------------------------------- | ---- | ------------- |
-| highWatermark | The threshold up on which connections count truncates to the lower watermark | int  | 10            |
-| lowWatermark  | The minimum connections count to hold after the high watermark was reached   | int  | 5             |
-
-### <a id="p2p_db"></a> Db
-
-| Name   | Description                              | Type   | Default value   |
-| ------ | ---------------------------------------- | ------ | --------------- |
-| engine | The used database engine (rocksdb/mapdb) | string | "rocksdb"       |
-| path   | The path to the p2p database             | string | "data/p2pstore" |
+| Name                | Description                                                                                                                                          | Type    | Default value   |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | --------------- |
+| bindAddress         | The bind address for p2p connections                                                                                                                 | string  | "0.0.0.0:14666" |
+| seed                | Private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively | string  | ""              |
+| overwriteStoredSeed | Whether to overwrite the private key if an existing peerdb exists                                                                                    | boolean | false           |
+| externalAddress     | External IP address under which the node is reachable; or 'auto' to determine it automatically                                                       | string  | "auto"          |
+| peerDBDirectory     | Path to the peer database directory                                                                                                                  | string  | "peerdb"        |
 
 Example:
 
 ```json
   {
     "p2p": {
-      "bindMultiAddresses": [
-        "/ip4/0.0.0.0/tcp/15600",
-        "/ip6/::/tcp/15600"
-      ],
-      "connectionManager": {
-        "highWatermark": 10,
-        "lowWatermark": 5
-      },
-      "identityPrivateKey": "",
-      "db": {
-        "engine": "rocksdb",
-        "path": "data/p2pstore"
-      },
-      "reconnectInterval": "30s"
+      "bindAddress": "0.0.0.0:14666",
+      "seed": "",
+      "overwriteStoredSeed": false,
+      "externalAddress": "auto",
+      "peerDBDirectory": "peerdb"
     }
   }
 ```
@@ -148,7 +135,7 @@ Example:
 
 | Name        | Description                                       | Type    | Default value    |
 | ----------- | ------------------------------------------------- | ------- | ---------------- |
-| enabled     | Whether the profiling plugin is enabled           | boolean | false            |
+| enabled     | Whether the profiling component is enabled        | boolean | false            |
 | bindAddress | The bind address on which the profiler listens on | string  | "localhost:6060" |
 
 Example:
@@ -208,6 +195,66 @@ Example:
       "limits": {
         "maxBodyLength": "1M",
         "maxResults": 1000
+      }
+    }
+  }
+```
+
+## <a id="database"></a> 6. Database
+
+| Name                           | Description                                                   | Type    | Default value |
+| ------------------------------ | ------------------------------------------------------------- | ------- | ------------- |
+| directory                      | Path to the database directory                                | string  | "db"          |
+| inMemory                       | Whether the database is only kept in memory and not persisted | boolean | false         |
+| maxOpenDBs                     | Maximum number of open database instances                     | int     | 10            |
+| pruningThreshold               | How many confirmed slots should be retained                   | uint    | 360           |
+| dbGranularity                  | How many slots should be contained in a single DB instance    | int     | 1             |
+| [settings](#database_settings) | Configuration for settings                                    | object  |               |
+
+### <a id="database_settings"></a> Settings
+
+| Name     | Description                                                            | Type   | Default value  |
+| -------- | ---------------------------------------------------------------------- | ------ | -------------- |
+| fileName | The file name of the settings file, relative to the database directory | string | "settings.bin" |
+
+Example:
+
+```json
+  {
+    "database": {
+      "directory": "db",
+      "inMemory": false,
+      "maxOpenDBs": 10,
+      "pruningThreshold": 360,
+      "dbGranularity": 1,
+      "settings": {
+        "fileName": "settings.bin"
+      }
+    }
+  }
+```
+
+## <a id="protocol"></a> 7. Protocol
+
+| Name                           | Description                | Type   | Default value |
+| ------------------------------ | -------------------------- | ------ | ------------- |
+| [snapshot](#protocol_snapshot) | Configuration for snapshot | object |               |
+
+### <a id="protocol_snapshot"></a> Snapshot
+
+| Name  | Description                                                                                | Type   | Default value    |
+| ----- | ------------------------------------------------------------------------------------------ | ------ | ---------------- |
+| path  | The path of the snapshot file                                                              | string | "./snapshot.bin" |
+| depth | Defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate | int    | 5                |
+
+Example:
+
+```json
+  {
+    "protocol": {
+      "snapshot": {
+        "path": "./snapshot.bin",
+        "depth": 5
       }
     }
   }

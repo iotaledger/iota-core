@@ -15,26 +15,20 @@
     "disableStacktrace": false,
     "stacktraceLevel": "panic",
     "encoding": "console",
+    "encodingConfig": {
+      "timeEncoder": "rfc3339"
+    },
     "outputPaths": [
       "stdout"
     ],
     "disableEvents": true
   },
   "p2p": {
-    "bindMultiAddresses": [
-      "/ip4/0.0.0.0/tcp/15600",
-      "/ip6/::/tcp/15600"
-    ],
-    "connectionManager": {
-      "highWatermark": 10,
-      "lowWatermark": 5
-    },
-    "identityPrivateKey": "",
-    "db": {
-      "engine": "rocksdb",
-      "path": "data/p2pstore"
-    },
-    "reconnectInterval": "30s"
+    "bindAddress": "0.0.0.0:14666",
+    "seed": "",
+    "overwriteStoredSeed": false,
+    "externalAddress": "auto",
+    "peerDBDirectory": "peerdb"
   },
   "profiling": {
     "enabled": false,
@@ -57,6 +51,22 @@
     "limits": {
       "maxBodyLength": "1M",
       "maxResults": 1000
+    }
+  },
+  "database": {
+    "directory": "db",
+    "inMemory": false,
+    "maxOpenDBs": 10,
+    "pruningThreshold": 360,
+    "dbGranularity": 1,
+    "settings": {
+      "fileName": "settings.bin"
+    }
+  },
+  "protocol": {
+    "snapshot": {
+      "path": "./snapshot.bin",
+      "depth": 5
     }
   }
 }
