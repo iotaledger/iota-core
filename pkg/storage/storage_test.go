@@ -16,10 +16,12 @@ import (
 func Test(t *testing.T) {
 	storageDirectory := t.TempDir()
 
-	slotTimeProvider := iotago.NewSlotTimeProvider(time.Now().Unix(), 10)
 	iotaBlock, err := builder.NewBlockBuilder().StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).Build()
 	require.NoError(t, err)
-	emptyBlock, err := model.BlockFromBlock(iotaBlock, iotago.V3API(&iotago.ProtocolParameters{}), slotTimeProvider)
+	emptyBlock, err := model.BlockFromBlock(iotaBlock, iotago.V3API(&iotago.ProtocolParameters{
+		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+		SlotDurationInSeconds: 10,
+	}))
 	require.NoError(t, err)
 
 	storage := New(storageDirectory, 1)
