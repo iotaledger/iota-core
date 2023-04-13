@@ -1,0 +1,38 @@
+package coreapi
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/pkg/errors"
+
+	"github.com/iotaledger/inx-app/pkg/httpserver"
+	"github.com/iotaledger/iota-core/pkg/restapi"
+	iotago "github.com/iotaledger/iota.go/v4"
+)
+
+func blockBytesByID(c echo.Context) ([]byte, error) {
+	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+	if err != nil {
+		return nil, err
+	}
+
+	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	if !exists {
+		return nil, errors.Errorf("block not found: %s", blockID.ToHex())
+	}
+
+	return block.Data(), nil
+}
+
+func blockByID(c echo.Context) (*iotago.Block, error) {
+	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+	if err != nil {
+		return nil, err
+	}
+
+	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	if !exists {
+		return nil, errors.Errorf("block not found: %s", blockID.ToHex())
+	}
+
+	return block.Block(), nil
+}

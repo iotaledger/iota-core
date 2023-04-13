@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
+	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
@@ -123,7 +124,8 @@ type dependencies struct {
 	dig.In
 	*restapi.RestRouteManager
 
-	AppInfo *app.Info
+	Protocol *protocol.Protocol
+	AppInfo  *app.Info
 }
 
 func configure() error {
@@ -136,6 +138,32 @@ func configure() error {
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	})
+
+	routeGroup.GET(RouteBlock, func(c echo.Context) error {
+		mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
+		if err != nil && err != httpserver.ErrNotAcceptable {
+			return err
+		}
+
+		switch mimeType {
+		case httpserver.MIMEApplicationVendorIOTASerializerV1:
+			resp, err := blockBytesByID(c)
+			if err != nil {
+				return err
+			}
+
+			return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, resp)
+
+		default:
+			// default to echo.MIMEApplicationJSON
+			resp, err := blockByID(c)
+			if err != nil {
+				return err
+			}
+
+			return httpserver.JSONResponse(c, http.StatusOK, resp)
+		}
 	})
 	return nil
 }
