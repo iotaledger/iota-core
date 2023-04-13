@@ -1,6 +1,8 @@
 package dashboard
 
 import (
+	"context"
+	"errors"
 	"net"
 	"net/http"
 	"runtime"
@@ -9,11 +11,13 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/gommon/log"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
+	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 )
@@ -56,6 +60,40 @@ func configure() error {
 
 func run() error {
 	runWebSocketStreams(Component)
+
+	if err := Component.Daemon().BackgroundWorker("Dashboard", func(ctx context.Context) {
+		Component.LogInfo("Starting Dashboard ... done")
+
+		stopped := make(chan struct{})
+		go func() {
+			Component.LogInfof("%s started, bind-address=%s, basic-auth=%v", Component.Name, ParamsDashboard.BindAddress, ParamsDashboard.BasicAuth.Enabled)
+			if err := server.Start(ParamsDashboard.BindAddress); err != nil {
+				if !errors.Is(err, http.ErrServerClosed) {
+					log.Errorf("Error serving: %s", err)
+				}
+				close(stopped)
+			}
+		}()
+
+		// stop if we are shutting down or the server could not be started
+		select {
+		case <-ctx.Done():
+		case <-stopped:
+		}
+
+		Component.LogInfof("Stopping %s ...", Component.Name)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			Component.LogWarnf("Error stopping: %s", err)
+		}
+
+		Component.LogInfo("Stopping Dashboard ... done")
+	}, daemon.PriorityDashboard); err != nil {
+		Component.LogPanicf("failed to start worker: %s", err)
+	}
+
 	return nil
 }
 
