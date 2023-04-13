@@ -5,7 +5,7 @@ import "github.com/iotaledger/hive.go/app"
 // ParametersDashboard contains the definition of configuration parameters used by the dashboard plugin.
 type ParametersDashboard struct {
 	// BindAddress defines the config flag of the dashboard binding address.
-	BindAddress string `default:"127.0.0.1:8081" usage:"the bind address of the dashboard"`
+	BindAddress string `default:"0.0.0.0:8081" usage:"the bind address of the dashboard"`
 	BasicAuth   struct {
 		// Enabled defines the config flag of the dashboard basic auth enabler.
 		Enabled bool `default:"false" usage:"whether to enable HTTP basic auth"`
