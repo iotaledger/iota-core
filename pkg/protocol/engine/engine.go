@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -95,7 +96,7 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source identity.ID) {
 	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
-func (e *Engine) Block(id iotago.BlockID) (block *model.Block, exists bool) {
+func (e *Engine) Block(id iotago.BlockID) (block *blockdag.Block, exists bool) {
 	// var err error
 	// if e.EvictionState.IsRootBlock(id) {
 	// 	block, err = e.Storage.Blocks.Load(id)
@@ -114,7 +115,7 @@ func (e *Engine) Block(id iotago.BlockID) (block *model.Block, exists bool) {
 	// block, err = e.Storage.Blocks.Load(id)
 	// exists = block != nil && err == nil
 
-	return
+	return e.blockDAG.Block(id)
 }
 
 func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
@@ -161,6 +162,8 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 	}
 
 	e.TriggerInitialized()
+
+	fmt.Println("Engine Settings", e.Storage.Settings.String())
 
 	return
 }
@@ -223,7 +226,6 @@ func (e *Engine) Name() string {
 }
 
 func (e *Engine) setupBlockStorage() {
-
 }
 
 func (e *Engine) setupEvictionState() {
