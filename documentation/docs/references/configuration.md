@@ -260,3 +260,23 @@ Example:
   }
 ```
 
+## <a id="activity"></a> 8. Activity
+
+| Name              | Description                                                         | Type    | Default value |
+| ----------------- | ------------------------------------------------------------------- | ------- | ------------- |
+| enabled           | Whether the Activity component is enabled                           | boolean | true          |
+| broadcastInterval | The interval at which the node will broadcast its activity block    | string  | "2s"          |
+| parentsCount      | The number of parents that node will choose for its activity blocks | int     | 8             |
+
+Example:
+
+```json
+  {
+    "activity": {
+      "enabled": true,
+      "broadcastInterval": "2s",
+      "parentsCount": 8
+    }
+  }
+```
+
