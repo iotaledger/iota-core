@@ -1,12 +1,15 @@
 package inmemorybooker
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/core/memstorage"
+	"github.com/iotaledger/hive.go/crypto/identity"
+	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -147,13 +150,44 @@ func (b *Booker) block(id iotago.BlockID) (block *booker.Block, exists bool) {
 }
 
 func (b *Booker) book(block *booker.Block) error {
-	// TODO: track votes
-	// votePower := booker.NewBlockVotePower(block.ID(), block.IssuingTime())
+	b.trackWitnessWeight(block)
 
 	block.SetBooked()
 	b.events.BlockBooked.Trigger(block)
 
 	return nil
+}
+
+func (b *Booker) trackWitnessWeight(votingBlock *booker.Block) {
+	witness := identity.ID(votingBlock.ModelsBlock.Block().IssuerID)
+
+	// TODO: only track witness weight for current validators.
+
+	// Add the witness to the voting block itself as each block carries a vote for itself.
+	votingBlock.AddWitness(witness)
+
+	// Walk the block's past cone until we reach an accepted or already supported (by this witness) block.
+	walk := walker.New[iotago.BlockID]().PushAll(votingBlock.Parents()...)
+	for walk.HasNext() {
+		blockID := walk.Next()
+		block, exists := b.block(blockID)
+		if !exists {
+			panic(fmt.Sprintf("parent %s does not exist", blockID))
+		}
+
+		// Skip further propagation if the witness is not new.
+		if !block.AddWitness(witness) {
+			continue
+		}
+		// TODO: Skip further propagation if block is already accepted.
+
+		walk.PushAll(block.Parents()...)
+
+		// TODO: here we might need to trigger an event WitnessAdded or something. However, doing this for each block might
+		//  be a bit expensive. Instead, we could keep track of the lowest rank of blocks and only trigger for those and
+		//  have a modified causal order in the acceptance gadget (with all booked blocks) that checks whether the acceptance threshold
+		//  is reached for these lowest rank blocks and accordingly propagates acceptance to their children.
+	}
 }
 
 func (b *Booker) markInvalid(block *booker.Block, reason error) {
