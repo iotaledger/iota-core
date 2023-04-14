@@ -238,7 +238,6 @@ func (b *BlockDAG) markSolid(block *blockdag.Block) (err error) {
 			return
 		}
 	}
-	fmt.Println("markSolid", block.ID())
 
 	// It is important to only set the block as solid when it was not "parked" as a future block.
 	// Future blocks are queued for solidification again when the slot is committed.

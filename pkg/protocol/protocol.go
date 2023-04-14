@@ -1,8 +1,6 @@
 package protocol
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -137,7 +135,6 @@ func (p *Protocol) initEngineManager() {
 func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
 	mainEngine := p.MainEngineInstance()
 
-	fmt.Println("process block", block.ID(), src)
 	mainEngine.ProcessBlockFromPeer(block, src)
 
 	return nil
