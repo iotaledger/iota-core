@@ -606,8 +606,8 @@ paths:
     get:
       tags:
         - account
-      summary: Get the mana of the account.
-      description: Get the mana of the account.
+      summary: Get the mana balance of the account of the latest committed slot.
+      description: Get the mana balance of the account of the latest committed slot.
       parameters:
           - in: path
             name: accountId
@@ -1120,491 +1120,66 @@ components:
     get-routes-response-example:
       value:
         routes:
-          - "core/v2"
-          - "dashboard-metrics/v1"
-          - "debug/v1"
+          - "core/v3"
+          - "dashboard-metrics/v2"
+          - "debug/v2"
     get-info-response-example:
       value:
-        name: HORNET
-        version: 0.6.0-alpha
-        status:
-          isHealthy: true
-          latestCommitment:
-            index: 480
-            timestamp: 1617802102
-            commitmentId: "0xb59ff329113b0da14343707450cb28d41fa18b295deabc4beb3fc1b6e70f9d9e"
-          confirmedCommitment:
-            index: 480
-            timestamp: 1617802102
-            commitmentId: "0xb59ff329113b0da14343707450cb28d41fa18b295deabc4beb3fc1b6e70f9d9e"
-          pruningIndex: 0
-        metrics:
-          blocksPerSecond: 17
-          referencedBlocksPerSecond: 16.8
-          referencedRate: 98.82352941176471
-        supportedProtocolVersions:
-          - 2
-          - 3
-        protocol:
-          networkName: iota-testnet
-          bech32Hrp: atoi
-          tokenSupply: "2779530283277761"
-          version: 2
-          minPowScore: 1000
-          belowMaxDepth: 15
-          rentStructure:
-            vByteCost: 500
-            vByteFactorData: 1
-            vByteFactorKey: 10
-        pendingProtocolParameters:
-          - type: 1
-            targetMilestoneIndex: 480
-            protocolVersion: 2
-            params: "0x03040560405060703940304956896"
-          - type: 1
-            targetMilestoneIndex: 485
-            protocolVersion: 2
-            params: "0x03040503045950393045930239392"
-          - type: 1
-            targetMilestoneIndex: 490
-            protocolVersion: 2
-            params: "0x02010290394032948950303939482"
-        baseToken:
-          name: "IOTA"
-          tickerSymbol: "MIOTA"
-          unit: "IOTA"
-          decimals: 0
-          useMetricPrefix: true
-        features:
-          - pow
     get-info-response-example-shimmer:
       value:
-        name: HORNET
-        version: 2.0.0-alpha8
-        status:
-          isHealthy: true
-          latestMilestone:
-            index: 480
-            timestamp: 1617802102
-            milestoneId: "0xb59ff329113b0da14343707450cb28d41fa18b295deabc4beb3fc1b6e70f9d9e"
-          confirmedMilestone:
-            index: 480
-            timestamp: 1617802102
-            milestoneId: "0xb59ff329113b0da14343707450cb28d41fa18b295deabc4beb3fc1b6e70f9d9e"
-          pruningIndex: 0
-        metrics:
-          blocksPerSecond: 17
-          referencedBlocksPerSecond: 16.8
-          referencedRate: 98.82352941176471
-        supportedProtocolVersions:
-          - 2
-          - 3
-        protocol:
-          networkName: shimmer-testnet
-          bech32Hrp: rms
-          tokenSupply: "2779530283277761"
-          version: 2
-          minPowScore: 1000
-          belowMaxDepth: 15
-          rentStructure:
-            vByteCost: 500
-            vByteFactorData: 1
-            vByteFactorKey: 10
-        pendingProtocolParameters:
-          - type: 1
-            targetMilestoneIndex: 480
-            protocolVersion: 2
-            params: "0x03040560405060703940304956896"
-          - type: 1
-            targetMilestoneIndex: 485
-            protocolVersion: 2
-            params: "0x03040503045950393045930239392"
-          - type: 1
-            targetMilestoneIndex: 490
-            protocolVersion: 2
-            params: "0x02010290394032948950303939482"
-        baseToken:
-          name: "Shimmer"
-          tickerSymbol: "SMR"
-          unit: "SMR"
-          decimals: 6
-          subunit: "glow"
-          useMetricPrefix: false
-        features:
-          - pow
-
     get-buildingBlock-response-example:
       value:
-        tips:
-          - "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
-          - "0x78d546b46aec4557872139a48f66bc567687e8413578a14323548732358914a2"
-
     post-blocks-response-example:
       value:
         blockId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
 
     get-block-by-id-response-example-new:
       value:
-        blockId: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
-        parents:
-          - "0x7ed3d67fc7b619e72e588f51fef2379e43e6e9a856635843b3f29aa3a3f1f006"
-          - "0xd97e89e49ed263b763afeda192515fe154ec826ceb92ef08926cd68ec02c9510"
-        isSolid: false
-        shouldPromote: true
-        shouldReattach: false
 
     get-block-by-id-response-example-solid:
       value:
-        blockId: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
-        parents:
-          - "0x7ed3d67fc7b619e72e588f51fef2379e43e6e9a856635843b3f29aa3a3f1f006"
-          - "0xd97e89e49ed263b763afeda192515fe154ec826ceb92ef08926cd68ec02c9510"
-        isSolid: true
-        shouldPromote: false
-        shouldReattach: false
 
     get-block-by-id-response-example-included:
       value:
-        blockId: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
-        parents:
-          - "0x7ed3d67fc7b619e72e588f51fef2379e43e6e9a856635843b3f29aa3a3f1f006"
-          - "0xd97e89e49ed263b763afeda192515fe154ec826ceb92ef08926cd68ec02c9510"
-        isSolid: true
-        referencedByMilestoneIndex: 15465
-        whiteFlagIndex: 25
-        ledgerInclusionState: included
 
     get-block-by-id-response-example-conflicting:
       value:
-        blockId: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
-        parents:
-          - "0x7ed3d67fc7b619e72e588f51fef2379e43e6e9a856635843b3f29aa3a3f1f006"
-          - "0xd97e89e49ed263b763afeda192515fe154ec826ceb92ef08926cd68ec02c9510"
-        isSolid: true
-        referencedByMilestoneIndex: 15465
-        whiteFlagIndex: 25
-        ledgerInclusionState: conflicting
-        conflictReason: 1
 
     post-tagged-data-block-request-example-minimal:
       value:
-        protocolVersion: 2
-        payload:
-          type: 5
-          tag: "0x68656c6c6f20776f726c64"
-          data: "0x5370616d6d696e6720646174612e0a436f756e743a203037323935320a54696d657374616d703a20323032312d30322d31315431303a32333a34392b30313a30300a54697073656c656374696f6e3a203934c2b573"
 
     post-transaction-block-request-example-minimal:
       value:
-        protocolVersion: 2
-        payload:
-          type: 6
-          essence:
-            type: 1
-            networkId: "1337133713371337"
-            inputsCommitment: "0x0e6c2998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
-            inputs:
-              - type: 0
-                transactionId: "0x0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
-                transactionOutputIndex: 0
-              - type: 0
-                transactionId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
-                transactionOutputIndex: 0
-              - type: 0
-                transactionId: "0xc138ecdc882010245e9574fbc1f1f43cc7c182fa890e46e018365dd49de0f16e"
-                transactionOutputIndex: 0
-            outputs:
-              - type: 3
-                amount: "50000000"
-                unlockConditions:
-                  - type: 0
-                    address:
-                      type: 0
-                      pubKeyHash: "0xd49931814e6bfbb8e221f1b2936e206e5a6b6abeb9c070f8603814c525c9abe3"
-            payload:
-          unlocks:
-            - type: 0
-              signature:
-                type: 0
-                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
-                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
-            - type: 1
-              reference: 0
-            - type: 1
-              reference: 0
-        nonce: '1020884'
 
     post-transaction-block-transaction-request-example:
       value:
 
     post-transaction-block-request-example-full:
       value:
-        protocolVersion: 2
-        parents:
-          - "0x6c5bc96948813faaf6d5a5f0c6bc453bf2e5343664884aea2873041bdc47c4ca"
-          - "0x97e2c4fce0f6e1023c19ed634e37a44744e21a743a79e8f1fc16d31dc8f47481"
-          - "0xc107c5f3d6189954c9b1b8e2fa556db4bcf7ad2da717d328ecf6d9a841a5f37d"
-          - "0xea19397d2670f904c4d8c8616ef7a0724321512f1c09f8eb2aeb0cc4299e2441"
-        payload:
-          type: 6
-          essence:
-            type: 1
-            networkId: "1337133713371337"
-            inputsCommitment: "0x0e6c2998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
-            inputs:
-              - type: 0
-                transactionId: "0x0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
-                transactionOutputIndex: 0
-              - type: 0
-                transactionId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
-                transactionOutputIndex: 0
-              - type: 0
-                transactionId: "0xc138ecdc882010245e9574fbc1f1f43cc7c182fa890e46e018365dd49de0f16e"
-                transactionOutputIndex: 0
-            outputs:
-              - type: 3
-                amount: "50000000"
-                unlockConditions:
-                  - type: 0
-                    address:
-                      type: 0
-                      pubKeyHash: "0xd49931814e6bfbb8e221f1b2936e206e5a6b6abeb9c070f8603814c525c9abe3"
-            payload:
-          unlocks:
-            - type: 0
-              signature:
-                type: 0
-                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
-                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
-            - type: 1
-              reference: 0
-            - type: 1
-              reference: 0
-        nonce: '1020884'
 
     get-block-by-id-empty-response-example:
       value:
-        protocolVersion: 3
-        networkID: 0
-        parents:
-          - "0xc0b728d4c292860b57747c7bfbd989ccc40be8c76229022644c05e1352bf1ea3"
-          - "0xe8db39681478cf9826bd2f31d045f16f5e1f478c5abc3030419da7911df9e288"
-        payload: null
-        nonce: '1481'
 
     get-block-by-id-transaction-response-example:
       value:
-        protocolVersion: 2
-        parents:
-          - "0x6c5bc96948813faaf6d5a5f0c6bc453bf2e5343664884aea2873041bdc47c4ca"
-          - "0x97e2c4fce0f6e1023c19ed634e37a44744e21a743a79e8f1fc16d31dc8f47481"
-          - "0xc107c5f3d6189954c9b1b8e2fa556db4bcf7ad2da717d328ecf6d9a841a5f37d"
-          - "0xea19397d2670f904c4d8c8616ef7a0724321512f1c09f8eb2aeb0cc4299e2441"
-        payload:
-          type: 6
-          essence:
-            type: 1
-            networkId: "1337133713371337"
-            inputsCommitment: "0x0e6c2998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
-            inputs:
-              - type: 0
-                transactionId: "0x0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
-                transactionOutputIndex: 0
-              - type: 0
-                transactionId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
-                transactionOutputIndex: 0
-              - type: 0
-                transactionId: "0xc138ecdc882010245e9574fbc1f1f43cc7c182fa890e46e018365dd49de0f16e"
-                transactionOutputIndex: 0
-            outputs:
-              - type: 3
-                amount: "50000000"
-                unlockConditions:
-                  - type: 0
-                    address:
-                      type: 0
-                      pubKeyHash: "0xd49931814e6bfbb8e221f1b2936e206e5a6b6abeb9c070f8603814c525c9abe3"
-            payload:
-          unlocks:
-            - type: 0
-              signature:
-                type: 0
-                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
-                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
-            - type: 1
-              reference: 0
-            - type: 1
-              reference: 0
-        nonce: '1020884'
-
-    get-block-by-id-milestone-response-example:
-      value:
-        protocolVersion: 2
-        parents:
-          - "0x23d388b13f64c2e24788d61891079c74daf6d036b768d75ad38e473c9d4da83b"
-          - "0x242974b25cab6f8378fe718ea729fa65492f03df4ce74b631899589242fa12b7"
-          - "0x2a331c562b48e261c11f073c7465551ffcc80c35ab6d09f4fd1cc81782e5fdc1"
-          - "0x438a14a651b8872896b4e57c92041e8962ca7d78cc38c774534020feefeff31a"
-          - "0x73c90398fb548a4410b49264e182e58a91baeecaa949cbfc1d01a9066cbd9935"
-          - "0xb9adfdc1effd3242b5c1d7b6df43d4b53e58943e820ced89c7dd39b8b52fcef0"
-        payload:
-          type: 1
-          index: 16241
-          timestamp: 1617959712
-          protocolVersion: 2
-          previousMilestoneId: "0xa6db9d0b3ecb274d90c21e9dde04012b2d13ad8aa0b90e82e7d3b626be67119d"
-          parents:
-            - "0x23d388b13f64c2e24788d61891079c74daf6d036b768d75ad38e473c9d4da83b"
-            - "0x242974b25cab6f8378fe718ea729fa65492f03df4ce74b631899589242fa12b7"
-            - "0x2a331c562b48e261c11f073c7465551ffcc80c35ab6d09f4fd1cc81782e5fdc1"
-            - "0x438a14a651b8872896b4e57c92041e8962ca7d78cc38c774534020feefeff31a"
-            - "0x73c90398fb548a4410b49264e182e58a91baeecaa949cbfc1d01a9066cbd9935"
-            - "0xb9adfdc1effd3242b5c1d7b6df43d4b53e58943e820ced89c7dd39b8b52fcef0"
-          inclusionMerkleRoot: "0x0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"
-          appliedMerkleRoot: "0x9cd745ef6800c8e8c80b09174ee4b250b3c43dfa62d7c6a4e61f848febf731a0"
-          publicKeys:
-            - "0x7205c145525cee64f1c9363696811d239919d830ad964b4e29359e6475848f5a"
-            - "0xe468e82df33d10dea3bd0eadcd7867946a674d207c39f5af4cc44365d268a7e6"
-          options:
-            - type: 1
-              targetMilestoneIndex: 16245
-              protocolVersion: 2
-              params: "0x174612e0a436f756e743a203037323935320a54696d657374616d703a203132372e3030302e3030302e303030"
-          signatures:
-            - "0xa642e96f71094f8523790131481e0fbfdc8265caa8e4b08793628b286065c317a5595d56edb5e918b24d4ee749768a2b5ae6010e751bf31f0d8145a390b82c00"
-            - "0x4bdfa2684bed01ce3a9a630b0688e868c290b8524c679daa79cb9d9f0f2aa5c57cf00a0fc694d1fed3696053ffa9bba6154ccb1564532cd49f807ba77de9a70c"
-        nonce: '1229782938247321090'
 
     get-block-by-id-tagged-data-response-example:
       value:
-        protocolVersion: 3
-        networkID: 0
-        strongParents:
-          - "0xa6db9d0b3ecb274d90c21e9dde04012b2d13ad8aa0b90e82e7d3b626be67119d"
-          - "0xfd31d9c926b5d97ae016535d66baee511dfa3b713b61d8eba2ae5c9929e38ca7"
-        weakParents:
-          - "0x222e88a63e5aca8ef48d3b8749e2fab51d1bc7c34c5604a2933ca2f180b342c9"
-          - "0xa22137ebe61435c6d0f3e16ad148376778d7bfb36e27329f02c221ec109525a6"
-        shallowLikedParents:
-          - "0xa6db9d0b3ecb274d90c21e9dde04012b2d13ad8aa0b90e82e7d3b626be67119d"
-          - "0xa22137ebe61435c6d0f3e16ad148376778d7bfb36e27329f02c221ec109525a6"
-        issuerID: "aaaaa"
-        issuerPublicKey: "bbeeeccccc"
-        issuingTime: 8394039282
-        slotCommitment:
-            index: 20
-            prevID: "JIFOSIFJ"
-            rootsID: "UIFUSDF"
-            cumulativeWeight: 99999
-        latestConfirmedSlot: 15
-        payload:
-          type: 5
-          tag: "0x68656c6c6f20776f726c64"
-          data: "0x5370616d6d696e6720646174612e0a436f756e743a203037323935320a54696d657374616d703a20323032312d30322d31315431303a32333a34392b30313a30300a54697073656c656374696f6e3a203934c2b573"
-        nonce: '2102864'
-        signature: "HGUEJDO"
 
     get-outputs-by-id-response-unspent-example:
       value:
-        metadata:
-          blockId: "0x9cd745ef6800c8e8c80b09174ee4b250b3c43dfa62d7c6a4e61f848febf731a0"
-          transactionId: "0x1ee46e19f4219ee65afc10227d0ca22753f76ef32d1e922e5cbe3fbc9b5a5298"
-          outputIndex: 1
-          isSpent: false
-          milestoneIndexBooked: 946699
-          milestoneTimestampBooked: 1643207130
-          ledgerIndex: 946704
-        output:
-          type: 3
-          amount: "1000"
-          unlockConditions:
-            - type: 0
-              address:
-                type: 0
-                pubKeyHash: "0x8eaf87ac1f52eb05f2c7c0c15502df990a228838dc37bd18de9503d69afd257d"
 
     get-outputs-by-id-response-spent-example:
       value:
-        metadata:
-          blockId: "0x9cd745ef6800c8e8c80b09174ee4b250b3c43dfa62d7c6a4e61f848febf731a0"
-          transactionId: "0xfa0de75d225cca2799395e5fc340702fc7eac821d2bdd79911126f131ae097a2"
-          outputIndex: 1
-          isSpent: true
-          milestoneIndexSpent: 946700
-          milestoneTimestampSpent: 1643207176
-          transactionIdSpent: "0xaf7579fb57746219561072c2cc0e4d0fbb8d493d075bd21bf25ae81a450c11ef"
-          milestoneIndexBooked: 946699
-          milestoneTimestampBooked: 1643207130
-          ledgerIndex: 946704
-        output:
-          type: 3
-          amount: "1000"
-          unlockConditions:
-            - type: 0
-              address:
-                type: 0
-                pubKeyHash: "0x8eaf87ac1f52eb05f2c7c0c15502df990a228838dc37bd18de9503d69afd257d"
 
     get-output-metadata-by-id-response-unspent-example:
       value:
-        blockId: "0x9cd745ef6800c8e8c80b09174ee4b250b3c43dfa62d7c6a4e61f848febf731a0"
-        transactionId: "0x1ee46e19f4219ee65afc10227d0ca22753f76ef32d1e922e5cbe3fbc9b5a5298"
-        outputIndex: 1
-        isSpent: false
-        milestoneIndexBooked: 1234567
-        milestoneTimestampBooked: 1643207146
-        ledgerIndex: 946704
 
     get-output-metadata-by-id-response-spent-example:
       value:
-        blockId: "0x9cd745ef6800c8e8c80b09174ee4b250b3c43dfa62d7c6a4e61f848febf731a0"
-        transactionId: "0xfa0de75d225cca2799395e5fc340702fc7eac821d2bdd79911126f131ae097a2"
-        outputIndex: 1
-        isSpent: true
-        milestoneIndexSpent: 1234570
-        milestoneTimestampSpent: 1643207176
-        transactionIdSpent: "0xaf7579fb57746219561072c2cc0e4d0fbb8d493d075bd21bf25ae81a450c11ef"
-        milestoneIndexBooked: 1234567
-        milestoneTimestampBooked: 1643207146
-        ledgerIndex: 946704
 
     get-included-block-of-transaction-example-json:
       value:
-        protocolVersion: 2
-        parents:
-          - "0x174e3151f6ce2cfb7f00829ac4a96a35caa2078cc20eba99359867cd21aad0d6"
-          - "0x5807bb4ad068e6cdadd103218e4e24ed55b62c985d4f64e97808d9f09180f89c"
-          - "0x7a09324557e9200f39bf493fc8fd6ac43e9ca750c6f6d884cc72386ddcb7d695"
-          - "0xde9e9d780ba7ebeebc38da16cb53b2a8991d38eee94bcdc3f3ef99aa8c345652"
-        payload:
-          type: 6
-          essence:
-            type: 1
-            networkId: "1337133713371337"
-            inputsCommitment: "0x0e6c2998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
-            inputs:
-              - type: 0
-                transactionId: "0xaf7579fb57746219561072c2cc0e4d0fbb8d493d075bd21bf25ae81a450c11ef"
-                transactionOutputIndex: 0
-            outputs:
-              - type: 3
-                unlockConditions:
-                  type: 0
-                  address:
-                    type: 0
-                    pubKeyHash: "0xa18996d96163405e3c0eb13fa3459a07f68a89e8cf7cc239c89e7192344daa5b"
-                amount: "1000000"
-            payload:
-              type: 2
-              index: "0x454f59"
-              data: ""
-          unlocks:
-            - type: 0
-              signature:
-                type: 0
-                publicKey: "0xee26ac07834c603c22130fced361ca58552b0dbfc63e4b73ba24b3b59d9f4050"
-                signature: "0x0492a353f96883c472e2686a640e77eda30be8fcc417aa9fc1c15eae854661e0253287be6ea68f649f19ca590de0a6c57fb88635ef0e013310e0be2b83609503"
-        nonce: '17293822569102719312'
 
     get-commitment-response-example:
       value:
@@ -1614,13 +1189,6 @@ components:
 
     get-utxo-changes-response-example:
       value:
-        index: 15465
-        createdOutputs:
-          - "0x1ee46e19f4219ee65afc10227d0ca22753f76ef32d1e922e5cbe3fbc9b5a52980100"
-          - "0xee3447d088e3e2c53c5b3e56a38fdc859ca2c4b4161cf256c0462ce4d34731820100"
-          - "0xf8bdbfb0f57ade7fbb95d31b11e2dbda9b2a35e9dc0cd3e11cb324e8a6bedc260100"
-        consumedOutputs:
-          - "0x3d36ec4afb2d634b9313f84606b98b69675a3ef6f44dcdecb18c30945b57221e0100"
 
     get-account-response-example:
       value:
@@ -1630,84 +1198,9 @@ components:
 
     get-peers-response-example:
       value:
-        - id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
-          multiAddresses:
-            - "/dns/abc.com/tcp/15602"
-          alias: abc
-          relation: known
-          connected: true
-          gossip:
-            heartbeat:
-              solidMilestoneIndex: 61527
-              prunedMilestoneIndex: 61200
-              latestMilestoneIndex: 61527
-              connectedNeighbors: 5
-              syncedNeighbors: 7
-            metrics:
-              newBlocks: 3799
-              knownBlocks: 554
-              receivedBlocks: 4370
-              receivedBlockRequests: 0
-              receivedMilestoneRequests: 1
-              receivedHeartbeats: 1
-              sentBlocks: 6
-              sentBlockRequests: 4325
-              sentMilestoneRequests: 31
-              sentHeartbeats: 9
-              droppedPackets: 0
-        - id: 12D3KooWNYDcJqxnWqCLSgeQKqNStwFUqHSJXPdSYTJnfxQESzie
-          multiAddresses:
-            - "/dns/xyz.com/tcp/15600"
-          alias: xyz
-          relation: known
-          connected: true
-          gossip:
-            heartbeat:
-              solidMilestoneIndex: 61527
-              prunedMilestoneIndex: 56508
-              latestMilestoneIndex: 61527
-              connectedNeighbors: 5
-              syncedNeighbors: 6
-            metrics:
-              newBlocks: 510
-              knownBlocks: 79
-              receivedBlocks: 589
-              receivedBlockRequests: 0
-              receivedMilestoneRequests: 1
-              receivedHeartbeats: 1
-              sentBlocks: 42
-              sentBlockRequests: 576
-              sentMilestoneRequests: 1
-              sentHeartbeats: 9
-              droppedPackets: 0
 
     get-peer-response-example:
       value:
-        id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
-        multiAddresses:
-          - "/dns/abc.com/tcp/15602"
-        alias: abc
-        relation: known
-        connected: true
-        gossip:
-          heartbeat:
-            solidMilestoneIndex: 61527
-            prunedMilestoneIndex: 61200
-            latestMilestoneIndex: 61527
-            connectedNeighbors: 5
-            syncedNeighbors: 7
-          metrics:
-            newBlocks: 3799
-            knownBlocks: 554
-            receivedBlocks: 4370
-            receivedBlockRequests: 0
-            receivedMilestoneRequests: 1
-            receivedHeartbeats: 1
-            sentBlocks: 6
-            sentBlockRequests: 4325
-            sentMilestoneRequests: 31
-            sentHeartbeats: 9
-            droppedPackets: 0
 
     post-peer-request-example:
       value:
@@ -1717,37 +1210,6 @@ components:
 
     post-peer-response-example:
       value:
-        id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
-        multiAddresses:
-          - "/dns/abc.com/tcp/15602"
-        alias: abc
-        relation: known
-        connected: true
-        gossip:
-          heartbeat:
-            solidMilestoneIndex: 61527
-            prunedMilestoneIndex: 61200
-            latestMilestoneIndex: 61527
-            connectedNeighbors: 5
-            syncedNeighbors: 7
-          metrics:
-            newBlocks: 3799
-            knownBlocks: 554
-            receivedBlocks: 4370
-            receivedBlockRequests: 0
-            receivedMilestoneRequests: 1
-            receivedHeartbeats: 1
-            sentBlocks: 6
-            sentBlockRequests: 4325
-            sentMilestoneRequests: 31
-            sentHeartbeats: 9
-            droppedPackets: 0
-
-
-    compute-whiteflag-response-example:
-      value:
-        inclusionMerkleRoot: "0x52fdfc072182654f163f5f0f9a621d729566c74d10037c4d7bbb0407d1e2c649"
-        appliedMerkleRoot: "0xbbffde11ef804fdbc7c8f62432937b7a00806c136eca21c54038d5a6bdd16251"
 
     database-prune-request-example:
       value:
@@ -2847,15 +2309,17 @@ components:
             - pending
             - confirmed
             - finalized
-          description: If `pending`, the block is still waiting for the inclusion. If `confirmed`, the block contains a transaction that has not been included in the ledger because it conflicts with another transaction. If the block does not contain a transaction, `ledgerInclusionState` is set to `noTransaction`.
+          description: If `pending`, the block is stored but not confirmed. If `confirmed`, the block is confirmed with the first level of knowledge. If `finalized`, the block is included and cannot be reverted anymore.
         txState:
           type: string
           enum:
             - pending
+            - conflicting
             - confirmed
             - finalized
+            - rejected
           description: If 'pending', the block contains not yet included transaction. If 'confirmed' means transaction is confirmed with the first level of knowledge. If 'finalized' means transaction is included and cannot be reverted anymore.
-        blockError:
+        blockStateReason:
           type: integer
           enum: [1,2,3]
           description: >
@@ -2864,7 +2328,7 @@ components:
               * `2` - denotes that the block is orphaned due to congestion control.
               * `3` - denotes that the block is orphaned due to negative mana balance.
               * `4` - denotes that ...
-        txError:
+        txStateReason:
           type: integer
           enum: [1,2,3,4,5,6,7,8,9,10,11,12,255]
           description: >
@@ -2919,7 +2383,7 @@ components:
           description: The index of the output.
         isSpent:
           type: boolean
-          description: Tells if the output is spent or not.
+          description: Tells if the output is spent in a confirmed transaction or not.
         commitmentIdSpent:
           type: string
           description: The commitment index of the slot at which this output was spent.
@@ -2968,17 +2432,11 @@ components:
 
 
     AccountManaResponse:
-      description: Returns the mana of the account.
+      description: Returns the mana balance of the account.
       properties:
         mana:
           type: integer
-          description: The mana of the account.
-        stake:
-          type: integer
-          description: The total stake of the account.
-        delegated:
-          type: integer
-          description: Total delegated mana of the node.
+          description: The latest committed mana balance of the account.
         AccountId:
           type: string
           description: The account ID of the node.
