@@ -5,8 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 )
@@ -14,21 +12,21 @@ import (
 type Block struct {
 	booked    bool
 	mutex     sync.RWMutex
-	witnesses *shrinkingmap.ShrinkingMap[identity.ID, types.Empty]
+	witnesses *advancedset.AdvancedSet[identity.ID]
 
 	*blockdag.Block
 }
 
 func NewBlock(block *blockdag.Block) *Block {
 	return &Block{
-		witnesses: shrinkingmap.New[identity.ID, types.Empty](),
+		witnesses: advancedset.New[identity.ID](),
 		Block:     block,
 	}
 }
 
 func NewRootBlock(block *blockdag.Block) *Block {
 	return &Block{
-		witnesses: shrinkingmap.New[identity.ID, types.Empty](),
+		witnesses: advancedset.New[identity.ID](),
 		Block:     block,
 		booked:    true,
 	}
@@ -56,7 +54,7 @@ func (b *Block) AddWitness(id identity.ID) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	return b.witnesses.Set(id, types.Void)
+	return b.witnesses.Add(id)
 }
 
 func (b *Block) String() string {
@@ -66,8 +64,6 @@ func (b *Block) String() string {
 	return builder.String()
 }
 
-// region Blocks ///////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // Blocks represents a collection of Block.
 type Blocks = *advancedset.AdvancedSet[*Block]
 
@@ -75,5 +71,3 @@ type Blocks = *advancedset.AdvancedSet[*Block]
 func NewBlocks(blocks ...*Block) (newBlocks Blocks) {
 	return advancedset.New(blocks...)
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
