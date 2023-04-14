@@ -60,7 +60,7 @@ type BlockDAG struct {
 
 	rootBlockProvider func(iotago.BlockID) (*blockdag.Block, bool)
 
-	Workers    *workerpool.Group
+	workers    *workerpool.Group
 	workerPool *workerpool.WorkerPool
 
 	module.Module
@@ -75,7 +75,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 				if _, _, err := b.Attach(block); err != nil {
 					e.Events.Error.Trigger(errors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.Block().IssuerID))
 				}
-			}, event.WithWorkerPool(e.Workers.CreatePool("BlockDAG.Attach", 2)))
+			}, event.WithWorkerPool(b.workers.CreatePool("BlockDAG.Attach", 2)))
 
 			e.Events.BlockDAG.LinkTo(b.events)
 
@@ -94,7 +94,7 @@ func New(workers *workerpool.Group, evictionState *eviction.State, latestCommitm
 		memStorage:     memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blockdag.Block](),
 		commitmentFunc: latestCommitmentFunc,
 		futureBlocks:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*blockdag.Block]](),
-		Workers:        workers,
+		workers:        workers,
 		workerPool:     workers.CreatePool("Solidifier", 2),
 	}, opts,
 		func(b *BlockDAG) {
@@ -199,6 +199,10 @@ func (b *BlockDAG) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
 	}
 
 	b.nextIndexToPromote = index + 1
+}
+
+func (b *BlockDAG) Shutdown() {
+	b.workers.Shutdown()
 }
 
 // evictSlot is used to evict Blocks from committed slots from the BlockDAG.

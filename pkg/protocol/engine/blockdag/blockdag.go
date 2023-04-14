@@ -19,5 +19,8 @@ type BlockDAG interface {
 	// SetInvalid marks a Block as invalid and propagates the invalidity to its future cone.
 	SetInvalid(block *Block, reason error) (wasUpdated bool)
 
+	// Shutdown shuts down the BlockDAG.
+	Shutdown()
+
 	module.Interface
 }
