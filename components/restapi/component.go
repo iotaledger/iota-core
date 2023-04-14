@@ -20,14 +20,14 @@ import (
 
 func init() {
 	Component = &app.Component{
-		Name:           "RestAPI",
-		DepsFunc:       func(cDeps dependencies) { deps = cDeps },
-		Params:         params,
-		InitConfigPars: initConfigPars,
-		Provide:        provide,
-		Configure:      configure,
-		Run:            run,
-		IsEnabled: func() bool {
+		Name:             "RestAPI",
+		DepsFunc:         func(cDeps dependencies) { deps = cDeps },
+		Params:           params,
+		InitConfigParams: initConfigParams,
+		Provide:          provide,
+		Configure:        configure,
+		Run:              run,
+		IsEnabled: func(_ *dig.Container) bool {
 			return ParamsRestAPI.Enabled
 		},
 	}
@@ -48,7 +48,7 @@ type dependencies struct {
 	RestRouteManager   *RestRouteManager
 }
 
-func initConfigPars(c *dig.Container) error {
+func initConfigParams(c *dig.Container) error {
 	type cfgResult struct {
 		dig.Out
 		RestAPIBindAddress      string `name:"restAPIBindAddress"`
