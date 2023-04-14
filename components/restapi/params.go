@@ -34,6 +34,13 @@ var ParamsRestAPI = &ParametersRestAPI{
 	PublicRoutes: []string{
 		"/health",
 		"/api/routes",
+		"/api/core/v3/info",
+		"/api/core/v3/blocks*",
+		"/api/core/v3/transactions*",
+		"/api/core/v3/commitments*",
+		"/api/core/v3/outputs*",
+		"/api/debug/v1/*",
+		"/api/indexer/v1/*",
 	},
 	ProtectedRoutes: []string{
 		"/api/*",
