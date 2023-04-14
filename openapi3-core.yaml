@@ -104,7 +104,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-  /api/core/v3/issuance/block-header:
+  /api/core/v3/blocks/issuance:
     get:
       tags:
         - blocks
