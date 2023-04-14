@@ -58,7 +58,7 @@ type BlockDAG struct {
 	// evictionMutex is a mutex that is used to synchronize the eviction of elements from the BlockDAG.
 	evictionMutex sync.RWMutex
 
-	slotTimeProviderFunc func() *iotago.SlotTimeProvider
+	rootBlockProvider func(iotago.BlockID) (*blockdag.Block, bool)
 
 	Workers    *workerpool.Group
 	workerPool *workerpool.WorkerPool
@@ -77,12 +77,9 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 				}
 			}, event.WithWorkerPool(e.Workers.CreatePool("BlockDAG.Attach", 2)))
 
-			e.Storage.Settings.HookInitialized(func() {
-				b.slotTimeProviderFunc = e.Storage.Settings.API().SlotTimeProvider
-			})
-
 			e.Events.BlockDAG.LinkTo(b.events)
-			b.TriggerInitialized()
+
+			b.Initialize(e.RootBlock)
 		})
 
 		return b
@@ -118,6 +115,12 @@ func New(workers *workerpool.Group, evictionState *eviction.State, latestCommitm
 	)
 }
 
+func (b *BlockDAG) Initialize(rootBlockProvider func(iotago.BlockID) (*blockdag.Block, bool)) {
+	b.rootBlockProvider = rootBlockProvider
+
+	b.TriggerInitialized()
+}
+
 var _ blockdag.BlockDAG = new(BlockDAG)
 
 func (b *BlockDAG) Events() *blockdag.Events {
@@ -150,29 +153,12 @@ func (b *BlockDAG) Block(id iotago.BlockID) (block *blockdag.Block, exists bool)
 	return b.block(id)
 }
 
-// SetInvalid marks a Block as invalid and propagates the invalidity to its future cone.
+// SetInvalid marks a Block as invalid.
 func (b *BlockDAG) SetInvalid(block *blockdag.Block, reason error) (wasUpdated bool) {
 	if wasUpdated = block.SetInvalid(); wasUpdated {
 		b.events.BlockInvalid.Trigger(&blockdag.BlockInvalidEvent{
 			Block:  block,
 			Reason: reason,
-		})
-
-		// TODO: is it really necessary to walk the future cone here?
-		//  Booking/tracking votes is atomic now, therefore a block can't be further processed before its parents are booked.
-		//  A block can only be determined as invalid during solidification/booking.
-		//  Therefore, it should be sufficient to check on solidification/booking for the status of the parents.
-		b.walkFutureCone(block.Children(), func(currentBlock *blockdag.Block) []*blockdag.Block {
-			if !currentBlock.SetInvalid() {
-				return nil
-			}
-
-			b.events.BlockInvalid.Trigger(&blockdag.BlockInvalidEvent{
-				Block:  currentBlock,
-				Reason: reason,
-			})
-
-			return currentBlock.Children()
 		})
 	}
 
@@ -368,8 +354,8 @@ func (b *BlockDAG) registerChild(child *blockdag.Block, parent model.Parent) {
 
 // block retrieves the Block with given id from the mem-storage.
 func (b *BlockDAG) block(id iotago.BlockID) (block *blockdag.Block, exists bool) {
-	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
-		return blockdag.NewRootBlock(id, commitmentID, b.slotTimeProviderFunc().EndTime(id.Index())), true
+	if rootBlock, isRootBlock := b.rootBlockProvider(id); isRootBlock {
+		return rootBlock, true
 	}
 
 	storage := b.memStorage.Get(id.Index(), false)

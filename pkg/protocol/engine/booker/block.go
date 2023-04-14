@@ -2,12 +2,10 @@ package booker
 
 import (
 	"sync"
-	"time"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Block struct {
@@ -23,9 +21,9 @@ func NewBlock(block *blockdag.Block) *Block {
 	}
 }
 
-func NewRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
+func NewRootBlock(block *blockdag.Block) *Block {
 	return &Block{
-		Block:  blockdag.NewRootBlock(id, commitmentID, issuingTime),
+		Block:  block,
 		booked: true,
 	}
 }

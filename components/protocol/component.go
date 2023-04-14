@@ -68,6 +68,9 @@ func configure() error {
 	deps.Protocol.Events.Engine.Error.Hook(func(err error) {
 		Component.LogErrorf("Error in Engine: %s", err)
 	})
+	deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(event *blockdag.BlockInvalidEvent) {
+		Component.LogErrorf("%s invalid: %s", event.Block.ID(), event.Reason)
+	})
 
 	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
 		Component.LogInfof("BlockReceived: %s", block.ID())

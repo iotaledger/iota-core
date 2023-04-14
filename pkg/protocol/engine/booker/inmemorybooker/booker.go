@@ -1,7 +1,6 @@
 package inmemorybooker
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -10,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
@@ -27,15 +25,12 @@ type Booker struct {
 
 	bookingOrder  *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *booker.Block]
 	blocks        *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *booker.Block]
-	bookingMutex  *syncutils.DAGMutex[iotago.BlockID]
 	evictionMutex sync.RWMutex
 
 	workers *workerpool.Group
 
-	// TODO: slotTimeProviderFunc is only needed for root blocks
-	slotTimeProviderFunc func() *iotago.SlotTimeProvider
-	// TODO: blockDAG is only needed for setting blocks invalid
-	blockDAG blockdag.BlockDAG
+	rootBlockProvider  func(iotago.BlockID) (*blockdag.Block, bool)
+	setInvalidCallback func(*blockdag.Block, error) bool
 
 	module.Module
 }
@@ -44,22 +39,17 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	return module.Provide(func(e *engine.Engine) booker.Booker {
 		b := New(e.Workers.CreateGroup("Booker"), e.EvictionState, opts...)
 
+		e.Events.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
+			if _, err := b.Queue(booker.NewBlock(block)); err != nil {
+				b.events.Error.Trigger(err)
+			}
+		})
+
 		e.HookConstructed(func() {
-			// TODO: can we assume that all events are set up before and we don't need to hook to e.Constructed?
-			e.Events.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
-				if _, err := b.Queue(booker.NewBlock(block)); err != nil {
-					panic(err)
-				}
-			})
-
-			e.Storage.Settings.HookInitialized(func() {
-				b.slotTimeProviderFunc = e.Storage.Settings.API().SlotTimeProvider
-			})
-
 			b.events.Error.Hook(e.Events.Error.Trigger)
-
 			e.Events.Booker.LinkTo(b.events)
-			b.TriggerInitialized()
+
+			b.Initialize(e.RootBlock, e.BlockDAG.SetInvalid)
 		})
 
 		return b
@@ -68,15 +58,14 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 
 func New(workers *workerpool.Group, evictionState *eviction.State, opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
-		events:       booker.NewEvents(),
-		blocks:       memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *booker.Block](),
-		bookingMutex: syncutils.NewDAGMutex[iotago.BlockID](),
+		events: booker.NewEvents(),
+		blocks: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *booker.Block](),
 
 		evictionState: evictionState,
 		workers:       workers,
 	}, opts, func(b *Booker) {
 		b.bookingOrder = causalorder.New[iotago.SlotIndex](
-			workers.CreatePo2ol("BookingOrder", 2),
+			workers.CreatePool("BookingOrder", 2),
 			b.Block,
 			(*booker.Block).IsBooked,
 			b.book,
@@ -88,6 +77,13 @@ func New(workers *workerpool.Group, evictionState *eviction.State, opts ...optio
 		b.evictionState.Events.SlotEvicted.Hook(b.evict)
 
 	}, (*Booker).TriggerConstructed)
+}
+
+func (b *Booker) Initialize(rootBlockProvider func(iotago.BlockID) (*blockdag.Block, bool), setInvalidCallback func(*blockdag.Block, error) bool) {
+	b.rootBlockProvider = rootBlockProvider
+	b.setInvalidCallback = setInvalidCallback
+
+	b.TriggerInitialized()
 }
 
 var _ booker.Booker = new(Booker)
@@ -107,7 +103,7 @@ func (b *Booker) queue(block *booker.Block) (ready bool, err error) {
 	defer b.evictionMutex.RUnlock()
 
 	if b.evictionState.InEvictedSlot(block.ID()) {
-		return false, nil
+		return false, errors.Errorf("%s is too old (issued at: %s)", block.ID(), block.Block.Block().IssuingTime)
 	}
 
 	b.blocks.Get(block.ID().Index(), true).Set(block.ID(), block)
@@ -138,8 +134,8 @@ func (b *Booker) isPayloadSolid(block *booker.Block) (isPayloadSolid bool, err e
 
 // block retrieves the Block with given id from the mem-storage.
 func (b *Booker) block(id iotago.BlockID) (block *booker.Block, exists bool) {
-	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
-		return booker.NewRootBlock(id, commitmentID, b.slotTimeProviderFunc().EndTime(id.Index())), true
+	if rootBlock, isRootBlock := b.rootBlockProvider(id); isRootBlock {
+		return booker.NewRootBlock(rootBlock), true
 	}
 
 	storage := b.blocks.Get(id.Index(), false)
@@ -151,15 +147,6 @@ func (b *Booker) block(id iotago.BlockID) (block *booker.Block, exists bool) {
 }
 
 func (b *Booker) book(block *booker.Block) error {
-	// Need to mutually exclude a fork on this block.
-	b.bookingMutex.Lock(block.ID())
-	defer b.bookingMutex.Unlock(block.ID())
-
-	// TODO: make sure this is actually necessary
-	if block.IsInvalid() {
-		return errors.Errorf("block with %s was marked as invalid", block.ID())
-	}
-
 	// TODO: track votes
 	// votePower := booker.NewBlockVotePower(block.ID(), block.IssuingTime())
 
@@ -170,9 +157,7 @@ func (b *Booker) book(block *booker.Block) error {
 }
 
 func (b *Booker) markInvalid(block *booker.Block, reason error) {
-	fmt.Println(">>>> invalid in booker", block.ID(), reason)
-	// TODO: do we need to call this on the blockDAG?
-	// b.blockDAG.SetInvalid(block.Block, errors.Wrap(reason, "block marked as invalid in Booker"))
+	b.setInvalidCallback(block.Block, errors.Wrap(reason, "block marked as invalid in Booker"))
 }
 
 // isReferenceValid checks if the reference between the child and its parent is valid.

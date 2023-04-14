@@ -123,6 +123,14 @@ func (e *Engine) Block(id iotago.BlockID) (block *blockdag.Block, exists bool) {
 	return e.BlockDAG.Block(id)
 }
 
+func (e *Engine) RootBlock(id iotago.BlockID) (block *blockdag.Block, isRootBlock bool) {
+	if commitmentID, isRootBlock := e.EvictionState.RootBlockCommitmentID(id); isRootBlock {
+		return blockdag.NewRootBlock(id, commitmentID, e.Storage.Settings.API().SlotTimeProvider().EndTime(id.Index())), true
+	}
+
+	return nil, false
+}
+
 func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 	e.isBootstrappedMutex.Lock()
 	defer e.isBootstrappedMutex.Unlock()
