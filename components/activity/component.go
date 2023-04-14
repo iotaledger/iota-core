@@ -42,6 +42,6 @@ func run() error {
 		ticker.WaitForGracefulShutdown()
 
 		<-ctx.Done()
-		Component.LogInfo("Gracefully shutting down the Protocol...")
-	}, daemon.PriorityProtocol)
+		Component.LogInfo("Stopping Activity... done")
+	}, daemon.PriorityActivity)
 }

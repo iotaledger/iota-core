@@ -9,5 +9,6 @@ const (
 	PriorityP2P
 	PriorityManualPeering
 	PriorityProtocol
+	PriorityActivity
 	PriorityRestAPI // depends on PriorityPoWHandler
 )
