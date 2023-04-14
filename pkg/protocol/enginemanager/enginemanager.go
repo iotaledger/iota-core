@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
@@ -41,6 +42,7 @@ type EngineManager struct {
 	filterProvider   module.Provider[*engine.Engine, filter.Filter]
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG]
 	bookerProvider   module.Provider[*engine.Engine, booker.Booker]
+	clockProvider    module.Provider[*engine.Engine, clock.Clock]
 
 	activeInstance *engine.Engine
 }
@@ -54,6 +56,7 @@ func New(
 	filterProvider module.Provider[*engine.Engine, filter.Filter],
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],
+	clockProvider module.Provider[*engine.Engine, clock.Clock],
 ) *EngineManager {
 	return &EngineManager{
 		workers:          workers,
@@ -64,6 +67,7 @@ func New(
 		filterProvider:   filterProvider,
 		blockDAGProvider: blockDAGProvider,
 		bookerProvider:   bookerProvider,
+		clockProvider:    clockProvider,
 	}
 }
 
@@ -136,6 +140,7 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.filterProvider,
 		e.blockDAGProvider,
 		e.bookerProvider,
+		e.clockProvider,
 		e.engineOptions...,
 	)
 }

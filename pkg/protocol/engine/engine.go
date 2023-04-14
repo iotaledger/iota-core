@@ -20,6 +20,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -36,6 +37,7 @@ type Engine struct {
 	BlockRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
 	BlockDAG       blockdag.BlockDAG
 	Booker         booker.Booker
+	Clock          clock.Clock
 
 	Workers *workerpool.Group
 
@@ -56,6 +58,7 @@ func New(
 	filterProvider module.Provider[*Engine, filter.Filter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
+	clockProvider module.Provider[*Engine, clock.Clock],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -73,6 +76,7 @@ func New(
 			e.BlockDAG = blockDAGProvider(e)
 			e.Filter = filterProvider(e)
 			e.Booker = bookerProvider(e)
+			e.Clock = clockProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings.TriggerInitialized,
