@@ -53,4 +53,8 @@ func setupRoutes(e *echo.Echo) {
 
 	// used to route into the dashboard index
 	e.GET("*", indexRoute)
+
+	apiRoutes := e.Group("/api")
+
+	setupExplorerRoutes(apiRoutes)
 }

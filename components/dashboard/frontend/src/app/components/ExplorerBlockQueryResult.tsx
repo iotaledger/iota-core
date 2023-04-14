@@ -3,17 +3,17 @@ import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
 import NodeStore from "../stores/NodeStore";
-import {inject, observer} from "mobx-react";
-import ExplorerStore, {GenesisBlockID} from "../stores/ExplorerStore";
+import { inject, observer } from "mobx-react";
+import ExplorerStore, { GenesisBlockID } from "../stores/ExplorerStore";
 import Spinner from "react-bootstrap/Spinner";
 import ListGroup from "react-bootstrap/ListGroup";
 import Badge from "react-bootstrap/Badge";
 import * as dateformat from 'dateformat';
-import {Link} from 'react-router-dom';
-import {BasicPayload} from './BasicPayload'
-import {TransactionPayload} from './TransactionPayload'
-import {getPayloadType, PayloadType} from '../misc/Payload'
-import {resolveBase58ConflictID} from "../utils/conflict";
+import { Link } from 'react-router-dom';
+import { BasicPayload } from './BasicPayload'
+import { TransactionPayload } from './TransactionPayload'
+import { getPayloadType, PayloadType } from '../misc/Payload'
+import { resolveBase58ConflictID } from "../utils/conflict";
 import { FaucetPayload } from './FaucetPayload';
 
 interface Props {
@@ -48,28 +48,28 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
     }
 
     getPayloadType() {
-        return getPayloadType(this.props.explorerStore.blk.payload_type)
+        return getPayloadType(this.props.explorerStore.blk.payloadType)
     }
 
     renderPayload() {
-        switch (this.props.explorerStore.blk.payload_type) {
+        switch (this.props.explorerStore.blk.payloadType) {
             case PayloadType.Transaction:
                 if (!this.props.explorerStore.blk.objectivelyInvalid) {
-                    return <TransactionPayload/>
+                    return <TransactionPayload />
                 }
-                return <BasicPayload/>
+                return <BasicPayload />
             case PayloadType.Data:
-                return <BasicPayload/>
+                return <BasicPayload />
             case PayloadType.Faucet:
-                return <FaucetPayload/>
+                return <FaucetPayload />
             default:
-                return <BasicPayload/>
+                return <BasicPayload />
         }
     }
 
     render() {
-        let {id} = this.props.match.params;
-        let {blk, query_loading, query_err} = this.props.explorerStore;
+        let { id } = this.props.match.params;
+        let { blk, query_loading, query_err } = this.props.explorerStore;
 
         if (id === GenesisBlockID) {
             return (
@@ -98,13 +98,13 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                     {
                         blk &&
                         <React.Fragment>
-                            <br/>
+                            <br />
                             <span>
-                                <Badge variant="light" style={{marginRight: 10}}>
-                                   Issuance Time: {dateformat(new Date(blk.issuance_timestamp * 1000), "dd.mm.yyyy HH:MM:ss")}
+                                <Badge variant="light" style={{ marginRight: 10 }}>
+                                    Issuance Time: {dateformat(new Date(blk.issuanceTimestamp * 1000), "dd.mm.yyyy HH:MM:ss")}
                                 </Badge>
                                 <Badge variant="light">
-                                   Solidification Time: {dateformat(new Date(blk.solidification_timestamp * 1000), "dd.mm.yyyy HH:MM:ss")}
+                                    Solidification Time: {dateformat(new Date(blk.solidificationTimestamp * 1000), "dd.mm.yyyy HH:MM:ss")}
                                 </Badge>
                             </span>
                         </React.Fragment>
@@ -120,7 +120,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                         Payload Type: {this.getPayloadType()}
                                     </ListGroup.Item>
                                     <ListGroup.Item>
-                                        Sequence Number: {blk.sequence_number}
+                                        Sequence Number: {blk.sequenceNumber}
                                     </ListGroup.Item>
                                     <ListGroup.Item>
                                         ConflictIDs:
@@ -129,7 +129,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                                 blk.conflictIDs.map((value, index) => {
                                                     return (
                                                         <ListGroup.Item key={"ConflictID" + index + 1}
-                                                                        className="text-break">
+                                                            className="text-break">
                                                             <Link to={`/explorer/conflict/${value}`}>
                                                                 {resolveBase58ConflictID(value)}
                                                             </Link>
@@ -146,7 +146,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                                 blk.addedConflictIDs.map((value, index) => {
                                                     return (
                                                         <ListGroup.Item key={"AddedConflictID" + index + 1}
-                                                                        className="text-break">
+                                                            className="text-break">
                                                             <Link to={`/explorer/conflict/${value}`}>
                                                                 {resolveBase58ConflictID(value)}
                                                             </Link>
@@ -163,7 +163,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                                 blk.subtractedConflictIDs.map((value, index) => {
                                                     return (
                                                         <ListGroup.Item key={"SubtractedConflictID" + index + 1}
-                                                                        className="text-break">
+                                                            className="text-break">
                                                             <Link to={`/explorer/conflict/${value}`}>
                                                                 {resolveBase58ConflictID(value)}
                                                             </Link>
@@ -222,21 +222,21 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                     <h5>Slot Commitment</h5>
                                     <ListGroup>
                                         <ListGroup.Item>
-                                            EC: {blk.ec}
+                                            CommitmentID: {blk.commitmentID}
                                         </ListGroup.Item>
                                         <ListGroup.Item>
                                             <ListGroup>
                                                 <ListGroup.Item>
-                                                    EI: {blk.ei}
+                                                    Index: {blk.commitment.index}
                                                 </ListGroup.Item>
                                                 <ListGroup.Item>
-                                                    ECR: {blk.ecr}
+                                                    prevID: {blk.commitment.prevID}
                                                 </ListGroup.Item>
                                                 <ListGroup.Item>
-                                                    PrevEC: {blk.prevEC}
+                                                    rootsID: {blk.commitment.rootsID}
                                                 </ListGroup.Item>
                                                 <ListGroup.Item>
-                                                    Cumulative Weight: {blk.cumulativeWeight}
+                                                    Cumulative Weight: {blk.commitment.cumulativeWeight}
                                                 </ListGroup.Item>
                                             </ListGroup>
                                         </ListGroup.Item>
@@ -279,10 +279,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                             <Col>
                                 <ListGroup>
                                     <ListGroup.Item>
-                                        Issuer Public Key: {blk.issuer_public_key}
-                                    </ListGroup.Item>
-                                    <ListGroup.Item>
-                                        Issuer NodeID: {blk.issuer_short_id}
+                                        IssuerID: {blk.issuerID}
                                     </ListGroup.Item>
                                     <ListGroup.Item>
                                         Block Signature: {blk.signature}
@@ -290,28 +287,63 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                 </ListGroup>
                             </Col>
                         </Row>
-                        {
-                            Object.keys(blk.parentsByType).map(parentsTypeName =>
-                                <Row className={"mb-3"}>
-                                    <Col>
-                                        <ListGroup>
-                                            {
-                                                blk.parentsByType[parentsTypeName].map((value, index) =>
-                                                    <ListGroup.Item className="text-break">
-                                                        {parentsTypeName} {index + 1}: {' '}
-                                                        <Link
-                                                            to={`/explorer/block/${blk.parentsByType[parentsTypeName][index]}`}>
-                                                            {blk.parentsByType[parentsTypeName][index]}
-                                                        </Link>
-                                                    </ListGroup.Item>
-                                                )
-                                            }
-                                        </ListGroup>
-                                    </Col>
-                                </Row>
-                            )
-                        }
-
+                        <Row>
+                            <Col>
+                                <ListGroup>
+                                    {
+                                        blk.strongParents.map((value, index) => {
+                                            return (
+                                                <ListGroup.Item key={"Strong Parent" + index + 1}
+                                                    className="text-break">
+                                                    Strong Parents {index + 1}: {' '}
+                                                    <Link to={`/explorer/block/${blk.strongParents[index]}`}>
+                                                        {blk.strongParents[index]}
+                                                    </Link>
+                                                </ListGroup.Item>
+                                            )
+                                        })
+                                    }
+                                </ListGroup>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col>
+                                <ListGroup>
+                                    {
+                                        blk.weakParents.map((value, index) => {
+                                            return (
+                                                <ListGroup.Item key={"Weak Parent" + index + 1}
+                                                    className="text-break">
+                                                    Weak Parents {index + 1}: {' '}
+                                                    <Link to={`/explorer/block/${blk.weakParents[index]}`}>
+                                                        {blk.weakParents[index]}
+                                                    </Link>
+                                                </ListGroup.Item>
+                                            )
+                                        })
+                                    }
+                                </ListGroup>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col>
+                                <ListGroup>
+                                    {
+                                        blk.shallowLikedParents.map((value, index) => {
+                                            return (
+                                                <ListGroup.Item key={"Shallow Liked Parent" + index + 1}
+                                                    className="text-break">
+                                                    Shallow Liked Parents {index + 1}: {' '}
+                                                    <Link to={`/explorer/block/${blk.shallowLikedParents[index]}`}>
+                                                        {blk.shallowLikedParents[index]}
+                                                    </Link>
+                                                </ListGroup.Item>
+                                            )
+                                        })
+                                    }
+                                </ListGroup>
+                            </Col>
+                        </Row>
                         <Row>
                             <Col>
                                 <ListGroup>
@@ -319,7 +351,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                         blk.strongChildren.map((value, index) => {
                                             return (
                                                 <ListGroup.Item key={"Strong Child" + index + 1}
-                                                                className="text-break">
+                                                    className="text-break">
                                                     Strong Child {index + 1}: {' '}
                                                     <Link to={`/explorer/block/${blk.strongChildren[index]}`}>
                                                         {blk.strongChildren[index]}
@@ -339,7 +371,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                         blk.weakChildren.map((value, index) => {
                                             return (
                                                 <ListGroup.Item key={"Weak Child" + index + 1}
-                                                                className="text-break">
+                                                    className="text-break">
                                                     Weak Child {index + 1}: {' '}
                                                     <Link to={`/explorer/block/${blk.weakChildren[index]}`}>
                                                         {blk.weakChildren[index]}
@@ -359,7 +391,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                         blk.shallowLikeChildren.map((value, index) => {
                                             return (
                                                 <ListGroup.Item key={"ShallowLike Child" + index + 1}
-                                                                className="text-break">
+                                                    className="text-break">
                                                     ShallowLike Child {index + 1}: {' '}
                                                     <Link to={`/explorer/block/${blk.shallowLikeChildren[index]}`}>
                                                         {blk.shallowLikeChildren[index]}
@@ -372,7 +404,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                             </Col>
                         </Row>
 
-                        <Row className={"mb-3"} style={{marginTop: "20px", marginBottom: "20px"}}>
+                        <Row className={"mb-3"} style={{ marginTop: "20px", marginBottom: "20px" }}>
                             <Col>
                                 <h3>Payload</h3>
                             </Col>
@@ -386,7 +418,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                 }
                 <Row className={"mb-3"}>
                     <Col>
-                        {query_loading && <Spinner animation="border"/>}
+                        {query_loading && <Spinner animation="border" />}
                     </Col>
                 </Row>
             </Container>

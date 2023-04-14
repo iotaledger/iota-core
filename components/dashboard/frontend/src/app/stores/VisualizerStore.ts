@@ -2,11 +2,13 @@ import { action, observable, ObservableMap } from 'mobx';
 import { registerHandler, WSMsgType } from "../misc/WS";
 import { RouterStore } from "mobx-react-router";
 import { default as Viva } from 'vivagraphjs';
-import {Block} from './ExplorerStore';
+import { Block } from './ExplorerStore';
 
 export class Vertex {
     id: string;
-    parentIDsByType: Map<String, Array<string>>;
+    strongParents: Array<string>;
+    weakParents: Array<string>;
+    shallowLikedParents: Array<string>;
     is_tip: boolean;
     is_finalized: boolean;
     is_tx: boolean;
@@ -148,7 +150,9 @@ export class VisualizerStore {
             let res = await fetch(`/api/block/${tipInfo.id}`);
             if (res.status === 200) {
                 let blk: Block = await res.json();
-                v.parentIDsByType = blk.parentsByType;
+                v.strongParents = blk.strongParents;
+                v.weakParents = blk.weakParents;
+                v.shallowLikedParents = blk.shallowLikedParents;
                 v.is_finalized = blk.acceptance;
             }
             this.verticesIncomingOrder.push(v.id);
@@ -198,22 +202,32 @@ export class VisualizerStore {
             node = this.graph.addNode(vert.id, vert);
         }
 
-        if (vert.parentIDsByType) {
-            Object.keys(vert.parentIDsByType).map((parentType) => {
-                vert.parentIDsByType[parentType].forEach((value) => {
-                    // if value is valid AND (links is empty OR there is no between parent and children)
-                    if (value && ((!node.links || !node.links.some(link => link.fromId === value)))) {
-                        // draw the link only when the parent exists
-                        let parent = this.graph.getNode(value);
-                        if (parent) {
-                            this.graph.addLink(value, vert.id);
-                        } else {
-                            console.log("link not added, parent doesn't exist", value);
-                        }
-                    }
-                })
-            })
+        if (vert.strongParents) {
+            this.linkParents(vert, node, vert.strongParents)
         }
+
+        if (vert.weakParents) {
+            this.linkParents(vert, node, vert.weakParents)
+        }
+
+        if (vert.shallowLikedParents) {
+            this.linkParents(vert, node, vert.shallowLikedParents)
+        }
+    }
+
+    linkParents = (vert: Vertex, node: any, parents: Array<string>) => {
+        parents.forEach((value) => {
+            // if value is valid AND (links is empty OR there is no between parent and children)
+            if (value && ((!node.links || !node.links.some(link => link.fromId === value)))) {
+                // draw the link only when the parent exists
+                let parent = this.graph.getNode(value);
+                if (parent) {
+                    this.graph.addLink(value, vert.id);
+                } else {
+                    console.log("link not added, parent doesn't exist", value);
+                }
+            }
+        })
     }
 
     colorForVertexState = (vert: Vertex) => {

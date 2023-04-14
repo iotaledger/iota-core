@@ -60,6 +60,7 @@ func configure() error {
 
 func run() error {
 	runWebSocketStreams(Component)
+	runLiveFeed(Component)
 
 	if err := Component.Daemon().BackgroundWorker("Dashboard", func(ctx context.Context) {
 		Component.LogInfo("Starting Dashboard ... done")

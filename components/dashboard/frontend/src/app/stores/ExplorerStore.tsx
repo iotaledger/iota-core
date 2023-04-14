@@ -1,5 +1,5 @@
-import {action, computed, observable} from 'mobx';
-import {registerHandler, WSMsgType} from "../misc/WS";
+import { action, computed, observable } from 'mobx';
+import { registerHandler, WSMsgType } from "../misc/WS";
 import {
     BasicPayload,
     getPayloadType,
@@ -11,21 +11,24 @@ import {
     Transaction
 } from "../misc/Payload";
 import * as React from "react";
-import {Link} from 'react-router-dom';
-import {RouterStore} from "mobx-react-router";
+import { Link } from 'react-router-dom';
+import { RouterStore } from "mobx-react-router";
 
 export const GenesisBlockID = "1111111111111111111111111111111111111111111111111111111111111111";
 export const GenesisTransactionID = "11111111111111111111111111111111";
 
 export class Block {
     id: string;
-    solidification_timestamp: number;
-    issuance_timestamp: number;
-    sequence_number: number;
-    issuer_public_key: string;
-    issuer_short_id: string;
+    networkID: number;
+    protocolVersion: number;
+    solidificationTimestamp: number;
+    issuanceTimestamp: number;
+    sequenceNumber: number;
+    issuerID: string;
     signature: string;
-    parentsByType: Map<string, Array<string>>;
+    strongParents: Array<string>;
+    weakParents: Array<string>;
+    shallowLikedParents: Array<string>;
     strongChildren: Array<string>;
     weakChildren: Array<string>;
     shallowLikeChildren: Array<string>;
@@ -44,21 +47,24 @@ export class Block {
     confirmationTime: number;
     confirmationBySlot: boolean;
     confirmationBySlotTime: number;
-    payload_type: number;
+    payloadType: number;
     payload: any;
     rank: number;
     sequenceID: number;
     isPastMarker: boolean;
     pastMarkerGap: number;
     pastMarkers: string;
-    ec: string;
-    ei: number;
-    ecr: string;
-    prevEC: string;
-    cumulativeWeight: number;
+    commitmentID: string
+    commitment: Commitment;
     latestConfirmedSlot: number;
 }
 
+export class Commitment {
+    index: number;
+    prevID: string;
+    rootsID: string;
+    cumulativeWeight: number;
+}
 export class AddressResult {
     address: string;
     explorerOutputs: Array<ExplorerOutput>;
@@ -147,10 +153,10 @@ class ConflictVoters {
 
 class SlotInfo {
     id: string;
-	index: number;
-	rootsID: string;
-	prevID: string ;
-	cumulativeWeight: number;
+    index: number;
+    rootsID: string;
+    prevID: string;
+    cumulativeWeight: number;
 }
 
 class SlotBlocks {
@@ -312,7 +318,7 @@ export class ExplorerStore {
 
     @action
     getTransactionAttachments = async (id: string) => {
-        const attachments = await this.fetchJson<never, {transactionID: string, blockIDs: string[]}>("get", `/api/transaction/${id}/attachments`)
+        const attachments = await this.fetchJson<never, { transactionID: string, blockIDs: string[] }>("get", `/api/transaction/${id}/attachments`)
         this.txAttachments = attachments;
     }
 
@@ -384,8 +390,8 @@ export class ExplorerStore {
 
     @action
     getSlotTransactions = async (index: number) => {
-       const res = await this.fetchJson<never, SlotTransactions>("get", `/api/slot/${index}/transactions`)
-       this.slotTransactions = res;
+        const res = await this.fetchJson<never, SlotTransactions>("get", `/api/slot/${index}/transactions`)
+        this.slotTransactions = res;
     }
 
     @action
@@ -438,11 +444,13 @@ export class ExplorerStore {
         this.blk.strongChildren = this.blk.strongChildren ? this.blk.strongChildren : []
         this.blk.weakChildren = this.blk.weakChildren ? this.blk.weakChildren : []
         this.blk.shallowLikeChildren = this.blk.shallowLikeChildren ? this.blk.shallowLikeChildren : []
-        this.blk.parentsByType = this.blk.parentsByType ? this.blk.parentsByType : new Map<string, Array<string>>()
+        this.blk.strongParents = this.blk.strongParents ? this.blk.strongParents : []
+        this.blk.weakParents = this.blk.weakParents ? this.blk.weakParents : []
+        this.blk.shallowLikedParents = this.blk.shallowLikedParents ? this.blk.shallowLikedParents : []
 
         this.query_err = null;
         this.query_loading = false;
-        switch (blk.payload_type) {
+        switch (blk.payloadType) {
             case PayloadType.Transaction:
                 this.payload = blk.payload as TransactionPayload
                 break;
@@ -532,15 +540,15 @@ export class ExplorerStore {
             }
             return v;
         })
-        : undefined;
+            : undefined;
 
         const response = await fetch(`${route}`, {
             method,
-            headers:{ 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body
         });
 
-        if (response.ok)  {
+        if (response.ok) {
             const responseData: U = await response.json();
             return responseData;
         }

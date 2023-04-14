@@ -114,3 +114,81 @@ type schedulerMetric struct {
 	CurrentBufferSize int     `json:"currentBufferSize"`
 	Deficit           float64 `json:"deficit"`
 }
+
+// ExplorerBlock defines the struct of the ExplorerBlock.
+type ExplorerBlock struct {
+	// ID is the block ID.
+	ID string `json:"id"`
+	// NetworkID is the network ID of the block that attaches to.
+	NetworkID iotago.NetworkID `json:"networkID"`
+	// ProtocolVersion is the protocol that proccess the block.
+	ProtocolVersion byte `json:"protocolVersion"`
+	// SolidificationTimestamp is the timestamp of the block.
+	SolidificationTimestamp int64 `json:"solidificationTimestamp"`
+	// The time when this block was issued
+	IssuanceTimestamp int64 `json:"issuanceTimestamp"`
+	// The issuer's sequence number of this block.
+	SequenceNumber uint64 `json:"sequenceNumber"`
+	// The public key of the issuer who issued this block.
+	IssuerID string `json:"issuerID"`
+	// The signature of the block.
+	Signature string `json:"signature"`
+	// StrongParents are the strong parents of the block.
+	StrongParents []string `json:"strongParents"`
+	// WeakParents are the strong parents of the block.
+	WeakParents []string `json:"weakParents"`
+	// ShallowLikedParents are the strong parents of the block.
+	ShallowLikedParents []string `json:"shallowLikedParents"`
+	// StrongChildren are the strong children of the block.
+	StrongChildren []string `json:"strongChildren"`
+	// WeakChildren are the weak children of the block.
+	WeakChildren []string `json:"weakChildren"`
+	// LikedInsteadChildren are the shallow like children of the block.
+	LikedInsteadChildren []string `json:"shallowLikeChildren"`
+	// Solid defines the solid status of the block.
+	Solid                  bool     `json:"solid"`
+	ConflictIDs            []string `json:"conflictIDs"`
+	AddedConflictIDs       []string `json:"addedConflictIDs"`
+	SubtractedConflictIDs  []string `json:"subtractedConflictIDs"`
+	Scheduled              bool     `json:"scheduled"`
+	Booked                 bool     `json:"booked"`
+	Orphaned               bool     `json:"orphaned"`
+	ObjectivelyInvalid     bool     `json:"objectivelyInvalid"`
+	SubjectivelyInvalid    bool     `json:"subjectivelyInvalid"`
+	Acceptance             bool     `json:"acceptance"`
+	AcceptanceTime         int64    `json:"acceptanceTime"`
+	Confirmation           bool     `json:"confirmation"`
+	ConfirmationTime       int64    `json:"confirmationTime"`
+	ConfirmationBySlot     bool     `json:"confirmationBySlot"`
+	ConfirmationBySlotTime int64    `json:"confirmationBySlotTime"`
+	// PayloadType defines the type of the payload.
+	PayloadType iotago.PayloadType `json:"payloadType"`
+	// Payload is the content of the payload.
+	Payload interface{} `json:"payload"`
+
+	// Structure details
+	Rank          uint64 `json:"rank"`
+	PastMarkerGap uint64 `json:"pastMarkerGap"`
+	IsPastMarker  bool   `json:"isPastMarker"`
+	PastMarkers   string `json:"pastMarkers"`
+
+	// Slot commitment
+	CommitmentID        string             `json:"commitmentID"`
+	Commitment          *iotago.Commitment `json:"commitment"`
+	LatestConfirmedSlot uint64             `json:"latestConfirmedSlot"`
+}
+
+// ExplorerAddress defines the struct of the ExplorerAddress.
+type ExplorerAddress struct {
+	Address         string           `json:"address"`
+	ExplorerOutputs []ExplorerOutput `json:"explorerOutputs"`
+}
+
+// ExplorerOutput defines the struct of the ExplorerOutput.
+type ExplorerOutput struct {
+	ID     iotago.OutputIDHex `json:"id"`
+	Output iotago.Output      `json:"output"`
+	// Metadata          *jsonmodels.OutputMetadata `json:"metadata"`
+	TxTimestamp int `json:"txTimestamp"`
+	// ConfirmationState coreapi.txState `json:"confirmationState"`
+}

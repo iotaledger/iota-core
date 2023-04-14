@@ -1,8 +1,8 @@
 import * as React from 'react';
-import {KeyboardEvent} from 'react';
+import { KeyboardEvent } from 'react';
 import Container from "react-bootstrap/Container";
-import {inject, observer} from "mobx-react";
-import {Link} from 'react-router-dom';
+import { inject, observer } from "mobx-react";
+import { Link } from 'react-router-dom';
 import VisualizerStore from "../stores/VisualizerStore";
 import NodeStore from "../stores/NodeStore";
 import Badge from "react-bootstrap/Badge";
@@ -63,7 +63,7 @@ export class Visualizer extends React.Component<Props, any> {
             vertices, finalized_count, selected,
             verticesLimit, tips_count, paused, search
         } = this.props.visualizerStore;
-        let {last_mps_metric, collecting} = this.props.nodeStore;
+        let { last_mps_metric, collecting } = this.props.nodeStore;
 
         return (
             <Container>
@@ -97,27 +97,27 @@ export class Visualizer extends React.Component<Props, any> {
                         <InputGroup className="mb-1" size="sm">
                             <OverlayTrigger
                                 trigger={['hover', 'focus']} placement="right" overlay={
-                                <Popover id="popover-basic">
-                                    <Popover.Content>
-                                        Ensures that only data needed for the visualizer is collected.
-                                    </Popover.Content>
-                                </Popover>}
+                                    <Popover id="popover-basic">
+                                        <Popover.Content>
+                                            Ensures that only data needed for the visualizer is collected.
+                                        </Popover.Content>
+                                    </Popover>}
                             >
                                 <Button variant="outline-secondary" onClick={this.toggleBackgroundDataCollection}
-                                        size="sm">
+                                    size="sm">
                                     {collecting ? "Stop Background Data Collection" : "Collect Background data"}
                                 </Button>
                             </OverlayTrigger>
-                            <br/>
+                            <br />
                         </InputGroup>
                         <InputGroup className="mb-1" size="sm">
                             <OverlayTrigger
                                 trigger={['hover', 'focus']} placement="right" overlay={
-                                <Popover id="popover-basic">
-                                    <Popover.Content>
-                                        Pauses/resumes rendering the graph.
-                                    </Popover.Content>
-                                </Popover>}
+                                    <Popover id="popover-basic">
+                                        <Popover.Content>
+                                            Pauses/resumes rendering the graph.
+                                        </Popover.Content>
+                                    </Popover>}
                             >
                                 <Button onClick={this.pauseResumeVisualizer} size="sm" variant="outline-secondary">
                                     {paused ? "Resume Rendering" : "Pause Rendering"}
@@ -125,46 +125,46 @@ export class Visualizer extends React.Component<Props, any> {
                             </OverlayTrigger>
                         </InputGroup>
                     </Col>
-                    <Col xs={{span: 5, offset: 2}}>
+                    <Col xs={{ span: 5, offset: 2 }}>
                         <p>
-                            <Badge pill style={{background: "#b9b7bd", color: "white"}}>
+                            <Badge pill style={{ background: "#b9b7bd", color: "white" }}>
                                 BLK Pending
                             </Badge>
                             {' '}
-                            <Badge pill style={{background: "#6c71c4", color: "white"}}>
+                            <Badge pill style={{ background: "#6c71c4", color: "white" }}>
                                 BLK Confirmed
                             </Badge>
                             {' '}
-                            <Badge pill style={{background: "#393e46", color: "white"}}>
+                            <Badge pill style={{ background: "#393e46", color: "white" }}>
                                 TX Pending
                             </Badge>
                             {' '}
-                            <Badge pill style={{background: "#fad02c", color: "white"}}>
+                            <Badge pill style={{ background: "#fad02c", color: "white" }}>
                                 TX Confirmed
                             </Badge>
                             {' '}
-                            <Badge pill style={{background: "#cb4b16", color: "white"}}>
+                            <Badge pill style={{ background: "#cb4b16", color: "white" }}>
                                 Tip
                             </Badge>
                             {' '}
-                            <Badge pill style={{background: "#b58900", color: "white"}}>
+                            <Badge pill style={{ background: "#b58900", color: "white" }}>
                                 Unknown
                             </Badge>
-                            <br/>
+                            <br />
                             Vertices: {vertices.size}, Tips: {tips_count},
                             Confirmed/UnConfirmed: {finalized_count}/{vertices.size - finalized_count},{' '}
                             BPS: {last_mps_metric.mps}
-                            <br/>
+                            <br />
                             Selected: {selected ?
-                            <Link to={`/explorer/block/${selected.id}`}>
-                                {selected.id.substr(0, 10)}
-                            </Link>
-                            : "-"}
-                            <br/>
+                                <Link to={`/explorer/block/${selected.id}`}>
+                                    {selected.id.substr(0, 10)}
+                                </Link>
+                                : "-"}
+                            <br />
                             {
-                                selected ? selected.parentIDsByType && Object.keys(selected.parentIDsByType).map((parentType) =>
-                                    <span> {parentType}:{' '}
-                                        {selected.parentIDsByType[parentType].map((parent) => {
+                                selected ? selected.strongParents &&
+                                    <span> Strong:{' '}
+                                        {selected.strongParents.map((parent) => {
                                             return (
                                                 <Link to={`/explorer/block/${parent}`}>
                                                     {parent.substr(0, 10) + " "}
@@ -173,7 +173,37 @@ export class Visualizer extends React.Component<Props, any> {
 
                                         })}
                                     </span>
-                                ) : ""
+                                    : ""
+                            }
+                            <br />
+                            {
+                                selected ? selected.weakParents &&
+                                    <span> Weak:{' '}
+                                        {selected.weakParents.map((parent) => {
+                                            return (
+                                                <Link to={`/explorer/block/${parent}`}>
+                                                    {parent.substr(0, 10) + " "}
+                                                </Link>
+                                            )
+
+                                        })}
+                                    </span>
+                                    : ""
+                            }
+                            <br />
+                            {
+                                selected ? selected.shallowLikedParents &&
+                                    <span> Shallow Liked:{' '}
+                                        {selected.shallowLikedParents.map((parent) => {
+                                            return (
+                                                <Link to={`/explorer/block/${parent}`}>
+                                                    {parent.substr(0, 10) + " "}
+                                                </Link>
+                                            )
+
+                                        })}
+                                    </span>
+                                    : ""
                             }
                         </p>
                     </Col>
@@ -184,7 +214,7 @@ export class Visualizer extends React.Component<Props, any> {
                     width: "100%",
                     height: "100%",
                     background: "#ededed"
-                }} id={"visualizer"}/>
+                }} id={"visualizer"} />
             </Container>
         );
     }
