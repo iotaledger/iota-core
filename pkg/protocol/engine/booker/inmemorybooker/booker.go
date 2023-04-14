@@ -67,7 +67,7 @@ func New(workers *workerpool.Group, evictionState *eviction.State, opts ...optio
 		evictionState: evictionState,
 		workers:       workers,
 	}, opts, func(b *Booker) {
-		b.bookingOrder = causalorder.New[iotago.SlotIndex](
+		b.bookingOrder = causalorder.New(
 			workers.CreatePool("BookingOrder", 2),
 			b.Block,
 			(*booker.Block).IsBooked,
@@ -78,7 +78,6 @@ func New(workers *workerpool.Group, evictionState *eviction.State, opts ...optio
 		)
 
 		b.evictionState.Events.SlotEvicted.Hook(b.evict)
-
 	}, (*Booker).TriggerConstructed)
 }
 
@@ -122,6 +121,11 @@ func (b *Booker) Block(id iotago.BlockID) (block *booker.Block, exists bool) {
 	return b.block(id)
 }
 
+func (b *Booker) Shutdown() {
+	b.workers.Shutdown()
+	b.TriggerStopped()
+}
+
 func (b *Booker) evict(slotIndex iotago.SlotIndex) {
 	b.bookingOrder.EvictUntil(slotIndex)
 
@@ -161,7 +165,7 @@ func (b *Booker) book(block *booker.Block) error {
 func (b *Booker) trackWitnessWeight(votingBlock *booker.Block) {
 	witness := identity.ID(votingBlock.ModelsBlock.Block().IssuerID)
 
-	// TODO: only track witness weight for current validators.
+	// TODO: only track witness weight for issuers having some weight: either they have cMana or they are in the committee.
 
 	// Add the witness to the voting block itself as each block carries a vote for itself.
 	votingBlock.AddWitness(witness)
@@ -181,6 +185,7 @@ func (b *Booker) trackWitnessWeight(votingBlock *booker.Block) {
 		}
 		// TODO: Skip further propagation if block is already accepted.
 
+		// TODO: We might not want to walk further than our direct weak and shallow liked parents.
 		walk.PushAll(block.Parents()...)
 
 		// TODO: here we might need to trigger an event WitnessAdded or something. However, doing this for each block might

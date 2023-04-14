@@ -92,6 +92,7 @@ func (e *Engine) Shutdown() {
 
 		e.BlockRequester.Shutdown()
 		e.Workers.Shutdown()
+		e.Booker.Shutdown()
 		e.BlockDAG.Shutdown()
 		e.Storage.Shutdown()
 	}

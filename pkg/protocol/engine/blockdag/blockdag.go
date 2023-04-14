@@ -16,11 +16,8 @@ type BlockDAG interface {
 	// SetOrphaned marks a Block as orphaned and propagates it to its future cone.
 	SetOrphaned(block *Block) (updated bool)
 
-	// SetInvalid marks a Block as invalid and propagates the invalidity to its future cone.
+	// SetInvalid marks a Block as invalid.
 	SetInvalid(block *Block, reason error) (wasUpdated bool)
-
-	// Shutdown shuts down the BlockDAG.
-	Shutdown()
 
 	module.Interface
 }

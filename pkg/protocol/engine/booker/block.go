@@ -60,6 +60,7 @@ func (b *Block) AddWitness(id identity.ID) (added bool) {
 func (b *Block) String() string {
 	builder := stringify.NewStructBuilder("VirtualVoting.Block", stringify.NewStructField("id", b.ID()))
 	builder.AddField(stringify.NewStructField("Booked", b.booked))
+	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
 
 	return builder.String()
 }

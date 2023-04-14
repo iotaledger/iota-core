@@ -12,8 +12,8 @@ type BlockVotePower struct {
 	time    time.Time
 }
 
-func NewBlockVotePower(id iotago.BlockID, time time.Time) BlockVotePower {
-	return BlockVotePower{
+func NewBlockVotePower(id iotago.BlockID, time time.Time) *BlockVotePower {
+	return &BlockVotePower{
 		blockID: id,
 		time:    time,
 	}
