@@ -2,23 +2,19 @@ package protocol
 
 import (
 	"context"
-	"time"
 
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/crypto/identity"
-	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
-	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/builder"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 )
 
 func init() {
@@ -72,6 +68,10 @@ func configure() error {
 		Component.LogInfof("BlockReceived: %s", block.ID())
 	})
 
+	deps.Protocol.Events.Engine.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+		Component.LogInfof("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
+	})
+
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
 		Component.LogInfof("BlockSolid: %s", block.ID())
 	})
@@ -86,33 +86,6 @@ func configure() error {
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		deps.Protocol.Run()
-
-		// TODO: remove dummy issuance
-		issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
-		pubKey := issuerKey.Public()
-		addr := iotago.Ed25519AddressFromPubKey(pubKey[:])
-
-		ticker := timeutil.NewTicker(func() {
-			block, err := builder.NewBlockBuilder().
-				StrongParents(deps.Protocol.TipManager.Tips(iotago.BlockMaxParents)).
-				Sign(&addr, issuerKey[:]).
-				Build()
-			if err != nil {
-				Component.LogWarnf("Error building block: %s", err.Error())
-				return
-			}
-			modelBlock, err := model.BlockFromBlock(block, deps.Protocol.API())
-			if err != nil {
-				Component.LogWarnf("Error creating model.Block from block: %s", err.Error())
-			}
-
-			err = deps.Protocol.ProcessBlock(modelBlock, deps.Peer.ID())
-			if err != nil {
-				Component.LogWarnf("Error processing block in Protocol: %s", err.Error())
-			}
-		}, 1*time.Second, ctx)
-		ticker.WaitForGracefulShutdown()
-
 		<-ctx.Done()
 		Component.LogInfo("Gracefully shutting down the Protocol...")
 		deps.Protocol.Shutdown()
