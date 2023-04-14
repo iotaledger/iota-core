@@ -18,12 +18,14 @@ tags:
     description: Everything about the node itself.
   - name: blocks
     description: Everything about blocks.
+  - name: congestion
+    description: Everything about rate and mana costs.
   - name: UTXO
     description: Everything about UTXOs.
   - name: commitments
     description: Everything about commitments.
   - name: account
-    description: Everything about accounts. - TO BE FINISHED
+    description: Everything about accounts. - TO BE FINISHED, only easy to retrieve info, more details in indexer api.
   - name: peers
     description: Everything about the peers of the node.
   - name: control
@@ -335,6 +337,91 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServiceUnavailableResponse'
+
+  '/api/core/v3/congestion/rmc':
+    get:
+      tags:
+        - congestion
+      summary: Get the recent Reference Mana Cost info.
+      description: >-
+          Get the recent Reference Mana Cost info.
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RMCResponse'
+              examples:
+                RMC:
+                  $ref: '#/components/examples/get-rmc-response-example'
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+        '503':
+          description: "Unsuccessful operation: indicates that the node is not synced."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableResponse'
+
+
+  '/api/core/v3/congestion/estimate':
+    get:
+      tags:
+        - congestion
+      summary: Get the rate setting estimate based on the current congestion.
+      description: >-
+        Get the rate setting estimate based on the current congestion.
+      responses:
+          '200':
+            description: "Successful operation."
+            content:
+                application/json:
+                  schema:
+                      $ref: '#/components/schemas/CongestionEstimateResponse'
+                  examples:
+                      CongestionEstimate:
+                      $ref: '#/components/examples/get-congestion-estimate-response-example'
+          '400':
+            description: "Unsuccessful operation: indicates that the provided data is invalid."
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/BadRequestResponse'
+          '403':
+            description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/ForbiddenResponse'
+          '500':
+            description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/InternalErrorResponse'
+          '503':
+            description: "Unsuccessful operation: indicates that the node is not synced."
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/ServiceUnavailableResponse'
 
   '/api/core/v3/outputs/{outputId}':
     get:
