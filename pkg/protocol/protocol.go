@@ -13,6 +13,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
@@ -44,6 +46,7 @@ type Protocol struct {
 	optsFilterProvider     module.Provider[*engine.Engine, filter.Filter]
 	optsBlockDAGProvider   module.Provider[*engine.Engine, blockdag.BlockDAG]
 	optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]
+	optsBookerProvider     module.Provider[*engine.Engine, booker.Booker]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -54,6 +57,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsFilterProvider:     blockfilter.NewProvider(),
 		optsBlockDAGProvider:   inmemoryblockdag.NewProvider(),
 		optsTipManagerProvider: trivialtipmanager.NewProvider(),
+		optsBookerProvider:     inmemorybooker.NewProvider(),
 
 		optsBaseDirectory:    "",
 		optsPruningThreshold: 6 * 60, // 1 hour given that slot duration is 10 seconds
@@ -123,6 +127,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsEngineOptions,
 		p.optsFilterProvider,
 		p.optsBlockDAGProvider,
+		p.optsBookerProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
@@ -189,6 +194,12 @@ func WithBlockDAGProvider(optsBlockDAGProvider module.Provider[*engine.Engine, b
 func WithTipManagerProvider(optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsTipManagerProvider = optsTipManagerProvider
+	}
+}
+
+func WithBookerProvider(optsBookerProvider module.Provider[*engine.Engine, booker.Booker]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsBookerProvider = optsBookerProvider
 	}
 }
 

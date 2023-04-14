@@ -111,6 +111,10 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source identity.ID) {
 	f.events.BlockAllowed.Trigger(block)
 }
 
+func (f *Filter) Shutdown() {
+	f.TriggerStopped()
+}
+
 // WithMinCommittableSlotAge specifies how old a slot has to be for it to be committable.
 func WithMinCommittableSlotAge(age iotago.SlotIndex) options.Option[Filter] {
 	return func(filter *Filter) {

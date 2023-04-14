@@ -109,6 +109,7 @@ func (blk *Block) SlotCommitmentID() iotago.CommitmentID {
 
 // TODO: maybe move to iota.go and introduce parent type
 func (blk *Block) Parents() (parents []iotago.BlockID) {
+	parents = make([]iotago.BlockID, 0)
 	blk.ForEachParent(func(parent Parent) {
 		parents = append(parents, parent.ID)
 	})
