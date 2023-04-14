@@ -105,7 +105,7 @@ func (b *Booker) queue(block *booker.Block) (ready bool, err error) {
 	defer b.evictionMutex.RUnlock()
 
 	if b.evictionState.InEvictedSlot(block.ID()) {
-		return false, errors.Errorf("%s is too old (issued at: %s)", block.ID(), block.Block.Block().IssuingTime)
+		return false, errors.Errorf("%s is too old (issued at: %s)", block.ID(), block.BlockDAGBlock.Block().IssuingTime)
 	}
 
 	b.blocks.Get(block.ID().Index(), true).Set(block.ID(), block)
@@ -200,7 +200,7 @@ func (b *Booker) trackWitnessWeight(votingBlock *booker.Block) {
 }
 
 func (b *Booker) markInvalid(block *booker.Block, reason error) {
-	b.setInvalidCallback(block.Block, errors.Wrap(reason, "block marked as invalid in Booker"))
+	b.setInvalidCallback(block.BlockDAGBlock, errors.Wrap(reason, "block marked as invalid in Booker"))
 }
 
 // isReferenceValid checks if the reference between the child and its parent is valid.

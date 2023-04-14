@@ -197,6 +197,12 @@ func WithTipManagerProvider(optsTipManagerProvider module.Provider[*engine.Engin
 	}
 }
 
+func WithBookerProvider(optsBookerProvider module.Provider[*engine.Engine, booker.Booker]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsBookerProvider = optsBookerProvider
+	}
+}
+
 func WithEngineOptions(opts ...options.Option[engine.Engine]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsEngineOptions = append(p.optsEngineOptions, opts...)

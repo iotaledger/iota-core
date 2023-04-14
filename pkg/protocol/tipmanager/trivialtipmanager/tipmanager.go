@@ -55,7 +55,7 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.Block, e.IsBootstrapped, opts...)
 
 		e.Events.Booker.BlockBooked.Hook(func(block *booker.Block) {
-			_ = t.AddTip(block.Block)
+			_ = t.AddTip(block.BlockDAGBlock)
 		}, event.WithWorkerPool(t.workers.CreatePool("AddTip", 2)))
 
 		e.Events.EvictionState.SlotEvicted.Hook(t.evict, event.WithWorkerPool(t.workers.CreatePool("SlotEvicted", 1)))

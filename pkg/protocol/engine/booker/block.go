@@ -14,20 +14,22 @@ type Block struct {
 	mutex     sync.RWMutex
 	witnesses *advancedset.AdvancedSet[identity.ID]
 
-	*blockdag.Block
+	*BlockDAGBlock
 }
+
+type BlockDAGBlock = blockdag.Block
 
 func NewBlock(block *blockdag.Block) *Block {
 	return &Block{
 		witnesses: advancedset.New[identity.ID](),
-		Block:     block,
+		BlockDAGBlock:     block,
 	}
 }
 
 func NewRootBlock(block *blockdag.Block) *Block {
 	return &Block{
 		witnesses: advancedset.New[identity.ID](),
-		Block:     block,
+		BlockDAGBlock:     block,
 		booked:    true,
 	}
 }
@@ -58,7 +60,10 @@ func (b *Block) AddWitness(id identity.ID) (added bool) {
 }
 
 func (b *Block) String() string {
-	builder := stringify.NewStructBuilder("VirtualVoting.Block", stringify.NewStructField("id", b.ID()))
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	builder := stringify.NewStructBuilder("Booker.Block", stringify.NewStructField("id", b.ID()))
 	builder.AddField(stringify.NewStructField("Booked", b.booked))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
 
