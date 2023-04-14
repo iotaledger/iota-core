@@ -68,5 +68,10 @@
       "path": "./snapshot.bin",
       "depth": 5
     }
+  },
+  "activity": {
+    "enabled": true,
+    "broadcastInterval": "2s",
+    "parentsCount": 8
   }
 }
