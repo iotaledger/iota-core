@@ -18,7 +18,7 @@ func init() {
 		DepsFunc: func(cDeps dependencies) { deps = cDeps },
 		Params:   params,
 		Run:      run,
-		IsEnabled: func() bool {
+		IsEnabled: func(_ *dig.Container) bool {
 			return ParamsActivity.Enabled
 		},
 	}
