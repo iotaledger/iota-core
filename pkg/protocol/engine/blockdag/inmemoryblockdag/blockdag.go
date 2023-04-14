@@ -98,7 +98,7 @@ func New(workers *workerpool.Group, evictionState *eviction.State, latestCommitm
 		workerPool:     workers.CreatePool("Solidifier", 2),
 	}, opts,
 		func(b *BlockDAG) {
-			b.solidifier = causalorder.New[iotago.SlotIndex](
+			b.solidifier = causalorder.New(
 				b.workerPool,
 				b.Block,
 				(*blockdag.Block).IsSolid,

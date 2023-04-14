@@ -179,6 +179,10 @@ func (b *Booker) trackWitnessWeight(votingBlock *booker.Block) {
 			panic(fmt.Sprintf("parent %s does not exist", blockID))
 		}
 
+		if _, isRootBlock := b.rootBlockProvider(blockID); isRootBlock {
+			continue
+		}
+
 		// Skip further propagation if the witness is not new.
 		if !block.AddWitness(witness) {
 			continue
