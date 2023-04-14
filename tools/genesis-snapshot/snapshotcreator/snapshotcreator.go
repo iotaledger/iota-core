@@ -51,7 +51,9 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	)
 	defer engineInstance.Shutdown()
 
-	engineInstance.EvictionState.AddRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID())
+	for blockID, commitmentID := range opt.RootBlocks {
+		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
+	}
 
 	if err := engineInstance.WriteSnapshot(opt.FilePath); err != nil {
 		return err

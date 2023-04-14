@@ -112,12 +112,10 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	fmt.Println("AddRootBlock", id, commitmentID, s.delayedBlockEvictionThreshold(s.lastEvictedSlot), s.lastEvictedSlot)
 	if id.Index() <= s.delayedBlockEvictionThreshold(s.lastEvictedSlot) {
 		return
 	}
 
-	fmt.Println("AddRootBlock", id, commitmentID, "2")
 	if s.rootBlocks.Get(id.Index(), true).Set(id, commitmentID) {
 		if err := s.storage.RootBlocks.Store(id, commitmentID); err != nil {
 			panic(errors.Wrapf(err, "failed to store root block %s", id))
@@ -181,13 +179,10 @@ func (s *State) LatestRootBlocks() iotago.BlockIDs {
 
 // Export exports the root blocks to the given writer.
 func (s *State) Export(writer io.WriteSeeker, evictedSlot iotago.SlotIndex) (err error) {
-	fmt.Println("exporting root blocks")
 	return stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
-		fmt.Println("exporting root blocks 2", s.delayedBlockEvictionThreshold(evictedSlot), evictedSlot)
 		for currentSlot := s.delayedBlockEvictionThreshold(evictedSlot) + 1; currentSlot <= evictedSlot; currentSlot++ {
 			fmt.Println(currentSlot, s.rootBlocks.Get(currentSlot, false).Size())
 			if err = s.storage.RootBlocks.Stream(currentSlot, func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
-				fmt.Println("exporting root block", rootBlockID, commitmentID)
 				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
 					return errors.Wrapf(err, "failed to write root block ID %s", rootBlockID)
 				}
@@ -213,8 +208,6 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 	var rootBlockID iotago.BlockID
 	var commitmentID iotago.CommitmentID
 
-	fmt.Println("Importing root blocks...")
-
 	return stream.ReadCollection(reader, func(i int) error {
 		if err = stream.ReadSerializable(reader, &rootBlockID, iotago.BlockIDLength); err != nil {
 			return errors.Wrapf(err, "failed to read root block id %d", i)
@@ -223,7 +216,6 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 			return errors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
 		}
 
-		fmt.Println("Importing root block", rootBlockID, commitmentID)
 		s.AddRootBlock(rootBlockID, commitmentID)
 
 		return nil
