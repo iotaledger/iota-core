@@ -19,7 +19,7 @@ func init() {
 		Params:   params,
 		Run:      run,
 		IsEnabled: func() bool {
-			return true
+			return ParamsActivity.Enabled
 		},
 	}
 }
