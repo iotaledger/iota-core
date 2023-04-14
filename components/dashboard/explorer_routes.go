@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/iotaledger/inx-app/pkg/httpserver"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
@@ -14,7 +15,6 @@ import (
 func setupExplorerRoutes(routeGroup *echo.Group) {
 	routeGroup.GET("/block/:"+restapi.ParameterBlockID, func(c echo.Context) (err error) {
 		blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
-		Component.LogWarnf("parse blockID failed, %v", err)
 		if err != nil {
 			return errors.Errorf("parse block ID error: %v", err)
 		}
@@ -91,44 +91,46 @@ func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 	// 	return nil, errors.WithMessagef(ErrNotFound, "block metadata %s", blockID.Base58())
 	// }
 
-	explorerBlk = createExplorerBlock(block.Block())
+	explorerBlk = createExplorerBlock(block)
 
 	return
 }
 
-func createExplorerBlock(block *iotago.Block) *ExplorerBlock {
+func createExplorerBlock(block *blockdag.Block) *ExplorerBlock {
 	// TODO: fill in missing fields
-	blkID, err := block.ID(deps.Protocol.API().SlotTimeProvider())
+	iotaBlk := block.Block()
+
+	commitmentID, err := iotaBlk.SlotCommitment.ID()
 	if err != nil {
 		return nil
 	}
 
-	commitmentID, err := block.SlotCommitment.ID()
-	if err != nil {
-		return nil
-	}
-
-	sigBytes, err := block.Signature.Encode()
+	sigBytes, err := iotaBlk.Signature.Encode()
 	if err != nil {
 		return nil
 	}
 
 	t := &ExplorerBlock{
-		ID:                  blkID.Identifier().ToHex(),
-		ProtocolVersion:     block.ProtocolVersion,
-		NetworkID:           block.NetworkID,
-		IssuanceTimestamp:   block.IssuingTime.Unix(),
-		IssuerID:            block.IssuerID.String(),
+		ID:                  block.ID().ToHex(),
+		ProtocolVersion:     iotaBlk.ProtocolVersion,
+		NetworkID:           iotaBlk.NetworkID,
+		IssuanceTimestamp:   iotaBlk.IssuingTime.Unix(),
+		IssuerID:            iotaBlk.IssuerID.String(),
 		Signature:           iotago.EncodeHex(sigBytes),
-		StrongParents:       block.StrongParents.ToHex(),
-		WeakParents:         block.WeakParents.ToHex(),
-		ShallowLikedParents: block.ShallowLikeParents.ToHex(),
+		StrongParents:       iotaBlk.StrongParents.ToHex(),
+		WeakParents:         iotaBlk.WeakParents.ToHex(),
+		ShallowLikedParents: iotaBlk.ShallowLikeParents.ToHex(),
 
-		PayloadType: block.Payload.PayloadType(),
+		PayloadType: func() iotago.PayloadType {
+			if iotaBlk.Payload != nil {
+				return iotaBlk.Payload.PayloadType()
+			}
+			return iotago.PayloadType(0)
+		}(),
 		// Payload:              ProcessPayload(block.Payload()),
 		CommitmentID:        commitmentID.ToHex(),
-		Commitment:          block.SlotCommitment,
-		LatestConfirmedSlot: uint64(block.LatestConfirmedSlot),
+		Commitment:          iotaBlk.SlotCommitment,
+		LatestConfirmedSlot: uint64(iotaBlk.LatestConfirmedSlot),
 	}
 
 	return t
