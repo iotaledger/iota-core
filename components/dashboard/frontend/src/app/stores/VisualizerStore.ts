@@ -65,7 +65,7 @@ export class VisualizerStore {
         this.routerStore = routerStore;
         registerHandler(WSMsgType.Vertex, this.addVertex);
         registerHandler(WSMsgType.TipInfo, this.addTipInfo);
-        this.fetchHistory();
+        // this.fetchHistory();
     }
 
     fetchHistory = async () => {
