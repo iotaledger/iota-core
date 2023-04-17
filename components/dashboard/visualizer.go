@@ -47,12 +47,12 @@ func sendVertex(blk *blockdag.Block, finalized bool) {
 	}}, true)
 }
 
-// func sendTipInfo(block *scheduler.Block, isTip bool) {
-// 	broadcastWsBlock(&wsblk{MsgTypeTipInfo, &tipinfo{
-// 		ID:    block.ID().Base58(),
-// 		IsTip: isTip,
-// 	}}, true)
-// }
+func sendTipInfo(block *blockdag.Block, isTip bool) {
+	broadcastWsBlock(&wsblk{MsgTypeTipInfo, &tipinfo{
+		ID:    block.ID().ToHex(),
+		IsTip: isTip,
+	}}, true)
+}
 
 func runVisualizer(component *app.Component) {
 	if err := component.Daemon().BackgroundWorker("Dashboard[Visualizer]", func(ctx context.Context) {
@@ -66,12 +66,12 @@ func runVisualizer(component *app.Component) {
 			// deps.Protocol.Events.Engine.Consensus.BlockGadget.BlockAccepted.Hook(func(block *blockgadget.Block) {
 			// 	sendVertex(block.ModelsBlock, block.IsAccepted())
 			// }, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			// deps.Protocol.Events.TipManager.TipAdded.Hook(func(block *scheduler.Block) {
-			// 	sendTipInfo(block, true)
-			// }, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			// deps.Protocol.Events.TipManager.TipRemoved.Hook(func(block *scheduler.Block) {
-			// 	sendTipInfo(block, false)
-			// }, event.WithWorkerPool(component.WorkerPool)).Unhook,
+			deps.Protocol.Events.TipManager.TipAdded.Hook(func(block *blockdag.Block) {
+				sendTipInfo(block, true)
+			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
+			deps.Protocol.Events.TipManager.TipRemoved.Hook(func(block *blockdag.Block) {
+				sendTipInfo(block, false)
+			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 		)
 		<-ctx.Done()
 		component.LogInfo("Stopping Dashboard[Visualizer] ...")

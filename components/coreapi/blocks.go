@@ -51,7 +51,7 @@ func blockMetadataByID(c echo.Context) (*blockMetadataResponse, error) {
 		bmResponse.BlockError = "block not found"
 	}
 
-	// todo set states and error types
+	// todo set states and error
 
 	return bmResponse, nil
 }

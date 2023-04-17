@@ -12,6 +12,8 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/event"
+	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 )
 
@@ -49,8 +51,7 @@ func runWebSocketStreams(component *app.Component) {
 			broadcastWsBlock(&wsblk{MsgTypeNodeStatus, currentNodeStatus()})
 			broadcastWsBlock(&wsblk{MsgTypeNeighborMetric, neighborMetrics()})
 			broadcastWsBlock(&wsblk{MsgTypeTipsMetric, &tipsInfo{
-				0,
-				//TotalTips: deps.Protocol.TipManager.TipCount(),
+				TotalTips: deps.Protocol.TipManager.TipCount(),
 			}})
 		case *componentsmetric:
 			broadcastWsBlock(&wsblk{MsgTypeComponentCounterMetric, x})
@@ -62,44 +63,32 @@ func runWebSocketStreams(component *app.Component) {
 	if err := component.Daemon().BackgroundWorker("Dashboard[StatusUpdate]", func(ctx context.Context) {
 		defer log.Info("Stopping Dashboard[StatusUpdate] ... done")
 
-		// TODO: this is temporary implementation to test websocket
-		ticker := time.NewTicker(time.Duration(1 * time.Second))
+		unhook := lo.Batch(
+			dashboardmetrics.Events.AttachedBPSUpdated.Hook(func(event *dashboardmetrics.AttachedBPSUpdatedEvent) {
+				process(event.BPS)
+			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
 
-		for {
-			select {
-			case <-ticker.C:
-				process(uint64(0))
-			case <-ctx.Done():
-				return
-			}
-		}
-		// unhook := lo.Batch(
-		// 	Events.AttachedBPSUpdated.Hook(func(event *AttachedBPSUpdatedEvent) {
-		// 		process(event.BPS)
-		// 	}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
+			dashboardmetrics.Events.ComponentCounterUpdated.Hook(func(event *dashboardmetrics.ComponentCounterUpdatedEvent) {
+				process(&componentsmetric{
+					Store:      event.ComponentStatus[dashboardmetrics.Attached],
+					Solidifier: event.ComponentStatus[dashboardmetrics.Solidified],
+					Scheduler:  event.ComponentStatus[dashboardmetrics.Scheduled],
+					Booker:     event.ComponentStatus[dashboardmetrics.Booked],
+				})
+			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
 
-		// 	Events.ComponentCounterUpdated.Hook(func(event *ComponentCounterUpdatedEvent) {
-		// 		componentStatus := event.ComponentStatus
-		// 		process(&componentsmetric{
-		// 			Store:      componentStatus[Attached],
-		// 			Solidifier: componentStatus[Solidified],
-		// 			Scheduler:  componentStatus[Scheduled],
-		// 			Booker:     componentStatus[Booked],
-		// 		})
-		// 	}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-
-		// 	Events.RateSetterUpdated.Hook(func(metric *RateSetterMetric) {
-		// 		process(&rateSetterMetric{
-		// 			Size:     metric.Size,
-		// 			Estimate: metric.Estimate.String(),
-		// 			Rate:     metric.Rate,
-		// 		})
-		// 	}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-		// )
-		// <-ctx.Done()
-		// log.Info("Stopping Dashboard[StatusUpdate] ...")
-		// unhook()
-		// log.Info("Stopping Dashboard[StatusUpdate] ... done")
+			// 	Events.RateSetterUpdated.Hook(func(metric *RateSetterMetric) {
+			// 		process(&rateSetterMetric{
+			// 			Size:     metric.Size,
+			// 			Estimate: metric.Estimate.String(),
+			// 			Rate:     metric.Rate,
+			// 		})
+			// 	}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
+		)
+		<-ctx.Done()
+		log.Info("Stopping Dashboard[StatusUpdate] ...")
+		unhook()
+		log.Info("Stopping Dashboard[StatusUpdate] ... done")
 	}, daemon.PriorityDashboard); err != nil {
 		log.Panicf("Failed to start as daemon: %s", err)
 	}

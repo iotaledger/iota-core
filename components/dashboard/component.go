@@ -29,11 +29,15 @@ func init() {
 		Params:    params,
 		Configure: configure,
 		Run:       run,
-		IsEnabled: func() bool {
+		IsEnabled: func(c *dig.Container) bool {
 			return true
 		},
 	}
 }
+
+var (
+	NodeStartupTimestamp = time.Now()
+)
 
 var (
 	Component *app.Component
@@ -54,7 +58,6 @@ type dependencies struct {
 func configure() error {
 	// TODO: register events here
 	configureServer()
-	configureEvents()
 	return nil
 }
 
@@ -144,19 +147,19 @@ func currentNodeStatus() *nodestatus {
 		LastPauseGC:  m.PauseNs[(m.NumGC+255)%256],
 	}
 
-	// get TangleTime
-	//tm := deps.Protocol.Engine().Clock
-	//status.TangleTime = tangleTime{
-	//	Synced:           deps.Protocol.Engine().IsSynced(),
-	//	Bootstrapped:     deps.Protocol.Engine().IsBootstrapped(),
-	//	AcceptedBlockID:  lastAcceptedBlock.BlockID().Base58(),
-	//	ConfirmedBlockID: lastConfirmedBlock.BlockID().Base58(),
-	//	ConfirmedSlot:    int64(deps.Protocol.Engine().LastConfirmedSlot()),
-	//	ATT:              tm.Accepted().Time().UnixNano(),
-	//	RATT:             tm.Accepted().RelativeTime().UnixNano(),
-	//	CTT:              tm.Confirmed().Time().UnixNano(),
-	//	RCTT:             tm.Confirmed().RelativeTime().UnixNano(),
-	//}
+	//get TangleTime
+	cl := deps.Protocol.MainEngineInstance().Clock
+	status.TangleTime = tangleTime{
+		Synced:       deps.Protocol.MainEngineInstance().IsSynced(),
+		Bootstrapped: deps.Protocol.MainEngineInstance().IsBootstrapped(),
+		//AcceptedBlockID:  lastAcceptedBlock.BlockID().Base58(),
+		//ConfirmedBlockID: lastConfirmedBlock.BlockID().Base58(),
+		//ConfirmedSlot:    int64(deps.Protocol.Engine().LastConfirmedSlot()),
+		ATT:  cl.Accepted().Time().UnixNano(),
+		RATT: cl.Accepted().RelativeTime().UnixNano(),
+		CTT:  cl.Confirmed().Time().UnixNano(),
+		RCTT: cl.Confirmed().RelativeTime().UnixNano(),
+	}
 	//
 	//scheduler := deps.Protocol.CongestionControl.Scheduler()
 	//if scheduler == nil {

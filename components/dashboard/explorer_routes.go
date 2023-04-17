@@ -1,16 +1,27 @@
 package dashboard
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
+
+	"github.com/labstack/echo/v4"
+	"github.com/pkg/errors"
 
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/restapi"
-	"github.com/labstack/echo/v4"
-	"github.com/pkg/errors"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 )
+
+// SearchResult defines the struct of the SearchResult.
+type SearchResult struct {
+	// Block is the *ExplorerBlock.
+	Block *ExplorerBlock `json:"block"`
+	// Address is the *ExplorerAddress.
+	Address *ExplorerAddress `json:"address"`
+}
 
 func setupExplorerRoutes(routeGroup *echo.Group) {
 	routeGroup.GET("/block/:"+restapi.ParameterBlockID, func(c echo.Context) (err error) {
@@ -27,14 +38,6 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 		return c.JSON(http.StatusOK, t)
 	})
 
-	// routeGroup.GET("/address/:id", func(c echo.Context) error {
-	// 	addr, err := findAddress(c.Param("id"))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return c.JSON(http.StatusOK, addr)
-	// })
-
 	// routeGroup.GET("/transaction/:transactionID", ledgerstateAPI.GetTransaction)
 	// routeGroup.GET("/transaction/:transactionID/metadata", ledgerstateAPI.GetTransactionMetadata)
 	// routeGroup.GET("/transaction/:transactionID/attachments", ledgerstateAPI.GetTransactionAttachments)
@@ -50,34 +53,33 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 	// routeGroup.GET("/slot/:index/transactions", slotAPI.GetTransactions)
 	// routeGroup.GET("/slot/:index/utxos", slotAPI.GetUTXOs)
 
-	// routeGroup.GET("/search/:search", func(c echo.Context) error {
-	// 	search := c.Param("search")
-	// 	result := &SearchResult{}
+	routeGroup.GET("/search/:search", func(c echo.Context) error {
+		search := c.Param("search")
+		result := &SearchResult{}
 
-	// 	switch strings.Contains(search, ":") {
-	// 	case true:
-	// 		var blockID models.BlockID
-	// 		err := blockID.FromBase58(search)
-	// 		if err != nil {
-	// 			return errors.WithMessagef(ErrInvalidParameter, "search ID %s", search)
-	// 		}
+		switch strings.Contains(search, ":") {
+		case true:
+			blockID, err := iotago.SlotIdentifierFromHexString(search)
+			if err != nil {
+				return errors.WithMessagef(ErrInvalidParameter, "search ID %s", search)
+			}
 
-	// 		blk, err := findBlock(blockID)
-	// 		if err != nil {
-	// 			return fmt.Errorf("can't find block %s: %w", search, err)
-	// 		}
-	// 		result.Block = blk
+			blk, err := findBlock(blockID)
+			if err != nil {
+				return fmt.Errorf("can't find block %s: %w", search, err)
+			}
+			result.Block = blk
 
-	// 	case false:
-	// 		addr, err := findAddress(search)
-	// 		if err != nil {
-	// 			return fmt.Errorf("can't find address %s: %w", search, err)
-	// 		}
-	// 		result.Address = addr
-	// 	}
+		case false:
+			//addr, err := findAddress(search)
+			//if err != nil {
+			//	return fmt.Errorf("can't find address %s: %w", search, err)
+			//}
+			//result.Address = addr
+		}
 
-	// 	return c.JSON(http.StatusOK, result)
-	// })
+		return c.JSON(http.StatusOK, result)
+	})
 }
 
 func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {

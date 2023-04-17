@@ -112,7 +112,7 @@ func init() {
 		Name:      "CoreAPIV3",
 		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
 		Configure: configure,
-		IsEnabled: func() bool {
+		IsEnabled: func(c *dig.Container) bool {
 			return restapi.ParamsRestAPI.Enabled
 		},
 	}
@@ -134,10 +134,10 @@ type dependencies struct {
 func configure() error {
 	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
 
-	// check if RestAPI plugin is disabled
-	if Component.App().IsComponentSkipped(restapi.Component) {
-		Component.LogPanic("RestAPI component needs to be enabled to use the CoreAPIV2 component")
-	}
+	//// check if RestAPI plugin is disabled
+	//if !Component.App().IsComponentEnabled(restapi.Component.Name) {
+	//	Component.LogPanic("RestAPI component needs to be enabled to use the CoreAPIV3 component")
+	//}
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
 		resp, err := info()

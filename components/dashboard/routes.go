@@ -17,6 +17,9 @@ const (
 	assets = "frontend/src/assets"
 )
 
+// ErrInvalidParameter defines the invalid parameter error.
+var ErrInvalidParameter = echo.NewHTTPError(http.StatusBadRequest, "invalid parameter")
+
 func indexRoute(e echo.Context) error {
 
 	index, err := staticFS.Open(build + "/index.html")

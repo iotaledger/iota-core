@@ -4,9 +4,10 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/app/components/profiling"
 	"github.com/iotaledger/hive.go/app/components/shutdown"
+	"github.com/iotaledger/iota-core/components/activity"
 	"github.com/iotaledger/iota-core/components/coreapi"
 	"github.com/iotaledger/iota-core/components/dashboard"
-	"github.com/iotaledger/iota-core/components/activity"
+	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
 	"github.com/iotaledger/iota-core/components/p2p"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
@@ -32,6 +33,7 @@ func App() *app.App {
 			coreapi.Component,
 			protocol.Component,
 			activity.Component,
+			dashboardmetrics.Component,
 			dashboard.Component,
 		),
 	)
