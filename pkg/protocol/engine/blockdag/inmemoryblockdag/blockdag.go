@@ -58,9 +58,9 @@ type BlockDAG struct {
 	// evictionMutex is a mutex that is used to synchronize the eviction of elements from the BlockDAG.
 	evictionMutex sync.RWMutex
 
-	slotTimeProviderFunc func() *iotago.SlotTimeProvider
+	rootBlockProvider func(iotago.BlockID) (*blockdag.Block, bool)
 
-	Workers    *workerpool.Group
+	workers    *workerpool.Group
 	workerPool *workerpool.WorkerPool
 
 	module.Module
@@ -75,14 +75,11 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 				if _, _, err := b.Attach(block); err != nil {
 					e.Events.Error.Trigger(errors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.Block().IssuerID))
 				}
-			}, event.WithWorkerPool(e.Workers.CreatePool("BlockDAG.Attach", 2)))
-
-			e.Storage.Settings.HookInitialized(func() {
-				b.slotTimeProviderFunc = e.Storage.Settings.API().SlotTimeProvider
-			})
+			}, event.WithWorkerPool(b.workers.CreatePool("BlockDAG.Attach", 2)))
 
 			e.Events.BlockDAG.LinkTo(b.events)
-			b.TriggerInitialized()
+
+			b.Initialize(e.RootBlock)
 		})
 
 		return b
@@ -97,11 +94,11 @@ func New(workers *workerpool.Group, evictionState *eviction.State, latestCommitm
 		memStorage:     memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blockdag.Block](),
 		commitmentFunc: latestCommitmentFunc,
 		futureBlocks:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*blockdag.Block]](),
-		Workers:        workers,
+		workers:        workers,
 		workerPool:     workers.CreatePool("Solidifier", 2),
 	}, opts,
 		func(b *BlockDAG) {
-			b.solidifier = causalorder.New[iotago.SlotIndex](
+			b.solidifier = causalorder.New(
 				b.workerPool,
 				b.Block,
 				(*blockdag.Block).IsSolid,
@@ -116,6 +113,12 @@ func New(workers *workerpool.Group, evictionState *eviction.State, latestCommitm
 		(*BlockDAG).TriggerConstructed,
 		(*BlockDAG).TriggerInitialized,
 	)
+}
+
+func (b *BlockDAG) Initialize(rootBlockProvider func(iotago.BlockID) (*blockdag.Block, bool)) {
+	b.rootBlockProvider = rootBlockProvider
+
+	b.TriggerInitialized()
 }
 
 var _ blockdag.BlockDAG = new(BlockDAG)
@@ -150,25 +153,12 @@ func (b *BlockDAG) Block(id iotago.BlockID) (block *blockdag.Block, exists bool)
 	return b.block(id)
 }
 
-// SetInvalid marks a Block as invalid and propagates the invalidity to its future cone.
+// SetInvalid marks a Block as invalid.
 func (b *BlockDAG) SetInvalid(block *blockdag.Block, reason error) (wasUpdated bool) {
 	if wasUpdated = block.SetInvalid(); wasUpdated {
 		b.events.BlockInvalid.Trigger(&blockdag.BlockInvalidEvent{
 			Block:  block,
 			Reason: reason,
-		})
-
-		b.walkFutureCone(block.Children(), func(currentBlock *blockdag.Block) []*blockdag.Block {
-			if !currentBlock.SetInvalid() {
-				return nil
-			}
-
-			b.events.BlockInvalid.Trigger(&blockdag.BlockInvalidEvent{
-				Block:  currentBlock,
-				Reason: reason,
-			})
-
-			return currentBlock.Children()
 		})
 	}
 
@@ -211,6 +201,11 @@ func (b *BlockDAG) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
 	b.nextIndexToPromote = index + 1
 }
 
+func (b *BlockDAG) Shutdown() {
+	b.workers.Shutdown()
+	b.TriggerStopped()
+}
+
 // evictSlot is used to evict Blocks from committed slots from the BlockDAG.
 func (b *BlockDAG) evictSlot(index iotago.SlotIndex) {
 	b.solidifierMutex.Lock()
@@ -238,7 +233,6 @@ func (b *BlockDAG) markSolid(block *blockdag.Block) (err error) {
 			return
 		}
 	}
-	fmt.Println("markSolid", block.ID())
 
 	// It is important to only set the block as solid when it was not "parked" as a future block.
 	// Future blocks are queued for solidification again when the slot is committed.
@@ -365,8 +359,8 @@ func (b *BlockDAG) registerChild(child *blockdag.Block, parent model.Parent) {
 
 // block retrieves the Block with given id from the mem-storage.
 func (b *BlockDAG) block(id iotago.BlockID) (block *blockdag.Block, exists bool) {
-	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
-		return blockdag.NewRootBlock(id, commitmentID, b.slotTimeProviderFunc().EndTime(id.Index())), true
+	if rootBlock, isRootBlock := b.rootBlockProvider(id); isRootBlock {
+		return rootBlock, true
 	}
 
 	storage := b.memStorage.Get(id.Index(), false)

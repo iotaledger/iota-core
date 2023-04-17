@@ -10,6 +10,8 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -46,10 +48,14 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		s,
 		blockfilter.NewProvider(),
 		inmemoryblockdag.NewProvider(),
+		inmemorybooker.NewProvider(),
+		blocktime.NewProvider(),
 	)
 	defer engineInstance.Shutdown()
 
-	engineInstance.EvictionState.AddRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID())
+	for blockID, commitmentID := range opt.RootBlocks {
+		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
+	}
 
 	if err := engineInstance.WriteSnapshot(opt.FilePath); err != nil {
 		return err

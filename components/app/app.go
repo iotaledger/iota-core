@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/app/components/shutdown"
 	"github.com/iotaledger/iota-core/components/coreapi"
 	"github.com/iotaledger/iota-core/components/dashboard"
+	"github.com/iotaledger/iota-core/components/activity"
 	"github.com/iotaledger/iota-core/components/p2p"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
@@ -30,6 +31,7 @@ func App() *app.App {
 			restapi.Component,
 			coreapi.Component,
 			protocol.Component,
+			activity.Component,
 			dashboard.Component,
 		),
 	)

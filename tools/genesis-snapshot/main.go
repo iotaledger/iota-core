@@ -6,8 +6,8 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
+	"github.com/iotaledger/iota-core/tools/genesis-snapshot/snapshotcreator"
 )
 
 func main() {

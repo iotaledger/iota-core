@@ -4,6 +4,8 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -17,6 +19,8 @@ type Events struct {
 	Filter         *filter.Events
 	BlockRequester *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
 	BlockDAG       *blockdag.Events
+	Booker         *booker.Events
+	Clock          *clock.Events
 
 	event.Group[Events, *Events]
 }
@@ -30,5 +34,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		Filter:         filter.NewEvents(),
 		BlockRequester: eventticker.NewEvents[iotago.SlotIndex, iotago.BlockID](),
 		BlockDAG:       blockdag.NewEvents(),
+		Booker:         booker.NewEvents(),
+		Clock:          clock.NewEvents(),
 	}
 })

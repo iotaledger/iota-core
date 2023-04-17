@@ -17,6 +17,11 @@ type StructConstraint[A any, B constraints.Ptr[A]] interface {
 
 type SerializableInt64 int64
 
+func (s *SerializableInt64) Add(add *SerializableInt64) *SerializableInt64 {
+	*s += *add
+	return s
+}
+
 func (s SerializableInt64) Bytes() (data []byte, err error) {
 	data = make([]byte, 8)
 	binary.LittleEndian.PutUint64(data, uint64(s))
