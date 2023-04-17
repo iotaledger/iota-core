@@ -24,6 +24,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -31,14 +32,15 @@ import (
 // region Engine /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Engine struct {
-	Events         *Events
-	Storage        *storage.Storage
-	Filter         filter.Filter
-	EvictionState  *eviction.State
-	BlockRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
-	BlockDAG       blockdag.BlockDAG
-	Booker         booker.Booker
-	Clock          clock.Clock
+	Events          *Events
+	Storage         *storage.Storage
+	Filter          filter.Filter
+	EvictionState   *eviction.State
+	BlockRequester  *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
+	BlockDAG        blockdag.BlockDAG
+	Booker          booker.Booker
+	Clock           clock.Clock
+	SybilProtection sybilprotection.SybilProtection
 
 	Workers *workerpool.Group
 

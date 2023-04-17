@@ -21,7 +21,6 @@ type Block struct {
 	solid               bool
 	invalid             bool
 	future              bool
-	orphaned            bool
 	strongChildren      []*Block
 	weakChildren        []*Block
 	shallowLikeChildren []*Block
@@ -84,6 +83,10 @@ func (blk *Block) Block() *iotago.Block {
 // TODO: maybe move to iota.go and introduce parent type
 func (blk *Block) Parents() (parents []iotago.BlockID) {
 	return blk.modelBlock.Parents()
+}
+
+func (blk *Block) StrongParents() (parents []iotago.BlockID) {
+	return blk.modelBlock.Block().StrongParents
 }
 
 // ForEachParent executes a consumer func for each parent.
@@ -185,15 +188,6 @@ func (b *Block) SetFuture() (wasUpdated bool) {
 	return true
 }
 
-// IsOrphaned returns true if the Block is orphaned (either due to being marked as orphaned itself or because it has
-// orphaned Blocks in its past cone).
-func (b *Block) IsOrphaned() (isOrphaned bool) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return b.orphaned
-}
-
 // Children returns the children of the Block.
 func (b *Block) Children() (children []*Block) {
 	b.mutex.RLock()
@@ -263,19 +257,6 @@ func (b *Block) SetInvalid() (wasUpdated bool) {
 	return true
 }
 
-// SetOrphaned sets the orphaned flag of the Block.
-func (b *Block) SetOrphaned(orphaned bool) (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if b.orphaned == orphaned {
-		return false
-	}
-	b.orphaned = orphaned
-
-	return true
-}
-
 func (b *Block) AppendChild(child *Block, childType model.ParentsType) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -328,6 +309,13 @@ func (b *Block) AddWitness(id identity.ID) (added bool) {
 	defer b.mutex.Unlock()
 
 	return b.witnesses.Add(id)
+}
+
+func (b *Block) Witnesses() []identity.ID {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.witnesses.Slice()
 }
 
 // IsAccepted returns true if the Block was accepted.

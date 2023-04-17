@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -136,10 +137,20 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
 		if !block.AddWitness(witness) {
 			continue
 		}
+
 		// TODO: Skip further propagation if block is already accepted.
 
-		// TODO: We might not want to walk further than our direct weak and shallow liked parents.
-		walk.PushAll(block.Parents()...)
+		block.ForEachParent(func(parent model.Parent) {
+			switch parent.Type {
+			case model.StrongParentType:
+				walk.Push(parent.ID)
+			case model.ShallowLikeParentType, model.WeakParentType:
+				if weakParent, exists := b.blockCache.Block(parent.ID); !exists {
+					weakParent.AddWitness(witness)
+					b.events.WitnessAdded.Trigger(weakParent)
+				}
+			}
+		})
 
 		// TODO: here we might need to trigger an event WitnessAdded or something. However, doing this for each block might
 		//  be a bit expensive. Instead, we could keep track of the lowest rank of blocks and only trigger for those and
