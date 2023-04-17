@@ -252,23 +252,23 @@ func (t *TipManager) selectTips(count int) (parents iotago.BlockIDs) {
 
 // checkMonotonicity returns true if the block has any accepted or scheduled child.
 func (t *TipManager) checkMonotonicity(block *blocks.Block) (anyScheduledOrAccepted bool) {
-	for _, child := range block.Children() {
-		if child.IsOrphaned() {
-			continue
-		}
-
-		// TODO: add when we have acceptance
-		// if t.blockAcceptanceGadget.IsBlockAccepted(child.ID()) {
-		// 	return true
-		// }
-
-		// TODO: add when we have a scheduler
-		// if childBlock, exists := t.blockRetrieverFunc(child.ID()); exists {
-		// 	if childBlock.IsScheduled() {
-		return true
-		// 	}
-		// }
-	}
+	//for _, child := range block.Children() {
+	//	if child.IsOrphaned() {
+	//		continue
+	//	}
+	//
+	//	// TODO: add when we have acceptance
+	//	// if t.blockAcceptanceGadget.IsBlockAccepted(child.ID()) {
+	//	// 	return true
+	//	// }
+	//
+	//	// TODO: add when we have a scheduler
+	//	// if childBlock, exists := t.blockRetrieverFunc(child.ID()); exists {
+	//	// 	if childBlock.IsScheduled() {
+	//	return true
+	//	// 	}
+	//	// }
+	//}
 
 	return false
 }

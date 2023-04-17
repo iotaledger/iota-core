@@ -365,7 +365,6 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("Solid", b.solid))
 	builder.AddField(stringify.NewStructField("Invalid", b.invalid))
 	builder.AddField(stringify.NewStructField("Future", b.future))
-	builder.AddField(stringify.NewStructField("Orphaned", b.orphaned))
 	builder.AddField(stringify.NewStructField("Booked", b.booked))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
 	builder.AddField(stringify.NewStructField("Accepted", b.accepted))

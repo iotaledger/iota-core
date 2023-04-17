@@ -1,4 +1,4 @@
-package dpos
+package poa
 
 import (
 	"sync"
@@ -70,17 +70,17 @@ func NewProvider(weightVector map[identity.ID]int64, opts ...options.Option[Sybi
 
 var _ sybilprotection.SybilProtection = &SybilProtection{}
 
-// Weights returns the current weights that are staked with validators.
+// Accounts returns all the known validators.
 func (s *SybilProtection) Accounts() *account.Accounts {
 	return s.accounts
 }
 
-// Accounts returns the set of validators that are currently active.
+// Committee returns the set of validators selected to be part of the committee.
 func (s *SybilProtection) Committee() *account.SelectedAccounts {
 	return s.accounts.SelectAccounts(lo.Keys(lo.PanicOnErr(s.accounts.Map()))...)
 }
 
-// Accounts returns the set of validators that are currently active.
+// OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
 func (s *SybilProtection) OnlineCommittee() *account.SelectedAccounts {
 	return s.onlineComittee
 }
@@ -95,8 +95,8 @@ func (s *SybilProtection) Shutdown() {
 }
 
 func (s *SybilProtection) initializeAccounts(weightVector map[identity.ID]int64) {
-	for identity, weight := range weightVector {
-		s.accounts.Update(identity, weight)
+	for id, weight := range weightVector {
+		s.accounts.Update(id, weight)
 	}
 }
 
@@ -111,6 +111,11 @@ func (s *SybilProtection) markValidatorActive(id identity.ID, activityTime time.
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	if !s.Committee().Has(id) {
+		// Only track identities that are part of the committee
+		return
+	}
 
 	if lastActivity, exists := s.lastActivities.Get(id); exists && lastActivity.After(activityTime) {
 		return

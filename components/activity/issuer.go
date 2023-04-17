@@ -36,5 +36,5 @@ func issueActivityBlock() {
 		return
 	}
 
-	Component.LogInfof("Issued activity block: %s", modelBlock.ID())
+	Component.LogInfof("Issued activity block: %s - %s", modelBlock.ID(), modelBlock.Block().IssuerID)
 }

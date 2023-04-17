@@ -16,14 +16,15 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Booker struct {
 	events *booker.Events
 
-	evictionState *eviction.State
-	// validators    *sybilprotection.WeightedSet
+	evictionState   *eviction.State
+	sybilProtection sybilprotection.SybilProtection
 
 	bookingOrder *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
@@ -37,7 +38,7 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.EvictionState, e.BlockCache, opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e.EvictionState, e.SybilProtection, e.BlockCache, opts...)
 
 		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 			if _, err := b.Queue(block); err != nil {
@@ -56,10 +57,11 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, evictionState *eviction.State, sybilProtection sybilprotection.SybilProtection, blockCache *blocks.Blocks, opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
-		events:     booker.NewEvents(),
-		blockCache: blockCache,
+		events:          booker.NewEvents(),
+		sybilProtection: sybilProtection,
+		blockCache:      blockCache,
 
 		evictionState: evictionState,
 		workers:       workers,
@@ -104,21 +106,25 @@ func (b *Booker) isPayloadSolid(block *blocks.Block) (isPayloadSolid bool, err e
 }
 
 func (b *Booker) book(block *blocks.Block) error {
-	b.trackWitnessWeight(block)
-
 	block.SetBooked()
 	b.events.BlockBooked.Trigger(block)
 
+	b.trackWitnessWeight(block)
 	return nil
 }
 
 func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
 	witness := identity.ID(votingBlock.Block().IssuerID)
 
-	// TODO: only track witness weight for issuers having some weight: either they have cMana or they are in the committee.
+	// Only track witness weight for issuers that are part of the committee.
+	if !b.sybilProtection.Committee().Has(witness) {
+		return
+	}
 
 	// Add the witness to the voting block itself as each block carries a vote for itself.
-	votingBlock.AddWitness(witness)
+	if votingBlock.AddWitness(witness) {
+		b.events.WitnessAdded.Trigger(votingBlock)
+	}
 
 	// Walk the block's past cone until we reach an accepted or already supported (by this witness) block.
 	walk := walker.New[iotago.BlockID]().PushAll(votingBlock.Parents()...)

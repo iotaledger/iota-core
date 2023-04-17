@@ -71,9 +71,9 @@ func (t *TipManager) checkBlockRecursive(block *blocks.Block, minSupportedTimest
 	// 	return true
 	// }
 
-	if block.IsOrphaned() {
-		return false
-	}
+	//if block.IsOrphaned() {
+	//	return false
+	//}
 
 	// if block is younger than TSC and not accepted, walk through strong parents' past cones
 	for _, strongParentID := range block.Block().StrongParents {

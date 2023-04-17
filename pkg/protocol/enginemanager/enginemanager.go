@@ -18,7 +18,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -38,11 +40,13 @@ type EngineManager struct {
 	storageOptions []options.Option[database.Manager]
 	workers        *workerpool.Group
 
-	engineOptions    []options.Option[engine.Engine]
-	filterProvider   module.Provider[*engine.Engine, filter.Filter]
-	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG]
-	bookerProvider   module.Provider[*engine.Engine, booker.Booker]
-	clockProvider    module.Provider[*engine.Engine, clock.Clock]
+	engineOptions           []options.Option[engine.Engine]
+	filterProvider          module.Provider[*engine.Engine, filter.Filter]
+	blockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
+	bookerProvider          module.Provider[*engine.Engine, booker.Booker]
+	clockProvider           module.Provider[*engine.Engine, clock.Clock]
+	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
+	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 
 	activeInstance *engine.Engine
 }
@@ -57,17 +61,21 @@ func New(
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],
 	clockProvider module.Provider[*engine.Engine, clock.Clock],
+	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection],
+	blockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget],
 ) *EngineManager {
 	return &EngineManager{
-		workers:          workers,
-		directory:        utils.NewDirectory(dir),
-		dbVersion:        dbVersion,
-		storageOptions:   storageOptions,
-		engineOptions:    engineOptions,
-		filterProvider:   filterProvider,
-		blockDAGProvider: blockDAGProvider,
-		bookerProvider:   bookerProvider,
-		clockProvider:    clockProvider,
+		workers:                 workers,
+		directory:               utils.NewDirectory(dir),
+		dbVersion:               dbVersion,
+		storageOptions:          storageOptions,
+		engineOptions:           engineOptions,
+		filterProvider:          filterProvider,
+		blockDAGProvider:        blockDAGProvider,
+		bookerProvider:          bookerProvider,
+		clockProvider:           clockProvider,
+		sybilProtectionProvider: sybilProtectionProvider,
+		blockGadgetProvider:     blockGadgetProvider,
 	}
 }
 
@@ -141,6 +149,8 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.blockDAGProvider,
 		e.bookerProvider,
 		e.clockProvider,
+		e.sybilProtectionProvider,
+		e.blockGadgetProvider,
 		e.engineOptions...,
 	)
 }

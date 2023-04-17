@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/crypto/identity"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -15,6 +16,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func init() {
@@ -42,12 +45,20 @@ type dependencies struct {
 
 func provide(c *dig.Container) error {
 	return c.Provide(func(p2pManager *p2p.Manager) *protocol.Protocol {
+		validators := make(map[identity.ID]int64)
+		for _, validator := range ParamsProtocol.SybilProtection.Committee {
+			hex := lo.PanicOnErr(iotago.DecodeHex(validator.Identity))
+			validators[identity.ID(hex[:])] = validator.Weight
+		}
+
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
 			p2pManager,
-
 			protocol.WithBaseDirectory(ParamsDatabase.Directory),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
+			protocol.WithSybilProtectionProvider(
+				poa.NewProvider(validators),
+			),
 		)
 	})
 }
@@ -56,6 +67,7 @@ func configure() error {
 	deps.Protocol.Events.Error.Hook(func(err error) {
 		Component.LogErrorf("Error in Protocol: %s", err)
 	})
+
 	// TODO: forward engine errors to protocol?
 	deps.Protocol.Events.Engine.Error.Hook(func(err error) {
 		Component.LogErrorf("Error in Engine: %s", err)
@@ -72,8 +84,21 @@ func configure() error {
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockSolid: %s", block.ID())
 	})
+
 	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockBooked: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.Booker.WitnessAdded.Hook(func(block *blocks.Block) {
+		Component.LogInfof("WitnessAdded: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+		Component.LogInfof("BlockAccepted: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+		Component.LogInfof("BlockConfirmed: %s", block.ID())
 	})
 
 	return nil

@@ -140,17 +140,6 @@ func (b *BlockDAG) SetInvalid(block *blocks.Block, reason error) (wasUpdated boo
 	return
 }
 
-// SetOrphaned marks a Block as orphaned and propagates it to its future cone.
-func (b *BlockDAG) SetOrphaned(block *blocks.Block) (updated bool) {
-	if !block.SetOrphaned(true) {
-		return
-	}
-
-	b.events.BlockOrphaned.Trigger(block)
-
-	return true
-}
-
 func (b *BlockDAG) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
 	b.solidifierMutex.RLock()
 	defer b.solidifierMutex.RUnlock()
@@ -206,9 +195,9 @@ func (b *BlockDAG) markSolid(block *blocks.Block) (err error) {
 
 	// It is important to only set the block as solid when it was not "parked" as a future block.
 	// Future blocks are queued for solidification again when the slot is committed.
-	block.SetSolid()
-
-	b.events.BlockSolid.Trigger(block)
+	if block.SetSolid() {
+		b.events.BlockSolid.Trigger(block)
+	}
 
 	return nil
 }

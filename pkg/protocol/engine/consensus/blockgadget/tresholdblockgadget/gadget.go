@@ -5,11 +5,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/goshimmer/packages/core/markers"
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/core/slot"
 	"github.com/iotaledger/hive.go/ds/walker"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -17,7 +14,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -43,47 +39,43 @@ type Gadget struct {
 
 func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine, blockgadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
-		g := New(e.SybilProtection, opts...)
+		g := New(e.Workers.CreateGroup("BlockGadget"), e.BlockCache, e.SybilProtection, opts...)
+		e.Events.Booker.WitnessAdded.Hook(g.tryConfirmOrAccept)
 
-		e.HookConstructed(func() {
-			e.SybilProtection.HookInitialized(func() {
-				g.Initialize(e.Workers.CreateGroup("BlockGadget"), e.BlockCache, e.EvictionState, e.SlotTimeProvider(), e.SybilProtection.Validators(), e.SybilProtection.Weights().TotalWeightWithoutZeroIdentity)
-			})
-		})
+		e.Events.BlockGadget.LinkTo(g.events)
 
 		return g
 	})
 }
 
-func New(sybilProtection sybilprotection.SybilProtection, opts ...options.Option[Gadget]) *Gadget {
+func New(workers *workerpool.Group, blockCache *blocks.Blocks, sybilProtection sybilprotection.SybilProtection, opts ...options.Option[Gadget]) *Gadget {
 	return options.Apply(&Gadget{
-		events: blockgadget.NewEvents(),
-
+		events:          blockgadget.NewEvents(),
+		workers:         workers,
 		sybilProtection: sybilProtection,
+		blockCache:      blockCache,
 
 		optsAcceptanceThreshold:   0.67,
 		optsConfirmationThreshold: 0.67,
-	}, opts)
-}
+	}, opts,
+		func(g *Gadget) {
+			g.acceptanceOrder = causalorder.New[iotago.SlotIndex, iotago.BlockID, *blocks.Block](g.workers.CreatePool("AcceptanceOrder", 2), blockCache.Block, (*blocks.Block).IsAccepted, g.markAsAccepted, g.acceptanceFailed, (*blocks.Block).StrongParents)
+			g.confirmationOrder = causalorder.New[iotago.SlotIndex, iotago.BlockID, *blocks.Block](g.workers.CreatePool("ConfirmationOrder", 2), blockCache.Block, (*blocks.Block).IsConfirmed, g.markAsConfirmed, g.confirmationFailed, (*blocks.Block).StrongParents)
 
-func (g *Gadget) Initialize(workers *workerpool.Group, blockCache *blocks.Blocks, evictionState *eviction.State, slotTimeProvider *slot.TimeProvider, validators *sybilprotection.WeightedSet, totalWeightCallback func() int64) {
-	g.workers = workers
-	g.blockCache = blockCache
-	g.validators = validators
-	g.totalWeightCallback = totalWeightCallback
-
-	g.acceptanceOrder = causalorder.New(g.workers.CreatePool("AcceptanceOrder", 2), blockCache.Block, (*blocks.Block).IsAccepted, g.markAsAccepted, g.acceptanceFailed, (*blocks.Block).StrongParents)
-	g.confirmationOrder = causalorder.New(g.workers.CreatePool("ConfirmationOrder", 2), blockCache.Block, (*blocks.Block).IsConfirmed, g.markAsConfirmed, g.confirmationFailed, (*blocks.Block).StrongParents)
-
-	// TODO: revisit whole eviction
-	// g.evictionState.Events.SlotEvicted.Hook(g.EvictUntil, event.WithWorkerPool(g.workers.CreatePool("Eviction", 1)))
-
-	g.TriggerConstructed()
-	g.TriggerInitialized()
+			// TODO: revisit whole eviction
+			// g.evictionState.Events.SlotEvicted.Hook(g.EvictUntil, event.WithWorkerPool(g.workers.CreatePool("Eviction", 1)))
+		},
+		(*Gadget).TriggerConstructed,
+	)
 }
 
 func (g *Gadget) Events() *blockgadget.Events {
 	return g.events
+}
+
+func (g *Gadget) Shutdown() {
+	g.workers.Shutdown()
+	g.TriggerStopped()
 }
 
 // IsBlockAccepted returns whether the given block is accepted.
@@ -97,41 +89,6 @@ func (g *Gadget) IsBlockConfirmed(blockID iotago.BlockID) bool {
 	return exists && block.IsConfirmed()
 }
 
-func (g *Gadget) RefreshSequence(sequenceID markers.SequenceID, newMaxSupportedIndex, prevMaxSupportedIndex markers.Index) {
-	g.evictionMutex.RLock()
-
-	var acceptedBlocks, confirmedBlocks []*blockgadget.Block
-
-	totalWeight := g.totalWeightCallback()
-
-	if lastAcceptedIndex, exists := g.lastAcceptedMarker.Get(sequenceID); exists {
-		prevMaxSupportedIndex = lo.Max(prevMaxSupportedIndex, lastAcceptedIndex)
-	}
-
-	for markerIndex := prevMaxSupportedIndex; markerIndex <= newMaxSupportedIndex; markerIndex++ {
-		marker, markerExists := g.booker.BlockCeiling(markers.NewMarker(sequenceID, markerIndex))
-		if !markerExists {
-			break
-		}
-
-		blocksToAccept, blocksToConfirm := g.tryConfirmOrAccept(totalWeight, marker)
-		acceptedBlocks = append(acceptedBlocks, blocksToAccept...)
-		confirmedBlocks = append(confirmedBlocks, blocksToConfirm...)
-
-		markerIndex = marker.Index()
-	}
-
-	g.evictionMutex.RUnlock()
-
-	// EVICTION
-	for _, block := range acceptedBlocks {
-		g.acceptanceOrder.Queue(block)
-	}
-	for _, block := range confirmedBlocks {
-		g.confirmationOrder.Queue(block)
-	}
-}
-
 // tryConfirmOrAccept checks if there is enough active weight to confirm blocks and then checks
 // if the marker has accumulated enough witness weight to be both accepted and confirmed.
 // Acceptance and Confirmation use the same threshold if confirmation is possible.
@@ -143,28 +100,15 @@ func (g *Gadget) tryConfirmOrAccept(block *blocks.Block) {
 
 	// check if we reached the confirmation threshold based on the total commitee weight
 	if IsThresholdReached(blockWeight, committeeTotalWeight, g.optsConfirmationThreshold) {
-		// need to mark outside 'if' statement, otherwise only the first condition would be executed due to lazy evaluation
-
-		// **************************************************
-		// TODO: ************************************************** FIX ME this won't trigger an event
-		// **************************************************
-		accepted := block.SetAccepted()
-		confirmed := block.SetConfirmed()
-		if accepted || confirmed {
-			g.propagateAcceptanceConfirmation(block, true)
-			return
-		}
+		g.propagateAcceptanceConfirmation(block, true)
 	} else if IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {
-		if block.SetAccepted() {
-			g.propagateAcceptanceConfirmation(block, false)
-			return
-		}
+		g.propagateAcceptanceConfirmation(block, false)
 	}
 
 	return
 }
 
-func (g *Gadget) EvictUntil(index slot.Index) {
+func (g *Gadget) EvictUntil(index iotago.SlotIndex) {
 	g.acceptanceOrder.EvictUntil(index)
 	g.confirmationOrder.EvictUntil(index)
 }
@@ -232,19 +176,11 @@ func (g *Gadget) markAsConfirmed(block *blocks.Block) (err error) {
 }
 
 func (g *Gadget) acceptanceFailed(block *blocks.Block, err error) {
-	g.events.Error.Trigger(errors.Wrapf(err, "could not mark block %s as accepted", block.ID()))
+	panic(errors.Wrapf(err, "could not mark block %s as accepted", block.ID()))
 }
 
 func (g *Gadget) confirmationFailed(block *blocks.Block, err error) {
-	g.events.Error.Trigger(errors.Wrapf(err, "could not mark block %s as confirmed", block.ID()))
-}
-
-func (g *Gadget) evictSequence(sequenceID markers.SequenceID) {
-	g.evictionMutex.Lock()
-	defer g.evictionMutex.Unlock()
-
-	g.lastAcceptedMarker.Delete(sequenceID)
-	g.lastConfirmedMarker.Delete(sequenceID)
+	panic(errors.Wrapf(err, "could not mark block %s as confirmed", block.ID()))
 }
 
 func IsThresholdReached(objectWeight, totalWeight int64, threshold float64) bool {
