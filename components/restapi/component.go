@@ -69,7 +69,6 @@ func initConfigParams(c *dig.Container) error {
 
 func provide(c *dig.Container) error {
 	if err := c.Provide(func() *echo.Echo {
-
 		e := httpserver.NewEcho(
 			Component.Logger(),
 			nil,

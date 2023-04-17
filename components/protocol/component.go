@@ -13,8 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 )
 
@@ -61,9 +60,6 @@ func configure() error {
 	deps.Protocol.Events.Engine.Error.Hook(func(err error) {
 		Component.LogErrorf("Error in Engine: %s", err)
 	})
-	deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(event *blockdag.BlockInvalidEvent) {
-		Component.LogErrorf("%s invalid: %s", event.Block.ID(), event.Reason)
-	})
 
 	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
 		Component.LogInfof("BlockReceived: %s", block.ID())
@@ -73,15 +69,11 @@ func configure() error {
 		Component.LogInfof("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
 	})
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
+	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockSolid: %s", block.ID())
 	})
-	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *booker.Block) {
+	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockBooked: %s", block.ID())
-	})
-
-	deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(event *blockdag.BlockInvalidEvent) {
-		Component.LogInfof("BlockInvalid: %s: %s", event.Block.ID(), event.Reason)
 	})
 
 	return nil

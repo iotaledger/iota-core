@@ -49,12 +49,14 @@ type rootBlock struct {
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
 	return &Block{
+		witnesses:  advancedset.New[identity.ID](),
 		modelBlock: data,
 	}
 }
 
 func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
 	return &Block{
+		witnesses: advancedset.New[identity.ID](),
 		rootBlock: &rootBlock{
 			blockID:      blockID,
 			commitmentID: commitmentID,
@@ -71,6 +73,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 	return &Block{
 		missing:        true,
 		missingBlockID: blockID,
+		witnesses:      advancedset.New[identity.ID](),
 	}
 }
 

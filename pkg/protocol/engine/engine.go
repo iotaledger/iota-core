@@ -74,7 +74,7 @@ func New(
 			optsBootstrappedThreshold: 10 * time.Second,
 			optsSnapshotDepth:         5,
 		}, opts, func(e *Engine) {
-			e.BlockCache = blocks.New(e.EvictionState, e.API().SlotTimeProvider)
+			e.BlockCache = blocks.New(e.EvictionState, func() *iotago.SlotTimeProvider { return e.API().SlotTimeProvider() })
 
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 
