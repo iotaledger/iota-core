@@ -14,7 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -60,8 +60,8 @@ func NewProvider(weightVector map[identity.ID]int64, opts ...options.Option[Sybi
 
 					s.clock = e.Clock
 
-					e.Events.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
-						s.markValidatorActive(identity.ID(block.ModelsBlock.Block().IssuerID[:]), block.IssuingTime())
+					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+						s.markValidatorActive(identity.ID(block.Block().IssuerID[:]), block.IssuingTime())
 					}, event.WithWorkerPool(s.workers.CreatePool("SybilProtection", 1)))
 				})
 			})

@@ -13,15 +13,14 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type (
-	blockRetrieverFunc func(id iotago.BlockID) (block *blockdag.Block, exists bool)
+	blockRetrieverFunc func(id iotago.BlockID) (block *blocks.Block, exists bool)
 	isBootstrappedFunc func() bool
 )
 
@@ -41,7 +40,7 @@ type TipManager struct {
 	walkerCache *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, types.Empty]
 
 	mutex sync.RWMutex
-	tips  *randommap.RandomMap[iotago.BlockID, *blockdag.Block]
+	tips  *randommap.RandomMap[iotago.BlockID, *blocks.Block]
 	// TipsConflictTracker *TipsConflictTracker
 
 	optsTimeSinceConfirmationThreshold time.Duration
@@ -54,8 +53,8 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
 		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.Block, e.IsBootstrapped, opts...)
 
-		e.Events.Booker.BlockBooked.Hook(func(block *booker.Block) {
-			_ = t.AddTip(block.BlockDAGBlock)
+		e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+			_ = t.AddTip(block)
 		}, event.WithWorkerPool(t.workers.CreatePool("AddTip", 2)))
 
 		e.Events.EvictionState.SlotEvicted.Hook(t.evict, event.WithWorkerPool(t.workers.CreatePool("SlotEvicted", 1)))
@@ -74,7 +73,7 @@ func New(workers *workerpool.Group, evictionState *eviction.State, blockRetrieve
 		workers:                            workers,
 		blockRetrieverFunc:                 blockRetriever,
 		isBootstrappedFunc:                 isBootstrappedFunc,
-		tips:                               randommap.New[iotago.BlockID, *blockdag.Block](),
+		tips:                               randommap.New[iotago.BlockID, *blocks.Block](),
 		walkerCache:                        memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, types.Empty](),
 		optsTimeSinceConfirmationThreshold: time.Minute,
 	}, opts,
@@ -90,7 +89,7 @@ func (t *TipManager) Events() *tipmanager.Events {
 }
 
 // AddTip adds a Block to the tip pool.
-func (t *TipManager) AddTip(block *blockdag.Block) (added bool) {
+func (t *TipManager) AddTip(block *blocks.Block) (added bool) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -105,7 +104,7 @@ func (t *TipManager) AddTip(block *blockdag.Block) (added bool) {
 
 // TODO: we might not need this at all
 // AddTipNonMonotonic adds a tip to the TipManager without checking for monotonicity.
-func (t *TipManager) AddTipNonMonotonic(block *blockdag.Block) (added bool) {
+func (t *TipManager) AddTipNonMonotonic(block *blocks.Block) (added bool) {
 	// TODO: add when we have a way to check if a block is invalid
 	// if block.IsSubjectivelyInvalid() {
 	// 	return
@@ -154,12 +153,12 @@ func (t *TipManager) Tips(count int) (tips iotago.BlockIDs) {
 }
 
 // AllTips returns a list of all tips that are stored in the TipManger.
-func (t *TipManager) AllTips() (allTips []*blockdag.Block) {
+func (t *TipManager) AllTips() (allTips []*blocks.Block) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	allTips = make([]*blockdag.Block, 0, t.tips.Size())
-	t.tips.ForEach(func(_ iotago.BlockID, value *blockdag.Block) bool {
+	allTips = make([]*blocks.Block, 0, t.tips.Size())
+	t.tips.ForEach(func(_ iotago.BlockID, value *blocks.Block) bool {
 		allTips = append(allTips, value)
 		return true
 	})
@@ -180,7 +179,7 @@ func (t *TipManager) Shutdown() {
 	t.TriggerStopped()
 }
 
-func (t *TipManager) addTip(block *blockdag.Block) (added bool) {
+func (t *TipManager) addTip(block *blocks.Block) (added bool) {
 	if !t.tips.Has(block.ID()) {
 		t.tips.Set(block.ID(), block)
 		// TODO: add when we have conflict tracking
@@ -196,7 +195,7 @@ func (t *TipManager) addTip(block *blockdag.Block) (added bool) {
 	return false
 }
 
-func (t *TipManager) removeTip(block *blockdag.Block) (deleted bool) {
+func (t *TipManager) removeTip(block *blocks.Block) (deleted bool) {
 	if _, deleted = t.tips.Delete(block.ID()); deleted {
 		// TODO: add when we have conflict tracking
 		// t.TipsConflictTracker.RemoveTip(block)
@@ -206,7 +205,7 @@ func (t *TipManager) removeTip(block *blockdag.Block) (deleted bool) {
 }
 
 // RemoveStrongParents removes all tips that are strong parents of the given block.
-func (t *TipManager) removeStrongParents(block *blockdag.Block) {
+func (t *TipManager) removeStrongParents(block *blocks.Block) {
 	for _, strongParentID := range block.Block().StrongParents {
 		if strongParentBlock, exists := t.blockRetrieverFunc(strongParentID); exists {
 			t.removeTip(strongParentBlock)
@@ -252,7 +251,7 @@ func (t *TipManager) selectTips(count int) (parents iotago.BlockIDs) {
 }
 
 // checkMonotonicity returns true if the block has any accepted or scheduled child.
-func (t *TipManager) checkMonotonicity(block *blockdag.Block) (anyScheduledOrAccepted bool) {
+func (t *TipManager) checkMonotonicity(block *blocks.Block) (anyScheduledOrAccepted bool) {
 	for _, child := range block.Children() {
 		if child.IsOrphaned() {
 			continue

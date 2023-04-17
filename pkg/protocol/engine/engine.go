@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
@@ -40,6 +41,8 @@ type Engine struct {
 	Clock          clock.Clock
 
 	Workers *workerpool.Group
+
+	BlockCache *blocks.Blocks
 
 	isBootstrapped      bool
 	isBootstrappedMutex sync.Mutex
@@ -71,6 +74,8 @@ func New(
 			optsBootstrappedThreshold: 10 * time.Second,
 			optsSnapshotDepth:         5,
 		}, opts, func(e *Engine) {
+			e.BlockCache = blocks.New(e.EvictionState, e.API().SlotTimeProvider)
+
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 
 			e.BlockDAG = blockDAGProvider(e)
@@ -107,34 +112,8 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source identity.ID) {
 	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
-func (e *Engine) Block(id iotago.BlockID) (block *blockdag.Block, exists bool) {
-	// var err error
-	// if e.EvictionState.IsRootBlock(id) {
-	// 	block, err = e.Storage.Blocks.Load(id)
-	// 	exists = block != nil && err == nil
-	// 	return
-	// }
-
-	// if cachedBlock, cachedBlockExists := e.Tangle.BlockDAG().Block(id); cachedBlockExists {
-	// 	return cachedBlock.ModelsBlock, !cachedBlock.IsMissing()
-	// }
-
-	// if id.Index() > e.Storage.Settings.LatestCommitment().Index() {
-	// 	return nil, false
-	// }
-	//
-	// block, err = e.Storage.Blocks.Load(id)
-	// exists = block != nil && err == nil
-
-	return e.BlockDAG.Block(id)
-}
-
-func (e *Engine) RootBlock(id iotago.BlockID) (block *blockdag.Block, isRootBlock bool) {
-	if commitmentID, isRootBlock := e.EvictionState.RootBlockCommitmentID(id); isRootBlock {
-		return blockdag.NewRootBlock(id, commitmentID, e.Storage.Settings.API().SlotTimeProvider().EndTime(id.Index())), true
-	}
-
-	return nil, false
+func (e *Engine) Block(id iotago.BlockID) (block *blocks.Block, exists bool) {
+	return e.BlockCache.Block(id)
 }
 
 func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
@@ -258,11 +237,11 @@ func (e *Engine) setupBlockRequester() {
 
 	// We need to hook to make sure that the request is created before the block arrives to avoid a race condition
 	// where we try to delete the request again before it is created. Thus, continuing to request forever.
-	e.Events.BlockDAG.BlockMissing.Hook(func(block *blockdag.Block) {
+	e.Events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
 		// TODO: ONLY START REQUESTING WHEN NOT IN WARPSYNC RANGE (or just not attach outside)?
 		e.BlockRequester.StartTicker(block.ID())
 	})
-	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blockdag.Block) {
+	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
 		e.BlockRequester.StopTicker(block.ID())
 	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", 1))) // Using just 1 worker to avoid contention
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
@@ -117,7 +118,7 @@ func (p *Protocol) initNetworkEvents() {
 		p.networkProtocol.RequestBlock(blockID)
 	}, event.WithWorkerPool(wpBlocks))
 
-	p.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
+	p.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 		p.networkProtocol.SendBlock(block.Block())
 	}, event.WithWorkerPool(wpBlocks))
 }

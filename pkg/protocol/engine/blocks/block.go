@@ -1,10 +1,12 @@
-package blockdag
+package blocks
 
 import (
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/iotaledger/hive.go/crypto/identity"
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/stringify"
@@ -12,22 +14,30 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// Block represents a Block annotated with Tangle related metadata.
 type Block struct {
-	missing        bool
-	missingBlockID iotago.BlockID
-
+	// BlockDAG block
+	missing             bool
+	missingBlockID      iotago.BlockID
 	solid               bool
 	invalid             bool
-	orphaned            bool
 	future              bool
+	orphaned            bool
 	strongChildren      []*Block
 	weakChildren        []*Block
 	shallowLikeChildren []*Block
-	mutex               sync.RWMutex
 
-	*rootBlock
-	*ModelsBlock
+	// Booker block
+	booked    bool
+	witnesses *advancedset.AdvancedSet[identity.ID]
+
+	// BlockGadget block
+	accepted  bool
+	confirmed bool
+
+	mutex sync.RWMutex
+
+	modelBlock *model.Block
+	rootBlock  *rootBlock
 }
 
 type rootBlock struct {
@@ -36,12 +46,10 @@ type rootBlock struct {
 	issuingTime  time.Time
 }
 
-type ModelsBlock = model.Block
-
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
 	return &Block{
-		ModelsBlock: data,
+		modelBlock: data,
 	}
 }
 
@@ -52,7 +60,10 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 			commitmentID: commitmentID,
 			issuingTime:  issuingTime,
 		},
-		solid: true,
+		solid:     true,
+		booked:    true,
+		accepted:  true,
+		confirmed: false,
 	}
 }
 
@@ -61,6 +72,24 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 		missing:        true,
 		missingBlockID: blockID,
 	}
+}
+
+func (blk *Block) Block() *iotago.Block {
+	return blk.modelBlock.Block()
+}
+
+// TODO: maybe move to iota.go and introduce parent type
+func (blk *Block) Parents() (parents []iotago.BlockID) {
+	return blk.modelBlock.Parents()
+}
+
+// ForEachParent executes a consumer func for each parent.
+func (blk *Block) ForEachParent(consumer func(parent model.Parent)) {
+	blk.modelBlock.ForEachParent(consumer)
+}
+
+func (b *Block) IsRootBlock() bool {
+	return b.rootBlock != nil
 }
 
 func (b *Block) ID() iotago.BlockID {
@@ -75,7 +104,7 @@ func (b *Block) ID() iotago.BlockID {
 		return b.rootBlock.blockID
 	}
 
-	return b.ModelsBlock.ID()
+	return b.modelBlock.ID()
 }
 
 func (b *Block) IssuingTime() time.Time {
@@ -90,7 +119,7 @@ func (b *Block) IssuingTime() time.Time {
 		return b.rootBlock.issuingTime
 	}
 
-	return b.ModelsBlock.IssuingTime()
+	return b.modelBlock.Block().IssuingTime
 }
 
 func (b *Block) SlotCommitmentID() iotago.CommitmentID {
@@ -105,7 +134,7 @@ func (b *Block) SlotCommitmentID() iotago.CommitmentID {
 		return b.rootBlock.commitmentID
 	}
 
-	return b.ModelsBlock.SlotCommitmentID()
+	return b.modelBlock.Block().SlotCommitment.MustID()
 }
 
 // IsMissing returns a flag that indicates if the underlying Block data hasn't been stored, yet.
@@ -267,21 +296,89 @@ func (b *Block) Update(data *model.Block) (wasPublished bool) {
 		return
 	}
 
-	b.ModelsBlock = data
+	b.modelBlock = data
 	b.missing = false
 
 	return true
+}
+
+func (b *Block) IsBooked() (isBooked bool) {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.booked
+}
+
+func (b *Block) SetBooked() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.booked; wasUpdated {
+		b.booked = true
+	}
+
+	return
+}
+
+func (b *Block) AddWitness(id identity.ID) (added bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return b.witnesses.Add(id)
+}
+
+// IsAccepted returns true if the Block was accepted.
+func (b *Block) IsAccepted() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.accepted
+}
+
+// SetAccepted sets the Block as accepted.
+func (b *Block) SetAccepted() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.accepted; wasUpdated {
+		b.accepted = true
+	}
+
+	return wasUpdated
+}
+
+func (b *Block) IsConfirmed() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.confirmed
+}
+
+func (b *Block) SetConfirmed() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.confirmed; wasUpdated {
+		b.confirmed = true
+	}
+
+	return wasUpdated
 }
 
 func (b *Block) String() string {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	builder := stringify.NewStructBuilder("BlockDAG.Block", stringify.NewStructField("id", b.ID()))
+	builder := stringify.NewStructBuilder("Engine.Block", stringify.NewStructField("id", b.ID()))
 	builder.AddField(stringify.NewStructField("Missing", b.missing))
 	builder.AddField(stringify.NewStructField("Solid", b.solid))
 	builder.AddField(stringify.NewStructField("Invalid", b.invalid))
+	builder.AddField(stringify.NewStructField("Future", b.future))
 	builder.AddField(stringify.NewStructField("Orphaned", b.orphaned))
+	builder.AddField(stringify.NewStructField("Booked", b.booked))
+	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
+	builder.AddField(stringify.NewStructField("Accepted", b.accepted))
+	builder.AddField(stringify.NewStructField("Confirmed", b.confirmed))
 
 	for index, child := range b.strongChildren {
 		builder.AddField(stringify.NewStructField(fmt.Sprintf("strongChildren%d", index), child.ID().String()))
@@ -295,7 +392,8 @@ func (b *Block) String() string {
 		builder.AddField(stringify.NewStructField(fmt.Sprintf("shallowLikeChildren%d", index), child.ID().String()))
 	}
 
-	builder.AddField(stringify.NewStructField("ModelsBlock", b.ModelsBlock))
+	builder.AddField(stringify.NewStructField("RootBlock", b.rootBlock))
+	builder.AddField(stringify.NewStructField("ModelsBlock", b.modelBlock))
 
 	return builder.String()
 }
