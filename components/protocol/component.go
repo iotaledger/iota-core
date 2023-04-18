@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/dig"
 
@@ -99,6 +100,14 @@ func configure() error {
 
 	deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockConfirmed: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
+		Component.LogInfof("AcceptedTimeUpdated: %s", time.String())
+	})
+
+	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
+		Component.LogInfof("ConfirmedTimeUpdated: %s", time.String())
 	})
 
 	return nil
