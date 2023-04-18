@@ -59,7 +59,7 @@ func (b *Blocks) StoreOrUpdate(data *model.Block) (storedBlock *Block, evicted, 
 	storage := b.blocks.Get(data.ID().Index(), true)
 	createdBlock, created := storage.GetOrCreate(data.ID(), func() *Block { return NewBlock(data) })
 	if !created {
-		return createdBlock, false, storedBlock.Update(data)
+		return createdBlock, false, createdBlock.Update(data)
 	}
 
 	return createdBlock, false, false
