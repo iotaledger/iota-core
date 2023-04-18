@@ -8,10 +8,10 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/core/storable"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/hive.go/stringify"
-	"github.com/iotaledger/iota-core/pkg/storage/storable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
