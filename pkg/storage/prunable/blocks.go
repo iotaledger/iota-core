@@ -4,31 +4,27 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Blocks struct {
-	Storage func(index iotago.SlotIndex) kvstore.KVStore
+	slot  iotago.SlotIndex
+	store kvstore.KVStore
 
 	api iotago.API
 }
 
-func NewBlocks(dbManager *Manager, storagePrefix byte) (newBlocks *Blocks) {
+func NewBlocks(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.API) (newBlocks *Blocks) {
 	return &Blocks{
-		Storage: lo.Bind([]byte{storagePrefix}, dbManager.Get),
-		api:     iotago.V3API(&iotago.ProtocolParameters{}), // TODO: do we need the protocol parameters for the storage?
+		slot:  slot,
+		store: store,
+		api:   api,
 	}
 }
 
 func (b *Blocks) Load(id iotago.BlockID) (*model.Block, error) {
-	storage := b.Storage(id.Index())
-	if storage == nil {
-		return nil, errors.Errorf("storage does not exist for slot %s", id.Index())
-	}
-
-	blockBytes, err := storage.Get(id[:])
+	blockBytes, err := b.store.Get(id[:])
 	if err != nil {
 		if errors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, nil
@@ -42,51 +38,29 @@ func (b *Blocks) Load(id iotago.BlockID) (*model.Block, error) {
 
 func (b *Blocks) Store(block *model.Block) error {
 	blockID := block.ID()
-	storage := b.Storage(blockID.Index())
-	if storage == nil {
-		return errors.Errorf("storage does not exist for slot %s", blockID.Index())
-	}
-
-	if err := storage.Set(blockID[:], block.Data()); err != nil {
-		return errors.Wrapf(err, "failed to store block %s", block.ID)
-	}
-
-	return nil
+	return b.store.Set(blockID[:], block.Data())
 }
 
 func (b *Blocks) Delete(id iotago.BlockID) (err error) {
-	storage := b.Storage(id.Index())
-	if storage == nil {
-		return errors.Errorf("storage does not exist for slot %s", id.Index())
-	}
-
-	if err = storage.Delete(id[:]); err != nil {
-		return errors.Wrapf(err, "failed to delete block %s", id)
-	}
-
-	return nil
+	return b.store.Delete(id[:])
 }
 
-func (b *Blocks) ForEachBlockInSlot(index iotago.SlotIndex, consumer func(blockID iotago.BlockID) bool) error {
-	storage := b.Storage(index)
-	if storage == nil {
-		return errors.Errorf("storage does not exist for slot %s", index)
-	}
-
+func (b *Blocks) ForEachBlockIDInSlot(consumer func(blockID iotago.BlockID) error) error {
 	var innerErr error
-	if err := storage.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
+	if err := b.store.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
 		var blockID iotago.BlockID
 		blockID, innerErr = iotago.SlotIdentifierFromBytes(key)
 		if innerErr != nil {
 			return false
 		}
-		return consumer(blockID)
+
+		return consumer(blockID) != nil
 	}); err != nil {
-		return errors.Wrapf(err, "failed to stream blockIDs for slot %s", index)
+		return errors.Wrapf(err, "failed to stream blockIDs for slot %s", b.slot)
 	}
 
 	if innerErr != nil {
-		return errors.Wrapf(innerErr, "failed to deserialize blockIDs for slot %s", index)
+		return errors.Wrapf(innerErr, "failed to deserialize blockIDs for slot %s", b.slot)
 	}
 
 	return nil

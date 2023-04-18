@@ -17,8 +17,8 @@ type Permanent struct {
 	store              kvstore.KVStore
 	storeHealthTracker *kvstore.StoreHealthTracker
 
-	Settings    *Settings
-	Commitments *Commitments
+	settings    *Settings
+	commitments *Commitments
 
 	sybilProtection kvstore.KVStore
 }
@@ -43,10 +43,18 @@ func New(baseDir *utils.Directory, dbConfig database.Config) *Permanent {
 		store:              store,
 		storeHealthTracker: storeHealthTracker,
 
-		Settings:        NewSettings(baseDir.Path("settings.bin")),
-		Commitments:     NewCommitments(baseDir.Path("commitments.bin")),
+		settings:        NewSettings(baseDir.Path("settings.bin")),
+		commitments:     NewCommitments(baseDir.Path("commitments.bin")),
 		sybilProtection: lo.PanicOnErr(store.WithExtendedRealm([]byte{sybilProtectionPrefix})),
 	}
+}
+
+func (p *Permanent) Settings() *Settings {
+	return p.settings
+}
+
+func (p *Permanent) Commitments() *Commitments {
+	return p.commitments
 }
 
 // SybilProtection returns the sybil protection storage (or a specialized sub-storage if a realm is provided).
@@ -66,12 +74,12 @@ func (p *Permanent) Size() int64 {
 		return 0
 	}
 
-	settingsSize, err := p.Settings.Size()
+	settingsSize, err := p.settings.Size()
 	if err != nil {
 		panic(err)
 	}
 
-	commitmentsSize, err := p.Settings.Size()
+	commitmentsSize, err := p.settings.Size()
 	if err != nil {
 		panic(err)
 	}
@@ -80,7 +88,7 @@ func (p *Permanent) Size() int64 {
 }
 
 func (p *Permanent) Shutdown() {
-	if err := p.Commitments.Close(); err != nil {
+	if err := p.commitments.Close(); err != nil {
 		panic(err)
 	}
 

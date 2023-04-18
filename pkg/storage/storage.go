@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
@@ -57,23 +56,17 @@ func New(directory string, dbVersion byte, opts ...options.Option[Storage]) *Sto
 				Directory:    s.dir.PathWithCreate(prunableDirName),
 				Version:      dbVersion,
 				PrefixHealth: []byte{storePrefixHealth},
+			}, s.optsPrunableManagerOptions...)
+
+			s.Permanent.Settings().HookInitialized(func() {
+				// TODO: do we make sure this is set before "running" the node?
+				s.Prunable.Initialize(s.Settings().API())
 			})
-
-			// TODO: this should only be done once no? actually should be part of snapshot loading
-			if err := s.Commitments.Store(iotago.NewEmptyCommitment()); err != nil {
-				panic(err)
-			}
-
 		})
 }
 
 func (s *Storage) Directory() string {
 	return s.dir.Path()
-}
-
-// PruneUntilSlot prunes storage slots less than and equal to the given index.
-func (s *Storage) PruneUntilSlot(index iotago.SlotIndex) {
-	s.Prunable.PruneUntilSlot(index)
 }
 
 // PrunableDatabaseSize returns the size of the underlying prunable databases.
@@ -84,6 +77,10 @@ func (s *Storage) PrunableDatabaseSize() int64 {
 // PermanentDatabaseSize returns the size of the underlying permanent database and files.
 func (s *Storage) PermanentDatabaseSize() int64 {
 	return s.Permanent.Size()
+}
+
+func (s *Storage) Size() int64 {
+	return s.Permanent.Size() + s.Prunable.Size()
 }
 
 // Shutdown shuts down the storage.
