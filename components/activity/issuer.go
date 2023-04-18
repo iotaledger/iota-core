@@ -14,6 +14,7 @@ func issueActivityBlock() {
 
 	block, err := builder.NewBlockBuilder().
 		StrongParents(deps.Protocol.TipManager.Tips(ParamsActivity.ParentsCount)).
+		SlotCommitment(deps.Protocol.MainEngineInstance().Storage.Settings.LatestCommitment()).
 		Payload(&iotago.TaggedData{
 			Tag: []byte("ACTIVITY"),
 		}).
@@ -36,5 +37,5 @@ func issueActivityBlock() {
 		return
 	}
 
-	Component.LogInfof("Issued activity block: %s", modelBlock.ID())
+	Component.LogInfof("Issued activity block: %s - commitment %s %d", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index)
 }

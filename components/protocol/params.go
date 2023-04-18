@@ -13,7 +13,18 @@ type ParametersProtocol struct {
 		// Depth defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate.
 		Depth int `default:"5" usage:"defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate"`
 	}
+
+	SybilProtection struct {
+		Committee Validators `noflag:"true"`
+	}
 }
+
+type Validator struct {
+	Identity string `usage:"the identity of the validator"`
+	Weight   int64  `usage:"the weight of the validator"`
+}
+
+type Validators []*Validator
 
 // ParametersDatabase contains the definition of configuration parameters used by the storage layer.
 type ParametersDatabase struct {

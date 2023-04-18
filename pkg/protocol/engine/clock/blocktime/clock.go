@@ -1,9 +1,12 @@
 package blocktime
 
 import (
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 )
 
@@ -27,32 +30,37 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 			confirmedTime: NewRelativeTime(),
 		}, opts, func(c *Clock) {
 			e.HookConstructed(func() {
-				// e.Ledger.HookInitialized(func() {
-				// 	c.acceptedTime.Set(e.SlotTimeProvider().EndTime(e.Storage.Settings.LatestCommitment().Index()))
-				// 	c.confirmedTime.Set(e.SlotTimeProvider().EndTime(e.Storage.Settings.LatestCommitment().Index()))
-
-				// 	c.TriggerInitialized()
-				// })
+				//e.Ledger.HookInitialized(func() {
+				//	c.acceptedTime.Set(e.SlotTimeProvider().EndTime(e.Storage.Settings.LatestCommitment().Index()))
+				//	c.confirmedTime.Set(e.SlotTimeProvider().EndTime(e.Storage.Settings.LatestCommitment().Index()))
+				//
+				//	c.TriggerInitialized()
+				//})
+				e.HookInitialized(func() {
+					//TODO: this is temporary until we have commitments
+					c.acceptedTime.Set(e.API().SlotTimeProvider().EndTime(0))
+					c.confirmedTime.Set(e.API().SlotTimeProvider().EndTime(0))
+				})
 
 				e.Events.Clock.AcceptedTimeUpdated.LinkTo(c.acceptedTime.OnUpdated)
 				e.Events.Clock.ConfirmedTimeUpdated.LinkTo(c.confirmedTime.OnUpdated)
 
-				// asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("Clock", 1))
-				// c.HookStopped(lo.Batch(
-				// 	e.Events.Consensus.BlockGadget.BlockAccepted.Hook(func(block *blockgadget.Block) {
-				// 		c.acceptedTime.Advance(block.IssuingTime())
-				// 	}, asyncOpt).Unhook,
+				asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("Clock", 1))
+				c.HookStopped(lo.Batch(
+					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+						c.acceptedTime.Advance(block.IssuingTime())
+					}, asyncOpt).Unhook,
 
-				// 	e.Events.Consensus.BlockGadget.BlockConfirmed.Hook(func(block *blockgadget.Block) {
-				// 		c.acceptedTime.Advance(block.IssuingTime())
-				// 		c.confirmedTime.Advance(block.IssuingTime())
-				// 	}, asyncOpt).Unhook,
+					e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+						c.acceptedTime.Advance(block.IssuingTime())
+						c.confirmedTime.Advance(block.IssuingTime())
+					}, asyncOpt).Unhook,
 
-				// 	e.Events.Consensus.SlotGadget.SlotConfirmed.Hook(func(index slot.Index) {
-				// 		c.acceptedTime.Advance(e.SlotTimeProvider().EndTime(index))
-				// 		c.confirmedTime.Advance(e.SlotTimeProvider().EndTime(index))
-				// 	}, asyncOpt).Unhook,
-				// ))
+					//e.Events.SlotGadget.SlotConfirmed.Hook(func(index slot.Index) {
+					//	c.acceptedTime.Advance(e.SlotTimeProvider().EndTime(index))
+					//	c.confirmedTime.Advance(e.SlotTimeProvider().EndTime(index))
+					//}, asyncOpt).Unhook,
+				))
 			})
 
 			e.HookStopped(c.TriggerStopped)

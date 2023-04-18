@@ -1,4 +1,4 @@
-package dpos
+package poa
 
 import (
 	"time"

@@ -19,10 +19,14 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -30,16 +34,21 @@ import (
 // region Engine /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Engine struct {
-	Events         *Events
-	Storage        *storage.Storage
-	Filter         filter.Filter
-	EvictionState  *eviction.State
-	BlockRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
-	BlockDAG       blockdag.BlockDAG
-	Booker         booker.Booker
-	Clock          clock.Clock
+	Events          *Events
+	Storage         *storage.Storage
+	Filter          filter.Filter
+	EvictionState   *eviction.State
+	BlockRequester  *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
+	BlockDAG        blockdag.BlockDAG
+	Booker          booker.Booker
+	Clock           clock.Clock
+	SybilProtection sybilprotection.SybilProtection
+	BlockGadget     blockgadget.Gadget
+	Notarization    notarization.Notarization
 
 	Workers *workerpool.Group
+
+	BlockCache *blocks.Blocks
 
 	isBootstrapped      bool
 	isBootstrappedMutex sync.Mutex
@@ -59,6 +68,9 @@ func New(
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
 	clockProvider module.Provider[*Engine, clock.Clock],
+	sybilProtectionProvider module.Provider[*Engine, sybilprotection.SybilProtection],
+	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
+	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -71,12 +83,17 @@ func New(
 			optsBootstrappedThreshold: 10 * time.Second,
 			optsSnapshotDepth:         5,
 		}, opts, func(e *Engine) {
+			e.BlockCache = blocks.New(e.EvictionState, func() *iotago.SlotTimeProvider { return e.API().SlotTimeProvider() })
+
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 
+			e.SybilProtection = sybilProtectionProvider(e)
 			e.BlockDAG = blockDAGProvider(e)
 			e.Filter = filterProvider(e)
 			e.Booker = bookerProvider(e)
 			e.Clock = clockProvider(e)
+			e.BlockGadget = blockGadgetProvider(e)
+			e.Notarization = notarizationProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings.TriggerInitialized,
@@ -107,34 +124,8 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source identity.ID) {
 	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
-func (e *Engine) Block(id iotago.BlockID) (block *blockdag.Block, exists bool) {
-	// var err error
-	// if e.EvictionState.IsRootBlock(id) {
-	// 	block, err = e.Storage.Blocks.Load(id)
-	// 	exists = block != nil && err == nil
-	// 	return
-	// }
-
-	// if cachedBlock, cachedBlockExists := e.Tangle.BlockDAG().Block(id); cachedBlockExists {
-	// 	return cachedBlock.ModelsBlock, !cachedBlock.IsMissing()
-	// }
-
-	// if id.Index() > e.Storage.Settings.LatestCommitment().Index() {
-	// 	return nil, false
-	// }
-	//
-	// block, err = e.Storage.Blocks.Load(id)
-	// exists = block != nil && err == nil
-
-	return e.BlockDAG.Block(id)
-}
-
-func (e *Engine) RootBlock(id iotago.BlockID) (block *blockdag.Block, isRootBlock bool) {
-	if commitmentID, isRootBlock := e.EvictionState.RootBlockCommitmentID(id); isRootBlock {
-		return blockdag.NewRootBlock(id, commitmentID, e.Storage.Settings.API().SlotTimeProvider().EndTime(id.Index())), true
-	}
-
-	return nil, false
+func (e *Engine) Block(id iotago.BlockID) (block *blocks.Block, exists bool) {
+	return e.BlockCache.Block(id)
 }
 
 func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
@@ -145,9 +136,9 @@ func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 		return true
 	}
 
-	// if isBootstrapped = time.Since(e.Clock.Accepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsFullyCommitted(); isBootstrapped {
-	// 	e.isBootstrapped = true
-	// }
+	if isBootstrapped = time.Since(e.Clock.Accepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsBootstrapped(); isBootstrapped {
+		e.isBootstrapped = true
+	}
 
 	return isBootstrapped
 }
@@ -258,11 +249,11 @@ func (e *Engine) setupBlockRequester() {
 
 	// We need to hook to make sure that the request is created before the block arrives to avoid a race condition
 	// where we try to delete the request again before it is created. Thus, continuing to request forever.
-	e.Events.BlockDAG.BlockMissing.Hook(func(block *blockdag.Block) {
+	e.Events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
 		// TODO: ONLY START REQUESTING WHEN NOT IN WARPSYNC RANGE (or just not attach outside)?
 		e.BlockRequester.StartTicker(block.ID())
 	})
-	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blockdag.Block) {
+	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
 		e.BlockRequester.StopTicker(block.ID())
 	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", 1))) // Using just 1 worker to avoid contention
 }

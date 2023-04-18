@@ -236,9 +236,10 @@ Example:
 
 ## <a id="protocol"></a> 7. Protocol
 
-| Name                           | Description                | Type   | Default value |
-| ------------------------------ | -------------------------- | ------ | ------------- |
-| [snapshot](#protocol_snapshot) | Configuration for snapshot | object |               |
+| Name                                         | Description                       | Type   | Default value |
+| -------------------------------------------- | --------------------------------- | ------ | ------------- |
+| [snapshot](#protocol_snapshot)               | Configuration for snapshot        | object |               |
+| [sybilProtection](#protocol_sybilprotection) | Configuration for sybilProtection | object |               |
 
 ### <a id="protocol_snapshot"></a> Snapshot
 
@@ -246,6 +247,19 @@ Example:
 | ----- | ------------------------------------------------------------------------------------------ | ------ | ---------------- |
 | path  | The path of the snapshot file                                                              | string | "./snapshot.bin" |
 | depth | Defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate | int    | 5                |
+
+### <a id="protocol_sybilprotection"></a> SybilProtection
+
+| Name                                             | Description                 | Type  | Default value     |
+| ------------------------------------------------ | --------------------------- | ----- | ----------------- |
+| [committee](#protocol_sybilprotection_committee) | Configuration for committee | array | see example below |
+
+### <a id="protocol_sybilprotection_committee"></a> Committee
+
+| Name     | Description                   | Type   | Default value |
+| -------- | ----------------------------- | ------ | ------------- |
+| identity | The identity of the validator | string | ""            |
+| weight   | The weight of the validator   | int    | 0             |
 
 Example:
 
@@ -255,6 +269,9 @@ Example:
       "snapshot": {
         "path": "./snapshot.bin",
         "depth": 5
+      },
+      "sybilProtection": {
+        "committee": null
       }
     }
   }

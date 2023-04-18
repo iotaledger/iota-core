@@ -5,10 +5,10 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 
-func (t *TipManager) isValidTip(tip *blockdag.Block) (err error) {
+func (t *TipManager) isValidTip(tip *blocks.Block) (err error) {
 	// TODO: add when we have acceptance and clock
 	// if !t.isPastConeTimestampCorrect(tip) {
 	// 	return errors.Errorf("cannot select tip due to TSC condition tip issuing time (%s), time (%s), min supported time (%s), block id (%s), tip pool size (%d), scheduled: (%t), orphaned: (%t), accepted: (%t)",
@@ -34,7 +34,7 @@ func (t *TipManager) isValidTip(tip *blockdag.Block) (err error) {
 // This function is optimized through the use of markers and the following assumption:
 //
 //	If there's any unaccepted block >TSC threshold, then the oldest accepted block will be >TSC threshold, too.
-func (t *TipManager) isPastConeTimestampCorrect(block *blockdag.Block) (timestampValid bool) {
+func (t *TipManager) isPastConeTimestampCorrect(block *blocks.Block) (timestampValid bool) {
 	// TODO: add when we have acceptance and clock
 	// minSupportedTimestamp := t.engine.Clock.Accepted().Time().Add(-t.optsTimeSinceConfirmationThreshold)
 
@@ -51,7 +51,7 @@ func (t *TipManager) isPastConeTimestampCorrect(block *blockdag.Block) (timestam
 	return
 }
 
-func (t *TipManager) checkBlockRecursive(block *blockdag.Block, minSupportedTimestamp time.Time) (timestampValid bool) {
+func (t *TipManager) checkBlockRecursive(block *blocks.Block, minSupportedTimestamp time.Time) (timestampValid bool) {
 	if storage := t.walkerCache.Get(block.ID().Index(), false); storage != nil {
 		if _, exists := storage.Get(block.ID()); exists {
 			return true
@@ -71,9 +71,9 @@ func (t *TipManager) checkBlockRecursive(block *blockdag.Block, minSupportedTime
 	// 	return true
 	// }
 
-	if block.IsOrphaned() {
-		return false
-	}
+	//if block.IsOrphaned() {
+	//	return false
+	//}
 
 	// if block is younger than TSC and not accepted, walk through strong parents' past cones
 	for _, strongParentID := range block.Block().StrongParents {
