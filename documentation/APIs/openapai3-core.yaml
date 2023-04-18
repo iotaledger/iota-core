@@ -24,8 +24,6 @@ tags:
     description: Everything about UTXOs.
   - name: commitments
     description: Everything about commitments.
-  - name: account
-    description: Everything about accounts. - TO BE FINISHED, only easy to retrieve info, more details in indexer api.
   - name: peers
     description: Everything about the peers of the node.
   - name: control
@@ -338,49 +336,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceUnavailableResponse'
 
-  '/api/core/v3/congestion/rmc':
-    get:
-      tags:
-        - congestion
-      summary: Get the recent Reference Mana Cost info.
-      description: >-
-          Get the recent Reference Mana Cost info.
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RMCResponse'
-              examples:
-                RMC:
-                  $ref: '#/components/examples/get-rmc-response-example'
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-        '503':
-          description: "Unsuccessful operation: indicates that the node is not synced."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ServiceUnavailableResponse'
-
-
   '/api/core/v3/congestion/estimate':
     get:
       tags:
@@ -615,8 +570,7 @@ paths:
                 $ref: '#/components/schemas/BlockMetadataResponse'
               examples:
                 default:
-                  $ref: >-
-                    #/components/examples/get-block-by-id-response-example-included
+                  $ref: '#/components/examples/get-block-by-id-response-example-included'
         '400':
           description: "Unsuccessful operation: indicates that the provided data is invalid."
           content:
@@ -647,100 +601,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServiceUnavailableResponse'
-
-  '/api/core/v3/account/{accountId}':
-    get:
-      tags:
-        - account
-      summary: Get the current state of the account.
-      description: Get the current state of the account.
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AccountResponse'
-              examples:
-                default:
-                  $ref: >-
-                    #/components/examples/get-account-response-example
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '404':
-          description: "Unsuccessful operation: indicates that the requested data was not found."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotFoundResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-
-
-
-  /api/indexer/v2/accounts/{accountId}/mana:
-    get:
-      tags:
-        - account outputs
-      summary: Returns the account mana related data for a given account identifier.
-      description: Returns the account mana related data for a given account identifier.
-      parameters:
-        - in: path
-          name: accountId
-          schema:
-            type: string
-          example: "0x1505ec099896ab05d9e08fbc7101ae4dff0093b3943b28f789ed2ca728bcc8d6"
-          description: Unique identifier of the account.
-          required: true
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AccountManaResponse'
-              examples:
-                Query results in single output:
-                  $ref: >-
-                    #/components/examples/get-account-response-example
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '404':
-          description: "Unsuccessful operation: indicates that the requested data was not found."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotFoundResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
 
   '/api/core/v3/commitment/{commitmentId}':
     get:
@@ -1101,8 +961,6 @@ paths:
         '500':
           description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
 
-  
-
   '/api/core/v3/control/database/prune':
     post:
       tags:
@@ -1271,6 +1129,9 @@ components:
     get-included-block-of-transaction-example-json:
       value:
 
+    get-block-by-id-response-example-included:
+      value:
+
     get-commitment-response-example:
       value:
 
@@ -1280,10 +1141,7 @@ components:
     get-utxo-changes-response-example:
       value:
 
-    get-account-response-example:
-      value:
-
-    get-account-mana-response-example:
+    get-congestion-estimate-response-example:
       value:
 
     get-peers-response-example:
@@ -1330,37 +1188,44 @@ components:
   schemas:
 
     Block:
-      description: A block is the object nodes gossip around in the network. It always references two other blocks that are known as parents. It is stored as a vertex on the tangle data structure that the nodes maintain. A block can have a maximum size of 32Kb.
+      description: A block is the object nodes gossip around in the network. It always references other blocks that are known as parents. It is stored as a vertex on the tangle data structure that the nodes maintain. A block can have a maximum size of 32Kb.
       properties:
         protocolVersion:
           type: number
           description: Protocol version identifier. It also tells which protocol rules apply to the block.
         networkID:
           type: number
-          description: Protocol version identifier. It also tells which protocol rules apply to the block.
+          description: Network version identifier. It also tells which network the node is running.
         strongParents:
           type: array
           description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
         weakParents:
           type: array
           description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
           items:
             type: string
-        shallowLikedParents:
+        shallowLikeParents:
           type: array
           description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
           items:
             type: string
         issuerID:
           type: string
+          description: The identifier of the issuer of this block.
         issuerPublicKey:
           type: string
+          description: The public key of the issuer.
         issuingTime:
           type: integer
+          description: The timestamp of issuing this block.
         slotCommitment:
           $ref: '#/components/schemas/Commitment'
+          description: The slot commitment contains in this block.
         latestConfirmedSlot:
           type: integer
+          description: The latest confirmed slot index of the node when issuing this block.
         payload:
           description: The inner payload of the block. Can be nil.
           oneOf:
@@ -1371,9 +1236,12 @@ components:
           description: The nonce which lets this block fulfill the Proof-of-Work requirement. Plain string encoded number.
         signature:
           type: string
+          description: The signature of entire block, signed by the issuer.
       required:
         - protocolVersion
-        - payload
+        - strongParents
+        - nonce
+
     TransactionPayload:
       description: The Transaction Payload to be embedded into a block.
       properties:
@@ -1408,7 +1276,7 @@ components:
           description: Network identifier. Plain string encoded number. This field signals for which network the block is meant for. It is computed out of the first 8 bytes of the `BLAKE2b-256` hash of the concatenation of the network name and protocol version string.
         creationTime:
           type: integer
-          description: aaaa
+          description: The timestamp of this transaction is created.
         inputsCommitment:
           type: string
           description: BLAKE2b-256 hash of the BLAKE2b-256 hashes of the serialized outputs referenced in Inputs by their outputIds (transactionId || outputIndex). Hex-encoded data with 0x prefix.
@@ -2180,37 +2048,37 @@ components:
           description: The semantic version of the node.
         issuerID:
           type: string
-          description: The name of the node.        
+          description: The issuer identifier of the node.        
         status:
           description: Status of the node.
           properties:
             isHealthy:
               type: boolean
               description: Tells whether the node is healthy or not.
-            acceptedBlockID:
-              description: The ID of the accepted block
+            lastAcceptedBlockID:
+              description: The identifier of the latest accepted block.
               type: string
-            confirmedBlockID:
-              description: The ID of the confirmed block
+            lastConfirmedBlockID:
+              description: The identifier of the latest confirmed block.
               type: string
             confirmedSlot:
-              description: The slot number of the confirmed block
+              description: The index of latest confirmed slot.
               type: integer
             ATT:
-              description: The current average transaction time
+              description: A notion of time that is anchored to the latest accepted block.
               type: integer
             RATT:
-              description: The recent average transaction time
+              description: The ATT after it has advanced with the system clock.
               type: integer
             CTT:
-              description: The current confirmation time threshold
+              description: A notion of time that is anchored to the latest confirmed block.
               type: integer
             RCTT:
-              description: The recent confirmation time threshold
+              description: The CTT after it has advanced with the system clock.
               type: integer
             latestCommittedSlot:
               type: object
-              description: Information about the latest seen commitment slot ID.
+              description: The latest slot that the node has committed to.
             pruningSlot:
               type: integer
               description: The index of the slot before which the tangle history is pruned.
@@ -2218,7 +2086,7 @@ components:
             - isHealthy
             - latestCommittedSlot
             - confirmedSlot
-            - pruningIndex
+            - pruningSlot
         metrics:
           description: Node metrics.
           properties:
@@ -2280,6 +2148,7 @@ components:
                 - vByteFactoKey
             genesisSlotIndex:
               type: integer
+              description: The genesis slot index.
           required:
             - networkName
             - bech32Hrp
@@ -2288,6 +2157,7 @@ components:
             - minPowScore
             - rentStructure
             - version
+            - genesisSlotIndex
         baseToken:
           description: Gives info about the base token the network uses.
           properties:
@@ -2343,7 +2213,7 @@ components:
           items:
             type: string
           description: The block identifiers that can be used to a attach a block to. Hex-encoded with 0x prefix.
-        shallowLikedParents:
+        shallowLikeParents:
           type: array
           items:
             type: string
@@ -2514,9 +2384,6 @@ components:
         - createdOutputs
         - consumedOutputs
 
-    AccountResponse:
-      description: Returns the account data of a given AccountId.
-
     PeersResponse:
       description: Returns all peers of the node.
       type: array
@@ -2597,22 +2464,3 @@ components:
             description: Indicates if a node is ready to issue a block in a current congestion or should wait.
         required:
           - congestion
-
-    AccountManaResponse:
-      description: Returns the mana related data of the account, mana balance, staking and delegation details.
-      properties:
-        mana:
-          type: integer
-          description: The mana of the account.
-        stake:
-          type: integer
-          description: The total stake of the account.
-        delegated:
-          type: integer
-          description: Total delegated mana of the node.
-        AccountId:
-          type: string
-          description: The account ID of the node.
-      required:
-        - AccountId
-        - mana

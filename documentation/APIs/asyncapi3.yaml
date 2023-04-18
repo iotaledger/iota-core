@@ -448,7 +448,7 @@ components:
             example:
               - >-
                 0xcf5f77d62285b9ed8d617729e9232ae346a328c1897f0939837198e93ec13e85
-          shallowLikedParents:
+          shallowLikeParents:
             type: array
             description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
             items:
