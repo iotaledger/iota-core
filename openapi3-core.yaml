@@ -301,9 +301,9 @@ paths:
                 Solid:
                   $ref: >-
                     #/components/examples/get-block-by-id-response-example-solid
-                Included:
+                Confirmed:
                   $ref: >-
-                    #/components/examples/get-block-by-id-response-example-included
+                    #/components/examples/get-block-by-id-response-example-confirmed
                 Conflicting:
                   $ref: >-
                     #/components/examples/get-block-by-id-response-example-conflicting
@@ -1226,7 +1226,7 @@ components:
     get-block-by-id-response-example-solid:
       value:
 
-    get-block-by-id-response-example-included:
+    get-block-by-id-response-example-confirmed:
       value:
 
     get-block-by-id-response-example-conflicting:
@@ -2401,10 +2401,8 @@ components:
           type: string
           enum:
             - pending
-            - conflicting
             - confirmed
             - finalized
-            - rejected
           description: If 'pending', the block contains not yet included transaction. If 'confirmed' means transaction is confirmed with the first level of knowledge. If 'finalized' means transaction is included and cannot be reverted anymore.
         blockStateReason:
           type: integer
