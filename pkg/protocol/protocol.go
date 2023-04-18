@@ -22,6 +22,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/tresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
@@ -57,6 +59,7 @@ type Protocol struct {
 	optsClockProvider           module.Provider[*engine.Engine, clock.Clock]
 	optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
+	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -71,6 +74,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsClockProvider:           blocktime.NewProvider(),
 		optsSybilProtectionProvider: poa.NewProvider(map[identity.ID]int64{}),
 		optsBlockGadgetProvider:     tresholdblockgadget.NewProvider(),
+		optsNotarizationProvider:    slotnotarization.NewProvider(),
 
 		optsBaseDirectory:    "",
 		optsPruningThreshold: 6 * 60, // 1 hour given that slot duration is 10 seconds
@@ -144,6 +148,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsClockProvider,
 		p.optsSybilProtectionProvider,
 		p.optsBlockGadgetProvider,
+		p.optsNotarizationProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
@@ -234,6 +239,12 @@ func WithSybilProtectionProvider(optsSybilProtectionProvider module.Provider[*en
 func WithBlockGadgetProvider(optsBlockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget]) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsBlockGadgetProvider = optsBlockGadgetProvider
+	}
+}
+
+func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.Engine, notarization.Notarization]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsNotarizationProvider = optsNotarizationProvider
 	}
 }
 

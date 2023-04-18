@@ -20,6 +20,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
@@ -47,6 +48,7 @@ type EngineManager struct {
 	clockProvider           module.Provider[*engine.Engine, clock.Clock]
 	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
+	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 
 	activeInstance *engine.Engine
 }
@@ -63,6 +65,7 @@ func New(
 	clockProvider module.Provider[*engine.Engine, clock.Clock],
 	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection],
 	blockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget],
+	notarizationProvider module.Provider[*engine.Engine, notarization.Notarization],
 ) *EngineManager {
 	return &EngineManager{
 		workers:                 workers,
@@ -76,6 +79,7 @@ func New(
 		clockProvider:           clockProvider,
 		sybilProtectionProvider: sybilProtectionProvider,
 		blockGadgetProvider:     blockGadgetProvider,
+		notarizationProvider:    notarizationProvider,
 	}
 }
 
@@ -151,6 +155,7 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.clockProvider,
 		e.sybilProtectionProvider,
 		e.blockGadgetProvider,
+		e.notarizationProvider,
 		e.engineOptions...,
 	)
 }

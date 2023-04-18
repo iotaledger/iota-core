@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/tresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -55,6 +56,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		blocktime.NewProvider(),
 		poa.NewProvider(map[identity.ID]int64{}),
 		tresholdblockgadget.NewProvider(),
+		slotnotarization.NewProvider(),
 	)
 	defer engineInstance.Shutdown()
 

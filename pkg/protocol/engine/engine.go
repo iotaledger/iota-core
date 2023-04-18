@@ -25,6 +25,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -43,6 +44,7 @@ type Engine struct {
 	Clock           clock.Clock
 	SybilProtection sybilprotection.SybilProtection
 	BlockGadget     blockgadget.Gadget
+	Notarization    notarization.Notarization
 
 	Workers *workerpool.Group
 
@@ -68,6 +70,7 @@ func New(
 	clockProvider module.Provider[*Engine, clock.Clock],
 	sybilProtectionProvider module.Provider[*Engine, sybilprotection.SybilProtection],
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
+	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -90,6 +93,7 @@ func New(
 			e.Booker = bookerProvider(e)
 			e.Clock = clockProvider(e)
 			e.BlockGadget = blockGadgetProvider(e)
+			e.Notarization = notarizationProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings.TriggerInitialized,
@@ -132,9 +136,9 @@ func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 		return true
 	}
 
-	// if isBootstrapped = time.Since(e.Clock.Accepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsFullyCommitted(); isBootstrapped {
-	// 	e.isBootstrapped = true
-	// }
+	if isBootstrapped = time.Since(e.Clock.Accepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsBootstrapped(); isBootstrapped {
+		e.isBootstrapped = true
+	}
 
 	return isBootstrapped
 }
