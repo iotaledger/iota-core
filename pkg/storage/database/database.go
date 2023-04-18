@@ -165,6 +165,7 @@ func StoreWithDefaultSettings(path string, createDatabaseIfNotExists bool, dbEng
 		tmpAllowedEngines = allowedEngines
 	}
 
+	// TODO: add check version here? also create DB settings struct?
 	targetEngine, err := CheckEngine(path, createDatabaseIfNotExists, dbEngine, tmpAllowedEngines...)
 	if err != nil {
 		return nil, err

@@ -1,18 +1,15 @@
 package permanent
 
 import (
-	"os"
-
 	"github.com/iotaledger/hive.go/kvstore"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
-	"github.com/iotaledger/iota-core/pkg/database"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 )
 
 const (
-	permanentDirName           = "permanent"
 	sybilProtectionPrefix byte = iota
 )
 
@@ -33,7 +30,7 @@ func New(dir *utils.Directory, version database.Version, dbEngine hivedb.Engine)
 		Commitments: NewCommitments(dir.Path("commitments.bin")),
 	}
 
-	permanentStore, err := database.StoreWithDefaultSettings(dir.Path(permanentDirName), true, dbEngine)
+	permanentStore, err := database.StoreWithDefaultSettings(dir.Path(), true, dbEngine)
 	if err != nil {
 		panic(err)
 	}
@@ -59,35 +56,32 @@ func (p *Permanent) SybilProtection(optRealm ...byte) kvstore.KVStore {
 
 // Size returns the size of the permanent storage.
 func (p *Permanent) Size() int64 {
-	size, err := ioutils.FolderSize(p.dir.Path(permanentDirName))
+	dbSize, err := ioutils.FolderSize(p.dir.Path())
 	if err != nil {
 		// TODO: introduce logger? m.logger.LogError("dbDirectorySize failed for %s: %w", m.permanentBaseDir, err)
 		return 0
 	}
 
-	for _, file := range []string{p.Settings.FilePath(), p.Commitments.FilePath()} {
-		s, err := fileSize(file)
-		if err != nil {
-			panic(err)
-		}
-		size += s
+	settingsSize, err := p.Settings.Size()
+	if err != nil {
+		panic(err)
 	}
 
-	return size
+	commitmentsSize, err := p.Settings.Size()
+	if err != nil {
+		panic(err)
+	}
+
+	return dbSize + settingsSize + commitmentsSize
 }
 
 func (p *Permanent) Shutdown() {
+	if err := p.Commitments.Close(); err != nil {
+		panic(err)
+	}
+
 	err := p.permanentStorage.Close()
 	if err != nil {
 		panic(err)
 	}
-}
-
-func fileSize(path string) (int64, error) {
-	s, err := os.Stat(path)
-	if err != nil {
-		return 0, err
-	}
-
-	return s.Size(), nil
 }

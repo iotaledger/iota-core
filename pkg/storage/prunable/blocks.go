@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/database"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -16,7 +15,7 @@ type Blocks struct {
 	api iotago.API
 }
 
-func NewBlocks(dbManager *database.Manager, storagePrefix byte) (newBlocks *Blocks) {
+func NewBlocks(dbManager *Manager, storagePrefix byte) (newBlocks *Blocks) {
 	return &Blocks{
 		Storage: lo.Bind([]byte{storagePrefix}, dbManager.Get),
 		api:     iotago.V3API(&iotago.ProtocolParameters{}), // TODO: do we need the protocol parameters for the storage?

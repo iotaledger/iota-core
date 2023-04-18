@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -14,7 +13,7 @@ type RootBlocks struct {
 }
 
 // NewRootBlocks creates a new RootBlocks instance.
-func NewRootBlocks(databaseInstance *database.Manager, storagePrefix byte) (newRootBlocks *RootBlocks) {
+func NewRootBlocks(databaseInstance *Manager, storagePrefix byte) (newRootBlocks *RootBlocks) {
 	return &RootBlocks{
 		Storage: lo.Bind([]byte{storagePrefix}, databaseInstance.Get),
 	}

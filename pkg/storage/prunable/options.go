@@ -1,4 +1,4 @@
-package database
+package prunable
 
 import (
 	"github.com/iotaledger/hive.go/logger"
@@ -10,13 +10,6 @@ import (
 func WithGranularity(granularity int64) options.Option[Manager] {
 	return func(m *Manager) {
 		m.optsGranularity = granularity
-	}
-}
-
-// WithBaseDir sets the base directory to store the DB to disk.
-func WithBaseDir(baseDir string) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsBaseDir = baseDir
 	}
 }
 

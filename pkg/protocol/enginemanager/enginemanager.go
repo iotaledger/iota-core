@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/database"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -24,6 +23,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )

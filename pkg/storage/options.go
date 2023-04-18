@@ -4,6 +4,7 @@ import (
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 )
 
 func WithDBEngine(optsDBEngine hivedb.Engine) options.Option[Storage] {
@@ -24,9 +25,8 @@ func WithLogger(log *logger.Logger) options.Option[Storage] {
 	}
 }
 
-// TODO: adjust for bucket store
-// func WithStorageDatabaseManagerOptions(opts ...options.Option[storage.Storage]) options.Option[Protocol] {
-// 	return func(p *Protocol) {
-// 		p.optsStorageOptions = append(p.optsStorageOptions, opts...)
-// 	}
-// }
+func WithPrunableManagerOptions(opts ...options.Option[prunable.Manager]) options.Option[Storage] {
+	return func(s *Storage) {
+		s.optsPrunableManagerOptions = append(s.optsPrunableManagerOptions, opts...)
+	}
+}

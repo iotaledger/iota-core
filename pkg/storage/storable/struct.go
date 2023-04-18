@@ -67,3 +67,12 @@ func (s *Struct[A, B]) ToFile(fileName ...string) (err error) {
 func (s *Struct[A, B]) FilePath() (filePath string) {
 	return s.filePath
 }
+
+func (s *Struct[A, B]) Size() (int64, error) {
+	fileInfo, err := os.Stat(s.filePath)
+	if err != nil {
+		return 0, err
+	}
+
+	return fileInfo.Size(), nil
+}
