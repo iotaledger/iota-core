@@ -122,6 +122,10 @@ func (g *Gadget) propagateAcceptanceConfirmation(initialBlock *blocks.Block, con
 			panic(fmt.Sprintf("parent %s does not exist", blockID))
 		}
 
+		if walkerBlock.IsRootBlock() {
+			continue
+		}
+
 		shouldWalkPastCone := false
 		if !walkerBlock.IsAccepted() {
 			g.acceptanceOrder.Queue(walkerBlock)
