@@ -31,9 +31,6 @@ func init() {
 		Provide:   provide,
 		Configure: configure,
 		Run:       run,
-		IsEnabled: func() bool {
-			return true
-		},
 	}
 }
 

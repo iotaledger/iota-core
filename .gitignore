@@ -1,4 +1,5 @@
 # Binaries for programs and plugins
+iota-core
 *.exe
 *.exe~
 *.dll
@@ -14,6 +15,8 @@
 # IDE related files
 .vscode/
 .idea/
+go.work
+go.work.sum
 
 # dist packages
 dist/
@@ -21,6 +24,10 @@ dist/
 # OSX related files
 .DS_Store
 
-# Data directory 
+# Data directories
 /data
 /peerdb
+/db
+
+# snapshot and settings file
+*.bin

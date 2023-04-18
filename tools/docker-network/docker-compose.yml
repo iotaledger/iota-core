@@ -1,0 +1,133 @@
+version: "3.9"
+# Create a custom build that can be re-used within Docker network
+x-build-iota-core: &iota-core_build
+  context: ../../../
+  dockerfile: ./iota-core/Dockerfile
+services:
+  peer_master:
+    build: *iota-core_build
+    stop_grace_period: 1m
+    command: >
+      ${COMMON_CONFIG}
+      ${MANUALPEERING_CONFIG}
+      --p2p.seed=0x88ce2019dd99fd5a3c46e10ffc192549fc4491eee07552153ff66cf792b6a0af
+    volumes:
+      - ./docker-network.snapshot:/app/snapshot.bin
+    ports:
+      - "8080:8080/tcp" # web API
+      - "8081:8081/tcp" # dashboard
+      - "6081:6061/tcp" # pprof
+    networks:
+      - iota-core
+
+  peer_master2:
+    image: docker-network-peer_master:latest
+    stop_grace_period: 1m
+    command: >
+      ${COMMON_CONFIG}
+      ${MANUALPEERING_CONFIG}
+      --p2p.seed=0xf739eea09eb0f4820f26504a3135131a075089b4c901c19c2099513ee016f516
+    volumes:
+      - ./docker-network.snapshot:/app/snapshot.bin
+
+    ports:
+      - "8070:8080/tcp" # web API
+      - "8071:8081/tcp" # dashboard
+      - "6071:6061/tcp" # pprof
+    networks:
+      - iota-core
+
+  peer_nomana:
+    image: docker-network-peer_master:latest
+    stop_grace_period: 1m
+    command: >
+      ${COMMON_CONFIG}
+      ${MANUALPEERING_CONFIG}
+      --p2p.seed=0x6bd12a0398f9264788bc6481e2665eb90bd58a33b82347fb70f612cc8a91fcce
+    volumes:
+      - ./docker-network.snapshot:/app/snapshot.bin
+    ports:
+      - "8040:8080/tcp" # web API
+      - "8041:8081/tcp" # dashboard
+      - "6041:6061/tcp" # pprof
+    networks:
+      - iota-core
+
+  peer_nomana2:
+    image: docker-network-peer_master:latest
+    stop_grace_period: 1m
+    command: >
+      ${COMMON_CONFIG}
+      ${MANUALPEERING_CONFIG}
+      --p2p.seed=0x4da1119dc9cc3750ebb313c3c7dcb50120465544d256ee3c0d4586ce1772c96b
+    volumes:
+      - ./docker-network.snapshot:/app/snapshot.bin
+    ports:
+      - "8030:8080/tcp" # web API
+      - "8031:8081/tcp" # dashboard
+      - "6031:6061/tcp" # pprof
+    networks:
+      - iota-core
+
+  faucet:
+    image: docker-network-peer_master:latest
+    stop_grace_period: 1m
+    command: >
+      ${COMMON_CONFIG}
+      ${MANUALPEERING_CONFIG}
+      --p2p.seed=0x2ab2792bba8ab6deb7978165e4072d3f00def97a0138b98ba2d21eba54159705
+    volumes:
+      - ./docker-network.snapshot:/app/snapshot.bin
+    ports:
+      - "8090:8080/tcp" # web API
+      - "8091:8081/tcp" # dashboard
+      - "6091:6061/tcp" # pprof
+    networks:
+      - iota-core
+
+  prometheus:
+    image: prom/prometheus:latest
+    profiles:
+      - grafana
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/run/secrets/prometheus.yml
+    secrets:
+      - prometheus.yml
+    networks:
+      - iota-core
+    depends_on:
+      - peer_master
+
+  grafana:
+    image: grafana/grafana:latest
+    profiles:
+      - grafana
+    environment:
+      # path to provisioning definitions can only be defined as
+      # environment variables for grafana within docker
+      - GF_PATHS_PROVISIONING=/var/lib/grafana/provisioning
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=false
+    networks:
+      - iota-core
+    ports:
+      - "3000:3000"
+    user: "104"
+    volumes:
+      - grafana-data-volume:/var/lib/grafana
+      - ./grafana/provisioning:/var/lib/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+# Create our own network
+networks:
+  iota-core:
+    driver: bridge
+# Named Docker volumes for data persistence
+volumes:
+  grafana-data-volume:
+# read only files to load in the containers that may be shared across containers
+secrets:
+  prometheus.yml:
+    file: ${PROMETHEUS_CONFIG:-./prometheus.yml}

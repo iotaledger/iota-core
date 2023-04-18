@@ -17,11 +17,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/database"
 )
 
-var (
-	// ErrMismatchedPrivateKeys is returned when the private key derived from the config does not correspond to the private
-	// key stored in an already existing peer database.
-	ErrMismatchedPrivateKeys = errors.New("private key derived from the seed defined in the config does not correspond with the already stored private key in the database")
-)
+// ErrMismatchedPrivateKeys is returned when the private key derived from the config does not correspond to the private
+// key stored in an already existing peer database.
+var ErrMismatchedPrivateKeys = errors.New("private key derived from the seed defined in the config does not correspond with the already stored private key in the database")
 
 // checks whether the seed from the cfg corresponds to the one in the peer database.
 func checkCfgSeedAgainstDB(cfgSeed []byte, peerDB *peer.DB) error {
@@ -124,7 +122,7 @@ func readSeedFromCfg() ([]byte, error) {
 	var seedBytes []byte
 	var err error
 
-	seedBytes, err = hexutil.Decode(ParamsP2P.Seed[7:])
+	seedBytes, err = hexutil.Decode(ParamsP2P.Seed)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid seed")
 	}
