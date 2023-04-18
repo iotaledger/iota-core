@@ -16,6 +16,8 @@ import (
 const (
 	permanentDirName = "permanent"
 	prunableDirName  = "prunable"
+
+	storePrefixHealth byte = 255
 )
 
 // Storage is an abstraction around the storage layer of the node.
@@ -37,17 +39,27 @@ type Storage struct {
 }
 
 // New creates a new storage instance with the named database version in the given directory.
-func New(directory string, version database.Version, opts ...options.Option[Storage]) *Storage {
+func New(directory string, dbVersion byte, opts ...options.Option[Storage]) *Storage {
 	return options.Apply(&Storage{
 		dir:          utils.NewDirectory(directory, true),
 		optsDBEngine: hivedb.EngineRocksDB,
 	}, opts,
 		func(s *Storage) {
-			// TODO: create different folders for settings and stuff
-			s.Permanent = permanent.New(utils.NewDirectory(s.dir.Path(permanentDirName), true), version, s.optsDBEngine)
-			s.Prunable = prunable.New(utils.NewDirectory(s.dir.Path(prunableDirName), true), version, s.optsDBEngine)
+			s.Permanent = permanent.New(s.dir, database.Config{
+				Engine:       s.optsDBEngine,
+				Directory:    s.dir.PathWithCreate(permanentDirName),
+				Version:      dbVersion,
+				PrefixHealth: []byte{storePrefixHealth},
+			})
 
-			// TODO: this should only be done once no?
+			s.Prunable = prunable.New(database.Config{
+				Engine:       s.optsDBEngine,
+				Directory:    s.dir.PathWithCreate(prunableDirName),
+				Version:      dbVersion,
+				PrefixHealth: []byte{storePrefixHealth},
+			})
+
+			// TODO: this should only be done once no? actually should be part of snapshot loading
 			if err := s.Commitments.Store(iotago.NewEmptyCommitment()); err != nil {
 				panic(err)
 			}

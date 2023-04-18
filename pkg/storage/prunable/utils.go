@@ -64,9 +64,5 @@ func getSortedDBInstancesFromDisk(baseDir string) (dbInfos []*dbInstanceFileInfo
 }
 
 func dbPrunableDirectorySize(base string, index iotago.SlotIndex) (int64, error) {
-	return dbDirectorySize(dbPathFromIndex(base, index))
-}
-
-func dbDirectorySize(path string) (int64, error) {
-	return ioutils.FolderSize(path)
+	return ioutils.FolderSize(dbPathFromIndex(base, index))
 }

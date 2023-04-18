@@ -2,7 +2,6 @@ package permanent
 
 import (
 	"github.com/iotaledger/hive.go/kvstore"
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -14,8 +13,8 @@ const (
 )
 
 type Permanent struct {
-	dir              *utils.Directory
-	permanentStorage kvstore.KVStore
+	dbConfig database.Config
+	store    kvstore.KVStore
 
 	Settings    *Settings
 	Commitments *Commitments
@@ -24,25 +23,18 @@ type Permanent struct {
 }
 
 // New returns a new permanent storage instance.
-func New(dir *utils.Directory, version database.Version, dbEngine hivedb.Engine) *Permanent {
-	p := &Permanent{
-		Settings:    NewSettings(dir.Path("settings.bin")),
-		Commitments: NewCommitments(dir.Path("commitments.bin")),
-	}
-
-	permanentStore, err := database.StoreWithDefaultSettings(dir.Path(), true, dbEngine)
+func New(baseDir *utils.Directory, dbConfig database.Config) *Permanent {
+	store, err := database.StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
 	if err != nil {
 		panic(err)
 	}
-	p.permanentStorage = permanentStore
 
-	if err = database.CheckVersion(p.permanentStorage, version); err != nil {
-		panic(err)
+	return &Permanent{
+		store:           store,
+		Settings:        NewSettings(baseDir.Path("settings.bin")),
+		Commitments:     NewCommitments(baseDir.Path("commitments.bin")),
+		sybilProtection: lo.PanicOnErr(store.WithExtendedRealm([]byte{sybilProtectionPrefix})),
 	}
-
-	p.sybilProtection = lo.PanicOnErr(p.permanentStorage.WithExtendedRealm([]byte{sybilProtectionPrefix}))
-
-	return p
 }
 
 // SybilProtection returns the sybil protection storage (or a specialized sub-storage if a realm is provided).
@@ -56,7 +48,7 @@ func (p *Permanent) SybilProtection(optRealm ...byte) kvstore.KVStore {
 
 // Size returns the size of the permanent storage.
 func (p *Permanent) Size() int64 {
-	dbSize, err := ioutils.FolderSize(p.dir.Path())
+	dbSize, err := ioutils.FolderSize(p.dbConfig.Directory)
 	if err != nil {
 		// TODO: introduce logger? m.logger.LogError("dbDirectorySize failed for %s: %w", m.permanentBaseDir, err)
 		return 0
@@ -80,7 +72,7 @@ func (p *Permanent) Shutdown() {
 		panic(err)
 	}
 
-	err := p.permanentStorage.Close()
+	err := p.store.Close()
 	if err != nil {
 		panic(err)
 	}

@@ -23,7 +23,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
-	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -38,7 +37,7 @@ type engineInfo struct {
 
 type EngineManager struct {
 	directory      *utils.Directory
-	dbVersion      database.Version
+	dbVersion      byte
 	storageOptions []options.Option[storage.Storage]
 	workers        *workerpool.Group
 
@@ -58,7 +57,7 @@ type EngineManager struct {
 func New(
 	workers *workerpool.Group,
 	dir string,
-	dbVersion database.Version,
+	dbVersion byte,
 	storageOptions []options.Option[storage.Storage],
 	engineOptions []options.Option[engine.Engine],
 	filterProvider module.Provider[*engine.Engine, filter.Filter],

@@ -2,11 +2,9 @@ package prunable
 
 import (
 	"github.com/iotaledger/hive.go/kvstore"
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
-	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -18,15 +16,16 @@ const (
 )
 
 type Prunable struct {
-	manager          *Manager
+	manager *Manager
+
 	Blocks           *Blocks
 	RootBlocks       *RootBlocks
 	Attestations     func(index iotago.SlotIndex) kvstore.KVStore
 	LedgerStateDiffs func(index iotago.SlotIndex) kvstore.KVStore
 }
 
-func New(dir *utils.Directory, version database.Version, dbEngine hivedb.Engine, opts ...options.Option[Manager]) *Prunable {
-	manager := NewManager(dir.Path(), version, dbEngine, opts...)
+func New(dbConfig database.Config, opts ...options.Option[Manager]) *Prunable {
+	manager := NewManager(dbConfig, opts...)
 
 	return &Prunable{
 		manager:          manager,

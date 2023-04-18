@@ -8,7 +8,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -23,9 +22,7 @@ type Manager struct {
 	maxPruned      iotago.SlotIndex
 	maxPrunedMutex sync.RWMutex
 
-	version  database.Version
-	baseDir  string
-	dbEngine hivedb.Engine
+	dbConfig database.Config
 
 	dbSizes *shrinkingmap.ShrinkingMap[iotago.SlotIndex, int64]
 
@@ -37,15 +34,15 @@ type Manager struct {
 	optsMaxOpenDBs  int
 }
 
-func NewManager(baseDir string, version database.Version, dbEngine hivedb.Engine, opts ...options.Option[Manager]) *Manager {
+func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Manager {
 	return options.Apply(&Manager{
 		maxPruned:       -1,
 		optsGranularity: 10,
 		optsMaxOpenDBs:  10,
+		dbConfig:        dbConfig,
+		dbSizes:         shrinkingmap.New[iotago.SlotIndex, int64](),
 	}, opts, func(m *Manager) {
 		m.logger = logger.NewWrappedLogger(m.optsLogger)
-		m.baseDir = baseDir
-		m.dbEngine = dbEngine
 
 		m.openDBs = cache.New[iotago.SlotIndex, *dbInstance](m.optsMaxOpenDBs)
 		m.openDBs.SetEvictCallback(func(baseIndex iotago.SlotIndex, db *dbInstance) {
@@ -53,27 +50,25 @@ func NewManager(baseDir string, version database.Version, dbEngine hivedb.Engine
 			if err != nil {
 				panic(err)
 			}
-			size, err := dbPrunableDirectorySize(m.baseDir, baseIndex)
+			size, err := dbPrunableDirectorySize(dbConfig.Directory, baseIndex)
 			if err != nil {
 				m.logger.LogError("failed to get size of prunable directory for base index %d: %w", baseIndex, err)
 			}
 
 			m.dbSizes.Set(baseIndex, size)
 		})
-
-		m.dbSizes = shrinkingmap.New[iotago.SlotIndex, int64]()
 	})
 }
 
 // TODO: this should be moved to the test only?
 // How do we currently know whether a slot was fully finished writing to disk?
 func (m *Manager) RestoreFromDisk() (latestBucketIndex iotago.SlotIndex) {
-	dbInfos := getSortedDBInstancesFromDisk(m.baseDir)
+	dbInfos := getSortedDBInstancesFromDisk(m.dbConfig.Directory)
 
 	// TODO: what to do if dbInfos is empty? -> start with a fresh DB?
 
 	for _, dbInfo := range dbInfos {
-		size, err := dbPrunableDirectorySize(m.baseDir, dbInfo.baseIndex)
+		size, err := dbPrunableDirectorySize(m.dbConfig.Directory, dbInfo.baseIndex)
 		if err != nil {
 			panic(err)
 		}
@@ -201,9 +196,9 @@ func (m *Manager) PrunableStorageSize() int64 {
 
 	// Add up all the open databases
 	m.openDBs.Each(func(key iotago.SlotIndex, val *dbInstance) {
-		size, err := dbPrunableDirectorySize(m.baseDir, key)
+		size, err := dbPrunableDirectorySize(m.dbConfig.Directory, key)
 		if err != nil {
-			m.logger.LogError("dbPrunableDirectorySize failed for %s%s: %w", m.baseDir, key, err)
+			m.logger.LogError("dbPrunableDirectorySize failed for %s%s: %w", m.dbConfig.Directory, key, err)
 			return
 		}
 		sum += size
@@ -258,7 +253,7 @@ func (m *Manager) getDBAndBucket(index iotago.SlotIndex) (db *dbInstance, bucket
 // createDBInstance creates a new DB instance for the given baseIndex.
 // If a folder/DB for the given baseIndex already exists, it is opened.
 func (m *Manager) createDBInstance(index iotago.SlotIndex) (newDBInstance *dbInstance) {
-	db, err := database.StoreWithDefaultSettings(dbPathFromIndex(m.baseDir, index), true, m.dbEngine)
+	db, err := database.StoreWithDefaultSettings(dbPathFromIndex(m.dbConfig.Directory, index), true, m.dbConfig.Engine)
 	if err != nil {
 		panic(err)
 	}
@@ -300,7 +295,7 @@ func (m *Manager) removeDBInstance(dbBaseIndex iotago.SlotIndex) {
 		m.openDBs.Remove(dbBaseIndex)
 	}
 
-	if err := os.RemoveAll(dbPathFromIndex(m.baseDir, dbBaseIndex)); err != nil {
+	if err := os.RemoveAll(dbPathFromIndex(m.dbConfig.Directory, dbBaseIndex)); err != nil {
 		panic(err)
 	}
 
