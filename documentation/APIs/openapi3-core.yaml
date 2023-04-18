@@ -397,7 +397,7 @@ paths:
                       $ref: '#/components/schemas/CongestionEstimateResponse'
                   examples:
                       CongestionEstimate:
-                      $ref: '#/components/examples/get-congestion-estimate-response-example'
+                        $ref: '#/components/examples/get-congestion-estimate-response-example'
           '400':
             description: "Unsuccessful operation: indicates that the provided data is invalid."
             content:
@@ -2450,12 +2450,11 @@ components:
 
     OutputResponse:
       description: Returns an output and its metadata.
-      properties:
-        anyOf:
-          - $ref: '#/components/schemas/BasicOutput'
-          - $ref: '#/components/schemas/AliasOutput'
-          - $ref: '#/components/schemas/FoundryOutput'
-          - $ref: '#/components/schemas/NFTOutput'
+      anyOf:
+        - $ref: '#/components/schemas/BasicOutput'
+        - $ref: '#/components/schemas/AliasOutput'
+        - $ref: '#/components/schemas/FoundryOutput'
+        - $ref: '#/components/schemas/NFTOutput'
 
     OutputMetadataResponse:
       description: Returns metadata about an output.
@@ -2517,20 +2516,6 @@ components:
 
     AccountResponse:
       description: Returns the account data of a given AccountId.
-
-
-    AccountManaResponse:
-      description: Returns the mana balance of the account.
-      properties:
-        mana:
-          type: integer
-          description: The latest committed mana balance of the account.
-        AccountId:
-          type: string
-          description: The account ID of the node.
-      required:
-        - AccountId
-        - mana
 
     PeersResponse:
       description: Returns all peers of the node.
