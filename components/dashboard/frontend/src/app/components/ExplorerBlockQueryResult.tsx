@@ -281,7 +281,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                     <ListGroup.Item>
                                         IssuerID: {blk.issuerID}
                                     </ListGroup.Item>
-                                    <ListGroup.Item>
+                                    <ListGroup.Item style={{'overflow':'auto'}}>
                                         Block Signature: {blk.signature}
                                     </ListGroup.Item>
                                 </ListGroup>
