@@ -151,7 +151,7 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
 			case model.StrongParentType:
 				walk.Push(parent.ID)
 			case model.ShallowLikeParentType, model.WeakParentType:
-				if weakParent, exists := b.blockCache.Block(parent.ID); !exists {
+				if weakParent, exists := b.blockCache.Block(parent.ID); exists {
 					weakParent.AddWitness(witness)
 					b.events.WitnessAdded.Trigger(weakParent)
 				}
