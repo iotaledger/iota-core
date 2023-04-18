@@ -689,20 +689,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
-  '/api/core/v3/account/{accountId}/mana':
+
+
+
+  /api/indexer/v2/accounts/{accountId}/mana:
     get:
       tags:
-        - account
-      summary: Get the mana balance of the account of the latest committed slot.
-      description: Get the mana balance of the account of the latest committed slot.
+        - account outputs
+      summary: Returns the account mana related data for a given account identifier.
+      description: Returns the account mana related data for a given account identifier.
       parameters:
-          - in: path
-            name: accountId
-            schema:
-              type: string
-            example: "0x7a09324557e9200f39bf493fc8fd6ac43e9ca750c6f6d884cc72386ddcb7d695"
-            required: true
-            description: Identifier of the account to look up.
+        - in: path
+          name: accountId
+          schema:
+            type: string
+          example: "0x1505ec099896ab05d9e08fbc7101ae4dff0093b3943b28f789ed2ca728bcc8d6"
+          description: Unique identifier of the account.
+          required: true
       responses:
         '200':
           description: "Successful operation."
@@ -711,9 +714,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/AccountManaResponse'
               examples:
-                default:
+                Query results in single output:
                   $ref: >-
-                    #/components/examples/get-account-mana-response-example
+                    #/components/examples/get-account-response-example
         '400':
           description: "Unsuccessful operation: indicates that the provided data is invalid."
           content:
@@ -2601,3 +2604,21 @@ components:
         - index
         - filePath
 
+    AccountManaResponse:
+      description: Returns the mana related data of the account, mana balance, staking and delegation details.
+      properties:
+        mana:
+          type: integer
+          description: The mana of the account.
+        stake:
+          type: integer
+          description: The total stake of the account.
+        delegated:
+          type: integer
+          description: Total delegated mana of the node.
+        AccountId:
+          type: string
+          description: The account ID of the node.
+      required:
+        - AccountId
+        - mana
