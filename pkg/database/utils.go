@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/pkg/errors"
+
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
@@ -71,4 +73,28 @@ func dbPrunableDirectorySize(base string, index iotago.SlotIndex) (int64, error)
 
 func dbDirectorySize(path string) (int64, error) {
 	return ioutils.FolderSize(path)
+}
+
+// CheckVersion checks whether the database is compatible with the current schema version.
+// also automatically sets the version if the database is new.
+func CheckVersion(db kvstore.KVStore, version Version) error {
+	entry, err := db.Get(dbVersionKey)
+	if errors.Is(err, kvstore.ErrKeyNotFound) {
+		// set the version in an empty DB
+		return db.Set(dbVersionKey, lo.PanicOnErr(version.Bytes()))
+	}
+	if err != nil {
+		return err
+	}
+	if len(entry) == 0 {
+		return errors.Errorf("no database version was persisted")
+	}
+	var storedVersion Version
+	if _, err := storedVersion.FromBytes(entry); err != nil {
+		return err
+	}
+	if storedVersion != version {
+		return errors.Errorf("incompatible database versions: supported version: %d, version of database: %d", version, storedVersion)
+	}
+	return nil
 }

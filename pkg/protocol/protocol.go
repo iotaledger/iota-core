@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/database"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -36,6 +35,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
+	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -59,7 +59,7 @@ type Protocol struct {
 
 	optsEngineOptions                 []options.Option[engine.Engine]
 	optsChainManagerOptions           []options.Option[chainmanager.Manager]
-	optsStorageDatabaseManagerOptions []options.Option[database.Manager]
+	optsStorageOptions []options.Option[storage.Storage]
 
 	optsFilterProvider          module.Provider[*engine.Engine, filter.Filter]
 	optsBlockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
@@ -191,7 +191,7 @@ func (p *Protocol) initEngineManager() {
 		p.Workers.CreateGroup("EngineManager"),
 		p.optsBaseDirectory,
 		DatabaseVersion,
-		p.optsStorageDatabaseManagerOptions,
+		p.optsStorageOptions,
 		p.optsEngineOptions,
 		p.optsFilterProvider,
 		p.optsBlockDAGProvider,
@@ -379,9 +379,9 @@ func WithChainManagerOptions(opts ...options.Option[chainmanager.Manager]) optio
 	}
 }
 
-func WithStorageDatabaseManagerOptions(opts ...options.Option[database.Manager]) options.Option[Protocol] {
+func WithStorageDatabaseManagerOptions(opts ...options.Option[storage.Storage]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.optsStorageDatabaseManagerOptions = append(p.optsStorageDatabaseManagerOptions, opts...)
+		p.optsStorageOptions = append(p.optsStorageOptions, opts...)
 	}
 }
 

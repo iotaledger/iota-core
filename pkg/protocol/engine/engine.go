@@ -232,11 +232,11 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 
 // RemoveFromFilesystem removes the directory of the engine from the filesystem.
 func (e *Engine) RemoveFromFilesystem() error {
-	return os.RemoveAll(e.Storage.Directory)
+	return os.RemoveAll(e.Storage.Directory())
 }
 
 func (e *Engine) Name() string {
-	return filepath.Base(e.Storage.Directory)
+	return filepath.Base(e.Storage.Directory())
 }
 
 func (e *Engine) setupBlockStorage() {

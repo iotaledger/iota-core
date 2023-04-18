@@ -1,7 +1,6 @@
 package database
 
 import (
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 )
@@ -25,18 +24,6 @@ func WithBaseDir(baseDir string) options.Option[Manager] {
 func WithMaxOpenDBs(optsMaxOpenDBs int) options.Option[Manager] {
 	return func(m *Manager) {
 		m.optsMaxOpenDBs = optsMaxOpenDBs
-	}
-}
-
-func WithDBEngine(optsDBEngine hivedb.Engine) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsDBEngine = optsDBEngine
-	}
-}
-
-func WithAllowedDBEngines(optsAllowedDBEngines []hivedb.Engine) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsAllowedDBEngines = optsAllowedDBEngines
 	}
 }
 

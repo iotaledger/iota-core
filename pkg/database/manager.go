@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/zyedidia/generic/cache"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -18,9 +17,6 @@ import (
 )
 
 type Manager struct {
-	permanentStorage kvstore.KVStore
-	permanentBaseDir string
-
 	openDBs         *cache.Cache[iotago.SlotIndex, *dbInstance]
 	bucketedBaseDir string
 	dbSizes         *shrinkingmap.ShrinkingMap[iotago.SlotIndex, int64]
@@ -29,35 +25,25 @@ type Manager struct {
 	maxPruned      iotago.SlotIndex
 	maxPrunedMutex sync.RWMutex
 
-	logger *logger.WrappedLogger
+	optsLogger *logger.Logger
+	logger     *logger.WrappedLogger
 
+	dbEngine hivedb.Engine
 	// The granularity of the DB instances (i.e. how many buckets/slots are stored in one DB).
 	optsGranularity int64
 	optsBaseDir     string
 	optsMaxOpenDBs  int
-
-	optsDBEngine         hivedb.Engine
-	optsAllowedDBEngines []hivedb.Engine
-	optsLogger           *logger.Logger
 }
 
 func NewManager(version Version, opts ...options.Option[Manager]) *Manager {
-	m := options.Apply(&Manager{
+	return options.Apply(&Manager{
 		maxPruned:       -1,
 		optsGranularity: 10,
 		optsBaseDir:     "db",
 		optsMaxOpenDBs:  10,
-		optsDBEngine:    hivedb.EngineMapDB,
 	}, opts, func(m *Manager) {
 		m.logger = logger.NewWrappedLogger(m.optsLogger)
 		m.bucketedBaseDir = filepath.Join(m.optsBaseDir, "pruned")
-		m.permanentBaseDir = filepath.Join(m.optsBaseDir, "permanent")
-
-		permanentStore, err := StoreWithDefaultSettings(m.permanentBaseDir, true, m.optsDBEngine)
-		if err != nil {
-			panic(err)
-		}
-		m.permanentStorage = permanentStore
 
 		m.openDBs = cache.New[iotago.SlotIndex, *dbInstance](m.optsMaxOpenDBs)
 		m.openDBs.SetEvictCallback(func(baseIndex iotago.SlotIndex, db *dbInstance) {
@@ -75,42 +61,10 @@ func NewManager(version Version, opts ...options.Option[Manager]) *Manager {
 
 		m.dbSizes = shrinkingmap.New[iotago.SlotIndex, int64]()
 	})
-
-	if err := m.checkVersion(version); err != nil {
-		panic(err)
-	}
-
-	return m
 }
 
-// checkVersion checks whether the database is compatible with the current schema version.
-// also automatically sets the version if the database is new.
-func (m *Manager) checkVersion(version Version) error {
-	entry, err := m.permanentStorage.Get(dbVersionKey)
-	if errors.Is(err, kvstore.ErrKeyNotFound) {
-		// set the version in an empty DB
-		return m.permanentStorage.Set(dbVersionKey, lo.PanicOnErr(version.Bytes()))
-	}
-	if err != nil {
-		return err
-	}
-	if len(entry) == 0 {
-		return errors.Errorf("no database version was persisted")
-	}
-	var storedVersion Version
-	if _, err := storedVersion.FromBytes(entry); err != nil {
-		return err
-	}
-	if storedVersion != version {
-		return errors.Errorf("incompatible database versions: supported version: %d, version of database: %d", version, storedVersion)
-	}
-	return nil
-}
-
-func (m *Manager) PermanentStorage() kvstore.KVStore {
-	return m.permanentStorage
-}
-
+// TODO: this should be moved to the test only?
+// How do we currently know whether a slot was fully finished writing to disk?
 func (m *Manager) RestoreFromDisk() (latestBucketIndex iotago.SlotIndex) {
 	dbInfos := getSortedDBInstancesFromDisk(m.bucketedBaseDir)
 
@@ -229,26 +183,6 @@ func (m *Manager) Shutdown() {
 			panic(err)
 		}
 	})
-
-	err := m.permanentStorage.Close()
-	if err != nil {
-		panic(err)
-	}
-}
-
-// TotalStorageSize returns the combined size of the permanent and prunable storage.
-func (m *Manager) TotalStorageSize() int64 {
-	return m.PermanentStorageSize() + m.PrunableStorageSize()
-}
-
-// PermanentStorageSize returns the size of the permanent storage.
-func (m *Manager) PermanentStorageSize() int64 {
-	size, err := dbDirectorySize(m.permanentBaseDir)
-	if err != nil {
-		m.logger.LogError("dbDirectorySize failed for %s: %w", m.permanentBaseDir, err)
-		return 0
-	}
-	return size
 }
 
 // PrunableStorageSize returns the size of the prunable storage containing all db instances.
@@ -322,7 +256,7 @@ func (m *Manager) getDBAndBucket(index iotago.SlotIndex) (db *dbInstance, bucket
 // createDBInstance creates a new DB instance for the given baseIndex.
 // If a folder/DB for the given baseIndex already exists, it is opened.
 func (m *Manager) createDBInstance(index iotago.SlotIndex) (newDBInstance *dbInstance) {
-	db, err := StoreWithDefaultSettings(dbPathFromIndex(m.bucketedBaseDir, index), true, m.optsDBEngine)
+	db, err := StoreWithDefaultSettings(dbPathFromIndex(m.bucketedBaseDir, index), true, m.dbEngine)
 	if err != nil {
 		panic(err)
 	}
