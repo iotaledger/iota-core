@@ -385,9 +385,9 @@ paths:
     get:
       tags:
         - congestion
-      summary: Get the rate setting estimate based on the current congestion.
+      summary: Check readiness of the node to issue a new block based on the rate setter and current network congestion. 1 means it is ready, 0 it is not.
       description: >-
-        Get the rate setting estimate based on the current congestion.
+        Check readiness of the node to issue a new block based on the rate setter and current network congestion. 1 means it is ready, 0 it is not.
       responses:
           '200':
             description: "Successful operation."
@@ -2603,6 +2603,15 @@ components:
       required:
         - index
         - filePath
+
+    CongestionEstimateResponse:
+        description: Indicates if a node is ready to issue a block in a current congestion or should wait; 1 - issue, 0 wait.
+        properties:
+          congestion:
+            type: integer
+            description: Indicates if a node is ready to issue a block in a current congestion or should wait.
+        required:
+          - congestion
 
     AccountManaResponse:
       description: Returns the mana related data of the account, mana balance, staking and delegation details.
