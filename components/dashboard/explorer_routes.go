@@ -3,7 +3,6 @@ package dashboard
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
@@ -57,26 +56,22 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 		search := c.Param("search")
 		result := &SearchResult{}
 
-		switch strings.Contains(search, ":") {
-		case true:
-			blockID, err := iotago.SlotIdentifierFromHexString(search)
-			if err != nil {
-				return errors.WithMessagef(ErrInvalidParameter, "search ID %s", search)
-			}
-
-			blk, err := findBlock(blockID)
-			if err != nil {
-				return fmt.Errorf("can't find block %s: %w", search, err)
-			}
-			result.Block = blk
-
-		case false:
-			//addr, err := findAddress(search)
-			//if err != nil {
-			//	return fmt.Errorf("can't find address %s: %w", search, err)
-			//}
-			//result.Address = addr
+		blockID, err := iotago.SlotIdentifierFromHexString(search)
+		if err != nil {
+			return errors.WithMessagef(ErrInvalidParameter, "search ID %s", search)
 		}
+
+		blk, err := findBlock(blockID)
+		if err != nil {
+			return fmt.Errorf("can't find block %s: %w", search, err)
+		}
+		result.Block = blk
+
+		//addr, err := findAddress(search)
+		//if err != nil {
+		//	return fmt.Errorf("can't find address %s: %w", search, err)
+		//}
+		//result.Address = addr
 
 		return c.JSON(http.StatusOK, result)
 	})
