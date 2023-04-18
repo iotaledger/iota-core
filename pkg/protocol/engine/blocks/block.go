@@ -64,7 +64,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		solid:     true,
 		booked:    true,
 		accepted:  true,
-		confirmed: false,
+		confirmed: true,
 	}
 }
 
