@@ -344,62 +344,6 @@ paths:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
 
-  /api/indexer/v2/accounts/{accountId}/mana:
-    get:
-      tags:
-        - account outputs
-      summary: Returns the account mana related data for a given account identifier.
-      description: Returns the account mana related data for a given account identifier.
-      parameters:
-        - in: path
-          name: accountId
-          schema:
-            type: string
-          example: "0x1505ec099896ab05d9e08fbc7101ae4dff0093b3943b28f789ed2ca728bcc8d6"
-          description: Unique identifier of the account.
-          required: true
-        - in: query
-          name: isStaking
-          schema:
-            type: string
-          example: iota1prlgpsht03ekmghhex8v7y67a835uns8dtlxu807hj0v279c74kj76j6rev
-          description: Filter account outputs based on staking. -- TO BE DONE add more filters
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AccountManaResponse'
-              examples:
-                Query results in single output:
-                  $ref: >-
-                    #/components/examples/get-account-response-example
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '404':
-          description: "Unsuccessful operation: indicates that the requested data was not found."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotFoundResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-
   /api/indexer/v2/outputs/foundry:
     get:
       tags:
@@ -870,21 +814,3 @@ components:
         - ledgerIndex
         - items
 
-    AccountManaResponse:
-      description: Returns the mana related data of the account, mana balance, staking and delegation details.
-      properties:
-        mana:
-          type: integer
-          description: The mana of the account.
-        stake:
-          type: integer
-          description: The total stake of the account.
-        delegated:
-          type: integer
-          description: Total delegated mana of the node.
-        AccountId:
-          type: string
-          description: The account ID of the node.
-      required:
-        - AccountId
-        - mana
