@@ -13,8 +13,9 @@ const (
 )
 
 type Permanent struct {
-	dbConfig database.Config
-	store    kvstore.KVStore
+	dbConfig           database.Config
+	store              kvstore.KVStore
+	storeHealthTracker *kvstore.StoreHealthTracker
 
 	Settings    *Settings
 	Commitments *Commitments
@@ -29,8 +30,19 @@ func New(baseDir *utils.Directory, dbConfig database.Config) *Permanent {
 		panic(err)
 	}
 
+	// TODO: What do we do if the DB is corrupted?
+	storeHealthTracker, err := kvstore.NewStoreHealthTracker(store, dbConfig.PrefixHealth, dbConfig.Version, nil)
+	if err != nil {
+		panic(err)
+	}
+	if err = storeHealthTracker.MarkCorrupted(); err != nil {
+		panic(err)
+	}
+
 	return &Permanent{
-		store:           store,
+		store:              store,
+		storeHealthTracker: storeHealthTracker,
+
 		Settings:        NewSettings(baseDir.Path("settings.bin")),
 		Commitments:     NewCommitments(baseDir.Path("commitments.bin")),
 		sybilProtection: lo.PanicOnErr(store.WithExtendedRealm([]byte{sybilProtectionPrefix})),
@@ -69,6 +81,10 @@ func (p *Permanent) Size() int64 {
 
 func (p *Permanent) Shutdown() {
 	if err := p.Commitments.Close(); err != nil {
+		panic(err)
+	}
+
+	if err := p.storeHealthTracker.MarkHealthy(); err != nil {
 		panic(err)
 	}
 

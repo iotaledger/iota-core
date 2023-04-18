@@ -8,7 +8,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -40,7 +39,7 @@ func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Mana
 		optsGranularity: 10,
 		optsMaxOpenDBs:  10,
 		dbConfig:        dbConfig,
-		dbSizes:         shrinkingmap.New[iotago.SlotIndex, int64](),
+		dbSizes:         shrinkingmap.New[iotago.SlotIndex, int64](), // TODO: don't we need to fill this when starting from disk?
 	}, opts, func(m *Manager) {
 		m.logger = logger.NewWrappedLogger(m.optsLogger)
 
@@ -58,43 +57,10 @@ func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Mana
 			m.dbSizes.Set(baseIndex, size)
 		})
 	})
-}
 
-// TODO: this should be moved to the test only?
-// How do we currently know whether a slot was fully finished writing to disk?
-func (m *Manager) RestoreFromDisk() (latestBucketIndex iotago.SlotIndex) {
-	dbInfos := getSortedDBInstancesFromDisk(m.dbConfig.Directory)
-
-	// TODO: what to do if dbInfos is empty? -> start with a fresh DB?
-
-	for _, dbInfo := range dbInfos {
-		size, err := dbPrunableDirectorySize(m.dbConfig.Directory, dbInfo.baseIndex)
-		if err != nil {
-			panic(err)
-		}
-		m.dbSizes.Set(dbInfo.baseIndex, size)
-	}
-
-	m.maxPrunedMutex.Lock()
-	m.maxPruned = dbInfos[len(dbInfos)-1].baseIndex - 1
-	m.maxPrunedMutex.Unlock()
-
-	for _, dbInfo := range dbInfos {
-		dbIndex := dbInfo.baseIndex
-		var healthy bool
-		for bucketIndex := dbIndex + iotago.SlotIndex(m.optsGranularity) - 1; bucketIndex >= dbIndex; bucketIndex-- {
-			bucket := m.getBucket(bucketIndex)
-			healthy = lo.PanicOnErr(bucket.Has(healthKey))
-			if healthy {
-				return bucketIndex
-			}
-
-			m.removeBucket(bucket)
-		}
-		m.removeDBInstance(dbIndex)
-	}
-
-	return 0
+	// TODO: Do we need two levels of "health"?
+	//  1. When the slot is fully written to disk, i.e., all blocks etc for a slot have been stored
+	//  2. For the bucket we need the kvstore.StoreHealthTracker to support versions and make sure the bucket is not corrupted
 }
 
 func (m *Manager) MaxPrunedSlot() iotago.SlotIndex {
@@ -104,7 +70,7 @@ func (m *Manager) MaxPrunedSlot() iotago.SlotIndex {
 	return m.maxPruned
 }
 
-// IsTooOld checks if the Block associated with the given id is too old (in a pruned slot).
+// IsTooOld checks if the index is in a pruned slot.
 func (m *Manager) IsTooOld(index iotago.SlotIndex) (isTooOld bool) {
 	m.maxPrunedMutex.RLock()
 	defer m.maxPrunedMutex.RUnlock()
@@ -124,22 +90,6 @@ func (m *Manager) Get(index iotago.SlotIndex, realm kvstore.Realm) kvstore.KVSto
 	}
 
 	return withRealm
-}
-
-func (m *Manager) Flush(index iotago.SlotIndex) {
-	// Flushing works on DB level
-	db := m.getDBInstance(index)
-	err := db.store.Flush()
-	if err != nil {
-		panic(err)
-	}
-
-	// Mark as healthy.
-	bucket := m.getBucket(index)
-	err = bucket.Set(healthKey, []byte{1})
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (m *Manager) PruneUntilSlot(index iotago.SlotIndex) {
@@ -184,15 +134,15 @@ func (m *Manager) Shutdown() {
 
 // PrunableStorageSize returns the size of the prunable storage containing all db instances.
 func (m *Manager) PrunableStorageSize() int64 {
-	m.openDBsMutex.Lock()
-	defer m.openDBsMutex.Unlock()
-
 	// Sum up all the evicted databases
 	var sum int64
 	m.dbSizes.ForEach(func(index iotago.SlotIndex, i int64) bool {
 		sum += i
 		return true
 	})
+
+	m.openDBsMutex.Lock()
+	defer m.openDBsMutex.Unlock()
 
 	// Add up all the open databases
 	m.openDBs.Each(func(key iotago.SlotIndex, val *dbInstance) {

@@ -36,6 +36,15 @@ func New(dbConfig database.Config, opts ...options.Option[Manager]) *Prunable {
 	}
 }
 
+// PruneUntilSlot prunes storage slots less than and equal to the given index.
+func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
+	p.manager.PruneUntilSlot(index)
+}
+
+func (p *Prunable) Size() int64 {
+	return p.manager.PrunableStorageSize()
+}
+
 func (p *Prunable) Shutdown() {
 	p.manager.Shutdown()
 }

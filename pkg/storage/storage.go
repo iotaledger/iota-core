@@ -73,13 +73,12 @@ func (s *Storage) Directory() string {
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.
 func (s *Storage) PruneUntilSlot(index iotago.SlotIndex) {
-	// s.databaseManager.PruneUntilSlot(index)
+	s.Prunable.PruneUntilSlot(index)
 }
 
 // PrunableDatabaseSize returns the size of the underlying prunable databases.
 func (s *Storage) PrunableDatabaseSize() int64 {
-	// return s.databaseManager.PrunableStorageSize()
-	return 0
+	return s.Prunable.Size()
 }
 
 // PermanentDatabaseSize returns the size of the underlying permanent database and files.
