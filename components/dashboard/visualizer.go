@@ -63,9 +63,9 @@ func runVisualizer(component *app.Component) {
 				// 	currentSlot.Store(int64(block.ID().Index()))
 				// }
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			// deps.Protocol.Events.Engine.Consensus.BlockGadget.BlockAccepted.Hook(func(block *blockgadget.Block) {
-			// 	sendVertex(block.ModelsBlock, block.IsAccepted())
-			// }, event.WithWorkerPool(component.WorkerPool)).Unhook,
+			deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+				sendVertex(block, block.IsAccepted())
+			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.TipManager.TipAdded.Hook(func(block *blocks.Block) {
 				sendTipInfo(block, true)
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
