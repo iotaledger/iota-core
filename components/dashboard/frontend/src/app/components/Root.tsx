@@ -15,9 +15,7 @@ import {ExplorerAddressQueryResult} from "./ExplorerAddressResult";
 import {Explorer404} from "./Explorer404";
 import {Neighbors} from "./Neighbors";
 import {Visualizer} from "./Visualizer";
-import {Conflicts} from "./Conflicts";
 import {Tips} from "./Tips";
-import {Mana} from "./Mana";
 import {ExplorerTransactionQueryResult} from "./ExplorerTransactionQueryResult";
 import {ExplorerOutputQueryResult} from "./ExplorerOutputQueryResult";
 import {ExplorerConflictQueryResult} from "./ExplorerConflictQueryResult";
@@ -67,16 +65,6 @@ export class Root extends React.Component<Props, any> {
                                 Visualizer
                             </Nav.Link>
                         </LinkContainer>
-                        <LinkContainer to="/mana">
-                            <Nav.Link>
-                                Mana
-                            </Nav.Link>
-                        </LinkContainer>
-                        <LinkContainer to="/conflicts">
-                            <Nav.Link>
-                                Conflicts
-                            </Nav.Link>
-                        </LinkContainer>
                         <LinkContainer to="/slots">
                             <Nav.Link>
                                 Slot
@@ -107,13 +95,11 @@ export class Root extends React.Component<Props, any> {
                     <Route exact path="/explorer/conflict/:id" component={ExplorerConflictQueryResult}/>
                     <Route exact path="/explorer/slot/commitment/:commitment" component={ExplorerSlotQueryResult}/>
                     <Route exact path="/explorer/404/:search" component={Explorer404}/>
-                    <Route exact path="/conflicts" component={Conflicts}/>
                     <Route exact path="/slots" component={SlotLiveFeed}/>
                     <Route exact path="/tips" component={Tips}/>
                     <Route exact path="/explorer" component={Explorer}/>
                     <Route exact path="/visualizer" component={Visualizer}/>
                     <Route exact path="/visualizer/history" component={Visualizer}/>
-                    <Route exact path="/mana" component={Mana}/>
                     <Redirect to="/dashboard"/>
                 </Switch>
                 {this.props.children}

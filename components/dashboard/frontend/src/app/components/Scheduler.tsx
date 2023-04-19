@@ -2,7 +2,6 @@ import * as React from 'react';
 import NodeStore from "../stores/NodeStore";
 import Card from "react-bootstrap/Card";
 import {inject, observer} from "mobx-react";
-import BufferSizeChart from "./BufferSizeChart";
 import DeficitChart from "./DeficitChart";
 
 interface Props {
@@ -34,8 +33,7 @@ export default class Scheduler extends React.Component<Props, any> {
                             </div>
                         </div>
                     </small>
-                    <hr/>
-                    <BufferSizeChart/>
+
                     <hr/>
                     <DeficitChart/>
 
