@@ -2,7 +2,6 @@ package chainmanager
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -11,7 +10,8 @@ type Events struct {
 	MissingCommitmentReceived *event.Event1[iotago.CommitmentID]
 	CommitmentBelowRoot       *event.Event1[iotago.CommitmentID]
 	ForkDetected              *event.Event1[*Fork]
-	EvictionState             *eviction.Events
+
+	RequestCommitment *event.Event1[iotago.CommitmentID]
 
 	event.Group[Events, *Events]
 }
@@ -22,5 +22,6 @@ var NewEvents = event.CreateGroupConstructor(func() *Events {
 		MissingCommitmentReceived: event.New1[iotago.CommitmentID](),
 		CommitmentBelowRoot:       event.New1[iotago.CommitmentID](),
 		ForkDetected:              event.New1[*Fork](),
+		RequestCommitment:         event.New1[iotago.CommitmentID](),
 	}
 })

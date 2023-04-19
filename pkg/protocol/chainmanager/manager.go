@@ -23,7 +23,7 @@ var (
 
 type Manager struct {
 	Events              *Events
-	CommitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 
 	commitmentsByID *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *Commitment]
 	rootCommitment  *Commitment
@@ -53,10 +53,12 @@ func NewManager(opts ...options.Option[Manager]) (manager *Manager) {
 		forksByForkingPoint:        shrinkingmap.New[iotago.CommitmentID, *Fork](),
 		lastEvictedSlot:            iotago.SlotIndex(-1),
 	}, opts, func(m *Manager) {
-		m.CommitmentRequester = eventticker.New(m.optsCommitmentRequester...)
-		m.Events.CommitmentMissing.Hook(m.CommitmentRequester.StartTicker)
-		m.Events.MissingCommitmentReceived.Hook(m.CommitmentRequester.StopTicker)
-		m.Events.CommitmentBelowRoot.Hook(m.CommitmentRequester.StopTicker)
+		m.commitmentRequester = eventticker.New(m.optsCommitmentRequester...)
+		m.Events.CommitmentMissing.Hook(m.commitmentRequester.StartTicker)
+		m.Events.MissingCommitmentReceived.Hook(m.commitmentRequester.StopTicker)
+		m.Events.CommitmentBelowRoot.Hook(m.commitmentRequester.StopTicker)
+
+		m.Events.RequestCommitment.LinkTo(m.commitmentRequester.Events.Tick)
 	})
 }
 
@@ -68,6 +70,10 @@ func (m *Manager) Initialize(c *iotago.Commitment) {
 	m.rootCommitment.PublishCommitment(c)
 	m.rootCommitment.SetSolid(true)
 	m.rootCommitment.publishChain(NewChain(m.rootCommitment))
+}
+
+func (m *Manager) Shutdown() {
+	m.commitmentRequester.Shutdown()
 }
 
 func (m *Manager) ProcessCommitmentFromSource(commitment *iotago.Commitment, source identity.ID) (isSolid bool, chain *Chain) {

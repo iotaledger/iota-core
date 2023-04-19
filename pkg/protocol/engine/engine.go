@@ -278,6 +278,19 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 	return
 }
 
+// EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
+// commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
+// from being processed as their chain will be deemed unsolid.
+func (e *Engine) EarliestRootCommitment() *iotago.Commitment {
+	earliestRootCommitmentID := e.EvictionState.EarliestRootCommitmentID()
+	rootCommitment, err := e.Storage.Commitments.Load(earliestRootCommitmentID.Index())
+	if err != nil {
+		panic(fmt.Sprintln("could not load earliest commitment after engine initialization", err))
+	}
+
+	return rootCommitment
+}
+
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // region Options //////////////////////////////////////////////////////////////////////////////////////////////////////

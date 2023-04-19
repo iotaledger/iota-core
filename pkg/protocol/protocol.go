@@ -102,6 +102,15 @@ func (p *Protocol) Run() {
 		panic(err)
 	}
 
+	rootCommitment := p.mainEngine.EarliestRootCommitment()
+
+	// the rootCommitment is also the earliest point in the chain we can fork from. It is used to prevent
+	// solidifying and processing commitments that we won't be able to switch to.
+	if err := p.mainEngine.Storage.Settings.SetChainID(rootCommitment.MustID()); err != nil {
+		panic(fmt.Sprintln("could not load set main engine's chain using", rootCommitment))
+	}
+	p.chainManager.Initialize(rootCommitment)
+
 	// p.linkTo(p.mainEngine) -> CC and TipManager
 	// TODO: why do we create a protocol only when running?
 	// TODO: fill up protocol params
@@ -114,7 +123,7 @@ func (p *Protocol) Shutdown() {
 		p.networkProtocol.Unregister()
 	}
 
-	p.chainManager.CommitmentRequester.Shutdown()
+	p.chainManager.Shutdown()
 
 	p.TipManager.Shutdown()
 
@@ -124,8 +133,7 @@ func (p *Protocol) Shutdown() {
 }
 
 func (p *Protocol) initNetworkEvents() {
-	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks")                  // Use max amount of workers for sending, receiving and requesting blocks
-	wpCommitments := p.Workers.CreatePool("NetworkEvents.SlotCommitments", 1) // Using just 1 worker to avoid contention
+	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks
 
 	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id identity.ID) {
 		if err := p.ProcessBlock(block, id); err != nil {
@@ -147,11 +155,30 @@ func (p *Protocol) initNetworkEvents() {
 		p.networkProtocol.SendBlock(block.Block())
 	}, event.WithWorkerPool(wpBlocks))
 
+	wpCommitments := p.Workers.CreatePool("NetworkEvents.SlotCommitments")
+
 	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
 		// when we receive a commitment request, do not look it up in the ChainManager but in the storage, else we might answer with commitments we did not issue ourselves and for which we cannot provide attestations
 		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments.Load(commitmentID.Index()); err == nil && requestedCommitment.MustID() == commitmentID {
 			p.networkProtocol.SendSlotCommitment(requestedCommitment, source)
 		}
+	}, event.WithWorkerPool(wpCommitments))
+
+	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, source identity.ID) {
+		p.chainManager.ProcessCommitmentFromSource(commitment, source)
+	}, event.WithWorkerPool(wpCommitments))
+
+	p.Events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
+		// Check if we have the requested commitment in our storage before asking our peers for it.
+		// This can happen after we restart the node because the chain manager builds up the chain again.
+		if cm, _ := p.MainEngineInstance().Storage.Commitments.Load(commitmentID.Index()); cm != nil {
+			if cm.MustID() == commitmentID {
+				p.chainManager.ProcessCommitment(cm)
+				return
+			}
+		}
+
+		p.networkProtocol.RequestCommitment(commitmentID)
 	}, event.WithWorkerPool(wpCommitments))
 }
 
@@ -180,31 +207,7 @@ func (p *Protocol) initEngineManager() {
 
 func (p *Protocol) initChainManager() {
 	p.chainManager = chainmanager.NewManager(p.optsChainManagerOptions...)
-
-	// the earliestRootCommitment is used to make sure that the chainManager knows the earliest possible
-	// commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
-	// from being processed as their chain will be deemed unsolid.
-	earliestRootCommitment := func() *iotago.Commitment {
-		earliestRootCommitmentID := p.MainEngineInstance().EvictionState.EarliestRootCommitmentID()
-		rootCommitment, err := p.MainEngineInstance().Storage.Commitments.Load(earliestRootCommitmentID.Index())
-		if err != nil {
-			panic(fmt.Sprintln("could not load earliest commitment after engine initialization", err))
-		}
-		return rootCommitment
-	}
-
-	p.MainEngineInstance().HookInitialized(func() {
-		rootCommitment := earliestRootCommitment()
-
-		// the rootCommitment is also the earliest point in the chain we can fork from. It is used to prevent
-		// solidifying and processing commitments that we won't be able to switch to.
-		if err := p.MainEngineInstance().Storage.Settings.SetChainID(rootCommitment.MustID()); err != nil {
-			panic(fmt.Sprintln("could not load set main engine's chain using", rootCommitment))
-		}
-		p.chainManager.Initialize(rootCommitment)
-	})
-
-	p.Events.ChainManager = p.chainManager.Events
+	p.Events.ChainManager.LinkTo(p.chainManager.Events)
 
 	wp := p.Workers.CreatePool("ChainManager", 1) // Using just 1 worker to avoid contention
 
@@ -213,7 +216,7 @@ func (p *Protocol) initChainManager() {
 	}, event.WithWorkerPool(wp))
 
 	//p.Events.Engine.Consensus.SlotGadget.SlotConfirmed.Hook(func(index slot.Index) {
-	//	rootCommitment := earliestRootCommitment()
+	//	rootCommitment := p.MainEngineInstance().EarliestRootCommitment()
 	//
 	//	// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
 	//	// we first specify the chain's cut-off point, and only then evict the state. It is also important to
@@ -230,25 +233,6 @@ func (p *Protocol) initChainManager() {
 	//}, event.WithWorkerPool(wp))
 
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wp))
-
-	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, source identity.ID) {
-		p.chainManager.ProcessCommitmentFromSource(commitment, source)
-	}, event.WithWorkerPool(wp))
-
-	p.chainManager.CommitmentRequester.Events.Tick.Hook(func(commitmentID iotago.CommitmentID) {
-		// Check if we have the requested commitment in our storage before asking our peers for it.
-		// This can happen after we restart the node because the chain manager builds up the chain again.
-		if cm, _ := p.MainEngineInstance().Storage.Commitments.Load(commitmentID.Index()); cm != nil {
-			if cm.MustID() == commitmentID {
-				wp.Submit(func() {
-					p.chainManager.ProcessCommitment(cm)
-				})
-				return
-			}
-		}
-
-		p.networkProtocol.RequestCommitment(commitmentID)
-	}, event.WithWorkerPool(p.Workers.CreatePool("RequestCommitment", 2)))
 }
 
 func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
