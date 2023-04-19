@@ -65,6 +65,7 @@ func run() error {
 	runWebSocketStreams(Component)
 	runLiveFeed(Component)
 	runVisualizer(Component)
+	runSlotsLiveFeed(Component)
 
 	if err := Component.Daemon().BackgroundWorker("Dashboard", func(ctx context.Context) {
 		Component.LogInfo("Starting Dashboard ... done")

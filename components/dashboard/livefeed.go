@@ -7,8 +7,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-
-	"github.com/labstack/gommon/log"
 )
 
 func runLiveFeed(component *app.Component) {
@@ -19,10 +17,10 @@ func runLiveFeed(component *app.Component) {
 		}, event.WithWorkerPool(Component.WorkerPool))
 
 		<-ctx.Done()
-		log.Info("Stopping Dashboard[Livefeed] ...")
+		component.LogInfo("Stopping Dashboard[Livefeed] ...")
 		hook.Unhook()
-		log.Info("Stopping Dashboard[Livefeed] ... done")
+		component.LogInfo("Stopping Dashboard[Livefeed] ... done")
 	}, daemon.PriorityDashboard); err != nil {
-		log.Panicf("Failed to start as daemon: %s", err)
+		component.LogPanicf("Failed to start as daemon: %s", err)
 	}
 }
