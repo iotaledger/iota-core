@@ -165,17 +165,18 @@ func configure() error {
 
 		default:
 			// default to echo.MIMEApplicationJSON
-			resp, err := blockByID(c)
+			block, err := blockByID(c)
 			if err != nil {
 				return err
 			}
+			resp := block.Block()
 
 			return httpserver.JSONResponse(c, http.StatusOK, resp)
 		}
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
-		resp, err := blockMetadataByID(c)
+		resp, err := blockMetadataResponseByID(c)
 		if err != nil {
 			return err
 		}

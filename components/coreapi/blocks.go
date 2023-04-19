@@ -5,51 +5,47 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/inx-app/pkg/httpserver"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/restapi"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func blockBytesByID(c echo.Context) ([]byte, error) {
+func blockByID(c echo.Context) (*blocks.Block, error) {
 	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
 	}
 
 	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
 	if !exists {
 		return nil, errors.Errorf("block not found: %s", blockID.ToHex())
 	}
-	blockBytes, err := deps.Protocol.API().Encode(block.Block)
+
+	return block, nil
+}
+
+func blockBytesByID(c echo.Context) ([]byte, error) {
+	block, err := blockByID(c)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to encode block: %s", blockID.ToHex())
+		return nil, err
+	}
+
+	blockBytes, err := deps.Protocol.API().Encode(block)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to encode block: %s", block.ID().ToHex())
 	}
 	return blockBytes, nil
 }
 
-func blockByID(c echo.Context) (*iotago.Block, error) {
-	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
-	if err != nil {
-		return nil, err
-	}
-
-	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
-	if !exists {
-		return nil, errors.Errorf("block not found: %s", blockID.ToHex())
-	}
-
-	return block.Block(), nil
-}
-
-func blockMetadataByID(c echo.Context) (*blockMetadataResponse, error) {
-	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
+	block, err := blockByID(c)
 	if err != nil {
 		return nil, err
 	}
 	bmResponse := &blockMetadataResponse{
-		BlockID:    blockID.ToHex(),
+		BlockID:    block.ID().ToHex(),
 		BlockState: blockStatePending.String(),
 	}
-	_, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	_, exists := deps.Protocol.MainEngineInstance().Block(block.ID())
 	if !exists {
 		bmResponse.BlockError = "block not found"
 	}
