@@ -17,10 +17,13 @@ var (
 
 	// counter for the received BPS (for dashboard).
 	mpsAttachedSinceLastMeasurement atomic.Uint64
+
+	lastAcceptedBlock  = NewLatestBlockTracker()
+	lastConfirmedBlock = NewLatestBlockTracker()
 )
 
-// BlockCountSinceStartPerComponentDashboard returns a map of block count per component types and their count since last time the value was read.
-func BlockCountSinceStartPerComponentDashboard() map[ComponentType]uint64 {
+// blockCountSinceStartPerComponentDashboard returns a map of block count per component types and their count since last time the value was read.
+func blockCountSinceStartPerComponentDashboard() map[ComponentType]uint64 {
 	blockCountPerComponentMutex.RLock()
 	defer blockCountPerComponentMutex.RUnlock()
 
@@ -36,7 +39,7 @@ func BlockCountSinceStartPerComponentDashboard() map[ComponentType]uint64 {
 // measures the Component Counter value per second.
 func measurePerComponentCounter() {
 	// sample the current counter value into a measured BPS value
-	componentCounters := BlockCountSinceStartPerComponentDashboard()
+	componentCounters := blockCountSinceStartPerComponentDashboard()
 
 	// reset the counter
 	blockCountPerComponentMutex.Lock()

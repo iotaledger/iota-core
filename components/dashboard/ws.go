@@ -76,14 +76,6 @@ func runWebSocketStreams(component *app.Component) {
 					Booker:     event.ComponentStatus[dashboardmetrics.Booked],
 				})
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-
-			// 	Events.RateSetterUpdated.Hook(func(metric *RateSetterMetric) {
-			// 		process(&rateSetterMetric{
-			// 			Size:     metric.Size,
-			// 			Estimate: metric.Estimate.String(),
-			// 			Rate:     metric.Rate,
-			// 		})
-			// 	}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
 		)
 		<-ctx.Done()
 		log.Info("Stopping Dashboard[StatusUpdate] ...")
@@ -140,22 +132,6 @@ func broadcastWsBlock(blk interface{}, dontDrop ...bool) {
 	}
 }
 
-func sendInitialData(ws *websocket.Conn) error {
-	// todo uncomment and resolve issues
-	//if err := ManaBufferInstance().SendValueBlks(ws); err != nil {
-	//	return err
-	//}
-	//if err := ManaBufferInstance().SendMapOverall(ws); err != nil {
-	//	return err
-	//}
-	//if err := ManaBufferInstance().SendMapOnline(ws); err != nil {
-	//	return err
-	//}
-	//sendAllConflicts()
-
-	return nil
-}
-
 func websocketRoute(c echo.Context) error {
 	defer func() {
 		if r := recover(); r != nil {
@@ -174,12 +150,6 @@ func websocketRoute(c echo.Context) error {
 	// cleanup client websocket
 	clientID, wsClient := registerWSClient()
 	defer removeWsClient(clientID)
-
-	// send initial data to the connected client
-	err = sendInitialData(ws)
-	if err != nil {
-		return err
-	}
 
 	for {
 		var blk interface{}

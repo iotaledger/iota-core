@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
+	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -147,35 +148,21 @@ func currentNodeStatus() *nodestatus {
 		NumGC:        m.NumGC,
 		LastPauseGC:  m.PauseNs[(m.NumGC+255)%256],
 	}
-
 	//get TangleTime
 	cl := deps.Protocol.MainEngineInstance().Clock
 	status.TangleTime = tangleTime{
-		Synced:       deps.Protocol.MainEngineInstance().IsSynced(),
-		Bootstrapped: deps.Protocol.MainEngineInstance().IsBootstrapped(),
-		//AcceptedBlockID:  lastAcceptedBlock.BlockID().Base58(),
-		//ConfirmedBlockID: lastConfirmedBlock.BlockID().Base58(),
-		//ConfirmedSlot:    int64(deps.Protocol.Engine().LastConfirmedSlot()),
-		ATT:  cl.Accepted().Time().UnixNano(),
-		RATT: cl.Accepted().RelativeTime().UnixNano(),
-		CTT:  cl.Confirmed().Time().UnixNano(),
-		RCTT: cl.Confirmed().RelativeTime().UnixNano(),
+		Synced:           deps.Protocol.MainEngineInstance().IsSynced(),
+		Bootstrapped:     deps.Protocol.MainEngineInstance().IsBootstrapped(),
+		AcceptedBlockID:  dashboardmetrics.GetLastAcceptedBlockID().ToHex(),
+		ConfirmedBlockID: dashboardmetrics.GetLastConfirmedBlockID().ToHex(),
+		CommittedSlot:    int64(deps.Protocol.MainEngineInstance().Notarization.Attestations().LastCommittedSlot()),
+		ConfirmedSlot:    0,
+		ATT:              cl.Accepted().Time().UnixNano(),
+		RATT:             cl.Accepted().RelativeTime().UnixNano(),
+		CTT:              cl.Confirmed().Time().UnixNano(),
+		RCTT:             cl.Confirmed().RelativeTime().UnixNano(),
 	}
-	//
-	//scheduler := deps.Protocol.CongestionControl.Scheduler()
-	//if scheduler == nil {
-	//	return nil
-	//}
-	//
-	//deficit, _ := scheduler.Deficit(deps.Local.ID()).Float64()
 
-	//status.Scheduler = schedulerMetric{
-	//	Running:           deps.Protocol.CongestionControl.Scheduler().IsRunning(),
-	//	Rate:              deps.Protocol.CongestionControl.Scheduler().Rate().String(),
-	//	MaxBufferSize:     deps.Protocol.CongestionControl.Scheduler().MaxBufferSize(),
-	//	CurrentBufferSize: deps.Protocol.CongestionControl.Scheduler().BufferSize(),
-	//	Deficit:           deficit,
-	//}
 	return status
 }
 

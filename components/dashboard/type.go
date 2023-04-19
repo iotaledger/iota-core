@@ -69,6 +69,7 @@ type tangleTime struct {
 
 	AcceptedBlockID  string `json:"acceptedBlockID"`
 	ConfirmedBlockID string `json:"confirmedBlockID"`
+	CommittedSlot    int64  `json:"committedSlot"`
 	ConfirmedSlot    int64  `json:"confirmedSlot"`
 }
 

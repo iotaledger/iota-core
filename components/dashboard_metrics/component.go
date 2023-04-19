@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func init() {
@@ -69,6 +70,14 @@ func run() error {
 	return nil
 }
 
+func GetLastAcceptedBlockID() iotago.BlockID {
+	return lastAcceptedBlock.BlockID()
+}
+
+func GetLastConfirmedBlockID() iotago.BlockID {
+	return lastConfirmedBlock.BlockID()
+}
+
 func registerLocalMetrics() {
 	// increase received BPS counter whenever we attached a block
 	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
@@ -76,4 +85,13 @@ func registerLocalMetrics() {
 		defer blockCountPerComponentMutex.Unlock()
 		increaseReceivedBPSCounter()
 	}, event.WithWorkerPool(Component.WorkerPool))
+
+	deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+		lastAcceptedBlock.Update(block)
+	})
+
+	deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+		lastConfirmedBlock.Update(block)
+	})
+
 }

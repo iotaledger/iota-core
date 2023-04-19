@@ -38,6 +38,11 @@ export default class TangleTime extends React.Component<Props, any> {
                                     {this.props.nodeStore.status.tangleTime.confirmedSlot}
                                 </div>
                             </div>
+                            <div className={"row"}>
+                                <div className={"col-12"}>Last Committed Slot:
+                                    {this.props.nodeStore.status.tangleTime.committedSlot}
+                                </div>
+                            </div>
                             <hr/>
                             <div className={"row"}>
                                 <div className={"col-3"}>

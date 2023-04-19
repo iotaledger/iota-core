@@ -26,6 +26,7 @@ class TangleTime {
     acceptedBlockID: string;
     confirmedBlockID: string;
     confirmedSlot: number;
+    committedSlot: number;
 }
 
 class MemoryMetrics {
