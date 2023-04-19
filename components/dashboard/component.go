@@ -30,7 +30,7 @@ func init() {
 		Configure: configure,
 		Run:       run,
 		IsEnabled: func(c *dig.Container) bool {
-			return true
+			return ParamsDashboard.Enabled
 		},
 	}
 }
