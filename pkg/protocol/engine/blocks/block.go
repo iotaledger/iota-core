@@ -30,8 +30,10 @@ type Block struct {
 	witnesses *advancedset.AdvancedSet[identity.ID]
 
 	// BlockGadget block
-	accepted  bool
-	confirmed bool
+	accepted         bool
+	ratifiers        *advancedset.AdvancedSet[identity.ID]
+	ratifiedAccepted bool
+	confirmed        bool
 
 	mutex sync.RWMutex
 
@@ -49,6 +51,7 @@ type rootBlock struct {
 func NewBlock(data *model.Block) *Block {
 	return &Block{
 		witnesses:  advancedset.New[identity.ID](),
+		ratifiers:  advancedset.New[identity.ID](),
 		modelBlock: data,
 	}
 }
@@ -56,15 +59,17 @@ func NewBlock(data *model.Block) *Block {
 func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
 	return &Block{
 		witnesses: advancedset.New[identity.ID](),
+		ratifiers: advancedset.New[identity.ID](),
 		rootBlock: &rootBlock{
 			blockID:      blockID,
 			commitmentID: commitmentID,
 			issuingTime:  issuingTime,
 		},
-		solid:     true,
-		booked:    true,
-		accepted:  true,
-		confirmed: true,
+		solid:            true,
+		booked:           true,
+		accepted:         true,
+		ratifiedAccepted: true, //TODO: check if this should be true
+		confirmed:        true, //TODO: check if this should be true
 	}
 }
 
@@ -73,6 +78,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 		missing:        true,
 		missingBlockID: blockID,
 		witnesses:      advancedset.New[identity.ID](),
+		ratifiers:      advancedset.New[identity.ID](),
 	}
 }
 
@@ -333,6 +339,40 @@ func (b *Block) SetAccepted() (wasUpdated bool) {
 
 	if wasUpdated = !b.accepted; wasUpdated {
 		b.accepted = true
+	}
+
+	return wasUpdated
+}
+
+func (b *Block) AddRatifier(id identity.ID) (added bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return b.ratifiers.Add(id)
+}
+
+func (b *Block) Ratifiers() []identity.ID {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.ratifiers.Slice()
+}
+
+// IsRatifiedAccepted returns true if the Block was ratified accepted.
+func (b *Block) IsRatifiedAccepted() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.ratifiedAccepted
+}
+
+// SetRatifiedAccepted sets the Block as ratified accepted.
+func (b *Block) SetRatifiedAccepted() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.ratifiedAccepted; wasUpdated {
+		b.ratifiedAccepted = true
 	}
 
 	return wasUpdated

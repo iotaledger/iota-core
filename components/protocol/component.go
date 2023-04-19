@@ -99,6 +99,10 @@ func configure() error {
 		Component.LogInfof("BlockAccepted: %s", block.ID())
 	})
 
+	deps.Protocol.Events.Engine.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+		Component.LogInfof("BlockRatifiedAccepted: %s", block.ID())
+	})
+
 	deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockConfirmed: %s", block.ID())
 	})
