@@ -13,7 +13,6 @@ import Card from "react-bootstrap/Card";
 import MemChart from "./MemChart";
 import ComponentCounterChart from "./ComponentCounterChart";
 import TangleTime from "./TangleTime";
-import Scheduler from "./Scheduler";
 import Bootstrapped from "./Bootstrapped";
 
 interface Props {
@@ -61,9 +60,6 @@ export class Dashboard extends React.Component<Props, any> {
                 </Row>
                 <Row className={"mb-3"}>
                     <Col><TipsChart/></Col>
-                </Row>
-                <Row className={"mb-3"}>
-                    <Col><Scheduler/></Col>
                 </Row>
                 <Row className={"mb-3"}>
                     <Col><ComponentCounterChart/></Col>
