@@ -60,4 +60,5 @@ func setupRoutes(e *echo.Echo) {
 	apiRoutes := e.Group("/api")
 
 	setupExplorerRoutes(apiRoutes)
+	setupTipsRoutes(apiRoutes)
 }
