@@ -127,7 +127,7 @@ func createExplorerBlock(block *blocks.Block) *ExplorerBlock {
 		// Payload:              ProcessPayload(block.Payload()),
 		CommitmentID:        commitmentID.ToHex(),
 		Commitment:          iotaBlk.SlotCommitment,
-		LatestConfirmedSlot: uint64(iotaBlk.LatestConfirmedSlot),
+		LatestConfirmedSlot: uint64(iotaBlk.LatestFinalizedSlot),
 	}
 
 	return t
