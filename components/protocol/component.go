@@ -123,6 +123,18 @@ func configure() error {
 		Component.LogInfof("SlotConfirmed: %d", index)
 	})
 
+	deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {
+		Component.LogInfof("RequestCommitment: %d", id)
+	})
+
+	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id identity.ID) {
+		Component.LogInfof("SlotCommitmentRequestReceived: %d", commitmentID)
+	})
+
+	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, id identity.ID) {
+		Component.LogInfof("SlotCommitmentReceived: %d", commitment.MustID())
+	})
+
 	return nil
 }
 
