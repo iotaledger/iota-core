@@ -13,12 +13,19 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
@@ -45,23 +52,29 @@ type Protocol struct {
 	optsEngineOptions                 []options.Option[engine.Engine]
 	optsStorageDatabaseManagerOptions []options.Option[database.Manager]
 
-	optsFilterProvider     module.Provider[*engine.Engine, filter.Filter]
-	optsBlockDAGProvider   module.Provider[*engine.Engine, blockdag.BlockDAG]
-	optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]
-	optsBookerProvider     module.Provider[*engine.Engine, booker.Booker]
-	optsClockProvider      module.Provider[*engine.Engine, clock.Clock]
+	optsFilterProvider          module.Provider[*engine.Engine, filter.Filter]
+	optsBlockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
+	optsTipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
+	optsBookerProvider          module.Provider[*engine.Engine, booker.Booker]
+	optsClockProvider           module.Provider[*engine.Engine, clock.Clock]
+	optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
+	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
+	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
-		Events:                 NewEvents(),
-		Workers:                workers,
-		dispatcher:             dispatcher,
-		optsFilterProvider:     blockfilter.NewProvider(),
-		optsBlockDAGProvider:   inmemoryblockdag.NewProvider(),
-		optsTipManagerProvider: trivialtipmanager.NewProvider(),
-		optsBookerProvider:     inmemorybooker.NewProvider(),
-		optsClockProvider:      blocktime.NewProvider(),
+		Events:                      NewEvents(),
+		Workers:                     workers,
+		dispatcher:                  dispatcher,
+		optsFilterProvider:          blockfilter.NewProvider(),
+		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
+		optsTipManagerProvider:      trivialtipmanager.NewProvider(),
+		optsBookerProvider:          inmemorybooker.NewProvider(),
+		optsClockProvider:           blocktime.NewProvider(),
+		optsSybilProtectionProvider: poa.NewProvider(map[identity.ID]int64{}),
+		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
+		optsNotarizationProvider:    slotnotarization.NewProvider(),
 
 		optsBaseDirectory:    "",
 		optsPruningThreshold: 6 * 60, // 1 hour given that slot duration is 10 seconds
@@ -109,7 +122,7 @@ func (p *Protocol) initNetworkEvents() {
 		}
 	}, event.WithWorkerPool(wpBlocks))
 	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id identity.ID) {
-		if block, exists := p.MainEngineInstance().Block(blockID); exists {
+		if block, exists := p.MainEngineInstance().Block(blockID); exists && !block.IsMissing() && !block.IsRootBlock() {
 			p.networkProtocol.SendBlock(block.Block(), id)
 		}
 	}, event.WithWorkerPool(wpBlocks))
@@ -117,7 +130,7 @@ func (p *Protocol) initNetworkEvents() {
 		p.networkProtocol.RequestBlock(blockID)
 	}, event.WithWorkerPool(wpBlocks))
 
-	p.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
+	p.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 		p.networkProtocol.SendBlock(block.Block())
 	}, event.WithWorkerPool(wpBlocks))
 }
@@ -133,6 +146,9 @@ func (p *Protocol) initEngineManager() {
 		p.optsBlockDAGProvider,
 		p.optsBookerProvider,
 		p.optsClockProvider,
+		p.optsSybilProtectionProvider,
+		p.optsBlockGadgetProvider,
+		p.optsNotarizationProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
@@ -211,6 +227,24 @@ func WithBookerProvider(optsBookerProvider module.Provider[*engine.Engine, booke
 func WithClockProvider(optsClockProvider module.Provider[*engine.Engine, clock.Clock]) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsClockProvider = optsClockProvider
+	}
+}
+
+func WithSybilProtectionProvider(optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsSybilProtectionProvider = optsSybilProtectionProvider
+	}
+}
+
+func WithBlockGadgetProvider(optsBlockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsBlockGadgetProvider = optsBlockGadgetProvider
+	}
+}
+
+func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.Engine, notarization.Notarization]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsNotarizationProvider = optsNotarizationProvider
 	}
 }
 

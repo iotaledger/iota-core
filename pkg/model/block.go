@@ -3,7 +3,6 @@ package model
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
@@ -97,14 +96,6 @@ func (blk *Block) Block() *iotago.Block {
 	})
 
 	return blk.block
-}
-
-func (blk *Block) IssuingTime() time.Time {
-	return blk.Block().IssuingTime
-}
-
-func (blk *Block) SlotCommitmentID() iotago.CommitmentID {
-	return blk.Block().SlotCommitment.MustID()
 }
 
 // TODO: maybe move to iota.go and introduce parent type

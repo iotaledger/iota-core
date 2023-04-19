@@ -13,6 +13,7 @@ services:
       --p2p.seed=0x88ce2019dd99fd5a3c46e10ffc192549fc4491eee07552153ff66cf792b6a0af
     volumes:
       - ./docker-network.snapshot:/app/snapshot.bin
+      - ./config.json:/app/config.json:ro
     ports:
       - "8080:8080/tcp" # web API
       - "8081:8081/tcp" # dashboard
@@ -29,6 +30,7 @@ services:
       --p2p.seed=0xf739eea09eb0f4820f26504a3135131a075089b4c901c19c2099513ee016f516
     volumes:
       - ./docker-network.snapshot:/app/snapshot.bin
+      - ./config.json:/app/config.json:ro
     ports:
       - "8070:8080/tcp" # web API
       - "8071:8081/tcp" # dashboard
@@ -45,15 +47,13 @@ services:
       --p2p.seed=0x6bd12a0398f9264788bc6481e2665eb90bd58a33b82347fb70f612cc8a91fcce
     volumes:
       - ./docker-network.snapshot:/app/snapshot.bin
+      - ./config.json:/app/config.json:ro
     ports:
       - "8040:8080/tcp" # web API
       - "8041:8081/tcp" # dashboard
       - "6041:6061/tcp" # pprof
     networks:
       - iota-core
-    depends_on:
-      - peer_master
-      - faucet
 
   peer_nomana2:
     image: docker-network-peer_master:latest
@@ -64,16 +64,14 @@ services:
       --p2p.seed=0x4da1119dc9cc3750ebb313c3c7dcb50120465544d256ee3c0d4586ce1772c96b
     volumes:
       - ./docker-network.snapshot:/app/snapshot.bin
+      - ./config.json:/app/config.json:ro
     ports:
       - "8030:8080/tcp" # web API
       - "8031:8081/tcp" # dashboard
       - "6031:6061/tcp" # pprof
     networks:
       - iota-core
-    depends_on:
-      - peer_master
-      - faucet
-      
+
   faucet:
     image: docker-network-peer_master:latest
     stop_grace_period: 1m
@@ -83,14 +81,13 @@ services:
       --p2p.seed=0x2ab2792bba8ab6deb7978165e4072d3f00def97a0138b98ba2d21eba54159705
     volumes:
       - ./docker-network.snapshot:/app/snapshot.bin
+      - ./config.json:/app/config.json:ro
     ports:
       - "8090:8080/tcp" # web API
       - "8091:8081/tcp" # dashboard
       - "6091:6061/tcp" # pprof
     networks:
       - iota-core
-    depends_on:
-      - peer_master
 
   prometheus:
     image: prom/prometheus:latest
