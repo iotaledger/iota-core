@@ -94,8 +94,10 @@ func (g *Gadget) IsBlockConfirmed(blockID iotago.BlockID) bool {
 // Acceptance and Confirmation use the same threshold if confirmation is possible.
 // If there is not enough online weight to achieve confirmation, then acceptance condition is evaluated based on total active weight.
 func (g *Gadget) tryConfirmOrAccept(block *blocks.Block) {
-	blockWeight := g.sybilProtection.Accounts().SelectAccounts(block.Witnesses()...).TotalWeight()
-	committeeTotalWeight := g.sybilProtection.Committee().TotalWeight()
+	committee := g.sybilProtection.Committee()
+	committeeTotalWeight := committee.TotalWeight()
+
+	blockWeight := committee.SelectAccounts(block.Witnesses()...).TotalWeight()
 	onlineCommitteeTotalWeight := g.sybilProtection.OnlineCommittee().TotalWeight()
 
 	// check if we reached the confirmation threshold based on the total commitee weight
@@ -104,8 +106,6 @@ func (g *Gadget) tryConfirmOrAccept(block *blocks.Block) {
 	} else if IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {
 		g.propagateAcceptanceConfirmation(block, false)
 	}
-
-	return
 }
 
 func (g *Gadget) EvictUntil(index iotago.SlotIndex) {
