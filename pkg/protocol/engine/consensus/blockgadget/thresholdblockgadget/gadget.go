@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/votes"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -101,9 +102,9 @@ func (g *Gadget) tryConfirmOrAccept(block *blocks.Block) {
 	onlineCommitteeTotalWeight := g.sybilProtection.OnlineCommittee().TotalWeight()
 
 	// check if we reached the confirmation threshold based on the total commitee weight
-	if IsThresholdReached(blockWeight, committeeTotalWeight, g.optsConfirmationThreshold) {
+	if votes.IsThresholdReached(blockWeight, committeeTotalWeight, g.optsConfirmationThreshold) {
 		g.propagateAcceptanceConfirmation(block, true)
-	} else if IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {
+	} else if votes.IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {
 		g.propagateAcceptanceConfirmation(block, false)
 	}
 }
@@ -185,10 +186,6 @@ func (g *Gadget) acceptanceFailed(block *blocks.Block, err error) {
 
 func (g *Gadget) confirmationFailed(block *blocks.Block, err error) {
 	panic(errors.Wrapf(err, "could not mark block %s as confirmed", block.ID()))
-}
-
-func IsThresholdReached(objectWeight, totalWeight int64, threshold float64) bool {
-	return objectWeight > int64(float64(totalWeight)*threshold)
 }
 
 var _ blockgadget.Gadget = new(Gadget)
