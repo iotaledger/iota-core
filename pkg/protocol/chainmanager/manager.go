@@ -132,6 +132,8 @@ func (m *Manager) EvictUntil(index iotago.SlotIndex) {
 		m.evict(currentIndex)
 	}
 	m.lastEvictedSlot = index
+
+	m.commitmentRequester.EvictUntil(index)
 }
 
 // RootCommitment returns the root commitment of the manager.

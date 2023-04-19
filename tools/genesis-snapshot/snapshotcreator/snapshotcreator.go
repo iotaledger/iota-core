@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
@@ -56,6 +57,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		blocktime.NewProvider(),
 		poa.NewProvider(map[identity.ID]int64{}),
 		thresholdblockgadget.NewProvider(),
+		totalweightslotgadget.NewProvider(),
 		slotnotarization.NewProvider(),
 	)
 	defer engineInstance.Shutdown()
