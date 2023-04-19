@@ -139,12 +139,15 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
 			continue
 		}
 
+		// Skip propagation if the block is already accepted.
+		if block.IsAccepted() {
+			continue
+		}
+
 		// Skip further propagation if the witness is not new.
 		if !block.AddWitness(witness) {
 			continue
 		}
-
-		// TODO: Skip further propagation if block is already accepted.
 
 		block.ForEachParent(func(parent model.Parent) {
 			switch parent.Type {
@@ -152,8 +155,9 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
 				walk.Push(parent.ID)
 			case model.ShallowLikeParentType, model.WeakParentType:
 				if weakParent, exists := b.blockCache.Block(parent.ID); exists {
-					weakParent.AddWitness(witness)
-					b.events.WitnessAdded.Trigger(weakParent)
+					if weakParent.AddWitness(witness) {
+						b.events.WitnessAdded.Trigger(weakParent)
+					}
 				}
 			}
 		})

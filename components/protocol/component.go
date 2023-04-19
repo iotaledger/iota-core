@@ -99,6 +99,10 @@ func configure() error {
 		Component.LogInfof("BlockAccepted: %s", block.ID())
 	})
 
+	deps.Protocol.Events.Engine.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+		Component.LogInfof("BlockRatifiedAccepted: %s", block.ID())
+	})
+
 	deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockConfirmed: %s", block.ID())
 	})
@@ -113,6 +117,10 @@ func configure() error {
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 		Component.LogInfof("SlotCommitted: %s - %d", details.Commitment.MustID(), details.Commitment.Index)
+	})
+
+	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		Component.LogInfof("SlotConfirmed: %d", index)
 	})
 
 	return nil

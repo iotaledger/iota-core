@@ -23,6 +23,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -44,6 +45,7 @@ type Engine struct {
 	Clock           clock.Clock
 	SybilProtection sybilprotection.SybilProtection
 	BlockGadget     blockgadget.Gadget
+	SlotGadget      slotgadget.Gadget
 	Notarization    notarization.Notarization
 
 	Workers *workerpool.Group
@@ -70,6 +72,7 @@ func New(
 	clockProvider module.Provider[*Engine, clock.Clock],
 	sybilProtectionProvider module.Provider[*Engine, sybilprotection.SybilProtection],
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
+	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
@@ -93,6 +96,7 @@ func New(
 			e.Booker = bookerProvider(e)
 			e.Clock = clockProvider(e)
 			e.BlockGadget = blockGadgetProvider(e)
+			e.SlotGadget = slotGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
 
 			e.HookInitialized(lo.Batch(
@@ -276,6 +280,19 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 	}
 
 	return
+}
+
+// EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
+// commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
+// from being processed as their chain will be deemed unsolid.
+func (e *Engine) EarliestRootCommitment() *iotago.Commitment {
+	earliestRootCommitmentID := e.EvictionState.EarliestRootCommitmentID()
+	rootCommitment, err := e.Storage.Commitments.Load(earliestRootCommitmentID.Index())
+	if err != nil {
+		panic(fmt.Sprintln("could not load earliest commitment after engine initialization", err))
+	}
+
+	return rootCommitment
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
