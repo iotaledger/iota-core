@@ -1,4 +1,4 @@
-package tresholdblockgadget
+package thresholdblockgadget
 
 import (
 	"fmt"

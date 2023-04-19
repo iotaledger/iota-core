@@ -19,7 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/tresholdblockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -73,7 +73,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
 		optsSybilProtectionProvider: poa.NewProvider(map[identity.ID]int64{}),
-		optsBlockGadgetProvider:     tresholdblockgadget.NewProvider(),
+		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
 
 		optsBaseDirectory:    "",

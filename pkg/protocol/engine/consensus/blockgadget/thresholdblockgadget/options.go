@@ -1,4 +1,4 @@
-package tresholdblockgadget
+package thresholdblockgadget
 
 import "github.com/iotaledger/hive.go/runtime/options"
 
