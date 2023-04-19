@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/stringify"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -17,7 +18,7 @@ type Commitment struct {
 
 	solid       bool
 	mainChildID iotago.CommitmentID
-	children    map[iotago.CommitmentID]*Commitment
+	children    *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *Commitment]
 	chain       *Chain
 
 	mutex sync.RWMutex
@@ -26,7 +27,7 @@ type Commitment struct {
 func NewCommitment(id iotago.CommitmentID) *Commitment {
 	return &Commitment{
 		id:       id,
-		children: make(map[iotago.CommitmentID]*Commitment),
+		children: shrinkingmap.New[iotago.CommitmentID, *Commitment](),
 	}
 }
 
@@ -48,7 +49,7 @@ func (c *Commitment) Children() []*Commitment {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	return lo.Values(c.children)
+	return c.children.Values()
 }
 
 func (c *Commitment) Chain() (chain *Chain) {
@@ -91,11 +92,11 @@ func (c *Commitment) registerChild(child *Commitment) (isSolid bool, chain *Chai
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if len(c.children) == 0 {
+	if c.children.Size() == 0 {
 		c.mainChildID = child.ID()
 	}
 
-	if c.children[child.ID()] = child; len(c.children) > 1 {
+	if c.children.Set(child.ID(), child); c.children.Size() > 1 {
 		return c.solid, NewChain(child), true
 	}
 
@@ -106,21 +107,21 @@ func (c *Commitment) deleteChild(child *Commitment) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	delete(c.children, child.ID())
+	c.children.Delete(child.ID())
 }
 
 func (c *Commitment) mainChild() *Commitment {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	return c.children[c.mainChildID]
+	return lo.Return1(c.children.Get(c.mainChildID))
 }
 
 func (c *Commitment) setMainChild(commitment *Commitment) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if _, has := c.children[commitment.ID()]; !has {
+	if c.children.Has(commitment.ID()) {
 		return errors.Errorf("trying to set a main child %s before registering it as a child", commitment.ID())
 	}
 	c.mainChildID = commitment.ID()
@@ -156,7 +157,7 @@ func (c *Commitment) String() string {
 		stringify.NewStructField("MainChildID", c.mainChildID),
 	)
 
-	for index, child := range c.children {
+	for index, child := range c.children.AsMap() {
 		builder.AddField(stringify.NewStructField(fmt.Sprintf("children%d", index), child.ID()))
 	}
 

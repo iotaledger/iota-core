@@ -3,6 +3,8 @@ package chainmanager
 import (
 	"sync"
 
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -10,7 +12,7 @@ type Chain struct {
 	ForkingPoint *Commitment
 
 	latestCommitmentIndex iotago.SlotIndex
-	commitmentsByIndex    map[iotago.SlotIndex]*Commitment
+	commitmentsByIndex    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
 
 	sync.RWMutex
 }
@@ -18,13 +20,15 @@ type Chain struct {
 func NewChain(forkingPoint *Commitment) (fork *Chain) {
 	forkingPointIndex := forkingPoint.Commitment().Index
 
-	return &Chain{
+	c := &Chain{
 		ForkingPoint:          forkingPoint,
 		latestCommitmentIndex: forkingPointIndex,
-		commitmentsByIndex: map[iotago.SlotIndex]*Commitment{
-			forkingPointIndex: forkingPoint,
-		},
+		commitmentsByIndex:    shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 	}
+
+	c.commitmentsByIndex.Set(forkingPointIndex, forkingPoint)
+
+	return c
 }
 
 func (c *Chain) IsSolid() (isSolid bool) {
@@ -38,21 +42,21 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment) {
 	c.RLock()
 	defer c.RUnlock()
 
-	return c.commitmentsByIndex[index]
+	return lo.Return1(c.commitmentsByIndex.Get(index))
 }
 
 func (c *Chain) Size() int {
 	c.RLock()
 	defer c.RUnlock()
 
-	return len(c.commitmentsByIndex)
+	return c.commitmentsByIndex.Size()
 }
 
 func (c *Chain) LatestCommitment() *Commitment {
 	c.RLock()
 	defer c.RUnlock()
 
-	return c.commitmentsByIndex[c.latestCommitmentIndex]
+	return lo.Return1(c.commitmentsByIndex.Get(c.latestCommitmentIndex))
 }
 
 func (c *Chain) addCommitment(commitment *Commitment) {
@@ -64,7 +68,7 @@ func (c *Chain) addCommitment(commitment *Commitment) {
 		c.latestCommitmentIndex = commitmentIndex
 	}
 
-	c.commitmentsByIndex[commitmentIndex] = commitment
+	c.commitmentsByIndex.Set(commitmentIndex, commitment)
 }
 
 func (c *Chain) dropCommitmentsAfter(index iotago.SlotIndex) {
@@ -72,7 +76,7 @@ func (c *Chain) dropCommitmentsAfter(index iotago.SlotIndex) {
 	defer c.Unlock()
 
 	for i := index + 1; i <= c.latestCommitmentIndex; i++ {
-		delete(c.commitmentsByIndex, i)
+		c.commitmentsByIndex.Delete(i)
 	}
 
 	if index < c.latestCommitmentIndex {

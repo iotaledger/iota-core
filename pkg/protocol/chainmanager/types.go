@@ -1,7 +1,14 @@
 package chainmanager
 
 import (
+	"github.com/iotaledger/hive.go/crypto/identity"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type ChainID = iotago.CommitmentID
+
+type Fork struct {
+	Source       identity.ID
+	Commitment   *iotago.Commitment
+	ForkingPoint *iotago.Commitment
+}
