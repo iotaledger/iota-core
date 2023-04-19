@@ -27,12 +27,12 @@ type Gadget struct {
 	slotTracker     *slottracker.SlotTracker
 	sybilProtection sybilprotection.SybilProtection
 
-	lastConfirmedSlot   iotago.SlotIndex
-	totalWeightCallback func() int64
+	lastFinalizedSlot          iotago.SlotIndex
+	storeLastFinalizedSlotFunc func(index iotago.SlotIndex)
 
 	mutex sync.RWMutex
 
-	optsSlotConfirmationThreshold float64
+	optsSlotFinalizationThreshold float64
 
 	module.Module
 }
@@ -41,30 +41,30 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	return module.Provide(func(e *engine.Engine) slotgadget.Gadget {
 		return options.Apply(&Gadget{
 			events:                        slotgadget.NewEvents(),
-			optsSlotConfirmationThreshold: 0.67,
+			optsSlotFinalizationThreshold: 0.67,
 		}, opts, func(g *Gadget) {
 			g.sybilProtection = e.SybilProtection
-			g.slotTracker = slottracker.NewSlotTracker(g.LastConfirmedSlot)
+			g.slotTracker = slottracker.NewSlotTracker(g.LatestFinalizedSlot)
 
 			e.Events.SlotGadget.LinkTo(g.events)
 
-			e.Events.BlockGadget.BlockAccepted.Hook(g.trackVotes)
+			e.Events.BlockGadget.BlockRatifiedAccepted.Hook(g.trackVotes)
 
-			e.Events.SlotGadget.SlotConfirmed.Hook(func(index iotago.SlotIndex) {
-				if err := e.Storage.Settings.SetLatestConfirmedSlot(index); err != nil {
-					e.Events.Error.Trigger(errors.Wrap(err, "failed to set latest confirmed slot"))
+			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
+				if err := e.Storage.Settings.SetLatestFinalizedSlot(index); err != nil {
+					e.Events.Error.Trigger(errors.Wrap(err, "failed to set latest finalized slot"))
 				}
-			})
+			}
 
 			e.HookConstructed(func() {
 				g.workers = e.Workers.CreateGroup("SlotGadget")
 
 				g.slotTracker.Events.VotersUpdated.Hook(func(evt *slottracker.VoterUpdatedEvent) {
-					g.refreshSlotConfirmation(evt.PrevLatestSlotIndex, evt.NewLatestSlotIndex)
+					g.refreshSlotFinalization(evt.PrevLatestSlotIndex, evt.NewLatestSlotIndex)
 				}, event.WithWorkerPool(g.workers.CreatePool("Refresh", 2)))
 
 				e.HookInitialized(func() {
-					g.lastConfirmedSlot = e.Storage.Permanent.Settings.LatestConfirmedSlot()
+					g.lastFinalizedSlot = e.Storage.Permanent.Settings.LatestFinalizedSlot()
 					g.TriggerInitialized()
 				})
 			})
@@ -78,41 +78,42 @@ func (g *Gadget) Shutdown() {
 	g.TriggerStopped()
 }
 
-func (g *Gadget) LastConfirmedSlot() iotago.SlotIndex {
+func (g *Gadget) LatestFinalizedSlot() iotago.SlotIndex {
 	g.mutex.RLock()
 	defer g.mutex.RUnlock()
 
-	return g.lastConfirmedSlot
+	return g.lastFinalizedSlot
 }
 
-func (g *Gadget) setLastConfirmedSlot(i iotago.SlotIndex) {
+func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	g.lastConfirmedSlot = i
+	g.lastFinalizedSlot = i
+	g.storeLastFinalizedSlotFunc(i)
 }
 
 func (g *Gadget) trackVotes(block *blocks.Block) {
 	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, identity.ID(block.Block().IssuerID), slottracker.SlotVotePower{Index: block.ID().Index()})
 }
 
-func (g *Gadget) refreshSlotConfirmation(previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) {
+func (g *Gadget) refreshSlotFinalization(previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) {
 	committee := g.sybilProtection.Committee()
 	committeeTotalWeight := committee.TotalWeight()
 
-	for i := lo.Max(g.LastConfirmedSlot(), previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
+	for i := lo.Max(g.LatestFinalizedSlot(), previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
 		attestorsTotalWeight := committee.SelectAccounts(g.slotTracker.Voters(i).Slice()...).TotalWeight()
 
-		if !votes.IsThresholdReached(attestorsTotalWeight, committeeTotalWeight, g.optsSlotConfirmationThreshold) {
+		if !votes.IsThresholdReached(attestorsTotalWeight, committeeTotalWeight, g.optsSlotFinalizationThreshold) {
 			break
 		}
 
 		// Lock here, so that SlotVotersTotalWeight is not inside the lock. Otherwise, it might cause a deadlock,
 		// because one thread owns write-lock on VirtualVoting lock and needs read lock on SlotGadget lock,
 		// while this method holds WriteLock on SlotGadget lock and is waiting for ReadLock on VirtualVoting.
-		g.setLastConfirmedSlot(i)
+		g.setLastFinalizedSlot(i)
 
-		g.events.SlotConfirmed.Trigger(i)
+		g.events.SlotFinalized.Trigger(i)
 
 		g.slotTracker.EvictSlot(i)
 	}

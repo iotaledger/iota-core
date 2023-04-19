@@ -119,7 +119,7 @@ func configure() error {
 		Component.LogInfof("SlotCommitted: %s - %d", details.Commitment.MustID(), details.Commitment.Index)
 	})
 
-	deps.Protocol.Events.Engine.SlotGadget.SlotConfirmed.Hook(func(index iotago.SlotIndex) {
+	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		Component.LogInfof("SlotConfirmed: %d", index)
 	})
 

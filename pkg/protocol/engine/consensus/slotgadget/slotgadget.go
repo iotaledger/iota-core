@@ -6,7 +6,7 @@ import (
 )
 
 type Gadget interface {
-	LastConfirmedSlot() iotago.SlotIndex
+	LatestFinalizedSlot() iotago.SlotIndex
 
 	module.Interface
 }

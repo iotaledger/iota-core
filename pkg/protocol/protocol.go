@@ -220,22 +220,19 @@ func (p *Protocol) initChainManager() {
 		p.chainManager.ProcessCommitment(details.Commitment)
 	}, event.WithWorkerPool(wp))
 
-	//p.Events.Engine.Consensus.SlotGadget.SlotConfirmed.Hook(func(index slot.Index) {
-	//	rootCommitment := p.MainEngineInstance().EarliestRootCommitment()
-	//
-	//	// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
-	//	// we first specify the chain's cut-off point, and only then evict the state. It is also important to
-	//	// note that no multiple goroutines should be allowed to perform this operation at once, hence the
-	//	// hooking worker pool should always have a single worker or these two calls should be protected by a lock.
-	//	p.chainManager.SetRootCommitment(rootCommitment)
-	//
-	//	// We want to evict just below the height of our new root commitment (so that the slot of the root commitment
-	//	// stays in memory storage and with it the root commitment itself as well).
-	//	p.chainManager.EvictUntil(rootCommitment.ID().Index() - 1)
-	//
-	//	// We don't want to request any commitments that are equal or below the new root commitment index anymore.
-	//	p.chainManager.CommitmentRequester.EvictUntil(rootCommitment.ID().Index())
-	//}, event.WithWorkerPool(wp))
+	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		rootCommitment := p.MainEngineInstance().EarliestRootCommitment()
+
+		// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
+		// we first specify the chain's cut-off point, and only then evict the state. It is also important to
+		// note that no multiple goroutines should be allowed to perform this operation at once, hence the
+		// hooking worker pool should always have a single worker or these two calls should be protected by a lock.
+		p.chainManager.SetRootCommitment(rootCommitment)
+
+		// We want to evict just below the height of our new root commitment (so that the slot of the root commitment
+		// stays in memory storage and with it the root commitment itself as well).
+		p.chainManager.EvictUntil(rootCommitment.MustID().Index() - 1)
+	}, event.WithWorkerPool(wp))
 
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wp))
 }

@@ -34,7 +34,7 @@ func NewSettings(path string) (settings *Settings) {
 			ProtocolParameters:      iotago.ProtocolParameters{},
 			LatestCommitment:        iotago.NewEmptyCommitment(),
 			LatestStateMutationSlot: 0,
-			LatestConfirmedSlot:     0,
+			LatestFinalizedSlot:     0,
 			ChainID:                 iotago.CommitmentID{},
 		}, path),
 	}
@@ -96,7 +96,7 @@ func (s *Settings) SetProtocolParameters(params iotago.ProtocolParameters) (err 
 	return nil
 }
 
-func (s *Settings) LatestCommitment() (latestCommitment *iotago.Commitment) {
+func (s *Settings) LatestCommitment() *iotago.Commitment {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -123,11 +123,11 @@ func (s *Settings) LatestStateMutationSlot() iotago.SlotIndex {
 	return s.settingsModel.LatestStateMutationSlot
 }
 
-func (s *Settings) SetLatestStateMutationSlot(latestStateMutationSlot iotago.SlotIndex) (err error) {
+func (s *Settings) SetLatestStateMutationSlot(index iotago.SlotIndex) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.settingsModel.LatestStateMutationSlot = latestStateMutationSlot
+	s.settingsModel.LatestStateMutationSlot = index
 
 	if err = s.ToFile(); err != nil {
 		return errors.Wrap(err, "failed to persist latest state mutation slot")
@@ -136,18 +136,18 @@ func (s *Settings) SetLatestStateMutationSlot(latestStateMutationSlot iotago.Slo
 	return nil
 }
 
-func (s *Settings) LatestConfirmedSlot() iotago.SlotIndex {
+func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return s.settingsModel.LatestConfirmedSlot
+	return s.settingsModel.LatestFinalizedSlot
 }
 
-func (s *Settings) SetLatestConfirmedSlot(latestConfirmedSlot iotago.SlotIndex) (err error) {
+func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.settingsModel.LatestConfirmedSlot = latestConfirmedSlot
+	s.settingsModel.LatestFinalizedSlot = index
 
 	if err = s.ToFile(); err != nil {
 		return errors.Wrap(err, "failed to persist latest confirmed slot")
@@ -215,7 +215,7 @@ func (s *Settings) String() string {
 	builder.AddField(stringify.NewStructField("ProtocolParameters", s.settingsModel.ProtocolParameters))
 	builder.AddField(stringify.NewStructField("LatestCommitment", s.settingsModel.LatestCommitment))
 	builder.AddField(stringify.NewStructField("LatestStateMutationSlot", s.settingsModel.LatestStateMutationSlot))
-	builder.AddField(stringify.NewStructField("LatestConfirmedSlot", s.settingsModel.LatestConfirmedSlot))
+	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.settingsModel.LatestFinalizedSlot))
 	builder.AddField(stringify.NewStructField("ChainID", s.settingsModel.ChainID))
 
 	return builder.String()
@@ -266,7 +266,7 @@ type settingsModel struct {
 	ProtocolParameters      iotago.ProtocolParameters `serix:"1"`
 	LatestCommitment        *iotago.Commitment        `serix:"2"`
 	LatestStateMutationSlot iotago.SlotIndex          `serix:"3"`
-	LatestConfirmedSlot     iotago.SlotIndex          `serix:"4"`
+	LatestFinalizedSlot     iotago.SlotIndex          `serix:"4"`
 	ChainID                 iotago.CommitmentID       `serix:"5"`
 
 	storable.Struct[settingsModel, *settingsModel]
