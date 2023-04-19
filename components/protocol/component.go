@@ -75,6 +75,10 @@ func configure() error {
 		Component.LogErrorf("Error in Engine: %s", err)
 	})
 
+	deps.Protocol.Events.Network.Error.Hook(func(err error, id identity.ID) {
+		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
+	})
+
 	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
 		Component.LogInfof("BlockReceived: %s", block.ID())
 	})

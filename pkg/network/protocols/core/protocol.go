@@ -127,7 +127,6 @@ func (p *Protocol) onBlock(blockData []byte, id identity.ID) {
 	blockIdentifier, err := iotago.BlockIdentifierFromBlockBytes(blockData)
 	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize block"), id)
-
 	}
 
 	isNew := p.duplicateBlockBytesFilter.AddIdentifier(types.Identifier(blockIdentifier))
@@ -159,7 +158,7 @@ func (p *Protocol) onBlockRequest(idBytes []byte, id identity.ID) {
 }
 
 func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id identity.ID) {
-	var receivedCommitment *iotago.Commitment
+	receivedCommitment := new(iotago.Commitment)
 	if _, err := p.api.Decode(commitmentBytes, receivedCommitment, serix.WithValidation()); err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize slot commitment"), id)
 
