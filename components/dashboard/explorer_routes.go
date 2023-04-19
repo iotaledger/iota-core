@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -93,7 +93,7 @@ func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 	return
 }
 
-func createExplorerBlock(block *blockdag.Block) *ExplorerBlock {
+func createExplorerBlock(block *blocks.Block) *ExplorerBlock {
 	// TODO: fill in missing fields
 	iotaBlk := block.Block()
 

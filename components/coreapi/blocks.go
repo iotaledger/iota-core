@@ -19,8 +19,11 @@ func blockBytesByID(c echo.Context) ([]byte, error) {
 	if !exists {
 		return nil, errors.Errorf("block not found: %s", blockID.ToHex())
 	}
-
-	return block.Data(), nil
+	blockBytes, err := deps.Protocol.API().Encode(block.Block)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to encode block: %s", blockID.ToHex())
+	}
+	return blockBytes, nil
 }
 
 func blockByID(c echo.Context) (*iotago.Block, error) {

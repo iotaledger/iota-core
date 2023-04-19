@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 
 // var (
@@ -37,7 +37,7 @@ type tipinfo struct {
 // 	Vertices []vertex `json:"vertices"`
 // }
 
-func sendVertex(blk *blockdag.Block, finalized bool) {
+func sendVertex(blk *blocks.Block, finalized bool) {
 	broadcastWsBlock(&wsblk{MsgTypeVertex, &vertex{
 		ID:            blk.ID().ToHex(),
 		StrongParents: blk.Block().StrongParents.ToHex(),
@@ -47,7 +47,7 @@ func sendVertex(blk *blockdag.Block, finalized bool) {
 	}}, true)
 }
 
-func sendTipInfo(block *blockdag.Block, isTip bool) {
+func sendTipInfo(block *blocks.Block, isTip bool) {
 	broadcastWsBlock(&wsblk{MsgTypeTipInfo, &tipinfo{
 		ID:    block.ID().ToHex(),
 		IsTip: isTip,
@@ -57,7 +57,7 @@ func sendTipInfo(block *blockdag.Block, isTip bool) {
 func runVisualizer(component *app.Component) {
 	if err := component.Daemon().BackgroundWorker("Dashboard[Visualizer]", func(ctx context.Context) {
 		unhook := lo.Batch(
-			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blockdag.Block) {
+			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 				sendVertex(block, false)
 				// if block.ID().Index() > slot.Index(currentSlot.Load()) {
 				// 	currentSlot.Store(int64(block.ID().Index()))
@@ -66,10 +66,10 @@ func runVisualizer(component *app.Component) {
 			// deps.Protocol.Events.Engine.Consensus.BlockGadget.BlockAccepted.Hook(func(block *blockgadget.Block) {
 			// 	sendVertex(block.ModelsBlock, block.IsAccepted())
 			// }, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.TipManager.TipAdded.Hook(func(block *blockdag.Block) {
+			deps.Protocol.Events.TipManager.TipAdded.Hook(func(block *blocks.Block) {
 				sendTipInfo(block, true)
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.TipManager.TipRemoved.Hook(func(block *blockdag.Block) {
+			deps.Protocol.Events.TipManager.TipRemoved.Hook(func(block *blocks.Block) {
 				sendTipInfo(block, false)
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 		)

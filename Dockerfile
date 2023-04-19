@@ -25,8 +25,6 @@ COPY ./iota.go ./iota.go
 COPY ./hive.go ./hive.go
 COPY ./inx/go ./inx/go
 COPY ./inx-app ./inx-app
-COPY ./iota-core/go.work ./iota-core/
-COPY ./iota-core/go.work.sum ./iota-core/
 COPY ./go.work ./
 COPY ./go.work.sum ./
 

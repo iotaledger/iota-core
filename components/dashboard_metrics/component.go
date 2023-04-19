@@ -12,7 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 
 func init() {
@@ -71,7 +71,7 @@ func run() error {
 
 func registerLocalMetrics() {
 	// increase received BPS counter whenever we attached a block
-	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blockdag.Block) {
+	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		blockCountPerComponentMutex.Lock()
 		defer blockCountPerComponentMutex.Unlock()
 		increaseReceivedBPSCounter()
