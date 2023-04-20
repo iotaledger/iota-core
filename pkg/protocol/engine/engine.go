@@ -257,6 +257,27 @@ func (e *Engine) setupBlockStorage() {
 func (e *Engine) setupEvictionState() {
 	e.Events.EvictionState.LinkTo(e.EvictionState.Events)
 
+	wp := e.Workers.CreatePool("EvictionState", 1) // Using just 1 worker to avoid contention
+
+	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+		block.ForEachParent(func(parent model.Parent) {
+			// TODO: ONLY ADD STRONG PARENTS AFTER NOT DOWNLOADING PAST WEAK ARROWS
+			// TODO: is this correct? could this lock acceptance in some extreme corner case? something like this happened, that confirmation is correctly advancing per block, but acceptance does not. I think it might have something to do with root blocks
+			if parent.ID.Index() < block.ID().Index() {
+				parentBlock, exists := e.Block(parent.ID)
+				if !exists {
+					e.Events.Error.Trigger(errors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
+					return
+				}
+				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.Block().SlotCommitment.MustID())
+			}
+		})
+	}, event.WithWorkerPool(wp))
+
+	e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+		e.EvictionState.EvictUntil(details.Commitment.Index)
+	}, event.WithWorkerPool(wp))
+
 	e.Events.EvictionState.SlotEvicted.Hook(e.BlockCache.EvictUntil)
 }
 
