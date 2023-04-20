@@ -23,19 +23,6 @@ func blockByID(c echo.Context) (*blocks.Block, error) {
 	return block, nil
 }
 
-func blockBytesByID(c echo.Context) ([]byte, error) {
-	block, err := blockByID(c)
-	if err != nil {
-		return nil, err
-	}
-
-	blockBytes, err := deps.Protocol.API().Encode(block)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to encode block: %s", block.ID().ToHex())
-	}
-	return blockBytes, nil
-}
-
 func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
 	block, err := blockByID(c)
 	if err != nil {
