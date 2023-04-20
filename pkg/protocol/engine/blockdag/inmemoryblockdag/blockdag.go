@@ -109,14 +109,6 @@ func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *b
 
 var _ blockdag.BlockDAG = new(BlockDAG)
 
-func (b *BlockDAG) Events() *blockdag.Events {
-	return b.events
-}
-
-func (b *BlockDAG) EvictionState() *eviction.State {
-	return b.evictionState
-}
-
 // Attach is used to attach new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
 func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached bool, err error) {
 	if block, wasAttached, err = b.attach(data); wasAttached {
@@ -174,6 +166,7 @@ func (b *BlockDAG) Shutdown() {
 func (b *BlockDAG) evictSlot(index iotago.SlotIndex) {
 	b.solidifierMutex.Lock()
 	defer b.solidifierMutex.Unlock()
+
 	b.solidifier.EvictUntil(index)
 }
 
