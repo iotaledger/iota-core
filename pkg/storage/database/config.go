@@ -9,3 +9,8 @@ type Config struct {
 	Version      byte
 	PrefixHealth []byte
 }
+
+func (c Config) WithDirectory(directory string) Config {
+	c.Directory = directory
+	return c
+}

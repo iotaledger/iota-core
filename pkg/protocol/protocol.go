@@ -379,7 +379,7 @@ func WithChainManagerOptions(opts ...options.Option[chainmanager.Manager]) optio
 	}
 }
 
-func WithStorageDatabaseManagerOptions(opts ...options.Option[storage.Storage]) options.Option[Protocol] {
+func WithStorageOptions(opts ...options.Option[storage.Storage]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsStorageOptions = append(p.optsStorageOptions, opts...)
 	}

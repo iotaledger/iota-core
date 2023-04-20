@@ -44,22 +44,17 @@ func New(directory string, dbVersion byte, opts ...options.Option[Storage]) *Sto
 		optsDBEngine: hivedb.EngineRocksDB,
 	}, opts,
 		func(s *Storage) {
-			s.Permanent = permanent.New(s.dir, database.Config{
+			dbConfig := database.Config{
 				Engine:       s.optsDBEngine,
 				Directory:    s.dir.PathWithCreate(permanentDirName),
 				Version:      dbVersion,
 				PrefixHealth: []byte{storePrefixHealth},
-			})
+			}
 
-			s.Prunable = prunable.New(database.Config{
-				Engine:       s.optsDBEngine,
-				Directory:    s.dir.PathWithCreate(prunableDirName),
-				Version:      dbVersion,
-				PrefixHealth: []byte{storePrefixHealth},
-			}, s.optsPrunableManagerOptions...)
+			s.Permanent = permanent.New(s.dir, dbConfig)
+			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPrunableManagerOptions...)
 
 			s.Permanent.Settings().HookInitialized(func() {
-				// TODO: do we make sure this is set before "running" the node?
 				s.Prunable.Initialize(s.Settings().API())
 			})
 		})

@@ -27,13 +27,21 @@ func (p *Prunable) Initialize(a iotago.API) {
 }
 
 func (p *Prunable) Blocks(slot iotago.SlotIndex) *Blocks {
-	// TODO: What if the storage for this index does not exist? What about read-only access?
-	return NewBlocks(slot, p.manager.Get(slot, []byte{blocksPrefix}), p.api)
+	store := p.manager.Get(slot, []byte{blocksPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewBlocks(slot, store, p.api)
 }
 
 func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *RootBlocks {
-	// TODO: What if the storage for this slot does not exist? What about read-only access?
-	return NewRootBlocks(slot, p.manager.Get(slot, []byte{rootBlocksPrefix}))
+	store := p.manager.Get(slot, []byte{rootBlocksPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewRootBlocks(slot, store)
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.

@@ -37,6 +37,7 @@ type dbInstanceFileInfo struct {
 	path      string
 }
 
+// getSortedDBInstancesFromDisk returns an ASC sorted list of db instances from the given base directory.
 func getSortedDBInstancesFromDisk(baseDir string) (dbInfos []*dbInstanceFileInfo) {
 	files, err := os.ReadDir(baseDir)
 	if err != nil {
@@ -57,7 +58,7 @@ func getSortedDBInstancesFromDisk(baseDir string) (dbInfos []*dbInstanceFileInfo
 	dbInfos = lo.Filter(dbInfos, func(info *dbInstanceFileInfo) bool { return info != nil })
 
 	sort.Slice(dbInfos, func(i, j int) bool {
-		return dbInfos[i].baseIndex > dbInfos[j].baseIndex
+		return dbInfos[i].baseIndex < dbInfos[j].baseIndex
 	})
 
 	return dbInfos

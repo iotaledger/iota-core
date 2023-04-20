@@ -1,9 +1,13 @@
 package permanent
 
 import (
+	"github.com/pkg/errors"
+
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 )
@@ -13,40 +17,41 @@ const (
 )
 
 type Permanent struct {
-	dbConfig           database.Config
-	store              kvstore.KVStore
-	storeHealthTracker *kvstore.StoreHealthTracker
+	dbConfig      database.Config
+	store         kvstore.KVStore
+	healthTracker *kvstore.StoreHealthTracker
 
 	settings    *Settings
 	commitments *Commitments
 
 	sybilProtection kvstore.KVStore
+
+	optsLogger *logger.Logger
+	logger     *logger.WrappedLogger
 }
 
 // New returns a new permanent storage instance.
-func New(baseDir *utils.Directory, dbConfig database.Config) *Permanent {
-	store, err := database.StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
-	if err != nil {
-		panic(err)
-	}
+func New(baseDir *utils.Directory, dbConfig database.Config, opts ...options.Option[Permanent]) *Permanent {
+	return options.Apply(&Permanent{
+		settings:    NewSettings(baseDir.Path("settings.bin")),
+		commitments: NewCommitments(baseDir.Path("commitments.bin")),
+	}, opts, func(p *Permanent) {
+		p.logger = logger.NewWrappedLogger(p.optsLogger)
 
-	// TODO: What do we do if the DB is corrupted?
-	storeHealthTracker, err := kvstore.NewStoreHealthTracker(store, dbConfig.PrefixHealth, dbConfig.Version, nil)
-	if err != nil {
-		panic(err)
-	}
-	if err = storeHealthTracker.MarkCorrupted(); err != nil {
-		panic(err)
-	}
+		var err error
+		p.store, err = database.StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
+		if err != nil {
+			panic(err)
+		}
 
-	return &Permanent{
-		store:              store,
-		storeHealthTracker: storeHealthTracker,
-
-		settings:        NewSettings(baseDir.Path("settings.bin")),
-		commitments:     NewCommitments(baseDir.Path("commitments.bin")),
-		sybilProtection: lo.PanicOnErr(store.WithExtendedRealm([]byte{sybilProtectionPrefix})),
-	}
+		p.healthTracker, err = kvstore.NewStoreHealthTracker(p.store, dbConfig.PrefixHealth, dbConfig.Version, nil)
+		if err != nil {
+			panic(errors.Wrapf(err, "database in %s is corrupted, delete database and resync node", dbConfig.Directory))
+		}
+		if err = p.healthTracker.MarkCorrupted(); err != nil {
+			panic(err)
+		}
+	})
 }
 
 func (p *Permanent) Settings() *Settings {
@@ -70,7 +75,7 @@ func (p *Permanent) SybilProtection(optRealm ...byte) kvstore.KVStore {
 func (p *Permanent) Size() int64 {
 	dbSize, err := ioutils.FolderSize(p.dbConfig.Directory)
 	if err != nil {
-		// TODO: introduce logger? m.logger.LogError("dbDirectorySize failed for %s: %w", m.permanentBaseDir, err)
+		p.logger.LogError("dbDirectorySize failed for %s: %w", p.dbConfig.Directory, err)
 		return 0
 	}
 
@@ -92,12 +97,10 @@ func (p *Permanent) Shutdown() {
 		panic(err)
 	}
 
-	if err := p.storeHealthTracker.MarkHealthy(); err != nil {
+	if err := p.healthTracker.MarkHealthy(); err != nil {
 		panic(err)
 	}
-
-	err := p.store.Close()
-	if err != nil {
+	if err := database.FlushAndClose(p.store); err != nil {
 		panic(err)
 	}
 }

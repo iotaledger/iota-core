@@ -39,16 +39,14 @@ func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Mana
 		optsGranularity: 10,
 		optsMaxOpenDBs:  10,
 		dbConfig:        dbConfig,
-		dbSizes:         shrinkingmap.New[iotago.SlotIndex, int64](), // TODO: don't we need to fill this when starting from disk?
+		dbSizes:         shrinkingmap.New[iotago.SlotIndex, int64](),
 	}, opts, func(m *Manager) {
 		m.logger = logger.NewWrappedLogger(m.optsLogger)
 
 		m.openDBs = cache.New[iotago.SlotIndex, *dbInstance](m.optsMaxOpenDBs)
 		m.openDBs.SetEvictCallback(func(baseIndex iotago.SlotIndex, db *dbInstance) {
-			err := db.store.Close()
-			if err != nil {
-				panic(err)
-			}
+			db.Close()
+
 			size, err := dbPrunableDirectorySize(dbConfig.Directory, baseIndex)
 			if err != nil {
 				m.logger.LogError("failed to get size of prunable directory for base index %d: %w", baseIndex, err)
@@ -56,11 +54,7 @@ func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Mana
 
 			m.dbSizes.Set(baseIndex, size)
 		})
-	})
-
-	// TODO: Do we need two levels of "health"?
-	//  1. When the slot is fully written to disk, i.e., all blocks etc for a slot have been stored
-	//  2. For the bucket we need the kvstore.StoreHealthTracker to support versions and make sure the bucket is not corrupted
+	}, (*Manager).restoreFromDisk)
 }
 
 func (m *Manager) MaxPrunedSlot() iotago.SlotIndex {
@@ -108,27 +102,12 @@ func (m *Manager) PruneUntilSlot(index iotago.SlotIndex) {
 	}
 }
 
-func (m *Manager) setMaxPruned(index iotago.SlotIndex) (previous iotago.SlotIndex) {
-	m.maxPrunedMutex.Lock()
-	defer m.maxPrunedMutex.Unlock()
-
-	if previous = m.maxPruned; previous >= index {
-		return
-	}
-
-	m.maxPruned = index
-	return
-}
-
 func (m *Manager) Shutdown() {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
 	m.openDBs.Each(func(index iotago.SlotIndex, db *dbInstance) {
-		err := db.store.Close()
-		if err != nil {
-			panic(err)
-		}
+		db.Close()
 	})
 }
 
@@ -157,6 +136,37 @@ func (m *Manager) PrunableStorageSize() int64 {
 	return sum
 }
 
+func (m *Manager) restoreFromDisk() {
+	dbInfos := getSortedDBInstancesFromDisk(m.dbConfig.Directory)
+
+	// There are no dbInstances on disk -> nothing to restore.
+	if len(dbInfos) == 0 {
+		return
+	}
+
+	// Set the maxPruned slot to the baseIndex-1 of the oldest dbInstance.
+	m.maxPrunedMutex.Lock()
+	m.maxPruned = dbInfos[0].baseIndex - 1
+	m.maxPrunedMutex.Unlock()
+
+	// Open all the dbInstances (perform health checks) and add them to the openDBs cache. Also fills the dbSizes map (when evicted from the cache).
+	for _, dbInfo := range dbInfos {
+		m.getDBInstance(dbInfo.baseIndex)
+	}
+}
+
+func (m *Manager) setMaxPruned(index iotago.SlotIndex) (previous iotago.SlotIndex) {
+	m.maxPrunedMutex.Lock()
+	defer m.maxPrunedMutex.Unlock()
+
+	if previous = m.maxPruned; previous >= index {
+		return
+	}
+
+	m.maxPruned = index
+	return
+}
+
 // getDBInstance returns the DB instance for the given baseIndex or creates a new one if it does not yet exist.
 // DBs are created as follows where each db is located in m.basedir/<starting baseIndex>/
 // (assuming a bucket granularity=2):
@@ -166,13 +176,14 @@ func (m *Manager) PrunableStorageSize() int64 {
 //	baseIndex 2 -> db 2
 func (m *Manager) getDBInstance(index iotago.SlotIndex) (db *dbInstance) {
 	baseIndex := m.computeDBBaseIndex(index)
+
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
 	// check if exists again, as other goroutine might have created it in parallel
 	db, exists := m.openDBs.Get(baseIndex)
 	if !exists {
-		db = m.createDBInstance(baseIndex)
+		db = newDBInstance(baseIndex, m.dbConfig.WithDirectory(dbPathFromIndex(m.dbConfig.Directory, baseIndex)))
 
 		// Remove the cached db size since we will open the db
 		m.dbSizes.Delete(baseIndex)
@@ -200,20 +211,6 @@ func (m *Manager) getDBAndBucket(index iotago.SlotIndex) (db *dbInstance, bucket
 	return db, m.createBucket(db, index)
 }
 
-// createDBInstance creates a new DB instance for the given baseIndex.
-// If a folder/DB for the given baseIndex already exists, it is opened.
-func (m *Manager) createDBInstance(index iotago.SlotIndex) (newDBInstance *dbInstance) {
-	db, err := database.StoreWithDefaultSettings(dbPathFromIndex(m.dbConfig.Directory, index), true, m.dbConfig.Engine)
-	if err != nil {
-		panic(err)
-	}
-
-	return &dbInstance{
-		index: index,
-		store: db,
-	}
-}
-
 // createBucket creates a new bucket for the given baseIndex. It uses the baseIndex as a realm on the underlying DB.
 func (m *Manager) createBucket(db *dbInstance, index iotago.SlotIndex) (bucket kvstore.KVStore) {
 	bucket, err := db.store.WithExtendedRealm(indexToRealm(index))
@@ -238,10 +235,8 @@ func (m *Manager) removeDBInstance(dbBaseIndex iotago.SlotIndex) {
 
 	db, exists := m.openDBs.Get(dbBaseIndex)
 	if exists {
-		err := db.store.Close()
-		if err != nil {
-			panic(err)
-		}
+		db.Close()
+
 		m.openDBs.Remove(dbBaseIndex)
 	}
 
@@ -251,16 +246,4 @@ func (m *Manager) removeDBInstance(dbBaseIndex iotago.SlotIndex) {
 
 	// Delete the db size since we pruned the whole directory
 	m.dbSizes.Delete(dbBaseIndex)
-}
-
-func (m *Manager) removeBucket(bucket kvstore.KVStore) {
-	err := bucket.Clear()
-	if err != nil {
-		panic(err)
-	}
-}
-
-type dbInstance struct {
-	index iotago.SlotIndex
-	store kvstore.KVStore // KVStore that is used to access the DB instance
 }
