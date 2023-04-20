@@ -8,6 +8,10 @@ import (
 )
 
 func issueActivityBlock() {
+	if !deps.Protocol.MainEngineInstance().IsBootstrapped() {
+		Component.LogDebug("Not issuing activity block because node is not bootstrapped yet.")
+		return
+	}
 	issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
 	pubKey := issuerKey.Public()
 	addr := iotago.Ed25519AddressFromPubKey(pubKey[:])
