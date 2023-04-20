@@ -71,42 +71,42 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source identity.ID) {
 	// TODO: if TX add check for TX timestamp
 
 	// Check if the block is trying to commit to a slot that is not yet committable
-	// if f.optsMinCommittableSlotAge > 0 && block.Commitment().Index() > 0 && block.Commitment().Index() > block.ID().Index()-f.optsMinCommittableSlotAge {
-	// 	f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-	// 		Block:  block,
-	// 		Reason: errors.WithMessagef(ErrorCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.Commitment().Index()),
-	// 	})
-	// 	return
-	// }
+	if f.optsMinCommittableSlotAge > 0 && block.Block().SlotCommitment.Index > 0 && block.Block().SlotCommitment.Index > block.ID().Index()-f.optsMinCommittableSlotAge {
+		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.WithMessagef(ErrorCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.Block().SlotCommitment.Index),
+		})
+		return
+	}
 
 	// Verify the timestamp is not too far in the future
-	// timeDelta := time.Since(block.IssuingTime())
-	// if timeDelta < -f.optsMaxAllowedWallClockDrift {
-	// 	f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-	// 		Block:  block,
-	// 		Reason: errors.WithMessagef(ErrorsBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
-	// 	})
-	// 	return
-	// }
+	timeDelta := time.Since(block.Block().IssuingTime)
+	if timeDelta < -f.optsMaxAllowedWallClockDrift {
+		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.WithMessagef(ErrorsBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
+		})
+		return
+	}
 
-	// if f.optsSignatureValidation {
-	// 	// Verify the block signature
-	// 	if valid, err := block.VerifySignature(); !valid {
-	// 		if err != nil {
-	// 			f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-	// 				Block:  block,
-	// 				Reason: errors.WithMessagef(ErrorsSignatureValidationFailed, "error: %s", err.Error()),
-	// 			})
-	// 			return
-	// 		}
-	//
-	// 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-	// 			Block:  block,
-	// 			Reason: ErrorsInvalidSignature,
-	// 		})
-	// 		return
-	// 	}
-	// }
+	if f.optsSignatureValidation {
+		// Verify the block signature
+		if valid, err := block.Block().VerifySignature(); !valid {
+			if err != nil {
+				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
+					Block:  block,
+					Reason: errors.WithMessagef(ErrorsSignatureValidationFailed, "error: %s", err.Error()),
+				})
+				return
+			}
+
+			f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ErrorsInvalidSignature,
+			})
+			return
+		}
+	}
 
 	f.events.BlockAllowed.Trigger(block)
 }

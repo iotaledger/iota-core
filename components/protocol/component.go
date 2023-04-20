@@ -17,7 +17,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -60,6 +62,18 @@ func provide(c *dig.Container) error {
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(validators),
+			),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(
+					slotnotarization.WithMinCommittableSlotAge(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),
+				),
+			),
+			protocol.WithFilterProvider(
+				blockfilter.NewProvider(
+					blockfilter.WithMinCommittableSlotAge(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),
+					blockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
+					blockfilter.WithSignatureValidation(true),
+				),
 			),
 		)
 	})
