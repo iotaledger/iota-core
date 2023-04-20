@@ -7,7 +7,7 @@ info:
   license:
     name: Apache 2.0
     url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
-  version: 2.0.0
+  version: 3.0.0
 externalDocs:
   description: Find out more about IOTA
   url: 'https://iota.org'
