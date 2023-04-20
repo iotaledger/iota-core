@@ -274,8 +274,10 @@ func (e *Engine) setupEvictionState() {
 		})
 	}, event.WithWorkerPool(wp))
 
-	e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		e.EvictionState.EvictUntil(details.Commitment.Index)
+	// In order to still have the root blocks when when ratifying a block, we need to evict a slot when the supermajority
+	// of the online committee have accepted a block committing to such slot.
+	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+		e.EvictionState.EvictUntil(block.SlotCommitmentID().Index())
 	}, event.WithWorkerPool(wp))
 
 	e.Events.EvictionState.SlotEvicted.Hook(e.BlockCache.EvictUntil)
