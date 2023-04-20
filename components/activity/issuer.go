@@ -8,7 +8,7 @@ import (
 )
 
 func issueActivityBlock() {
-	if !deps.Protocol.MainEngineInstance().IsBootstrapped() {
+	if !ParamsActivity.IgnoreBootstrapped && !deps.Protocol.MainEngineInstance().IsBootstrapped() {
 		Component.LogDebug("Not issuing activity block because node is not bootstrapped yet.")
 		return
 	}
