@@ -338,56 +338,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceUnavailableResponse'
 
-  '/api/core/v3/congestion/rmc':
+  '/api/core/v3/congestion':
     get:
       tags:
         - congestion
-      summary: Get the recent Reference Mana Cost info.
+      summary: Check readiness of the node to issue a new block based on the rate setter and current network congestion.
       description: >-
-          Get the recent Reference Mana Cost info.
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RMCResponse'
-              examples:
-                RMC:
-                  $ref: '#/components/examples/get-rmc-response-example'
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-        '503':
-          description: "Unsuccessful operation: indicates that the node is not synced."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ServiceUnavailableResponse'
-
-
-  '/api/core/v3/congestion/estimate':
-    get:
-      tags:
-        - congestion
-      summary: Check readiness of the node to issue a new block based on the rate setter and current network congestion. 1 means it is ready, 0 it is not.
-      description: >-
-        Check readiness of the node to issue a new block based on the rate setter and current network congestion. 1 means it is ready, 0 it is not.
+        Check readiness of the node to issue a new block based on the rate setter and current network congestion. If no accountID is provided in the
+        query string parameter, return the congestion info of the node that the request is sent to.
+      parameters:
+        - in: query
+          name: accountID
+          schema:
+            type: string
+          example: iota1qgyzyx
       responses:
           '200':
             description: "Successful operation."
@@ -2602,7 +2566,12 @@ components:
         properties:
           congestion:
             type: integer
-            description: Indicates if a node is ready to issue a block in a current congestion or should wait.
+            description: >
+              Values:
+                * `0`: ready to issue a block.
+                * `1`: need to wait.
+          rmc:
+            type: number
         required:
           - congestion
 
@@ -2624,6 +2593,3 @@ components:
       required:
         - AccountId
         - mana
-
-    RMCResponse:
-      description: RMC response
