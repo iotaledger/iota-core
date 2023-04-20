@@ -244,6 +244,8 @@ func (e *Engine) setupBlockStorage() {
 
 func (e *Engine) setupEvictionState() {
 	e.Events.EvictionState.LinkTo(e.EvictionState.Events)
+
+	e.Events.EvictionState.SlotEvicted.Hook(e.BlockCache.EvictUntil)
 }
 
 func (e *Engine) setupBlockRequester() {

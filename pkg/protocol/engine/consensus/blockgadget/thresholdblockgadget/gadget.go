@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/walker"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -44,6 +45,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
 		g := New(e.Workers.CreateGroup("BlockGadget"), e.BlockCache, e.SybilProtection, opts...)
 		e.Events.Booker.WitnessAdded.Hook(g.tryAccept)
+		e.Events.EvictionState.SlotEvicted.Hook(g.evictUntil, event.WithWorkerPool(g.workers.CreatePool("Eviction", 1)))
 
 		e.Events.BlockGadget.LinkTo(g.events)
 
@@ -65,9 +67,6 @@ func New(workers *workerpool.Group, blockCache *blocks.Blocks, sybilProtection s
 			g.acceptanceOrder = causalorder.New[iotago.SlotIndex, iotago.BlockID, *blocks.Block](g.workers.CreatePool("AcceptanceOrder", 2), blockCache.Block, (*blocks.Block).IsAccepted, g.markAsAccepted, g.acceptanceFailed, (*blocks.Block).StrongParents)
 			g.ratifiedAcceptanceOrder = causalorder.New[iotago.SlotIndex, iotago.BlockID, *blocks.Block](g.workers.CreatePool("RatifiedAcceptanceOrder", 2), blockCache.Block, (*blocks.Block).IsRatifiedAccepted, g.markAsRatifiedAccepted, g.ratifiedAcceptanceFailed, (*blocks.Block).StrongParents)
 			g.confirmationOrder = causalorder.New[iotago.SlotIndex, iotago.BlockID, *blocks.Block](g.workers.CreatePool("ConfirmationOrder", 2), blockCache.Block, (*blocks.Block).IsConfirmed, g.markAsConfirmed, g.confirmationFailed, (*blocks.Block).StrongParents)
-
-			// TODO: revisit whole eviction
-			// g.evictionState.Events.SlotEvicted.Hook(g.EvictUntil, event.WithWorkerPool(g.workers.CreatePool("Eviction", 1)))
 		},
 		(*Gadget).TriggerConstructed,
 	)
@@ -176,7 +175,7 @@ func (g *Gadget) tryRatifiedAcceptAndConfirm(block *blocks.Block) {
 	}
 }
 
-func (g *Gadget) EvictUntil(index iotago.SlotIndex) {
+func (g *Gadget) evictUntil(index iotago.SlotIndex) {
 	g.acceptanceOrder.EvictUntil(index)
 	g.confirmationOrder.EvictUntil(index)
 }
