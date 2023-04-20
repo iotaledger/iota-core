@@ -18,7 +18,9 @@ type StructConstraint[A any, B constraints.Ptr[A]] interface {
 type SerializableInt64 int64
 
 func (s *SerializableInt64) Add(add *SerializableInt64) *SerializableInt64 {
-	*s += *add
+	if add != nil {
+		*s += *add
+	}
 	return s
 }
 

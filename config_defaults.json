@@ -67,6 +67,9 @@
     "snapshot": {
       "path": "./snapshot.bin",
       "depth": 5
+    },
+    "sybilProtection": {
+      "committee": null
     }
   },
   "activity": {

@@ -27,7 +27,7 @@ func init() {
 		Provide:          provide,
 		Configure:        configure,
 		Run:              run,
-		IsEnabled: func(_ *dig.Container) bool {
+		IsEnabled: func(c *dig.Container) bool {
 			return ParamsRestAPI.Enabled
 		},
 	}
@@ -69,7 +69,6 @@ func initConfigParams(c *dig.Container) error {
 
 func provide(c *dig.Container) error {
 	if err := c.Provide(func() *echo.Echo {
-
 		e := httpserver.NewEcho(
 			Component.Logger(),
 			nil,

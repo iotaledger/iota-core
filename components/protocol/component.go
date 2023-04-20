@@ -2,20 +2,24 @@ package protocol
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/crypto/identity"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func init() {
@@ -43,12 +47,20 @@ type dependencies struct {
 
 func provide(c *dig.Container) error {
 	return c.Provide(func(p2pManager *p2p.Manager) *protocol.Protocol {
+		validators := make(map[identity.ID]int64)
+		for _, validator := range ParamsProtocol.SybilProtection.Committee {
+			hex := lo.PanicOnErr(iotago.DecodeHex(validator.Identity))
+			validators[identity.ID(hex[:])] = validator.Weight
+		}
+
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
 			p2pManager,
-
 			protocol.WithBaseDirectory(ParamsDatabase.Directory),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
+			protocol.WithSybilProtectionProvider(
+				poa.NewProvider(validators),
+			),
 		)
 	})
 }
@@ -57,12 +69,14 @@ func configure() error {
 	deps.Protocol.Events.Error.Hook(func(err error) {
 		Component.LogErrorf("Error in Protocol: %s", err)
 	})
+
 	// TODO: forward engine errors to protocol?
 	deps.Protocol.Events.Engine.Error.Hook(func(err error) {
 		Component.LogErrorf("Error in Engine: %s", err)
 	})
-	deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(event *blockdag.BlockInvalidEvent) {
-		Component.LogErrorf("%s invalid: %s", event.Block.ID(), event.Reason)
+
+	deps.Protocol.Events.Network.Error.Hook(func(err error, id identity.ID) {
+		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})
 
 	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
@@ -73,15 +87,56 @@ func configure() error {
 		Component.LogInfof("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
 	})
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blockdag.Block) {
+	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockSolid: %s", block.ID())
 	})
-	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *booker.Block) {
+
+	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockBooked: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(event *blockdag.BlockInvalidEvent) {
-		Component.LogInfof("BlockInvalid: %s: %s", event.Block.ID(), event.Reason)
+	deps.Protocol.Events.Engine.Booker.WitnessAdded.Hook(func(block *blocks.Block) {
+		Component.LogInfof("WitnessAdded: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+		Component.LogInfof("BlockAccepted: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+		Component.LogInfof("BlockRatifiedAccepted: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+		Component.LogInfof("BlockConfirmed: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
+		Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
+	})
+
+	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
+		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
+	})
+
+	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+		Component.LogInfof("SlotCommitted: %s - %d", details.Commitment.MustID(), details.Commitment.Index)
+	})
+
+	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		Component.LogInfof("SlotConfirmed: %d", index)
+	})
+
+	deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {
+		Component.LogInfof("RequestCommitment: %d", id)
+	})
+
+	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id identity.ID) {
+		Component.LogInfof("SlotCommitmentRequestReceived: %d", commitmentID)
+	})
+
+	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, id identity.ID) {
+		Component.LogInfof("SlotCommitmentReceived: %d", commitment.MustID())
 	})
 
 	return nil

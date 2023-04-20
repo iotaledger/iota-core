@@ -6,8 +6,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -21,6 +24,9 @@ type Events struct {
 	BlockDAG       *blockdag.Events
 	Booker         *booker.Events
 	Clock          *clock.Events
+	BlockGadget    *blockgadget.Events
+	SlotGadget     *slotgadget.Events
+	Notarization   *notarization.Events
 
 	event.Group[Events, *Events]
 }
@@ -36,5 +42,8 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		BlockDAG:       blockdag.NewEvents(),
 		Booker:         booker.NewEvents(),
 		Clock:          clock.NewEvents(),
+		BlockGadget:    blockgadget.NewEvents(),
+		SlotGadget:     slotgadget.NewEvents(),
+		Notarization:   notarization.NewEvents(),
 	}
 })
