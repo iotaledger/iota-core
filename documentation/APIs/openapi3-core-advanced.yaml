@@ -342,7 +342,7 @@ paths:
     get:
       tags:
         - congestion
-      summary: Check readiness of the node to issue a new block based on the rate setter and current network congestion.
+      summary: Check readiness of the node to issue a new block, and the mana cost based on the rate setter and current network congestion.
       description: >-
         Check readiness of the node to issue a new block based on the rate setter and current network congestion. If no accountID is provided in the
         query string parameter, return the congestion info of the node that the request is sent to.
@@ -351,41 +351,50 @@ paths:
           name: accountID
           schema:
             type: string
-          example: iota1qgyzyx
+          example: "did:iota:123456789abcdefghi"
+          required: false
+          description: Identifier of the account to be checked for readines.
+        - in: query
+          name: slotIndex
+          schema:
+            type: integer
+          example: 1622568540
+          required: false
+          description: Check the cost and issuance readiness for a specific slot index.
       responses:
-          '200':
-            description: "Successful operation."
-            content:
-                application/json:
-                  schema:
-                      $ref: '#/components/schemas/CongestionEstimateResponse'
-                  examples:
-                    CongestionEstimate:
-                      $ref: '#/components/examples/get-congestion-estimate-response-example'
-          '400':
-            description: "Unsuccessful operation: indicates that the provided data is invalid."
-            content:
-              application/json:
-                schema:
-                  $ref: '#/components/schemas/BadRequestResponse'
-          '403':
-            description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-            content:
-              application/json:
-                schema:
-                  $ref: '#/components/schemas/ForbiddenResponse'
-          '500':
-            description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-            content:
-              application/json:
-                schema:
-                  $ref: '#/components/schemas/InternalErrorResponse'
-          '503':
-            description: "Unsuccessful operation: indicates that the node is not synced."
-            content:
-              application/json:
-                schema:
-                  $ref: '#/components/schemas/ServiceUnavailableResponse'
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CongestionResponse'
+              examples:
+                CongestionResponse:
+                  $ref: '#/components/examples/get-congestion-estimate-response-example'
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+        '503':
+          description: "Unsuccessful operation: indicates that the node is not synced."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableResponse'
 
   '/api/core/v3/outputs/{outputId}':
     get:
@@ -499,7 +508,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-  
+
   '/api/core/v3/transactions/{transactionId}/included-block':
     get:
       tags:
@@ -558,7 +567,7 @@ paths:
   '/api/core/v3/transactions/{transactionId}/included-block/metadata':
     get:
       tags:
-      - UTXO
+        - UTXO
       summary: Find the metadata of the included block of a transaction.
       description: >-
         Find the metadata of the included block of a transaction.
@@ -1064,7 +1073,7 @@ paths:
         '500':
           description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
 
-  
+
 
   '/api/core/v3/control/database/prune':
     post:
@@ -1241,9 +1250,6 @@ components:
       value: "070000000a1a0000977c626276b19ef8b3c445709f2f0f2ccc4abb98d97617f421f240c0d1ee066d4306e67a0321889ef8ec89b7eff1378049e058f0fa87a78c2452ae72631a5a99d913d1cbb3525b8faa1800e28dfcb28154bcba10154c39ef87ceda793cb44f58ae1549c88ea13fe4a9695bb6f0aba6cb756522209e5066a96039ae12b398b975693bdc21e222997c86ff9bfc5844f0372d58ff6fa510688e53c181bbdf4db41f9b627540a70e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a80000000300d85e5b1590d898d1e0cdebb2e3b5337c8b76270142663d78811683ba47c17c989ad7a8f0ff2c6438bf435786d4a5b0125a5caf7367061b49a739389d5ebea234c0466c86f88a3f8add03bff04c2e34b214683f2f6983641e1d1185da7e2c3e0200d9922819a39e94ddf3907f4b9c8df93f39f026244fcb609205b9a879022599f218be2536d8b7b8547faa3dbdfe98339ebe9e2b2417a8a03eee02b2a8312b9e026dd0a33261a58a240cd0a1b06cdf1775d98d316f162d3eec402f4bf08bea2a0700f9d9656a60049083eef61487632187b351294c1fa23d118060d813db6d03e8b6ca8180d435708e826bc2042ccd667babb59c5cc461ff29dba966359fcd6fc511cdfdf10d6576f36ac2a6e5cb691e13968c13947ffbd9239939d3802b2fbe0f06"
 
     get-utxo-changes-response-example:
-      value:
-
-    get-rmc-response-example:
       value:
 
     get-congestion-estimate-response-example:
@@ -2152,7 +2158,7 @@ components:
           description: The semantic version of the node.
         issuerID:
           type: string
-          description: The name of the node.        
+          description: The name of the node.
         status:
           description: Status of the node.
           properties:
@@ -2561,19 +2567,25 @@ components:
         - index
         - filePath
 
-    CongestionEstimateResponse:
-        description: Indicates if a node is ready to issue a block in a current congestion or should wait; 1 - issue, 0 wait.
-        properties:
-          congestion:
-            type: integer
-            description: >
-              Values:
-                * `0`: ready to issue a block.
-                * `1`: need to wait.
-          rmc:
-            type: number
-        required:
-          - congestion
+    CongestionResponse:
+      description: Provides the cost and readiness to issue estimates.
+      properties:
+        slot-index:
+          type: integer
+          description: The slot index for which the congestion estimate is provided.
+        ready:
+          type: integer
+          description: >
+            Provided only if account specified in the request. Indicates if a node is ready to issue a block in a current congestion or should wait.
+            Values:
+              * `0`: ready to issue a block.
+              * `1`: need to wait.
+        cost:
+          type: integer
+          description: The cost in mana for issuing a block in a current congestion estimated based on RMC and slot index.
+      required:
+        - slot-index
+        - cost
 
     AccountManaResponse:
       description: Returns the mana related data of the account, mana balance, staking and delegation details.
