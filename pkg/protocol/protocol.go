@@ -57,9 +57,9 @@ type Protocol struct {
 	optsSnapshotPath     string
 	optsPruningThreshold uint64
 
-	optsEngineOptions                 []options.Option[engine.Engine]
-	optsChainManagerOptions           []options.Option[chainmanager.Manager]
-	optsStorageOptions []options.Option[storage.Storage]
+	optsEngineOptions       []options.Option[engine.Engine]
+	optsChainManagerOptions []options.Option[chainmanager.Manager]
+	optsStorageOptions      []options.Option[storage.Storage]
 
 	optsFilterProvider          module.Provider[*engine.Engine, filter.Filter]
 	optsBlockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
@@ -110,7 +110,7 @@ func (p *Protocol) Run() {
 
 	// the rootCommitment is also the earliest point in the chain we can fork from. It is used to prevent
 	// solidifying and processing commitments that we won't be able to switch to.
-	if err := p.mainEngine.Storage.Settings.SetChainID(rootCommitment.MustID()); err != nil {
+	if err := p.mainEngine.Storage.Settings().SetChainID(rootCommitment.MustID()); err != nil {
 		panic(fmt.Sprintln("could not load set main engine's chain using", rootCommitment))
 	}
 	p.chainManager.Initialize(rootCommitment)
@@ -163,7 +163,7 @@ func (p *Protocol) initNetworkEvents() {
 
 	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
 		// when we receive a commitment request, do not look it up in the ChainManager but in the storage, else we might answer with commitments we did not issue ourselves and for which we cannot provide attestations
-		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments.Load(commitmentID.Index()); err == nil && requestedCommitment.MustID() == commitmentID {
+		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); err == nil && requestedCommitment.MustID() == commitmentID {
 			p.networkProtocol.SendSlotCommitment(requestedCommitment, source)
 		}
 	}, event.WithWorkerPool(wpCommitments))
@@ -175,7 +175,7 @@ func (p *Protocol) initNetworkEvents() {
 	p.Events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
 		// Check if we have the requested commitment in our storage before asking our peers for it.
 		// This can happen after we restart the node because the chain manager builds up the chain again.
-		if cm, _ := p.MainEngineInstance().Storage.Commitments.Load(commitmentID.Index()); cm != nil {
+		if cm, _ := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); cm != nil {
 			if cm.MustID() == commitmentID {
 				p.chainManager.ProcessCommitment(cm)
 				return
@@ -242,21 +242,21 @@ func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
 
 	isSolid, chain := p.chainManager.ProcessCommitmentFromSource(block.Block().SlotCommitment, src)
 	if !isSolid {
-		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings.LatestCommitment().MustID() {
+		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().MustID() {
 			return nil
 		}
 
-		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.Block().SlotCommitment.MustID(), mainEngine.Storage.Settings.LatestCommitment().MustID(), block.ID())
+		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.Block().SlotCommitment.MustID(), mainEngine.Storage.Settings().LatestCommitment().MustID(), block.ID())
 	}
 
 	processed := false
 
-	if mainChain := mainEngine.Storage.Settings.ChainID(); chain.ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
+	if mainChain := mainEngine.Storage.Settings().ChainID(); chain.ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
 		mainEngine.ProcessBlockFromPeer(block, src)
 		processed = true
 	}
 
-	//if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
+	// if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
 	//	if candidateChain := candidateEngine.Storage.Settings.ChainID(); chain.ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
 	//		candidateEngine.ProcessBlockFromPeer(block, src)
 	//		if candidateEngine.IsBootstrapped() &&
@@ -266,7 +266,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
 	//		}
 	//		processed = true
 	//	}
-	//}
+	// }
 
 	if !processed {
 		return errors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.Block().SlotCommitment.MustID())

@@ -14,6 +14,7 @@ import (
 
 const (
 	sybilProtectionPrefix byte = iota
+	attestationsPrefix
 )
 
 type Permanent struct {
@@ -25,6 +26,7 @@ type Permanent struct {
 	commitments *Commitments
 
 	sybilProtection kvstore.KVStore
+	attestations    kvstore.KVStore
 
 	optsLogger *logger.Logger
 	logger     *logger.WrappedLogger
@@ -51,6 +53,9 @@ func New(baseDir *utils.Directory, dbConfig database.Config, opts ...options.Opt
 		if err = p.healthTracker.MarkCorrupted(); err != nil {
 			panic(err)
 		}
+
+		p.sybilProtection = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{sybilProtectionPrefix}))
+		p.attestations = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{attestationsPrefix}))
 	})
 }
 
@@ -69,6 +74,15 @@ func (p *Permanent) SybilProtection(optRealm ...byte) kvstore.KVStore {
 	}
 
 	return lo.PanicOnErr(p.sybilProtection.WithExtendedRealm(optRealm))
+}
+
+// Attestations returns the "attestations" storage (or a specialized sub-storage if a realm is provided).
+func (p *Permanent) Attestations(optRealm ...byte) kvstore.KVStore {
+	if len(optRealm) == 0 {
+		return p.attestations
+	}
+
+	return lo.PanicOnErr(p.attestations.WithExtendedRealm(optRealm))
 }
 
 // Size returns the size of the permanent storage.

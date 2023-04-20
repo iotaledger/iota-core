@@ -1,6 +1,7 @@
 package prunable
 
 import (
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -9,6 +10,7 @@ import (
 const (
 	blocksPrefix byte = iota
 	rootBlocksPrefix
+	attestationsPrefix
 )
 
 type Prunable struct {
@@ -27,7 +29,7 @@ func (p *Prunable) Initialize(a iotago.API) {
 }
 
 func (p *Prunable) Blocks(slot iotago.SlotIndex) *Blocks {
-	store := p.manager.Get(slot, []byte{blocksPrefix})
+	store := p.manager.Get(slot, kvstore.Realm{blocksPrefix})
 	if store == nil {
 		return nil
 	}
@@ -36,12 +38,16 @@ func (p *Prunable) Blocks(slot iotago.SlotIndex) *Blocks {
 }
 
 func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *RootBlocks {
-	store := p.manager.Get(slot, []byte{rootBlocksPrefix})
+	store := p.manager.Get(slot, kvstore.Realm{rootBlocksPrefix})
 	if store == nil {
 		return nil
 	}
 
 	return NewRootBlocks(slot, store)
+}
+
+func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
+	return p.manager.Get(slot, kvstore.Realm{attestationsPrefix})
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.

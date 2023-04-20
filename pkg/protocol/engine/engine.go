@@ -287,7 +287,7 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 // from being processed as their chain will be deemed unsolid.
 func (e *Engine) EarliestRootCommitment() *iotago.Commitment {
 	earliestRootCommitmentID := e.EvictionState.EarliestRootCommitmentID()
-	rootCommitment, err := e.Storage.Commitments.Load(earliestRootCommitmentID.Index())
+	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentID.Index())
 	if err != nil {
 		panic(fmt.Sprintln("could not load earliest commitment after engine initialization", err))
 	}
