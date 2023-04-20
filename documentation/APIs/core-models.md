@@ -1,0 +1,497 @@
+# Core Models
+
+
+
+
+## Block
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>Protocol Version</td>
+    <td>uint8</td>
+    <td>This field denotes what protocol rules apply to the block. 
+</td>
+  </tr>
+  <tr>
+    <td>Network ID</td>
+    <td>uint64</td>
+    <td>Network identifier. This field denotes whether the block was meant for mainnet, testnet, or a private net. It also marks what protocol rules apply to the block. Usually, it will be set to the first 8 bytes of the BLAKE2b-256 hash of the concatenation of the network type and the protocol version string.</td>
+  </tr>
+  <tr>
+    <td>Strong Parents Count</td>
+    <td>uint8</td>
+    <td>The number of messages that are directly approved.</td>
+  </tr>
+  <tr>
+    <td valign="top">Strong Parents <code>anyOf</code></td>
+    <td colspan="2">
+      <details>
+        <summary>Parent</summary>
+        <blockquote>
+          References another directly approved block.
+        </blockquote>
+        <table>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>Block ID</td>
+            <td>ByteArray[40]</td>
+            <td>The Block ID of the strong parent.</td>
+          </tr>
+        </table>
+      </details>
+    </td>
+  </tr>
+  <tr>
+  <tr>
+    <td>Weak Parents Count</td>
+    <td>uint8</td>
+    <td>The number of messages that are directly approved.</td>
+  </tr>
+  <tr>
+    <td valign="top">Weak Parents <code>anyOf</code></td>
+    <td colspan="2">
+      <details>
+        <summary>Parent</summary>
+        <blockquote>
+          References another directly approved block.
+        </blockquote>
+        <table>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>Block ID</td>
+            <td>ByteArray[40]</td>
+            <td>The Block ID of the parent.</td>
+          </tr>
+        </table>
+      </details>
+    </td>
+  </tr>
+  <tr>
+  <tr>
+    <td>Shallow Like Parents Count</td>
+    <td>uint8</td>
+    <td>The number of messages that are directly approved.</td>
+  </tr>
+  <tr>
+    <td valign="top">Shallow Like Parents <code>anyOf</code></td>
+    <td colspan="2">
+      <details>
+        <summary>Parent</summary>
+        <blockquote>
+          References another directly approved block.
+        </blockquote>
+        <table>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>Block ID</td>
+            <td>ByteArray[40]</td>
+            <td>The Block ID of the parent.</td>
+          </tr>
+        </table>
+      </details>
+    </td>
+  </tr>
+  <tr>
+    <td>Issuer ID</td>
+    <td>ByteArray[32]</td>
+    <td>The issuer identifier</td>
+  </tr>
+  <tr>
+    <td>Issuing Time</td>
+    <td>uint32</td>
+    <td>The time the block is issued.</td>
+  </tr>
+  <tr>
+    <td>Commitment Length</td>
+    <td>uint32</td>
+    <td>The length of serialized Slot Commitment structure.</td>
+  </tr>
+  <tr>
+    <td valign="top">Slot Commitment <code>oneOf</code></td>
+    <td colspan="2">
+      <details open="true">
+        <summary>Commitment</summary>
+        <blockquote>
+          A structure contains the summary of a slot.
+        </blockquote>
+        <table>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>Index</td>
+            <td>int64</td>
+            <td>
+              The slot index of this commitment. It is calculated based on genesis timestamp and the duration of a slot.
+            </td>
+          </tr>
+          <tr>
+            <td>Previous Commitment ID</td>
+            <td>ByteArray[40]</td>
+            <td>The commitment ID of the previous slot.</td>
+          </tr>
+          <tr>
+            <td>Root ID</td>
+            <td>ByteArray[32]</td>
+            <td>A BLAKE2b-256 hash of multiple merkle tree roots of a slot. </td>
+          </tr>
+          <tr>
+            <td>Cumulative Weight</td>
+            <td>int64</td>
+            <td>The sum of previous slot commitment cumulative weight and weight of issuers of accepted blocks within this slot. </td>
+          </tr>
+        </table>
+      </details>
+    </td>
+  </tr>
+  <tr>
+    <td>Latest Finalized Slot</td>
+    <td>int64</td>
+    <td>The slot index of latest finalized slot.</td>
+  </tr>
+  <tr>
+    <td>Payload Length</td>
+    <td>uint32</td>
+    <td>The length of the following payload in bytes. A length of 0 means no payload will be attached.</td>
+  </tr>
+  <tr>
+    <td valign="top">Payload <code>oneOf</code></td>
+    <td colspan="2">
+      <details open="true">
+        <summary>Generic Payload</summary>
+        <table>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>Payload Type</td>
+            <td>uint32</td>
+            <td>
+              The type of the payload. It will instruct the node how to parse the fields that follow.
+            </td>
+          </tr>
+          <tr>
+            <td>Payload Bytes</td>
+            <td>ByteArray</td>
+            <td>A sequence of serialized bytes, where the structure depends on `Payload Type`.</td>
+          </tr>
+        </table>
+      </details>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">Signature <code>oneOf</code></td>
+    <td colspan="2">
+      <details open="true">
+        <summary>Generic Signature</summary>
+        <table>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>Signature Type</td>
+            <td>uint8</td>
+            <td>
+              The type of the signature. It will instruct the node how to parse the fields that follow.
+            </td>
+          </tr>
+          <tr>
+            <td>Signature Bytes</td>
+            <td>ByteArray</td>
+            <td>A sequence of serialized bytes, where the structure depends on `Signature Type`.</td>
+          </tr>
+        </table>
+      </details>
+    </td>
+  </tr>
+  <tr>
+    <td>Nonce</td>
+    <td>uint64</td>
+    <td>The nonce which lets this block fulfill the PoW requirement.</td>
+  </tr>
+</table>
+
+### Block Syntactic Validation Rules
+
+
+
+### Block ID
+Block ID denotes an identifier of a block, with type `ArrayBytes[40]`. It is calculated as the following steps, using BLAKE2b-256 hash function:
+
+* `content` is the serialized block **without** signature and nonce.
+* `slot_index` is the slot index of the Issuing Time of the block.
+* `signatureBytes` is the serialized Ed25519 signature.
+
+1. `content_hash` = hash(`content`)
+2. `id` = hash(Concat(`content_hash`, signatureBytes))
+3. And finally, `BlockID` = Concat(`id`, `slot_index`) 
+
+
+
+## Slot Index
+
+Timeline is divided into slots, and each slot has a corresponding slot index.
+To calculate the slot index of a timestamp, `genesisTimestamp` and the duration of a slot are needed.
+The slot index of timestamp `ts` is `(ts - genesisTimestamp)/duration + 1`.
+
+## Commitment
+### Commitment ID
+
+Commitment ID denotes an identifier of a commitment, with type `ArrayBytes[40]`. It is calculated as the following steps, using BLAKE2b-256 hash function:
+
+* `content` is the serialized commitment.
+* `slot_index` is the slot index of the commitment.
+
+1. `content_hash` = hash(`content`)
+3. And finally, `CommitmentID` = Concat(`content_hash`, `slot_index`) 
+
+## Payloads
+The following table lists all currently specified payloads that can be part of a block. 
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Payload Type</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>Tagged Data</td>
+        <td>5</td>
+        <td>A payload which holds a tag and associated data.</td>
+    </tr>
+    <tr>
+        <td>Transaction</td>
+        <td>6</td>
+        <td>A payload which holds a transaction with its inputs, outputs and unlocks.</td>
+    </tr>
+</table>
+
+### Tagged Data payload
+
+Tagged Data payload holds a tag and associated data.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>Payload Type</td>
+        <td>uint32</td>
+        <td>
+            The type of the payload. It will instruct the node how to parse the fields that follow.
+        </td>
+    </tr>
+    <tr>
+        <td>Tag</td>
+        <td>(uint8)ByteArray</td>
+        <td>The tag to use to categorize the data in binary form. A leading uint8 denotes its length.</td>
+    </tr>
+    <tr>
+        <td>Data</td>
+        <td>(uint32)ByteArray</td>
+        <td>Binary data. A leading uint32 denotes its length.</td>
+    </tr>
+</table>
+
+#### Tagged Payload Syntactic Validation Rules
+* The length of a Tag must < `64`.
+* The length of the Data must < `8192`.
+
+### Transaction     
+ TIP-20
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td valign="top">Essence <code>oneOf</code></td>
+    <td colspan="2">
+      <details open="true">
+        <summary>Transaction Essence</summary>
+        <blockquote>
+          Describes the essence data making up a transaction by defining its inputs, outputs and an optional payload.
+        </blockquote>
+        <table>
+          <tr>
+            <td><b>Name</b></td>
+            <td><b>Type</b></td>
+            <td><b>Description</b></td>
+          </tr>
+          <tr>
+            <td>Network ID</td>
+            <td>uint64</td>
+            <td>
+              The unique value denoting whether the block was meant for mainnet, shimmer, testnet, or a private network. It consists of the first 8 bytes of the BLAKE2b-256 hash of the network name.
+            </td>
+          </tr>
+          <tr>
+            <td>Creation Time</td>
+            <td>uint64</td>
+            <td>The time at which this transaction was created by the client.</td>
+          </tr>
+          <tr>
+            <td>Inputs Count</td>
+            <td>uint16</td>
+            <td>The number of input entries.</td>
+          </tr>
+          <tr>
+            <td valign="top">Inputs <code>anyOf</code></td>
+            <td colspan="2">
+              <details>
+                <summary>UTXO Input</summary>
+                <blockquote>
+                  Describes an input which references an unspent transaction output to consume.
+                </blockquote>
+                <table>
+                  <tr>
+                    <td><b>Name</b></td>
+                    <td><b>Type</b></td>
+                    <td><b>Description</b></td>
+                  </tr>
+                  <tr>
+                    <td>Input Type</td>
+                    <td>uint8</td>
+                    <td>
+                      Set to <strong>value 0</strong> to denote an <i>TIP-20 UTXO Input</i>.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Transaction ID</td>
+                    <td>ByteArray[32]</td>
+                    <td>The BLAKE2b-256 hash of the transaction payload containing the referenced output.</td>
+                  </tr>
+                  <tr>
+                    <td>Transaction Output Index</td>
+                    <td>uint16</td>
+                    <td>The output index of the referenced output.</td>
+                  </tr>
+                </table>
+              </details>
+            </td>
+          </tr>
+          <tr>
+            <td>Inputs Commitment</td>
+            <td>ByteArray[32]</td>
+            <td>
+              BLAKE2b-256 hash serving as a commitment to the serialized outputs referenced by <code>Inputs</code>.
+            </td>
+          </tr>
+          <tr>
+            <td>Outputs Count</td>
+            <td>uint16</td>
+            <td>The number of output entries.</td>
+          </tr>
+          <tr>
+            <td valign="top">Outputs <code>anyOf</code></td>
+            <td colspan="2">
+              <details>
+                <summary>Basic Output</summary>
+                <blockquote>
+                  Describes a deposit to a single address. The output might contain optional features and native tokens.
+                </blockquote>
+              </details>
+              <details>
+                <summary>Alias Output</summary>
+                <blockquote>
+                  Describes an alias account in the ledger.
+                </blockquote>
+              </details>
+              <details>
+                <summary>Foundry Output</summary>
+                <blockquote>
+                  Describes a foundry that controls supply of native tokens.
+                </blockquote>
+              </details>
+              <details>
+                <summary>NFT Output</summary>
+                <blockquote>
+                  Describes a unique, non-fungible token deposit to a single address.
+                </blockquote>
+              </details>
+            </td>
+          </tr>
+          <tr>
+            <td>Payload Length</td>
+            <td>uint32</td>
+            <td>The length in bytes of the optional payload.</td>
+          </tr>
+          <tr>
+            <td valign="top">Payload <code>optOneOf</code></td>
+            <td colspan="2">
+              <details>
+                <summary>Tagged Data Payload</summary>
+                <blockquote>
+                  Describes data with optional tag, defined in previous section.
+                </blockquote>
+              </details>
+            </td>
+          </tr>
+        </table>
+      </details>
+    </td>
+  </tr>
+  <tr>
+    <td>Unlocks Count</td>
+    <td>uint16</td>
+    <td>The number of unlock entries. It must match the field <code>Inputs Count</code>.</td>
+  </tr>
+  <tr>
+    <td valign="top">Unlocks <code>anyOf</code></td>
+    <td colspan="2">
+      <details>
+        <summary>Signature Unlock</summary>
+        <blockquote>
+          Defines an unlock containing a signature.
+        </blockquote>
+      </details>
+      <details>
+        <summary>Reference Unlock</summary>
+        <blockquote>
+          References a previous unlock, where the same unlock can be used for multiple inputs.
+        </blockquote>
+      </details>
+      <details>
+        <summary>Alias Unlock</summary>
+        <blockquote>
+          References a previous unlock of a consumed alias output.
+        </blockquote>
+      </details>
+      <details>
+        <summary>NFT Unlock</summary>
+        <blockquote>
+          References a previous unlock of a consumed NFT output.
+        </blockquote>
+      </details>
+    </td>
+  </tr>
+</table>
+
+
+## Outputs
+Output and unlock designs are the same as described in [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#output-design)
