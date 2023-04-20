@@ -6,22 +6,57 @@ import (
 	"iota-core/pkg/types"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/xerrors"
+
+	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
+	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-func TestMemPool(t *testing.T) {
-	mockedLedger := newMockedLedger()
+func mockedVM(inputTransaction types.Transaction, inputs []types.Output, gasLimit ...uint64) (outputs []types.Output, err error) {
+	transaction, ok := inputTransaction.(*mockedTransaction)
+	if !ok {
+		return nil, xerrors.Errorf("invalid transaction type in MockedVM")
+	}
 
-	memPool := New(mockedLedger)
-	require.NoError(t, memPool.ProcessTransaction(newMockedTransaction()))
+	for i := uint16(0); i < transaction.outputCount; i++ {
+		id, err := transaction.ID()
+		if err != nil {
+			return nil, err
+		}
+
+		outputs = append(outputs, newMockedOutput(id, i))
+	}
+
+	return outputs, nil
+}
+
+func TestMemPool(t *testing.T) {
+	workerGroup := workerpool.NewGroup(t.Name())
+
+	ledgerInstance := newMockedLedger()
+	memPool := New(mockedVM, ledgerInstance, workerGroup)
+	genesisOutput := newMockedOutput(tpkg.RandTransactionID(), 0)
+	ledgerInstance.unspentOutputs[genesisOutput.ID()] = genesisOutput
+
+	memPool.cachedOutputs.Set(genesisOutput.ID(), &OutputMetadata{ID: genesisOutput.ID(), output: genesisOutput, Spenders: advancedset.New[*TransactionMetadata]()})
+
+	require.NoError(t, memPool.ProcessTransaction(newMockedTransaction(1, genesisOutput)))
 }
 
 type mockedTransaction struct {
-	id     types.TransactionID
-	inputs []types.Input
+	id          types.TransactionID
+	inputs      []types.Input
+	outputCount uint16
 }
 
-func newMockedTransaction() *mockedTransaction {
-	return &mockedTransaction{}
+func newMockedTransaction(outputCount uint16, inputs ...types.Input) *mockedTransaction {
+	return &mockedTransaction{
+		id:          tpkg.RandTransactionID(),
+		inputs:      inputs,
+		outputCount: outputCount,
+	}
 }
 
 func (m mockedTransaction) ID() (types.TransactionID, error) {
@@ -38,19 +73,36 @@ func (m mockedTransaction) String() string {
 
 var _ types.Transaction = &mockedTransaction{}
 
+type mockedOutput struct {
+	id types.OutputID
+}
+
+func newMockedOutput(transactionID types.TransactionID, index uint16) *mockedOutput {
+	return &mockedOutput{id: iotago.OutputIDFromTransactionIDAndIndex(transactionID, index)}
+}
+
+func (m mockedOutput) ID() types.OutputID {
+	return m.id
+}
+
+func (m mockedOutput) String() string {
+	return "MockedOutput(" + m.id.ToHex() + ")"
+}
+
 type mockedLedger struct {
-	unspentOutputs map[types.OutputID]*OutputMetadata
+	unspentOutputs map[types.OutputID]types.Output
 }
 
 func newMockedLedger() *mockedLedger {
 	return &mockedLedger{
-		unspentOutputs: make(map[types.OutputID]*OutputMetadata),
+		unspentOutputs: make(map[types.OutputID]types.Output),
 	}
 }
 
 func (m mockedLedger) Output(id types.OutputID) (output types.Output, exists bool) {
-	// TODO implement me
-	panic("implement me")
+	output, exists = m.unspentOutputs[id]
+
+	return output, exists
 }
 
 var _ types.Ledger = &mockedLedger{}

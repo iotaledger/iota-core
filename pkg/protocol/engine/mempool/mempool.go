@@ -18,9 +18,9 @@ type MemPool struct {
 	ledger types.Ledger
 	vm     types.VM
 
-	transactions      *shrinkingmap.ShrinkingMap[iotago.TransactionID, *TransactionMetadata]
-	cachedOutputs     *shrinkingmap.ShrinkingMap[iotago.OutputID, *OutputMetadata]
-	asyncLoadedEvents *shrinkingmap.ShrinkingMap[iotago.OutputID, *event.Event1[*OutputMetadata]]
+	transactions      *shrinkingmap.ShrinkingMap[types.TransactionID, *TransactionMetadata]
+	cachedOutputs     *shrinkingmap.ShrinkingMap[types.OutputID, *OutputMetadata]
+	asyncLoadedEvents *shrinkingmap.ShrinkingMap[types.OutputID, *event.Event1[*OutputMetadata]]
 
 	events *types.MemPoolEvents
 
@@ -28,14 +28,23 @@ type MemPool struct {
 	executionWorkers *workerpool.WorkerPool
 	bookingWorkers   *workerpool.WorkerPool
 
-	solidificationMutex *syncutils.DAGMutex[iotago.OutputID]
+	solidificationMutex *syncutils.DAGMutex[types.OutputID]
 }
 
-func New(ledgerInstance types.Ledger) *MemPool {
+func New(vm types.VM, ledgerInstance types.Ledger, workers *workerpool.Group) *MemPool {
 	return &MemPool{
+		transactions:      shrinkingmap.New[types.TransactionID, *TransactionMetadata](),
+		cachedOutputs:     shrinkingmap.New[types.OutputID, *OutputMetadata](),
+		asyncLoadedEvents: shrinkingmap.New[types.OutputID, *event.Event1[*OutputMetadata]](),
+
+		ioWorker:         workers.CreatePool("ioWorker", 1),
+		executionWorkers: workers.CreatePool("executionWorkers", 1),
+		bookingWorkers:   workers.CreatePool("bookingWorkers", 1),
+
 		ledger:              ledgerInstance,
+		vm:                  vm,
 		events:              types.NewMemPoolEvents(),
-		solidificationMutex: syncutils.NewDAGMutex[iotago.OutputID](),
+		solidificationMutex: syncutils.NewDAGMutex[types.OutputID](),
 	}
 }
 
@@ -54,8 +63,16 @@ func (m *MemPool) ProcessTransaction(transaction types.Transaction) error {
 	return nil
 }
 
-func (m *MemPool) Output(id iotago.OutputID) *OutputMetadata {
-	panic("implement me")
+func (m *MemPool) Output(id types.OutputID) (types.Output, bool) {
+	m.solidificationMutex.RLock(id)
+	defer m.solidificationMutex.RUnlock(id)
+
+	output, exists := m.cachedOutputs.Get(id)
+	if exists {
+		return output.Output(), true
+	}
+
+	return m.ledger.Output(id)
 }
 
 func (m *MemPool) storeTransaction(transaction types.Transaction) (metadata *TransactionMetadata, err error) {
