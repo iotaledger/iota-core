@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -22,13 +23,13 @@ const (
 	defaultMinSlotCommittableAge = 6
 )
 
-// region Manager //////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // Manager is the component that manages the slot commitments.
 type Manager struct {
 	events        *notarization.Events
 	slotMutations *SlotMutations
 	attestations  *Attestations
+
+	workers *workerpool.Group
 
 	storage         *storage.Storage
 	commitmentMutex sync.RWMutex
@@ -46,6 +47,7 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
 		return options.Apply(&Manager{
 			events:                    notarization.NewEvents(),
+			workers:                   e.Workers.CreateGroup("NotarizationManager"),
 			optsMinCommittableSlotAge: defaultMinSlotCommittableAge,
 		}, opts,
 			func(m *Manager) {
@@ -66,17 +68,17 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 					m.storage = e.Storage
 					m.acceptedTimeFunc = e.Clock.Accepted().Time
 
-					wpBlocks := e.Workers.CreatePool("NotarizationManager.Blocks", 1)           // Using just 1 worker to avoid contention
-					wpCommitments := e.Workers.CreatePool("NotarizationManager.Commitments", 1) // Using just 1 worker to avoid contention
+					wpBlocks := m.workers.CreatePool("Blocks", 1)           // Using just 1 worker to avoid contention
+					wpCommitments := m.workers.CreatePool("Commitments", 1) // Using just 1 worker to avoid contention
 
 					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-						if err := m.NotarizeAcceptedBlock(block); err != nil {
+						if err := m.notarizeAcceptedBlock(block); err != nil {
 							e.Events.Error.Trigger(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 						}
 					}, event.WithWorkerPool(wpBlocks))
 
 					// Slots are committed whenever ATT advances, start committing only when bootstrapped.
-					e.Events.Clock.AcceptedTimeUpdated.Hook(m.TryCommitUntil, event.WithWorkerPool(wpCommitments))
+					e.Events.Clock.AcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
 
 					m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index)
 
@@ -95,11 +97,12 @@ func (m *Manager) Attestations() notarization.Attestations {
 }
 
 func (m *Manager) Shutdown() {
+	m.workers.Shutdown()
 	m.TriggerStopped()
 }
 
-// TryCommitUntil tries to create slot commitments until the new provided acceptance time.
-func (m *Manager) TryCommitUntil(acceptanceTime time.Time) {
+// tryCommitUntil tries to create slot commitments until the new provided acceptance time.
+func (m *Manager) tryCommitUntil(acceptanceTime time.Time) {
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 
@@ -116,7 +119,7 @@ func (m *Manager) IsBootstrapped() bool {
 	return m.storage.Settings().LatestCommitment().Index >= m.slotTimeProviderFunc().IndexFromTime(m.acceptedTimeFunc())-m.optsMinCommittableSlotAge-1
 }
 
-func (m *Manager) NotarizeAcceptedBlock(block *blocks.Block) (err error) {
+func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 	if err = m.slotMutations.AddAcceptedBlock(block); err != nil {
 		return errors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
@@ -232,16 +235,3 @@ func (m *Manager) PerformLocked(perform func(m notarization.Notarization)) {
 }
 
 var _ notarization.Notarization = new(Manager)
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// region Options //////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// WithMinCommittableSlotAge specifies how old a slot has to be for it to be committable.
-func WithMinCommittableSlotAge(age iotago.SlotIndex) options.Option[Manager] {
-	return func(manager *Manager) {
-		manager.optsMinCommittableSlotAge = age
-	}
-}
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
