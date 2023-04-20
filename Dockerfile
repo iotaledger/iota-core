@@ -23,6 +23,8 @@ FROM env-with-go-work-0 AS env-with-go-work-1
 
 COPY ./iota.go ./iota.go
 COPY ./hive.go ./hive.go
+COPY ./inx/go ./inx/go
+COPY ./inx-app ./inx-app
 COPY ./go.work ./
 COPY ./go.work.sum ./
 

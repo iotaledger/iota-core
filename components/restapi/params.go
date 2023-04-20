@@ -9,7 +9,7 @@ type ParametersRestAPI struct {
 	// Enabled defines whether the REST API plugin is enabled.
 	Enabled bool `default:"true" usage:"whether the REST API plugin is enabled"`
 	// the bind address on which the REST API listens on
-	BindAddress string `default:"0.0.0.0:14265" usage:"the bind address on which the REST API listens on"`
+	BindAddress string `default:"0.0.0.0:8080" usage:"the bind address on which the REST API listens on"`
 	// the HTTP REST routes which can be called without authorization. Wildcards using * are allowed
 	PublicRoutes []string `usage:"the HTTP REST routes which can be called without authorization. Wildcards using * are allowed"`
 	// the HTTP REST routes which need to be called with authorization. Wildcards using * are allowed
@@ -34,6 +34,13 @@ var ParamsRestAPI = &ParametersRestAPI{
 	PublicRoutes: []string{
 		"/health",
 		"/api/routes",
+		"/api/core/v3/info",
+		"/api/core/v3/blocks*",
+		"/api/core/v3/transactions*",
+		"/api/core/v3/commitments*",
+		"/api/core/v3/outputs*",
+		"/api/debug/v1/*",
+		"/api/indexer/v1/*",
 	},
 	ProtectedRoutes: []string{
 		"/api/*",
