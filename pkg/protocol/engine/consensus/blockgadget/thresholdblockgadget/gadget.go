@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/walker"
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -45,7 +44,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
 		g := New(e.Workers.CreateGroup("BlockGadget"), e.BlockCache, e.SybilProtection, opts...)
 		e.Events.Booker.WitnessAdded.Hook(g.tryAccept)
-		e.Events.EvictionState.SlotEvicted.Hook(g.evictUntil, event.WithWorkerPool(g.workers.CreatePool("Eviction", 1)))
+		e.BlockCache.Evict.Hook(g.evictUntil)
 
 		e.Events.BlockGadget.LinkTo(g.events)
 

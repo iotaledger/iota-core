@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -23,7 +22,6 @@ import (
 type Booker struct {
 	events *booker.Events
 
-	evictionState   *eviction.State
 	sybilProtection sybilprotection.SybilProtection
 
 	bookingOrder *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
@@ -38,7 +36,7 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.EvictionState, e.SybilProtection, e.BlockCache, opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection, e.BlockCache, opts...)
 
 		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 			if _, err := b.Queue(block); err != nil {
@@ -57,14 +55,13 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, evictionState *eviction.State, sybilProtection sybilprotection.SybilProtection, blockCache *blocks.Blocks, opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, sybilProtection sybilprotection.SybilProtection, blockCache *blocks.Blocks, opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:          booker.NewEvents(),
 		sybilProtection: sybilProtection,
 		blockCache:      blockCache,
 
-		evictionState: evictionState,
-		workers:       workers,
+		workers: workers,
 	}, opts, func(b *Booker) {
 		b.bookingOrder = causalorder.New(
 			workers.CreatePool("BookingOrder", 2),
@@ -76,7 +73,7 @@ func New(workers *workerpool.Group, evictionState *eviction.State, sybilProtecti
 			causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](isReferenceValid),
 		)
 
-		b.evictionState.Events.SlotEvicted.Hook(b.evict)
+		blockCache.Evict.Hook(b.evict)
 	}, (*Booker).TriggerConstructed)
 }
 

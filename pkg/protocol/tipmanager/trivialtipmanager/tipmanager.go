@@ -51,13 +51,13 @@ type TipManager struct {
 // NewProvider creates a new TipManager provider.
 func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
-		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.Block, e.IsBootstrapped, opts...)
+		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.BlockCache.Block, e.IsBootstrapped, opts...)
 
 		e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 			_ = t.AddTip(block)
 		}, event.WithWorkerPool(t.workers.CreatePool("AddTip", 2)))
 
-		e.Events.EvictionState.SlotEvicted.Hook(t.evict, event.WithWorkerPool(t.workers.CreatePool("SlotEvicted", 1)))
+		e.BlockCache.Evict.Hook(t.evict)
 
 		t.TriggerInitialized()
 

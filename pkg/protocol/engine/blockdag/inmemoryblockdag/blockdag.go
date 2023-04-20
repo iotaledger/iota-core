@@ -100,7 +100,7 @@ func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *b
 				causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](checkReference),
 			)
 
-			evictionState.Events.SlotEvicted.Hook(b.evictSlot, event.WithWorkerPool(b.workerPool))
+			blockCache.Evict.Hook(b.evictSlot)
 		},
 		(*BlockDAG).TriggerConstructed,
 		(*BlockDAG).TriggerInitialized,
