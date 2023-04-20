@@ -74,11 +74,6 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 							e.Events.Error.Trigger(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 						}
 					}, event.WithWorkerPool(wpBlocks))
-					e.Events.BlockDAG.BlockOrphaned.Hook(func(block *blocks.Block) {
-						if err := m.NotarizeOrphanedBlock(block); err != nil {
-							e.Events.Error.Trigger(errors.Wrapf(err, "failed to remove orphaned block %s from slot", block.ID()))
-						}
-					}, event.WithWorkerPool(wpBlocks))
 
 					// Slots are committed whenever ATT advances, start committing only when bootstrapped.
 					e.Events.Clock.AcceptedTimeUpdated.Hook(m.TryCommitUntil, event.WithWorkerPool(wpCommitments))
@@ -128,18 +123,6 @@ func (m *Manager) NotarizeAcceptedBlock(block *blocks.Block) (err error) {
 
 	if _, err = m.attestations.Add(iotago.NewAttestation(block.Block(), m.slotTimeProviderFunc())); err != nil {
 		return errors.Wrap(err, "failed to add block to attestations")
-	}
-
-	return
-}
-
-func (m *Manager) NotarizeOrphanedBlock(block *blocks.Block) (err error) {
-	if err = m.slotMutations.RemoveAcceptedBlock(block); err != nil {
-		return errors.Wrap(err, "failed to remove accepted block from slot mutations")
-	}
-
-	if _, err = m.attestations.Delete(iotago.NewAttestation(block.Block(), m.slotTimeProviderFunc())); err != nil {
-		return errors.Wrap(err, "failed to delete block from attestations")
 	}
 
 	return

@@ -22,9 +22,6 @@ type Events struct {
 	// BlockInvalid is triggered when a Block is found to be invalid.
 	BlockInvalid *event.Event2[*blocks.Block, error]
 
-	// BlockOrphaned is triggered when a Block becomes orphaned.
-	BlockOrphaned *event.Event1[*blocks.Block]
-
 	event.Group[Events, *Events]
 }
 
@@ -36,6 +33,5 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		BlockMissing:         event.New1[*blocks.Block](),
 		MissingBlockAttached: event.New1[*blocks.Block](),
 		BlockInvalid:         event.New2[*blocks.Block, error](),
-		BlockOrphaned:        event.New1[*blocks.Block](),
 	}
 })
