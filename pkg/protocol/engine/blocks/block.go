@@ -68,8 +68,8 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		solid:            true,
 		booked:           true,
 		accepted:         true,
-		ratifiedAccepted: true, //TODO: check if this should be true
-		confirmed:        true, //TODO: check if this should be true
+		ratifiedAccepted: true, // TODO: check if this should be true
+		confirmed:        true, // TODO: check if this should be true
 	}
 }
 
@@ -426,4 +426,8 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("ModelsBlock", b.modelBlock))
 
 	return builder.String()
+}
+
+func (blk *Block) ModelBlock() *model.Block {
+	return blk.modelBlock
 }

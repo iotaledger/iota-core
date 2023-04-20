@@ -29,8 +29,8 @@ func Test(t *testing.T) {
 	genesisCommitment := iotago.NewEmptyCommitment()
 	require.NoError(t, storage.Commitments.Store(genesisCommitment))
 	require.NoError(t, storage.Commitments.Store(iotago.NewCommitment(1, genesisCommitment.MustID(), iotago.Identifier{}, 0)))
-	require.NoError(t, storage.Blocks.Store(emptyBlock))
-	fmt.Println(storage.Blocks.Load(emptyBlock.ID()))
+	require.NoError(t, storage.blocks.Store(emptyBlock))
+	fmt.Println(storage.blocks.Load(emptyBlock.ID()))
 
 	storage.databaseManager.Flush(0)
 
@@ -40,7 +40,7 @@ func Test(t *testing.T) {
 	fmt.Println(lo.PanicOnErr(storage.Commitments.Load(0)), lo.PanicOnErr(storage.Commitments.Load(1)))
 	require.Equal(t, iotago.SlotIndex(10), storage.Settings.LatestStateMutationSlot())
 
-	fmt.Println(storage.Blocks.Load(emptyBlock.ID()))
+	fmt.Println(storage.blocks.Load(emptyBlock.ID()))
 
 	storage.Shutdown()
 }

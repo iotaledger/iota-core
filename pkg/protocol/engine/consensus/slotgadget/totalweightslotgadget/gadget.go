@@ -51,7 +51,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 			e.Events.BlockGadget.BlockRatifiedAccepted.Hook(g.trackVotes)
 
 			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
-				if err := e.Storage.Settings.SetLatestFinalizedSlot(index); err != nil {
+				if err := e.Storage.Settings().SetLatestFinalizedSlot(index); err != nil {
 					e.Events.Error.Trigger(errors.Wrap(err, "failed to set latest finalized slot"))
 				}
 			}
@@ -64,7 +64,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				}, event.WithWorkerPool(g.workers.CreatePool("Refresh", 2)))
 
 				e.HookInitialized(func() {
-					g.lastFinalizedSlot = e.Storage.Permanent.Settings.LatestFinalizedSlot()
+					g.lastFinalizedSlot = e.Storage.Permanent.Settings().LatestFinalizedSlot()
 					g.TriggerInitialized()
 				})
 			})

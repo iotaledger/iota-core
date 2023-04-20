@@ -30,6 +30,17 @@ func (d *Directory) Path(relativePathElements ...string) (path string) {
 	return filepath.Join(append([]string{d.path}, relativePathElements...)...)
 }
 
+// PathWithCreate returns the absolute path that corresponds to the relative path and creates the folder if it doesn't exist.
+func (d *Directory) PathWithCreate(relativePathElements ...string) string {
+	path := filepath.Join(append([]string{d.path}, relativePathElements...)...)
+
+	if err := ioutils.CreateDirectory(path, defaultPermissions); err != nil {
+		panic(err)
+	}
+
+	return path
+}
+
 func (d *Directory) RemoveSubdir(name string) error {
 	return os.RemoveAll(d.Path(name))
 }

@@ -1,4 +1,4 @@
-package database
+package prunable
 
 import (
 	"fmt"
@@ -141,7 +141,7 @@ func TestManager_Get(t *testing.T) {
 		}
 	}
 
-	latestBucketIndex := m.RestoreFromDisk()
+	latestBucketIndex := m.restoreFromDisk()
 	assert.EqualValues(t, bucketsCount-1, latestBucketIndex)
 
 	// Check that folder structure is correct. Everything above bucketsCount-1 was unhealthy -> db files should be deleted.

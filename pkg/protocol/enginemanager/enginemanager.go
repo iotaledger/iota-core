@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/database"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -38,8 +37,8 @@ type engineInfo struct {
 
 type EngineManager struct {
 	directory      *utils.Directory
-	dbVersion      database.Version
-	storageOptions []options.Option[database.Manager]
+	dbVersion      byte
+	storageOptions []options.Option[storage.Storage]
 	workers        *workerpool.Group
 
 	engineOptions           []options.Option[engine.Engine]
@@ -58,8 +57,8 @@ type EngineManager struct {
 func New(
 	workers *workerpool.Group,
 	dir string,
-	dbVersion database.Version,
-	storageOptions []options.Option[database.Manager],
+	dbVersion byte,
+	storageOptions []options.Option[storage.Storage],
 	engineOptions []options.Option[engine.Engine],
 	filterProvider module.Provider[*engine.Engine, filter.Filter],
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
@@ -119,7 +118,7 @@ func (e *EngineManager) LoadActiveEngine() (*engine.Engine, error) {
 }
 
 func (e *EngineManager) CleanupNonActive() error {
-	activeDir := filepath.Base(e.activeInstance.Storage.Directory)
+	activeDir := filepath.Base(e.activeInstance.Storage.Directory())
 
 	dirs, err := e.directory.SubDirs()
 	if err != nil {
@@ -144,7 +143,7 @@ func (e *EngineManager) SetActiveInstance(instance *engine.Engine) error {
 	e.activeInstance = instance
 
 	info := &engineInfo{
-		Name: filepath.Base(instance.Storage.Directory),
+		Name: filepath.Base(instance.Storage.Directory()),
 	}
 
 	return ioutils.WriteJSONToFile(e.infoFilePath(), info, 0o644)

@@ -1,7 +1,6 @@
-package database
+package prunable
 
 import (
-	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 )
@@ -14,29 +13,10 @@ func WithGranularity(granularity int64) options.Option[Manager] {
 	}
 }
 
-// WithBaseDir sets the base directory to store the DB to disk.
-func WithBaseDir(baseDir string) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsBaseDir = baseDir
-	}
-}
-
 // WithMaxOpenDBs sets the maximum concurrently open DBs.
 func WithMaxOpenDBs(optsMaxOpenDBs int) options.Option[Manager] {
 	return func(m *Manager) {
 		m.optsMaxOpenDBs = optsMaxOpenDBs
-	}
-}
-
-func WithDBEngine(optsDBEngine hivedb.Engine) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsDBEngine = optsDBEngine
-	}
-}
-
-func WithAllowedDBEngines(optsAllowedDBEngines []hivedb.Engine) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsAllowedDBEngines = optsAllowedDBEngines
 	}
 }
 

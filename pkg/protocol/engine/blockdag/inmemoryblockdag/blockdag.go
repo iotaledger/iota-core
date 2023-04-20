@@ -60,7 +60,7 @@ type BlockDAG struct {
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.Storage.Commitments.Load, opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.Storage.Commitments().Load, opts...)
 
 		e.HookConstructed(func() {
 			e.Events.Filter.BlockAllowed.Hook(func(block *model.Block) {

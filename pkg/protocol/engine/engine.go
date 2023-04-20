@@ -80,7 +80,7 @@ func New(
 		&Engine{
 			Events:        NewEvents(),
 			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance),
+			EvictionState: eviction.NewState(storageInstance.RootBlocks, storageInstance.Settings().LatestCommitment().Index),
 			Workers:       workers,
 
 			optsBootstrappedThreshold: 10 * time.Second,
@@ -100,8 +100,8 @@ func New(
 			e.Notarization = notarizationProvider(e)
 
 			e.HookInitialized(lo.Batch(
-				e.Storage.Settings.TriggerInitialized,
-				e.Storage.Commitments.TriggerInitialized,
+				e.Storage.Settings().TriggerInitialized,
+				e.Storage.Commitments().TriggerInitialized,
 			))
 		},
 		(*Engine).setupBlockStorage,
@@ -152,11 +152,11 @@ func (e *Engine) IsSynced() (isBootstrapped bool) {
 }
 
 func (e *Engine) API() iotago.API {
-	return e.Storage.Settings.API()
+	return e.Storage.Settings().API()
 }
 
 func (e *Engine) Initialize(snapshot ...string) (err error) {
-	if !e.Storage.Settings.SnapshotImported() {
+	if !e.Storage.Settings().SnapshotImported() {
 		if len(snapshot) == 0 || snapshot[0] == "" {
 			panic("no snapshot path specified")
 		}
@@ -164,27 +164,27 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 			return errors.Wrapf(err, "failed to read snapshot from file '%s'", snapshot)
 		}
 	} else {
-		e.Storage.Settings.UpdateAPI()
-		e.Storage.Settings.TriggerInitialized()
-		e.Storage.Commitments.TriggerInitialized()
-		e.EvictionState.PopulateFromStorage(e.Storage.Settings.LatestCommitment().Index)
+		e.Storage.Settings().UpdateAPI()
+		e.Storage.Settings().TriggerInitialized()
+		e.Storage.Commitments().TriggerInitialized()
+		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index)
 
-		// e.Notarization.Attestations().SetLastCommittedSlot(e.Storage.Settings.LatestCommitment().Index())
-		// e.Notarization.Attestations().TriggerInitialized()
+		// e.Notarization.attestations().SetLastCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
+		// e.Notarization.attestations().TriggerInitialized()
 		//
 		// e.Notarization.TriggerInitialized()
 	}
 
 	e.TriggerInitialized()
 
-	fmt.Println("Engine Settings", e.Storage.Settings.String())
+	fmt.Println("Engine Settings", e.Storage.Settings().String())
 
 	return
 }
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
 	if len(targetSlot) == 0 {
-		targetSlot = append(targetSlot, e.Storage.Settings.LatestCommitment().Index)
+		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index)
 	}
 
 	if fileHandle, err := os.Create(filePath); err != nil {
@@ -199,9 +199,9 @@ func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) 
 }
 
 func (e *Engine) Import(reader io.ReadSeeker) (err error) {
-	if err = e.Storage.Settings.Import(reader); err != nil {
+	if err = e.Storage.Settings().Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import settings")
-	} else if err = e.Storage.Commitments.Import(reader); err != nil {
+	} else if err = e.Storage.Commitments().Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import commitments")
 		// } else if err = e.Ledger.Import(reader); err != nil {
 		// 	return errors.Wrap(err, "failed to import ledger")
@@ -215,9 +215,9 @@ func (e *Engine) Import(reader io.ReadSeeker) (err error) {
 }
 
 func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
-	if err = e.Storage.Settings.Export(writer); err != nil {
+	if err = e.Storage.Settings().Export(writer); err != nil {
 		return errors.Wrap(err, "failed to export settings")
-	} else if err = e.Storage.Commitments.Export(writer, targetSlot); err != nil {
+	} else if err = e.Storage.Commitments().Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export commitments")
 		// } else if err = e.Ledger.Export(writer, targetSlot); err != nil {
 		// 	return errors.Wrap(err, "failed to export ledger")
@@ -232,14 +232,26 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 
 // RemoveFromFilesystem removes the directory of the engine from the filesystem.
 func (e *Engine) RemoveFromFilesystem() error {
-	return os.RemoveAll(e.Storage.Directory)
+	return os.RemoveAll(e.Storage.Directory())
 }
 
 func (e *Engine) Name() string {
-	return filepath.Base(e.Storage.Directory)
+	return filepath.Base(e.Storage.Directory())
 }
 
 func (e *Engine) setupBlockStorage() {
+	wp := e.Workers.CreatePool("BlockStorage", 1) // Using just 1 worker to avoid contention
+
+	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+		store := e.Storage.Blocks(block.ID().Index())
+		if store == nil {
+			e.Events.Error.Trigger(errors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
+		}
+
+		if err := store.Store(block.ModelBlock()); err != nil {
+			e.Events.Error.Trigger(errors.Wrapf(err, "failed to store block with %s", block.ID()))
+		}
+	}, event.WithWorkerPool(wp))
 }
 
 func (e *Engine) setupEvictionState() {
@@ -277,7 +289,7 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 
 	if err = e.Import(file); err != nil {
 		return errors.Wrap(err, "failed to import snapshot")
-	} else if err = e.Storage.Settings.SetSnapshotImported(true); err != nil {
+	} else if err = e.Storage.Settings().SetSnapshotImported(true); err != nil {
 		return errors.Wrap(err, "failed to set snapshot imported flag")
 	}
 
@@ -289,7 +301,7 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 // from being processed as their chain will be deemed unsolid.
 func (e *Engine) EarliestRootCommitment() *iotago.Commitment {
 	earliestRootCommitmentID := e.EvictionState.EarliestRootCommitmentID()
-	rootCommitment, err := e.Storage.Commitments.Load(earliestRootCommitmentID.Index())
+	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentID.Index())
 	if err != nil {
 		panic(fmt.Sprintln("could not load earliest commitment after engine initialization", err))
 	}
