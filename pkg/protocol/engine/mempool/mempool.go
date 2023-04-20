@@ -75,6 +75,7 @@ func (m *MemPool) Output(id types.OutputID) (types.Output, bool) {
 	return m.ledger.Output(id)
 }
 
+// storeTransaction stores the given transaction in the MemPool and returns the corresponding metadata.
 func (m *MemPool) storeTransaction(transaction types.Transaction) (metadata *TransactionMetadata, err error) {
 	transactionID, err := transaction.ID()
 	if err != nil {
@@ -133,7 +134,7 @@ func (m *MemPool) checkSolidity(transactionMetadata *TransactionMetadata) (isSol
 				if output, exists := m.ledger.Output(outputID); exists {
 					m.publishOutput(&OutputMetadata{
 						ID:       outputID,
-						Source:   transactionMetadata,
+						Source:   nil,
 						Spenders: advancedset.New[*TransactionMetadata](),
 						output:   output,
 					})

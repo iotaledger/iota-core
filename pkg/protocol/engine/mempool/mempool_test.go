@@ -1,7 +1,9 @@
 package mempool
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"iota-core/pkg/types"
 
@@ -35,14 +37,21 @@ func mockedVM(inputTransaction types.Transaction, inputs []types.Output, gasLimi
 func TestMemPool(t *testing.T) {
 	workerGroup := workerpool.NewGroup(t.Name())
 
-	ledgerInstance := newMockedLedger()
-	memPool := New(mockedVM, ledgerInstance, workerGroup)
 	genesisOutput := newMockedOutput(tpkg.RandTransactionID(), 0)
+
+	ledgerInstance := newMockedLedger()
 	ledgerInstance.unspentOutputs[genesisOutput.ID()] = genesisOutput
 
+	memPool := New(mockedVM, ledgerInstance, workerGroup)
 	memPool.cachedOutputs.Set(genesisOutput.ID(), &OutputMetadata{ID: genesisOutput.ID(), output: genesisOutput, Spenders: advancedset.New[*TransactionMetadata]()})
 
+	memPool.Events().TransactionSolid.Hook(func(metadata types.TransactionMetadata) {
+		fmt.Println("TransactionBooked", metadata.ID())
+	})
+
 	require.NoError(t, memPool.ProcessTransaction(newMockedTransaction(1, genesisOutput)))
+
+	time.Sleep(5 * time.Second)
 }
 
 type mockedTransaction struct {

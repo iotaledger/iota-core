@@ -18,6 +18,10 @@ type TransactionMetadata struct {
 	mutex sync.RWMutex
 }
 
+func (t *TransactionMetadata) ID() types.TransactionID {
+	return t.id
+}
+
 func (t *TransactionMetadata) IsBooked() bool {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
