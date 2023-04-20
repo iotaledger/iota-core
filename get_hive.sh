@@ -11,6 +11,6 @@ done
 
 go mod tidy
 
-pushd tools/integration-tests/tester
-go mod tidy
-popd
+#pushd tools/integration-tests/tester
+#go mod tidy
+#popd
