@@ -39,13 +39,13 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion)
 	defer s.Shutdown()
 
-	if err := s.Commitments.Store(iotago.NewEmptyCommitment()); err != nil {
+	if err := s.Commitments().Store(iotago.NewEmptyCommitment()); err != nil {
 		return errors.Wrap(err, "failed to store empty commitment")
 	}
-	if err := s.Settings.SetProtocolParameters(opt.ProtocolParameters); err != nil {
+	if err := s.Settings().SetProtocolParameters(opt.ProtocolParameters); err != nil {
 		return errors.Wrap(err, "failed to set the genesis time")
 	}
-	if err := s.Settings.SetChainID(lo.PanicOnErr(s.Commitments.Load(0)).MustID()); err != nil {
+	if err := s.Settings().SetChainID(lo.PanicOnErr(s.Commitments().Load(0)).MustID()); err != nil {
 		return errors.Wrap(err, "failed to set chainID")
 	}
 
