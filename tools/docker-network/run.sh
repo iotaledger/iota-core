@@ -37,10 +37,12 @@ fi
 echo "Create snapshot"
 if [ $FEATURE -ne 0 ]
 then
-  go run ../genesis-snapshot/. --config feature
+  pushd ../genesis-snapshot; go run -tags=rocksdb . --config feature
 else
-  go run ../genesis-snapshot/. --config docker
+  pushd ../genesis-snapshot; go run -tags=rocksdb . --config docker
 fi
+popd
+mv ../genesis-snapshot/*.snapshot .
 chmod o+r *.snapshot
 
 
