@@ -11,8 +11,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/autopeering/peer"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/iota-core/pkg/network"
 )
 
 // ConnectPeerOption defines an option for the DialPeer and AcceptPeer methods.
@@ -25,7 +25,7 @@ type connectPeerConfig struct {
 // ProtocolHandler holds callbacks to handle a protocol.
 type ProtocolHandler struct {
 	PacketFactory func() proto.Message
-	PacketHandler func(identity.ID, proto.Message) error
+	PacketHandler func(network.PeerID, proto.Message) error
 }
 
 func buildConnectPeerConfig(opts []ConnectPeerOption) *connectPeerConfig {
@@ -59,7 +59,7 @@ type Manager struct {
 	stopMutex sync.RWMutex
 	isStopped bool
 
-	neighbors      map[identity.ID]*Neighbor
+	neighbors      map[network.PeerID]*Neighbor
 	neighborsMutex sync.RWMutex
 
 	registeredProtocolsMutex sync.RWMutex
@@ -77,7 +77,7 @@ func NewManager(libp2pHost host.Host, local *peer.Local, log *logger.Logger) *Ma
 			NeighborsGroupAuto:   NewNeighborGroupEvents(),
 			NeighborsGroupManual: NewNeighborGroupEvents(),
 		},
-		neighbors:           map[identity.ID]*Neighbor{},
+		neighbors:           map[network.PeerID]*Neighbor{},
 		registeredProtocols: map[protocol.ID]*ProtocolHandler{},
 	}
 }
@@ -100,7 +100,7 @@ func (m *Manager) NeighborGroupEvents(group NeighborsGroup) *NeighborGroupEvents
 }
 
 // RegisterProtocol registers a new protocol.
-func (m *Manager) RegisterProtocol(protocolID string, factory func() proto.Message, handler func(identity.ID, proto.Message) error) {
+func (m *Manager) RegisterProtocol(protocolID string, factory func() proto.Message, handler func(network.PeerID, proto.Message) error) {
 	m.registeredProtocolsMutex.Lock()
 	defer m.registeredProtocolsMutex.Unlock()
 
@@ -142,7 +142,7 @@ func (m *Manager) AddInbound(ctx context.Context, p *peer.Peer, group NeighborsG
 }
 
 // GetNeighbor returns the neighbor by its id.
-func (m *Manager) GetNeighbor(id identity.ID) (*Neighbor, error) {
+func (m *Manager) GetNeighbor(id network.PeerID) (*Neighbor, error) {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 	nbr, ok := m.neighbors[id]
@@ -153,7 +153,7 @@ func (m *Manager) GetNeighbor(id identity.ID) (*Neighbor, error) {
 }
 
 // DropNeighbor disconnects the neighbor with the given ID and the group.
-func (m *Manager) DropNeighbor(id identity.ID, group NeighborsGroup) error {
+func (m *Manager) DropNeighbor(id network.PeerID, group NeighborsGroup) error {
 	nbr, err := m.getNeighborWithGroup(id, group)
 	if err != nil {
 		return errors.WithStack(err)
@@ -163,7 +163,7 @@ func (m *Manager) DropNeighbor(id identity.ID, group NeighborsGroup) error {
 }
 
 // Send sends a message with the specific protocol to a set of neighbors.
-func (m *Manager) Send(packet proto.Message, protocolID string, to ...identity.ID) {
+func (m *Manager) Send(packet proto.Message, protocolID string, to ...network.PeerID) {
 	var neighbors []*Neighbor
 	if len(to) == 0 {
 		neighbors = m.AllNeighbors()
@@ -188,8 +188,8 @@ func (m *Manager) AllNeighbors() []*Neighbor {
 }
 
 // AllNeighborsIDs returns all the ids of the neighbors that are currently connected.
-func (m *Manager) AllNeighborsIDs() (ids []identity.ID) {
-	ids = make([]identity.ID, 0)
+func (m *Manager) AllNeighborsIDs() (ids []network.PeerID) {
+	ids = make([]network.PeerID, 0)
 	neighbors := m.AllNeighbors()
 	for _, nbr := range neighbors {
 		ids = append(ids, nbr.ID())
@@ -198,7 +198,7 @@ func (m *Manager) AllNeighborsIDs() (ids []identity.ID) {
 }
 
 // GetNeighborsByID returns all the neighbors that are currently connected corresponding to the supplied ids.
-func (m *Manager) GetNeighborsByID(ids []identity.ID) []*Neighbor {
+func (m *Manager) GetNeighborsByID(ids []network.PeerID) []*Neighbor {
 	result := make([]*Neighbor, 0, len(ids))
 	if len(ids) == 0 {
 		return result
@@ -215,7 +215,7 @@ func (m *Manager) GetNeighborsByID(ids []identity.ID) []*Neighbor {
 }
 
 // getNeighborWithGroup returns neighbor by ID and group.
-func (m *Manager) getNeighborWithGroup(id identity.ID, group NeighborsGroup) (*Neighbor, error) {
+func (m *Manager) getNeighborWithGroup(id network.PeerID, group NeighborsGroup) (*Neighbor, error) {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 	nbr, ok := m.neighbors[id]
@@ -278,7 +278,7 @@ func (m *Manager) addNeighbor(ctx context.Context, p *peer.Peer, group Neighbors
 	return nil
 }
 
-func (m *Manager) neighborExists(id identity.ID) bool {
+func (m *Manager) neighborExists(id network.PeerID) bool {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 	_, exists := m.neighbors[id]

@@ -11,13 +11,13 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -123,7 +123,7 @@ func (e *Engine) Shutdown() {
 	}
 }
 
-func (e *Engine) ProcessBlockFromPeer(block *model.Block, source identity.ID) {
+func (e *Engine) ProcessBlockFromPeer(block *model.Block, source network.PeerID) {
 	e.Filter.ProcessReceivedBlock(block, source)
 	e.Events.BlockProcessed.Trigger(block.ID())
 }

@@ -38,6 +38,7 @@ type dependencies struct {
 
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
+		Component.LogInfof("Starting Activity with IssuerID: %s", issuerID().ToHex())
 		ticker := timeutil.NewTicker(issueActivityBlock, ParamsActivity.BroadcastInterval, ctx)
 		ticker.WaitForGracefulShutdown()
 

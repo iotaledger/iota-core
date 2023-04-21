@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -111,7 +110,7 @@ func (b *Booker) book(block *blocks.Block) error {
 }
 
 func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
-	witness := identity.ID(votingBlock.Block().IssuerID)
+	witness := votingBlock.Block().IssuerID
 
 	// Only track witness weight for issuers that are part of the committee.
 	if !b.sybilProtection.Committee().Has(witness) {

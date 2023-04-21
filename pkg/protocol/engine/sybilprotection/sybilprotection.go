@@ -9,13 +9,13 @@ import (
 // SybilProtection is the minimal interface for the SybilProtection component of the IOTA protocol.
 type SybilProtection interface {
 	// Accounts returns the weights of identities in the SybilProtection.
-	Accounts() *account.Accounts
+	Accounts() *account.Accounts[iotago.AccountID, *iotago.AccountID]
 
 	// Committee returns the set of validators that is used to track confirmation.
-	Committee() *account.SelectedAccounts
+	Committee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
 
 	// OnlineCommittee returns the set of online validators that is used to track acceptance.
-	OnlineCommittee() *account.SelectedAccounts
+	OnlineCommittee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
 
 	// LastCommittedSlot returns the last committed slot.
 	LastCommittedSlot() iotago.SlotIndex

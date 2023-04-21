@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -55,7 +54,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		inmemoryblockdag.NewProvider(),
 		inmemorybooker.NewProvider(),
 		blocktime.NewProvider(),
-		poa.NewProvider(map[identity.ID]int64{}),
+		poa.NewProvider(map[iotago.AccountID]int64{}),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
 		slotnotarization.NewProvider(),

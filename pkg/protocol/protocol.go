@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -82,7 +81,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsTipManagerProvider:      trivialtipmanager.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
-		optsSybilProtectionProvider: poa.NewProvider(map[identity.ID]int64{}),
+		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
@@ -139,13 +138,13 @@ func (p *Protocol) Shutdown() {
 func (p *Protocol) initNetworkEvents() {
 	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks
 
-	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id identity.ID) {
+	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {
 		if err := p.ProcessBlock(block, id); err != nil {
 			p.Events.Error.Trigger(err)
 		}
 	}, event.WithWorkerPool(wpBlocks))
 
-	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id identity.ID) {
+	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id network.PeerID) {
 		if block, exists := p.MainEngineInstance().Block(blockID); exists && !block.IsMissing() && !block.IsRootBlock() {
 			p.networkProtocol.SendBlock(block.Block(), id)
 		}
@@ -161,14 +160,14 @@ func (p *Protocol) initNetworkEvents() {
 
 	wpCommitments := p.Workers.CreatePool("NetworkEvents.SlotCommitments")
 
-	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
+	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source network.PeerID) {
 		// when we receive a commitment request, do not look it up in the ChainManager but in the storage, else we might answer with commitments we did not issue ourselves and for which we cannot provide attestations
 		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); err == nil && requestedCommitment.MustID() == commitmentID {
 			p.networkProtocol.SendSlotCommitment(requestedCommitment, source)
 		}
 	}, event.WithWorkerPool(wpCommitments))
 
-	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, source identity.ID) {
+	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, source network.PeerID) {
 		p.chainManager.ProcessCommitmentFromSource(commitment, source)
 	}, event.WithWorkerPool(wpCommitments))
 
@@ -237,7 +236,7 @@ func (p *Protocol) initChainManager() {
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wp))
 }
 
-func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
+func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	mainEngine := p.MainEngineInstance()
 
 	isSolid, chain := p.chainManager.ProcessCommitmentFromSource(block.Block().SlotCommitment, src)

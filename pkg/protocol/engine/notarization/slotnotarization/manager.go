@@ -57,7 +57,7 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 
 				m.attestations = NewAttestations(e.Storage.Permanent.Attestations,
 					e.Storage.Prunable.Attestations,
-					func() *account.Accounts {
+					func() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
 						// Using a func here because at this point SybilProtection is not guaranteed to exist since the engine has not been constructed, but other modules already might want to use `Attestations()`
 						return e.SybilProtection.Accounts()
 					}, m.slotTimeProviderFunc)

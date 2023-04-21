@@ -6,12 +6,12 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/iotaledger/hive.go/constraints"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/thresholdmap"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestLatestVotes(t *testing.T) {
-	voter := identity.ID{}
+	voter := iotago.AccountID{}
 
 	{
 		latestVotes := NewLatestVotes[int, MockedVotePower](voter)

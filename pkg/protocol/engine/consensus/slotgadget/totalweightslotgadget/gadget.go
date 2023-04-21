@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -94,7 +93,7 @@ func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {
 }
 
 func (g *Gadget) trackVotes(block *blocks.Block) {
-	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, identity.ID(block.Block().IssuerID), slottracker.SlotVotePower{Index: block.ID().Index()})
+	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, block.Block().IssuerID, slottracker.SlotVotePower{Index: block.ID().Index()})
 }
 
 func (g *Gadget) refreshSlotFinalization(previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) {

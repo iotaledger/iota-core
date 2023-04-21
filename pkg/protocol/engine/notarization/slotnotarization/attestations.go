@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -29,8 +28,8 @@ const (
 type Attestations struct {
 	persistentStorage    func(optRealm ...byte) kvstore.KVStore
 	bucketedStorage      func(index iotago.SlotIndex) kvstore.KVStore
-	weightsProviderFunc  func() *account.Accounts
-	cachedAttestations   *memstorage.IndexedStorage[iotago.SlotIndex, identity.ID, *shrinkingmap.ShrinkingMap[iotago.BlockID, *iotago.Attestation]]
+	weightsProviderFunc  func() *account.Accounts[iotago.AccountID, *iotago.AccountID]
+	cachedAttestations   *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *shrinkingmap.ShrinkingMap[iotago.BlockID, *iotago.Attestation]]
 	slotTimeProviderFunc func() *iotago.SlotTimeProvider
 	mutex                *syncutils.DAGMutex[iotago.SlotIndex]
 
@@ -38,13 +37,13 @@ type Attestations struct {
 	module.Module
 }
 
-func NewAttestations(persistentStorage func(optRealm ...byte) kvstore.KVStore, bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore, weightsProviderFunc func() *account.Accounts, slotTimeProviderFunc func() *iotago.SlotTimeProvider) *Attestations {
+func NewAttestations(persistentStorage func(optRealm ...byte) kvstore.KVStore, bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore, weightsProviderFunc func() *account.Accounts[iotago.AccountID, *iotago.AccountID], slotTimeProviderFunc func() *iotago.SlotTimeProvider) *Attestations {
 	return &Attestations{
 		Committable:          traits.NewCommittable(persistentStorage(), PrefixAttestationsLastCommittedSlot),
 		persistentStorage:    persistentStorage,
 		bucketedStorage:      bucketedStorage,
 		weightsProviderFunc:  weightsProviderFunc,
-		cachedAttestations:   memstorage.NewIndexedStorage[iotago.SlotIndex, identity.ID, *shrinkingmap.ShrinkingMap[iotago.BlockID, *iotago.Attestation]](),
+		cachedAttestations:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *shrinkingmap.ShrinkingMap[iotago.BlockID, *iotago.Attestation]](),
 		slotTimeProviderFunc: slotTimeProviderFunc,
 		mutex:                syncutils.NewDAGMutex[iotago.SlotIndex](),
 	}
@@ -65,7 +64,7 @@ func (a *Attestations) Add(attestation *iotago.Attestation) (added bool, err err
 	}
 
 	slotStorage := a.cachedAttestations.Get(slotIndex, true)
-	issuerStorage, _ := slotStorage.GetOrCreate(identity.ID(attestation.IssuerID), func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *iotago.Attestation] {
+	issuerStorage, _ := slotStorage.GetOrCreate(attestation.IssuerID, func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *iotago.Attestation] {
 		return shrinkingmap.New[iotago.BlockID, *iotago.Attestation]()
 	})
 
@@ -87,7 +86,7 @@ func (a *Attestations) Delete(attestation *iotago.Attestation) (deleted bool, er
 		return false, nil
 	}
 
-	issuerStorage, exists := slotStorage.Get(identity.ID(attestation.IssuerID))
+	issuerStorage, exists := slotStorage.Get(attestation.IssuerID)
 	if !exists {
 		return false, nil
 	}
@@ -95,7 +94,7 @@ func (a *Attestations) Delete(attestation *iotago.Attestation) (deleted bool, er
 	return issuerStorage.Delete(attestation.BlockID), nil
 }
 
-func (a *Attestations) Commit(index iotago.SlotIndex) (attestations *ads.Map[identity.ID, iotago.Attestation, *identity.ID, *iotago.Attestation], weight int64, err error) {
+func (a *Attestations) Commit(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], weight int64, err error) {
 	a.mutex.Lock(index)
 	defer a.mutex.Unlock(index)
 
@@ -127,7 +126,7 @@ func (a *Attestations) Weight(index iotago.SlotIndex) (weight int64, err error) 
 	return a.weight(index)
 }
 
-func (a *Attestations) Get(index iotago.SlotIndex) (attestations *ads.Map[identity.ID, iotago.Attestation, *identity.ID, *iotago.Attestation], err error) {
+func (a *Attestations) Get(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error) {
 	a.mutex.RLock(index)
 	defer a.mutex.RUnlock(index)
 
@@ -160,7 +159,7 @@ func (a *Attestations) Import(reader io.ReadSeeker) (err error) {
 			return errors.Wrapf(err, "failed to read attestation %d", i)
 		}
 
-		attestations.Set(identity.ID(importedAttestation.IssuerID), importedAttestation)
+		attestations.Set(importedAttestation.IssuerID, importedAttestation)
 
 		return
 	}); err != nil {
@@ -195,7 +194,7 @@ func (a *Attestations) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 			return 0, errors.Wrapf(writeErr, "failed to export attestations for slot %d", targetSlot)
 		}
 
-		if streamErr := attestations.Stream(func(issuerID identity.ID, attestation *iotago.Attestation) bool {
+		if streamErr := attestations.Stream(func(issuerID iotago.AccountID, attestation *iotago.Attestation) bool {
 			if writeErr = stream.WriteSerializable(writer, attestation); writeErr != nil {
 				writeErr = errors.Wrapf(writeErr, "failed to write attestation for issuer %s", issuerID)
 			} else {
@@ -211,13 +210,13 @@ func (a *Attestations) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 	})
 }
 
-func (a *Attestations) commit(index iotago.SlotIndex) (attestations *ads.Map[identity.ID, iotago.Attestation, *identity.ID, *iotago.Attestation], weight int64, err error) {
+func (a *Attestations) commit(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], weight int64, err error) {
 	if attestations, err = a.attestations(index); err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to get attestors for slot %d", index)
 	}
 
 	if cachedSlotStorage := a.cachedAttestations.Evict(index); cachedSlotStorage != nil {
-		cachedSlotStorage.ForEach(func(id identity.ID, attestationsOfID *shrinkingmap.ShrinkingMap[iotago.BlockID, *iotago.Attestation]) bool {
+		cachedSlotStorage.ForEach(func(id iotago.AccountID, attestationsOfID *shrinkingmap.ShrinkingMap[iotago.BlockID, *iotago.Attestation]) bool {
 			if latestAttestation := latestAttestation(attestationsOfID); latestAttestation != nil {
 				if attestorWeight, exists := a.weightsProviderFunc().Get(id); exists {
 					attestations.Set(id, latestAttestation)
@@ -245,11 +244,11 @@ func (a *Attestations) flush(index iotago.SlotIndex) (err error) {
 	return
 }
 
-func (a *Attestations) attestations(index iotago.SlotIndex) (attestations *ads.Map[identity.ID, iotago.Attestation, *identity.ID, *iotago.Attestation], err error) {
+func (a *Attestations) attestations(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error) {
 	if attestationsStorage, err := a.bucketedStorage(index).WithExtendedRealm([]byte{PrefixAttestations}); err != nil {
 		return nil, errors.Wrapf(err, "failed to access storage for attestors of slot %d", index)
 	} else {
-		return ads.NewMap[identity.ID, iotago.Attestation](attestationsStorage), nil
+		return ads.NewMap[iotago.AccountID, iotago.Attestation](attestationsStorage), nil
 	}
 }
 
