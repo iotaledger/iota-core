@@ -4,6 +4,7 @@ import (
 	"iota-core/pkg/protocol/engine/ledger"
 
 	"github.com/iotaledger/hive.go/runtime/event"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type MemPoolEvents struct {
@@ -17,7 +18,7 @@ type MemPoolEvents struct {
 
 	TransactionBooked *event.Event1[TransactionMetadata]
 
-	TransactionAccepted *event.Event1[TransactionID]
+	TransactionAccepted *event.Event1[iotago.TransactionID]
 
 	event.Group[MemPoolEvents, *MemPoolEvents]
 }
@@ -28,7 +29,7 @@ var NewMemPoolEvents = event.CreateGroupConstructor(func() *MemPoolEvents {
 		TransactionSolid:           event.New1[TransactionMetadata](),
 		TransactionExecuted:        event.New2[TransactionMetadata, []ledger.OutputMetadata](),
 		TransactionExecutionFailed: event.New2[TransactionMetadata, error](),
-		TransactionAccepted:        event.New1[TransactionID](),
+		TransactionAccepted:        event.New1[iotago.TransactionID](),
 		TransactionBooked:          event.New1[TransactionMetadata](),
 	}
 })

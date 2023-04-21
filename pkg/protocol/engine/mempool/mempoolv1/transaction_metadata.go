@@ -4,22 +4,22 @@ import (
 	"sync"
 
 	"iota-core/pkg/protocol/engine/ledger"
-	"iota-core/pkg/protocol/engine/mempool"
+	"iota-core/pkg/protocol/engine/vm"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 )
 
 type TransactionMetadata struct {
-	id            mempool.TransactionID
+	id            vm.TransactionID
 	inputs        []*OutputMetadata
 	outputs       []*OutputMetadata
 	missingInputs *advancedset.AdvancedSet[ledger.OutputID]
-	Transaction   mempool.Transaction
+	Transaction   vm.Transaction
 
 	mutex sync.RWMutex
 }
 
-func (t *TransactionMetadata) ID() mempool.TransactionID {
+func (t *TransactionMetadata) ID() vm.TransactionID {
 	return t.id
 }
 

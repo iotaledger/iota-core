@@ -1,8 +1,10 @@
 package mempoolv1
 
 import (
+	iotago2 "iota-core/pkg/iotago"
 	types2 "iota-core/pkg/protocol/engine/ledger"
 	"iota-core/pkg/protocol/engine/mempool"
+	"iota-core/pkg/protocol/engine/vm"
 
 	"golang.org/x/xerrors"
 
@@ -17,9 +19,9 @@ import (
 
 type MemPool struct {
 	ledger types2.Ledger
-	vm     mempool.VM
+	vm     vm.VM
 
-	transactions      *shrinkingmap.ShrinkingMap[mempool.TransactionID, *TransactionMetadata]
+	transactions      *shrinkingmap.ShrinkingMap[vm.TransactionID, *TransactionMetadata]
 	cachedOutputs     *shrinkingmap.ShrinkingMap[types2.OutputID, *OutputMetadata]
 	asyncLoadedEvents *shrinkingmap.ShrinkingMap[types2.OutputID, *event.Event1[*OutputMetadata]]
 
@@ -32,9 +34,9 @@ type MemPool struct {
 	solidificationMutex *syncutils.DAGMutex[types2.OutputID]
 }
 
-func New(vm mempool.VM, ledgerInstance types2.Ledger, workers *workerpool.Group) *MemPool {
+func New(vm vm.VM, ledgerInstance types2.Ledger, workers *workerpool.Group) *MemPool {
 	return &MemPool{
-		transactions:      shrinkingmap.New[mempool.TransactionID, *TransactionMetadata](),
+		transactions:      shrinkingmap.New[vm.TransactionID, *TransactionMetadata](),
 		cachedOutputs:     shrinkingmap.New[types2.OutputID, *OutputMetadata](),
 		asyncLoadedEvents: shrinkingmap.New[types2.OutputID, *event.Event1[*OutputMetadata]](),
 
@@ -49,7 +51,7 @@ func New(vm mempool.VM, ledgerInstance types2.Ledger, workers *workerpool.Group)
 	}
 }
 
-func (m *MemPool) ProcessTransaction(transaction mempool.Transaction) error {
+func (m *MemPool) ProcessTransaction(transaction vm.Transaction) error {
 	transactionMetadata, err := m.storeTransaction(transaction)
 	if err != nil {
 		return xerrors.Errorf("failed to store transaction: %w", err)
@@ -64,7 +66,7 @@ func (m *MemPool) ProcessTransaction(transaction mempool.Transaction) error {
 	return nil
 }
 
-func (m *MemPool) Output(id types2.OutputID) (types2.Output, bool) {
+func (m *MemPool) Output(id types2.OutputID) (iotago2.Output, bool) {
 	m.solidificationMutex.RLock(id)
 	defer m.solidificationMutex.RUnlock(id)
 
@@ -77,7 +79,7 @@ func (m *MemPool) Output(id types2.OutputID) (types2.Output, bool) {
 }
 
 // storeTransaction stores the given transaction in the MemPool and returns the corresponding metadata.
-func (m *MemPool) storeTransaction(transaction mempool.Transaction) (metadata *TransactionMetadata, err error) {
+func (m *MemPool) storeTransaction(transaction vm.Transaction) (metadata *TransactionMetadata, err error) {
 	transactionID, err := transaction.ID()
 	if err != nil {
 		return nil, xerrors.Errorf("failed to retrieve transaction ID: %w", err)
@@ -91,7 +93,7 @@ func (m *MemPool) storeTransaction(transaction mempool.Transaction) (metadata *T
 	metadata, isNew := m.transactions.GetOrCreate(transactionID, func() *TransactionMetadata {
 		return &TransactionMetadata{
 			id:            transactionID,
-			missingInputs: advancedset.New(lo.Map(inputs, mempool.Input.ID)...),
+			missingInputs: advancedset.New(lo.Map(inputs, iotago2.Input.ID)...),
 			inputs:        make([]*OutputMetadata, len(inputs)),
 		}
 	})

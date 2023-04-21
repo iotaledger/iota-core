@@ -1,9 +1,13 @@
-package mempool
+package iotago
+
+import (
+	iotago "github.com/iotaledger/iota.go/v4"
+)
 
 // Transaction is the type that is used to describe instructions how to modify the ledger state.
 type Transaction interface {
 	// ID returns the identifier of the Transaction.
-	ID() (TransactionID, error)
+	ID() (iotago.TransactionID, error)
 
 	// Inputs returns the inputs of the Transaction.
 	Inputs() ([]Input, error)

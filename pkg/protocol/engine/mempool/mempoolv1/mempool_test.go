@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	iotago2 "iota-core/pkg/iotago"
 	types2 "iota-core/pkg/protocol/engine/ledger"
 	"iota-core/pkg/protocol/engine/mempool"
+	"iota-core/pkg/protocol/engine/vm"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/xerrors"
@@ -17,7 +19,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-func mockedVM(inputTransaction mempool.Transaction, inputs []types2.Output, gasLimit ...uint64) (outputs []types2.Output, err error) {
+func mockedVM(inputTransaction vm.Transaction, inputs []iotago2.Output, gasLimit ...uint64) (outputs []iotago2.Output, err error) {
 	transaction, ok := inputTransaction.(*mockedTransaction)
 	if !ok {
 		return nil, xerrors.Errorf("invalid transaction type in MockedVM")
@@ -56,12 +58,12 @@ func TestMemPool(t *testing.T) {
 }
 
 type mockedTransaction struct {
-	id          mempool.TransactionID
-	inputs      []mempool.Input
+	id          vm.TransactionID
+	inputs      []iotago2.Input
 	outputCount uint16
 }
 
-func newMockedTransaction(outputCount uint16, inputs ...mempool.Input) *mockedTransaction {
+func newMockedTransaction(outputCount uint16, inputs ...iotago2.Input) *mockedTransaction {
 	return &mockedTransaction{
 		id:          tpkg.RandTransactionID(),
 		inputs:      inputs,
@@ -69,11 +71,11 @@ func newMockedTransaction(outputCount uint16, inputs ...mempool.Input) *mockedTr
 	}
 }
 
-func (m mockedTransaction) ID() (mempool.TransactionID, error) {
+func (m mockedTransaction) ID() (vm.TransactionID, error) {
 	return m.id, nil
 }
 
-func (m mockedTransaction) Inputs() ([]mempool.Input, error) {
+func (m mockedTransaction) Inputs() ([]iotago2.Input, error) {
 	return m.inputs, nil
 }
 
@@ -81,13 +83,13 @@ func (m mockedTransaction) String() string {
 	return "MockedTransaction(" + m.id.String() + ")"
 }
 
-var _ mempool.Transaction = &mockedTransaction{}
+var _ vm.Transaction = &mockedTransaction{}
 
 type mockedOutput struct {
 	id types2.OutputID
 }
 
-func newMockedOutput(transactionID mempool.TransactionID, index uint16) *mockedOutput {
+func newMockedOutput(transactionID vm.TransactionID, index uint16) *mockedOutput {
 	return &mockedOutput{id: iotago.OutputIDFromTransactionIDAndIndex(transactionID, index)}
 }
 
@@ -100,16 +102,16 @@ func (m mockedOutput) String() string {
 }
 
 type mockedLedger struct {
-	unspentOutputs map[types2.OutputID]types2.Output
+	unspentOutputs map[types2.OutputID]iotago2.Output
 }
 
 func newMockedLedger() *mockedLedger {
 	return &mockedLedger{
-		unspentOutputs: make(map[types2.OutputID]types2.Output),
+		unspentOutputs: make(map[types2.OutputID]iotago2.Output),
 	}
 }
 
-func (m mockedLedger) Output(id types2.OutputID) (output types2.Output, exists bool) {
+func (m mockedLedger) Output(id types2.OutputID) (output iotago2.Output, exists bool) {
 	output, exists = m.unspentOutputs[id]
 
 	return output, exists

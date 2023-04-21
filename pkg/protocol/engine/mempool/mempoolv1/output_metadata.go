@@ -1,7 +1,7 @@
 package mempoolv1
 
 import (
-	"iota-core/pkg/protocol/engine/ledger"
+	iotago2 "iota-core/pkg/iotago"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -11,10 +11,10 @@ type OutputMetadata struct {
 	ID       iotago.OutputID
 	Source   *TransactionMetadata
 	Spenders *advancedset.AdvancedSet[*TransactionMetadata]
-	output   ledger.Output
+	output   iotago2.Output
 }
 
-func (o *OutputMetadata) Output() ledger.Output {
+func (o *OutputMetadata) Output() iotago2.Output {
 	return o.output
 }
 
