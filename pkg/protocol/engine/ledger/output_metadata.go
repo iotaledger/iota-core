@@ -1,3 +1,3 @@
-package types
+package ledger
 
 type OutputMetadata interface{}

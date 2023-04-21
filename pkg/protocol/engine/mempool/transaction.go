@@ -1,4 +1,4 @@
-package types
+package mempool
 
 // Transaction is the type that is used to describe instructions how to modify the ledger state.
 type Transaction interface {

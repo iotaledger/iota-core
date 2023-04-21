@@ -1,4 +1,4 @@
-package types
+package ledger
 
 import (
 	iotago "github.com/iotaledger/iota.go/v4"
