@@ -3,25 +3,25 @@ module github.com/iotaledger/iota-core
 go 1.20
 
 require (
-	github.com/ethereum/go-ethereum v1.11.5
+	github.com/ethereum/go-ethereum v1.11.6
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/app v0.0.0-20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/autopeering v0.0.0-20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/constraints v0.0.0-20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/ds v0.0.0-20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/lo v0.0.0-20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/logger v0.0.0-20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230420102951-ba31debb32ab
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230420102951-ba31debb32ab
+	github.com/iotaledger/hive.go/ads v0.0.0-20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/app v0.0.0-20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/autopeering v0.0.0-20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/ds v0.0.0-20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/lo v0.0.0-20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/logger v0.0.0-20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230421071105-e0b495d651a5
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230421071105-e0b495d651a5
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230414063201-6891da12467e
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230419141639-711279e87d64
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230421070802-725c94096b50
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.27.1
