@@ -18,7 +18,7 @@ import (
 
 // SlotMutations is an in-memory data structure that enables the collection of mutations for uncommitted slots.
 type SlotMutations struct {
-	weights *account.Accounts
+	weights *account.Accounts[iotago.AccountID, *iotago.AccountID]
 
 	AcceptedBlockRemoved *event.Event1[iotago.BlockID]
 
@@ -35,7 +35,7 @@ type SlotMutations struct {
 }
 
 // NewSlotMutations creates a new SlotMutations instance.
-func NewSlotMutations(weights *account.Accounts, lastCommittedSlot iotago.SlotIndex) (newMutationFactory *SlotMutations) {
+func NewSlotMutations(weights *account.Accounts[iotago.AccountID, *iotago.AccountID], lastCommittedSlot iotago.SlotIndex) (newMutationFactory *SlotMutations) {
 	return &SlotMutations{
 		AcceptedBlockRemoved: event.New1[iotago.BlockID](),
 		weights:              weights,

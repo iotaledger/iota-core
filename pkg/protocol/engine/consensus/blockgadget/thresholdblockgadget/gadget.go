@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -108,7 +107,7 @@ func (g *Gadget) tryAccept(block *blocks.Block) {
 }
 
 func (g *Gadget) trackRatifierWeight(votingBlock *blocks.Block) {
-	ratifier := identity.ID(votingBlock.Block().IssuerID)
+	ratifier := votingBlock.Block().IssuerID
 
 	// Only track ratifier weight for issuers that are part of the committee.
 	if !g.sybilProtection.Committee().Has(ratifier) {

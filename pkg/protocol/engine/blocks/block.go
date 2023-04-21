@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
@@ -27,11 +26,11 @@ type Block struct {
 
 	// Booker block
 	booked    bool
-	witnesses *advancedset.AdvancedSet[identity.ID]
+	witnesses *advancedset.AdvancedSet[iotago.AccountID]
 
 	// BlockGadget block
 	accepted         bool
-	ratifiers        *advancedset.AdvancedSet[identity.ID]
+	ratifiers        *advancedset.AdvancedSet[iotago.AccountID]
 	ratifiedAccepted bool
 	confirmed        bool
 
@@ -50,16 +49,16 @@ type rootBlock struct {
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
 	return &Block{
-		witnesses:  advancedset.New[identity.ID](),
-		ratifiers:  advancedset.New[identity.ID](),
+		witnesses:  advancedset.New[iotago.AccountID](),
+		ratifiers:  advancedset.New[iotago.AccountID](),
 		modelBlock: data,
 	}
 }
 
 func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
 	return &Block{
-		witnesses: advancedset.New[identity.ID](),
-		ratifiers: advancedset.New[identity.ID](),
+		witnesses: advancedset.New[iotago.AccountID](),
+		ratifiers: advancedset.New[iotago.AccountID](),
 		rootBlock: &rootBlock{
 			blockID:      blockID,
 			commitmentID: commitmentID,
@@ -77,8 +76,8 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 	return &Block{
 		missing:        true,
 		missingBlockID: blockID,
-		witnesses:      advancedset.New[identity.ID](),
-		ratifiers:      advancedset.New[identity.ID](),
+		witnesses:      advancedset.New[iotago.AccountID](),
+		ratifiers:      advancedset.New[iotago.AccountID](),
 	}
 }
 
@@ -310,14 +309,14 @@ func (b *Block) SetBooked() (wasUpdated bool) {
 	return
 }
 
-func (b *Block) AddWitness(id identity.ID) (added bool) {
+func (b *Block) AddWitness(id iotago.AccountID) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
 	return b.witnesses.Add(id)
 }
 
-func (b *Block) Witnesses() []identity.ID {
+func (b *Block) Witnesses() []iotago.AccountID {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
@@ -344,14 +343,14 @@ func (b *Block) SetAccepted() (wasUpdated bool) {
 	return wasUpdated
 }
 
-func (b *Block) AddRatifier(id identity.ID) (added bool) {
+func (b *Block) AddRatifier(id iotago.AccountID) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
 	return b.ratifiers.Add(id)
 }
 
-func (b *Block) Ratifiers() []identity.ID {
+func (b *Block) Ratifiers() []iotago.AccountID {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 

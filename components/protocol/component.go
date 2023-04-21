@@ -8,7 +8,6 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
@@ -50,10 +49,10 @@ type dependencies struct {
 
 func provide(c *dig.Container) error {
 	return c.Provide(func(p2pManager *p2p.Manager) *protocol.Protocol {
-		validators := make(map[identity.ID]int64)
+		validators := make(map[iotago.AccountID]int64)
 		for _, validator := range ParamsProtocol.SybilProtection.Committee {
 			hex := lo.PanicOnErr(iotago.DecodeHex(validator.Identity))
-			validators[identity.ID(hex[:])] = validator.Weight
+			validators[iotago.AccountID(hex[:])] = validator.Weight
 		}
 
 		return protocol.New(
