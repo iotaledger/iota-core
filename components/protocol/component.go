@@ -158,6 +158,7 @@ func configure() error {
 
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
+		//nolint:contextcheck // false positive
 		deps.Protocol.Run()
 		<-ctx.Done()
 		Component.LogInfo("Gracefully shutting down the Protocol...")

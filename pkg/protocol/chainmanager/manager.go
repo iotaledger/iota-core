@@ -98,6 +98,7 @@ func (m *Manager) ProcessCandidateCommitment(commitment *iotago.Commitment) (isS
 	if chainCommitment == nil {
 		return false, nil
 	}
+
 	return isSolid, chainCommitment.Chain()
 }
 
@@ -224,6 +225,7 @@ func (m *Manager) processCommitment(commitment *iotago.Commitment) (isNew bool, 
 		} else {
 			m.Events.CommitmentBelowRoot.Trigger(commitment.MustID())
 		}
+
 		return false, isRootCommitment, chainCommitment
 	}
 
@@ -364,6 +366,7 @@ func (m *Manager) registerCommitment(commitment *iotago.Commitment) (isNew bool,
 	}
 
 	isSolid, _, wasForked = m.registerChild(parentCommitment, chainCommitment)
+
 	return true, isSolid, wasForked, chainCommitment
 }
 

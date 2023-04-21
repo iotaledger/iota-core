@@ -244,24 +244,26 @@ func (a *Attestations) flush(index iotago.SlotIndex) (err error) {
 	return
 }
 
-func (a *Attestations) attestations(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error) {
-	if attestationsStorage, err := a.bucketedStorage(index).WithExtendedRealm([]byte{PrefixAttestations}); err != nil {
+func (a *Attestations) attestations(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
+	attestationsStorage, err := a.bucketedStorage(index).WithExtendedRealm([]byte{PrefixAttestations})
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to access storage for attestors of slot %d", index)
-	} else {
-		return ads.NewMap[iotago.AccountID, iotago.Attestation](attestationsStorage), nil
 	}
+
+	return ads.NewMap[iotago.AccountID, iotago.Attestation](attestationsStorage), nil
 }
 
 func (a *Attestations) weight(index iotago.SlotIndex) (weight int64, err error) {
-	if value, err := a.bucketedStorage(index).Get([]byte{PrefixAttestationsWeight}); err != nil {
+	value, err := a.bucketedStorage(index).Get([]byte{PrefixAttestationsWeight})
+	if err != nil {
 		if errors.Is(err, kvstore.ErrKeyNotFound) {
 			return 0, nil
 		}
 
 		return 0, errors.Wrapf(err, "failed to retrieve weight of attestations for slot %d", index)
-	} else {
-		return int64(binary.LittleEndian.Uint64(value)), nil
 	}
+
+	return int64(binary.LittleEndian.Uint64(value)), nil
 }
 
 func (a *Attestations) setWeight(index iotago.SlotIndex, weight int64) (err error) {

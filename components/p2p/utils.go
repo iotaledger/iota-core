@@ -100,6 +100,7 @@ func isPeerDBNew() (bool, error) {
 		if len(files) != 0 {
 			break
 		}
+
 		fallthrough
 	case os.IsNotExist(err):
 		isNewDB = true

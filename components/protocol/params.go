@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 )
 
-// ParametersProtocol
+// ParametersProtocol contains the definition of the configuration parameters used by the Protocol.
 type ParametersProtocol struct {
 	// Snapshot contains snapshots related configuration parameters.
 	Snapshot struct {
@@ -56,7 +56,7 @@ type ParametersDatabase struct {
 	}
 }
 
-// ParamsProtocol
+// ParamsProtocol contains the configuration parameters used by the Protocol.
 var ParamsProtocol = &ParametersProtocol{}
 
 // ParamsDatabase contains configuration parameters used by Database.

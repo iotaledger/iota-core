@@ -10,6 +10,7 @@ import (
 func issuerID() iotago.AccountID {
 	issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
 	pubKey := issuerKey.Public()
+
 	return iotago.AccountID(iotago.Ed25519AddressFromPubKey(pubKey[:]))
 }
 
@@ -18,6 +19,7 @@ func issueActivityBlock() {
 		Component.LogDebug("Not issuing activity block because node is not bootstrapped yet.")
 		return
 	}
+
 	issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
 	pubKey := issuerKey.Public()
 	addr := iotago.Ed25519AddressFromPubKey(pubKey[:])

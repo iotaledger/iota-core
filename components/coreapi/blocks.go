@@ -42,12 +42,12 @@ func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
 	return bmResponse, nil
 }
 
-func blockIssuance(c echo.Context) (*blockIssuanceResponse, error) {
-	// todo
+func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
+	//nolint:nilnil // temporary nil,nil
 	return nil, nil
 }
 
-func sendBlock(c echo.Context) (*blockCreatedResponse, error) {
-	// todo
+func sendBlock(_ echo.Context) (*blockCreatedResponse, error) {
+	//nolint:nilnil // temporary nil,nil
 	return nil, nil
 }

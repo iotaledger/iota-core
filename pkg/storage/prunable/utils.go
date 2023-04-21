@@ -12,8 +12,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-var healthKey = []byte("bucket_health")
-
 // indexToRealm converts an baseIndex to a realm with some shifting magic.
 func indexToRealm(index iotago.SlotIndex) kvstore.Realm {
 	return []byte{
@@ -50,6 +48,7 @@ func getSortedDBInstancesFromDisk(baseDir string) (dbInfos []*dbInstanceFileInfo
 		if convErr != nil {
 			return nil
 		}
+
 		return &dbInstanceFileInfo{
 			baseIndex: iotago.SlotIndex(atoi),
 			path:      filepath.Join(baseDir, e.Name()),

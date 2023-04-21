@@ -196,6 +196,7 @@ func run() error {
 				Component.LogErrorf("Failed to stop the manager", "err", err)
 			}
 		}()
+		//nolint:contextcheck // false positive
 		addPeersFromConfigToManager(deps.ManualPeeringMgr)
 		<-ctx.Done()
 
@@ -254,5 +255,6 @@ func getKnownPeersFromConfig() ([]*manualpeering.KnownPeerToAdd, error) {
 	if err := json.Unmarshal([]byte(ParamsPeers.KnownPeers), &peers); err != nil {
 		return nil, errors.Wrap(err, "can't parse peers from json")
 	}
+
 	return peers, nil
 }

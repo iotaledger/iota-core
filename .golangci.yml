@@ -1,5 +1,10 @@
 run:
     tests: true
+    skip-dirs:
+        - components/dashboard
+    skip-files:
+        - ".*_test.go$"
+        - "testframework.go"
 
 linters-settings:
     gofmt:

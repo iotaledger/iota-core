@@ -35,6 +35,7 @@ func buildConnectPeerConfig(opts []ConnectPeerOption) *connectPeerConfig {
 	for _, o := range opts {
 		o(conf)
 	}
+
 	return conf
 }
 
@@ -149,6 +150,7 @@ func (m *Manager) GetNeighbor(id network.PeerID) (*Neighbor, error) {
 	if !ok {
 		return nil, ErrUnknownNeighbor
 	}
+
 	return nbr, nil
 }
 
@@ -159,6 +161,7 @@ func (m *Manager) DropNeighbor(id network.PeerID, group NeighborsGroup) error {
 		return errors.WithStack(err)
 	}
 	nbr.Close()
+
 	return nil
 }
 
@@ -184,6 +187,7 @@ func (m *Manager) AllNeighbors() []*Neighbor {
 	for _, n := range m.neighbors {
 		result = append(result, n)
 	}
+
 	return result
 }
 
@@ -194,6 +198,7 @@ func (m *Manager) AllNeighborsIDs() (ids []network.PeerID) {
 	for _, nbr := range neighbors {
 		ids = append(ids, nbr.ID())
 	}
+
 	return
 }
 
@@ -211,6 +216,7 @@ func (m *Manager) GetNeighborsByID(ids []network.PeerID) []*Neighbor {
 			result = append(result, n)
 		}
 	}
+
 	return result
 }
 
@@ -222,6 +228,7 @@ func (m *Manager) getNeighborWithGroup(id network.PeerID, group NeighborsGroup) 
 	if !ok || nbr.Group != group {
 		return nil, ErrUnknownNeighbor
 	}
+
 	return nbr, nil
 }
 
@@ -268,6 +275,7 @@ func (m *Manager) addNeighbor(ctx context.Context, p *peer.Peer, group Neighbors
 				nbr.Log.Errorw("error closing stream", "err", resetErr)
 			}
 		}
+
 		return errors.WithStack(err)
 	}
 	nbr.readLoop()
@@ -282,6 +290,7 @@ func (m *Manager) neighborExists(id network.PeerID) bool {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 	_, exists := m.neighbors[id]
+
 	return exists
 }
 
@@ -298,6 +307,7 @@ func (m *Manager) setNeighbor(nbr *Neighbor) error {
 		return errors.WithStack(ErrDuplicateNeighbor)
 	}
 	m.neighbors[nbr.ID()] = nbr
+
 	return nil
 }
 

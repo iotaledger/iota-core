@@ -14,5 +14,6 @@ func GetAddress(p *peer.Peer) string {
 	if p2pEndpoint == nil {
 		panic("peer does not support p2p Endpoint")
 	}
+
 	return net.JoinHostPort(p.IP().String(), strconv.Itoa(p2pEndpoint.Port()))
 }

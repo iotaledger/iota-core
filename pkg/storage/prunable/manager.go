@@ -164,6 +164,7 @@ func (m *Manager) setMaxPruned(index iotago.SlotIndex) (previous iotago.SlotInde
 	}
 
 	m.maxPruned = index
+
 	return
 }
 
@@ -217,6 +218,7 @@ func (m *Manager) createBucket(db *dbInstance, index iotago.SlotIndex) (bucket k
 	if err != nil {
 		panic(err)
 	}
+
 	return bucket
 }
 
