@@ -204,7 +204,7 @@ func (p *Protocol) initEngineManager() {
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("could not load active engine: %s", err))
 	}
 	p.mainEngine = mainEngine
 }
