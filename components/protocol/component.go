@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -89,11 +90,11 @@ func configure() error {
 		Component.LogErrorf("Error in Engine: %s", err)
 	})
 
-	deps.Protocol.Events.Network.Error.Hook(func(err error, id identity.ID) {
+	deps.Protocol.Events.Network.Error.Hook(func(err error, id network.PeerID) {
 		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})
 
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
+	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
 		Component.LogInfof("BlockReceived: %s", block.ID())
 	})
 
@@ -145,11 +146,11 @@ func configure() error {
 		Component.LogInfof("RequestCommitment: %d", id)
 	})
 
-	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id identity.ID) {
+	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id network.PeerID) {
 		Component.LogInfof("SlotCommitmentRequestReceived: %d", commitmentID)
 	})
 
-	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, id identity.ID) {
+	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, id network.PeerID) {
 		Component.LogInfof("SlotCommitmentReceived: %d", commitment.MustID())
 	})
 

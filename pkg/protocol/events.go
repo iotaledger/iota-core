@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
@@ -10,10 +9,7 @@ import (
 )
 
 type Events struct {
-	InvalidBlockReceived     *event.Event1[identity.ID]
-	CandidateEngineActivated *event.Event1[*engine.Engine]
-	MainEngineSwitched       *event.Event1[*engine.Engine]
-	Error                    *event.Event1[error]
+	Error *event.Event1[error]
 
 	Network      *core.Events
 	Engine       *engine.Events
@@ -25,10 +21,7 @@ type Events struct {
 
 var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 	return &Events{
-		InvalidBlockReceived:     event.New1[identity.ID](),
-		CandidateEngineActivated: event.New1[*engine.Engine](),
-		MainEngineSwitched:       event.New1[*engine.Engine](),
-		Error:                    event.New1[error](),
+		Error: event.New1[error](),
 
 		Network:      core.NewEvents(),
 		Engine:       engine.NewEvents(),

@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 )
 
@@ -75,7 +76,7 @@ type Manager struct {
 	isStopped         bool
 	reconnectInterval time.Duration
 	knownPeersMutex   sync.RWMutex
-	knownPeers        map[identity.ID]*knownPeer
+	knownPeers        map[network.PeerID]*knownPeer
 	workerPool        *workerpool.WorkerPool
 
 	onGossipNeighborRemovedHook *event.Hook[func(*p2p.NeighborRemovedEvent)]
@@ -89,7 +90,7 @@ func NewManager(p2pm *p2p.Manager, local *peer.Local, workerPool *workerpool.Wor
 		local:             local,
 		log:               log,
 		reconnectInterval: defaultReconnectInterval,
-		knownPeers:        map[identity.ID]*knownPeer{},
+		knownPeers:        map[network.PeerID]*knownPeer{},
 		workerPool:        workerPool,
 	}
 	return m
@@ -293,7 +294,7 @@ func (m *Manager) removeAllKnownPeers() error {
 	return resultErr
 }
 
-func (m *Manager) removePeerByID(peerID identity.ID) error {
+func (m *Manager) removePeerByID(peerID network.PeerID) error {
 	kp, exists := m.knownPeers[peerID]
 	if !exists {
 		return nil

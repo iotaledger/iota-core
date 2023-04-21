@@ -5,11 +5,11 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -67,7 +67,7 @@ func (f *Filter) Events() *filter.Events {
 }
 
 // ProcessReceivedBlock processes block from the given source.
-func (f *Filter) ProcessReceivedBlock(block *model.Block, source identity.ID) {
+func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID) {
 	// TODO: if TX add check for TX timestamp
 
 	// Check if the block is trying to commit to a slot that is not yet committable
