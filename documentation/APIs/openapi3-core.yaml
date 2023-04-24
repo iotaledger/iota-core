@@ -83,10 +83,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/InfoResponse'
               examples:
-                IOTA:
+                default:
                   $ref: '#/components/examples/get-info-response-example'
-                Shimmer:
-                  $ref: '#/components/examples/get-info-response-example-shimmer'
         '403':
           description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
           content:
@@ -149,17 +147,17 @@ paths:
             schema:
               $ref: '#/components/schemas/SubmitBlockRequest'
             examples:
-              Minimal Block with Tagged Data Payload:
+              Minimal block with Tagged Data Payload:
                 $ref: "#/components/examples/post-tagged-data-block-request-example-minimal"
-              Full block with Transaction Payload:
+              Full block with Tagged Data Payload:
                 $ref: >-
-                  #/components/examples/post-transaction-block-request-example-full
+                  #/components/examples/post-tagged-data-block-request-example-full
               Minimal Block with Transaction Payload:
                 $ref: >-
                   #/components/examples/post-transaction-block-request-example-minimal
-              Only Transaction payload:
+              Full block with Transaction Payload:
                 $ref: >-
-                  #/components/examples/post-transaction-block-transaction-request-example
+                  #/components/examples/post-transaction-block-request-example-full
           application/vnd.iota.serializer-v1:
             schema:
               type: string
@@ -294,9 +292,6 @@ paths:
               examples:
                 New Block:
                   $ref: '#/components/examples/get-block-by-id-response-example-new'
-                Solid:
-                  $ref: >-
-                    #/components/examples/get-block-by-id-response-example-solid
                 Confirmed:
                   $ref: >-
                     #/components/examples/get-block-by-id-response-example-confirmed
@@ -358,10 +353,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/OutputResponse'
               examples:
-                unspent:
-                  $ref: '#/components/examples/get-outputs-by-id-response-unspent-example'
-                spent:
-                  $ref: '#/components/examples/get-outputs-by-id-response-spent-example'
+                default:
+                  $ref: '#/components/examples/get-outputs-by-id-response-example'
             application/vnd.iota.serializer-v1:
               schema:
                 type: string
@@ -1029,79 +1022,534 @@ components:
           - "debug/v2"
     get-info-response-example:
       value:
-    get-info-response-example-shimmer:
-      value:
+        name: Example Node
+        version: 1.0.0
+        issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        status:
+          isHealthy: true
+          lastAcceptedBlockID: "123abc"
+          lastConfirmedBlockID: "456def"
+          confirmedSlot: 100
+          ATT: 1682328545
+          RATT: 1682328550
+          CTT: 1682328525
+          RCTT: 1682328535
+          latestCommittedSlot: 107
+          pruningSlot: 20
+        metrics:
+          blocksPerSecond: 17
+          referencedBlocksPerSecond: 16.2
+          referencedRate: 98.82352941176471
+        supportedProtocolVersions:
+          - 2
+          - 3
+        protocol:
+          networkName: iota-core-testnet
+          bech32Hrp: rms
+          tokenSupply: "2779530283277761"
+          version: 3
+          minPowScore: 1000
+          belowMaxDepth: 15
+          rentStructure:
+            vByteCost: 500
+            vByteFactorData: 1
+            vByteFactorKey: 10
+          genesisSlotIndex: 0
+        baseToken:
+          baseToken:
+          name: "Shimmer"
+          tickerSymbol: "SMR"
+          unit: "SMR"
+          decimals: 6
+          subunit: "glow"
+          useMetricPrefix: false
+        features:
+          - pow
+          - consensus
+
     get-buildingBlock-response-example:
       value:
+        strongParents:
+          - "0x4f746934d0075179a37ca3e807b7e793ec4ec9189ba31c9ad092d7497b01118c1000000000000000"
+          - "0x59daaaba1cd10cd268966376e17710d100c90826fe258753d461acac99b7e3341500000000000000"
+        weakParents:
+          - "0xebb058f1f1c8f1ac6508465deeee1dd090396f9e6e2b5c103eef5583f20a0c133a00000000000000"
+          - "0xb173e2d2b6f72600f00da84492ddb6eadee703dc39fb846725828059272093fb3b00000000000000"
+        shallowLikeParents:
+          - "0xdbf86c778d69f413296c2d4d3086d76c74bf4d719e6e95c03a3d9a955ed39bcf3e00000000000000"
+          - "0xf15b2ec698e396c9d2e69bc753246631aedebb657da09ba0e0c8d42518a1e8953e00000000000000"
+        latestFinalizedSlot: 1422
+        commitment:
+          index: 1432
+          prevID: "0xbf07dc16986166953f5a72c19d78642aab6cbde63964a2369ec3d425144eb42b3800000000000000"
+          rootsID: "350d43147235b544344066eb908e48e33c8374ea161b6ec8e7b20e6d98b47616"
+          cumulativeWeight: 45678
+
     post-blocks-response-example:
       value:
         blockId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
 
     get-block-by-id-response-example-new:
       value:
-
-    get-block-by-id-response-example-solid:
-      value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "pending"
+        txState: "pending"
+        reissuePayload: false
 
     get-block-by-id-response-example-confirmed:
       value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "confirmed"
+        txState: "confirmed"
 
     get-block-by-id-response-example-conflicting:
       value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "pending"
+        txState: "pending"
+        blockStateReason: 1
+        txStateReason: 5
+
 
     post-tagged-data-block-request-example-minimal:
       value:
+        protocolVersion: 3
+        payload:
+          type: 5
+          tag: "0x72616e646f6d207461673a206769746875622e636f6d"
+          data: "0x5468697320697320616e206578616d706c6520746578742077616c6c20776974682070726f746f636f6c20332e"
 
     post-transaction-block-request-example-minimal:
       value:
+        protocolVersion: 3
+        payload:
+          type: 6
+          essence:
+            type: 1
+            networkId: "1337133713371337"
+            creationTime: 1682328545
+            inputsCommitment: "0x0e6c2998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+            inputs:
+              - type: 0
+                transactionId: "0x0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0xc138ecdc882010245e9574fbc1f1f43cc7c182fa890e46e018365dd49de0f16e"
+                transactionOutputIndex: 0
+            outputs:
+              - type: 3
+                amount: "50000000"
+                unlockConditions:
+                  - type: 0
+                    address:
+                      type: 0
+                      pubKeyHash: "0xd49931814e6bfbb8e221f1b2936e206e5a6b6abeb9c070f8603814c525c9abe3"
+          unlocks:
+            - type: 0
+              signature:
+                type: 0
+                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
+                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
+            - type: 1
+              reference: 0
+            - type: 1
+              reference: 0
 
-    post-transaction-block-transaction-request-example:
+    post-tagged-data-block-request-example-full:
       value:
+        protocolVersion: 3
+        networkID: 10
+        strongParents:
+          - "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          - "0x408a53af982c49d1398ab5c5b5f5b390d4c4da7da48b61bb9ba7f97c1e8dd7f60000000000000000"
+        weakParents:
+          - "0xe8a904ce3ee081f20a68bb38b2d406cfd138775ba52ea555d93a4e4d4b0ad8440000000000000000"
+          - "0xbce912a0f383cd07660d3c08f3d3f3c7fb9de31e2cc1b93d4c29332ef693ba0c0000000000000000"
+        shallowLikeParents:
+          - "0x0276d29ec6b3cbbf3ed6d1f01af8e29b9c6a9ee9c9375e8e5b5b5c5b5b5d45580000000000000000"
+          - "0x70a5ce5d8fc3290a9885b1af5d8766d51db89a67a6a839f6d23a6cb8d6f3b6e30000000000000000"
+        issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
+        issuingTime: 1649442459
+        slotCommitment:
+          index: 110
+          prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
+          rootsID: "f4ab06bc4b5db1410b2a7d54c43143ba5a6940e725e43c7f62ddc111d96f83f3"
+          cumulativeWeight: 12345
+        latestFinalizedSlot: 98
+        payload:
+          type: 5
+          tag: "0x72616e646f6d207461673a206769746875622e636f6d"
+          data: "0x5468697320697320616e206578616d706c6520746578742077616c6c20776974682070726f746f636f6c20332e"
+        nonce: "105368"
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
+
 
     post-transaction-block-request-example-full:
       value:
+        protocolVersion: 3
+        networkID: 10
+        strongParents:
+          - "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          - "0x408a53af982c49d1398ab5c5b5f5b390d4c4da7da48b61bb9ba7f97c1e8dd7f60000000000000000"
+        weakParents:
+          - "0xe8a904ce3ee081f20a68bb38b2d406cfd138775ba52ea555d93a4e4d4b0ad8440000000000000000"
+          - "0xbce912a0f383cd07660d3c08f3d3f3c7fb9de31e2cc1b93d4c29332ef693ba0c0000000000000000"
+        shallowLikeParents:
+          - "0x0276d29ec6b3cbbf3ed6d1f01af8e29b9c6a9ee9c9375e8e5b5b5c5b5b5d45580000000000000000"
+          - "0x70a5ce5d8fc3290a9885b1af5d8766d51db89a67a6a839f6d23a6cb8d6f3b6e30000000000000000"
+        issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
+        issuingTime: 1649442459
+        slotCommitment:
+          index: 110
+          prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
+          rootsID: "f4ab06bc4b5db1410b2a7d54c43143ba5a6940e725e43c7f62ddc111d96f83f3"
+          cumulativeWeight: 12345
+        latestFinalizedSlot: 98
+        payload:
+          type: 6
+          essence:
+            type: 1
+            networkId: "1337133713371337"
+            creationTime: 1649442459
+            inputsCommitment: "0x0e6c2998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+            inputs:
+              - type: 0
+                transactionId: "0x0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0xc138ecdc882010245e9574fbc1f1f43cc7c182fa890e46e018365dd49de0f16e"
+                transactionOutputIndex: 0
+            outputs:
+              - type: 3
+                amount: "50000000"
+                unlockConditions:
+                  - type: 0
+                    address:
+                      type: 0
+                      pubKeyHash: "0xd49931814e6bfbb8e221f1b2936e206e5a6b6abeb9c070f8603814c525c9abe3"
+            payload:
+          unlocks:
+            - type: 0
+              signature:
+                type: 0
+                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
+                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
+            - type: 1
+              reference: 0
+            - type: 1
+              reference: 0
+        nonce: "105368"
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
+
 
     get-block-by-id-empty-response-example:
       value:
+        protocolVersion: 3
+        parents:
+          - "0x7e0a99f3a1fa23b1c38a2e35d9c0d387a69a335c0d7d91b8e0694840ed2be0cf"
+          - "0x9a9a47ec0fb93783ee0dd7f7021bb98724be39a06e20c25d87e21accd34d5b98"
+        nonce: '8423'
 
     get-block-by-id-transaction-response-example:
       value:
+        protocolVersion: 3
+        networkID: 10
+        strongParents:
+          - "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          - "0x408a53af982c49d1398ab5c5b5f5b390d4c4da7da48b61bb9ba7f97c1e8dd7f60000000000000000"
+        weakParents:
+          - "0xe8a904ce3ee081f20a68bb38b2d406cfd138775ba52ea555d93a4e4d4b0ad8440000000000000000"
+          - "0xbce912a0f383cd07660d3c08f3d3f3c7fb9de31e2cc1b93d4c29332ef693ba0c0000000000000000"
+        shallowLikeParents:
+          - "0x0276d29ec6b3cbbf3ed6d1f01af8e29b9c6a9ee9c9375e8e5b5b5c5b5b5d45580000000000000000"
+          - "0x70a5ce5d8fc3290a9885b1af5d8766d51db89a67a6a839f6d23a6cb8d6f3b6e30000000000000000"
+        issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
+        issuingTime: 1649442459
+        slotCommitment:
+          index: 2310
+          prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
+          rootsID: "f4ab06bc4b5db1410b2a7d54c43143ba5a6940e725e43c7f62ddc111d96f83f3"
+          cumulativeWeight: 12345
+        latestFinalizedSlot: 98
+        payload:
+          type: 6
+          essence:
+            type: 1
+            networkId: "1337133713371337"
+            creationTime: 1649442459
+            inputsCommitment: "0x0e6c2998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+            inputs:
+              - type: 0
+                transactionId: "0x0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0xc138ecdc882010245e9574fbc1f1f43cc7c182fa890e46e018365dd49de0f16e"
+                transactionOutputIndex: 0
+            outputs:
+              - type: 3
+                amount: "50000000"
+                unlockConditions:
+                  - type: 0
+                    address:
+                      type: 0
+                      pubKeyHash: "0xd49931814e6bfbb8e221f1b2936e206e5a6b6abeb9c070f8603814c525c9abe3"
+            payload:
+          unlocks:
+            - type: 0
+              signature:
+                type: 0
+                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
+                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
+            - type: 1
+              reference: 0
+            - type: 1
+              reference: 0
+        nonce: "105368"
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
+
 
     get-block-by-id-tagged-data-response-example:
       value:
+        protocolVersion: 3
+        networkID: 10
+        strongParents:
+          - "0x2f746934d0075179a37ca3e807b7e793ec4ec9189ba31c9ad092d7497b01118c1000000000000000"
+          - "0x1a4b52759a4a4e879d38478139913f71c6fcd2ee76c924e5be2b9c9321d61f6e1000000000000000"
+          - "0xb55045d5d57818e93b2c9e75f5e328ce5a04f3db3a5a5cf44949f7c8e4d0b4f10000000000000000"
+        weakParents:
+          - "0xa5ee03d7196d7ab8c0d61740f9c91e16b2bc33d82a22b531c71ccf117951682d1000000000000000"
+          - "0x3d1b7b51c66e2b06c1e819d82e7f20d1870c753bd25d19aae78a8b70e06b1aef1000000000000000"
+          - "0xd2ca3ef0f7d2f0b2d02e857cbe77f33a3bce54cf3d3c5f0446b7f6da3d8a3ea8000000000000000"
+        shallowLikeParents:
+          - "0x4f746934d0075179a37ca3e807b7e793ec4ec9189ba31c9ad092d7497b01118c1000000000000000"
+          - "0xc9e87d77b547deea65e7f1a36d125ef7c901139bebb3158e76ee1e9b71dcbfe4000000000000000"
+          - "0x2d237c37248f1e833c08a1189f9a69c0b3f8c3e039d14291ab7e60a88c4f4d3c000000000000000"
+        issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
+        issuingTime: 1649442459
+        slotCommitment:
+          index: 928
+          prevID: "0x6dcf06b23919b4d4c1c4d1f51af7e510618a2cecb7f2d4c4d0b4a4deef531b7e0000000000000000"
+          rootsID: "51f7c406c6d5e52fc8642cf3ca3b1403a57c5bf6f4529a1a0e107822c27d03f7"
+          cumulativeWeight: 98765
+        latestFinalizedSlot: 98
+        payload:
+          type: 5
+          tag: "0x68656c6c6f20776f726c64"
+          data: "0x5370616d6d696e6720646174612e0a436f756e743a203037323935320a54696d657374616d703a20323032312d30322d31315431303a32333a34392b30313a30300a54697073656c656374696f6e3a203934c2b573"
+        nonce: "105368"
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
 
-    get-outputs-by-id-response-unspent-example:
+    get-outputs-by-id-response-example:
       value:
-
-    get-outputs-by-id-response-spent-example:
-      value:
+        type: 3
+        amount: "1000"
+        unlockConditions:
+          - type: 0
+            address:
+              type: 0
+              pubKeyHash: "0x8eaf87ac1f52eb05f2c7c0c15502df990a228838dc37bd18de9503d69afd257d"
 
     get-output-metadata-by-id-response-unspent-example:
       value:
+        blockId: "0xd3a0a0c76ab2d9b406a32c30c43e102fe0f39a12a3f6c1e3b19d239db2f18d75"
+        transactionId: "0x1c52e8e630d1c6e45ab6f46c63d8d6cb02e6c2ed6e31b6c97d6f5c5f5a5d5c5b"
+        outputIndex: 3
+        isSpent: false
+        includedCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
+        latestCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
 
     get-output-metadata-by-id-response-spent-example:
       value:
+        blockId: "0xd3a0a0c76ab2d9b406a32c30c43e102fe0f39a12a3f6c1e3b19d239db2f18d75"
+        transactionId: "0x1c52e8e630d1c6e45ab6f46c63d8d6cb02e6c2ed6e31b6c97d6f5c5f5a5d5c5b"
+        outputIndex: 3
+        isSpent: true
+        commitmentIdSpent: "0x4b91c935926c77d0ac9b4a569c3eb3b0f0c9918f2d4f4d9bb1c7dfc19b41e4c2"
+        transactionIdSpent: "0x1ee46e19f4219ee65afc10227d0ca22753f76ef32d1e922e5cbe3fbc9b5a5298"
+        includedCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
+        latestCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
 
     get-included-block-of-transaction-example-json:
       value:
+        protocolVersion: 3
+        networkID: 10
+        strongParents:
+          - "0x9f1d034765d23c40191c5ebe1c6d35d708b71098c8d5ca416f5fb5b5ab23d7c40000000000000000"
+          - "0x0e311af8c74c57b9fb80c0ec1611ebcc0fdecc309e7c01b0df902bd0da8b0490000000000000000"
+        issuerID: "0x4c4f0b0d12eb4e4d92f8e0bbf69e0320bde236a5550205827e15eaa482431bfb"
+        issuerPublicKey: "0x3daa3e847a75c9f2992d7804c4a6012d1cefb4b4ed4c19df92b1f26860b50510"
+        issuingTime: 1650810641
+        slotCommitment:
+          index: 873
+          prevID: "0xb5b5ac29d5e8fa7c3af29564ef2237c34e29dfe0c6e73a688e9c913b266bc36f0000000000000000"
+          rootsID: "43d2c8e7e874429a9b59c73b6ec251f09983fc1f09853d6cfc45ba88214c6a45"
+          cumulativeWeight: 23456
+        latestFinalizedSlot: 87
+        payload:
+          type: 6
+          essence:
+            type: 1
+            networkId: "1337133713371337"
+            creationTime: 1650810641
+            inputsCommitment: "0x4d423ed05816f8af0e86bb40b3f43b31f20f35cfa9d95b0762d5220a0cc16914"
+            inputs:
+              - type: 0
+                transactionId: "0x9f1d034765d23c40191c5ebe1c6d35d708b71098c8d5ca416f5fb5b5ab23d7c4"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0x0e311af8c74c57b9fb80c0ec1611ebcc0fdecc309e7c01b0df902bd0da8b0490"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0x34a08f1d72c65e79bce03e7d19808d4c422b4a4a4c9e79e0a4d054ce1f91b96e"
+                transactionOutputIndex: 0
+            outputs:
+              - type: 3
+                amount: "50000000"
+                unlockConditions:
+                  - type: 0
+                    address:
+                      type: 0
+                      pubKeyHash: "0x46180c14d31c8bfedf131de79816061b3e3dbf16fc36d52a31e140ccf808b2f2"
+            payload:
+          unlocks:
+            - type: 
+              signature:
+                type: 0
+                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
+                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
+            - type: 1
+              reference: 0
+            - type: 1
+              reference: 0
+        nonce: "105368"
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
 
     get-block-by-id-response-example-included:
       value:
+        blockId: "0x3a1f5795b46bf5db14df44f603c28453622d96f10ec54f1a8e781c59a1f4d4fa"
+        strongParents:
+          - "0x2d7f26c53bdaa80b8f7bea6c2f6aa128f65719c233d7e285019fe156a6e192a9"
+          - "0xd49d937ee12d7f8e54b70ba7d3bb3b1b7d8aa2c9f0d5835a5d5a2598bf44eab6"
+        blockState: "pending"
+        txState: "pending"
+        reissuePayload: false
 
     get-commitment-response-example:
       value:
+        index: 986
+        prevID: "0x8fb6cbb1ecf02c6b5a6a5a6a5f6c5a6a5f6c5a6a5a6a5a6a5f6c5a6a5a6a5f6c50000000000000000"
+        rootsID: "3e3a3f518e88f73d691be29c2f99469e747ad9e4b4a98d4a0176f012881942af"
+        cumulativeWeight: 78901
 
     get-commitment-response-binary-example:
       value: "070000000a1a0000977c626276b19ef8b3c445709f2f0f2ccc4abb98d97617f421f240c0d1ee066d4306e67a0321889ef8ec89b7eff1378049e058f0fa87a78c2452ae72631a5a99d913d1cbb3525b8faa1800e28dfcb28154bcba10154c39ef87ceda793cb44f58ae1549c88ea13fe4a9695bb6f0aba6cb756522209e5066a96039ae12b398b975693bdc21e222997c86ff9bfc5844f0372d58ff6fa510688e53c181bbdf4db41f9b627540a70e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a80000000300d85e5b1590d898d1e0cdebb2e3b5337c8b76270142663d78811683ba47c17c989ad7a8f0ff2c6438bf435786d4a5b0125a5caf7367061b49a739389d5ebea234c0466c86f88a3f8add03bff04c2e34b214683f2f6983641e1d1185da7e2c3e0200d9922819a39e94ddf3907f4b9c8df93f39f026244fcb609205b9a879022599f218be2536d8b7b8547faa3dbdfe98339ebe9e2b2417a8a03eee02b2a8312b9e026dd0a33261a58a240cd0a1b06cdf1775d98d316f162d3eec402f4bf08bea2a0700f9d9656a60049083eef61487632187b351294c1fa23d118060d813db6d03e8b6ca8180d435708e826bc2042ccd667babb59c5cc461ff29dba966359fcd6fc511cdfdf10d6576f36ac2a6e5cb691e13968c13947ffbd9239939d3802b2fbe0f06"
 
     get-utxo-changes-response-example:
       value:
+        index: 789
+        createdOutputs:
+          - "0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2"
+          - "0x3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4"
+        consumedOutputs:
+          - "0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6"
+          - "0x7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7"
 
     get-peers-response-example:
       value:
+        - id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
+          multiAddresses:
+            - "/dns/abc.com/tcp/15602"
+          alias: abc
+          relation: known
+          connected: true
+          gossip:
+            heartbeat:
+              latestCommittedSlotIndex: 61527
+              prunedSlotIndex: 61200
+              latestConfirmedSlotIndex: 61527
+              connectedNeighbors: 5
+              syncedNeighbors: 7
+            metrics:
+              newBlocks: 3799
+              knownBlocks: 554
+              receivedBlocks: 4370
+              receivedBlockRequests: 0
+              receivedHeartbeats: 1
+              sentBlocks: 6
+              sentBlockRequests: 4325
+              sentHeartbeats: 9
+              droppedPackets: 0
+        - id: 12D3KooWNYDcJqxnWqCLSgeQKqNStwFUqHSJXPdSYTJnfxQESzie
+          multiAddresses:
+            - "/dns/xyz.com/tcp/15600"
+          alias: xyz
+          relation: known
+          connected: true
+          gossip:
+            heartbeat:
+              latestCommittedSlotIndex: 61527
+              prunedSlotIndex: 56508
+              latestConfirmedSlotIndex: 61527
+              connectedNeighbors: 5
+              syncedNeighbors: 6
+            metrics:
+              newBlocks: 510
+              knownBlocks: 79
+              receivedBlocks: 589
+              receivedBlockRequests: 0
+              receivedHeartbeats: 1
+              sentBlocks: 42
+              sentBlockRequests: 576
+              sentHeartbeats: 9
+              droppedPackets: 0
 
     get-peer-response-example:
       value:
+        id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
+        multiAddresses:
+          - "/dns/abc.com/tcp/15602"
+        alias: abc
+        relation: known
+        connected: true
+        gossip:
+          heartbeat:
+            latestCommittedSlotIndex: 61527
+            prunedSlotIndex: 61200
+            latestConfirmedSlotIndex: 61527
+            connectedNeighbors: 5
+            syncedNeighbors: 7
+          metrics:
+            newBlocks: 3799
+            knownBlocks: 554
+            receivedBlocks: 4370
+            receivedBlockRequests: 0
+            receivedHeartbeats: 1
+            sentBlocks: 6
+            sentBlockRequests: 4325
+            sentHeartbeats: 9
+            droppedPackets: 0
 
     post-peer-request-example:
       value:
@@ -1111,6 +1559,29 @@ components:
 
     post-peer-response-example:
       value:
+        id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
+        multiAddresses:
+          - "/dns/abc.com/tcp/15602"
+        alias: abc
+        relation: known
+        connected: true
+        gossip:
+          heartbeat:
+            latestCommittedSlotIndex: 61527
+            prunedSlotIndex: 61200
+            latestConfirmedSlotIndex: 61527
+            connectedNeighbors: 5
+            syncedNeighbors: 7
+          metrics:
+            newBlocks: 3799
+            knownBlocks: 554
+            receivedBlocks: 4370
+            receivedBlockRequests: 0
+            receivedHeartbeats: 1
+            sentBlocks: 6
+            sentBlockRequests: 4325
+            sentHeartbeats: 9
+            droppedPackets: 0
 
     database-prune-request-example:
       value:
@@ -1176,7 +1647,7 @@ components:
         slotCommitment:
           $ref: '#/components/schemas/Commitment'
           description: The slot commitment contains in this block.
-        latestConfirmedSlot:
+        latestFinalizedSlot:
           type: integer
           description: The latest confirmed slot index of the node when issuing this block.
         payload:
@@ -2171,7 +2642,7 @@ components:
           items:
             type: string
           description: The block identifiers that can be used to a attach a block to. Hex-encoded with 0x prefix.
-        latestConfirmedSlot:
+        latestFinalizedSlot:
           type: integer
           description: The latest confirmed slot index.
         commitment:
@@ -2197,12 +2668,52 @@ components:
       description: Submits a block to the node.
       properties:
         protocolVersion:
+          type: number
+          description: Protocol version identifier. It also tells which protocol rules apply to the block.
+        networkID:
+          type: number
+          description: Network version identifier. It also tells which network the node is running.
+        strongParents:
+          type: array
+          description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
+        weakParents:
+          type: array
+          description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
+        shallowLikeParents:
+          type: array
+          description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
+        issuerID:
+          type: string
+          description: The identifier of the issuer of this block.
+        issuerPublicKey:
+          type: string
+          description: The public key of the issuer.
+        issuingTime:
           type: integer
-          description: Protocol version number of the block. It also tells which protocol rules apply to the block.
+          description: The timestamp of issuing this block.
+        slotCommitment:
+          $ref: '#/components/schemas/Commitment'
+          description: The slot commitment contains in this block.
+        latestFinalizedSlot:
+          type: integer
+          description: The latest confirmed slot index of the node when issuing this block.
         payload:
+          description: The inner payload of the block. Can be nil.
           oneOf:
             - $ref: '#/components/schemas/TransactionPayload'
             - $ref: '#/components/schemas/TaggedDataPayload'
+        nonce:
+          type: string
+          description: The nonce which lets this block fulfill the Proof-of-Work requirement. Plain string encoded number.
+        signature:
+          type: string
+          description: The signature of entire block, signed by the issuer.
       required:
         - protocolVersion
 
