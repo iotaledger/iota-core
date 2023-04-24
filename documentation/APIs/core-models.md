@@ -228,6 +228,8 @@ Block ID denotes an identifier of a block, with type `ArrayBytes[40]`. It is cal
 2. `id` = hash(Concat(`content_hash`, signatureBytes))
 3. And finally, `BlockID` = Concat(`id`, `slot_index`) 
 
+The string format of Block ID is hexadecimal encoding of Block ID with `0x` prefix.
+
 ### Block Syntactic Validation Rules
 
 * Block size must not exceeds `MaxBlockSize` bytes, currently is `32768`.
@@ -309,6 +311,7 @@ Caculation:
 1. `content_hash` = hash(`content`)
 2. And finally, `CommitmentID` = Concat(`content_hash`, `slot_index`) 
 
+The string format of Commitment ID is hexadecimal encoding of Commitment ID with `0x` prefix.
 
 ## Payloads
 The following table lists all currently specified payloads that can be part of a block. 
