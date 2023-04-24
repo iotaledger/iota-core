@@ -220,9 +220,10 @@ The following table describes the serialization of a Block:
 Block ID denotes an identifier of a block, with type `ArrayBytes[40]`. It is calculated as the following steps, using BLAKE2b-256 hash function:
 
 * `content` is the serialized block **without** signature and nonce.
-* `slot_index` is the slot index of the Issuing Time of the block.
+* `slot_index` is the slot index of the `Issuing Time` of the block.
 * `signatureBytes` is the serialized Ed25519 signature.
 
+Calculation:
 1. `content_hash` = hash(`content`)
 2. `id` = hash(Concat(`content_hash`, signatureBytes))
 3. And finally, `BlockID` = Concat(`id`, `slot_index`) 
