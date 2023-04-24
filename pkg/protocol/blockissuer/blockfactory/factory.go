@@ -66,11 +66,7 @@ func (f *Factory) CreateBlockWithReferences(p iotago.Payload, references model.P
 		}
 	}
 
-	slotCommitment, lastFinalizedSlot, err := f.commitmentFunc()
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot retrieve slot commitment")
-	}
-
+	slotCommitment, lastFinalizedSlot := f.commitmentFunc()
 	pubKey := f.localPrivateKey.Public()
 	addr := iotago.Ed25519AddressFromPubKey(pubKey[:])
 
@@ -164,7 +160,7 @@ func (f *Factory) tips(p iotago.Payload, parentsCount int) (parents iotago.Block
 type ReferencesFunc func(payload iotago.Payload, strongParents iotago.BlockIDs) (references model.ParentReferences, err error)
 
 // CommitmentFunc is a function type that returns the commitment of the latest committable slot.
-type CommitmentFunc func() (commitment *iotago.Commitment, lastFinalizedSlot iotago.SlotIndex, err error)
+type CommitmentFunc func() (commitment *iotago.Commitment, lastFinalizedSlot iotago.SlotIndex)
 
 func WithTipSelectionTimeout(timeout time.Duration) options.Option[Factory] {
 	return func(factory *Factory) {

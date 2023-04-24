@@ -126,6 +126,11 @@ func (m *Manager) GetP2PHost() host.Host {
 	return m.libp2pHost
 }
 
+// GetLocalPeer return the local peer.
+func (m *Manager) GetLocalPeer() *peer.Local {
+	return m.local
+}
+
 // AddOutbound tries to add a neighbor by connecting to that peer.
 func (m *Manager) AddOutbound(ctx context.Context, p *peer.Peer, group NeighborsGroup,
 	connectOpts ...ConnectPeerOption,

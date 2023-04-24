@@ -58,6 +58,7 @@ func provide(c *dig.Container) error {
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
 			p2pManager,
+			p2pManager.GetLocalPeer(),
 			protocol.WithBaseDirectory(ParamsDatabase.Directory),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
 			protocol.WithSybilProtectionProvider(

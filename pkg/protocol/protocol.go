@@ -5,6 +5,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/autopeering/peer"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -12,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
+	"github.com/iotaledger/iota-core/pkg/protocol/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
@@ -42,12 +45,14 @@ import (
 
 type Protocol struct {
 	Events        *Events
-	engineManager *enginemanager.EngineManager
 	TipManager    tipmanager.TipManager
+	BlockIssuer   *blockissuer.BlockIssuer
+	engineManager *enginemanager.EngineManager
 	chainManager  *chainmanager.Manager
 
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
+	localPeer       *peer.Local
 	networkProtocol *core.Protocol
 
 	mainEngine *engine.Engine
@@ -60,6 +65,8 @@ type Protocol struct {
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
 	optsStorageOptions      []options.Option[storage.Storage]
 
+	optsBlockIssuerOptions []options.Option[blockissuer.BlockIssuer]
+
 	optsFilterProvider          module.Provider[*engine.Engine, filter.Filter]
 	optsBlockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
 	optsTipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
@@ -71,11 +78,12 @@ type Protocol struct {
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 }
 
-func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
+func New(workers *workerpool.Group, dispatcher network.Endpoint, localPeer *peer.Local, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
 		Events:                      NewEvents(),
 		Workers:                     workers,
 		dispatcher:                  dispatcher,
+		localPeer:                   localPeer,
 		optsFilterProvider:          blockfilter.NewProvider(),
 		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
 		optsTipManagerProvider:      trivialtipmanager.NewProvider(),
@@ -100,6 +108,20 @@ func (p *Protocol) Run() {
 	p.Events.Engine.LinkTo(p.mainEngine.Events)
 	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
 	p.Events.TipManager.LinkTo(p.TipManager.Events())
+
+	// TODO: the BlockIssuer needs to be invalidated together with the TipManager when switching engines.
+	p.BlockIssuer = blockissuer.New(
+		lo.PanicOnErr(p.localPeer.Database().LocalPrivateKey()),
+		p.mainEngine.IsBootstrapped,
+		func() (*iotago.Commitment, iotago.SlotIndex) {
+			return p.mainEngine.Storage.Settings().LatestCommitment(), p.mainEngine.Storage.Settings().LatestFinalizedSlot()
+		},
+		p.ProcessBlock,
+		p.TipManager,
+		p.optsBlockIssuerOptions...,
+	)
+
+	p.Events.BlockIssuer.LinkTo(p.BlockIssuer.Events)
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
 		panic(err)
@@ -290,10 +312,6 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	panic(fmt.Sprintf("Fork detected: %s", fork))
 }
 
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// region Options //////////////////////////////////////////////////////////////////////////////////////////////////////
-
 func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsBaseDirectory = baseDirectory
@@ -384,4 +402,8 @@ func WithStorageOptions(opts ...options.Option[storage.Storage]) options.Option[
 	}
 }
 
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+func WithBlockIssuerOptions(opts ...options.Option[blockissuer.BlockIssuer]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsBlockIssuerOptions = append(p.optsBlockIssuerOptions, opts...)
+	}
+}
