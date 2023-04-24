@@ -7,7 +7,7 @@ info:
   license:
     name: Apache 2.0
     url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
-  version: 3.0.0
+  version: 2.0.0
 externalDocs:
   description: Find out more about IOTA
   url: 'https://iota.org'
@@ -16,6 +16,8 @@ servers:
 tags:
   - name: basic outputs
     description: Query Basic Outputs.
+  - name: account outputs
+    description: Query Account Outputs. - TO BE UPDATED
   - name: foundry outputs
     description: Query Foundry Outputs.
   - name: nft outputs
@@ -180,6 +182,167 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
+
+  /api/indexer/v2/outputs/account:
+    get:
+      tags:
+        - account outputs
+      summary: Returns account outputs filtered based on parameters.
+      description: Returns account outputs filtered based on parameters.
+      parameters:
+        - in: query
+          name: stateController
+          schema:
+            type: string
+          example: iota1qrhacyfwlcnzkvzteumekfkrrwks98mpdm37cj4xx3drvmjvnep6xqgyzyx
+          description: Filter outputs based on bech32-encoded state controller address.
+        - in: query
+          name: governor
+          schema:
+            type: string
+          example: iota1qrhacyfwlcnzkvzteumekfkrrwks98mpdm37cj4xx3drvmjvnep6xqgyzyx
+          description: Filter outputs based on bech32-encoded governor (governance controller) address.
+        - in: query
+          name: issuer
+          schema:
+            type: string
+          example: iota1qrhacyfwlcnzkvzteumekfkrrwks98mpdm37cj4xx3drvmjvnep6xqgyzyx
+          description: Filters outputs based on bech32-encoded issuer address.
+        - in: query
+          name: sender
+          schema:
+            type: string
+          example: iota1qrhacyfwlcnzkvzteumekfkrrwks98mpdm37cj4xx3drvmjvnep6xqgyzyx
+          description: Filters outputs based on bech32-encoded sender address.
+        - in: query
+          name: hasNativeTokens
+          schema:
+            type: boolean
+          example: true
+          description: Filters outputs based on the presence of native tokens.
+        - in: query
+          name: minNativeTokenCount
+          schema:
+            type: integer
+          example: 2
+          description: Filters outputs that have at least a certain number of distinct native tokens.
+        - in: query
+          name: maxNativeTokenCount
+          schema:
+            type: integer
+          example: 5
+          description: Filters outputs that have at most a certain number of distinct native tokens.
+        - in: query
+          name: createdBefore
+          schema:
+            type: integer
+          example: 1643383242
+          description: Return outputs that were created before a certain Unix timestamp.
+        - in: query
+          name: createdAfter
+          schema:
+            type: integer
+          example: 1643383242
+          description: Return outputs that were created after a certain Unix timestamp.
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+          example: 10
+          description: The maximum amount of items returned in one call. If there are more items, a cursor to the next page is returned too.
+            The parameter is ignored when pageSize is defined via the cursor parameter.
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          example: 0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a790200.10
+          description: Starts the search from the cursor (confirmationMS+outputId.pageSize).
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutputsResponse'
+              examples:
+                Query results in 3 outputs:
+                  $ref: >-
+                    #/components/examples/get-outputs-response-three-example
+                No matching outputIds found:
+                  $ref: >-
+                    #/components/examples/get-outputs-empty-response-example
+                Paging - more items found than it can fit on single page:
+                  $ref: >-
+                    #/components/examples/get-outputs-pagesize2-response-example
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+
+  /api/indexer/v2/outputs/account/{accountId}:
+    get:
+      tags:
+        - account outputs
+      summary: Returns the outputId of the current unspent account output for accountId.
+      description: Returns the outputId of the current unspent account output for accountId.
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            type: string
+          example: "0x1505ec099896ab05d9e08fbc7101ae4dff0093b3943b28f789ed2ca728bcc8d6"
+          description: Unique identifier of the account.
+          required: true
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutputsResponse'
+              examples:
+                Query results in single output:
+                  $ref: >-
+                    #/components/examples/get-outputs-response-single-example
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '404':
+          description: "Unsuccessful operation: indicates that the requested data was not found."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+
 
   /api/indexer/v2/outputs/foundry:
     get:
