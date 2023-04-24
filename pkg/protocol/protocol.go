@@ -112,6 +112,7 @@ func (p *Protocol) Run() {
 	// TODO: the BlockIssuer needs to be invalidated together with the TipManager when switching engines.
 	p.BlockIssuer = blockissuer.New(
 		lo.PanicOnErr(p.localPeer.Database().LocalPrivateKey()),
+		p.API,
 		p.mainEngine.IsBootstrapped,
 		func() (*iotago.Commitment, iotago.SlotIndex) {
 			return p.mainEngine.Storage.Settings().LatestCommitment(), p.mainEngine.Storage.Settings().LatestFinalizedSlot()

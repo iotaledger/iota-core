@@ -22,7 +22,7 @@ type Factory struct {
 
 	// referenceProvider *ReferenceProvider
 	localPrivateKey ed25519.PrivateKey
-	api             iotago.API
+	apiFunc         func() iotago.API
 	blockRetriever  func(blockID iotago.BlockID) (block *blocks.Block, exists bool)
 	tipManager      tipmanager.TipManager
 	referencesFunc  ReferencesFunc
@@ -33,10 +33,11 @@ type Factory struct {
 }
 
 // NewBlockFactory creates a new block factory.
-func NewBlockFactory(localPrivateKey ed25519.PrivateKey, tipManager tipmanager.TipManager, referencesFunc ReferencesFunc, commitmentFunc CommitmentFunc, opts ...options.Option[Factory]) *Factory {
+func NewBlockFactory(localPrivateKey ed25519.PrivateKey, apiFunc func() iotago.API, tipManager tipmanager.TipManager, referencesFunc ReferencesFunc, commitmentFunc CommitmentFunc, opts ...options.Option[Factory]) *Factory {
 	return options.Apply(&Factory{
 		Events:          newEvents(),
 		localPrivateKey: localPrivateKey,
+		apiFunc:         apiFunc,
 		tipManager:      tipManager,
 		referencesFunc:  referencesFunc,
 		commitmentFunc:  commitmentFunc,
@@ -84,7 +85,7 @@ func (f *Factory) CreateBlockWithReferences(p iotago.Payload, references model.P
 		return nil, errors.Wrap(err, "error building block")
 	}
 
-	modelBlock, err := model.BlockFromBlock(block, f.api)
+	modelBlock, err := model.BlockFromBlock(block, f.apiFunc())
 	if err != nil {
 		return nil, errors.Wrap(err, "error serializing block to model block")
 	}

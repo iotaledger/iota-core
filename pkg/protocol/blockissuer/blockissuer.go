@@ -30,7 +30,7 @@ type BlockIssuer struct {
 }
 
 // New creates a new block issuer.
-func New(localPrivateKey ed25519.PrivateKey, isBootstrappedFunc func() bool, latestCommitmentFunc blockfactory.CommitmentFunc, processBlockFunc func(*model.Block, network.PeerID) error, tipManager tipmanager.TipManager, opts ...options.Option[BlockIssuer]) *BlockIssuer {
+func New(localPrivateKey ed25519.PrivateKey, apiFunc func() iotago.API, isBootstrappedFunc func() bool, latestCommitmentFunc blockfactory.CommitmentFunc, processBlockFunc func(*model.Block, network.PeerID) error, tipManager tipmanager.TipManager, opts ...options.Option[BlockIssuer]) *BlockIssuer {
 	return options.Apply(&BlockIssuer{
 		Events:               NewEvents(),
 		localPrivateKey:      localPrivateKey,
@@ -40,6 +40,7 @@ func New(localPrivateKey ed25519.PrivateKey, isBootstrappedFunc func() bool, lat
 	}, opts, func(i *BlockIssuer) {
 		i.factory = blockfactory.NewBlockFactory(
 			localPrivateKey,
+			apiFunc,
 			tipManager,
 			// TODO: change when we have a way to fix the opinion coming from strong parents.
 			func(_ iotago.Payload, strongParents iotago.BlockIDs) (model.ParentReferences, error) {
