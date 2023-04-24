@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -15,8 +16,15 @@ func TestName(t *testing.T) {
 
 	f.HookLogging()
 
-	f.Node("node1").IssueBlock()
+	blockID1 := f.Node("node1").IssueBlock()
 	f.Node("node1").Wait()
 	f.Node("node2").Wait()
 	f.Node("node2").IssueBlock()
+
+	node1 := f.Node("node1")
+	node1.Wait()
+	f.Node("node2").Wait()
+
+	block, exist := node1.Protocol.MainEngineInstance().Block(blockID1)
+	fmt.Println(block.String(), exist)
 }

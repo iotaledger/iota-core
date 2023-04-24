@@ -123,16 +123,13 @@ func (p *Protocol) Run() {
 
 func (p *Protocol) Shutdown() {
 	if p.networkProtocol != nil {
-		p.networkProtocol.Unregister()
+		p.networkProtocol.Shutdown()
 	}
 
-	p.chainManager.Shutdown()
-
-	p.TipManager.Shutdown()
-
-	p.mainEngine.Shutdown()
-
 	p.Workers.Shutdown()
+	p.mainEngine.Shutdown()
+	p.chainManager.Shutdown()
+	p.TipManager.Shutdown()
 }
 
 func (p *Protocol) initNetworkEvents() {

@@ -115,11 +115,12 @@ func (e *Engine) Shutdown() {
 	if !e.WasStopped() {
 		e.TriggerStopped()
 
-		e.BlockRequester.Shutdown()
-		e.Workers.Shutdown()
-		e.Booker.Shutdown()
+		e.Filter.Shutdown()
 		e.BlockDAG.Shutdown()
+		e.BlockRequester.Shutdown()
+		e.Booker.Shutdown()
 		e.Storage.Shutdown()
+		e.Workers.Shutdown()
 	}
 }
 

@@ -88,7 +88,7 @@ func (f *Framework) Run() {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	f.createValidatorsFromNodes()
+	f.validators = f.createValidatorsFromNodes()
 	path := f.createSnapshot()
 	f.running = true
 
@@ -103,18 +103,20 @@ func (f *Framework) Run() {
 	}
 }
 
-func (f *Framework) createValidatorsFromNodes() {
+func (f *Framework) createValidatorsFromNodes() map[iotago.AccountID]int64 {
 	if f.running {
 		panic("cannot create validators from nodes: framework already running")
 	}
 
-	f.validators = make(map[iotago.AccountID]int64)
+	validators := make(map[iotago.AccountID]int64)
 	for _, node := range f.nodes {
 		if node.Weight == 0 {
 			continue
 		}
-		f.validators[node.AccountID] = node.Weight
+		validators[node.AccountID] = node.Weight
 	}
+
+	return validators
 }
 
 func (f *Framework) createSnapshot() string {

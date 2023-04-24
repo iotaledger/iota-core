@@ -49,7 +49,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 		panic(err)
 	}
 
-	accountID := iotago.AccountID(pub)
+	accountID := iotago.AccountID(iotago.Ed25519AddressFromPubKey(pub))
 	accountID.RegisterAlias(name)
 
 	peerID := network.PeerID(pub)
@@ -193,9 +193,7 @@ func (n *Node) Shutdown() {
 	n.Workers.Shutdown()
 }
 
-func (n *Node) IssueBlock() {
-	addr := iotago.Ed25519AddressFromPubKey(n.pubKey)
-
+func (n *Node) IssueBlock() iotago.BlockID {
 	block, err := builder.NewBlockBuilder().
 		StrongParents(n.Protocol.TipManager.Tips(8)).
 		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()).
@@ -203,25 +201,26 @@ func (n *Node) IssueBlock() {
 		Payload(&iotago.TaggedData{
 			Tag: []byte("ACTIVITY"),
 		}).
-		Sign(&addr, n.privateKey).
+		Sign((*iotago.Ed25519Address)(&n.AccountID), n.privateKey).
 		Build()
 
 	if err != nil {
 		panic(err)
-		return
+		return iotago.EmptyBlockID()
 	}
 
 	modelBlock, err := model.BlockFromBlock(block, n.Protocol.API())
 	if err != nil {
 		panic(err)
-		return
+		return iotago.EmptyBlockID()
 	}
 
 	err = n.Protocol.ProcessBlock(modelBlock, n.PeerID)
 	if err != nil {
 		panic(err)
-		return
+		return iotago.EmptyBlockID()
 	}
 
 	fmt.Printf("Issued block: %s - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
+	return modelBlock.ID()
 }

@@ -93,8 +93,11 @@ func (p *Protocol) RequestAttestations(cm *iotago.Commitment, endIndex iotago.Sl
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) Unregister() {
+func (p *Protocol) Shutdown() {
 	p.network.UnregisterProtocol(protocolID)
+
+	p.workerPool.Shutdown()
+	p.workerPool.ShutdownComplete.Wait()
 }
 
 func (p *Protocol) handlePacket(nbr network.PeerID, packet proto.Message) (err error) {
