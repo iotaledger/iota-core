@@ -1,9 +1,21 @@
 # Core Models
 
+This document defines core models for IOTA V3 protocol.
 
-
+* [Block](#block)
+  * [Block ID](#block-id)
+  * [Block Syntactic Validation Rules](#block-syntactic-validation-rules)
+* [Slot Index](#slot-index)
+* [Commitment](#commitment)
+  * [Commitment ID](#commitment-id)
+* [Payloads](#payloads)
+  * [Tagged Data Payload](#tagged-data-payload)
+  * [Transaction](#transaction)
+  * [Outputs and Unlock blocks](#outputs-and-unlock-blocks)
 
 ## Block
+The following table describes the serialization of a Block:
+
 <table>
   <tr>
     <th>Name</th>
@@ -128,37 +140,8 @@
       <details open="true">
         <summary>Commitment</summary>
         <blockquote>
-          A structure contains the summary of a slot.
+          Commitment is an object that contains a summary of a slot. More descriptions are in Commitment section.
         </blockquote>
-        <table>
-          <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-          </tr>
-          <tr>
-            <td>Index</td>
-            <td>int64</td>
-            <td>
-              The slot index of this commitment. It is calculated based on genesis timestamp and the duration of a slot.
-            </td>
-          </tr>
-          <tr>
-            <td>Previous Commitment ID</td>
-            <td>ByteArray[40]</td>
-            <td>The commitment ID of the previous slot.</td>
-          </tr>
-          <tr>
-            <td>Root ID</td>
-            <td>ByteArray[32]</td>
-            <td>A BLAKE2b-256 hash of multiple merkle tree roots of a slot. </td>
-          </tr>
-          <tr>
-            <td>Cumulative Weight</td>
-            <td>int64</td>
-            <td>The sum of previous slot commitment cumulative weight and weight of issuers of accepted blocks within this slot. </td>
-          </tr>
-        </table>
       </details>
     </td>
   </tr>
@@ -233,9 +216,6 @@
   </tr>
 </table>
 
-### Block Syntactic Validation Rules
-
-
 
 ### Block ID
 Block ID denotes an identifier of a block, with type `ArrayBytes[40]`. It is calculated as the following steps, using BLAKE2b-256 hash function:
@@ -248,6 +228,21 @@ Block ID denotes an identifier of a block, with type `ArrayBytes[40]`. It is cal
 2. `id` = hash(Concat(`content_hash`, signatureBytes))
 3. And finally, `BlockID` = Concat(`id`, `slot_index`) 
 
+### Block Syntactic Validation Rules
+
+* Block size must not exceeds `MaxBlockSize` bytes, currently is `32768`.
+* `Protocol Version` must match the `Protocol Version` config parameter of the node.
+* Must have at least **1** `Strong Parents`.
+* `Strong Parents`, `Weak Parents`, `Shallow Like Parents` must not exceeds `BlockMaxParents` (currently is **8**) per type.
+* `Strong Parents`, `Weak Parents`, `Shallow Like Parents` of parents must be lexically ordered.
+* `Strong Parents`, `Weak Parents`, `Shallow Like Parents` must not have duplicates in each list.
+* `Weak Parents` must be disjunct to the rest of the parents.
+* `Payload Type` must match one of the values described under Payloads.
+  Data Fields must be correctly parsable in the context of the `Payload Type`.
+  The payload itself must pass syntactic validation.
+* `Signature` must be valid, the input of a signature is concatation of Issuing Time bytes, Commitment ID bytes and Block bytes (without Signature and Nonce) by order.
+* There must be no trailing bytes after all block fields have been parsed.
+
 
 
 ## Slot Index
@@ -257,6 +252,52 @@ To calculate the slot index of a timestamp, `genesisTimestamp` and the duration 
 The slot index of timestamp `ts` is `(ts - genesisTimestamp)/duration + 1`.
 
 ## Commitment
+
+Commitment is an object that contains a summary of a slot, and it is linked to the commitment of the previous slot. 
+Multiple sparse merkle trees are managed by per slot, which are:
+* *Tangle tree*: All accepted blocks within a slot.
+* *State mutation tree*: All accepted transactions within a slot.
+* *Activity tree*: All active accounts within a slot.
+* *State tree*: All accepted created/consumed outputs within a slot.
+* *Mana tree*: Mana of all accounts at the end of slot.
+
+When a slot is committable, new commitment is generated and will be included in the new issued blocks.
+
+The following table describes the serialization of a Commitment:
+
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>Index</td>
+    <td>int64</td>
+    <td>
+      The slot index of this commitment. It is calculated based on genesis timestamp and the duration of a slot.
+    </td>
+  </tr>
+  <tr>
+    <td>Previous Commitment ID</td>
+    <td>ByteArray[40]</td>
+    <td>The commitment ID of the previous slot.</td>
+  </tr>
+  <tr>
+    <td>Root ID</td>
+    <td>ByteArray[32]</td>
+    <td>
+      A BLAKE2b-256 hash of concating multiple sparse merkle tree roots of a slot.
+      <i>Root ID = hash( Concat( hash(Concat(Tangle, TX)), hash(Concat(State, Mana)) ) )</i>  
+    </td>
+  </tr>
+  <tr>
+    <td>Cumulative Weight</td>
+    <td>int64</td>
+    <td>The sum of previous slot commitment cumulative weight and weight of issuers of accepted blocks within this slot. </td>
+  </tr>
+</table>
+
 ### Commitment ID
 
 Commitment ID denotes an identifier of a commitment, with type `ArrayBytes[40]`. It is calculated as the following steps, using BLAKE2b-256 hash function:
@@ -264,8 +305,10 @@ Commitment ID denotes an identifier of a commitment, with type `ArrayBytes[40]`.
 * `content` is the serialized commitment.
 * `slot_index` is the slot index of the commitment.
 
+Caculation:
 1. `content_hash` = hash(`content`)
-3. And finally, `CommitmentID` = Concat(`content_hash`, `slot_index`) 
+2. And finally, `CommitmentID` = Concat(`content_hash`, `slot_index`) 
+
 
 ## Payloads
 The following table lists all currently specified payloads that can be part of a block. 
@@ -291,6 +334,7 @@ The following table lists all currently specified payloads that can be part of a
 ### Tagged Data payload
 
 Tagged Data payload holds a tag and associated data.
+The following table describes the serialization of a Tagged payload:
 
 <table>
     <tr>
@@ -318,11 +362,13 @@ Tagged Data payload holds a tag and associated data.
 </table>
 
 #### Tagged Payload Syntactic Validation Rules
-* The length of a Tag must < `64`.
-* The length of the Data must < `8192`.
+* The length of a Tag must < `64` bytes.
+* The length of the Data must < `8192` bytes.
 
 ### Transaction     
- TIP-20
+
+The following table describes the serialization of a Transaction:
+
 <table>
   <tr>
     <th>Name</th>
@@ -492,6 +538,7 @@ Tagged Data payload holds a tag and associated data.
   </tr>
 </table>
 
+Transaction validation rules follow [TIP 20 Transaction Payload with TIP-18 Output Types](https://github.com/iotaledger/tips/blob/ae7fbd336e506f907080aa6b16d6ffb0d7a5553c/tips/TIP-0020/tip-0020.md).
 
-## Outputs
+### Outputs and Unlock blocks
 Output and unlock designs are the same as described in [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#output-design)
