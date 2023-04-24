@@ -7,9 +7,11 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func init() {
@@ -35,6 +37,14 @@ type dependencies struct {
 	Peer     *peer.Local
 	Protocol *protocol.Protocol
 }
+
+func issuerID() iotago.AccountID {
+	issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
+	pubKey := issuerKey.Public()
+
+	return iotago.AccountID(iotago.Ed25519AddressFromPubKey(pubKey[:]))
+}
+
 
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {

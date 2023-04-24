@@ -1,16 +1,8 @@
 package activity
 
 import (
-	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
-
-func issuerID() iotago.AccountID {
-	issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
-	pubKey := issuerKey.Public()
-
-	return iotago.AccountID(iotago.Ed25519AddressFromPubKey(pubKey[:]))
-}
 
 func issueActivityBlock() {
 	if !ParamsActivity.IgnoreBootstrapped && !deps.Protocol.MainEngineInstance().IsBootstrapped() {
@@ -22,7 +14,7 @@ func issueActivityBlock() {
 		Tag: []byte("ACTIVITY"),
 	})
 	if err != nil {
-		Component.LogWarnf("error building block: %s", err.Error())
+		Component.LogWarnf("error issuing activity block: %s", err.Error())
 		return
 	}
 
