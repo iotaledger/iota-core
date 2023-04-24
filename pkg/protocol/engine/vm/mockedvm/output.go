@@ -1,7 +1,7 @@
 package mockedvm
 
 import (
-	iotago2 "iota-core/pkg/iotago"
+	iotago2 "iota-core/pkg/protocol/engine/vm"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -33,4 +33,4 @@ func (m *MockedOutput) ID() iotago.OutputID {
 }
 
 // code contract (make sure the struct implements all required methods).
-var _ iotago2.Output = new(MockedOutput)
+var _ iotago2.State = new(MockedOutput)

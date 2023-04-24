@@ -1,7 +1,7 @@
 package mockedvm
 
 import (
-	iotago2 "iota-core/pkg/iotago"
+	iotago2 "iota-core/pkg/protocol/engine/mempool"
 
 	"github.com/iotaledger/hive.go/stringify"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -30,9 +30,9 @@ func (m *MockedInput) String() (humanReadable string) {
 }
 
 // utxoInput type-casts the MockedInput to a utxo.Input.
-func (m *MockedInput) utxoInput() (input iotago2.Input) {
+func (m *MockedInput) utxoInput() (input iotago2.StateReference) {
 	return m
 }
 
 // code contract (make sure the struct implements all required methods).
-var _ iotago2.Input = new(MockedInput)
+var _ iotago2.StateReference = new(MockedInput)

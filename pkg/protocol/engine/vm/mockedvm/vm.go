@@ -2,6 +2,7 @@ package mockedvm
 
 import (
 	"iota-core/pkg/iotago"
+	"iota-core/pkg/protocol/engine/vm"
 
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
@@ -11,13 +12,13 @@ import (
 
 // ExecuteTransaction executes the Transaction and determines the Outputs from the given Inputs. It returns an error
 // if the execution fails.
-func ExecuteTransaction(transaction iotago.Transaction, inputs []iotago.Output, _ ...uint64) (outputs []iotago.Output, err error) {
+func ExecuteTransaction(transaction vm.StateTransition, inputs []vm.State, _ ...uint64) (outputs []vm.State, err error) {
 	typedTransaction, ok := transaction.(*MockedTransaction)
 	if !ok {
 		return nil, xerrors.Errorf("invalid transaction type in MockedVM")
 	}
 
-	outputs = make([]iotago.Output, typedTransaction.M.OutputCount)
+	outputs = make([]vm.State, typedTransaction.M.OutputCount)
 	for i := uint16(0); i < typedTransaction.M.OutputCount; i++ {
 		id, idErr := transaction.ID()
 		if idErr != nil {
@@ -48,7 +49,7 @@ func RegisterWithAPI(api iotago.API) {
 		panic(errors.Wrap(err, "error registering ExtendedLockedOutput type settings"))
 	}
 
-	if err := api.Underlying().RegisterInterfaceObjects((*iotago.Output)(nil), new(MockedOutput)); err != nil {
+	if err := api.Underlying().RegisterInterfaceObjects((*vm.State)(nil), new(MockedOutput)); err != nil {
 		panic(errors.Wrap(err, "error registering utxo.Output interface implementations"))
 	}
 }

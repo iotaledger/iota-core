@@ -34,7 +34,7 @@ type TestFramework struct {
 	test *testing.T
 
 	// transactionsByAlias contains a dictionary that maps a human-readable alias to a MockedTransaction.
-	transactionsByAlias map[string]vm.Transaction
+	transactionsByAlias map[string]vm.StateTransition
 
 	// transactionsByAliasMutex contains a mutex that is used to synchronize parallel access to the transactionsByAlias.
 	transactionsByAliasMutex syncutils.RWMutexFake
@@ -53,7 +53,7 @@ func NewTestFramework(test *testing.T, instance mempool.MemPool) *TestFramework 
 		test:     test,
 		Instance: instance,
 		// ConflictDAG:         conflictdag.NewFramework(test, instance.ConflictDAG()),
-		transactionsByAlias: make(map[string]vm.Transaction),
+		transactionsByAlias: make(map[string]vm.StateTransition),
 		outputIDsByAlias:    make(map[string]ledger.OutputID),
 	}
 

@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 
 	"iota-core/pkg/iotago"
+	"iota-core/pkg/protocol/engine/mempool"
+	"iota-core/pkg/protocol/engine/vm"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/serix/model"
@@ -22,7 +24,6 @@ type MockedTransaction struct {
 }
 
 type mockedTransaction struct {
-
 	// Inputs contains the list of MockedInput objects that address the consumed Outputs.
 	Inputs []*MockedInput `serix:"0,lengthPrefixType=uint16"`
 
@@ -56,8 +57,8 @@ func (m *MockedTransaction) ID() (iotago.TransactionID, error) {
 }
 
 // Inputs returns the inputs of the Transaction.
-func (m *MockedTransaction) Inputs() ([]iotago.Input, error) {
-	return lo.Map(m.M.Inputs, func(input *MockedInput) iotago.Input {
+func (m *MockedTransaction) Inputs() ([]mempool.StateReference, error) {
+	return lo.Map(m.M.Inputs, func(input *MockedInput) mempool.StateReference {
 		return input
 	}), nil
 }
@@ -79,7 +80,7 @@ func (m *MockedTransaction) String() string {
 
 // code contract (make sure the struct implements all required methods).
 var (
-	_ iotago.Transaction = new(MockedTransaction)
+	_ vm.StateTransition = new(MockedTransaction)
 	_ iotago.Payload     = new(MockedTransaction)
 )
 
