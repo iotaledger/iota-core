@@ -126,7 +126,7 @@ The following table describes the serialization of a Block:
   </tr>
   <tr>
     <td>Issuing Time</td>
-    <td>uint32</td>
+    <td>int64</td>
     <td>The time the block is issued.</td>
   </tr>
   <tr>
@@ -249,7 +249,7 @@ The string format of Block ID is hexadecimal encoding of Block ID with `0x` pref
 
 ## Slot Index
 
-Timeline is divided into slots, and each slot has a corresponding slot index.
+Timeline is divided into slots, and each slot has a corresponding slot index, which is a `int64`.
 To calculate the slot index of a timestamp, `genesisTimestamp` and the duration of a slot are needed.
 The slot index of timestamp `ts` is `(ts - genesisTimestamp)/duration + 1`.
 
@@ -401,7 +401,7 @@ The following table describes the serialization of a Transaction:
           </tr>
           <tr>
             <td>Creation Time</td>
-            <td>uint64</td>
+            <td>int64</td>
             <td>The time at which this transaction was created by the client.</td>
           </tr>
           <tr>
