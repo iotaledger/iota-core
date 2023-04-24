@@ -2,7 +2,6 @@ package mempooltests
 
 import (
 	"iota-core/pkg/protocol/engine/mempool"
-	"iota-core/pkg/protocol/engine/vm"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -34,4 +33,4 @@ func (t *Transaction) String() string {
 	return "Transaction(" + t.id.String() + ")"
 }
 
-var _ vm.StateTransition = new(Transaction)
+var _ mempool.Transaction = new(Transaction)

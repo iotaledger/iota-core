@@ -2,9 +2,8 @@ package ledgerv1
 
 import (
 	"golang.org/x/xerrors"
+	"iota-core/pkg/promise"
 	"iota-core/pkg/protocol/engine/ledger"
-	"iota-core/pkg/protocol/engine/mempool/promise"
-	"iota-core/pkg/protocol/engine/vm"
 
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -20,8 +19,8 @@ func New(workers *workerpool.Group) *Ledger {
 	}
 }
 
-func (m *Ledger) ResolveState(id iotago.OutputID) *promise.Promise[vm.State] {
-	p := promise.New[vm.State]()
+func (m *Ledger) ResolveState(id iotago.OutputID) *promise.Promise[ledger.State] {
+	p := promise.New[ledger.State]()
 
 	m.ioWorker.Submit(func() {
 		if output, exists := m.loadOutput(id); exists {
@@ -34,7 +33,7 @@ func (m *Ledger) ResolveState(id iotago.OutputID) *promise.Promise[vm.State] {
 	return p
 }
 
-func (m *Ledger) loadOutput(id iotago.OutputID) (vm.State, bool) {
+func (m *Ledger) loadOutput(id iotago.OutputID) (ledger.State, bool) {
 	// TODO
 	return nil, false
 }

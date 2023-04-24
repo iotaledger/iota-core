@@ -6,14 +6,25 @@ import (
 
 // Promise is a promise that can be resolved or rejected.
 type Promise[T any] struct {
-	successCallbacks  []func(T)
-	errorCallbacks    []func(error)
+	// successCallbacks are called when the promise is resolved successfully.
+	successCallbacks []func(T)
+
+	// errorCallbacks are called when the promise is rejected.
+	errorCallbacks []func(error)
+
+	// completeCallbacks are called when the promise is resolved or rejected.
 	completeCallbacks []func()
 
-	result   T
-	err      error
+	// result is the result of the promise.
+	result T
+
+	// err is the error of the promise.
+	err error
+
+	// complete is true if the promise is resolved or rejected.
 	complete bool
 
+	// mutex is used to synchronize access to the promise.
 	mutex sync.RWMutex
 }
 

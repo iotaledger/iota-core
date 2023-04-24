@@ -1,4 +1,4 @@
-package vmtests
+package ledgertests
 
 import iotago "github.com/iotaledger/iota.go/v4"
 

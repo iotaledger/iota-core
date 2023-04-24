@@ -1,8 +1,8 @@
 package mempool
 
 import (
-	"iota-core/pkg/protocol/engine/mempool/promise"
-	"iota-core/pkg/protocol/engine/vm"
+	"iota-core/pkg/promise"
+	"iota-core/pkg/protocol/engine/ledger"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -17,7 +17,7 @@ type StateReference interface {
 }
 
 // StateReferenceResolver is a function that resolves a StateReference to a State.
-type StateReferenceResolver func(reference StateReference) *promise.Promise[vm.State]
+type StateReferenceResolver func(reference StateReference) *promise.Promise[ledger.State]
 
 // StateReferenceType is the type of StateReference.
 type StateReferenceType = uint16

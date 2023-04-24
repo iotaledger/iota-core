@@ -4,11 +4,12 @@ import (
 	"context"
 
 	"golang.org/x/xerrors"
-	"iota-core/pkg/protocol/engine/vm"
-	vmtests "iota-core/pkg/protocol/engine/vm/tests"
+	"iota-core/pkg/protocol/engine/ledger"
+	ledgertests "iota-core/pkg/protocol/engine/ledger/tests"
+	"iota-core/pkg/protocol/engine/mempool"
 )
 
-func VM(inputTransaction vm.StateTransition, inputs []vm.State, ctx context.Context) (outputs []vm.State, err error) {
+func VM(inputTransaction mempool.Transaction, inputs []ledger.State, ctx context.Context) (outputs []ledger.State, err error) {
 	transaction, ok := inputTransaction.(*Transaction)
 	if !ok {
 		return nil, xerrors.Errorf("invalid transaction type in MockedVM")
@@ -20,7 +21,7 @@ func VM(inputTransaction vm.StateTransition, inputs []vm.State, ctx context.Cont
 			return nil, err
 		}
 
-		outputs = append(outputs, vmtests.NewState(id, i))
+		outputs = append(outputs, ledgertests.NewState(id, i))
 	}
 
 	return outputs, nil

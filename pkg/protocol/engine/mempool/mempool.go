@@ -9,6 +9,8 @@ type MemPool interface {
 
 	ProcessTransaction(transaction Transaction) error
 
+	TransactionMetadata(id iotago.TransactionID) (metadata TransactionWithMetadata, exists bool)
+
 	SetTransactionInclusionSlot(id iotago.TransactionID, inclusionSlot iotago.SlotIndex) error
 
 	EvictTransaction(id iotago.TransactionID) error

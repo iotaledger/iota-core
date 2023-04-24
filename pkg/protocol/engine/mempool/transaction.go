@@ -1,14 +1,10 @@
 package mempool
 
 import (
-	"iota-core/pkg/protocol/engine/vm"
-
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Transaction interface {
-	vm.StateTransition
-
 	// ID returns the identifier of the Transaction.
 	ID() (iotago.TransactionID, error)
 
@@ -17,8 +13,4 @@ type Transaction interface {
 
 	// String returns a human-readable version of the Transaction.
 	String() string
-}
-
-type TransactionMetadata interface {
-	ID() iotago.TransactionID
 }

@@ -6,15 +6,15 @@ import (
 )
 
 type Events struct {
-	TransactionStored *event.Event1[TransactionMetadata]
+	TransactionStored *event.Event1[TransactionWithMetadata]
 
-	TransactionSolid *event.Event1[TransactionMetadata]
+	TransactionSolid *event.Event1[TransactionWithMetadata]
 
-	TransactionExecuted *event.Event1[TransactionMetadata]
+	TransactionExecuted *event.Event1[TransactionWithMetadata]
 
-	TransactionExecutionFailed *event.Event2[TransactionMetadata, error]
+	TransactionExecutionFailed *event.Event2[TransactionWithMetadata, error]
 
-	TransactionBooked *event.Event1[TransactionMetadata]
+	TransactionBooked *event.Event1[TransactionWithMetadata]
 
 	TransactionAccepted *event.Event1[iotago.TransactionID]
 
@@ -23,11 +23,11 @@ type Events struct {
 
 var NewEvents = event.CreateGroupConstructor(func() *Events {
 	return &Events{
-		TransactionStored:          event.New1[TransactionMetadata](),
-		TransactionSolid:           event.New1[TransactionMetadata](),
-		TransactionExecuted:        event.New1[TransactionMetadata](),
-		TransactionExecutionFailed: event.New2[TransactionMetadata, error](),
+		TransactionStored:          event.New1[TransactionWithMetadata](),
+		TransactionSolid:           event.New1[TransactionWithMetadata](),
+		TransactionExecuted:        event.New1[TransactionWithMetadata](),
+		TransactionExecutionFailed: event.New2[TransactionWithMetadata, error](),
 		TransactionAccepted:        event.New1[iotago.TransactionID](),
-		TransactionBooked:          event.New1[TransactionMetadata](),
+		TransactionBooked:          event.New1[TransactionWithMetadata](),
 	}
 })
