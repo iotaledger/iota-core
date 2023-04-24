@@ -6,7 +6,7 @@ import (
 
 func TestName(t *testing.T) {
 	f := NewFramework(t)
-	// defer f.Shutdown()
+	defer f.Shutdown()
 
 	f.AddValidatorNode("node1", 100)
 	f.AddValidatorNode("node2", 100)

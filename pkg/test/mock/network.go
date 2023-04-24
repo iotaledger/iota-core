@@ -27,47 +27,47 @@ func NewNetwork() *Network {
 	}
 }
 
-func (m *Network) Join(endpointID network.PeerID, partition string) *Endpoint {
-	m.dispatchersMutex.Lock()
-	defer m.dispatchersMutex.Unlock()
+func (n *Network) Join(endpointID network.PeerID, partition string) *Endpoint {
+	n.dispatchersMutex.Lock()
+	defer n.dispatchersMutex.Unlock()
 
-	endpoint := newMockedEndpoint(endpointID, m, partition)
+	endpoint := newMockedEndpoint(endpointID, n, partition)
 
-	dispatchers, exists := m.dispatchersByPartition[partition]
+	dispatchers, exists := n.dispatchersByPartition[partition]
 	if !exists {
 		dispatchers = make(map[network.PeerID]*Endpoint)
-		m.dispatchersByPartition[partition] = dispatchers
+		n.dispatchersByPartition[partition] = dispatchers
 	}
 	dispatchers[endpointID] = endpoint
 
 	return endpoint
 }
 
-func (m *Network) MergePartitionsToMain(partitions ...string) {
-	m.dispatchersMutex.Lock()
-	defer m.dispatchersMutex.Unlock()
+func (n *Network) MergePartitionsToMain(partitions ...string) {
+	n.dispatchersMutex.Lock()
+	defer n.dispatchersMutex.Unlock()
 
 	switch {
 	case len(partitions) == 0:
 		// Merge all partitions to main
-		for partitionID := range m.dispatchersByPartition {
+		for partitionID := range n.dispatchersByPartition {
 			if partitionID != NetworkMainPartition {
-				m.mergePartition(partitionID)
+				n.mergePartition(partitionID)
 			}
 		}
 	default:
 		for _, partitionID := range partitions {
-			m.mergePartition(partitionID)
+			n.mergePartition(partitionID)
 		}
 	}
 }
 
-func (m *Network) mergePartition(partitionID string) {
-	for _, endpoint := range m.dispatchersByPartition[partitionID] {
+func (n *Network) mergePartition(partitionID string) {
+	for _, endpoint := range n.dispatchersByPartition[partitionID] {
 		endpoint.partition = NetworkMainPartition
-		m.dispatchersByPartition[NetworkMainPartition][endpoint.id] = endpoint
+		n.dispatchersByPartition[NetworkMainPartition][endpoint.id] = endpoint
 	}
-	delete(m.dispatchersByPartition, partitionID)
+	delete(n.dispatchersByPartition, partitionID)
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,7 +82,7 @@ type Endpoint struct {
 	handlersMutex sync.RWMutex
 }
 
-func newMockedEndpoint(id network.PeerID, n *Network, partition string) (newMockedNetwork *Endpoint) {
+func newMockedEndpoint(id network.PeerID, n *Network, partition string) *Endpoint {
 	return &Endpoint{
 		id:        id,
 		network:   n,
@@ -91,55 +91,62 @@ func newMockedEndpoint(id network.PeerID, n *Network, partition string) (newMock
 	}
 }
 
-func (m *Endpoint) RegisterProtocol(protocolID string, _ func() proto.Message, handler func(network.PeerID, proto.Message) error) {
-	m.handlersMutex.Lock()
-	defer m.handlersMutex.Unlock()
+func (e *Endpoint) RegisterProtocol(protocolID string, _ func() proto.Message, handler func(network.PeerID, proto.Message) error) {
+	e.handlersMutex.Lock()
+	defer e.handlersMutex.Unlock()
 
-	m.handlers[protocolID] = handler
+	e.handlers[protocolID] = handler
 }
 
-func (m *Endpoint) UnregisterProtocol(protocolID string) {
-	m.handlersMutex.Lock()
-	defer m.handlersMutex.Unlock()
+func (e *Endpoint) UnregisterProtocol(protocolID string) {
+	e.handlersMutex.Lock()
+	defer e.handlersMutex.Unlock()
 
-	delete(m.handlers, protocolID)
+	delete(e.handlers, protocolID)
+
+	e.network.dispatchersMutex.Lock()
+	defer e.network.dispatchersMutex.Unlock()
+
+	delete(e.network.dispatchersByPartition[e.partition], e.id)
 }
 
-func (m *Endpoint) Send(packet proto.Message, protocolID string, to ...network.PeerID) {
-	m.network.dispatchersMutex.RLock()
-	defer m.network.dispatchersMutex.RUnlock()
+func (e *Endpoint) Send(packet proto.Message, protocolID string, to ...network.PeerID) {
+	e.network.dispatchersMutex.RLock()
+	defer e.network.dispatchersMutex.RUnlock()
 
 	if len(to) == 0 {
-		to = lo.Keys(m.network.dispatchersByPartition[m.partition])
+		to = lo.Keys(e.network.dispatchersByPartition[e.partition])
 	}
 
 	for _, id := range to {
-		if id == m.id {
+		if id == e.id {
 			continue
 		}
 
-		dispatcher, exists := m.network.dispatchersByPartition[m.partition][id]
+		dispatcher, exists := e.network.dispatchersByPartition[e.partition][id]
 		if !exists {
-			fmt.Println("ERROR: no dispatcher for ", id)
+			fmt.Println(e.id, "ERROR: no dispatcher for ", id)
+			continue
 		}
 
 		protocolHandler, exists := dispatcher.handler(protocolID)
 		if !exists {
-			fmt.Println("ERROR: no protocol handler for ", protocolID)
+			fmt.Println(e.id, "ERROR: no protocol handler for", protocolID, id)
+			continue
 		}
 
-		if err := protocolHandler(m.id, packet); err != nil {
-			fmt.Println("ERROR: ", err)
+		if err := protocolHandler(e.id, packet); err != nil {
+			fmt.Println(e.id, "ERROR: ", err)
 		}
 	}
 
 }
 
-func (m *Endpoint) handler(protocolID string) (handler func(network.PeerID, proto.Message) error, exists bool) {
-	m.handlersMutex.RLock()
-	defer m.handlersMutex.RUnlock()
+func (e *Endpoint) handler(protocolID string) (handler func(network.PeerID, proto.Message) error, exists bool) {
+	e.handlersMutex.RLock()
+	defer e.handlersMutex.RUnlock()
 
-	handler, exists = m.handlers[protocolID]
+	handler, exists = e.handlers[protocolID]
 	return
 }
 
