@@ -59,6 +59,12 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 
 					s.clock = e.Clock
 
+					e.Clock.HookInitialized(func() {
+						for v := range weightVector {
+							s.markValidatorActive(v, e.Clock.Accepted().RelativeTime())
+						}
+					})
+
 					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
 					}, event.WithWorkerPool(s.workers.CreatePool("SybilProtection", 1)))
