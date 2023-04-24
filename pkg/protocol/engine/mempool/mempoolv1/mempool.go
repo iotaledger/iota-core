@@ -1,6 +1,7 @@
 package mempoolv1
 
 import (
+	"context"
 	"sync/atomic"
 
 	"github.com/pkg/errors"
@@ -22,7 +23,7 @@ type MemPool struct {
 
 	resolveInput mempool.StateReferenceResolver
 
-	events *mempool.MemPoolEvents
+	events *mempool.Events
 
 	transactions *shrinkingmap.ShrinkingMap[iotago.TransactionID, *TransactionMetadata]
 
@@ -37,7 +38,7 @@ func New(vm vm.VM, inputResolver mempool.StateReferenceResolver, workers *worker
 	m := &MemPool{
 		executeStateTransition: vm,
 		resolveInput:           inputResolver,
-		events:                 mempool.NewMemPoolEvents(),
+		events:                 mempool.NewEvents(),
 		transactions:           shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
 		cachedStates:           shrinkingmap.New[iotago.OutputID, *promise.Promise[*StateMetadata]](),
 		executionWorkers:       workers.CreatePool("executionWorkers", 1),
@@ -72,7 +73,7 @@ func (m *MemPool) EvictTransaction(id iotago.TransactionID) error {
 	panic("implement me")
 }
 
-func (m *MemPool) Events() *mempool.MemPoolEvents {
+func (m *MemPool) Events() *mempool.Events {
 	return m.events
 }
 
@@ -111,7 +112,7 @@ func (m *MemPool) resolveInputs(transactionMetadata *TransactionMetadata) {
 }
 
 func (m *MemPool) executeTransaction(transactionMetadata *TransactionMetadata) {
-	outputStates, executionErr := m.executeStateTransition(transactionMetadata.Transaction, lo.Map(transactionMetadata.inputs, (*StateMetadata).State), nil)
+	outputStates, executionErr := m.executeStateTransition(transactionMetadata.Transaction, lo.Map(transactionMetadata.inputs, (*StateMetadata).State), context.Background())
 	if executionErr != nil {
 		m.events.TransactionExecutionFailed.Trigger(transactionMetadata, executionErr)
 

@@ -5,7 +5,7 @@ import (
 )
 
 type MemPool interface {
-	Events() *MemPoolEvents
+	Events() *Events
 
 	ProcessTransaction(transaction Transaction) error
 

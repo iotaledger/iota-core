@@ -18,3 +18,7 @@ type Transaction interface {
 	// String returns a human-readable version of the Transaction.
 	String() string
 }
+
+type TransactionMetadata interface {
+	ID() iotago.TransactionID
+}

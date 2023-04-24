@@ -5,7 +5,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type MemPoolEvents struct {
+type Events struct {
 	TransactionStored *event.Event1[TransactionMetadata]
 
 	TransactionSolid *event.Event1[TransactionMetadata]
@@ -18,11 +18,11 @@ type MemPoolEvents struct {
 
 	TransactionAccepted *event.Event1[iotago.TransactionID]
 
-	event.Group[MemPoolEvents, *MemPoolEvents]
+	event.Group[Events, *Events]
 }
 
-var NewMemPoolEvents = event.CreateGroupConstructor(func() *MemPoolEvents {
-	return &MemPoolEvents{
+var NewEvents = event.CreateGroupConstructor(func() *Events {
+	return &Events{
 		TransactionStored:          event.New1[TransactionMetadata](),
 		TransactionSolid:           event.New1[TransactionMetadata](),
 		TransactionExecuted:        event.New1[TransactionMetadata](),

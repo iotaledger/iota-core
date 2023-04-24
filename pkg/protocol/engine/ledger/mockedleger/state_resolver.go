@@ -13,7 +13,7 @@ type StateResolver struct {
 	statesByID map[iotago.OutputID]vm.State
 }
 
-func NewStateResolver(initialStates ...vm.State) *StateResolver {
+func New(initialStates ...vm.State) *StateResolver {
 	return &StateResolver{
 		statesByID: lo.KeyBy(initialStates, vm.State.ID),
 	}
