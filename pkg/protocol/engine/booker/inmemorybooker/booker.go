@@ -167,8 +167,10 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
 	}
 }
 
-func (b *Booker) markInvalid(block *blocks.Block, _ error) {
-	block.SetInvalid()
+func (b *Booker) markInvalid(block *blocks.Block, err error) {
+	if block.SetInvalid() {
+		b.events.BlockInvalid.Trigger(block, errors.Wrap(err, "block marked as invalid in Booker"))
+	}
 }
 
 // isReferenceValid checks if the reference between the child and its parent is valid.
