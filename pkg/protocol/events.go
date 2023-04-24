@@ -28,6 +28,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		Network:      core.NewEvents(),
 		Engine:       engine.NewEvents(),
 		TipManager:   tipmanager.NewEvents(),
+		BlockIssuer:  blockissuer.NewEvents(),
 		ChainManager: chainmanager.NewEvents(),
 	}
 })
