@@ -6,12 +6,14 @@ This document defines core models for IOTA V3 protocol.
   * [Block ID](#block-id)
   * [Block Syntactic Validation Rules](#block-syntactic-validation-rules)
 * [Slot Index](#slot-index)
-* [Commitment](#commitment)
-  * [Commitment ID](#commitment-id)
+* [Slot Commitment](#slot-commitment)
+  * [Slot Commitment ID](#slot-commitment-id)
 * [Payloads](#payloads)
   * [Tagged Data Payload](#tagged-data-payload)
   * [Transaction](#transaction)
   * [Outputs and Unlock blocks](#outputs-and-unlock-blocks)
+* [Signature](#signature)
+  * [Ed25519 Signature](#ed25519-signature)
 
 ## Block
 The following table describes the serialization of a Block:
@@ -31,12 +33,12 @@ The following table describes the serialization of a Block:
   <tr>
     <td>Network ID</td>
     <td>uint64</td>
-    <td>Network identifier. This field denotes whether the block was meant for mainnet, testnet, or a private net. It also marks what protocol rules apply to the block. Usually, it will be set to the first 8 bytes of the BLAKE2b-256 hash of the concatenation of the network type and the protocol version string.</td>
+    <td>Network identifier. Usually, it will be set to the first 8 bytes of the BLAKE2b-256 hash of the concatenation of the network type and the protocol version string.</td>
   </tr>
   <tr>
     <td>Strong Parents Count</td>
     <td>uint8</td>
-    <td>The number of messages that are directly approved.</td>
+    <td>The number of blocks that are strongly directly approved.</td>
   </tr>
   <tr>
     <td valign="top">Strong Parents <code>anyOf</code></td>
@@ -65,7 +67,7 @@ The following table describes the serialization of a Block:
   <tr>
     <td>Weak Parents Count</td>
     <td>uint8</td>
-    <td>The number of messages that are directly approved.</td>
+    <td>The number of blocks that are weakly directly approved.</td>
   </tr>
   <tr>
     <td valign="top">Weak Parents <code>anyOf</code></td>
@@ -94,16 +96,13 @@ The following table describes the serialization of a Block:
   <tr>
     <td>Shallow Like Parents Count</td>
     <td>uint8</td>
-    <td>The number of messages that are directly approved.</td>
+    <td>The number of blocks that are directly referenced to adjust opinion.</td>
   </tr>
   <tr>
     <td valign="top">Shallow Like Parents <code>anyOf</code></td>
     <td colspan="2">
       <details>
         <summary>Parent</summary>
-        <blockquote>
-          References another directly approved block.
-        </blockquote>
         <table>
           <tr>
             <th>Name</th>
@@ -130,7 +129,7 @@ The following table describes the serialization of a Block:
     <td>The time the block is issued.</td>
   </tr>
   <tr>
-    <td>Commitment Length</td>
+    <td>Slot Commitment Length</td>
     <td>uint32</td>
     <td>The length of serialized Slot Commitment structure.</td>
   </tr>
@@ -138,9 +137,9 @@ The following table describes the serialization of a Block:
     <td valign="top">Slot Commitment <code>oneOf</code></td>
     <td colspan="2">
       <details open="true">
-        <summary>Commitment</summary>
+        <summary>Slot Commitment</summary>
         <blockquote>
-          Commitment is an object that contains a summary of a slot. More descriptions are in Commitment section.
+          Slot Commitment is an object that contains a summary of a slot. More descriptions are in Slot Commitment section.
         </blockquote>
       </details>
     </td>
@@ -253,7 +252,7 @@ Timeline is divided into slots, and each slot has a corresponding slot index, wh
 To calculate the slot index of a timestamp, `genesisTimestamp` and the duration of a slot are needed.
 The slot index of timestamp `ts` is `(ts - genesisTimestamp)/duration + 1`.
 
-## Commitment
+## Slot Commitment
 
 Commitment is an object that contains a summary of a slot, and it is linked to the commitment of the previous slot. 
 Multiple sparse merkle trees are managed by per slot, which are:
@@ -281,7 +280,7 @@ The following table describes the serialization of a Commitment:
     </td>
   </tr>
   <tr>
-    <td>Previous Commitment ID</td>
+    <td>Previous Slot Commitment ID</td>
     <td>ByteArray[40]</td>
     <td>The commitment ID of the previous slot.</td>
   </tr>
@@ -300,7 +299,7 @@ The following table describes the serialization of a Commitment:
   </tr>
 </table>
 
-### Commitment ID
+### Slot Commitment ID
 
 Commitment ID denotes an identifier of a commitment, with type `ArrayBytes[40]`. It is calculated as the following steps, using BLAKE2b-256 hash function:
 
@@ -344,13 +343,6 @@ The following table describes the serialization of a Tagged payload:
         <th>Name</th>
         <th>Type</th>
         <th>Description</th>
-    </tr>
-    <tr>
-        <td>Payload Type</td>
-        <td>uint32</td>
-        <td>
-            The type of the payload. It will instruct the node how to parse the fields that follow.
-        </td>
     </tr>
     <tr>
         <td>Tag</td>
@@ -545,3 +537,41 @@ Transaction validation rules follow [TIP 20 Transaction Payload with TIP-18 Outp
 
 ### Outputs and Unlock blocks
 Output and unlock designs are the same as described in [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#output-design)
+
+## Signature
+
+The following table lists all currently supported signatures.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Signature Type</th>
+    </tr>
+    <tr>
+        <td>Ed25519</td>
+        <td>0</td>
+    </tr>
+</table>
+
+### Ed25519 Signature
+
+The following table describes the serialization of a Ed25519 signature:
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>Public Key</td>
+        <td>ByteArray[32]</td>
+        <td>
+            The public key used to verify the given signature.
+        </td>
+    </tr>
+    <tr>
+        <td>Signature</td>
+        <td>ByteArray[64]</td>
+        <td>The signature.</td>
+    </tr>
+</table>
