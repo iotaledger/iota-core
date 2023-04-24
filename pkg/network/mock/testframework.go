@@ -86,10 +86,10 @@ type MockedEndpoint struct {
 	handlersMutex sync.RWMutex
 }
 
-func NewMockedEndpoint(id network.PeerID, network *MockedNetwork, partition string) (newMockedNetwork *MockedEndpoint) {
+func NewMockedEndpoint(id network.PeerID, n *MockedNetwork, partition string) (newMockedNetwork *MockedEndpoint) {
 	return &MockedEndpoint{
 		id:        id,
-		network:   network,
+		network:   n,
 		partition: partition,
 		handlers:  make(map[string]func(network.PeerID, proto.Message) error),
 	}
