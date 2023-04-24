@@ -46,6 +46,15 @@ type rootBlock struct {
 	issuingTime  time.Time
 }
 
+func (r *rootBlock) String() string {
+	builder := stringify.NewStructBuilder("rootBlock")
+	builder.AddField(stringify.NewStructField("blockID", r.blockID))
+	builder.AddField(stringify.NewStructField("commitmentID", r.commitmentID))
+	builder.AddField(stringify.NewStructField("issuingTime", r.issuingTime))
+
+	return builder.String()
+}
+
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
 	return &Block{
