@@ -31,6 +31,7 @@ func (s *SlotTracker) slotVoters(slotIndex iotago.SlotIndex) *advancedset.Advanc
 	slotVoters, _ := s.votersPerSlot.GetOrCreate(slotIndex, func() *advancedset.AdvancedSet[iotago.AccountID] {
 		return advancedset.New[iotago.AccountID]()
 	})
+
 	return slotVoters
 }
 
@@ -96,6 +97,7 @@ func (s *SlotTracker) EvictSlot(indexToEvict iotago.SlotIndex) {
 		if power.Index <= indexToEvict {
 			identitiesToPrune = append(identitiesToPrune, identity)
 		}
+
 		return nil
 	})
 

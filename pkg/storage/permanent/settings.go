@@ -21,8 +21,7 @@ type Settings struct {
 	*settingsModel
 	mutex sync.RWMutex
 
-	api              iotago.API
-	slotTimeProvider *iotago.SlotTimeProvider
+	api iotago.API
 
 	module.Module
 }

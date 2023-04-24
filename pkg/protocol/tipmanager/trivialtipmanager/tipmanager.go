@@ -201,6 +201,7 @@ func (t *TipManager) removeTip(block *blocks.Block) (deleted bool) {
 		// t.TipsConflictTracker.RemoveTip(block)
 		t.events.TipRemoved.Trigger(block)
 	}
+
 	return
 }
 
@@ -251,6 +252,7 @@ func (t *TipManager) selectTips(count int) (parents iotago.BlockIDs) {
 }
 
 // checkMonotonicity returns true if the block has any accepted or scheduled child.
+// nolint:revive,unparam // code is commented out
 func (t *TipManager) checkMonotonicity(block *blocks.Block) (anyScheduledOrAccepted bool) {
 	//for _, child := range block.Children() {
 	//	if child.IsOrphaned() {

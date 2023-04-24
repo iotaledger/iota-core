@@ -29,9 +29,6 @@ type SlotMutations struct {
 	latestCommittedIndex iotago.SlotIndex
 
 	evictionMutex sync.RWMutex
-
-	// lastCommittedSlotCumulativeWeight stores the cumulative weight of the last committed slot
-	lastCommittedSlotCumulativeWeight uint64
 }
 
 // NewSlotMutations creates a new SlotMutations instance.

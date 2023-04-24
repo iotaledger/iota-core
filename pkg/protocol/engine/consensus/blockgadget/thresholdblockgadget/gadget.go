@@ -165,7 +165,7 @@ func (g *Gadget) tryRatifiedAcceptAndConfirm(block *blocks.Block) {
 	blockWeight := committee.SelectAccounts(block.Ratifiers()...).TotalWeight()
 	onlineCommitteeTotalWeight := g.sybilProtection.OnlineCommittee().TotalWeight()
 
-	// check if we reached the confirmation threshold based on the total commitee weight
+	// check if we reached the confirmation threshold based on the total committee weight.
 	if votes.IsThresholdReached(blockWeight, committeeTotalWeight, g.optsConfirmationThreshold) {
 		g.propagateRatifiedAcceptanceAndConfirmation(block, true)
 	} else if votes.IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {

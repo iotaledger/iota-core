@@ -198,6 +198,7 @@ func configure() error {
 		if err != nil {
 			return err
 		}
+
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 

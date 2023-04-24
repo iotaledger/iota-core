@@ -207,6 +207,7 @@ func (b *BlockDAG) isFutureBlock(block *blocks.Block) (isFutureBlock bool) {
 		lo.Return1(b.futureBlocks.Get(block.Block().SlotCommitment.Index, true).GetOrCreate(block.Block().SlotCommitment.MustID(), func() *advancedset.AdvancedSet[*blocks.Block] {
 			return advancedset.New[*blocks.Block]()
 		})).Add(block)
+
 		return true
 	}
 
