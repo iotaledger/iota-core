@@ -1,4 +1,4 @@
-package test
+package testsuite
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
-	"github.com/iotaledger/iota-core/pkg/test/mock"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/tools/genesis-snapshot/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
