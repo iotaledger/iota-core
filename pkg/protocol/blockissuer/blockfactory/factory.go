@@ -60,7 +60,7 @@ func (f *Factory) CreateBlockWithReferences(p iotago.Payload, references model.P
 
 	var err error
 	if references == nil {
-		references, err = f.tryGetReferences(p, strongParentsCount)
+		references, err = f.getReferencesWithRetry(p, strongParentsCount)
 		if err != nil {
 			return nil, errors.Wrap(err, "error while trying to get references")
 		}
@@ -97,7 +97,34 @@ func (f *Factory) CreateBlockWithReferences(p iotago.Payload, references model.P
 	return modelBlock, nil
 }
 
-func (f *Factory) GetReferences(p iotago.Payload, parentsCount int) (references model.ParentReferences, err error) {
+// getReferencesWithRetry tries to get references for the given payload. If it fails, it will retry at regular intervals until
+// the timeout is reached.
+func (f *Factory) getReferencesWithRetry(p iotago.Payload, parentsCount int) (references model.ParentReferences, err error) {
+	references, err = f.getReferences(p, parentsCount)
+	if err == nil {
+		return references, nil
+	}
+	f.Events.Error.Trigger(errors.Wrap(err, "could not get references"))
+
+	timeout := time.NewTimer(f.optsTipSelectionTimeout)
+	interval := time.NewTicker(f.optsTipSelectionRetryInterval)
+	for {
+		select {
+		case <-interval.C:
+			references, err = f.getReferences(p, parentsCount)
+			if err != nil {
+				f.Events.Error.Trigger(errors.Wrap(err, "could not get references"))
+				continue
+			}
+
+			return references, nil
+		case <-timeout.C:
+			return nil, errors.Errorf("timeout while trying to select tips and determine references")
+		}
+	}
+}
+
+func (f *Factory) getReferences(p iotago.Payload, parentsCount int) (references model.ParentReferences, err error) {
 	strongParents := f.tips(p, parentsCount)
 	if len(strongParents) == 0 {
 		return nil, errors.Errorf("no strong parents were selected in tip selection")
@@ -111,31 +138,6 @@ func (f *Factory) GetReferences(p iotago.Payload, parentsCount int) (references 
 
 	// TODO: should we remove duplicates in the references? It shouldn't be necessary with the new ConflictDAG.
 	return references, nil
-}
-
-func (f *Factory) tryGetReferences(p iotago.Payload, parentsCount int) (references model.ParentReferences, err error) {
-	references, err = f.GetReferences(p, parentsCount)
-	if err == nil {
-		return references, nil
-	}
-	f.Events.Error.Trigger(errors.Wrap(err, "could not get references"))
-
-	timeout := time.NewTimer(f.optsTipSelectionTimeout)
-	interval := time.NewTicker(f.optsTipSelectionRetryInterval)
-	for {
-		select {
-		case <-interval.C:
-			references, err = f.GetReferences(p, parentsCount)
-			if err != nil {
-				f.Events.Error.Trigger(errors.Wrap(err, "could not get references"))
-				continue
-			}
-
-			return references, nil
-		case <-timeout.C:
-			return nil, errors.Errorf("timeout while trying to select tips and determine references")
-		}
-	}
 }
 
 // TODO: when Ledger is refactored, we need to rework the stuff below

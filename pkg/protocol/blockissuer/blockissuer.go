@@ -43,6 +43,7 @@ func New(protocol *protocol.Protocol, localPrivateKey ed25519.PrivateKey, opts .
 		i.Factory = blockfactory.NewBlockFactory(
 			localPrivateKey,
 			i.protocol.TipManager,
+			// TODO: change when we have a way to fix the opinion coming from strong parents.
 			func(_ iotago.Payload, strongParents iotago.BlockIDs) (model.ParentReferences, error) {
 				return model.ParentReferences{
 					model.StrongParentType: strongParents,
@@ -113,12 +114,12 @@ func (i *BlockIssuer) IssueBlockAndAwaitBlockToBeBooked(block *model.Block, maxA
 	exit := make(chan struct{})
 	defer close(exit)
 
-	defer i.protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
-		if block.ID() != block.ID() {
+	defer i.protocol.Events.Engine.Booker.BlockBooked.Hook(func(bookedBlock *blocks.Block) {
+		if bookedBlock.ID() != block.ID() {
 			return
 		}
 		select {
-		case booked <- block:
+		case booked <- bookedBlock:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
@@ -150,12 +151,12 @@ func (i *BlockIssuer) IssueBlockAndAwaitBlockToBeTracked(block *model.Block, max
 	exit := make(chan struct{})
 	defer close(exit)
 
-	defer i.protocol.Events.Engine.Booker.WitnessAdded.Hook(func(block *blocks.Block) {
-		if block.ID() != block.ID() {
+	defer i.protocol.Events.Engine.Booker.WitnessAdded.Hook(func(trackedBlock *blocks.Block) {
+		if trackedBlock.ID() != block.ID() {
 			return
 		}
 		select {
-		case booked <- block:
+		case booked <- trackedBlock:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
