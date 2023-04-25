@@ -26,7 +26,7 @@ func (s *StateResolver) AddState(state ledger.State) {
 func (s *StateResolver) ResolveState(id iotago.OutputID) *promise.Promise[ledger.State] {
 	output, exists := s.statesByID[id]
 	if !exists {
-		return promise.New[ledger.State]().Reject(xerrors.Errorf("output %s not found", id))
+		return promise.New[ledger.State]().Reject(xerrors.Errorf("output %s not found: %w", id.ToHex(), ledger.ErrStateNotFound))
 	}
 
 	return promise.New[ledger.State]().Resolve(output)

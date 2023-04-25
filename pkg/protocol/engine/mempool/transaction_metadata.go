@@ -10,7 +10,13 @@ type TransactionWithMetadata interface {
 
 	Transaction() Transaction
 
+	IsStored() bool
+
+	IsSolid() bool
+
 	IsBooked() bool
+
+	IsExecuted() bool
 
 	Outputs() *advancedset.AdvancedSet[StateWithMetadata]
 }

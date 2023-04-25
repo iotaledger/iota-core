@@ -63,11 +63,29 @@ func (t *TransactionWithMetadata) Outputs() *advancedset.AdvancedSet[mempool.Sta
 	return outputs
 }
 
+func (t *TransactionWithMetadata) IsStored() bool {
+	return t != nil
+}
+
+func (t *TransactionWithMetadata) IsSolid() bool {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	return t.inputs != nil
+}
+
 func (t *TransactionWithMetadata) IsBooked() bool {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
 	return t.booked
+}
+
+func (t *TransactionWithMetadata) IsExecuted() bool {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	return t.outputs != nil
 }
 
 func (t *TransactionWithMetadata) PublishInput(index int, input *StateWithMetadata) {
