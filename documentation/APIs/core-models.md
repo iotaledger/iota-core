@@ -255,7 +255,8 @@ The slot index of timestamp `ts` is `(ts - genesisTimestamp)/duration + 1`.
 
 ## Slot Commitment
 
-Commitment is an object that contains a summary of a slot, and it is linked to the commitment of the previous slot. 
+Commitment is an object that contains a summary of a slot, and it is linked to the commitment of the previous slot, which forms a commitment chain. 
+
 Multiple sparse merkle trees are managed by per slot, which are:
 * *Tangle tree*: All accepted blocks within a slot.
 * *State mutation tree*: All accepted transactions within a slot.
@@ -265,7 +266,9 @@ Multiple sparse merkle trees are managed by per slot, which are:
 
 When a slot is committable, new commitment is generated and will be included in the new issued blocks.
 
-The following table describes the serialization of a Commitment:
+**Note** that more trees will be added in the future, but this will only change the calculation of `Root ID`, the Slot Commitment structure stays the same.
+
+The following table describes the serialization of a Slot Commitment:
 
 <table>
   <tr>
@@ -296,22 +299,22 @@ The following table describes the serialization of a Commitment:
   <tr>
     <td>Cumulative Weight</td>
     <td>int64</td>
-    <td>The sum of previous slot commitment cumulative weight and weight of issuers of accepted blocks within this slot. </td>
+    <td>The sum of previous slot commitment cumulative weight and weight of issuers of accepted blocks within this slot. It is just an indication of "committed into" this slot, and can not strictly be used for evaluating the switching of a chain.</td>
   </tr>
 </table>
 
 ### Slot Commitment ID
 
-Commitment ID denotes an identifier of a commitment, with type `ArrayBytes[40]`. It is calculated as the following steps, using BLAKE2b-256 hash function:
+Slot Commitment ID denotes an identifier of a slot commitment, with type `ArrayBytes[40]`. It is calculated as the following steps, using BLAKE2b-256 hash function:
 
-* `content` is the serialized commitment.
-* `slot_index` is the slot index of the commitment.
+* `content` is the serialized slot commitment.
+* `slot_index` is the slot index of the slot commitment.
 
 Caculation:
 1. `content_hash` = hash(`content`)
 2. And finally, `CommitmentID` = Concat(`content_hash`, `slot_index`) 
 
-The string format of Commitment ID is hexadecimal encoding of Commitment ID with `0x` prefix.
+The string format of Slot Commitment ID is hexadecimal encoding of Slot Commitment ID with `0x` prefix.
 
 ## Payloads
 The following table lists all currently specified payloads that can be part of a block. 
