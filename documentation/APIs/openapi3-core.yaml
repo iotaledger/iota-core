@@ -290,12 +290,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlockMetadataResponse'
               examples:
-                New Block:
+                New Block with Transaction Payload:
+                  $ref: '#/components/examples/get-block-by-id-response-example-new-transaction'
+                New Block without Transaction Payload:
                   $ref: '#/components/examples/get-block-by-id-response-example-new'
-                Confirmed:
+                Confirmed with Transaction Payload:
+                  $ref: >-
+                    #/components/examples/get-block-by-id-response-example-confirmed-transaction
+                Confirmed without Transaction Payload:
                   $ref: >-
                     #/components/examples/get-block-by-id-response-example-confirmed
-                Conflicting:
+                Conflicting with Transaction Payload:
+                  $ref: >-
+                    #/components/examples/get-block-by-id-response-example-conflicting-transaction
+                Conflicting without Transaction Payload:
                   $ref: >-
                     #/components/examples/get-block-by-id-response-example-conflicting
         '400':
@@ -463,7 +471,7 @@ paths:
                 $ref: '#/components/schemas/BlockResponse'
               examples:
                 default:
-                  $ref: '#/components/examples/get-included-block-of-transaction-example-json'
+                  $ref: '#/components/examples/get-block-by-id-transaction-response-example'
             application/vnd.iota.serializer-v1:
               schema:
                 type: string
@@ -519,7 +527,7 @@ paths:
                 $ref: '#/components/schemas/BlockMetadataResponse'
               examples:
                 default:
-                  $ref: '#/components/examples/get-block-by-id-response-example-included'
+                  $ref: '#/components/examples/get-block-by-id-response-example-confirmed-transaction'
         '400':
           description: "Unsuccessful operation: indicates that the provided data is invalid."
           content:
@@ -1089,7 +1097,7 @@ components:
       value:
         blockId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
 
-    get-block-by-id-response-example-new:
+    get-block-by-id-response-example-new-transaction:
       value:
         blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
         strongParents:
@@ -1098,8 +1106,17 @@ components:
         blockState: "pending"
         txState: "pending"
         reissuePayload: false
+    
+    get-block-by-id-response-example-new:
+      value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "pending"
+        reissuePayload: false
 
-    get-block-by-id-response-example-confirmed:
+    get-block-by-id-response-example-confirmed-transaction:
       value:
         blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
         strongParents:
@@ -1108,7 +1125,15 @@ components:
         blockState: "confirmed"
         txState: "confirmed"
 
-    get-block-by-id-response-example-conflicting:
+    get-block-by-id-response-example-confirmed:
+      value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "confirmed"
+
+    get-block-by-id-response-example-conflicting-transaction:
       value:
         blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
         strongParents:
@@ -1119,6 +1144,14 @@ components:
         blockStateReason: 1
         txStateReason: 5
 
+    get-block-by-id-response-example-conflicting:
+      value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "pending"
+        blockStateReason: 1
 
     post-tagged-data-block-request-example-minimal:
       value:
@@ -1262,10 +1295,21 @@ components:
     get-block-by-id-empty-response-example:
       value:
         protocolVersion: 3
-        parents:
-          - "0x7e0a99f3a1fa23b1c38a2e35d9c0d387a69a335c0d7d91b8e0694840ed2be0cf"
-          - "0x9a9a47ec0fb93783ee0dd7f7021bb98724be39a06e20c25d87e21accd34d5b98"
+        networkID: 10
+        strongParents:
+          - "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          - "0x408a53af982c49d1398ab5c5b5f5b390d4c4da7da48b61bb9ba7f97c1e8dd7f60000000000000000"
+        issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
+        issuingTime: 1649442459
+        slotCommitment:
+          index: 110
+          prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
+          rootsID: "f4ab06bc4b5db1410b2a7d54c43143ba5a6940e725e43c7f62ddc111d96f83f3"
+          cumulativeWeight: 12345
+        latestFinalizedSlot: 98
         nonce: '8423'
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
 
     get-block-by-id-transaction-response-example:
       value:
@@ -1390,71 +1434,6 @@ components:
         transactionIdSpent: "0x1ee46e19f4219ee65afc10227d0ca22753f76ef32d1e922e5cbe3fbc9b5a5298"
         includedCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
         latestCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
-
-    get-included-block-of-transaction-example-json:
-      value:
-        protocolVersion: 3
-        networkID: 10
-        strongParents:
-          - "0x9f1d034765d23c40191c5ebe1c6d35d708b71098c8d5ca416f5fb5b5ab23d7c40000000000000000"
-          - "0x0e311af8c74c57b9fb80c0ec1611ebcc0fdecc309e7c01b0df902bd0da8b0490000000000000000"
-        issuerID: "0x4c4f0b0d12eb4e4d92f8e0bbf69e0320bde236a5550205827e15eaa482431bfb"
-        issuerPublicKey: "0x3daa3e847a75c9f2992d7804c4a6012d1cefb4b4ed4c19df92b1f26860b50510"
-        issuingTime: 1650810641
-        slotCommitment:
-          index: 873
-          prevID: "0xb5b5ac29d5e8fa7c3af29564ef2237c34e29dfe0c6e73a688e9c913b266bc36f0000000000000000"
-          rootsID: "43d2c8e7e874429a9b59c73b6ec251f09983fc1f09853d6cfc45ba88214c6a45"
-          cumulativeWeight: 23456
-        latestFinalizedSlot: 87
-        payload:
-          type: 6
-          essence:
-            type: 1
-            networkId: "1337133713371337"
-            creationTime: 1650810641
-            inputsCommitment: "0x4d423ed05816f8af0e86bb40b3f43b31f20f35cfa9d95b0762d5220a0cc16914"
-            inputs:
-              - type: 0
-                transactionId: "0x9f1d034765d23c40191c5ebe1c6d35d708b71098c8d5ca416f5fb5b5ab23d7c4"
-                transactionOutputIndex: 0
-              - type: 0
-                transactionId: "0x0e311af8c74c57b9fb80c0ec1611ebcc0fdecc309e7c01b0df902bd0da8b0490"
-                transactionOutputIndex: 0
-              - type: 0
-                transactionId: "0x34a08f1d72c65e79bce03e7d19808d4c422b4a4a4c9e79e0a4d054ce1f91b96e"
-                transactionOutputIndex: 0
-            outputs:
-              - type: 3
-                amount: "50000000"
-                unlockConditions:
-                  - type: 0
-                    address:
-                      type: 0
-                      pubKeyHash: "0x46180c14d31c8bfedf131de79816061b3e3dbf16fc36d52a31e140ccf808b2f2"
-            payload:
-          unlocks:
-            - type: 
-              signature:
-                type: 0
-                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
-                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
-            - type: 1
-              reference: 0
-            - type: 1
-              reference: 0
-        nonce: "105368"
-        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
-
-    get-block-by-id-response-example-included:
-      value:
-        blockId: "0x3a1f5795b46bf5db14df44f603c28453622d96f10ec54f1a8e781c59a1f4d4fa"
-        strongParents:
-          - "0x2d7f26c53bdaa80b8f7bea6c2f6aa128f65719c233d7e285019fe156a6e192a9"
-          - "0xd49d937ee12d7f8e54b70ba7d3bb3b1b7d8aa2c9f0d5835a5d5a2598bf44eab6"
-        blockState: "pending"
-        txState: "pending"
-        reissuePayload: false
 
     get-commitment-response-example:
       value:
@@ -2769,7 +2748,7 @@ components:
               * `1` - denotes that the block is invalid.
               * `2` - denotes that the block is orphaned due to congestion control.
               * `3` - denotes that the block is orphaned due to negative mana balance.
-              * `4` - denotes that ...
+            **Note** more reasons will be added
         txStateReason:
           type: integer
           enum: [1,2,3,4,5,6,7,8,9,10,11,12,255]
