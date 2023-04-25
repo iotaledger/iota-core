@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	ErrorCommitmentNotCommittable      = errors.New("a block cannot commit to a slot that cannot objectively be committable yet")
-	ErrorsBlockTimeTooFarAheadInFuture = errors.New("a block cannot be too far ahead in the future")
-	ErrorsInvalidSignature             = errors.New("block has invalid signature")
-	ErrorsSignatureValidationFailed    = errors.New("error validating block signature")
+	ErrCommitmentNotCommittable     = errors.New("a block cannot commit to a slot that cannot objectively be committable yet")
+	ErrBlockTimeTooFarAheadInFuture = errors.New("a block cannot be too far ahead in the future")
+	ErrInvalidSignature             = errors.New("block has invalid signature")
+	ErrSignatureValidationFailed    = errors.New("error validating block signature")
 )
 
 // Filter filters blocks.
@@ -74,8 +74,10 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	if f.optsMinCommittableSlotAge > 0 && block.Block().SlotCommitment.Index > 0 && block.Block().SlotCommitment.Index > block.ID().Index()-f.optsMinCommittableSlotAge {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrorCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.Block().SlotCommitment.Index),
+			Reason: errors.WithMessagef(ErrCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.Block().SlotCommitment.Index),
+			Source: source,
 		})
+
 		return
 	}
 
@@ -84,8 +86,10 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrorsBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
+			Reason: errors.WithMessagef(ErrBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
+			Source: source,
 		})
+
 		return
 	}
 
@@ -95,15 +99,19 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 			if err != nil {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,
-					Reason: errors.WithMessagef(ErrorsSignatureValidationFailed, "error: %s", err.Error()),
+					Reason: errors.WithMessagef(ErrSignatureValidationFailed, "error: %s", err.Error()),
+					Source: source,
 				})
+
 				return
 			}
 
 			f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 				Block:  block,
-				Reason: ErrorsInvalidSignature,
+				Reason: ErrInvalidSignature,
+				Source: source,
 			})
+
 			return
 		}
 	}

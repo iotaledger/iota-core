@@ -132,6 +132,7 @@ func (e *EngineManager) CleanupNonActive() error {
 			return errors.Wrapf(err, "unable to remove subdirectory %s", dir)
 		}
 	}
+
 	return nil
 }
 
@@ -181,6 +182,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 		instance.Shutdown()
 		_ = instance.RemoveFromFilesystem()
 		_ = os.Remove(snapshotPath)
+
 		return nil, err
 	}
 

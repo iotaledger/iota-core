@@ -30,11 +30,11 @@ func NewTestFramework(t *testing.T, api iotago.API, optsFilter ...options.Option
 	}
 
 	tf.Filter.Events().BlockAllowed.Hook(func(block *model.Block) {
-		t.Logf("BlockAllowed: %s", block.ID)
+		t.Logf("BlockAllowed: %s", block.ID())
 	})
 
 	tf.Filter.Events().BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
-		t.Logf("BlockFiltered: %s - %s", event.Block.ID, event.Reason)
+		t.Logf("BlockFiltered: %s - %s", event.Block.ID(), event.Reason)
 	})
 
 	return tf

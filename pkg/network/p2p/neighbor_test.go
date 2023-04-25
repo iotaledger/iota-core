@@ -1,12 +1,15 @@
 package p2p
 
 import (
+	"context"
 	"net"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +20,6 @@ import (
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/logger"
-	"github.com/iotaledger/iota-core/pkg/libp2putil/libp2ptesting"
 	p2pproto "github.com/iotaledger/iota-core/pkg/network/p2p/proto"
 )
 
@@ -28,7 +30,7 @@ var (
 )
 
 func TestNeighborClose(t *testing.T) {
-	a, _, teardown := libp2ptesting.NewStreamsPipe(t)
+	a, _, teardown := newStreamsPipe(t)
 	defer teardown()
 
 	n := newTestNeighbor("A", a)
@@ -37,7 +39,7 @@ func TestNeighborClose(t *testing.T) {
 }
 
 func TestNeighborCloseTwice(t *testing.T) {
-	a, _, teardown := libp2ptesting.NewStreamsPipe(t)
+	a, _, teardown := newStreamsPipe(t)
 	defer teardown()
 
 	n := newTestNeighbor("A", a)
@@ -47,7 +49,7 @@ func TestNeighborCloseTwice(t *testing.T) {
 }
 
 func TestNeighborWrite(t *testing.T) {
-	a, b, teardown := libp2ptesting.NewStreamsPipe(t)
+	a, b, teardown := newStreamsPipe(t)
 	defer teardown()
 
 	var countA uint32
@@ -99,4 +101,42 @@ func newTestPeer(name string) *peer.Peer {
 	copy(publicKey[:], name)
 
 	return peer.NewPeer(identity.New(publicKey), net.IPv4zero, services)
+}
+
+// newStreamsPipe returns a pair of libp2p Stream that are talking to each other.
+func newStreamsPipe(t testing.TB) (network.Stream, network.Stream, func()) {
+	ctx := context.Background()
+	host1, err := libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
+		libp2p.DisableRelay(),
+	)
+	require.NoError(t, err)
+	host2, err := libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
+		libp2p.DisableRelay(),
+	)
+	require.NoError(t, err)
+	acceptStremCh := make(chan network.Stream, 1)
+	host2.Peerstore().AddAddrs(host1.ID(), host1.Addrs(), peerstore.PermanentAddrTTL)
+	host2.SetStreamHandler(protocol.TestingID, func(s network.Stream) {
+		acceptStremCh <- s
+	})
+	host1.Peerstore().AddAddrs(host2.ID(), host2.Addrs(), peerstore.PermanentAddrTTL)
+	dialStream, err := host1.NewStream(ctx, host2.ID(), protocol.TestingID)
+	require.NoError(t, err)
+	_, err = dialStream.Write(nil)
+	require.NoError(t, err)
+	acceptStream := <-acceptStremCh
+	tearDown := func() {
+		err2 := dialStream.Close()
+		require.NoError(t, err2)
+		err2 = acceptStream.Close()
+		require.NoError(t, err2)
+		err2 = host1.Close()
+		require.NoError(t, err2)
+		err2 = host2.Close()
+		require.NoError(t, err2)
+	}
+
+	return dialStream, acceptStream, tearDown
 }

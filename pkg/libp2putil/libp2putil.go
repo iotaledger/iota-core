@@ -16,10 +16,12 @@ func GetLibp2pIdentity(lPeer *peer.Local) (libp2p.Option, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+
 	libp2pPrivateKey, err := ToLibp2pPrivateKey(ourPrivateKey)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+
 	return libp2p.Identity(libp2pPrivateKey), nil
 }
 
@@ -29,10 +31,12 @@ func ToLibp2pPrivateKey(ourPrivateKey ed25519.PrivateKey) (libp2pcrypto.PrivKey,
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+
 	libp2pPrivateKey, err := libp2pcrypto.UnmarshalEd25519PrivateKey(privateKeyBytes)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+
 	return libp2pPrivateKey, nil
 }
 
@@ -42,13 +46,16 @@ func ToLibp2pPeerID(p *peer.Peer) (libp2ppeer.ID, error) {
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
+
 	pubKeyLibp2p, err := libp2pcrypto.UnmarshalEd25519PublicKey(pubKeyBytes)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
+
 	libp2pID, err := libp2ppeer.IDFromPublicKey(pubKeyLibp2p)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
+
 	return libp2pID, nil
 }

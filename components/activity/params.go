@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 )
 
-// ParametersActivity
+// ParametersActivity contains the definition of the configuration parameters used by the Activity component.
 type ParametersActivity struct {
 	// Enabled defines whether the Activity component is enabled.
 	Enabled bool `default:"true" usage:"whether the Activity component is enabled"`
@@ -18,7 +18,7 @@ type ParametersActivity struct {
 	IgnoreBootstrapped bool `default:"false" usage:"whether the Activity component should start issuing activity blocks before the main engine is bootstrapped"`
 }
 
-// ParamsActivity
+// ParamsActivity contains the values of the configuration parameters used by the Activity component.
 var ParamsActivity = &ParametersActivity{}
 
 var params = &app.ComponentParams{

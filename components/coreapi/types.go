@@ -5,8 +5,10 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+//nolint:unused // transactions are currently unused
 type txState int
 
+//nolint:unused // transactions are currently unused
 const (
 	txStatePending txState = iota
 	txStateConfirmed
@@ -15,6 +17,7 @@ const (
 	txStateConflicting
 )
 
+//nolint:unused // transactions are currently unused
 func (t txState) String() string {
 	switch t {
 	case txStatePending:

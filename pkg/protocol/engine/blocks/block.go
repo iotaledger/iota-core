@@ -90,22 +90,22 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 	}
 }
 
-func (blk *Block) Block() *iotago.Block {
-	return blk.modelBlock.Block()
+func (b *Block) Block() *iotago.Block {
+	return b.modelBlock.Block()
 }
 
-// TODO: maybe move to iota.go and introduce parent type
-func (blk *Block) Parents() (parents []iotago.BlockID) {
-	return blk.modelBlock.Parents()
+// TODO: maybe move to iota.go and introduce parent type.
+func (b *Block) Parents() (parents []iotago.BlockID) {
+	return b.modelBlock.Parents()
 }
 
-func (blk *Block) StrongParents() (parents []iotago.BlockID) {
-	return blk.modelBlock.Block().StrongParents
+func (b *Block) StrongParents() (parents []iotago.BlockID) {
+	return b.modelBlock.Block().StrongParents
 }
 
 // ForEachParent executes a consumer func for each parent.
-func (blk *Block) ForEachParent(consumer func(parent model.Parent)) {
-	blk.modelBlock.ForEachParent(consumer)
+func (b *Block) ForEachParent(consumer func(parent model.Parent)) {
+	b.modelBlock.ForEachParent(consumer)
 }
 
 func (b *Block) IsRootBlock() bool {
@@ -199,6 +199,7 @@ func (b *Block) SetFuture() (wasUpdated bool) {
 	}
 
 	b.future = true
+
 	return true
 }
 
@@ -438,6 +439,6 @@ func (b *Block) String() string {
 	return builder.String()
 }
 
-func (blk *Block) ModelBlock() *model.Block {
-	return blk.modelBlock
+func (b *Block) ModelBlock() *model.Block {
+	return b.modelBlock
 }

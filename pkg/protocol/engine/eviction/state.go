@@ -175,6 +175,7 @@ func (s *State) LatestRootBlocks() iotago.BlockIDs {
 	if len(rootBlocks) == 0 {
 		return iotago.BlockIDs{iotago.EmptyBlockID()}
 	}
+
 	return rootBlocks
 }
 

@@ -35,7 +35,7 @@ func (r *RootBlocks) Delete(blockID iotago.BlockID) (err error) {
 	return r.store.Delete(blockID)
 }
 
-// Stream streams all root blocks for a slot index
+// Stream streams all root blocks for a slot index.
 func (r *RootBlocks) Stream(consumer func(id iotago.BlockID, commitmentID iotago.CommitmentID) error) error {
 	if storageErr := r.store.Iterate(kvstore.EmptyPrefix, func(blockID iotago.BlockID, commitmentID iotago.CommitmentID) (advance bool) {
 		return consumer(blockID, commitmentID) != nil
