@@ -53,6 +53,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	f.AssertLatestFinalizedSlot(0, f.Nodes()...)
 	f.AssertChainID(iotago.NewEmptyCommitment().MustID(), f.Nodes()...)
 
+	f.AssertStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}, f.Nodes()...)
+
 	f.AssertSybilProtection(200, 200, node1, node2, node3, node4)
 	// TODO: manually set nodes as active/inactive? then verify again
 
