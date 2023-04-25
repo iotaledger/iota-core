@@ -2748,7 +2748,7 @@ components:
               * `1` - denotes that the block is invalid.
               * `2` - denotes that the block is orphaned due to congestion control.
               * `3` - denotes that the block is orphaned due to negative mana balance.
-            **Note** more reasons will be added
+              * Note: more reasons will be added.
         txStateReason:
           type: integer
           enum: [1,2,3,4,5,6,7,8,9,10,11,12,255]
