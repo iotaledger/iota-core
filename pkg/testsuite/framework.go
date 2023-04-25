@@ -27,6 +27,8 @@ type Framework struct {
 
 	validators map[iotago.AccountID]int64
 
+	ProtocolParameters iotago.ProtocolParameters
+
 	mutex sync.RWMutex
 }
 
@@ -36,6 +38,20 @@ func NewFramework(t *testing.T) *Framework {
 		Network:   mock.NewNetwork(),
 		Directory: utils.NewDirectory(t.TempDir()),
 		nodes:     make(map[string]*mock.Node),
+		ProtocolParameters: iotago.ProtocolParameters{
+			Version:     3,
+			NetworkName: t.Name(),
+			Bech32HRP:   "rms",
+			MinPoWScore: 10,
+			RentStructure: iotago.RentStructure{
+				VByteCost:    100,
+				VBFactorData: 1,
+				VBFactorKey:  10,
+			},
+			TokenSupply:           1_000_0000,
+			GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+			SlotDurationInSeconds: 10,
+		},
 	}
 }
 
@@ -49,6 +65,33 @@ func (f *Framework) Node(name string) *mock.Node {
 	}
 
 	return node
+}
+
+func (f *Framework) Nodes(names ...string) []*mock.Node {
+	if len(names) == 0 {
+		f.mutex.RLock()
+		defer f.mutex.RUnlock()
+
+		nodes := make([]*mock.Node, 0, len(f.nodes))
+		for _, node := range f.nodes {
+			nodes = append(nodes, node)
+		}
+
+		return nodes
+	}
+
+	nodes := make([]*mock.Node, len(names))
+	for i, name := range names {
+		nodes[i] = f.Node(name)
+	}
+
+	return nodes
+}
+
+func (f *Framework) Wait(nodes ...*mock.Node) {
+	for _, node := range nodes {
+		node.Wait()
+	}
 }
 
 func (f *Framework) Shutdown() {
@@ -124,20 +167,7 @@ func (f *Framework) createSnapshot() string {
 	var base = []options.Option[snapshotcreator.Options]{
 		snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
 		snapshotcreator.WithFilePath(path),
-		snapshotcreator.WithProtocolParameters(iotago.ProtocolParameters{
-			Version:     3,
-			NetworkName: f.Testing.Name(),
-			Bech32HRP:   "rms",
-			MinPoWScore: 10,
-			RentStructure: iotago.RentStructure{
-				VByteCost:    100,
-				VBFactorData: 1,
-				VBFactorKey:  10,
-			},
-			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Unix()),
-			SlotDurationInSeconds: 10,
-		}),
+		snapshotcreator.WithProtocolParameters(f.ProtocolParameters),
 		snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
 			iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
 		}),
@@ -157,5 +187,11 @@ func (f *Framework) HookLogging() {
 
 	for _, node := range f.nodes {
 		node.HookLogging()
+	}
+}
+
+func mustNodes(nodes []*mock.Node) {
+	if len(nodes) == 0 {
+		panic("no nodes provided")
 	}
 }
