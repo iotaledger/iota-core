@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -138,6 +139,9 @@ func (i *BlockIssuer) issueBlock(block *model.Block) error {
 func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, p iotago.Payload, parentsCount int) (references model.ParentReferences, err error) {
 	timeout := time.NewTimer(i.optsTipSelectionTimeout)
 	interval := time.NewTicker(i.optsTipSelectionRetryInterval)
+	defer timeutil.CleanupTimer(timeout)
+	defer timeutil.CleanupTicker(interval)
+
 	for {
 		references = i.protocol.TipManager.Tips(parentsCount)
 		if len(references[model.StrongParentType]) > 0 {
