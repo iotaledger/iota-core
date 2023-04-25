@@ -17,22 +17,31 @@ func NewEvent() *Event {
 }
 
 func (f *Event) Trigger() {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+	for _, callback := range func() (callbacks []func()) {
+		f.mutex.Lock()
+		defer f.mutex.Unlock()
 
-	for _, callback := range f.triggeredCallbacks {
+		if callbacks = f.triggeredCallbacks; callbacks != nil {
+			f.triggeredCallbacks = nil
+		}
+
+		return callbacks
+	}() {
 		callback()
 	}
-	f.triggeredCallbacks = nil
 }
 
 func (f *Event) OnTrigger(callback func()) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+	if func() (triggeredAlready bool) {
+		f.mutex.Lock()
+		defer f.mutex.Unlock()
 
-	if f.triggeredCallbacks != nil {
-		f.triggeredCallbacks = append(f.triggeredCallbacks, callback)
-	} else {
+		if triggeredAlready = f.triggeredCallbacks == nil; !triggeredAlready {
+			f.triggeredCallbacks = append(f.triggeredCallbacks, callback)
+		}
+
+		return triggeredAlready
+	}() {
 		callback()
 	}
 }
@@ -58,14 +67,19 @@ func NewEvent1[T any]() *Event1[T] {
 }
 
 func (f *Event1[T]) Trigger(arg T) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+	for _, callback := range func() (callbacks []func(T)) {
+		f.mutex.Lock()
+		defer f.mutex.Unlock()
 
-	for _, callback := range f.triggeredCallbacks {
+		if callbacks = f.triggeredCallbacks; callbacks != nil {
+			f.triggeredCallbacks = nil
+			f.triggerResult = &arg
+		}
+
+		return callbacks
+	}() {
 		callback(arg)
 	}
-	f.triggerResult = &arg
-	f.triggeredCallbacks = nil
 }
 
 func (f *Event1[T]) OnTrigger(callback func(T)) {

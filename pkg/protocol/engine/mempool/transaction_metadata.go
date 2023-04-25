@@ -22,13 +22,13 @@ type TransactionWithMetadata interface {
 
 	IsEvicted() bool
 
-	HookSolid(func())
+	OnSolid(func())
 
-	HookExecuted(func())
+	OnExecuted(func())
 
-	HookBooked(func())
+	OnBooked(func())
 
-	HookInvalid(func(error))
+	OnInvalid(func(error))
 
-	HookEvicted(func())
+	OnEvicted(func())
 }

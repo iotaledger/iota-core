@@ -64,7 +64,7 @@ func (t *TestFramework) ProcessTransactions(alias ...string) error {
 		transaction, transactionExists := t.transactionByAlias[alias]
 		require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", alias)
 
-		if err := t.Instance.ProcessTransaction(transaction); err != nil {
+		if _, err := t.Instance.ProcessTransaction(transaction); err != nil {
 			return err
 		}
 	}
@@ -186,7 +186,7 @@ func (t *TestFramework) waitBooked(transactionAliases ...string) {
 		transactionMetadata, exists := t.TransactionMetadata(transactionAlias)
 		require.True(t.test, exists, "transaction '%s' does not exist", transactionAlias)
 
-		transactionMetadata.HookBooked(allBooked.Done)
+		transactionMetadata.OnBooked(allBooked.Done)
 	}
 
 	allBooked.Wait()

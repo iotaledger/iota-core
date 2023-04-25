@@ -93,23 +93,23 @@ func (t *TransactionWithMetadata) IsEvicted() bool {
 	return t.evicted.WasTriggered()
 }
 
-func (t *TransactionWithMetadata) HookSolid(callback func()) {
+func (t *TransactionWithMetadata) OnSolid(callback func()) {
 	t.solid.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) HookExecuted(callback func()) {
+func (t *TransactionWithMetadata) OnExecuted(callback func()) {
 	t.executed.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) HookBooked(callback func()) {
+func (t *TransactionWithMetadata) OnBooked(callback func()) {
 	t.booked.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) HookInvalid(callback func(error)) {
+func (t *TransactionWithMetadata) OnInvalid(callback func(error)) {
 	t.invalid.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) HookEvicted(callback func()) {
+func (t *TransactionWithMetadata) OnEvicted(callback func()) {
 	t.evicted.OnTrigger(callback)
 }
 
@@ -120,11 +120,12 @@ func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetada
 	t.inputs[index] = input
 }
 
-func (t *TransactionWithMetadata) publishOutputStates(outputStates []ledger.State) {
+func (t *TransactionWithMetadata) publishExecutionResult(outputStates []ledger.State) {
 	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
 	for _, outputState := range outputStates {
 		t.outputs = append(t.outputs, NewStateWithMetadata(outputState, t))
 	}
+	t.mutex.Unlock()
+
+	t.executed.Trigger()
 }

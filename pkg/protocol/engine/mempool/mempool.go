@@ -7,7 +7,7 @@ import (
 type MemPool interface {
 	Events() *Events
 
-	ProcessTransaction(transaction Transaction) error
+	ProcessTransaction(transaction Transaction) (metadata TransactionWithMetadata, err error)
 
 	TransactionMetadata(id iotago.TransactionID) (metadata TransactionWithMetadata, exists bool)
 

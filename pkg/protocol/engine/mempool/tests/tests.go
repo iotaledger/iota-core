@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/iotaledger/hive.go/runtime/debug"
 )
 
 func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
@@ -16,6 +18,8 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 }
 
 func TestProcessTransaction(t *testing.T, tf *TestFramework) {
+	debug.SetEnabled(true)
+
 	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
 	tf.CreateTransaction("tx2", []string{"tx1:0"}, 1)
 
@@ -25,6 +29,8 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 }
 
 func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
+	debug.SetEnabled(true)
+
 	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
 	tf.CreateTransaction("tx2", []string{"tx1:0"}, 1)
 	tf.CreateTransaction("tx3", []string{"tx2:0"}, 1)
