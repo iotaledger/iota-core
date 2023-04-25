@@ -217,11 +217,11 @@ func (t *TipManager) removeStrongParents(block *blocks.Block) {
 	}
 }
 
-func (t *TipManager) selectTips(count int) (parents iotago.BlockIDs) {
+func (t *TipManager) selectTips(count int) (strongParents iotago.BlockIDs) {
 	t.mutex.Lock() // RemoveTip might get called, so we need a write-lock here
 	defer t.mutex.Unlock()
 
-	parents = make(iotago.BlockIDs, 0)
+	strongParents = make(iotago.BlockIDs, 0)
 	tips := t.tips.RandomUniqueEntries(count)
 
 	// We obtain up to 8 latest root blocks if there is no valid tip and we submit them to the TSC check as some
@@ -239,7 +239,7 @@ func (t *TipManager) selectTips(count int) (parents iotago.BlockIDs) {
 
 	for _, tip := range tips {
 		if err := t.isValidTip(tip); err == nil {
-			parents = append(parents, tip.ID())
+			strongParents = append(strongParents, tip.ID())
 		} else {
 			t.removeTip(tip)
 
@@ -251,7 +251,7 @@ func (t *TipManager) selectTips(count int) (parents iotago.BlockIDs) {
 		}
 	}
 
-	return parents
+	return strongParents
 }
 
 // checkMonotonicity returns true if the block has any accepted or scheduled child.
