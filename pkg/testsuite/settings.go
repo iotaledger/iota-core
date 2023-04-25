@@ -19,7 +19,7 @@ func (f *Framework) AssertProtocolParameters(parameters iotago.ProtocolParameter
 	mustNodes(nodes)
 
 	for _, node := range nodes {
-		require.Equalf(f.Testing, parameters, node.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(), "%s: expected %s, got %s", node.Name, parameters.String(), node.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters().String())
+		require.Equalf(f.Testing, parameters, *node.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(), "%s: expected %s, got %s", node.Name, parameters.String(), node.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters().String())
 	}
 }
 

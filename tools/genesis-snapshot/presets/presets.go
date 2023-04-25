@@ -5,7 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/tools/genesis-snapshot/snapshotcreator"
+	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
