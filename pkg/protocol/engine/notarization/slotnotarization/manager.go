@@ -181,7 +181,7 @@ func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool
 func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	latestCommitment := m.storage.Settings().LatestCommitment()
 	if index != latestCommitment.Index()+1 {
-		m.events.Error.Trigger(errors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index))
+		m.events.Error.Trigger(errors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
 
 		return false
 	}
