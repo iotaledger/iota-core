@@ -74,11 +74,11 @@ func (s *Settings) SetSnapshotImported(initialized bool) (err error) {
 	return nil
 }
 
-func (s *Settings) ProtocolParameters() iotago.ProtocolParameters {
+func (s *Settings) ProtocolParameters() *iotago.ProtocolParameters {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return s.settingsModel.ProtocolParameters
+	return &s.settingsModel.ProtocolParameters
 }
 
 func (s *Settings) SetProtocolParameters(params iotago.ProtocolParameters) (err error) {

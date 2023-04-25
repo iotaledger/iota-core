@@ -19,12 +19,14 @@ var (
 	ErrCommitmentNotCommittable     = errors.New("a block cannot commit to a slot that cannot objectively be committable yet")
 	ErrBlockTimeTooFarAheadInFuture = errors.New("a block cannot be too far ahead in the future")
 	ErrInvalidSignature             = errors.New("block has invalid signature")
-	ErrSignatureValidationFailed    = errors.New("error validating block signature")
+	ErrInvalidProofOfWork           = errors.New("error validating PoW")
 )
 
 // Filter filters blocks.
 type Filter struct {
 	events *filter.Events
+
+	protocolParamsFunc func() *iotago.ProtocolParameters
 
 	optsMaxAllowedWallClockDrift time.Duration
 	optsMinCommittableSlotAge    iotago.SlotIndex
@@ -35,7 +37,7 @@ type Filter struct {
 
 func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
 	return module.Provide(func(e *engine.Engine) filter.Filter {
-		f := New(opts...)
+		f := New(e.Storage.Settings().ProtocolParameters, opts...)
 
 		e.HookConstructed(func() {
 			f.events.BlockFiltered.Hook(func(filteredEvent *filter.BlockFilteredEvent) {
@@ -52,9 +54,10 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 var _ filter.Filter = new(Filter)
 
 // New creates a new Filter.
-func New(opts ...options.Option[Filter]) *Filter {
+func New(protocolParamsFunc func() *iotago.ProtocolParameters, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
 		events:                  filter.NewEvents(),
+		protocolParamsFunc:      protocolParamsFunc,
 		optsSignatureValidation: true,
 	}, opts,
 		(*Filter).TriggerConstructed,
@@ -70,7 +73,32 @@ func (f *Filter) Events() *filter.Events {
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID) {
 	// TODO: if TX add check for TX timestamp
 
-	// Check if the block is trying to commit to a slot that is not yet committable
+	protocolParams := f.protocolParamsFunc()
+	if protocolParams.MinPoWScore > 0 {
+		// Check if the block has enough PoW score.
+		score, _, err := block.Block().POW()
+		if err != nil {
+			f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
+				Block:  block,
+				Reason: errors.WithMessage(ErrInvalidProofOfWork, "error calculating PoW score"),
+				Source: source,
+			})
+
+			return
+		}
+
+		if score < float64(protocolParams.MinPoWScore) {
+			f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
+				Block:  block,
+				Reason: errors.WithMessagef(ErrInvalidProofOfWork, "score %f is less than min score %d", score, protocolParams.MinPoWScore),
+				Source: source,
+			})
+
+			return
+		}
+	}
+
+	// Check if the block is trying to commit to a slot that is not yet committable.
 	if f.optsMinCommittableSlotAge > 0 && block.Block().SlotCommitment.Index > 0 && block.Block().SlotCommitment.Index > block.ID().Index()-f.optsMinCommittableSlotAge {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
@@ -81,7 +109,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 		return
 	}
 
-	// Verify the timestamp is not too far in the future
+	// Verify the timestamp is not too far in the future.
 	timeDelta := time.Since(block.Block().IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
@@ -94,12 +122,12 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	}
 
 	if f.optsSignatureValidation {
-		// Verify the block signature
+		// Verify the block signature.
 		if valid, err := block.Block().VerifySignature(); !valid {
 			if err != nil {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,
-					Reason: errors.WithMessagef(ErrSignatureValidationFailed, "error: %s", err.Error()),
+					Reason: errors.WithMessagef(ErrInvalidSignature, "error: %s", err.Error()),
 					Source: source,
 				})
 
