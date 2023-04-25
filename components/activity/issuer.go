@@ -26,7 +26,7 @@ func issueActivityBlock() {
 
 	block, err := builder.NewBlockBuilder().
 		StrongParents(deps.Protocol.TipManager.Tips(ParamsActivity.ParentsCount)).
-		SlotCommitment(deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()).
+		SlotCommitment(deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()).
 		LatestFinalizedSlot(deps.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
 		Payload(&iotago.TaggedData{
 			Tag: []byte("ACTIVITY"),

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -43,7 +44,7 @@ func BlockFromBlock(iotaBlock *iotago.Block, api iotago.API, opts ...serix.Optio
 	return block, nil
 }
 
-func BlockFromBlockIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
+func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
 	iotaBlock := new(iotago.Block)
 	if _, err := api.Decode(data, iotaBlock, opts...); err != nil {
 		return nil, err
@@ -73,7 +74,7 @@ func BlockFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Block, 
 		return nil, err
 	}
 
-	return BlockFromBlockIDAndBytes(blockID, data, api, opts...)
+	return BlockFromIDAndBytes(blockID, data, api, opts...)
 }
 
 func (blk *Block) ID() iotago.BlockID {
@@ -96,6 +97,10 @@ func (blk *Block) Block() *iotago.Block {
 	})
 
 	return blk.block
+}
+
+func (blk *Block) SlotCommitment() *Commitment {
+	return lo.PanicOnErr(CommitmentFromCommitment(blk.Block().SlotCommitment, blk.api))
 }
 
 // TODO: maybe move to iota.go and introduce parent type.

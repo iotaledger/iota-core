@@ -80,7 +80,7 @@ func New(
 		&Engine{
 			Events:        NewEvents(),
 			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance.RootBlocks, storageInstance.Settings().LatestCommitment().Index),
+			EvictionState: eviction.NewState(storageInstance.RootBlocks, storageInstance.Settings().LatestCommitment().Index()),
 			Workers:       workers,
 
 			optsBootstrappedThreshold: 10 * time.Second,
@@ -167,7 +167,7 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		e.Storage.Settings().UpdateAPI()
 		e.Storage.Settings().TriggerInitialized()
 		e.Storage.Commitments().TriggerInitialized()
-		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index)
+		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
 
 		// e.Notarization.attestations().SetLastCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 		// e.Notarization.attestations().TriggerInitialized()
@@ -184,7 +184,7 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
 	if len(targetSlot) == 0 {
-		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index)
+		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index())
 	}
 
 	if fileHandle, err := os.Create(filePath); err != nil {
@@ -322,7 +322,7 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 // EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
 // commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
 // from being processed as their chain will be deemed unsolid.
-func (e *Engine) EarliestRootCommitment() *iotago.Commitment {
+func (e *Engine) EarliestRootCommitment() *model.Commitment {
 	earliestRootCommitmentID := e.EvictionState.EarliestRootCommitmentID()
 	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentID.Index())
 	if err != nil {

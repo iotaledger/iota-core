@@ -34,7 +34,7 @@ type BlockDAG struct {
 	solidifier *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
-	commitmentFunc func(index iotago.SlotIndex) (*iotago.Commitment, error)
+	commitmentFunc func(index iotago.SlotIndex) (*model.Commitment, error)
 
 	// futureBlocks contains blocks with a commitment in the future, that should not be passed to the booker yet.
 	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*blocks.Block]]
@@ -79,7 +79,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, latestCommitmentFunc func(iotago.SlotIndex) (*iotago.Commitment, error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, latestCommitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
 		events:         blockdag.NewEvents(),
 		evictionState:  evictionState,
@@ -144,7 +144,7 @@ func (b *BlockDAG) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
 			panic(fmt.Sprintf("failed to load commitment for index %d: %s", i, err))
 		}
 		if storage := b.futureBlocks.Get(i, false); storage != nil {
-			if futureBlocks, exists := storage.Get(cm.MustID()); exists {
+			if futureBlocks, exists := storage.Get(cm.ID()); exists {
 				_ = futureBlocks.ForEach(func(futureBlock *blocks.Block) (err error) {
 					b.solidifier.Queue(futureBlock)
 					return nil

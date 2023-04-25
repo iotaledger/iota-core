@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -18,7 +19,8 @@ type TestFramework struct {
 	Instance *Manager
 
 	test               *testing.T
-	commitmentsByAlias map[string]*iotago.Commitment
+	api                iotago.API
+	commitmentsByAlias map[string]*model.Commitment
 
 	forkDetected              int32
 	commitmentMissing         int32
@@ -28,14 +30,15 @@ type TestFramework struct {
 	sync.RWMutex
 }
 
-func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) (testFramework *TestFramework) {
-	snapshotCommitment := iotago.NewCommitment(0, iotago.SlotIdentifier{}, iotago.Identifier{}, 0)
+func NewTestFramework(test *testing.T, api iotago.API, opts ...options.Option[TestFramework]) (testFramework *TestFramework) {
+	snapshotCommitment := model.NewEmptyCommitment(api)
 
 	return options.Apply(&TestFramework{
 		Instance: NewManager(),
 
 		test: test,
-		commitmentsByAlias: map[string]*iotago.Commitment{
+		api:  api,
+		commitmentsByAlias: map[string]*model.Commitment{
 			"Genesis": snapshotCommitment,
 		},
 	}, opts, func(t *TestFramework) {
@@ -66,8 +69,10 @@ func (t *TestFramework) CreateCommitment(alias string, prevAlias string) {
 	prevCommitmentID, previousIndex := t.previousCommitmentID(prevAlias)
 	randomECR := blake2b.Sum256([]byte(alias + prevAlias))
 
-	t.commitmentsByAlias[alias] = iotago.NewCommitment(previousIndex+1, prevCommitmentID, randomECR, 0)
-	t.commitmentsByAlias[alias].MustID().RegisterAlias(alias)
+	cm, err := model.CommitmentFromCommitment(iotago.NewCommitment(previousIndex+1, prevCommitmentID, randomECR, 0), t.api)
+	require.NoError(t.test, err)
+	t.commitmentsByAlias[alias] = cm
+	t.commitmentsByAlias[alias].ID().RegisterAlias(alias)
 }
 
 func (t *TestFramework) ProcessCommitment(alias string) (isSolid bool, chain *Chain) {
@@ -82,7 +87,7 @@ func (t *TestFramework) Chain(alias string) (chain *Chain) {
 	return t.Instance.Chain(t.SlotCommitment(alias))
 }
 
-func (t *TestFramework) commitment(alias string) *iotago.Commitment {
+func (t *TestFramework) commitment(alias string) *model.Commitment {
 	t.RLock()
 	defer t.RUnlock()
 
@@ -94,7 +99,7 @@ func (t *TestFramework) commitment(alias string) *iotago.Commitment {
 	return commitment
 }
 
-func (t *TestFramework) ChainCommitment(alias string) *Commitment {
+func (t *TestFramework) ChainCommitment(alias string) *ChainCommitment {
 	cm, exists := t.Instance.commitment(t.SlotCommitment(alias))
 	require.True(t.test, exists)
 
@@ -117,8 +122,8 @@ func (t *TestFramework) AssertCommitmentBelowRootCount(expected int) {
 	require.EqualValues(t.test, expected, t.commitmentBelowRoot, "commitmentBelowRoot count does not match")
 }
 
-func (t *TestFramework) AssertEqualChainCommitments(commitments []*Commitment, aliases ...string) {
-	var chainCommitments []*Commitment
+func (t *TestFramework) AssertEqualChainCommitments(commitments []*ChainCommitment, aliases ...string) {
+	var chainCommitments []*ChainCommitment
 	for _, alias := range aliases {
 		chainCommitments = append(chainCommitments, t.ChainCommitment(alias))
 	}
@@ -127,19 +132,19 @@ func (t *TestFramework) AssertEqualChainCommitments(commitments []*Commitment, a
 }
 
 func (t *TestFramework) SlotCommitment(alias string) iotago.CommitmentID {
-	return t.commitment(alias).MustID()
+	return t.commitment(alias).ID()
 }
 
 func (t *TestFramework) SlotIndex(alias string) iotago.SlotIndex {
-	return t.commitment(alias).Index
+	return t.commitment(alias).Index()
 }
 
 func (t *TestFramework) SlotCommitmentRoot(alias string) iotago.Identifier {
-	return t.commitment(alias).RootsID
+	return t.commitment(alias).RootsID()
 }
 
 func (t *TestFramework) PrevSlotCommitment(alias string) iotago.CommitmentID {
-	return t.commitment(alias).PrevID
+	return t.commitment(alias).PrevID()
 }
 
 func (t *TestFramework) AssertChainIsAlias(chain *Chain, alias string) {
@@ -148,7 +153,7 @@ func (t *TestFramework) AssertChainIsAlias(chain *Chain, alias string) {
 		return
 	}
 
-	require.Equal(t.test, t.commitment(alias).MustID(), chain.ForkingPoint.ID())
+	require.Equal(t.test, t.commitment(alias).ID(), chain.ForkingPoint.ID())
 }
 
 func (t *TestFramework) AssertChainState(chains map[string]string) {
@@ -183,5 +188,5 @@ func (t *TestFramework) previousCommitmentID(alias string) (previousCommitmentID
 		panic("the previous commitment does not exist")
 	}
 
-	return previousCommitment.MustID(), previousCommitment.Index
+	return previousCommitment.ID(), previousCommitment.Index()
 }

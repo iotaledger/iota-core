@@ -7,49 +7,51 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/storable"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Commitments struct {
-	slice    *storable.Slice[iotago.Commitment, *iotago.Commitment]
+	api      iotago.API
+	slice    *storable.ByteSlice
 	filePath string
 
 	module.Module
 }
 
-func NewCommitments(path string) (newCommitment *Commitments) {
-	commitmentsLength, err := determineCommitmentLength()
-	if err != nil {
-		panic(errors.Wrapf(err, "failed to serialize empty commitment (to determine its length)"))
-	}
-
-	commitmentsSlice, err := storable.NewSlice[iotago.Commitment](path, commitmentsLength)
+func NewCommitments(path string, api iotago.API) *Commitments {
+	commitmentsSlice, err := storable.NewByteSlice(path, len(model.NewEmptyCommitment(api).Data()))
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create commitments file"))
 	}
 
 	return &Commitments{
+		api:      api,
 		slice:    commitmentsSlice,
 		filePath: path,
 	}
 }
 
-func (c *Commitments) Store(commitment *iotago.Commitment) (err error) {
-	if err = c.slice.Set(int(commitment.Index), commitment); err != nil {
-		return errors.Wrapf(err, "failed to store commitment for slot %d", commitment.Index)
+func (c *Commitments) Store(commitment *model.Commitment) (err error) {
+	if err = c.slice.Set(int(commitment.Commitment().Index), commitment.Data()); err != nil {
+		return errors.Wrapf(err, "failed to store commitment for slot %d", commitment.Commitment().Index)
 	}
 
 	return nil
 }
 
-func (c *Commitments) Load(index iotago.SlotIndex) (commitment *iotago.Commitment, err error) {
-	if commitment, err = c.slice.Get(int(index)); err != nil {
+func (c *Commitments) loadBytes(index iotago.SlotIndex) (commitmentBytes []byte, err error) {
+	return c.slice.Get(int(index))
+}
+
+func (c *Commitments) Load(index iotago.SlotIndex) (commitment *model.Commitment, err error) {
+	bytes, err := c.loadBytes(index)
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get commitment for slot %d", index)
 	}
 
-	return commitment, nil
+	return model.CommitmentFromBytes(bytes, c.api)
 }
 
 func (c *Commitments) Close() (err error) {
@@ -67,11 +69,11 @@ func (c *Commitments) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex)
 	}
 
 	for slotIndex := iotago.SlotIndex(0); slotIndex <= targetSlot; slotIndex++ {
-		commitment, err := c.Load(slotIndex)
+		commitmentBytes, err := c.loadBytes(slotIndex)
 		if err != nil {
 			return errors.Wrapf(err, "failed to load commitment for slot %d", slotIndex)
 		}
-		if err = binary.Write(writer, binary.LittleEndian, lo.PanicOnErr(commitment.Bytes())); err != nil {
+		if err = binary.Write(writer, binary.LittleEndian, commitmentBytes); err != nil {
 			return errors.Wrapf(err, "failed to write commitment for slot %d", slotIndex)
 		}
 	}
@@ -85,7 +87,7 @@ func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to read slot boundary")
 	}
 
-	commitmentSize := len(lo.PanicOnErr(iotago.NewEmptyCommitment().Bytes()))
+	commitmentSize := c.slice.EntrySize()
 
 	for slotIndex := int64(0); slotIndex <= slotBoundary; slotIndex++ {
 		commitmentBytes := make([]byte, commitmentSize)
@@ -93,11 +95,9 @@ func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
 			return errors.Wrapf(err, "failed to read commitment bytes for slot %d", slotIndex)
 		}
 
-		newCommitment := new(iotago.Commitment)
-		if consumedBytes, fromBytesErr := newCommitment.FromBytes(commitmentBytes); fromBytesErr != nil {
-			return errors.Wrapf(fromBytesErr, "failed to parse commitment of slot %d", slotIndex)
-		} else if consumedBytes != commitmentSize {
-			return errors.Errorf("failed to read commitment of slot %d: consumed bytes (%d) != expected bytes (%d)", slotIndex, consumedBytes, commitmentSize)
+		newCommitment, err := model.CommitmentFromBytes(commitmentBytes, c.api)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse commitment of slot %d", slotIndex)
 		}
 
 		if err = c.Store(newCommitment); err != nil {
@@ -108,13 +108,4 @@ func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
 	c.TriggerInitialized()
 
 	return nil
-}
-
-func determineCommitmentLength() (length int, err error) {
-	serializedCommitment, err := iotago.NewEmptyCommitment().Bytes()
-	if err != nil {
-		return 0, err
-	}
-
-	return len(serializedCommitment), nil
 }
