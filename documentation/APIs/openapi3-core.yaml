@@ -1063,6 +1063,7 @@ components:
             vByteFactorData: 1
             vByteFactorKey: 10
           genesisSlotIndex: 0
+          slotDuration: 10
         baseToken:
           baseToken:
           name: "Shimmer"
@@ -2552,6 +2553,9 @@ components:
             genesisSlotIndex:
               type: integer
               description: The genesis slot index.
+            slotDuration:
+              type: integer
+              description: The duration of a slot, in seconds.
           required:
             - networkName
             - bech32Hrp
