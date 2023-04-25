@@ -6,7 +6,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/network"
 )
@@ -16,19 +15,19 @@ import (
 const mainPartition = "main"
 
 type MockedNetwork struct {
-	dispatchersByPartition map[string]map[identity.ID]*MockedEndpoint
+	dispatchersByPartition map[string]map[network.PeerID]*MockedEndpoint
 	dispatchersMutex       sync.RWMutex
 }
 
 func NewMockedNetwork() (mockedNetwork *MockedNetwork) {
 	return &MockedNetwork{
-		dispatchersByPartition: map[string]map[identity.ID]*MockedEndpoint{
-			mainPartition: make(map[identity.ID]*MockedEndpoint),
+		dispatchersByPartition: map[string]map[network.PeerID]*MockedEndpoint{
+			mainPartition: make(map[network.PeerID]*MockedEndpoint),
 		},
 	}
 }
 
-func (m *MockedNetwork) Join(endpointID identity.ID, partition ...string) (endpoint *MockedEndpoint) {
+func (m *MockedNetwork) Join(endpointID network.PeerID, partition ...string) (endpoint *MockedEndpoint) {
 	m.dispatchersMutex.Lock()
 	defer m.dispatchersMutex.Unlock()
 
@@ -40,7 +39,7 @@ func (m *MockedNetwork) Join(endpointID identity.ID, partition ...string) (endpo
 
 	dispatchers, exists := m.dispatchersByPartition[partitionID]
 	if !exists {
-		dispatchers = make(map[identity.ID]*MockedEndpoint)
+		dispatchers = make(map[network.PeerID]*MockedEndpoint)
 		m.dispatchersByPartition[partitionID] = dispatchers
 	}
 	dispatchers[endpointID] = endpoint
@@ -80,23 +79,23 @@ func (m *MockedNetwork) mergePartition(partitionID string) {
 // region MockedEndpoint ///////////////////////////////////////////////////////////////////////////////////////////////
 
 type MockedEndpoint struct {
-	id            identity.ID
+	id            network.PeerID
 	network       *MockedNetwork
 	partition     string
-	handlers      map[string]func(identity.ID, proto.Message) error
+	handlers      map[string]func(network.PeerID, proto.Message) error
 	handlersMutex sync.RWMutex
 }
 
-func NewMockedEndpoint(id identity.ID, network *MockedNetwork, partition string) (newMockedNetwork *MockedEndpoint) {
+func NewMockedEndpoint(id network.PeerID, n *MockedNetwork, partition string) (newMockedNetwork *MockedEndpoint) {
 	return &MockedEndpoint{
 		id:        id,
-		network:   network,
+		network:   n,
 		partition: partition,
-		handlers:  make(map[string]func(identity.ID, proto.Message) error),
+		handlers:  make(map[string]func(network.PeerID, proto.Message) error),
 	}
 }
 
-func (m *MockedEndpoint) RegisterProtocol(protocolID string, newMessage func() proto.Message, handler func(identity.ID, proto.Message) error) {
+func (m *MockedEndpoint) RegisterProtocol(protocolID string, newMessage func() proto.Message, handler func(network.PeerID, proto.Message) error) {
 	m.handlersMutex.Lock()
 	defer m.handlersMutex.Unlock()
 
@@ -110,7 +109,7 @@ func (m *MockedEndpoint) UnregisterProtocol(protocolID string) {
 	delete(m.handlers, protocolID)
 }
 
-func (m *MockedEndpoint) Send(packet proto.Message, protocolID string, to ...identity.ID) {
+func (m *MockedEndpoint) Send(packet proto.Message, protocolID string, to ...network.PeerID) {
 	m.network.dispatchersMutex.RLock()
 	defer m.network.dispatchersMutex.RUnlock()
 
@@ -133,7 +132,7 @@ func (m *MockedEndpoint) Send(packet proto.Message, protocolID string, to ...ide
 	}
 }
 
-func (m *MockedEndpoint) handler(protocolID string) (handler func(identity.ID, proto.Message) error, exists bool) {
+func (m *MockedEndpoint) handler(protocolID string) (handler func(network.PeerID, proto.Message) error, exists bool) {
 	m.handlersMutex.RLock()
 	defer m.handlersMutex.RUnlock()
 

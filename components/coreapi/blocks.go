@@ -23,19 +23,6 @@ func blockByID(c echo.Context) (*blocks.Block, error) {
 	return block, nil
 }
 
-func blockBytesByID(c echo.Context) ([]byte, error) {
-	block, err := blockByID(c)
-	if err != nil {
-		return nil, err
-	}
-
-	blockBytes, err := deps.Protocol.API().Encode(block)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to encode block: %s", block.ID().ToHex())
-	}
-	return blockBytes, nil
-}
-
 func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
 	block, err := blockByID(c)
 	if err != nil {
@@ -55,12 +42,12 @@ func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
 	return bmResponse, nil
 }
 
-func blockIssuance(c echo.Context) (*blockIssuanceResponse, error) {
-	// todo
+func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
+	//nolint:nilnil // temporary nil,nil
 	return nil, nil
 }
 
-func sendBlock(c echo.Context) (*blockCreatedResponse, error) {
-	// todo
+func sendBlock(_ echo.Context) (*blockCreatedResponse, error) {
+	//nolint:nilnil // temporary nil,nil
 	return nil, nil
 }

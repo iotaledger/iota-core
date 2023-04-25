@@ -7,15 +7,27 @@ import (
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
+func issuerID() iotago.AccountID {
+	issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
+	pubKey := issuerKey.Public()
+
+	return iotago.AccountID(iotago.Ed25519AddressFromPubKey(pubKey[:]))
+}
+
 func issueActivityBlock() {
+	if !ParamsActivity.IgnoreBootstrapped && !deps.Protocol.MainEngineInstance().IsBootstrapped() {
+		Component.LogDebug("Not issuing activity block because node is not bootstrapped yet.")
+		return
+	}
+
 	issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
 	pubKey := issuerKey.Public()
 	addr := iotago.Ed25519AddressFromPubKey(pubKey[:])
 
 	block, err := builder.NewBlockBuilder().
 		StrongParents(deps.Protocol.TipManager.Tips(ParamsActivity.ParentsCount)).
-		SlotCommitment(deps.Protocol.MainEngineInstance().Storage.Settings.LatestCommitment()).
-		LatestFinalizedSlot(deps.Protocol.MainEngineInstance().Storage.Settings.LatestFinalizedSlot()).
+		SlotCommitment(deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()).
+		LatestFinalizedSlot(deps.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
 		Payload(&iotago.TaggedData{
 			Tag: []byte("ACTIVITY"),
 		}).

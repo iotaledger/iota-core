@@ -11,6 +11,7 @@ services:
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
       --p2p.seed=0x88ce2019dd99fd5a3c46e10ffc192549fc4491eee07552153ff66cf792b6a0af
+      --activity.ignoreBootstrapped=true
     volumes:
       - ./docker-network.snapshot:/app/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -28,6 +29,7 @@ services:
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
       --p2p.seed=0xf739eea09eb0f4820f26504a3135131a075089b4c901c19c2099513ee016f516
+      --activity.ignoreBootstrapped=true
     volumes:
       - ./docker-network.snapshot:/app/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -35,6 +37,24 @@ services:
       - "8070:8080/tcp" # web API
       - "8071:8081/tcp" # dashboard
       - "6071:6061/tcp" # pprof
+    networks:
+      - iota-core
+
+  faucet:
+    image: docker-network-peer_master:latest
+    stop_grace_period: 1m
+    command: >
+      ${COMMON_CONFIG}
+      ${MANUALPEERING_CONFIG}
+      --p2p.seed=0x2ab2792bba8ab6deb7978165e4072d3f00def97a0138b98ba2d21eba54159705
+      --activity.ignoreBootstrapped=true
+    volumes:
+      - ./docker-network.snapshot:/app/snapshot.bin
+      - ./config.json:/app/config.json:ro
+    ports:
+      - "8090:8080/tcp" # web API
+      - "8091:8081/tcp" # dashboard
+      - "6091:6061/tcp" # pprof
     networks:
       - iota-core
 
@@ -69,23 +89,6 @@ services:
       - "8030:8080/tcp" # web API
       - "8031:8081/tcp" # dashboard
       - "6031:6061/tcp" # pprof
-    networks:
-      - iota-core
-
-  faucet:
-    image: docker-network-peer_master:latest
-    stop_grace_period: 1m
-    command: >
-      ${COMMON_CONFIG}
-      ${MANUALPEERING_CONFIG}
-      --p2p.seed=0x2ab2792bba8ab6deb7978165e4072d3f00def97a0138b98ba2d21eba54159705
-    volumes:
-      - ./docker-network.snapshot:/app/snapshot.bin
-      - ./config.json:/app/config.json:ro
-    ports:
-      - "8090:8080/tcp" # web API
-      - "8091:8081/tcp" # dashboard
-      - "6091:6061/tcp" # pprof
     networks:
       - iota-core
 

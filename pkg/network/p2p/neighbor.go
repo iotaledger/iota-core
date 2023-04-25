@@ -106,6 +106,7 @@ func (n *Neighbor) PacketsRead() (count uint64) {
 	for _, stream := range n.protocols {
 		count += stream.packetsRead.Load()
 	}
+
 	return count
 }
 
@@ -114,6 +115,7 @@ func (n *Neighbor) PacketsWritten() (count uint64) {
 	for _, stream := range n.protocols {
 		count += stream.packetsWritten.Load()
 	}
+
 	return count
 }
 
@@ -126,6 +128,7 @@ func (n *Neighbor) getAnyStream() *PacketsStream {
 	for _, stream := range n.protocols {
 		return stream
 	}
+
 	return nil
 }
 
@@ -153,6 +156,7 @@ func (n *Neighbor) readLoop() {
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
 						n.Log.Warnw("Failed to disconnect", "err", disconnectErr)
 					}
+
 					return
 				}
 				n.packetReceivedFunc(n, protocolID, packet)
@@ -177,6 +181,7 @@ func (n *Neighbor) writeLoop() {
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
 						n.Log.Warnw("Failed to disconnect", "err", disconnectErr)
 					}
+
 					return
 				}
 				if err := stream.WritePacket(sendPacket.packet); err != nil {
@@ -184,6 +189,7 @@ func (n *Neighbor) writeLoop() {
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
 						n.Log.Warnw("Failed to disconnect", "err", disconnectErr)
 					}
+
 					return
 				}
 			}
@@ -214,5 +220,6 @@ func (n *Neighbor) disconnect() (err error) {
 		n.Log.Info("Connection closed")
 		n.disconnectedFunc(n)
 	})
+
 	return err
 }

@@ -1,16 +1,16 @@
 package filter
 
 import (
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/network"
 )
 
 type Filter interface {
 	Events() *Events
 
 	// ProcessReceivedBlock processes block from the given source.
-	ProcessReceivedBlock(block *model.Block, source identity.ID)
+	ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 	module.Interface
 }

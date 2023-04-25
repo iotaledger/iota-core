@@ -8,11 +8,11 @@ import (
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/pkg/network"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -76,7 +76,7 @@ func (m *Manager) Shutdown() {
 	m.commitmentRequester.Shutdown()
 }
 
-func (m *Manager) ProcessCommitmentFromSource(commitment *iotago.Commitment, source identity.ID) (isSolid bool, chain *Chain) {
+func (m *Manager) ProcessCommitmentFromSource(commitment *iotago.Commitment, source network.PeerID) (isSolid bool, chain *Chain) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
@@ -98,6 +98,7 @@ func (m *Manager) ProcessCandidateCommitment(commitment *iotago.Commitment) (isS
 	if chainCommitment == nil {
 		return false, nil
 	}
+
 	return isSolid, chainCommitment.Chain()
 }
 
@@ -224,6 +225,7 @@ func (m *Manager) processCommitment(commitment *iotago.Commitment) (isNew bool, 
 		} else {
 			m.Events.CommitmentBelowRoot.Trigger(commitment.MustID())
 		}
+
 		return false, isRootCommitment, chainCommitment
 	}
 
@@ -288,7 +290,7 @@ func (m *Manager) evaluateAgainstRootCommitment(commitment *iotago.Commitment) (
 	return
 }
 
-func (m *Manager) detectForks(commitment *Commitment, source identity.ID) {
+func (m *Manager) detectForks(commitment *Commitment, source network.PeerID) {
 	forkingPoint, err := m.forkingPointAgainstMainChain(commitment)
 	if err != nil {
 		return
@@ -364,6 +366,7 @@ func (m *Manager) registerCommitment(commitment *iotago.Commitment) (isNew bool,
 	}
 
 	isSolid, _, wasForked = m.registerChild(parentCommitment, chainCommitment)
+
 	return true, isSolid, wasForked, chainCommitment
 }
 

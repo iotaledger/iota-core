@@ -25,17 +25,22 @@ func NewDelimitedWriter(w io.Writer) *UvarintWriter {
 func (uw *UvarintWriter) WriteBlk(blk proto.Message) (err error) {
 	var data []byte
 	lenBuf := make([]byte, varint.MaxLenUvarint63)
+
 	data, err = proto.Marshal(blk)
 	if err != nil {
 		return err
 	}
+
 	length := uint64(len(data))
 	n := varint.PutUvarint(lenBuf, length)
+
 	_, err = uw.w.Write(lenBuf[:n])
 	if err != nil {
 		return err
 	}
+
 	_, err = uw.w.Write(data)
+
 	return err
 }
 
@@ -55,6 +60,7 @@ func (ur *UvarintReader) ReadBlk(blk proto.Message) error {
 	if err != nil {
 		return err
 	}
+
 	if length64 > iotago.MaxBlockSize {
 		return errors.Errorf("max block size exceeded: %d", length64)
 	}
@@ -62,5 +68,6 @@ func (ur *UvarintReader) ReadBlk(blk proto.Message) error {
 	if _, err := io.ReadFull(ur.r, buf); err != nil {
 		return err
 	}
+
 	return proto.Unmarshal(buf, blk)
 }

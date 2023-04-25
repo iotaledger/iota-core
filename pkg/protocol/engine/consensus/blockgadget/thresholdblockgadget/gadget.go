@@ -6,9 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/walker"
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -45,7 +43,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
 		g := New(e.Workers.CreateGroup("BlockGadget"), e.BlockCache, e.SybilProtection, opts...)
 		e.Events.Booker.WitnessAdded.Hook(g.tryAccept)
-		e.Events.EvictionState.SlotEvicted.Hook(g.evictUntil, event.WithWorkerPool(g.workers.CreatePool("Eviction", 1)))
+		e.BlockCache.Evict.Hook(g.evictUntil)
 
 		e.Events.BlockGadget.LinkTo(g.events)
 
@@ -109,7 +107,7 @@ func (g *Gadget) tryAccept(block *blocks.Block) {
 }
 
 func (g *Gadget) trackRatifierWeight(votingBlock *blocks.Block) {
-	ratifier := identity.ID(votingBlock.Block().IssuerID)
+	ratifier := votingBlock.Block().IssuerID
 
 	// Only track ratifier weight for issuers that are part of the committee.
 	if !g.sybilProtection.Committee().Has(ratifier) {
@@ -167,7 +165,7 @@ func (g *Gadget) tryRatifiedAcceptAndConfirm(block *blocks.Block) {
 	blockWeight := committee.SelectAccounts(block.Ratifiers()...).TotalWeight()
 	onlineCommitteeTotalWeight := g.sybilProtection.OnlineCommittee().TotalWeight()
 
-	// check if we reached the confirmation threshold based on the total commitee weight
+	// check if we reached the confirmation threshold based on the total committee weight.
 	if votes.IsThresholdReached(blockWeight, committeeTotalWeight, g.optsConfirmationThreshold) {
 		g.propagateRatifiedAcceptanceAndConfirmation(block, true)
 	} else if votes.IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {

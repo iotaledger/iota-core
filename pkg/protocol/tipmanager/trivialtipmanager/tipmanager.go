@@ -51,13 +51,13 @@ type TipManager struct {
 // NewProvider creates a new TipManager provider.
 func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
-		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.Block, e.IsBootstrapped, opts...)
+		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.BlockCache.Block, e.IsBootstrapped, opts...)
 
 		e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 			_ = t.AddTip(block)
 		}, event.WithWorkerPool(t.workers.CreatePool("AddTip", 2)))
 
-		e.Events.EvictionState.SlotEvicted.Hook(t.evict, event.WithWorkerPool(t.workers.CreatePool("SlotEvicted", 1)))
+		e.BlockCache.Evict.Hook(t.evict)
 
 		t.TriggerInitialized()
 
@@ -201,6 +201,7 @@ func (t *TipManager) removeTip(block *blocks.Block) (deleted bool) {
 		// t.TipsConflictTracker.RemoveTip(block)
 		t.events.TipRemoved.Trigger(block)
 	}
+
 	return
 }
 
@@ -251,6 +252,7 @@ func (t *TipManager) selectTips(count int) (parents iotago.BlockIDs) {
 }
 
 // checkMonotonicity returns true if the block has any accepted or scheduled child.
+// nolint:revive,unparam // code is commented out
 func (t *TipManager) checkMonotonicity(block *blocks.Block) (anyScheduledOrAccepted bool) {
 	//for _, child := range block.Children() {
 	//	if child.IsOrphaned() {

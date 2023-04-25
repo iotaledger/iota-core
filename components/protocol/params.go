@@ -1,10 +1,12 @@
 package protocol
 
 import (
+	"time"
+
 	"github.com/iotaledger/hive.go/app"
 )
 
-// ParametersProtocol
+// ParametersProtocol contains the definition of the configuration parameters used by the Protocol.
 type ParametersProtocol struct {
 	// Snapshot contains snapshots related configuration parameters.
 	Snapshot struct {
@@ -12,6 +14,16 @@ type ParametersProtocol struct {
 		Path string `default:"./snapshot.bin" usage:"the path of the snapshot file"`
 		// Depth defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate.
 		Depth int `default:"5" usage:"defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate"`
+	}
+
+	Notarization struct {
+		// MinSlotCommittableAge defines the min age of a committable slot.
+		MinSlotCommittableAge int64 `default:"6" usage:"min age of a committable slot denoted in slots"`
+	}
+
+	Filter struct {
+		// MaxAllowedClockDrift defines the maximum drift our wall clock can have to future blocks being received from the network.
+		MaxAllowedClockDrift time.Duration `default:"5s" usage:"the maximum drift our wall clock can have to future blocks being received from the network"`
 	}
 
 	SybilProtection struct {
@@ -44,7 +56,7 @@ type ParametersDatabase struct {
 	}
 }
 
-// ParamsProtocol
+// ParamsProtocol contains the configuration parameters used by the Protocol.
 var ParamsProtocol = &ParametersProtocol{}
 
 // ParamsDatabase contains configuration parameters used by Database.

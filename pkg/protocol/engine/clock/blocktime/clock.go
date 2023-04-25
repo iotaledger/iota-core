@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Clock implements the clock.Clock interface that sources its notion of time from accepted and confirmed blocks.
@@ -30,16 +31,11 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 			confirmedTime: NewRelativeTime(),
 		}, opts, func(c *Clock) {
 			e.HookConstructed(func() {
-				//e.Ledger.HookInitialized(func() {
-				//	c.acceptedTime.Set(e.SlotTimeProvider().EndTime(e.Storage.Settings.LatestCommitment().Index()))
-				//	c.confirmedTime.Set(e.SlotTimeProvider().EndTime(e.Storage.Settings.LatestCommitment().Index()))
-				//
-				//	c.TriggerInitialized()
-				//})
-				e.HookInitialized(func() {
-					//TODO: this is temporary until we have commitments
-					c.acceptedTime.Set(e.API().SlotTimeProvider().EndTime(0))
-					c.confirmedTime.Set(e.API().SlotTimeProvider().EndTime(0))
+				e.Storage.Settings().HookInitialized(func() {
+					c.acceptedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index))
+					c.confirmedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index))
+
+					c.TriggerInitialized()
 				})
 
 				e.Events.Clock.AcceptedTimeUpdated.LinkTo(c.acceptedTime.OnUpdated)
@@ -56,10 +52,10 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 						c.confirmedTime.Advance(block.IssuingTime())
 					}, asyncOpt).Unhook,
 
-					//e.Events.SlotGadget.SlotConfirmed.Hook(func(index slot.Index) {
-					//	c.acceptedTime.Advance(e.SlotTimeProvider().EndTime(index))
-					//	c.confirmedTime.Advance(e.SlotTimeProvider().EndTime(index))
-					//}, asyncOpt).Unhook,
+					e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+						c.acceptedTime.Advance(e.API().SlotTimeProvider().EndTime(index))
+						c.confirmedTime.Advance(e.API().SlotTimeProvider().EndTime(index))
+					}, asyncOpt).Unhook,
 				))
 			})
 

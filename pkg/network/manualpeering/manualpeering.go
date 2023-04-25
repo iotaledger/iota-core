@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 )
 
@@ -75,7 +76,7 @@ type Manager struct {
 	isStopped         bool
 	reconnectInterval time.Duration
 	knownPeersMutex   sync.RWMutex
-	knownPeers        map[identity.ID]*knownPeer
+	knownPeers        map[network.PeerID]*knownPeer
 	workerPool        *workerpool.WorkerPool
 
 	onGossipNeighborRemovedHook *event.Hook[func(*p2p.NeighborRemovedEvent)]
@@ -89,9 +90,10 @@ func NewManager(p2pm *p2p.Manager, local *peer.Local, workerPool *workerpool.Wor
 		local:             local,
 		log:               log,
 		reconnectInterval: defaultReconnectInterval,
-		knownPeers:        map[identity.ID]*knownPeer{},
+		knownPeers:        map[network.PeerID]*knownPeer{},
 		workerPool:        workerPool,
 	}
+
 	return m
 }
 
@@ -103,6 +105,7 @@ func (m *Manager) AddPeer(peers ...*KnownPeerToAdd) error {
 			resultErr = err
 		}
 	}
+
 	return resultErr
 }
 
@@ -114,6 +117,7 @@ func (m *Manager) RemovePeer(keys ...ed25519.PublicKey) error {
 			resultErr = err
 		}
 	}
+
 	return resultErr
 }
 
@@ -132,6 +136,7 @@ func BuildGetPeersConfig(opts []GetPeersOption) *GetPeersConfig {
 	for _, o := range opts {
 		o(conf)
 	}
+
 	return conf
 }
 
@@ -140,6 +145,7 @@ func (c *GetPeersConfig) ToOptions() (opts []GetPeersOption) {
 	if c.OnlyConnected {
 		opts = append(opts, WithOnlyConnectedPeers())
 	}
+
 	return opts
 }
 
@@ -155,6 +161,7 @@ func (m *Manager) GetPeers(opts ...GetPeersOption) []*KnownPeer {
 	conf := BuildGetPeersConfig(opts)
 	m.knownPeersMutex.RLock()
 	defer m.knownPeersMutex.RUnlock()
+
 	peers := make([]*KnownPeer, 0, len(m.knownPeers))
 	for _, kp := range m.knownPeers {
 		connStatus := kp.getConnStatus()
@@ -167,6 +174,7 @@ func (m *Manager) GetPeers(opts ...GetPeersOption) []*KnownPeer {
 			})
 		}
 	}
+
 	return peers
 }
 
@@ -193,11 +201,13 @@ func (m *Manager) Stop() (err error) {
 	m.stopOnce.Do(func() {
 		m.stopMutex.Lock()
 		defer m.stopMutex.Unlock()
+
 		m.isStopped = true
 		err = errors.WithStack(m.removeAllKnownPeers())
 		m.onGossipNeighborRemovedHook.Unhook()
 		m.onGossipNeighborAddedHook.Unhook()
 	})
+
 	return err
 }
 
@@ -229,10 +239,12 @@ func newKnownPeer(p *KnownPeerToAdd, connDirection ConnectionDirection) (*knownP
 		doneCh:        make(chan struct{}),
 	}
 	kp.setConnStatus(ConnStatusDisconnected)
+
 	return kp, nil
 }
 
 func (kp *knownPeer) getConnStatus() ConnectionStatus {
+	//nolint:forcetypeassert // we do not care
 	return kp.connStatus.Load().(ConnectionStatus)
 }
 
@@ -244,13 +256,17 @@ func (m *Manager) addPeer(p *KnownPeerToAdd) error {
 	if !m.isStarted.Load() {
 		return errors.New("manual peering manager hasn't been started yet")
 	}
+
 	m.stopMutex.RLock()
 	defer m.stopMutex.RUnlock()
+
 	if m.isStopped {
 		return errors.New("manual peering manager was stopped")
 	}
+
 	m.knownPeersMutex.Lock()
 	defer m.knownPeersMutex.Unlock()
+
 	connDirection, err := m.connectionDirection(p.PublicKey)
 	if err != nil {
 		return errors.WithStack(err)
@@ -268,32 +284,37 @@ func (m *Manager) addPeer(p *KnownPeerToAdd) error {
 		defer close(kp.doneCh)
 		m.keepPeerConnected(kp)
 	}()
+
 	return nil
 }
 
 func (m *Manager) removePeer(key ed25519.PublicKey) error {
 	m.knownPeersMutex.Lock()
 	defer m.knownPeersMutex.Unlock()
+
 	m.log.Infow("Removing peer from from the list of known peers in manual peering",
 		"publicKey", key)
 	peerID := identity.NewID(key)
 	err := m.removePeerByID(peerID)
+
 	return errors.WithStack(err)
 }
 
 func (m *Manager) removeAllKnownPeers() error {
 	m.knownPeersMutex.Lock()
 	defer m.knownPeersMutex.Unlock()
+
 	var resultErr error
 	for peerID := range m.knownPeers {
 		if err := m.removePeerByID(peerID); err != nil {
 			resultErr = err
 		}
 	}
+
 	return resultErr
 }
 
-func (m *Manager) removePeerByID(peerID identity.ID) error {
+func (m *Manager) removePeerByID(peerID network.PeerID) error {
 	kp, exists := m.knownPeers[peerID]
 	if !exists {
 		return nil
@@ -304,6 +325,7 @@ func (m *Manager) removePeerByID(peerID identity.ID) error {
 	if err := m.p2pm.DropNeighbor(peerID, p2p.NeighborsGroupManual); err != nil && !errors.Is(err, p2p.ErrUnknownNeighbor) {
 		return errors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID)
 	}
+
 	return nil
 }
 
@@ -362,6 +384,7 @@ func (m *Manager) onGossipNeighborAdded(neighbor *p2p.Neighbor) {
 func (m *Manager) changeNeighborStatus(neighbor *p2p.Neighbor, connStatus ConnectionStatus) {
 	m.knownPeersMutex.RLock()
 	defer m.knownPeersMutex.RUnlock()
+
 	kp, exists := m.knownPeers[neighbor.ID()]
 	if !exists {
 		return

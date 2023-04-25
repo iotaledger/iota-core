@@ -11,6 +11,6 @@ done
 
 go mod tidy
 
-pushd tools/integration-tests/tester
+pushd tools/genesis-snapshot
 go mod tidy
 popd

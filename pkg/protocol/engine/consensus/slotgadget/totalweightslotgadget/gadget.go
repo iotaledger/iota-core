@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -51,7 +50,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 			e.Events.BlockGadget.BlockRatifiedAccepted.Hook(g.trackVotes)
 
 			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
-				if err := e.Storage.Settings.SetLatestFinalizedSlot(index); err != nil {
+				if err := e.Storage.Settings().SetLatestFinalizedSlot(index); err != nil {
 					e.Events.Error.Trigger(errors.Wrap(err, "failed to set latest finalized slot"))
 				}
 			}
@@ -64,7 +63,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				}, event.WithWorkerPool(g.workers.CreatePool("Refresh", 2)))
 
 				e.HookInitialized(func() {
-					g.lastFinalizedSlot = e.Storage.Permanent.Settings.LatestFinalizedSlot()
+					g.lastFinalizedSlot = e.Storage.Permanent.Settings().LatestFinalizedSlot()
 					g.TriggerInitialized()
 				})
 			})
@@ -94,7 +93,7 @@ func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {
 }
 
 func (g *Gadget) trackVotes(block *blocks.Block) {
-	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, identity.ID(block.Block().IssuerID), slottracker.SlotVotePower{Index: block.ID().Index()})
+	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, block.Block().IssuerID, slottracker.SlotVotePower{Index: block.ID().Index()})
 }
 
 func (g *Gadget) refreshSlotFinalization(previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) {

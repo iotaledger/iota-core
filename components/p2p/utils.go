@@ -14,7 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/rocksdb"
-	"github.com/iotaledger/iota-core/pkg/database"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 )
 
 // ErrMismatchedPrivateKeys is returned when the private key derived from the config does not correspond to the private
@@ -100,6 +100,7 @@ func isPeerDBNew() (bool, error) {
 		if len(files) != 0 {
 			break
 		}
+
 		fallthrough
 	case os.IsNotExist(err):
 		isNewDB = true

@@ -8,10 +8,10 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/core/storable"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/hive.go/stringify"
-	"github.com/iotaledger/iota-core/pkg/storage/storable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -21,8 +21,7 @@ type Settings struct {
 	*settingsModel
 	mutex sync.RWMutex
 
-	api              iotago.API
-	slotTimeProvider *iotago.SlotTimeProvider
+	api iotago.API
 
 	module.Module
 }
@@ -75,11 +74,11 @@ func (s *Settings) SetSnapshotImported(initialized bool) (err error) {
 	return nil
 }
 
-func (s *Settings) ProtocolParameters() iotago.ProtocolParameters {
+func (s *Settings) ProtocolParameters() *iotago.ProtocolParameters {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return s.settingsModel.ProtocolParameters
+	return &s.settingsModel.ProtocolParameters
 }
 
 func (s *Settings) SetProtocolParameters(params iotago.ProtocolParameters) (err error) {

@@ -4,21 +4,23 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Blocks struct {
+	Evict                *event.Event1[iotago.SlotIndex]
 	blocks               *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *Block]
 	evictionState        *eviction.State
 	slotTimeProviderFunc func() *iotago.SlotTimeProvider
 	evictionMutex        sync.RWMutex
 }
 
-func New(evictionState *eviction.State, slotTimeProviderFunc func() *iotago.SlotTimeProvider, opts ...options.Option[Blocks]) *Blocks {
+func New(evictionState *eviction.State, slotTimeProviderFunc func() *iotago.SlotTimeProvider) *Blocks {
 	return &Blocks{
+		Evict:                event.New1[iotago.SlotIndex](),
 		blocks:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *Block](),
 		evictionState:        evictionState,
 		slotTimeProviderFunc: slotTimeProviderFunc,
@@ -26,6 +28,8 @@ func New(evictionState *eviction.State, slotTimeProviderFunc func() *iotago.Slot
 }
 
 func (b *Blocks) EvictUntil(index iotago.SlotIndex) {
+	b.Evict.Trigger(index)
+
 	b.evictionMutex.Lock()
 	defer b.evictionMutex.Unlock()
 
@@ -74,6 +78,7 @@ func (b *Blocks) GetOrCreate(blockID iotago.BlockID, createFunc func() *Block) (
 	}
 
 	storage := b.blocks.Get(blockID.Index(), true)
+
 	return storage.GetOrCreate(blockID, createFunc)
 }
 
@@ -86,5 +91,6 @@ func (b *Blocks) StoreBlock(block *Block) (stored bool) {
 	}
 
 	storage := b.blocks.Get(block.ID().Index(), true)
+
 	return storage.Set(block.ID(), block)
 }

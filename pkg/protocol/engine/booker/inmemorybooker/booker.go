@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -15,7 +14,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -23,22 +21,20 @@ import (
 type Booker struct {
 	events *booker.Events
 
-	evictionState   *eviction.State
 	sybilProtection sybilprotection.SybilProtection
 
 	bookingOrder *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
 	workers *workerpool.Group
 
-	blockCache         *blocks.Blocks
-	setInvalidCallback func(*blocks.Block, error) bool
+	blockCache *blocks.Blocks
 
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.EvictionState, e.SybilProtection, e.BlockCache, opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection, e.BlockCache, opts...)
 
 		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 			if _, err := b.Queue(block); err != nil {
@@ -57,26 +53,25 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, evictionState *eviction.State, sybilProtection sybilprotection.SybilProtection, blockCache *blocks.Blocks, opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, sybilProtection sybilprotection.SybilProtection, blockCache *blocks.Blocks, opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:          booker.NewEvents(),
 		sybilProtection: sybilProtection,
 		blockCache:      blockCache,
 
-		evictionState: evictionState,
-		workers:       workers,
+		workers: workers,
 	}, opts, func(b *Booker) {
 		b.bookingOrder = causalorder.New(
 			workers.CreatePool("BookingOrder", 2),
 			blockCache.Block,
 			(*blocks.Block).IsBooked,
 			b.book,
-			func(block *blocks.Block, _ error) { block.SetInvalid() },
+			b.markInvalid,
 			(*blocks.Block).Parents,
 			causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](isReferenceValid),
 		)
 
-		b.evictionState.Events.SlotEvicted.Hook(b.evict)
+		blockCache.Evict.Hook(b.evict)
 	}, (*Booker).TriggerConstructed)
 }
 
@@ -89,6 +84,7 @@ func (b *Booker) Queue(block *blocks.Block) (wasQueued bool, err error) {
 	}
 
 	b.bookingOrder.Queue(block)
+
 	return true, nil
 }
 
@@ -101,7 +97,7 @@ func (b *Booker) evict(slotIndex iotago.SlotIndex) {
 	b.bookingOrder.EvictUntil(slotIndex)
 }
 
-func (b *Booker) isPayloadSolid(block *blocks.Block) (isPayloadSolid bool, err error) {
+func (b *Booker) isPayloadSolid(_ *blocks.Block) (isPayloadSolid bool, err error) {
 	return true, nil
 }
 
@@ -110,11 +106,12 @@ func (b *Booker) book(block *blocks.Block) error {
 	b.events.BlockBooked.Trigger(block)
 
 	b.trackWitnessWeight(block)
+
 	return nil
 }
 
 func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
-	witness := identity.ID(votingBlock.Block().IssuerID)
+	witness := votingBlock.Block().IssuerID
 
 	// Only track witness weight for issuers that are part of the committee.
 	if !b.sybilProtection.Committee().Has(witness) {
@@ -170,8 +167,10 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
 	}
 }
 
-func (b *Booker) markInvalid(block *blocks.Block, reason error) {
-	b.setInvalidCallback(block, errors.Wrap(reason, "block marked as invalid in Booker"))
+func (b *Booker) markInvalid(block *blocks.Block, err error) {
+	if block.SetInvalid() {
+		b.events.BlockInvalid.Trigger(block, errors.Wrap(err, "block marked as invalid in Booker"))
+	}
 }
 
 // isReferenceValid checks if the reference between the child and its parent is valid.

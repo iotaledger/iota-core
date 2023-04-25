@@ -60,7 +60,7 @@ type BlockDAG struct {
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.Storage.Commitments.Load, opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.Storage.Commitments().Load, opts...)
 
 		e.HookConstructed(func() {
 			e.Events.Filter.BlockAllowed.Hook(func(block *model.Block) {
@@ -100,7 +100,7 @@ func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *b
 				causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](checkReference),
 			)
 
-			evictionState.Events.SlotEvicted.Hook(b.evictSlot, event.WithWorkerPool(b.workerPool))
+			blockCache.Evict.Hook(b.evictSlot)
 		},
 		(*BlockDAG).TriggerConstructed,
 		(*BlockDAG).TriggerInitialized,
@@ -207,6 +207,7 @@ func (b *BlockDAG) isFutureBlock(block *blocks.Block) (isFutureBlock bool) {
 		lo.Return1(b.futureBlocks.Get(block.Block().SlotCommitment.Index, true).GetOrCreate(block.Block().SlotCommitment.MustID(), func() *advancedset.AdvancedSet[*blocks.Block] {
 			return advancedset.New[*blocks.Block]()
 		})).Add(block)
+
 		return true
 	}
 

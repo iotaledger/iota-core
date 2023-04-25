@@ -1,3 +1,4 @@
+// nolint:unused,revive,unparam
 package trivialtipmanager
 
 import (
@@ -88,6 +89,7 @@ func (t *TipManager) checkBlockRecursive(block *blocks.Block, minSupportedTimest
 	}
 
 	t.walkerCache.Get(block.ID().Index(), true).Set(block.ID(), types.Void)
+
 	return true
 }
 

@@ -154,24 +154,23 @@ func configure() error {
 			return err
 		}
 
+		block, err := blockByID(c)
+		if err != nil {
+			return err
+		}
+
+		// default to echo.MIMEApplicationJSON
 		switch mimeType {
 		case httpserver.MIMEApplicationVendorIOTASerializerV1:
-			resp, err := blockBytesByID(c)
-			if err != nil {
-				return err
-			}
-
-			return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, resp)
+			return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, block.ModelBlock().Data())
 
 		default:
-			// default to echo.MIMEApplicationJSON
-			block, err := blockByID(c)
+			j, err := deps.Protocol.API().JSONEncode(block.Block())
 			if err != nil {
 				return err
 			}
-			resp := block.Block()
 
-			return httpserver.JSONResponse(c, http.StatusOK, resp)
+			return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, j)
 		}
 	})
 
@@ -180,6 +179,7 @@ func configure() error {
 		if err != nil {
 			return err
 		}
+
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeAlmostSynced())
 
@@ -198,6 +198,7 @@ func configure() error {
 		if err != nil {
 			return err
 		}
+
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 

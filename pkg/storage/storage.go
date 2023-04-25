@@ -3,71 +3,85 @@ package storage
 import (
 	"sync"
 
+	hivedb "github.com/iotaledger/hive.go/kvstore/database"
+	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/database"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
-	iotago "github.com/iotaledger/iota.go/v4"
+)
+
+const (
+	permanentDirName = "permanent"
+	prunableDirName  = "prunable"
+
+	storePrefixHealth byte = 255
 )
 
 // Storage is an abstraction around the storage layer of the node.
 type Storage struct {
+	dir *utils.Directory
+
 	// Permanent is the section of the storage that is maintained forever (holds the current ledger state).
 	*permanent.Permanent
 
 	// Prunable is the section of the storage that is pruned regularly (holds the history of the ledger state).
 	*prunable.Prunable
 
-	// databaseManager is the database manager.
-	databaseManager *database.Manager
-
 	shutdownOnce sync.Once
 
-	Directory string
+	optsDBEngine               hivedb.Engine
+	optsAllowedDBEngines       []hivedb.Engine
+	optsLogger                 *logger.Logger
+	optsPrunableManagerOptions []options.Option[prunable.Manager]
 }
 
 // New creates a new storage instance with the named database version in the given directory.
-func New(directory string, version database.Version, opts ...options.Option[database.Manager]) (newStorage *Storage) {
-	databaseManager := database.NewManager(version, append(opts, database.WithBaseDir(directory))...)
+func New(directory string, dbVersion byte, opts ...options.Option[Storage]) *Storage {
+	return options.Apply(&Storage{
+		dir:          utils.NewDirectory(directory, true),
+		optsDBEngine: hivedb.EngineRocksDB,
+	}, opts,
+		func(s *Storage) {
+			dbConfig := database.Config{
+				Engine:       s.optsDBEngine,
+				Directory:    s.dir.PathWithCreate(permanentDirName),
+				Version:      dbVersion,
+				PrefixHealth: []byte{storePrefixHealth},
+			}
 
-	newStorage = &Storage{
-		Permanent: permanent.New(utils.NewDirectory(directory, true), databaseManager),
-		Prunable:  prunable.New(databaseManager),
+			s.Permanent = permanent.New(s.dir, dbConfig)
+			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPrunableManagerOptions...)
 
-		databaseManager: databaseManager,
-		Directory:       directory,
-	}
-
-	if err := newStorage.Commitments.Store(iotago.NewEmptyCommitment()); err != nil {
-		panic(err)
-	}
-
-	return newStorage
+			s.Permanent.Settings().HookInitialized(func() {
+				s.Prunable.Initialize(s.Settings().API())
+			})
+		})
 }
 
-// PruneUntilSlot prunes storage slots less than and equal to the given index.
-func (s *Storage) PruneUntilSlot(index iotago.SlotIndex) {
-	s.databaseManager.PruneUntilSlot(index)
+func (s *Storage) Directory() string {
+	return s.dir.Path()
 }
 
 // PrunableDatabaseSize returns the size of the underlying prunable databases.
 func (s *Storage) PrunableDatabaseSize() int64 {
-	return s.databaseManager.PrunableStorageSize()
+	return s.Prunable.Size()
 }
 
 // PermanentDatabaseSize returns the size of the underlying permanent database and files.
 func (s *Storage) PermanentDatabaseSize() int64 {
-	return s.Permanent.SettingsAndCommitmentsSize() + s.databaseManager.PermanentStorageSize()
+	return s.Permanent.Size()
+}
+
+func (s *Storage) Size() int64 {
+	return s.Permanent.Size() + s.Prunable.Size()
 }
 
 // Shutdown shuts down the storage.
 func (s *Storage) Shutdown() {
 	s.shutdownOnce.Do(func() {
-		if err := s.Permanent.Commitments.Close(); err != nil {
-			panic(err)
-		}
-
-		s.databaseManager.Shutdown()
+		s.Permanent.Shutdown()
+		s.Prunable.Shutdown()
 	})
 }

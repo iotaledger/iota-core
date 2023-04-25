@@ -2,7 +2,6 @@ package snapshotcreator
 
 import (
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -17,7 +16,7 @@ type Options struct {
 	// RootBlocks define the initial blocks to which new blocks can attach to.
 	RootBlocks map[iotago.BlockID]iotago.CommitmentID
 
-	DataBaseVersion database.Version
+	DataBaseVersion byte
 }
 
 func NewOptions(opts ...options.Option[Options]) *Options {
@@ -28,7 +27,7 @@ func NewOptions(opts ...options.Option[Options]) *Options {
 	}, opts)
 }
 
-func WithDatabaseVersion(dbVersion database.Version) options.Option[Options] {
+func WithDatabaseVersion(dbVersion byte) options.Option[Options] {
 	return func(m *Options) {
 		m.DataBaseVersion = dbVersion
 	}

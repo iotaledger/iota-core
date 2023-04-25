@@ -5,12 +5,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/database"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -36,6 +34,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
+	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -57,9 +56,9 @@ type Protocol struct {
 	optsSnapshotPath     string
 	optsPruningThreshold uint64
 
-	optsEngineOptions                 []options.Option[engine.Engine]
-	optsChainManagerOptions           []options.Option[chainmanager.Manager]
-	optsStorageDatabaseManagerOptions []options.Option[database.Manager]
+	optsEngineOptions       []options.Option[engine.Engine]
+	optsChainManagerOptions []options.Option[chainmanager.Manager]
+	optsStorageOptions      []options.Option[storage.Storage]
 
 	optsFilterProvider          module.Provider[*engine.Engine, filter.Filter]
 	optsBlockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
@@ -82,7 +81,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsTipManagerProvider:      trivialtipmanager.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
-		optsSybilProtectionProvider: poa.NewProvider(map[identity.ID]int64{}),
+		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
@@ -110,7 +109,7 @@ func (p *Protocol) Run() {
 
 	// the rootCommitment is also the earliest point in the chain we can fork from. It is used to prevent
 	// solidifying and processing commitments that we won't be able to switch to.
-	if err := p.mainEngine.Storage.Settings.SetChainID(rootCommitment.MustID()); err != nil {
+	if err := p.mainEngine.Storage.Settings().SetChainID(rootCommitment.MustID()); err != nil {
 		panic(fmt.Sprintln("could not load set main engine's chain using", rootCommitment))
 	}
 	p.chainManager.Initialize(rootCommitment)
@@ -139,13 +138,13 @@ func (p *Protocol) Shutdown() {
 func (p *Protocol) initNetworkEvents() {
 	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks
 
-	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id identity.ID) {
+	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {
 		if err := p.ProcessBlock(block, id); err != nil {
 			p.Events.Error.Trigger(err)
 		}
 	}, event.WithWorkerPool(wpBlocks))
 
-	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id identity.ID) {
+	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id network.PeerID) {
 		if block, exists := p.MainEngineInstance().Block(blockID); exists && !block.IsMissing() && !block.IsRootBlock() {
 			p.networkProtocol.SendBlock(block.Block(), id)
 		}
@@ -161,21 +160,21 @@ func (p *Protocol) initNetworkEvents() {
 
 	wpCommitments := p.Workers.CreatePool("NetworkEvents.SlotCommitments")
 
-	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
+	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source network.PeerID) {
 		// when we receive a commitment request, do not look it up in the ChainManager but in the storage, else we might answer with commitments we did not issue ourselves and for which we cannot provide attestations
-		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments.Load(commitmentID.Index()); err == nil && requestedCommitment.MustID() == commitmentID {
+		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); err == nil && requestedCommitment.MustID() == commitmentID {
 			p.networkProtocol.SendSlotCommitment(requestedCommitment, source)
 		}
 	}, event.WithWorkerPool(wpCommitments))
 
-	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, source identity.ID) {
+	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, source network.PeerID) {
 		p.chainManager.ProcessCommitmentFromSource(commitment, source)
 	}, event.WithWorkerPool(wpCommitments))
 
 	p.Events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
 		// Check if we have the requested commitment in our storage before asking our peers for it.
 		// This can happen after we restart the node because the chain manager builds up the chain again.
-		if cm, _ := p.MainEngineInstance().Storage.Commitments.Load(commitmentID.Index()); cm != nil {
+		if cm, _ := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); cm != nil {
 			if cm.MustID() == commitmentID {
 				p.chainManager.ProcessCommitment(cm)
 				return
@@ -191,7 +190,7 @@ func (p *Protocol) initEngineManager() {
 		p.Workers.CreateGroup("EngineManager"),
 		p.optsBaseDirectory,
 		DatabaseVersion,
-		p.optsStorageDatabaseManagerOptions,
+		p.optsStorageOptions,
 		p.optsEngineOptions,
 		p.optsFilterProvider,
 		p.optsBlockDAGProvider,
@@ -237,26 +236,26 @@ func (p *Protocol) initChainManager() {
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wp))
 }
 
-func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
+func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	mainEngine := p.MainEngineInstance()
 
 	isSolid, chain := p.chainManager.ProcessCommitmentFromSource(block.Block().SlotCommitment, src)
 	if !isSolid {
-		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings.LatestCommitment().MustID() {
+		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().MustID() {
 			return nil
 		}
 
-		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.Block().SlotCommitment.MustID(), mainEngine.Storage.Settings.LatestCommitment().MustID(), block.ID())
+		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.Block().SlotCommitment.MustID(), mainEngine.Storage.Settings().LatestCommitment().MustID(), block.ID())
 	}
 
 	processed := false
 
-	if mainChain := mainEngine.Storage.Settings.ChainID(); chain.ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
+	if mainChain := mainEngine.Storage.Settings().ChainID(); chain.ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
 		mainEngine.ProcessBlockFromPeer(block, src)
 		processed = true
 	}
 
-	//if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
+	// if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
 	//	if candidateChain := candidateEngine.Storage.Settings.ChainID(); chain.ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
 	//		candidateEngine.ProcessBlockFromPeer(block, src)
 	//		if candidateEngine.IsBootstrapped() &&
@@ -266,7 +265,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
 	//		}
 	//		processed = true
 	//	}
-	//}
+	// }
 
 	if !processed {
 		return errors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.Block().SlotCommitment.MustID())
@@ -379,9 +378,9 @@ func WithChainManagerOptions(opts ...options.Option[chainmanager.Manager]) optio
 	}
 }
 
-func WithStorageDatabaseManagerOptions(opts ...options.Option[database.Manager]) options.Option[Protocol] {
+func WithStorageOptions(opts ...options.Option[storage.Storage]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.optsStorageDatabaseManagerOptions = append(p.optsStorageDatabaseManagerOptions, opts...)
+		p.optsStorageOptions = append(p.optsStorageOptions, opts...)
 	}
 }
 

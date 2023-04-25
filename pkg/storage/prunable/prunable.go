@@ -2,8 +2,8 @@ package prunable
 
 import (
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/database"
+	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -11,21 +11,54 @@ const (
 	blocksPrefix byte = iota
 	rootBlocksPrefix
 	attestationsPrefix
-	ledgerStateDiffsPrefix
 )
 
 type Prunable struct {
-	Blocks           *Blocks
-	RootBlocks       *RootBlocks
-	Attestations     func(index iotago.SlotIndex) kvstore.KVStore
-	LedgerStateDiffs func(index iotago.SlotIndex) kvstore.KVStore
+	api     iotago.API
+	manager *Manager
 }
 
-func New(dbManager *database.Manager) (newPrunable *Prunable) {
+func New(dbConfig database.Config, opts ...options.Option[Manager]) *Prunable {
 	return &Prunable{
-		Blocks:           NewBlocks(dbManager, blocksPrefix),
-		RootBlocks:       NewRootBlocks(dbManager, rootBlocksPrefix),
-		Attestations:     lo.Bind([]byte{attestationsPrefix}, dbManager.Get),
-		LedgerStateDiffs: lo.Bind([]byte{ledgerStateDiffsPrefix}, dbManager.Get),
+		manager: NewManager(dbConfig, opts...),
 	}
+}
+
+func (p *Prunable) Initialize(a iotago.API) {
+	p.api = a
+}
+
+func (p *Prunable) Blocks(slot iotago.SlotIndex) *Blocks {
+	store := p.manager.Get(slot, kvstore.Realm{blocksPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewBlocks(slot, store, p.api)
+}
+
+func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *RootBlocks {
+	store := p.manager.Get(slot, kvstore.Realm{rootBlocksPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewRootBlocks(slot, store)
+}
+
+func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
+	return p.manager.Get(slot, kvstore.Realm{attestationsPrefix})
+}
+
+// PruneUntilSlot prunes storage slots less than and equal to the given index.
+func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
+	p.manager.PruneUntilSlot(index)
+}
+
+func (p *Prunable) Size() int64 {
+	return p.manager.PrunableStorageSize()
+}
+
+func (p *Prunable) Shutdown() {
+	p.manager.Shutdown()
 }
