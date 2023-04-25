@@ -70,11 +70,12 @@ func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index iotago.Slot
 
 func (t *TestFramework) IssueSigned(alias string) {
 	keyPair := ed25519.GenerateKeyPair()
+	// We derive a dummy account from addr.
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
 	block, err := builder.NewBlockBuilder().
 		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
 		IssuingTime(time.Now()).
-		Sign(addr, keyPair.PrivateKey[:]).
+		Sign(iotago.AccountID(addr[:]), keyPair.PrivateKey[:]).
 		Build()
 	require.NoError(t.Test, err)
 

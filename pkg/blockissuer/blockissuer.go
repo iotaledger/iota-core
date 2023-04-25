@@ -108,7 +108,7 @@ func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Pa
 		SlotCommitment(slotCommitment).
 		LatestFinalizedSlot(lastFinalizedSlot).
 		Payload(p).
-		Sign(i.Account.Address().(*iotago.Ed25519Address), i.Account.PrivateKey()).
+		Sign(i.Account.ID(), i.Account.PrivateKey()).
 		ProofOfWork(ctx, float64(i.protocol.MainEngineInstance().Storage.Settings().ProtocolParameters().MinPoWScore)).
 		Build()
 	if err != nil {
