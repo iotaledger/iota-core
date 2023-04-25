@@ -22,19 +22,21 @@ var _ Account = &Ed25519Account{}
 
 // Ed25519Account is an account that uses an Ed25519 key pair.
 type Ed25519Account struct {
+	accountID  iotago.AccountID
 	privateKey ed25519.PrivateKey
 }
 
 // NewEd25519Account creates a new Ed25519Account.
 func NewEd25519Account(accountID iotago.AccountID, privateKey ed25519.PrivateKey) *Ed25519Account {
 	return &Ed25519Account{
+		accountID:  accountID,
 		privateKey: privateKey,
 	}
 }
 
 // ID returns the account ID.
 func (e *Ed25519Account) ID() iotago.AccountID {
-	return iotago.Identifier(e.Address().(*iotago.Ed25519Address)[:])
+	return e.accountID
 }
 
 // Address returns the account address.
