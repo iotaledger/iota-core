@@ -33,8 +33,8 @@ paths:
         - node
       summary: Returns the health of the node.
       description: >-
-        Returns the health of the node. A node considers itself healthy if its bootstrapped and his Accepted Tangle Time (ATT) is not further behind his local clock tha BootstrapWindow. 
-        This information might be useful for load-balancing or uptime monitoring.
+        Returns the health of the node. A node considers itself healthy if it is bootstrapped and its Accepted Tangle Time (ATT) is not 
+        further behind its local clock than BootstrapWindow.
       responses:
         '200':
           description: "Successful operation: indicates that the node is healthy."
@@ -303,9 +303,6 @@ paths:
                 Conflicting with Transaction Payload:
                   $ref: >-
                     #/components/examples/get-block-by-id-response-example-conflicting-transaction
-                Conflicting without Transaction Payload:
-                  $ref: >-
-                    #/components/examples/get-block-by-id-response-example-conflicting
         '400':
           description: "Unsuccessful operation: indicates that the provided data is invalid."
           content:
@@ -1035,8 +1032,8 @@ components:
         issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
         status:
           isHealthy: true
-          lastAcceptedBlockID: "123abc"
-          lastConfirmedBlockID: "456def"
+          lastAcceptedBlockID: "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          lastConfirmedBlockID: "0x59daaaba1cd10cd268966376e17710d100c90826fe258753d461acac99b7e3341500000000000000"
           confirmedSlot: 100
           ATT: 1682328545
           RATT: 1682328550
@@ -1091,12 +1088,12 @@ components:
         commitment:
           index: 1432
           prevID: "0xbf07dc16986166953f5a72c19d78642aab6cbde63964a2369ec3d425144eb42b3800000000000000"
-          rootsID: "350d43147235b544344066eb908e48e33c8374ea161b6ec8e7b20e6d98b47616"
+          rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
           cumulativeWeight: 45678
 
     post-blocks-response-example:
       value:
-        blockId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
+        blockId: "0xb173e2d2b6f72600f00da84492ddb6eadee703dc39fb846725828059272093fb3b00000000000000"
 
     get-block-by-id-response-example-new-transaction:
       value:
@@ -1144,15 +1141,6 @@ components:
         txState: "pending"
         blockStateReason: 1
         txStateReason: 5
-
-    get-block-by-id-response-example-conflicting:
-      value:
-        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
-        strongParents:
-          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
-          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
-        blockState: "pending"
-        blockStateReason: 1
 
     post-tagged-data-block-request-example-minimal:
       value:
@@ -1220,7 +1208,7 @@ components:
         slotCommitment:
           index: 110
           prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
-          rootsID: "f4ab06bc4b5db1410b2a7d54c43143ba5a6940e725e43c7f62ddc111d96f83f3"
+          rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
           cumulativeWeight: 12345
         latestFinalizedSlot: 98
         payload:
@@ -1250,7 +1238,7 @@ components:
         slotCommitment:
           index: 110
           prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
-          rootsID: "f4ab06bc4b5db1410b2a7d54c43143ba5a6940e725e43c7f62ddc111d96f83f3"
+          rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
           cumulativeWeight: 12345
         latestFinalizedSlot: 98
         payload:
@@ -1306,7 +1294,7 @@ components:
         slotCommitment:
           index: 110
           prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
-          rootsID: "f4ab06bc4b5db1410b2a7d54c43143ba5a6940e725e43c7f62ddc111d96f83f3"
+          rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
           cumulativeWeight: 12345
         latestFinalizedSlot: 98
         nonce: '8423'
@@ -1331,7 +1319,7 @@ components:
         slotCommitment:
           index: 2310
           prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
-          rootsID: "f4ab06bc4b5db1410b2a7d54c43143ba5a6940e725e43c7f62ddc111d96f83f3"
+          rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
           cumulativeWeight: 12345
         latestFinalizedSlot: 98
         payload:
@@ -1396,7 +1384,7 @@ components:
         slotCommitment:
           index: 928
           prevID: "0x6dcf06b23919b4d4c1c4d1f51af7e510618a2cecb7f2d4c4d0b4a4deef531b7e0000000000000000"
-          rootsID: "51f7c406c6d5e52fc8642cf3ca3b1403a57c5bf6f4529a1a0e107822c27d03f7"
+          rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
           cumulativeWeight: 98765
         latestFinalizedSlot: 98
         payload:
@@ -1440,7 +1428,7 @@ components:
       value:
         index: 986
         prevID: "0x8fb6cbb1ecf02c6b5a6a5a6a5f6c5a6a5f6c5a6a5a6a5a6a5f6c5a6a5a6a5f6c50000000000000000"
-        rootsID: "3e3a3f518e88f73d691be29c2f99469e747ad9e4b4a98d4a0176f012881942af"
+        rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
         cumulativeWeight: 78901
 
     get-commitment-response-binary-example:
@@ -2645,7 +2633,11 @@ components:
           description: The digest of multiple merkle roots within this slot.
         cumulativeWeight:
           type: integer
-          description: The cumulative weight of this commitment.
+          description: 
+            The sum of previous slot commitment cumulative weight and 
+            weight of issuers of accepted blocks within this slot. 
+            It is just an indication of "committed into" this slot,
+            and can not strictly be used for evaluating the switching of a chain.
 
     SubmitBlockRequest:
       description: Submits a block to the node.
@@ -2770,7 +2762,6 @@ components:
               * `10` - denotes that the inputs commitment is invalid.
               * `11` - denotes that an output contains a Sender with an ident (address) which is not unlocked.
               * `12` - denotes that the chain state transition is invalid.
-              * `13` - denotes that ...
               * `255` - denotes that the semantic validation failed.
         reissuePayload:
           type: boolean

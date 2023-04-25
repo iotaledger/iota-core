@@ -126,7 +126,7 @@ The following table describes the serialization of a Block:
   <tr>
     <td>Issuing Time</td>
     <td>int64</td>
-    <td>The time the block is issued.</td>
+    <td>The time the block is issued. It's a Unix time in nanoseconds.</td>
   </tr>
   <tr>
     <td>Slot Commitment Length</td>
@@ -155,7 +155,7 @@ The following table describes the serialization of a Block:
     <td>The length of the following payload in bytes. A length of 0 means no payload will be attached.</td>
   </tr>
   <tr>
-    <td valign="top">Payload <code>oneOf</code></td>
+    <td valign="top">Payload <code>optOneOf</code></td>
     <td colspan="2">
       <details open="true">
         <summary>Generic Payload</summary>
@@ -184,28 +184,13 @@ The following table describes the serialization of a Block:
   <tr>
     <td valign="top">Signature <code>oneOf</code></td>
     <td colspan="2">
-      <details open="true">
-        <summary>Generic Signature</summary>
-        <table>
-          <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-          </tr>
-          <tr>
-            <td>Signature Type</td>
-            <td>uint8</td>
-            <td>
-              The type of the signature. It will instruct the node how to parse the fields that follow.
-            </td>
-          </tr>
-          <tr>
-            <td>Signature Bytes</td>
-            <td>ByteArray</td>
-            <td>A sequence of serialized bytes, where the structure depends on `Signature Type`.</td>
-          </tr>
-        </table>
+      <details>
+        <summary>Ed25519 Signature</summary>
+        <blockquote>
+          With Signature Type 0, more details are described in Signature section.
+        </blockquote>
       </details>
+    </td>
     </td>
   </tr>
   <tr>
@@ -221,7 +206,8 @@ Block ID denotes an identifier of a block, with type `ArrayBytes[40]`. It is cal
 
 * `content` is the serialized block **without** signature and nonce.
 * `slot_index` is the slot index of the `Issuing Time` of the block.
-* `signatureBytes` is the serialized Ed25519 signature.
+   **Note**: It's **not** the same slot index as in the Slot Commitment.
+* `signatureBytes` is the serialized signature.
 
 Calculation:
 1. `content_hash` = hash(`content`)
@@ -234,15 +220,16 @@ The string format of Block ID is hexadecimal encoding of Block ID with `0x` pref
 
 * Block size must not exceeds `MaxBlockSize` bytes, currently is `32768`.
 * `Protocol Version` must match the `Protocol Version` config parameter of the node.
-* Must have at least **1** `Strong Parents`.
-* `Strong Parents`, `Weak Parents`, `Shallow Like Parents` must not exceeds `BlockMaxParents` (currently is **8**) per type.
-* `Strong Parents`, `Weak Parents`, `Shallow Like Parents` of parents must be lexically ordered.
+* It must hold true that 1 ≤ `Strong Parents Count` ≤ 8.
+* It must hold true that 0 ≤ `Weak Parents Count` ≤ 8.
+* It must hold true that 0 ≤ `Shallow Like Parents Count` ≤ 8.
+* `Strong Parents`, `Weak Parents`, `Shallow Like Parents` must be lexically ordered.
 * `Strong Parents`, `Weak Parents`, `Shallow Like Parents` must not have duplicates in each list.
-* `Weak Parents` must be disjunct to the rest of the parents.
+* `Weak Parents` must be disjunct to the rest of the parents, no weak parent should be in either strong or shallow like parents.
 * `Payload Type` must match one of the values described under Payloads.
   Data Fields must be correctly parsable in the context of the `Payload Type`.
   The payload itself must pass syntactic validation.
-* `Signature` must be valid, the input of a signature is concatation of Issuing Time bytes, Commitment ID bytes and Block bytes (without Signature and Nonce) by order.
+* `Signature` must be valid, the input of a signature is concatation of `Issuing Time` bytes, `Slot Commitment ID` bytes and Block bytes (without Signature and Nonce) by order.
 * There must be no trailing bytes after all block fields have been parsed.
 
 
@@ -257,14 +244,14 @@ The slot index of timestamp `ts` is `(ts - genesisTimestamp)/duration + 1`.
 
 Commitment is an object that contains a summary of a slot, and it is linked to the commitment of the previous slot, which forms a commitment chain. 
 
-Multiple sparse merkle trees are managed by per slot, which are:
+Multiple sparse merkle trees are managed per slot, which are:
 * *Tangle tree*: All accepted blocks within a slot.
 * *State mutation tree*: All accepted transactions within a slot.
 * *Activity tree*: All active accounts within a slot.
 * *State tree*: All accepted created/consumed outputs within a slot.
-* *Mana tree*: Mana of all accounts at the end of slot.
+* *Mana tree*: Mana of all accounts at the end of a slot.
 
-When a slot is committable, new commitment is generated and will be included in the new issued blocks.
+A slot is committable after waiting `MinCommittableSlotAge` slots from the current one. When a slot is committable, new commitment is generated and will be included in the new issued blocks. so the slot index in a slot commitment is always lagged behind of the block's slot index, which is its `Issuing Time`.
 
 **Note** that more trees will be added in the future, but this will only change the calculation of `Root ID`, the Slot Commitment structure stays the same.
 
@@ -292,7 +279,7 @@ The following table describes the serialization of a Slot Commitment:
     <td>Root ID</td>
     <td>ByteArray[32]</td>
     <td>
-      A BLAKE2b-256 hash of concating multiple sparse merkle tree roots of a slot.
+      A BLAKE2b-256 hash of concatenating multiple sparse merkle tree roots of a slot.
       <i>Root ID = hash( Concat( hash(Concat(Tangle, TX)), hash(Concat(State, Mana)) ) )</i>  
     </td>
   </tr>
@@ -398,7 +385,7 @@ The following table describes the serialization of a Transaction:
           <tr>
             <td>Creation Time</td>
             <td>int64</td>
-            <td>The time at which this transaction was created by the client.</td>
+            <td>The time at which this transaction was created by the client. It's a Unix time in nanoseconds.</td>
           </tr>
           <tr>
             <td>Inputs Count</td>
