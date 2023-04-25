@@ -69,7 +69,7 @@ func (t *TestFramework) StateReference(alias string) mempool.StateReference {
 func (t *TestFramework) ProcessTransaction(alias string, referencedStates []string, outputCount uint16) error {
 	transaction := NewTransaction(outputCount, lo.Map(referencedStates, t.StateReference)...)
 
-	t.registerTransactionAlias(alias, transaction)
+	t.registerTransactionAliases(alias, transaction)
 
 	return t.Instance.ProcessTransaction(transaction)
 }
@@ -151,7 +151,7 @@ func (t *TestFramework) markTransactionBookedTriggered(id iotago.TransactionID) 
 	t.transactionBookedTriggered[id] = true
 }
 
-func (t *TestFramework) registerTransactionAlias(alias string, transaction *Transaction) {
+func (t *TestFramework) registerTransactionAliases(alias string, transaction *Transaction) {
 	t.transactionIDByAlias[alias] = lo.PanicOnErr(transaction.ID())
 	t.transactionIDByAlias[alias].RegisterAlias(alias)
 
