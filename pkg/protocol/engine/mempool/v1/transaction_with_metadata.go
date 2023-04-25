@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"golang.org/x/xerrors"
+	"iota-core/pkg/promise"
 	"iota-core/pkg/protocol/engine/ledger"
 	"iota-core/pkg/protocol/engine/mempool"
 
@@ -18,7 +19,11 @@ type TransactionWithMetadata struct {
 	outputs         []*StateWithMetadata
 	transaction     mempool.Transaction
 
-	booked bool
+	booked   *promise.Event
+	solid    *promise.Event
+	executed *promise.Event
+	evicted  *promise.Event
+	invalid  *promise.Event1[error]
 
 	mutex sync.RWMutex
 }
@@ -39,6 +44,11 @@ func NewTransactionMetadata(transaction mempool.Transaction) (*TransactionWithMe
 		inputReferences: inputReferences,
 		inputs:          make([]*StateWithMetadata, len(inputReferences)),
 		transaction:     transaction,
+		booked:          promise.NewEvent(),
+		solid:           promise.NewEvent(),
+		executed:        promise.NewEvent(),
+		evicted:         promise.NewEvent(),
+		invalid:         promise.NewEvent1[error](),
 	}, nil
 }
 
@@ -63,50 +73,58 @@ func (t *TransactionWithMetadata) Outputs() *advancedset.AdvancedSet[mempool.Sta
 	return outputs
 }
 
-func (t *TransactionWithMetadata) IsStored() bool {
-	return t != nil
-}
-
 func (t *TransactionWithMetadata) IsSolid() bool {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
-	return t.inputs != nil
-}
-
-func (t *TransactionWithMetadata) IsBooked() bool {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
-	return t.booked
+	return t.solid.WasTriggered()
 }
 
 func (t *TransactionWithMetadata) IsExecuted() bool {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
-	return t.outputs != nil
+	return t.executed.WasTriggered()
 }
 
-func (t *TransactionWithMetadata) PublishInput(index int, input *StateWithMetadata) {
+func (t *TransactionWithMetadata) IsBooked() bool {
+	return t.booked.WasTriggered()
+}
+
+func (t *TransactionWithMetadata) IsInvalid() bool {
+	return t.invalid.WasTriggered()
+}
+
+func (t *TransactionWithMetadata) IsEvicted() bool {
+	return t.evicted.WasTriggered()
+}
+
+func (t *TransactionWithMetadata) HookSolid(callback func()) {
+	t.solid.OnTrigger(callback)
+}
+
+func (t *TransactionWithMetadata) HookExecuted(callback func()) {
+	t.executed.OnTrigger(callback)
+}
+
+func (t *TransactionWithMetadata) HookBooked(callback func()) {
+	t.booked.OnTrigger(callback)
+}
+
+func (t *TransactionWithMetadata) HookInvalid(callback func(error)) {
+	t.invalid.OnTrigger(callback)
+}
+
+func (t *TransactionWithMetadata) HookEvicted(callback func()) {
+	t.evicted.OnTrigger(callback)
+}
+
+func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetadata) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
 	t.inputs[index] = input
 }
 
-func (t *TransactionWithMetadata) PublishOutputStates(outputStates []ledger.State) {
+func (t *TransactionWithMetadata) publishOutputStates(outputStates []ledger.State) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
 	for _, outputState := range outputStates {
 		t.outputs = append(t.outputs, NewStateWithMetadata(outputState, t))
 	}
-}
-
-func (t *TransactionWithMetadata) setBooked() {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	t.booked = true
 }

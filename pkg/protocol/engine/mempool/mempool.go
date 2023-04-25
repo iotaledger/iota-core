@@ -13,7 +13,7 @@ type MemPool interface {
 
 	SetTransactionInclusionSlot(id iotago.TransactionID, inclusionSlot iotago.SlotIndex) error
 
-	EvictTransaction(id iotago.TransactionID) error
+	EvictTransaction(id iotago.TransactionID)
 
 	ConflictDAG() interface{}
 }

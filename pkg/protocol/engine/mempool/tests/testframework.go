@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"iota-core/pkg/protocol/engine/mempool"
@@ -18,11 +17,11 @@ type TestFramework struct {
 	Instance mempool.MemPool
 
 	stateIDByAlias               map[string]iotago.OutputID
-	transactionIDByAlias         map[string]iotago.TransactionID
-	transactionStoredTriggered   map[iotago.TransactionID]bool
-	transactionSolidTriggered    map[iotago.TransactionID]bool
-	transactionExecutedTriggered map[iotago.TransactionID]bool
-	transactionBookedTriggered   map[iotago.TransactionID]bool
+	transactionByAlias           map[string]mempool.Transaction
+	globalStoredEventTriggered   map[iotago.TransactionID]bool
+	globalSolidEventTriggered    map[iotago.TransactionID]bool
+	globalExecutedEventTriggered map[iotago.TransactionID]bool
+	globalBookedEventTriggered   map[iotago.TransactionID]bool
 	test                         *testing.T
 	mutex                        sync.RWMutex
 }
@@ -31,17 +30,50 @@ func NewTestFramework(test *testing.T, instance mempool.MemPool) *TestFramework 
 	t := &TestFramework{
 		Instance:                     instance,
 		stateIDByAlias:               make(map[string]iotago.OutputID),
-		transactionIDByAlias:         make(map[string]iotago.TransactionID),
-		transactionStoredTriggered:   make(map[iotago.TransactionID]bool),
-		transactionSolidTriggered:    make(map[iotago.TransactionID]bool),
-		transactionBookedTriggered:   make(map[iotago.TransactionID]bool),
-		transactionExecutedTriggered: make(map[iotago.TransactionID]bool),
+		transactionByAlias:           make(map[string]mempool.Transaction),
+		globalStoredEventTriggered:   make(map[iotago.TransactionID]bool),
+		globalSolidEventTriggered:    make(map[iotago.TransactionID]bool),
+		globalBookedEventTriggered:   make(map[iotago.TransactionID]bool),
+		globalExecutedEventTriggered: make(map[iotago.TransactionID]bool),
 		test:                         test,
 	}
 
 	t.setupHookedEvents()
 
 	return t
+}
+
+func (t *TestFramework) CreateTransaction(alias string, referencedStates []string, outputCount uint16) {
+	// create transaction
+	transaction := NewTransaction(outputCount, lo.Map(referencedStates, t.stateReference)...)
+	t.transactionByAlias[alias] = transaction
+
+	// register the transaction ID alias
+	transactionID, transactionIDErr := transaction.ID()
+	require.NoError(t.test, transactionIDErr, "failed to retrieve transaction ID of transaction with alias '%s'", alias)
+	transactionID.RegisterAlias(alias)
+
+	// register the aliases for the generated output IDs
+	for i := uint16(0); i < transaction.outputCount; i++ {
+		t.stateIDByAlias[alias+":"+strconv.Itoa(int(i))] = iotago.OutputIDFromTransactionIDAndIndex(transactionID, i)
+	}
+}
+
+func (t *TestFramework) ProcessTransactions(alias ...string) error {
+	for _, alias := range alias {
+		transaction, transactionExists := t.transactionByAlias[alias]
+		require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", alias)
+
+		if err := t.Instance.ProcessTransaction(transaction); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *TestFramework) TransactionMetadata(alias string) (mempool.TransactionWithMetadata, bool) {
+	return t.Instance.TransactionMetadata(t.TransactionID(alias))
 }
 
 func (t *TestFramework) StateID(alias string) iotago.OutputID {
@@ -56,22 +88,13 @@ func (t *TestFramework) StateID(alias string) iotago.OutputID {
 }
 
 func (t *TestFramework) TransactionID(alias string) iotago.TransactionID {
-	transactionID, exists := t.transactionIDByAlias[alias]
-	require.True(t.test, exists, "transaction with alias '%s' does not exist", alias)
+	transaction, transactionExists := t.transactionByAlias[alias]
+	require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", alias)
+
+	transactionID, transactionIDErr := transaction.ID()
+	require.NoError(t.test, transactionIDErr, "failed to retrieve transaction ID of transaction with alias '%s'", alias)
 
 	return transactionID
-}
-
-func (t *TestFramework) StateReference(alias string) mempool.StateReference {
-	return LedgerStateReference(t.StateID(alias))
-}
-
-func (t *TestFramework) ProcessTransaction(alias string, referencedStates []string, outputCount uint16) error {
-	transaction := NewTransaction(outputCount, lo.Map(referencedStates, t.StateReference)...)
-
-	t.registerTransactionAliases(alias, transaction)
-
-	return t.Instance.ProcessTransaction(transaction)
 }
 
 func (t *TestFramework) RequireBooked(transactionAliases ...string) {
@@ -87,7 +110,7 @@ func (t *TestFramework) setupHookedEvents() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionStored with '%s'", metadata.ID())
 		}
 
-		require.True(t.test, metadata.IsStored(), "transaction is not marked as stored")
+		require.NotNilf(t.test, metadata, "transaction metadata is nil")
 
 		t.markTransactionStoredTriggered(metadata.ID())
 	})
@@ -127,48 +150,46 @@ func (t *TestFramework) markTransactionStoredTriggered(id iotago.TransactionID) 
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.transactionStoredTriggered[id] = true
+	t.globalStoredEventTriggered[id] = true
 }
 
 func (t *TestFramework) markTransactionSolidTriggered(id iotago.TransactionID) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.transactionSolidTriggered[id] = true
+	t.globalSolidEventTriggered[id] = true
 }
 
 func (t *TestFramework) markTransactionExecutedTriggered(id iotago.TransactionID) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.transactionExecutedTriggered[id] = true
+	t.globalExecutedEventTriggered[id] = true
 }
 
 func (t *TestFramework) markTransactionBookedTriggered(id iotago.TransactionID) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.transactionBookedTriggered[id] = true
+	t.globalBookedEventTriggered[id] = true
 }
 
-func (t *TestFramework) registerTransactionAliases(alias string, transaction *Transaction) {
-	t.transactionIDByAlias[alias] = lo.PanicOnErr(transaction.ID())
-	t.transactionIDByAlias[alias].RegisterAlias(alias)
-
-	for i := uint16(0); i < transaction.outputCount; i++ {
-		t.stateIDByAlias[alias+":"+strconv.Itoa(int(i))] = iotago.OutputIDFromTransactionIDAndIndex(t.transactionIDByAlias[alias], i)
-	}
+func (t *TestFramework) stateReference(alias string) mempool.StateReference {
+	return LedgerStateReference(t.StateID(alias))
 }
 
 func (t *TestFramework) waitBooked(transactionAliases ...string) {
-	for _, transactionAlias := range transactionAliases {
-		require.Eventuallyf(t.test, func() bool {
-			transactionMetadata, transactionMetadataExists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
-			bookedTriggered, _ := t.transactionBookedTriggered[t.TransactionID(transactionAlias)]
+	var allBooked sync.WaitGroup
 
-			return bookedTriggered || transactionMetadataExists && transactionMetadata.IsBooked()
-		}, 10*time.Second, 50*time.Millisecond, "transaction '%s' was not booked in time", transactionAlias)
+	allBooked.Add(len(transactionAliases))
+	for _, transactionAlias := range transactionAliases {
+		transactionMetadata, exists := t.TransactionMetadata(transactionAlias)
+		require.True(t.test, exists, "transaction '%s' does not exist", transactionAlias)
+
+		transactionMetadata.HookBooked(allBooked.Done)
 	}
+
+	allBooked.Wait()
 }
 
 func (t *TestFramework) requireBookedTriggered(transactionAliases ...string) {
@@ -176,7 +197,7 @@ func (t *TestFramework) requireBookedTriggered(transactionAliases ...string) {
 	defer t.mutex.RUnlock()
 
 	for _, transactionAlias := range transactionAliases {
-		require.True(t.test, t.transactionBookedTriggered[t.TransactionID(transactionAlias)], "transaction '%s' was not booked", transactionAlias)
+		require.True(t.test, t.globalBookedEventTriggered[t.TransactionID(transactionAlias)], "transaction '%s' was not booked", transactionAlias)
 	}
 }
 

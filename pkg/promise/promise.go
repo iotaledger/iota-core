@@ -2,18 +2,20 @@ package promise
 
 import (
 	"sync"
+
+	"github.com/iotaledger/hive.go/ds/orderedmap"
 )
 
 // Promise is a promise that can be resolved or rejected.
 type Promise[T any] struct {
 	// successCallbacks are called when the promise is resolved successfully.
-	successCallbacks []func(T)
+	successCallbacks *orderedmap.OrderedMap[CallbackID, func(T)]
 
 	// errorCallbacks are called when the promise is rejected.
-	errorCallbacks []func(error)
+	errorCallbacks *orderedmap.OrderedMap[CallbackID, func(error)]
 
 	// completeCallbacks are called when the promise is resolved or rejected.
-	completeCallbacks []func()
+	completeCallbacks *orderedmap.OrderedMap[CallbackID, func()]
 
 	// result is the result of the promise.
 	result T
@@ -29,12 +31,18 @@ type Promise[T any] struct {
 }
 
 // New creates a new promise.
-func New[T any]() *Promise[T] {
-	return &Promise[T]{
-		successCallbacks:  make([]func(T), 0),
-		errorCallbacks:    make([]func(error), 0),
-		completeCallbacks: make([]func(), 0),
+func New[T any](optResolver ...func(p *Promise[T])) *Promise[T] {
+	p := &Promise[T]{
+		successCallbacks:  orderedmap.New[CallbackID, func(T)](),
+		errorCallbacks:    orderedmap.New[CallbackID, func(error)](),
+		completeCallbacks: orderedmap.New[CallbackID, func()](),
 	}
+
+	if len(optResolver) > 0 {
+		optResolver[0](p)
+	}
+
+	return p
 }
 
 // Resolve resolves the promise with the given result.
@@ -46,16 +54,21 @@ func (f *Promise[T]) Resolve(result T) *Promise[T] {
 		return f
 	}
 
+	f.successCallbacks.ForEach(func(key CallbackID, callback func(T)) bool {
+		callback(result)
+		return true
+	})
+
+	f.completeCallbacks.ForEach(func(key CallbackID, callback func()) bool {
+		callback()
+		return true
+	})
+
+	f.successCallbacks = nil
+	f.errorCallbacks = nil
+	f.completeCallbacks = nil
 	f.result = result
 	f.complete = true
-
-	for _, callback := range f.successCallbacks {
-		callback(result)
-	}
-
-	for _, callback := range f.completeCallbacks {
-		callback()
-	}
 
 	return f
 }
@@ -69,58 +82,127 @@ func (f *Promise[T]) Reject(err error) *Promise[T] {
 		return f
 	}
 
+	f.errorCallbacks.ForEach(func(key CallbackID, callback func(error)) bool {
+		callback(err)
+		return true
+	})
+
+	f.completeCallbacks.ForEach(func(key CallbackID, callback func()) bool {
+		callback()
+		return true
+	})
+
+	f.successCallbacks = nil
+	f.errorCallbacks = nil
+	f.completeCallbacks = nil
 	f.err = err
 	f.complete = true
-
-	for _, callback := range f.errorCallbacks {
-		callback(err)
-	}
-
-	for _, callback := range f.completeCallbacks {
-		callback()
-	}
 
 	return f
 }
 
 // OnSuccess registers a callback that is called when the promise is resolved.
-func (f *Promise[T]) OnSuccess(callback func(result T)) *Promise[T] {
+func (f *Promise[T]) OnSuccess(callback func(result T)) (cancel func()) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if !f.complete {
-		f.successCallbacks = append(f.successCallbacks, callback)
-	} else if f.err == nil {
-		callback(f.result)
+	if f.complete {
+		if f.err == nil {
+			callback(f.result)
+		}
+
+		return func() {}
 	}
 
-	return f
+	callbackID := NewCallbackID()
+	f.successCallbacks.Set(callbackID, callback)
+
+	return func() {
+		f.mutex.Lock()
+		defer f.mutex.Unlock()
+
+		if f.successCallbacks != nil {
+			f.successCallbacks.Delete(callbackID)
+		}
+	}
 }
 
 // OnError registers a callback that is called when the promise is rejected.
-func (f *Promise[T]) OnError(callback func(err error)) *Promise[T] {
+func (f *Promise[T]) OnError(callback func(err error)) func() {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if !f.complete {
-		f.errorCallbacks = append(f.errorCallbacks, callback)
-	} else if f.err != nil {
-		callback(f.err)
+	if f.complete {
+		if f.err != nil {
+			callback(f.err)
+		}
+
+		return func() {}
 	}
 
-	return f
+	callbackID := NewCallbackID()
+	f.errorCallbacks.Set(callbackID, callback)
+
+	return func() {
+		f.mutex.Lock()
+		defer f.mutex.Unlock()
+
+		if f.errorCallbacks != nil {
+			f.errorCallbacks.Delete(callbackID)
+		}
+	}
 }
 
 // OnComplete registers a callback that is called when the promise is resolved or rejected.
-func (f *Promise[T]) OnComplete(callback func()) *Promise[T] {
+func (f *Promise[T]) OnComplete(callback func()) func() {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if !f.complete {
-		f.completeCallbacks = append(f.completeCallbacks, callback)
-	} else {
+	if f.complete {
 		callback()
+
+		return func() {}
 	}
 
-	return f
+	callbackID := NewCallbackID()
+	f.completeCallbacks.Set(callbackID, callback)
+
+	return func() {
+		f.mutex.Lock()
+		defer f.mutex.Unlock()
+
+		f.completeCallbacks.Delete(callbackID)
+	}
+}
+
+// WasResolved returns true if the promise was resolved.
+func (f *Promise[T]) WasResolved() bool {
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
+
+	return f.complete && f.err == nil
+}
+
+// WasRejected returns true if the promise was rejected.
+func (f *Promise[T]) WasRejected() bool {
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
+
+	return f.complete && f.err != nil
+}
+
+// WasCompleted returns true if the promise was resolved or rejected.
+func (f *Promise[T]) WasCompleted() bool {
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
+
+	return f.complete
+}
+
+// IsEmpty returns true if the promise has no callbacks.
+func (f *Promise[T]) IsEmpty() bool {
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
+
+	return f.successCallbacks.IsEmpty() && f.errorCallbacks.IsEmpty() && f.completeCallbacks.IsEmpty()
 }

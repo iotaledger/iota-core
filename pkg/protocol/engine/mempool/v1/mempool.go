@@ -70,9 +70,10 @@ func (m *MemPool) SetTransactionInclusionSlot(id iotago.TransactionID, inclusion
 	panic("implement me")
 }
 
-func (m *MemPool) EvictTransaction(id iotago.TransactionID) error {
-	// TODO implement me
-	panic("implement me")
+func (m *MemPool) EvictTransaction(transactionID iotago.TransactionID) {
+	if transaction, exists := m.cachedTransactions.Get(transactionID); exists && m.cachedTransactions.Delete(transactionID) {
+		transaction.evicted.Trigger()
+	}
 }
 
 func (m *MemPool) Events() *mempool.Events {
@@ -88,28 +89,47 @@ func (m *MemPool) resolveInputs(transactionMetadata *TransactionWithMetadata) {
 	missingInputs := uint64(len(transactionMetadata.inputReferences))
 
 	for i, input := range transactionMetadata.inputReferences {
-		inputRequest, inputRequestCreated := m.cachedStates.GetOrCreate(input.ReferencedStateID(), promise.New[*StateWithMetadata])
-		inputRequest.OnSuccess(func(state *StateWithMetadata) {
-			if transactionMetadata.PublishInput(i, state); atomic.AddUint64(&missingInputs, ^uint64(0)) == 0 {
-				m.events.TransactionSolid.Trigger(transactionMetadata)
+		var cancelRequest context.CancelFunc
 
-				m.executionWorkers.Submit(func() { m.executeTransaction(transactionMetadata) })
+		stateRequest := m.cachedStates.Compute(input.ReferencedStateID(), func(value *promise.Promise[*StateWithMetadata], exists bool) *promise.Promise[*StateWithMetadata] {
+			if !exists {
+				value = promise.New[*StateWithMetadata](func(p *promise.Promise[*StateWithMetadata]) {
+					stateRequest := m.resolveInput(input)
+
+					stateRequest.OnSuccess(func(state ledger.State) {
+						p.Resolve(NewStateWithMetadata(state))
+					})
+
+					stateRequest.OnError(func(err error) {
+						if !errors.Is(err, ledger.ErrStateNotFound) {
+							p.Reject(err)
+						}
+					})
+				})
 			}
-		}).OnError(func(err error) {
-			// TODO: MARK TRANSACTION AS UNSOLIDIFIABLE AND CLEAN UP
+
+			cancelRequest = lo.Batch(
+				value.OnSuccess(func(state *StateWithMetadata) {
+					if transactionMetadata.publishInput(i, state); atomic.AddUint64(&missingInputs, ^uint64(0)) == 0 {
+						transactionMetadata.solid.Trigger()
+						m.events.TransactionSolid.Trigger(transactionMetadata)
+
+						m.executionWorkers.Submit(func() { m.executeTransaction(transactionMetadata) })
+					}
+				}),
+				value.OnError(transactionMetadata.invalid.Trigger),
+			)
+
+			return value
 		})
 
-		if inputRequestCreated {
-			m.resolveInput(input).OnSuccess(func(state ledger.State) {
-				inputRequest.Resolve(NewStateWithMetadata(state))
-			}).OnError(func(err error) {
-				if errors.Is(err, ledger.ErrStateNotFound) {
-					// TODO: DELAYED inputRequest.Reject(err) / WAIT FOR SOLIDIFICATION (BUT NOT FOREVER)
-				} else {
-					inputRequest.Reject(err)
-				}
-			})
-		}
+		transactionMetadata.HookEvicted(func() {
+			cancelRequest()
+
+			if stateRequest.IsEmpty() {
+				m.cachedStates.Delete(input.ReferencedStateID(), stateRequest.IsEmpty)
+			}
+		})
 	}
 }
 
@@ -121,7 +141,8 @@ func (m *MemPool) executeTransaction(transactionMetadata *TransactionWithMetadat
 		return
 	}
 
-	transactionMetadata.PublishOutputStates(outputStates)
+	transactionMetadata.publishOutputStates(outputStates)
+	transactionMetadata.executed.Trigger()
 
 	m.events.TransactionExecuted.Trigger(transactionMetadata)
 
@@ -132,10 +153,10 @@ func (m *MemPool) bookTransaction(transactionMetadata *TransactionWithMetadata) 
 	// determine the branches and inherit them to the outputs
 
 	for _, output := range transactionMetadata.outputs {
-		lo.Return1(m.cachedStates.GetOrCreate(output.id, promise.New[*StateWithMetadata])).Resolve(output)
+		lo.Return1(m.cachedStates.GetOrCreate(output.id, lo.NoVariadic(promise.New[*StateWithMetadata]))).Resolve(output)
 	}
 
-	transactionMetadata.setBooked()
+	transactionMetadata.booked.Trigger()
 
 	m.events.TransactionBooked.Trigger(transactionMetadata)
 }

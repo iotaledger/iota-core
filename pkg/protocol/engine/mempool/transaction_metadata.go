@@ -10,13 +10,25 @@ type TransactionWithMetadata interface {
 
 	Transaction() Transaction
 
-	IsStored() bool
+	Outputs() *advancedset.AdvancedSet[StateWithMetadata]
 
 	IsSolid() bool
 
-	IsBooked() bool
-
 	IsExecuted() bool
 
-	Outputs() *advancedset.AdvancedSet[StateWithMetadata]
+	IsBooked() bool
+
+	IsInvalid() bool
+
+	IsEvicted() bool
+
+	HookSolid(func())
+
+	HookExecuted(func())
+
+	HookBooked(func())
+
+	HookInvalid(func(error))
+
+	HookEvicted(func())
 }
