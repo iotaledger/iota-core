@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
@@ -141,7 +142,7 @@ func (t *TipManager) RemoveTip(blockID iotago.BlockID) (removed bool) {
 }
 
 // Tips returns count number of tips, maximum MaxParentsCount.
-func (t *TipManager) Tips(count int) (tips iotago.BlockIDs) {
+func (t *TipManager) Tips(count int) (references model.ParentReferences) {
 	if count > iotago.BlockMaxParents {
 		count = iotago.BlockMinParents
 	}
@@ -149,7 +150,9 @@ func (t *TipManager) Tips(count int) (tips iotago.BlockIDs) {
 		count = iotago.BlockMinParents
 	}
 
-	return t.selectTips(count)
+	return model.ParentReferences{
+		model.StrongParentType: t.selectTips(count),
+	}
 }
 
 // AllTips returns a list of all tips that are stored in the TipManger.

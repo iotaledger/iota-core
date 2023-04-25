@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
+	"github.com/iotaledger/iota-core/pkg/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -34,22 +35,22 @@ var (
 type dependencies struct {
 	dig.In
 
-	Peer     *peer.Local
-	Protocol *protocol.Protocol
+	Peer        *peer.Local
+	Protocol    *protocol.Protocol
+	BlockIssuer *blockissuer.BlockIssuer
 }
 
 func issuerID() iotago.AccountID {
 	issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
 	pubKey := issuerKey.Public()
 
-	return iotago.AccountID(iotago.Ed25519AddressFromPubKey(pubKey[:]))
+	return iotago.AccountID(*iotago.Ed25519AddressFromPubKey(pubKey[:]))
 }
-
 
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		Component.LogInfof("Starting Activity with IssuerID: %s", issuerID().ToHex())
-		ticker := timeutil.NewTicker(issueActivityBlock, ParamsActivity.BroadcastInterval, ctx)
+		ticker := timeutil.NewTicker(func() { issueActivityBlock(ctx) }, ParamsActivity.BroadcastInterval, ctx)
 		ticker.WaitForGracefulShutdown()
 
 		<-ctx.Done()

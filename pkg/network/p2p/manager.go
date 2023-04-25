@@ -100,6 +100,11 @@ func (m *Manager) NeighborGroupEvents(group NeighborsGroup) *NeighborGroupEvents
 	return m.neighborGroupEvents[group]
 }
 
+// LocalPeerID returns the local peer ID.
+func (m *Manager) LocalPeerID() network.PeerID {
+	return m.local.ID()
+}
+
 // RegisterProtocol registers a new protocol.
 func (m *Manager) RegisterProtocol(protocolID string, factory func() proto.Message, handler func(network.PeerID, proto.Message) error) {
 	m.registeredProtocolsMutex.Lock()

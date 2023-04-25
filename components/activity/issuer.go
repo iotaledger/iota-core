@@ -1,19 +1,26 @@
 package activity
 
 import (
+	"context"
+
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func issueActivityBlock() {
+func issueActivityBlock(ctx context.Context) {
 	if !ParamsActivity.IgnoreBootstrapped && !deps.Protocol.MainEngineInstance().IsBootstrapped() {
 		Component.LogDebug("Not issuing activity block because node is not bootstrapped yet.")
 		return
 	}
 
-	block, err := deps.Protocol.BlockIssuer.IssuePayload(&iotago.TaggedData{
+	block, err := deps.BlockIssuer.CreateBlock(ctx, &iotago.TaggedData{
 		Tag: []byte("ACTIVITY"),
 	})
 	if err != nil {
+		Component.LogWarnf("error issuing activity block: %s", err.Error())
+		return
+	}
+
+	if err := deps.BlockIssuer.IssueBlock(block); err != nil {
 		Component.LogWarnf("error issuing activity block: %s", err.Error())
 		return
 	}
