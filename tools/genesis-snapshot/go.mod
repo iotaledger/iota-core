@@ -8,7 +8,7 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20230421071105-e0b495d651a5
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230421071105-e0b495d651a5
 	github.com/iotaledger/iota-core v0.0.0-20230414140919-e676d4aef341
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230421070802-725c94096b50
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230425063530-87b3d1f67b6c
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.5
 )

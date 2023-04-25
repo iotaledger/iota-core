@@ -152,8 +152,8 @@ github.com/iotaledger/hive.go/stringify v0.0.0-20230421071105-e0b495d651a5 h1:ad
 github.com/iotaledger/hive.go/stringify v0.0.0-20230421071105-e0b495d651a5/go.mod h1:l/F3cA/+67QdNj+sohv2v4HhmsdOcWScoA+sVYoAE4c=
 github.com/iotaledger/iota.go v1.0.0 h1:tqm1FxJ/zOdzbrAaQ5BQpVF8dUy2eeGlSeWlNG8GoXY=
 github.com/iotaledger/iota.go v1.0.0/go.mod h1:RiKYwDyY7aCD1L0YRzHSjOsJ5mUR9yvQpvhZncNcGQI=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230421070802-725c94096b50 h1:LXn6RaQoLCkFHcuyquf+J7m2DdVvw9QLWuzSuEgecoQ=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230421070802-725c94096b50/go.mod h1:oTJ5J8gGf3BpKUEmHlh7Mw1WGWxb+KOjPSuMKLBFMus=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230425063530-87b3d1f67b6c h1:DoxiK88a+KN+VmvemTCNGJirzYGaUw8cn6MQ3ujbPrI=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230425063530-87b3d1f67b6c/go.mod h1:oTJ5J8gGf3BpKUEmHlh7Mw1WGWxb+KOjPSuMKLBFMus=
 github.com/iris-contrib/blackfriday v2.0.0+incompatible/go.mod h1:UzZ2bDEoaSGPbkg6SAB4att1aAwTmVIx/5gCVqeyUdI=
 github.com/iris-contrib/go.uuid v2.0.0+incompatible/go.mod h1:iz2lgM/1UnEf1kP0L/+fafWORmlnuysV2EMP8MW+qe0=
 github.com/iris-contrib/jade v1.1.3/go.mod h1:H/geBymxJhShH5kecoiOCSssPX7QWYH7UaeZTSWddIk=
