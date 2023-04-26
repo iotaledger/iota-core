@@ -1,8 +1,7 @@
-package mempool
+package ledger
 
 import (
 	"iota-core/pkg/promise"
-	"iota-core/pkg/protocol/engine/ledger"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -12,12 +11,12 @@ import (
 type StateReference interface {
 	Type() StateReferenceType
 
-	// ReferencedStateID returns the ID of the referenced State in the replicated ledger.
-	ReferencedStateID() iotago.OutputID
+	// StateID returns the ID of the referenced State in the replicated ledger.
+	StateID() iotago.OutputID
 }
 
 // StateReferenceResolver is a function that resolves a StateReference to a State.
-type StateReferenceResolver func(reference StateReference) *promise.Promise[ledger.State]
+type StateReferenceResolver func(reference StateReference) *promise.Promise[State]
 
 // StateReferenceType is the type of StateReference.
 type StateReferenceType = uint16

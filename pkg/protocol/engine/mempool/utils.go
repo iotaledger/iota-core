@@ -6,8 +6,8 @@ import (
 	"iota-core/pkg/protocol/engine/ledger"
 )
 
-func TypedReferenceResolver(resolvers map[StateReferenceType]StateReferenceResolver) func(StateReference) *promise.Promise[ledger.State] {
-	return func(reference StateReference) *promise.Promise[ledger.State] {
+func TypedReferenceResolver(resolvers map[ledger.StateReferenceType]ledger.StateReferenceResolver) func(ledger.StateReference) *promise.Promise[ledger.State] {
+	return func(reference ledger.StateReference) *promise.Promise[ledger.State] {
 		if resolver, resolverExists := resolvers[reference.Type()]; resolverExists {
 			return resolver(reference)
 		}

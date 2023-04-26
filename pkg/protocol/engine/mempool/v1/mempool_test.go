@@ -6,7 +6,6 @@ import (
 	"iota-core/pkg/promise"
 	"iota-core/pkg/protocol/engine/ledger"
 	ledgertests "iota-core/pkg/protocol/engine/ledger/tests"
-	"iota-core/pkg/protocol/engine/mempool"
 	"iota-core/pkg/protocol/engine/mempool/tests"
 
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -20,7 +19,7 @@ func TestMemPool(t *testing.T) {
 func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	ledgerState := ledgertests.New(ledgertests.NewState(iotago.TransactionID{}, 0))
 
-	return mempooltests.NewTestFramework(t, New(mempooltests.VM, func(reference mempool.StateReference) *promise.Promise[ledger.State] {
-		return ledgerState.ResolveState(reference.ReferencedStateID())
+	return mempooltests.NewTestFramework(t, New(mempooltests.VM, func(reference ledger.StateReference) *promise.Promise[ledger.State] {
+		return ledgerState.ResolveState(reference.StateID())
 	}, workerpool.NewGroup(t.Name())))
 }

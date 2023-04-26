@@ -1,6 +1,7 @@
 package mempooltests
 
 import (
+	"iota-core/pkg/protocol/engine/ledger"
 	"iota-core/pkg/protocol/engine/mempool"
 
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -9,11 +10,11 @@ import (
 
 type Transaction struct {
 	id          iotago.TransactionID
-	inputs      []mempool.StateReference
+	inputs      []ledger.StateReference
 	outputCount uint16
 }
 
-func NewTransaction(outputCount uint16, inputs ...mempool.StateReference) *Transaction {
+func NewTransaction(outputCount uint16, inputs ...ledger.StateReference) *Transaction {
 	return &Transaction{
 		id:          tpkg.RandTransactionID(),
 		inputs:      inputs,
@@ -25,7 +26,7 @@ func (t *Transaction) ID() (iotago.TransactionID, error) {
 	return t.id, nil
 }
 
-func (t *Transaction) Inputs() ([]mempool.StateReference, error) {
+func (t *Transaction) Inputs() ([]ledger.StateReference, error) {
 	return t.inputs, nil
 }
 

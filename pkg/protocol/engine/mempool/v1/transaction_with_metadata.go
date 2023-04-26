@@ -14,7 +14,7 @@ import (
 
 type TransactionWithMetadata struct {
 	id              iotago.TransactionID
-	inputReferences []mempool.StateReference
+	inputReferences []ledger.StateReference
 	inputs          []*StateWithMetadata
 	outputs         []*StateWithMetadata
 	transaction     mempool.Transaction
@@ -128,4 +128,8 @@ func (t *TransactionWithMetadata) publishExecutionResult(outputStates []ledger.S
 	t.mutex.Unlock()
 
 	t.executed.Trigger()
+}
+
+func (t *TransactionWithMetadata) triggerBooked() {
+	t.booked.Trigger()
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"iota-core/pkg/protocol/engine/ledger"
 	"iota-core/pkg/protocol/engine/mempool"
 
 	"github.com/iotaledger/hive.go/lo"
@@ -64,7 +65,7 @@ func (t *TestFramework) ProcessTransactions(alias ...string) error {
 		transaction, transactionExists := t.transactionByAlias[alias]
 		require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", alias)
 
-		if _, err := t.Instance.ProcessTransaction(transaction); err != nil {
+		if _, err := t.Instance.AddTransaction(transaction); err != nil {
 			return err
 		}
 	}
@@ -73,7 +74,7 @@ func (t *TestFramework) ProcessTransactions(alias ...string) error {
 }
 
 func (t *TestFramework) TransactionMetadata(alias string) (mempool.TransactionWithMetadata, bool) {
-	return t.Instance.TransactionMetadata(t.TransactionID(alias))
+	return t.Instance.Transaction(t.TransactionID(alias))
 }
 
 func (t *TestFramework) StateID(alias string) iotago.OutputID {
@@ -174,8 +175,8 @@ func (t *TestFramework) markTransactionBookedTriggered(id iotago.TransactionID) 
 	t.globalBookedEventTriggered[id] = true
 }
 
-func (t *TestFramework) stateReference(alias string) mempool.StateReference {
-	return LedgerStateReference(t.StateID(alias))
+func (t *TestFramework) stateReference(alias string) ledger.StateReference {
+	return ledger.StoredStateReference(t.StateID(alias))
 }
 
 func (t *TestFramework) waitBooked(transactionAliases ...string) {
@@ -203,7 +204,7 @@ func (t *TestFramework) requireBookedTriggered(transactionAliases ...string) {
 
 func (t *TestFramework) requireMarkedBooked(transactionAliases ...string) {
 	for _, transactionAlias := range transactionAliases {
-		transactionMetadata, transactionMetadataExists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
+		transactionMetadata, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
 
 		require.True(t.test, transactionMetadataExists && transactionMetadata.IsBooked(), "transaction %s was not booked", transactionAlias)
 	}
