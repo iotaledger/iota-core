@@ -85,7 +85,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, p iotago.Payload, parents
 
 // CreateBlockWithReferences creates a new block with the references submit.
 func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Payload, references model.ParentReferences, strongParentsCountOpt ...int) (*model.Block, error) {
-	strongParentsCount := iotago.BlockMinStrongParents
+	strongParentsCount := iotago.BlockMaxParents
 	if len(strongParentsCountOpt) > 0 {
 		strongParentsCount = strongParentsCountOpt[0]
 	}
