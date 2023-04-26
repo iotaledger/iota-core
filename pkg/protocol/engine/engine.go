@@ -129,6 +129,10 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source network.PeerID)
 	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
+func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {
+	return e.BlockCache.Block(id)
+}
+
 func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	cachedBlock, exists := e.BlockCache.Block(id)
 	if exists && !cachedBlock.IsRootBlock() {

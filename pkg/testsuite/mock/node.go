@@ -49,7 +49,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 		panic(err)
 	}
 
-	accountID := iotago.AccountID(iotago.Ed25519AddressFromPubKey(pub))
+	accountID := iotago.AccountID(*iotago.Ed25519AddressFromPubKey(pub))
 	accountID.RegisterAlias(name)
 
 	peerID := network.PeerID(pub)
@@ -201,7 +201,7 @@ func (n *Node) IssueBlock() iotago.BlockID {
 		Payload(&iotago.TaggedData{
 			Tag: []byte("ACTIVITY"),
 		}).
-		Sign((*iotago.Ed25519Address)(&n.AccountID), n.privateKey).
+		Sign(n.AccountID, n.privateKey).
 		Build()
 
 	if err != nil {

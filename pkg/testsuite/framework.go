@@ -2,11 +2,14 @@ package testsuite
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
@@ -26,6 +29,7 @@ type Framework struct {
 	running   bool
 
 	validators map[iotago.AccountID]int64
+	blocks     *shrinkingmap.ShrinkingMap[string, *model.Block]
 
 	ProtocolParameters iotago.ProtocolParameters
 
@@ -38,11 +42,12 @@ func NewFramework(t *testing.T) *Framework {
 		Network:   mock.NewNetwork(),
 		Directory: utils.NewDirectory(t.TempDir()),
 		nodes:     make(map[string]*mock.Node),
+		blocks:    shrinkingmap.New[string, *model.Block](),
 		ProtocolParameters: iotago.ProtocolParameters{
 			Version:     3,
 			NetworkName: t.Name(),
 			Bech32HRP:   "rms",
-			MinPoWScore: 10,
+			MinPoWScore: 0,
 			RentStructure: iotago.RentStructure{
 				VByteCost:    100,
 				VBFactorData: 1,
@@ -53,6 +58,51 @@ func NewFramework(t *testing.T) *Framework {
 			SlotDurationInSeconds: 10,
 		},
 	}
+}
+
+func (f *Framework) Block(alias string) *model.Block {
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
+
+	block, exist := f.blocks.Get(alias)
+	if !exist {
+		panic(fmt.Sprintf("block %s not registered", alias))
+	}
+
+	return block
+}
+
+func (f *Framework) Blocks(aliases ...string) []*model.Block {
+	blocks := make([]*model.Block, len(aliases))
+	for i, alias := range aliases {
+		blocks[i] = f.Block(alias)
+	}
+
+	return blocks
+}
+
+func (f *Framework) BlocksByGroup(group string) []*model.Block {
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
+
+	blocks := make([]*model.Block, 0)
+
+	f.blocks.ForEach(func(alias string, block *model.Block) bool {
+		if strings.HasPrefix(alias, group) {
+			blocks = append(blocks, block)
+		}
+		return true
+	})
+
+	return blocks
+}
+
+func (f *Framework) RegisterBlock(alias string, block *model.Block) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	f.blocks.Set(alias, block)
+	block.ID().Identifier().RegisterAlias(alias)
 }
 
 func (f *Framework) Node(name string) *mock.Node {
