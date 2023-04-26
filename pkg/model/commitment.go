@@ -3,8 +3,6 @@ package model
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"sync"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
@@ -17,13 +15,21 @@ type Commitment struct {
 
 	commitmentID iotago.CommitmentID
 
-	data           []byte
-	commitmentOnce sync.Once
-	commitment     *iotago.Commitment
+	data       []byte
+	commitment *iotago.Commitment
 }
 
 func NewEmptyCommitment(api iotago.API) *Commitment {
 	return lo.PanicOnErr(CommitmentFromCommitment(iotago.NewEmptyCommitment(), api))
+}
+
+func NewCommitment(commitmentID iotago.CommitmentID, iotaCommitment *iotago.Commitment, data []byte, api iotago.API) (*Commitment, error) {
+	return &Commitment{
+		api:          api,
+		commitmentID: commitmentID,
+		data:         data,
+		commitment:   iotaCommitment,
+	}, nil
 }
 
 func CommitmentFromCommitment(iotaCommitment *iotago.Commitment, api iotago.API, opts ...serix.Option) (*Commitment, error) {
@@ -37,36 +43,7 @@ func CommitmentFromCommitment(iotaCommitment *iotago.Commitment, api iotago.API,
 		return nil, err
 	}
 
-	commitment := &Commitment{
-		api:          api,
-		commitmentID: commitmentID,
-		data:         data,
-	}
-
-	commitment.commitmentOnce.Do(func() {
-		commitment.commitment = iotaCommitment
-	})
-
-	return commitment, nil
-}
-
-func CommitmentFromIDAndBytes(commitmentID iotago.CommitmentID, data []byte, api iotago.API, opts ...serix.Option) (*Commitment, error) {
-	iotaCommitment := new(iotago.Commitment)
-	if _, err := api.Decode(data, iotaCommitment, opts...); err != nil {
-		return nil, err
-	}
-
-	commitment := &Commitment{
-		api:          api,
-		commitmentID: commitmentID,
-		data:         data,
-	}
-
-	commitment.commitmentOnce.Do(func() {
-		commitment.commitment = iotaCommitment
-	})
-
-	return commitment, nil
+	return NewCommitment(commitmentID, iotaCommitment, data, api)
 }
 
 func CommitmentFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Commitment, error) {
@@ -80,7 +57,7 @@ func CommitmentFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Co
 		return nil, err
 	}
 
-	return CommitmentFromIDAndBytes(commitmentID, data, api, opts...)
+	return NewCommitment(commitmentID, iotaCommitment, data, api)
 }
 
 func (c *Commitment) ID() iotago.CommitmentID {
@@ -108,16 +85,6 @@ func (c *Commitment) Data() []byte {
 }
 
 func (c *Commitment) Commitment() *iotago.Commitment {
-	c.commitmentOnce.Do(func() {
-		iotaCommitment := new(iotago.Commitment)
-		// No need to verify the commitment again here
-		if _, err := c.api.Decode(c.data, iotaCommitment); err != nil {
-			panic(fmt.Sprintf("failed to deserialize commitment: %v, error: %s", c.commitmentID.ToHex(), err))
-		}
-
-		c.commitment = iotaCommitment
-	})
-
 	return c.commitment
 }
 
