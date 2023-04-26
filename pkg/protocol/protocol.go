@@ -142,7 +142,7 @@ func (p *Protocol) initNetworkEvents() {
 	}, event.WithWorkerPool(wpBlocks))
 
 	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id network.PeerID) {
-		if block, exists := p.MainEngineInstance().Block(blockID); exists && !block.IsMissing() && !block.IsRootBlock() {
+		if block, exists := p.MainEngineInstance().Block(blockID); exists {
 			p.networkProtocol.SendBlock(block.Block(), id)
 		}
 	}, event.WithWorkerPool(wpBlocks))

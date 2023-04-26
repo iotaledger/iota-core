@@ -129,8 +129,27 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source network.PeerID)
 	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
-func (e *Engine) Block(id iotago.BlockID) (block *blocks.Block, exists bool) {
-	return e.BlockCache.Block(id)
+func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
+	cachedBlock, exists := e.BlockCache.Block(id)
+	if exists && !cachedBlock.IsRootBlock() {
+		return cachedBlock.ModelBlock(), !cachedBlock.IsMissing()
+	}
+
+	// The block should've been in the block cache, so there's no need to check the storage.
+	if !exists && id.Index() > e.Storage.Settings().LatestCommitment().Index {
+		return nil, false
+	}
+
+	s := e.Storage.Blocks(id.Index())
+	if s == nil {
+		return nil, false
+	}
+	modelBlock, err := s.Load(id)
+	if err != nil {
+		// TODO: log error?
+		return nil, false
+	}
+	return modelBlock, modelBlock != nil
 }
 
 func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
@@ -270,7 +289,7 @@ func (e *Engine) setupEvictionState() {
 					e.Events.Error.Trigger(errors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
 					return
 				}
-				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.SlotCommitmentID())
+				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.Block().SlotCommitment.MustID())
 			}
 		})
 	}, event.WithWorkerPool(wp))
