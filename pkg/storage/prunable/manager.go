@@ -35,7 +35,7 @@ type Manager struct {
 
 func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Manager {
 	return options.Apply(&Manager{
-		maxPruned:       -1,
+		maxPruned:       0,
 		optsGranularity: 10,
 		optsMaxOpenDBs:  10,
 		dbConfig:        dbConfig,

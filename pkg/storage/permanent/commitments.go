@@ -21,7 +21,7 @@ type Commitments struct {
 }
 
 func NewCommitments(path string, api iotago.API) *Commitments {
-	commitmentsSlice, err := storable.NewByteSlice(path, len(model.NewEmptyCommitment(api).Data()))
+	commitmentsSlice, err := storable.NewByteSlice(path, uint64(len(model.NewEmptyCommitment(api).Data())))
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create commitments file"))
 	}
@@ -34,7 +34,7 @@ func NewCommitments(path string, api iotago.API) *Commitments {
 }
 
 func (c *Commitments) Store(commitment *model.Commitment) (err error) {
-	if err = c.slice.Set(int(commitment.Commitment().Index), commitment.Data()); err != nil {
+	if err = c.slice.Set(uint64(commitment.Commitment().Index), commitment.Data()); err != nil {
 		return errors.Wrapf(err, "failed to store commitment for slot %d", commitment.Commitment().Index)
 	}
 
@@ -42,7 +42,7 @@ func (c *Commitments) Store(commitment *model.Commitment) (err error) {
 }
 
 func (c *Commitments) loadBytes(index iotago.SlotIndex) (commitmentBytes []byte, err error) {
-	return c.slice.Get(int(index))
+	return c.slice.Get(uint64(index))
 }
 
 func (c *Commitments) Load(index iotago.SlotIndex) (commitment *model.Commitment, err error) {

@@ -11,7 +11,7 @@ func issuerID() iotago.AccountID {
 	issuerKey := lo.PanicOnErr(deps.Peer.Database().LocalPrivateKey())
 	pubKey := issuerKey.Public()
 
-	return iotago.AccountID(iotago.Ed25519AddressFromPubKey(pubKey[:]))
+	return iotago.AccountID(iotago.Ed25519AddressFromPubKey(pubKey[:])[:])
 }
 
 func issueActivityBlock() {
@@ -31,7 +31,7 @@ func issueActivityBlock() {
 		Payload(&iotago.TaggedData{
 			Tag: []byte("ACTIVITY"),
 		}).
-		Sign(&addr, issuerKey[:]).
+		Sign(iotago.AccountID(addr[:]), issuerKey[:]).
 		Build()
 	if err != nil {
 		Component.LogWarnf("error building block: %s", err.Error())

@@ -76,7 +76,7 @@ func (c *Commitment) RootsID() iotago.Identifier {
 	return c.Commitment().RootsID
 }
 
-func (c *Commitment) CumulativeWeight() int64 {
+func (c *Commitment) CumulativeWeight() uint64 {
 	return c.Commitment().CumulativeWeight
 }
 

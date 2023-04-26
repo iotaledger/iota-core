@@ -52,7 +52,7 @@ func NewManager(opts ...options.Option[Manager]) (manager *Manager) {
 		commitmentEntityMutex:      syncutils.NewDAGMutex[iotago.CommitmentID](),
 		forkingPointsByCommitments: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, iotago.CommitmentID](),
 		forksByForkingPoint:        shrinkingmap.New[iotago.CommitmentID, *Fork](),
-		lastEvictedSlot:            iotago.SlotIndex(-1),
+		lastEvictedSlot:            iotago.SlotIndex(0),
 	}, opts, func(m *Manager) {
 		m.commitmentRequester = eventticker.New(m.optsCommitmentRequester...)
 		m.Events.CommitmentMissing.Hook(m.commitmentRequester.StartTicker)

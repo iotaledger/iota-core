@@ -208,7 +208,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 			iotago.Identifier{},
 			iotago.Identifier(m.slotMutations.weights.Root()),
 		).ID(),
-		m.storage.Settings().LatestCommitment().CumulativeWeight()+attestationsWeight,
+		m.storage.Settings().LatestCommitment().CumulativeWeight()+uint64(attestationsWeight),
 	)
 
 	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, m.storage.Settings().API(), serix.WithValidation())
