@@ -129,11 +129,6 @@ The following table describes the serialization of a Block:
     <td>The time the block is issued. It's a Unix-like timestamp in nanosecond.</td>
   </tr>
   <tr>
-    <td>Slot Commitment Length</td>
-    <td>uint32</td>
-    <td>The length of serialized Slot Commitment structure.</td>
-  </tr>
-  <tr>
     <td valign="top">Slot Commitment <code>oneOf</code></td>
     <td colspan="2">
       <details open="true">
