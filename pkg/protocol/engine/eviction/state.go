@@ -8,10 +8,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/core/index"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -59,7 +59,7 @@ func (s *State) EvictUntil(index iotago.SlotIndex) {
 	}
 
 	for currentIndex := lastEvictedSlot; currentIndex < index; currentIndex++ {
-		if delayedIndex := s.delayedBlockEvictionThreshold(currentIndex); delayedIndex >= 0 {
+		if delayedIndex, shouldEvict := s.delayedBlockEvictionThreshold(currentIndex); shouldEvict {
 			s.rootBlocks.Evict(delayedIndex)
 		}
 	}
@@ -113,7 +113,7 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if id.Index() <= s.delayedBlockEvictionThreshold(s.lastEvictedSlot) {
+	if id.Index() <= lo.Return1(s.delayedBlockEvictionThreshold(s.lastEvictedSlot)) {
 		return
 	}
 
@@ -143,7 +143,7 @@ func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if id.Index() <= s.delayedBlockEvictionThreshold(s.lastEvictedSlot) || id.Index() > s.lastEvictedSlot {
+	if id.Index() <= lo.Return1(s.delayedBlockEvictionThreshold(s.lastEvictedSlot)) || id.Index() > s.lastEvictedSlot {
 		return false
 	}
 
@@ -157,7 +157,7 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if id.Index() <= s.delayedBlockEvictionThreshold(s.lastEvictedSlot) || id.Index() > s.lastEvictedSlot {
+	if id.Index() <= lo.Return1(s.delayedBlockEvictionThreshold(s.lastEvictedSlot)) || id.Index() > s.lastEvictedSlot {
 		return iotago.CommitmentID{}, false
 	}
 
@@ -182,7 +182,7 @@ func (s *State) LatestRootBlocks() iotago.BlockIDs {
 // Export exports the root blocks to the given writer.
 func (s *State) Export(writer io.WriteSeeker, evictedSlot iotago.SlotIndex) (err error) {
 	return stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
-		for currentSlot := s.delayedBlockEvictionThreshold(evictedSlot) + 1; currentSlot <= evictedSlot; currentSlot++ {
+		for currentSlot := lo.Return1(s.delayedBlockEvictionThreshold(evictedSlot)) + 1; currentSlot <= evictedSlot; currentSlot++ {
 			fmt.Println(currentSlot, s.rootBlocks.Get(currentSlot, false).Size())
 			if err = s.rootBlockStorageFunc(currentSlot).Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
 				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
@@ -226,7 +226,7 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 
 // PopulateFromStorage populates the root blocks from the storage.
 func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
-	for index := latestCommitmentIndex - s.delayedBlockEvictionThreshold(latestCommitmentIndex); index <= latestCommitmentIndex; index++ {
+	for index := latestCommitmentIndex - lo.Return1(s.delayedBlockEvictionThreshold(latestCommitmentIndex)); index <= latestCommitmentIndex; index++ {
 		_ = s.rootBlockStorageFunc(index).Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
 			s.AddRootBlock(id, commitmentID)
 
@@ -236,8 +236,12 @@ func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 }
 
 // delayedBlockEvictionThreshold returns the slot index that is the threshold for delayed rootblocks eviction.
-func (s *State) delayedBlockEvictionThreshold(slotIndex iotago.SlotIndex) (threshold iotago.SlotIndex) {
-	return index.Max(slotIndex-s.optsRootBlocksEvictionDelay-1, 0)
+func (s *State) delayedBlockEvictionThreshold(slotIndex iotago.SlotIndex) (threshold iotago.SlotIndex, shouldEvict bool) {
+	if slotIndex > s.optsRootBlocksEvictionDelay-1 {
+		return slotIndex - s.optsRootBlocksEvictionDelay - 1, true
+	}
+
+	return 0, false
 }
 
 // WithRootBlocksEvictionDelay sets the time since confirmation threshold.
