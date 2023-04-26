@@ -176,10 +176,28 @@ channels:
         - name: outputs
       operationId: output
       description: >-
-        Publishes the given wanted output on subscription and when its state
-        changes (created, spent).
+        Publishes the given wanted output on subscriptions.
       message:
         $ref: '#/components/messages/OutputPayload'
+
+  'output-metadata/{outputId}':
+    parameters:
+      outputId:
+        description: Hex encoded identifier of the output.
+        schema:
+          type: string
+          examples:
+            - '0xd026f8b1c856d4e844cc734bbe095429fb880ec4d93f3ccffe3b292a7de17be70000'
+    subscribe:
+      tags:
+        - name: outputs
+      operationId: outputMetadata
+      description: >-
+        Publishes the given wanted output metadata on subscription and when its state
+        changes (created, spent).
+      message:
+        $ref: '#/components/messages/OutputMetadataPayload'
+
   'outputs/alias/{aliasId}':
     parameters:
       aliasId:
@@ -403,23 +421,23 @@ components:
       contentType: application/json
       payload:
         type: object
-        required:
-          - metadata
-          - output
         properties:
-          metadata:
-            type: object
-            description: Metadata about the output.
-            oneOf:
-              - $ref: '#/components/schemas/OutputMetadata'
           output:
-            type: object
-            description: The output object itself.
             anyOf:
               - $ref: '#/components/schemas/BasicOutput'
               - $ref: '#/components/schemas/AliasOutput'
               - $ref: '#/components/schemas/FoundryOutput'
               - $ref: '#/components/schemas/NFTOutput'
+              
+    OutputMetadataPayload:
+      contentType: application/json
+      payload:
+        type: object
+        properties:
+          metadata:
+            oneOf:
+              - $ref: '#/components/schemas/OutputMetadata'
+
     BlockMetadata:
       contentType: application/json
       payload:
