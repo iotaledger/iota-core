@@ -107,13 +107,19 @@ func (s *State) InEvictedSlot(id iotago.BlockID) bool {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	return id.Index() <= s.lastEvictedSlot
+	return s.lastEvictedSlot.IsEvicted(id.Index())
 }
 
 func (s *State) inRootBlockEvictedSlot(id iotago.BlockID) bool {
-	if id.Index() <= lo.Return1(s.delayedBlockEvictionThreshold(s.lastEvictedSlot)) {
+	evictedSlot, valid := s.lastEvictedSlot.Index()
+	if !valid {
+		return false
+	}
+
+	if id.Index() <= lo.Return1(s.delayedBlockEvictionThreshold(evictedSlot)) {
 		return true
 	}
+
 	return false
 }
 
@@ -152,7 +158,7 @@ func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if s.inRootBlockEvictedSlot(id) || id.Index() > s.lastEvictedSlot {
+	if s.inRootBlockEvictedSlot(id) || s.lastEvictedSlot.IsEvicted(id.Index()) {
 		return false
 	}
 
@@ -166,7 +172,7 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if s.inRootBlockEvictedSlot(id) || id.Index() > s.lastEvictedSlot {
+	if s.inRootBlockEvictedSlot(id) || s.lastEvictedSlot.IsEvicted(id.Index()) {
 		return iotago.CommitmentID{}, false
 	}
 

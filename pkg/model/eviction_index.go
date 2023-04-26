@@ -15,14 +15,20 @@ func (e EvictionIndex) ShouldEvict(newIndex iotago.SlotIndex) bool {
 }
 
 func (e EvictionIndex) MarkEvicted(index iotago.SlotIndex) (previous iotago.SlotIndex, hadPrevious bool) {
+	var prev iotago.SlotIndex
+	var hadPrev bool
+
 	if e.index == nil {
 		e.index = new(iotago.SlotIndex)
-		return 0, false
+		hadPrev = false
+	} else {
+		prev = *e.index
+		hadPrev = true
 	}
-	prev := *e.index
+
 	*e.index = index
 
-	return prev, true
+	return prev, hadPrev
 }
 
 func (e EvictionIndex) Index() (current iotago.SlotIndex, valid bool) {
@@ -39,4 +45,12 @@ func (e EvictionIndex) NextIndex() iotago.SlotIndex {
 	}
 
 	return *e.index + 1
+}
+
+func (e EvictionIndex) IsEvicted(index iotago.SlotIndex) bool {
+	if e.index == nil {
+		return false
+	}
+
+	return index <= *e.index
 }
