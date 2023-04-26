@@ -239,6 +239,10 @@ func (p *Protocol) initChainManager() {
 func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	mainEngine := p.MainEngineInstance()
 
+	if !mainEngine.WasInitialized() {
+		return errors.Errorf("protocol engine not yet initialized")
+	}
+
 	isSolid, chain := p.chainManager.ProcessCommitmentFromSource(block.SlotCommitment(), src)
 	if !isSolid {
 		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().ID() {
