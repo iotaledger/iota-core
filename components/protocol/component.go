@@ -134,7 +134,7 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		Component.LogInfof("SlotCommitted: %s - %d", details.Commitment.MustID(), details.Commitment.Index)
+		Component.LogInfof("SlotCommitted: %s - %d", details.Commitment.ID(), details.Commitment.Index())
 	})
 
 	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
@@ -142,15 +142,15 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {
-		Component.LogInfof("RequestCommitment: %d", id)
+		Component.LogInfof("RequestCommitment: %s", id)
 	})
 
 	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id network.PeerID) {
-		Component.LogInfof("SlotCommitmentRequestReceived: %d", commitmentID)
+		Component.LogInfof("SlotCommitmentRequestReceived: %s", commitmentID)
 	})
 
-	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, id network.PeerID) {
-		Component.LogInfof("SlotCommitmentReceived: %d", commitment.MustID())
+	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id network.PeerID) {
+		Component.LogInfof("SlotCommitmentReceived: %s", commitment.ID())
 	})
 
 	return nil

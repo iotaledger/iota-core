@@ -29,11 +29,6 @@ func runSlotsLiveFeed(component *app.Component) {
 	}
 }
 
-func onSlotCommitted(e *notarization.SlotCommittedDetails) {
-	cID, err := e.Commitment.ID()
-	if err != nil {
-		return
-	}
-
-	broadcastWsBlock(&wsblk{MsgTypeSlotInfo, &SlotInfo{Index: e.Commitment.Index, ID: cID.ToHex()}})
+func onSlotCommitted(details *notarization.SlotCommittedDetails) {
+	broadcastWsBlock(&wsblk{MsgTypeSlotInfo, &SlotInfo{Index: details.Commitment.Index(), ID: details.Commitment.ID().ToHex()}})
 }

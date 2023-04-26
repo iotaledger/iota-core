@@ -34,7 +34,7 @@ func (b *Blocks) Load(id iotago.BlockID) (*model.Block, error) {
 		return nil, errors.Wrapf(err, "failed to get block %s", id)
 	}
 
-	return model.BlockFromBlockIDAndBytes(id, blockBytes, b.api)
+	return model.BlockFromIDAndBytes(id, blockBytes, b.api)
 }
 
 func (b *Blocks) Store(block *model.Block) error {

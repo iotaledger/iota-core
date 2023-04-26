@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -18,8 +19,8 @@ type Manager struct {
 	openDBs      *cache.Cache[iotago.SlotIndex, *dbInstance]
 	openDBsMutex sync.Mutex
 
-	maxPruned      iotago.SlotIndex
-	maxPrunedMutex sync.RWMutex
+	lastPrunedSlot model.EvictionIndex
+	pruningMutex   sync.RWMutex
 
 	dbConfig database.Config
 
@@ -35,7 +36,6 @@ type Manager struct {
 
 func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Manager {
 	return options.Apply(&Manager{
-		maxPruned:       -1,
 		optsGranularity: 10,
 		optsMaxOpenDBs:  10,
 		dbConfig:        dbConfig,
@@ -57,19 +57,12 @@ func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Mana
 	}, (*Manager).restoreFromDisk)
 }
 
-func (m *Manager) MaxPrunedSlot() iotago.SlotIndex {
-	m.maxPrunedMutex.RLock()
-	defer m.maxPrunedMutex.RUnlock()
-
-	return m.maxPruned
-}
-
 // IsTooOld checks if the index is in a pruned slot.
 func (m *Manager) IsTooOld(index iotago.SlotIndex) (isTooOld bool) {
-	m.maxPrunedMutex.RLock()
-	defer m.maxPrunedMutex.RUnlock()
+	m.pruningMutex.RLock()
+	defer m.pruningMutex.RUnlock()
 
-	return index <= m.maxPruned
+	return index < m.lastPrunedSlot.NextIndex()
 }
 
 func (m *Manager) Get(index iotago.SlotIndex, realm kvstore.Realm) kvstore.KVStore {
@@ -87,6 +80,9 @@ func (m *Manager) Get(index iotago.SlotIndex, realm kvstore.Realm) kvstore.KVSto
 }
 
 func (m *Manager) PruneUntilSlot(index iotago.SlotIndex) {
+	m.pruningMutex.Lock()
+	defer m.pruningMutex.Unlock()
+
 	var baseIndexToPrune iotago.SlotIndex
 	if m.computeDBBaseIndex(index)+iotago.SlotIndex(m.optsGranularity)-1 == index {
 		// Upper bound of the DB instance should be pruned. So we can delete the entire DB file.
@@ -95,10 +91,9 @@ func (m *Manager) PruneUntilSlot(index iotago.SlotIndex) {
 		baseIndexToPrune = m.computeDBBaseIndex(index) - 1
 	}
 
-	currentPrunedIndex := m.setMaxPruned(baseIndexToPrune)
-	for currentPrunedIndex+iotago.SlotIndex(m.optsGranularity) <= baseIndexToPrune {
-		currentPrunedIndex += iotago.SlotIndex(m.optsGranularity)
-		m.prune(currentPrunedIndex)
+	for currentIndex := m.lastPrunedSlot.NextIndex(); currentIndex <= baseIndexToPrune; currentIndex += iotago.SlotIndex(m.optsGranularity) {
+		m.prune(currentIndex)
+		m.lastPrunedSlot.MarkEvicted(currentIndex)
 	}
 }
 
@@ -145,27 +140,14 @@ func (m *Manager) restoreFromDisk() {
 	}
 
 	// Set the maxPruned slot to the baseIndex-1 of the oldest dbInstance.
-	m.maxPrunedMutex.Lock()
-	m.maxPruned = dbInfos[0].baseIndex - 1
-	m.maxPrunedMutex.Unlock()
+	m.pruningMutex.Lock()
+	m.lastPrunedSlot.MarkEvicted(dbInfos[0].baseIndex - 1)
+	m.pruningMutex.Unlock()
 
 	// Open all the dbInstances (perform health checks) and add them to the openDBs cache. Also fills the dbSizes map (when evicted from the cache).
 	for _, dbInfo := range dbInfos {
 		m.getDBInstance(dbInfo.baseIndex)
 	}
-}
-
-func (m *Manager) setMaxPruned(index iotago.SlotIndex) (previous iotago.SlotIndex) {
-	m.maxPrunedMutex.Lock()
-	defer m.maxPrunedMutex.Unlock()
-
-	if previous = m.maxPruned; previous >= index {
-		return
-	}
-
-	m.maxPruned = index
-
-	return
 }
 
 // getDBInstance returns the DB instance for the given baseIndex or creates a new one if it does not yet exist.
