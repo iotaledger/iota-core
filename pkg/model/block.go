@@ -16,7 +16,7 @@ type Block struct {
 	commitment *Commitment
 }
 
-func NewBlock(blockID iotago.BlockID, iotaBlock *iotago.Block, data []byte, api iotago.API) (*Block, error) {
+func newBlock(blockID iotago.BlockID, iotaBlock *iotago.Block, data []byte, api iotago.API) (*Block, error) {
 	commitment, err := CommitmentFromCommitment(iotaBlock.SlotCommitment, api)
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func BlockFromBlock(iotaBlock *iotago.Block, api iotago.API, opts ...serix.Optio
 		return nil, err
 	}
 
-	return NewBlock(blockID, iotaBlock, data, api)
+	return newBlock(blockID, iotaBlock, data, api)
 }
 
 func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
@@ -53,7 +53,7 @@ func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, op
 		return nil, err
 	}
 
-	return NewBlock(blockID, iotaBlock, data, api)
+	return newBlock(blockID, iotaBlock, data, api)
 }
 
 func BlockFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
@@ -67,7 +67,7 @@ func BlockFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Block, 
 		return nil, err
 	}
 
-	return NewBlock(blockID, iotaBlock, data, api)
+	return newBlock(blockID, iotaBlock, data, api)
 }
 
 func (blk *Block) ID() iotago.BlockID {
