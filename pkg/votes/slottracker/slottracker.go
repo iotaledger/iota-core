@@ -115,9 +115,9 @@ type SlotVotePower struct {
 }
 
 func (p SlotVotePower) Compare(other SlotVotePower) int {
-	if p.Index-other.Index < 0 {
+	if other.Index > p.Index {
 		return -1
-	} else if p.Index-other.Index > 0 {
+	} else if other.Index < p.Index {
 		return 1
 	} else {
 		return 0
