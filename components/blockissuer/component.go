@@ -58,14 +58,12 @@ func provide(c *dig.Container) error {
 		Protocol *protocol.Protocol
 	}
 
-	c.Provide(func(deps innerDependencies) *blockissuer.BlockIssuer {
+	return c.Provide(func(deps innerDependencies) *blockissuer.BlockIssuer {
 		return blockissuer.New(deps.Protocol, accountFromParam(ParamsBlockIssuer.IssuerAccount, ParamsBlockIssuer.PrivateKey),
 			blockissuer.WithTipSelectionTimeout(ParamsBlockIssuer.TipSelectionTimeout),
 			blockissuer.WithTipSelectionRetryInterval(ParamsBlockIssuer.TipSelectionRetryInterval),
 		)
 	})
-
-	return nil
 }
 
 func run() error {

@@ -41,7 +41,11 @@ func (e *Ed25519Account) ID() iotago.AccountID {
 
 // Address returns the account address.
 func (e *Ed25519Account) Address() iotago.Address {
-	return iotago.Ed25519AddressFromPubKey(e.privateKey.Public().(ed25519.PublicKey))
+	ed25519PubKey, ok := e.privateKey.Public().(ed25519.PublicKey)
+	if !ok {
+		panic("invalid public key type")
+	}
+	return iotago.Ed25519AddressFromPubKey(ed25519PubKey)
 }
 
 // PrivateKey returns the account private key for signing.

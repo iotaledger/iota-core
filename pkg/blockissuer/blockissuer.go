@@ -156,7 +156,7 @@ func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, _ iotago.Paylo
 		case <-timeout.C:
 			return nil, errors.Errorf("timeout while trying to select tips and determine references")
 		case <-ctx.Done():
-			return nil, errors.Errorf("context cancelled whilst trying to select tips and determine references: %s", ctx.Err().Error())
+			return nil, errors.Errorf("context canceled whilst trying to select tips and determine references: %s", ctx.Err().Error())
 		}
 	}
 }
