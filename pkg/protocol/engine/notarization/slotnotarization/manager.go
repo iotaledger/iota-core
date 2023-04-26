@@ -99,8 +99,8 @@ func (m *Manager) Attestations() notarization.Attestations {
 }
 
 func (m *Manager) Shutdown() {
-	m.workers.Shutdown()
 	m.TriggerStopped()
+	m.workers.Shutdown()
 }
 
 // tryCommitUntil tries to create slot commitments until the new provided acceptance time.
@@ -164,6 +164,10 @@ func (m *Manager) MinCommittableSlotAge() iotago.SlotIndex {
 
 func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
 	for i := m.storage.Settings().LatestCommitment().Index() + 1; i <= acceptedBlockIndex; i++ {
+		if m.WasStopped() {
+			break
+		}
+
 		if !m.isCommittable(i, acceptedBlockIndex) {
 			return
 		}

@@ -65,10 +65,6 @@ func New(protocolParamsFunc func() *iotago.ProtocolParameters, opts ...options.O
 	)
 }
 
-func (f *Filter) Events() *filter.Events {
-	return f.events
-}
-
 // ProcessReceivedBlock processes block from the given source.
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID) {
 	// TODO: if TX add check for TX timestamp

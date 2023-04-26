@@ -158,8 +158,8 @@ func (b *BlockDAG) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
 }
 
 func (b *BlockDAG) Shutdown() {
-	b.workers.Shutdown()
 	b.TriggerStopped()
+	b.workers.Shutdown()
 }
 
 // evictSlot is used to evict Blocks from committed slots from the BlockDAG.
