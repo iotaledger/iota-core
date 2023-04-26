@@ -75,8 +75,8 @@ func (g *Gadget) Events() *blockgadget.Events {
 }
 
 func (g *Gadget) Shutdown() {
-	g.workers.Shutdown()
 	g.TriggerStopped()
+	g.workers.Shutdown()
 }
 
 // IsBlockAccepted returns whether the given block is accepted.
