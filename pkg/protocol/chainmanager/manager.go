@@ -40,7 +40,7 @@ type Manager struct {
 	optsMinimumForkDepth int64
 
 	commitmentEntityMutex *syncutils.DAGMutex[iotago.CommitmentID]
-	lastEvictedSlot       iotago.SlotIndex
+	lastEvictedSlot       model.EvictionIndex
 }
 
 func NewManager(opts ...options.Option[Manager]) (manager *Manager) {
@@ -52,7 +52,6 @@ func NewManager(opts ...options.Option[Manager]) (manager *Manager) {
 		commitmentEntityMutex:      syncutils.NewDAGMutex[iotago.CommitmentID](),
 		forkingPointsByCommitments: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, iotago.CommitmentID](),
 		forksByForkingPoint:        shrinkingmap.New[iotago.CommitmentID, *Fork](),
-		lastEvictedSlot:            iotago.SlotIndex(0),
 	}, opts, func(m *Manager) {
 		m.commitmentRequester = eventticker.New(m.optsCommitmentRequester...)
 		m.Events.CommitmentMissing.Hook(m.commitmentRequester.StartTicker)
@@ -126,14 +125,10 @@ func (m *Manager) EvictUntil(index iotago.SlotIndex) {
 	m.evictionMutex.Lock()
 	defer m.evictionMutex.Unlock()
 
-	if index <= m.lastEvictedSlot {
-		return
-	}
-
-	for currentIndex := m.lastEvictedSlot + 1; currentIndex <= index; currentIndex++ {
+	for currentIndex := m.lastEvictedSlot.NextIndex(); currentIndex <= index; currentIndex++ {
 		m.evict(currentIndex)
+		m.lastEvictedSlot.MarkEvicted(currentIndex)
 	}
-	m.lastEvictedSlot = index
 
 	m.commitmentRequester.EvictUntil(index)
 }

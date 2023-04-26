@@ -166,7 +166,7 @@ func (t *TestFramework) AssertChainState(chains map[string]string) {
 		}
 		if chainAlias == "evicted" {
 			_, exists := t.Instance.commitment(t.SlotCommitment(commitmentAlias))
-			require.False(t.test, exists, "commitment %s should be pruned", commitmentAlias)
+			require.False(t.test, exists, "commitment %s should be evicted", commitmentAlias)
 			continue
 		}
 		commitmentsByChainAlias[chainAlias] = append(commitmentsByChainAlias[chainAlias], commitmentAlias)
