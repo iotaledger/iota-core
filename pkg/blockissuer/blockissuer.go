@@ -72,7 +72,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 
 	select {
 	case <-ctx.Done():
-		return errors.Errorf("context cancelled whilst waiting for event on block %s", block.ID())
+		return errors.Errorf("context canceled whilst waiting for event on block %s", block.ID())
 	case <-triggered:
 		return nil
 	}
@@ -122,6 +122,7 @@ func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Pa
 	}
 
 	i.events.BlockConstructed.Trigger(modelBlock)
+
 	return modelBlock, nil
 }
 
@@ -136,7 +137,7 @@ func (i *BlockIssuer) issueBlock(block *model.Block) error {
 
 // getReferencesWithRetry tries to get references for the given payload. If it fails, it will retry at regular intervals until
 // the timeout is reached.
-func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, p iotago.Payload, parentsCount int) (references model.ParentReferences, err error) {
+func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, _ iotago.Payload, parentsCount int) (references model.ParentReferences, err error) {
 	timeout := time.NewTimer(i.optsTipSelectionTimeout)
 	interval := time.NewTicker(i.optsTipSelectionRetryInterval)
 	defer timeutil.CleanupTimer(timeout)
@@ -155,7 +156,7 @@ func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, p iotago.Paylo
 		case <-timeout.C:
 			return nil, errors.Errorf("timeout while trying to select tips and determine references")
 		case <-ctx.Done():
-			return nil, errors.Errorf("context cancelled whilst trying to select tips and determine references: %w", ctx.Err())
+			return nil, errors.Errorf("context cancelled whilst trying to select tips and determine references: %s", ctx.Err().Error())
 		}
 	}
 }

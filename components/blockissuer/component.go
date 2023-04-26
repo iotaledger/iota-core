@@ -64,6 +64,7 @@ func provide(c *dig.Container) error {
 			blockissuer.WithTipSelectionRetryInterval(ParamsBlockIssuer.TipSelectionRetryInterval),
 		)
 	})
+
 	return nil
 }
 

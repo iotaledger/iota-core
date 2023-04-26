@@ -11,7 +11,7 @@ const (
 	PriorityProtocol
 	PriorityBlockIssuer
 	PriorityActivity // depends on BlockIssuer
-	PriorityRestAPI // depends on PriorityPoWHandler
+	PriorityRestAPI  // depends on PriorityPoWHandler
 	PriorityDashboardMetrics
 	PriorityDashboard
 )
