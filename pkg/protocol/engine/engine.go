@@ -116,10 +116,16 @@ func (e *Engine) Shutdown() {
 		e.TriggerStopped()
 
 		e.BlockRequester.Shutdown()
-		e.Workers.Shutdown()
+		e.Notarization.Shutdown()
 		e.Booker.Shutdown()
 		e.BlockDAG.Shutdown()
+		e.BlockGadget.Shutdown()
+		e.SlotGadget.Shutdown()
+		e.Clock.Shutdown()
+		e.SybilProtection.Shutdown()
+		e.Filter.Shutdown()
 		e.Storage.Shutdown()
+		e.Workers.Shutdown()
 	}
 }
 
