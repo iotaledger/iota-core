@@ -376,6 +376,13 @@ The following table describes the serialization of a Transaction:
             <td><b>Description</b></td>
           </tr>
           <tr>
+            <td>Transaction Essence Type</td>
+            <td>uint8</td>
+            <td>
+              Set to value 2. 
+            </td>
+          </tr>
+          <tr>
             <td>Network ID</td>
             <td>uint64</td>
             <td>
