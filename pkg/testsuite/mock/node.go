@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -193,6 +195,8 @@ func (n *Node) Shutdown() {
 	n.Workers.Shutdown()
 }
 
+// TODO: the block Issuance should be improved once the protocol has a better way to issue blocks.
+
 func (n *Node) IssueBlock() iotago.BlockID {
 	block, err := builder.NewBlockBuilder().
 		StrongParents(n.Protocol.TipManager.Tips(8)).
@@ -206,21 +210,65 @@ func (n *Node) IssueBlock() iotago.BlockID {
 
 	if err != nil {
 		panic(err)
-		return iotago.EmptyBlockID()
 	}
 
 	modelBlock, err := model.BlockFromBlock(block, n.Protocol.API())
 	if err != nil {
 		panic(err)
-		return iotago.EmptyBlockID()
 	}
 
 	err = n.Protocol.ProcessBlock(modelBlock, n.PeerID)
 	if err != nil {
 		panic(err)
-		return iotago.EmptyBlockID()
 	}
 
 	fmt.Printf("Issued block: %s - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
 	return modelBlock.ID()
 }
+
+func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, parents ...iotago.BlockID) *model.Block {
+	slotTimeProvider := n.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
+	issuingTime := time.Unix(slotTimeProvider.GenesisUnixTime()+int64(slot-1)*slotTimeProvider.Duration(), 0)
+	require.True(n.Testing, issuingTime.Before(time.Now()), "issued block is in the current or future slot")
+
+	block, err := builder.NewBlockBuilder().
+		StrongParents(parents).
+		IssuingTime(issuingTime).
+		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()).
+		LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
+		Payload(&iotago.TaggedData{
+			Tag: []byte("ACTIVITY"),
+		}).
+		Sign(n.AccountID, n.privateKey).
+		Build()
+
+	if err != nil {
+		panic(err)
+	}
+
+	modelBlock, err := model.BlockFromBlock(block, n.Protocol.API())
+	if err != nil {
+		panic(err)
+	}
+
+	err = n.Protocol.ProcessBlock(modelBlock, n.PeerID)
+	if err != nil {
+		panic(err)
+	}
+
+	modelBlock.ID().RegisterAlias(alias)
+	fmt.Printf("Issued block: %s - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
+
+	return modelBlock
+}
+
+// func (n *Node) IssueBlock(alias string, parents ...models.BlockID) *models.Block {
+// 	tf := n.EngineTestFramework()
+//
+// 	tf.BlockDAG.CreateAndSignBlock(alias, &n.KeyPair,
+// 		models.WithStrongParents(models.NewBlockIDs(parents...)),
+// 		models.WithCommitment(n.Protocol.Engine().Storage.Settings.LatestCommitment()),
+// 	)
+// 	tf.BlockDAG.IssueBlocks(alias)
+// 	return tf.BlockDAG.Block(alias)
+// }

@@ -3,13 +3,14 @@ package testsuite
 import (
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 )
 
 func (f *Framework) AssertBlock(block *model.Block, node *mock.Node) *model.Block {
 	loadedBlock, exists := node.Protocol.MainEngineInstance().Block(block.ID())
-	require.True(f.Testing, exists, "%s: block %s does not exist", node.Name, block)
+	require.True(f.Testing, exists, "%s: block %s does not exist", node.Name, block.ID())
 	require.Equalf(f.Testing, block.ID(), loadedBlock.ID(), "%s: expected %s, got %s", node.Name, block.Block(), loadedBlock.ID())
 	require.Equalf(f.Testing, block.Data(), loadedBlock.Data(), "%s: expected %s, got %s", node.Name, block.Data(), loadedBlock.Data())
 
@@ -24,8 +25,7 @@ func (f *Framework) AssertBlocksExist(blocks []*model.Block, expectedExist bool,
 			if expectedExist {
 				f.AssertBlock(block, node)
 			} else {
-				_, exists := node.Protocol.MainEngineInstance().Block(block.ID())
-				require.False(f.Testing, exists, "%s: block %s exists", node.Name, block)
+				require.False(f.Testing, lo.Return2(node.Protocol.MainEngineInstance().Block(block.ID())), "%s: block %s exists", node.Name, block)
 			}
 		}
 	}
@@ -38,7 +38,7 @@ func (f *Framework) AssertBlocksAccepted(blocks []*model.Block, expectedAccepted
 		for _, block := range blocks {
 			blockFromCache, exists := node.Protocol.MainEngineInstance().BlockFromCache(block.ID())
 			if exists {
-				require.Equalf(f.Testing, expectedAccepted, blockFromCache.IsAccepted(), "%s: expected %s, got %s", node.Name, expectedAccepted, blockFromCache.IsAccepted())
+				require.Equalf(f.Testing, expectedAccepted, blockFromCache.IsAccepted(), "AssertBlocksAccepted: %s: expected %v, got %v", node.Name, expectedAccepted, blockFromCache.IsAccepted())
 				f.AssertBlock(block, node)
 			} else {
 				// A block that doesn't exist in the cache and is expected to be accepted should be found in the storage.

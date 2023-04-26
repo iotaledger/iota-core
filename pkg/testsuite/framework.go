@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -54,7 +55,7 @@ func NewFramework(t *testing.T) *Framework {
 				VBFactorKey:  10,
 			},
 			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*10),
 			SlotDurationInSeconds: 10,
 		},
 	}
@@ -72,13 +73,20 @@ func (f *Framework) Block(alias string) *model.Block {
 	return block
 }
 
-func (f *Framework) Blocks(aliases ...string) []*model.Block {
-	blocks := make([]*model.Block, len(aliases))
-	for i, alias := range aliases {
-		blocks[i] = f.Block(alias)
-	}
+func (f *Framework) BlockID(alias string) iotago.BlockID {
+	return f.Block(alias).ID()
+}
 
-	return blocks
+func (f *Framework) BlockIDs(aliases ...string) []iotago.BlockID {
+	return lo.Map(aliases, func(alias string) iotago.BlockID {
+		return f.BlockID(alias)
+	})
+}
+
+func (f *Framework) Blocks(aliases ...string) []*model.Block {
+	return lo.Map(aliases, func(alias string) *model.Block {
+		return f.Block(alias)
+	})
 }
 
 func (f *Framework) BlocksByGroup(group string) []*model.Block {
@@ -97,12 +105,22 @@ func (f *Framework) BlocksByGroup(group string) []*model.Block {
 	return blocks
 }
 
+func (f *Framework) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, node *mock.Node, parents ...iotago.BlockID) *model.Block {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	block := node.IssueBlockAtSlot(alias, slot, parents...)
+
+	f.blocks.Set(alias, block)
+	return block
+}
+
 func (f *Framework) RegisterBlock(alias string, block *model.Block) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
 	f.blocks.Set(alias, block)
-	block.ID().Identifier().RegisterAlias(alias)
+	block.ID().RegisterAlias(alias)
 }
 
 func (f *Framework) Node(name string) *mock.Node {
@@ -142,6 +160,12 @@ func (f *Framework) Wait(nodes ...*mock.Node) {
 	for _, node := range nodes {
 		node.Wait()
 	}
+}
+
+func (f *Framework) WaitWithDelay(delay time.Duration, nodes ...*mock.Node) {
+	f.Wait(nodes...)
+	time.Sleep(delay)
+	f.Wait(nodes...)
 }
 
 func (f *Framework) Shutdown() {
@@ -189,7 +213,7 @@ func (f *Framework) Run() {
 		node.Initialize(
 			protocol.WithSnapshotPath(path),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(f.validators),
+				poa.NewProvider(f.validators, poa.WithActivityWindow(time.Second*10)),
 			),
 			protocol.WithBaseDirectory(f.Directory.PathWithCreate(node.Name)),
 		)
