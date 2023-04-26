@@ -125,8 +125,8 @@ The following table describes the serialization of a Block:
   </tr>
   <tr>
     <td>Issuing Time</td>
-    <td>int64</td>
-    <td>The time the block is issued. It's a Unix time in nanoseconds.</td>
+    <td>uint64</td>
+    <td>The time the block is issued. It's a Unix-like timestamp in nanosecond.</td>
   </tr>
   <tr>
     <td>Slot Commitment Length</td>
@@ -146,7 +146,7 @@ The following table describes the serialization of a Block:
   </tr>
   <tr>
     <td>Latest Finalized Slot</td>
-    <td>int64</td>
+    <td>uint64</td>
     <td>The slot index of latest finalized slot.</td>
   </tr>
   <tr>
@@ -236,7 +236,7 @@ The string format of Block ID is hexadecimal encoding of Block ID with `0x` pref
 
 ## Slot Index
 
-Timeline is divided into slots, and each slot has a corresponding slot index, which is a `int64`.
+Timeline is divided into slots, and each slot has a corresponding slot index, which is a `uint64`.
 To calculate the slot index of a timestamp, `genesisTimestamp` and the duration of a slot are needed.
 The slot index of timestamp `ts` is `(ts - genesisTimestamp)/duration + 1`.
 
@@ -265,7 +265,7 @@ The following table describes the serialization of a Slot Commitment:
   </tr>
   <tr>
     <td>Index</td>
-    <td>int64</td>
+    <td>uint64</td>
     <td>
       The slot index of this commitment. It is calculated based on genesis timestamp and the duration of a slot.
     </td>
@@ -285,7 +285,7 @@ The following table describes the serialization of a Slot Commitment:
   </tr>
   <tr>
     <td>Cumulative Weight</td>
-    <td>int64</td>
+    <td>uint64</td>
     <td>The sum of previous slot commitment cumulative weight and weight of issuers of accepted blocks within this slot. It is just an indication of "committed into" this slot, and can not strictly be used for evaluating the switching of a chain.</td>
   </tr>
 </table>
@@ -384,8 +384,8 @@ The following table describes the serialization of a Transaction:
           </tr>
           <tr>
             <td>Creation Time</td>
-            <td>int64</td>
-            <td>The time at which this transaction was created by the client. It's a Unix time in nanoseconds.</td>
+            <td>uint64</td>
+            <td>The time at which this transaction was created by the client. It's a Unix-like timestamp in nanosecond.</td>
           </tr>
           <tr>
             <td>Inputs Count</td>
