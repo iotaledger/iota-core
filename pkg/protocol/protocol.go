@@ -230,7 +230,9 @@ func (p *Protocol) initChainManager() {
 
 		// We want to evict just below the height of our new root commitment (so that the slot of the root commitment
 		// stays in memory storage and with it the root commitment itself as well).
-		p.chainManager.EvictUntil(rootCommitment.ID().Index() - 1)
+		if rootCommitment.ID().Index() > 0 {
+			p.chainManager.EvictUntil(rootCommitment.ID().Index() - 1)
+		}
 	}, event.WithWorkerPool(wp))
 
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wp))
