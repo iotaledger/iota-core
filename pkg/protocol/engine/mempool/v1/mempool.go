@@ -53,22 +53,22 @@ func (m *MemPool) ConflictDAG() interface{} {
 }
 
 func (m *MemPool) AddTransaction(transaction mempool.Transaction) (metadata mempool.TransactionWithMetadata, err error) {
-	newTransactionMetadata, err := NewTransactionMetadata(transaction)
+	metadataToStore, err := NewTransactionMetadata(transaction)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create transaction metadata: %w", err)
 	}
 
-	transactionMetadata, stored := m.cachedTransactions.GetOrCreate(newTransactionMetadata.ID(), func() *TransactionWithMetadata {
-		return newTransactionMetadata
+	metadata, stored := m.cachedTransactions.GetOrCreate(metadataToStore.ID(), func() *TransactionWithMetadata {
+		return metadataToStore
 	})
 
 	if stored {
-		m.events.TransactionStored.Trigger(transactionMetadata)
+		m.events.TransactionStored.Trigger(metadataToStore)
 
-		m.solidifyInputs(transactionMetadata)
+		m.solidifyInputs(metadataToStore)
 	}
 
-	return transactionMetadata, nil
+	return metadata, nil
 }
 
 func (m *MemPool) RemoveTransaction(transactionID iotago.TransactionID) {
@@ -99,11 +99,11 @@ func (m *MemPool) SetTransactionIncluded(id iotago.TransactionID, inclusionSlot 
 }
 
 func (m *MemPool) solidifyInputs(transactionMetadata *TransactionWithMetadata) {
-	// inputsToSolidify is used by solidify to keep track of how many inputs are still missing to become solid.
+	// inputsToSolidify is used by solidifyInput to keep track of how many inputs are still missing to become solid.
 	inputsToSolidify := uint64(len(transactionMetadata.inputReferences))
 
-	// solidify requests an input from the ledger and triggers the transaction solid event if all inputs are loaded.
-	solidify := func(input ledger.StateReference, index int) (request *promise.Promise[*StateWithMetadata], cancelRequest func()) {
+	// solidifyInput requests an input from the ledger and triggers the transaction solid event if all inputs are loaded.
+	solidifyInput := func(input ledger.StateReference, index int) (request *promise.Promise[*StateWithMetadata], cancelRequest func()) {
 		return m.cachedStateRequests.Compute(input.StateID(), func(request *promise.Promise[*StateWithMetadata], exists bool) *promise.Promise[*StateWithMetadata] {
 			if !exists {
 				request = m.requestStateMetadata(input, true)
@@ -128,7 +128,7 @@ func (m *MemPool) solidifyInputs(transactionMetadata *TransactionWithMetadata) {
 	}
 
 	for i, input := range transactionMetadata.inputReferences {
-		solidificationRequest, cancelRequest := solidify(input, i)
+		solidificationRequest, cancelRequest := solidifyInput(input, i)
 
 		transactionMetadata.OnEvicted(func() {
 			if cancelRequest(); solidificationRequest.IsEmpty() {
@@ -142,7 +142,8 @@ func (m *MemPool) executeTransaction(transactionMetadata *TransactionWithMetadat
 	m.executionWorkers.Submit(func() {
 		outputStates, err := m.executeStateTransition(transactionMetadata.Transaction(), lo.Map(transactionMetadata.inputs, (*StateWithMetadata).State), context.Background())
 		if err != nil {
-			transactionMetadata.invalid.Trigger(err)
+			transactionMetadata.triggerInvalid(err)
+
 			m.events.TransactionInvalid.Trigger(transactionMetadata, err)
 
 			return

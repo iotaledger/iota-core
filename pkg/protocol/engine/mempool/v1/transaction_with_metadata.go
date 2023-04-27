@@ -118,6 +118,12 @@ func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetada
 	defer t.mutex.Unlock()
 
 	t.inputs[index] = input
+
+	input.OnSpent(func(spender *TransactionWithMetadata) {
+		if spender != t {
+			return
+		}
+	})
 }
 
 func (t *TransactionWithMetadata) publishExecutionResult(outputStates []ledger.State) {
@@ -132,4 +138,8 @@ func (t *TransactionWithMetadata) publishExecutionResult(outputStates []ledger.S
 
 func (t *TransactionWithMetadata) triggerBooked() {
 	t.booked.Trigger()
+}
+
+func (t *TransactionWithMetadata) triggerInvalid(reason error) {
+	t.invalid.Trigger(reason)
 }

@@ -24,6 +24,10 @@ func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetad
 	}
 }
 
+func (s *StateWithMetadata) OnSpent(func(spender *TransactionWithMetadata)) {
+	// TODO: implement me
+}
+
 func (s *StateWithMetadata) ID() iotago.OutputID {
 	return s.id
 }
