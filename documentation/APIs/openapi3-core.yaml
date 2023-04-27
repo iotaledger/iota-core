@@ -140,7 +140,7 @@ paths:
         - blocks
       summary: Submit a block.
       description: >-
-        Submit a block or transaction. This endpoint will return the identifier of the built block. `protocolVersion` is always required!
+        Submit a block or a payload. This endpoint will return the identifier of the built block. `protocolVersion` is always required!
       requestBody:
         content:
           application/json:
@@ -1032,8 +1032,8 @@ components:
         issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
         status:
           isHealthy: true
-          lastAcceptedBlockID: "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
-          lastConfirmedBlockID: "0x59daaaba1cd10cd268966376e17710d100c90826fe258753d461acac99b7e3341500000000000000"
+          lastAcceptedBlockId: "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          lastConfirmedBlockId: "0x59daaaba1cd10cd268966376e17710d100c90826fe258753d461acac99b7e3341500000000000000"
           confirmedSlot: 100
           ATT: 1682328545
           RATT: 1682328550
@@ -1043,8 +1043,8 @@ components:
           pruningSlot: 20
         metrics:
           blocksPerSecond: 17
-          referencedBlocksPerSecond: 16.2
-          referencedRate: 98.82352941176471
+          confirmedBlocksPerSecond: 16.2
+          confirmedRate: 98.82352941176471
         supportedProtocolVersions:
           - 2
           - 3
@@ -1205,7 +1205,7 @@ components:
         issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
         issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
         issuingTime: 1649442459
-        slotCommitment:
+        commitment:
           index: 110
           prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
           rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
@@ -1235,7 +1235,7 @@ components:
         issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
         issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
         issuingTime: 1649442459
-        slotCommitment:
+        commitment:
           index: 110
           prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
           rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
@@ -1291,7 +1291,7 @@ components:
         issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
         issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
         issuingTime: 1649442459
-        slotCommitment:
+        commitment:
           index: 110
           prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
           rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
@@ -1316,7 +1316,7 @@ components:
         issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
         issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
         issuingTime: 1649442459
-        slotCommitment:
+        commitment:
           index: 2310
           prevID: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
           rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
@@ -1381,7 +1381,7 @@ components:
         issuerID: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
         issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
         issuingTime: 1649442459
-        slotCommitment:
+        commitment:
           index: 928
           prevID: "0x6dcf06b23919b4d4c1c4d1f51af7e510618a2cecb7f2d4c4d0b4a4deef531b7e0000000000000000"
           rootsID: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
@@ -1612,7 +1612,7 @@ components:
         issuingTime:
           type: integer
           description: The timestamp of issuing this block.
-        slotCommitment:
+        commitment:
           $ref: '#/components/schemas/Commitment'
           description: The slot commitment contains in this block.
         latestFinalizedSlot:
@@ -2447,10 +2447,10 @@ components:
             isHealthy:
               type: boolean
               description: Tells whether the node is healthy or not.
-            lastAcceptedBlockID:
+            lastAcceptedBlockId:
               description: The identifier of the latest accepted block.
               type: string
-            lastConfirmedBlockID:
+            lastConfirmedBlockId:
               description: The identifier of the latest confirmed block.
               type: string
             confirmedSlot:
@@ -2486,18 +2486,18 @@ components:
               description: The current rate of new blocks per second.
               type: number
               format: float
-            referencedBlocksPerSecond:
-              description: The current rate of referenced blocks per second.
+            confirmedBlocksPerSecond:
+              description: The current rate of confirmed blocks per second.
               type: number
               format: float
-            referencedRate:
-              description: The ratio of referenced blocks in relation to new blocks of the last confirmed slot.
+            confirmedRate:
+              description: The ratio of confirmed blocks in relation to new blocks of the last confirmed slot.
               type: number
               format: float
           required:
             - blocksPerSecond
-            - referencedBlocksPerSecond
-            - referencedRate
+            - confirmedBlocksPerSecond
+            - confirmedRate
         supportedProtocolVersions:
           type: array
           description: The supported protocol versions.
@@ -2615,7 +2615,7 @@ components:
           description: The block identifiers that can be used to a attach a block to. Hex-encoded with 0x prefix.
         latestFinalizedSlot:
           type: integer
-          description: The latest confirmed slot index.
+          description: The latest finalized slot index.
         commitment:
           $ref: '#/components/schemas/Commitment'
 
@@ -2672,12 +2672,12 @@ components:
         issuingTime:
           type: integer
           description: The timestamp of issuing this block.
-        slotCommitment:
+        commitment:
           $ref: '#/components/schemas/Commitment'
           description: The slot commitment contains in this block.
         latestFinalizedSlot:
           type: integer
-          description: The latest confirmed slot index of the node when issuing this block.
+          description: The latest finalized slot index of the node when issuing this block.
         payload:
           description: The inner payload of the block. Can be nil.
           oneOf:

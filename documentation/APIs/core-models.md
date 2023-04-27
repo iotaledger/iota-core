@@ -152,29 +152,18 @@ The following table describes the serialization of a Block:
   <tr>
     <td valign="top">Payload <code>optOneOf</code></td>
     <td colspan="2">
-      <details open="true">
-        <summary>Generic Payload</summary>
-        <table>
-          <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-          </tr>
-          <tr>
-            <td>Payload Type</td>
-            <td>uint32</td>
-            <td>
-              The type of the payload. It will instruct the node how to parse the fields that follow.
-            </td>
-          </tr>
-          <tr>
-            <td>Payload Bytes</td>
-            <td>ByteArray</td>
-            <td>A sequence of serialized bytes, where the structure depends on `Payload Type`.</td>
-          </tr>
-        </table>
+      <details>
+        <summary>Tagged Data Payload</summary>
+        <blockquote>
+          With Payload Type 5, more details are described in Tagged Data Payload section.
+        </blockquote>
       </details>
-    </td>
+      <details>
+        <summary>Transaction Payload</summary>
+        <blockquote>
+          With Payload Type 6, more details are described in Transaction section.
+        </blockquote>
+      </details>
   </tr>
   <tr>
     <td valign="top">Signature <code>oneOf</code></td>
@@ -237,7 +226,9 @@ The slot index of timestamp `ts` is `(ts - genesisTimestamp)/duration + 1`.
 
 ## Slot Commitment
 
-Commitment is an object that contains a summary of a slot, and it is linked to the commitment of the previous slot, which forms a commitment chain. 
+Slot Commitment is an object that contains a summary of a slot, and it is linked to the commitment of the previous slot, which forms a commitment chain. 
+
+**Note**: Slot Commitment and Commitment may be used interchangeably in this file and other API files. 
 
 Multiple sparse merkle trees are managed per slot, which are:
 * *Tangle tree*: All accepted blocks within a slot.
@@ -271,7 +262,7 @@ The following table describes the serialization of a Slot Commitment:
     <td>The commitment ID of the previous slot.</td>
   </tr>
   <tr>
-    <td>Root ID</td>
+    <td>Roots ID</td>
     <td>ByteArray[32]</td>
     <td>
       A BLAKE2b-256 hash of concatenating multiple sparse merkle tree roots of a slot.
@@ -331,6 +322,11 @@ The following table describes the serialization of a Tagged payload:
         <th>Description</th>
     </tr>
     <tr>
+        <td>Payload Type</td>
+        <td>uint32</td>
+        <td>The payload type of Tagged Data payload is 5.</td>
+    </tr>
+    <tr>
         <td>Tag</td>
         <td>(uint8)ByteArray</td>
         <td>The tag to use to categorize the data in binary form. A leading uint8 denotes its length.</td>
@@ -346,9 +342,9 @@ The following table describes the serialization of a Tagged payload:
 * The length of a Tag must < `64` bytes.
 * The length of the Data must < `8192` bytes.
 
-### Transaction     
+### Transaction Payload    
 
-The following table describes the serialization of a Transaction:
+The following table describes the serialization of a Transaction Payload:
 
 <table>
   <tr>
@@ -356,6 +352,11 @@ The following table describes the serialization of a Transaction:
     <th>Type</th>
     <th>Description</th>
   </tr>
+  <tr>
+        <td>Payload Type</td>
+        <td>uint32</td>
+        <td>The payload type of Transaction payload is 6.</td>
+    </tr>
   <tr>
     <td valign="top">Essence <code>oneOf</code></td>
     <td colspan="2">
@@ -533,7 +534,7 @@ Output and unlock designs are the same as described in [TIP-18 Multi-Asset Ledge
 
 ## Signature
 
-The following table lists all currently supported signatures.
+The following table lists all currently supported signatures:
 
 <table>
     <tr>
@@ -554,6 +555,11 @@ The following table describes the serialization of a Ed25519 signature:
         <th>Name</th>
         <th>Type</th>
         <th>Description</th>
+    </tr>
+    <tr>
+        <td>Signature Type</td>
+        <td>uint8</td>
+        <td>The signature type of Ed25519 is 0.</td>
     </tr>
     <tr>
         <td>Public Key</td>

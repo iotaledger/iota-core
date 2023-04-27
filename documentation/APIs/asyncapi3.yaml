@@ -168,7 +168,7 @@ channels:
       operationId: transactionIncludedBlock
       description: >-
         Publishes the earliest confirmed block which carried the transaction with the
-        specified transaction id.
+        specified transaction ID.
       message:
         $ref: '#/components/messages/Block'
   'outputs/{outputId}':
@@ -505,6 +505,7 @@ components:
                 * `1` - denotes that the block is invalid.
                 * `2` - denotes that the block is orphaned due to congestion control.
                 * `3` - denotes that the block is orphaned due to negative mana balance.    
+                * Note: more reasons will be added.
           txStateReason:
             type: integer
             enum:
@@ -1229,6 +1230,10 @@ components:
           type: string
           description: The commitment index at which the output was included into the ledger.
           example: '0xe526f8b1c856d4e844cc734bbe095429fb880ec4d93f3ccffe3b292a7de17be7'       
+        latestCommitmentId:
+          type: string
+          description: The current latest commitment id for which the request was made.
+          example: '0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a'       
       required:
         - blockId
         - transactionId
