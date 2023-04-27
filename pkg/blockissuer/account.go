@@ -45,6 +45,7 @@ func (e *Ed25519Account) Address() iotago.Address {
 	if !ok {
 		panic("invalid public key type")
 	}
+
 	return iotago.Ed25519AddressFromPubKey(ed25519PubKey)
 }
 
