@@ -3,6 +3,7 @@
 This document defines core models for IOTA V3 protocol.
 
 * [Block](#block)
+  * [Block Signature](#block-signature)
   * [Block ID](#block-id)
   * [Block Syntactic Validation Rules](#block-syntactic-validation-rules)
 * [Slot Index](#slot-index)
@@ -184,6 +185,17 @@ The following table describes the serialization of a Block:
   </tr>
 </table>
 
+### Block Signature
+This is how the signature is generated:
+
+* `content` is the serialized block **without** signature and nonce.
+* `slot_commitment_ID` is the identifier calculated from the Slot Commitment within the block, following steps described in [Slot Commitment ID](#slot-commitment-id) section.
+* `Issuing Time` is the block issuing time.
+
+Calculation:
+1. `content_hash` = hash(`content`)
+2. `data` = Concat(`Issuing Time`, `slot_commitment_ID`, `content_hash`)
+3. And sign with the Issuer PubKey, `Signature` = Sign(`data`) 
 
 ### Block ID
 Block ID denotes an identifier of a block, with type `ArrayBytes[40]`. It is calculated as the following steps, using BLAKE2b-256 hash function:
@@ -213,8 +225,7 @@ The string format of Block ID is hexadecimal encoding of Block ID with `0x` pref
 * `Payload Type` must match one of the values described under Payloads.
   Data Fields must be correctly parsable in the context of the `Payload Type`.
   The payload itself must pass syntactic validation.
-* `Signature` must be valid, 
-`Signature` = Sign(Concat(`Issuing Time`, `Slot Commitment ID` from the Slot Commitment, `content_hash`)).
+* `Signature` must be valid.
 * There must be no trailing bytes after all block fields have been parsed.
 
 
