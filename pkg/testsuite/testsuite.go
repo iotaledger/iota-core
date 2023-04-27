@@ -105,14 +105,14 @@ func (t *TestSuite) Blocks(aliases ...string) []*model.Block {
 	})
 }
 
-func (t *TestSuite) BlocksByGroup(group string) []*model.Block {
+func (t *TestSuite) BlocksWithPrefix(prefix string) []*model.Block {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
 	blocks := make([]*model.Block, 0)
 
 	t.blocks.ForEach(func(alias string, block *model.Block) bool {
-		if strings.HasPrefix(alias, group) {
+		if strings.HasPrefix(alias, prefix) {
 			blocks = append(blocks, block)
 		}
 

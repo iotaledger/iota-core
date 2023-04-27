@@ -38,7 +38,7 @@ func (t *TestSuite) AssertBlocksAccepted(blocks []*model.Block, expectedAccepted
 		for _, block := range blocks {
 			blockFromCache, exists := node.Protocol.MainEngineInstance().BlockFromCache(block.ID())
 			if exists {
-				require.Equalf(t.Testing, expectedAccepted, blockFromCache.IsAccepted(), "AssertBlocksAccepted: %s: expected %v, got %v", node.Name, expectedAccepted, blockFromCache.IsAccepted())
+				require.Equalf(t.Testing, expectedAccepted, blockFromCache.IsAccepted(), "AssertBlocksAccepted: %s: block %s expected %v, got %v", node.Name, blockFromCache.ID(), expectedAccepted, blockFromCache.IsAccepted())
 				t.AssertBlock(block, node)
 			} else {
 				// A block that doesn't exist in the cache and is expected to be accepted should be found in the storage.

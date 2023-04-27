@@ -35,7 +35,7 @@ func (t *TestSuite) AssertLatestCommitmentSlotIndex(slot int, nodes ...*mock.Nod
 	mustNodes(nodes)
 
 	for _, node := range nodes {
-		require.EqualValuesf(t.Testing, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index(), "AssertLatestCommitmentSlotIndex: %s: expected %s, got %s", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index)
+		require.EqualValuesf(t.Testing, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index(), "AssertLatestCommitmentSlotIndex: %s: expected %v, got %v", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index())
 	}
 }
 

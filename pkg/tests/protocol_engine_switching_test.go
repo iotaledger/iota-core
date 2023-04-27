@@ -84,8 +84,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 		ts.WaitWithDelay(1 * time.Second) // Give some time for the blocks to arrive over the network
 
-		ts.AssertBlocksExist(ts.BlocksByGroup("P1"), true, node1, node2)
-		ts.AssertBlocksExist(ts.BlocksByGroup("P1"), false, node3, node4)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, node1, node2)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, node3, node4)
 
 		ts.AssertBlocksAccepted(ts.Blocks("P1.A", "P1.B", "P1.C", "P1.D", "P1.E", "P1.F"), true, node1, node2)
 		ts.AssertBlocksAccepted(ts.Blocks("P1.G"), false, node1, node2) // block not referenced yet
@@ -109,8 +109,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 		ts.WaitWithDelay(1 * time.Second) // Give some time for the blocks to arrive over the network
 
-		ts.AssertBlocksExist(ts.BlocksByGroup("P2"), true, node3, node4)
-		ts.AssertBlocksExist(ts.BlocksByGroup("P2"), false, node1, node2)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, node3, node4)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
 
 		ts.AssertBlocksAccepted(ts.Blocks("P2.A", "P2.B", "P2.C", "P2.D", "P2.E", "P2.F"), true, node3, node4)
 		ts.AssertBlocksAccepted(ts.Blocks("P2.G"), false, node3, node4) // block not referenced yet

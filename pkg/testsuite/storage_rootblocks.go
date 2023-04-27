@@ -16,11 +16,10 @@ func (t *TestSuite) AssertStorageRootBlocks(blocks []*model.Block, nodes ...*moc
 			require.NotNilf(t.Testing, storage, "%s: storage for %s is nil", node.Name, block.ID().Index())
 
 			loadedBlockID, commitmentID, err := storage.Load(block.ID())
-			require.NoError(t.Testing, err, "%s: failed to load root block %s", node.Name, block)
+			require.NoError(t.Testing, err, "%s: failed to load root block %s", node.Name, block.ID())
 
-			require.Equalf(t.Testing, block.ID(), loadedBlockID, "%s: expected %s, got %s", node.Name, block.Block(), loadedBlockID)
-			// TODO: replace with block.Commitment()
-			require.Equalf(t.Testing, block.Block().SlotCommitment.MustID(), commitmentID, "%s: expected %s, got %s", node.Name, block.Block().SlotCommitment.MustID(), commitmentID)
+			require.Equalf(t.Testing, block.ID(), loadedBlockID, "%s: block %s expected %s, got %s", node.Name, block.ID(), block.ID(), loadedBlockID)
+			require.Equalf(t.Testing, block.SlotCommitment().ID(), commitmentID, "%s: block %s expected %s, got %s", node.Name, block.ID(), block.SlotCommitment().ID(), commitmentID)
 		}
 	}
 }

@@ -252,7 +252,7 @@ func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 
 // delayedBlockEvictionThreshold returns the slot index that is the threshold for delayed rootblocks eviction.
 func (s *State) delayedBlockEvictionThreshold(slotIndex iotago.SlotIndex) (threshold iotago.SlotIndex, shouldEvict bool) {
-	//return index.Max(slotIndex-s.optsRootBlocksEvictionDelay-1, -1)
+	// return index.Max(slotIndex-s.optsRootBlocksEvictionDelay-1, -1)
 	if slotIndex > s.optsRootBlocksEvictionDelay+1 {
 		return slotIndex - s.optsRootBlocksEvictionDelay - 1, true
 	}
