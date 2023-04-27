@@ -9,7 +9,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (f *Framework) AssertStorageCommitments(commitments []*iotago.Commitment, nodes ...*mock.Node) {
+func (t *TestSuite) AssertStorageCommitments(commitments []*iotago.Commitment, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -18,7 +18,7 @@ func (f *Framework) AssertStorageCommitments(commitments []*iotago.Commitment, n
 			if err != nil {
 				panic(fmt.Sprintf("failed to load commitment %s: %s", commitment.MustID(), err.Error()))
 			}
-			require.Equalf(f.Testing, *commitment, *storedCommitment, "%s: expected %s, got %s", node.Name, commitment, storedCommitment)
+			require.Equalf(t.Testing, *commitment, *storedCommitment, "%s: expected %s, got %s", node.Name, commitment, storedCommitment)
 		}
 	}
 }

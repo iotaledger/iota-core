@@ -20,7 +20,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type Framework struct {
+type TestSuite struct {
 	Testing *testing.T
 	Network *mock.Network
 
@@ -40,16 +40,16 @@ type Framework struct {
 	mutex sync.RWMutex
 }
 
-func NewFramework(t *testing.T, snapshotOptions ...options.Option[snapshotcreator.Options]) *Framework {
-	f := &Framework{
-		Testing:   t,
+func NewTestSuite(testingT *testing.T, snapshotOptions ...options.Option[snapshotcreator.Options]) *TestSuite {
+	t := &TestSuite{
+		Testing:   testingT,
 		Network:   mock.NewNetwork(),
-		Directory: utils.NewDirectory(t.TempDir()),
+		Directory: utils.NewDirectory(testingT.TempDir()),
 		nodes:     make(map[string]*mock.Node),
 		blocks:    shrinkingmap.New[string, *model.Block](),
 		ProtocolParameters: iotago.ProtocolParameters{
 			Version:     3,
-			NetworkName: t.Name(),
+			NetworkName: testingT.Name(),
 			Bech32HRP:   "rms",
 			MinPoWScore: 0,
 			RentStructure: iotago.RentStructure{
@@ -63,25 +63,25 @@ func NewFramework(t *testing.T, snapshotOptions ...options.Option[snapshotcreato
 		},
 	}
 
-	f.snapshotPath = f.Directory.Path("genesis_snapshot.bin")
+	t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
 	var defaultSnapshotOptions = []options.Option[snapshotcreator.Options]{
 		snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
-		snapshotcreator.WithFilePath(f.snapshotPath),
-		snapshotcreator.WithProtocolParameters(f.ProtocolParameters),
+		snapshotcreator.WithFilePath(t.snapshotPath),
+		snapshotcreator.WithProtocolParameters(t.ProtocolParameters),
 		snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
 			iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
 		}),
 	}
-	f.optsSnapshotOptions = append(defaultSnapshotOptions, snapshotOptions...)
+	t.optsSnapshotOptions = append(defaultSnapshotOptions, snapshotOptions...)
 
-	return f
+	return t
 }
 
-func (f *Framework) Block(alias string) *model.Block {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
+func (t *TestSuite) Block(alias string) *model.Block {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
 
-	block, exist := f.blocks.Get(alias)
+	block, exist := t.blocks.Get(alias)
 	if !exist {
 		panic(fmt.Sprintf("block %s not registered", alias))
 	}
@@ -89,29 +89,29 @@ func (f *Framework) Block(alias string) *model.Block {
 	return block
 }
 
-func (f *Framework) BlockID(alias string) iotago.BlockID {
-	return f.Block(alias).ID()
+func (t *TestSuite) BlockID(alias string) iotago.BlockID {
+	return t.Block(alias).ID()
 }
 
-func (f *Framework) BlockIDs(aliases ...string) []iotago.BlockID {
+func (t *TestSuite) BlockIDs(aliases ...string) []iotago.BlockID {
 	return lo.Map(aliases, func(alias string) iotago.BlockID {
-		return f.BlockID(alias)
+		return t.BlockID(alias)
 	})
 }
 
-func (f *Framework) Blocks(aliases ...string) []*model.Block {
+func (t *TestSuite) Blocks(aliases ...string) []*model.Block {
 	return lo.Map(aliases, func(alias string) *model.Block {
-		return f.Block(alias)
+		return t.Block(alias)
 	})
 }
 
-func (f *Framework) BlocksByGroup(group string) []*model.Block {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
+func (t *TestSuite) BlocksByGroup(group string) []*model.Block {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
 
 	blocks := make([]*model.Block, 0)
 
-	f.blocks.ForEach(func(alias string, block *model.Block) bool {
+	t.blocks.ForEach(func(alias string, block *model.Block) bool {
 		if strings.HasPrefix(alias, group) {
 			blocks = append(blocks, block)
 		}
@@ -121,29 +121,29 @@ func (f *Framework) BlocksByGroup(group string) []*model.Block {
 	return blocks
 }
 
-func (f *Framework) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, node *mock.Node, parents ...iotago.BlockID) *model.Block {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, node *mock.Node, parents ...iotago.BlockID) *model.Block {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
 	block := node.IssueBlockAtSlot(alias, slot, parents...)
 
-	f.blocks.Set(alias, block)
+	t.blocks.Set(alias, block)
 	return block
 }
 
-func (f *Framework) RegisterBlock(alias string, block *model.Block) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+func (t *TestSuite) RegisterBlock(alias string, block *model.Block) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
-	f.blocks.Set(alias, block)
+	t.blocks.Set(alias, block)
 	block.ID().RegisterAlias(alias)
 }
 
-func (f *Framework) Node(name string) *mock.Node {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
+func (t *TestSuite) Node(name string) *mock.Node {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
 
-	node, exist := f.nodes[name]
+	node, exist := t.nodes[name]
 	if !exist {
 		panic(fmt.Sprintf("node %s does not exist", name))
 	}
@@ -151,13 +151,13 @@ func (f *Framework) Node(name string) *mock.Node {
 	return node
 }
 
-func (f *Framework) Nodes(names ...string) []*mock.Node {
+func (t *TestSuite) Nodes(names ...string) []*mock.Node {
 	if len(names) == 0 {
-		f.mutex.RLock()
-		defer f.mutex.RUnlock()
+		t.mutex.RLock()
+		defer t.mutex.RUnlock()
 
-		nodes := make([]*mock.Node, 0, len(f.nodes))
-		for _, node := range f.nodes {
+		nodes := make([]*mock.Node, 0, len(t.nodes))
+		for _, node := range t.nodes {
 			nodes = append(nodes, node)
 		}
 
@@ -166,72 +166,72 @@ func (f *Framework) Nodes(names ...string) []*mock.Node {
 
 	nodes := make([]*mock.Node, len(names))
 	for i, name := range names {
-		nodes[i] = f.Node(name)
+		nodes[i] = t.Node(name)
 	}
 
 	return nodes
 }
 
-func (f *Framework) Wait(nodes ...*mock.Node) {
+func (t *TestSuite) Wait(nodes ...*mock.Node) {
 	for _, node := range nodes {
 		node.Wait()
 	}
 }
 
-func (f *Framework) WaitWithDelay(delay time.Duration, nodes ...*mock.Node) {
-	f.Wait(nodes...)
+func (t *TestSuite) WaitWithDelay(delay time.Duration, nodes ...*mock.Node) {
+	t.Wait(nodes...)
 	time.Sleep(delay)
-	f.Wait(nodes...)
+	t.Wait(nodes...)
 }
 
-func (f *Framework) Shutdown() {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
+func (t *TestSuite) Shutdown() {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
 
-	for _, node := range f.nodes {
+	for _, node := range t.nodes {
 		node.Shutdown()
 	}
 }
 
-func (f *Framework) AddValidatorNodeToPartition(name string, weight int64, partition string, opts ...options.Option[protocol.Protocol]) *mock.Node {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string, opts ...options.Option[protocol.Protocol]) *mock.Node {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
-	if weight > 0 && f.running {
+	if weight > 0 && t.running {
 		panic(fmt.Sprintf("cannot add validator node %s to partition %s with weight %d: framework already running", name, partition, weight))
 	}
 
-	f.nodes[name] = mock.NewNode(f.Testing, f.Network, partition, name, weight, opts...)
-	return f.nodes[name]
+	t.nodes[name] = mock.NewNode(t.Testing, t.Network, partition, name, weight, opts...)
+	return t.nodes[name]
 }
 
-func (f *Framework) AddValidatorNode(name string, weight int64, opts ...options.Option[protocol.Protocol]) *mock.Node {
-	return f.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition, opts...)
+func (t *TestSuite) AddValidatorNode(name string, weight int64, opts ...options.Option[protocol.Protocol]) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition, opts...)
 }
 
-func (f *Framework) AddNodeToPartition(name string, partition string, opts ...options.Option[protocol.Protocol]) *mock.Node {
-	return f.AddValidatorNodeToPartition(name, 0, partition, opts...)
+func (t *TestSuite) AddNodeToPartition(name string, partition string, opts ...options.Option[protocol.Protocol]) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, 0, partition, opts...)
 }
 
-func (f *Framework) AddNode(name string, opts ...options.Option[protocol.Protocol]) *mock.Node {
-	return f.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition, opts...)
+func (t *TestSuite) AddNode(name string, opts ...options.Option[protocol.Protocol]) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition, opts...)
 }
 
-func (f *Framework) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
-	err := snapshotcreator.CreateSnapshot(f.optsSnapshotOptions...)
+	err := snapshotcreator.CreateSnapshot(t.optsSnapshotOptions...)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
 
-	for _, node := range f.nodes {
+	for _, node := range t.nodes {
 		baseOpts := []options.Option[protocol.Protocol]{
-			protocol.WithSnapshotPath(f.snapshotPath),
-			protocol.WithBaseDirectory(f.Directory.PathWithCreate(node.Name)),
+			protocol.WithSnapshotPath(t.snapshotPath),
+			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(f.Validators()),
+				poa.NewProvider(t.Validators()),
 			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
@@ -246,34 +246,34 @@ func (f *Framework) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		node.Initialize(baseOpts...)
 	}
 
-	f.running = true
+	t.running = true
 }
 
-func (f *Framework) Validators() map[iotago.AccountID]int64 {
-	f.validatorsOnce.Do(func() {
-		if f.running {
+func (t *TestSuite) Validators() map[iotago.AccountID]int64 {
+	t.validatorsOnce.Do(func() {
+		if t.running {
 			panic("cannot create validators from nodes: framework already running")
 		}
 
 		validators := make(map[iotago.AccountID]int64)
-		for _, node := range f.nodes {
+		for _, node := range t.nodes {
 			if node.Weight == 0 {
 				continue
 			}
 			validators[node.AccountID] = node.Weight
 		}
 
-		f.validators = validators
+		t.validators = validators
 	})
 
-	return f.validators
+	return t.validators
 }
 
-func (f *Framework) HookLogging() {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
+func (t *TestSuite) HookLogging() {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
 
-	for _, node := range f.nodes {
+	for _, node := range t.nodes {
 		node.HookLogging()
 	}
 }
