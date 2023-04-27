@@ -16,7 +16,7 @@ func issueActivityBlock(ctx context.Context) {
 		Tag: []byte("ACTIVITY"),
 	})
 	if err != nil {
-		Component.LogWarnf("error issuing activity block: %s", err.Error())
+		Component.LogWarnf("error creating activity block: %s", err.Error())
 		return
 	}
 

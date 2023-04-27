@@ -106,7 +106,7 @@ func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Pa
 		StrongParents(references[model.StrongParentType]).
 		WeakParents(references[model.WeakParentType]).
 		ShallowLikeParents(references[model.ShallowLikeParentType]).
-		SlotCommitment(slotCommitment).
+		SlotCommitment(slotCommitment.Commitment()).
 		LatestFinalizedSlot(lastFinalizedSlot).
 		Payload(p).
 		Sign(i.Account.ID(), i.Account.PrivateKey()).
