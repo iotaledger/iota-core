@@ -196,8 +196,11 @@ func (n *Node) Shutdown() {
 // TODO: the block Issuance should be improved once the protocol has a better way to issue blocks.
 
 func (n *Node) IssueBlock() iotago.BlockID {
+	references := n.Protocol.TipManager.Tips(iotago.BlockMaxParents)
 	block, err := builder.NewBlockBuilder().
-		StrongParents(n.Protocol.TipManager.Tips(8)).
+		StrongParents(references[model.StrongParentType]).
+		WeakParents(references[model.WeakParentType]).
+		ShallowLikeParents(references[model.ShallowLikeParentType]).
 		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()).
 		LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
 		Payload(&iotago.TaggedData{
@@ -269,8 +272,8 @@ func (n *Node) IssueActivity(duration time.Duration, wg *sync.WaitGroup) {
 		fmt.Println(n.Name, "> Starting activity")
 		var counter int
 		for {
-			if tips := n.Protocol.TipManager.Tips(1); len(tips) > 0 {
-				if !n.issueActivityBlock(fmt.Sprintf("activity %s.%d", n.Name, counter), tips...) {
+			if references := n.Protocol.TipManager.Tips(iotago.BlockMaxParents); len(references[model.StrongParentType]) > 0 {
+				if !n.issueActivityBlock(fmt.Sprintf("activity %s.%d", n.Name, counter), references[model.StrongParentType]...) {
 					fmt.Println(n.Name, "> Stopped activity due to block not being issued")
 					return
 				}

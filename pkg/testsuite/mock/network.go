@@ -91,6 +91,10 @@ func newMockedEndpoint(id network.PeerID, n *Network, partition string) *Endpoin
 	}
 }
 
+func (e *Endpoint) LocalPeerID() network.PeerID {
+	return e.id
+}
+
 func (e *Endpoint) RegisterProtocol(protocolID string, _ func() proto.Message, handler func(network.PeerID, proto.Message) error) {
 	e.handlersMutex.Lock()
 	defer e.handlersMutex.Unlock()
