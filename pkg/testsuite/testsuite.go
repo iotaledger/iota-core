@@ -115,6 +115,7 @@ func (t *TestSuite) BlocksByGroup(group string) []*model.Block {
 		if strings.HasPrefix(alias, group) {
 			blocks = append(blocks, block)
 		}
+
 		return true
 	})
 
@@ -128,6 +129,7 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, node *
 	block := node.IssueBlockAtSlot(alias, slot, parents...)
 
 	t.blocks.Set(alias, block)
+
 	return block
 }
 
@@ -202,6 +204,7 @@ func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, parti
 	}
 
 	t.nodes[name] = mock.NewNode(t.Testing, t.Network, partition, name, weight, opts...)
+
 	return t.nodes[name]
 }
 

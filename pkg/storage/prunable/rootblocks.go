@@ -32,8 +32,10 @@ func (r *RootBlocks) Load(blockID iotago.BlockID) (id iotago.BlockID, commitment
 		if errors.Is(err, kvstore.ErrKeyNotFound) {
 			return iotago.EmptyBlockID(), iotago.CommitmentID{}, nil
 		}
+
 		return iotago.EmptyBlockID(), iotago.CommitmentID{}, errors.Wrapf(err, "failed to get root block %s", id)
 	}
+
 	return blockID, commitmentID, nil
 }
 

@@ -146,7 +146,7 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	}
 
 	// The block should've been in the block cache, so there's no need to check the storage.
-	if !exists && id.Index() > e.Storage.Settings().LatestCommitment().Index {
+	if !exists && id.Index() > e.Storage.Settings().LatestCommitment().Index() {
 		return nil, false
 	}
 
@@ -159,6 +159,7 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 		// TODO: log error?
 		return nil, false
 	}
+
 	return modelBlock, modelBlock != nil
 }
 

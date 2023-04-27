@@ -121,9 +121,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.Wait()
 		ts.AssertLatestCommitmentSlotIndex(8, ts.Nodes()...)
 
-		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment())
-		require.Equal(t, node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment(), node4.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment())
-		require.NotEqual(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment())
+		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+		require.Equal(t, node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node4.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+		require.NotEqual(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
 
 	// Merge the partitions

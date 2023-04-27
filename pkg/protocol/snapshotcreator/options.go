@@ -5,7 +5,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// Options stores the details about snapshots created for integration tests
+// Options stores the details about snapshots created for integration tests.
 type Options struct {
 	// FilePath is the path to the snapshot file.
 	FilePath string

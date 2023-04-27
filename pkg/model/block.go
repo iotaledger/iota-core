@@ -3,8 +3,6 @@ package model
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"sync"
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"

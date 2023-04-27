@@ -27,7 +27,7 @@ func (t *TestSuite) AssertLatestCommitment(commitment *iotago.Commitment, nodes 
 	mustNodes(nodes)
 
 	for _, node := range nodes {
-		require.Truef(t.Testing, commitment.Equals(node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()), "AssertLatestCommitment: %s: expected %s, got %s", node.Name, commitment.String(), node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().String())
+		require.Truef(t.Testing, commitment.Equals(node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()), "AssertLatestCommitment: %s: expected %s, got %s", node.Name, commitment.String(), node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().String())
 	}
 }
 
@@ -35,7 +35,7 @@ func (t *TestSuite) AssertLatestCommitmentSlotIndex(slot int, nodes ...*mock.Nod
 	mustNodes(nodes)
 
 	for _, node := range nodes {
-		require.EqualValuesf(t.Testing, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index, "AssertLatestCommitmentSlotIndex: %s: expected %s, got %s", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index)
+		require.EqualValuesf(t.Testing, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index(), "AssertLatestCommitmentSlotIndex: %s: expected %s, got %s", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index)
 	}
 }
 

@@ -40,8 +40,6 @@ type Node struct {
 
 	optsProtocolOptions []options.Option[protocol.Protocol]
 
-	mutex sync.RWMutex
-
 	Protocol *protocol.Protocol
 }
 
@@ -170,7 +168,7 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s\n", n.Name, engineName, details.Commitment.MustID(), details.Commitment)
+		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment)
 	})
 
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
@@ -200,7 +198,7 @@ func (n *Node) Shutdown() {
 func (n *Node) IssueBlock() iotago.BlockID {
 	block, err := builder.NewBlockBuilder().
 		StrongParents(n.Protocol.TipManager.Tips(8)).
-		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()).
+		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()).
 		LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
 		Payload(&iotago.TaggedData{
 			Tag: []byte("ACTIVITY"),
@@ -223,6 +221,7 @@ func (n *Node) IssueBlock() iotago.BlockID {
 	}
 
 	fmt.Printf("Issued block: %s - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
+
 	return modelBlock.ID()
 }
 
@@ -234,7 +233,7 @@ func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, parents ...
 	block, err := builder.NewBlockBuilder().
 		StrongParents(parents).
 		IssuingTime(issuingTime).
-		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()).
+		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()).
 		LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
 		Payload(&iotago.TaggedData{
 			Tag: []byte("ACTIVITY"),
@@ -293,7 +292,7 @@ func (n *Node) issueActivityBlock(alias string, parents ...iotago.BlockID) bool 
 
 		block, err := builder.NewBlockBuilder().
 			StrongParents(parents).
-			SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()).
+			SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()).
 			LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
 			Payload(&iotago.TaggedData{
 				Tag: []byte("ACTIVITY"),
@@ -319,5 +318,6 @@ func (n *Node) issueActivityBlock(alias string, parents ...iotago.BlockID) bool 
 
 		return true
 	}
+
 	return false
 }

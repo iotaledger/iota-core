@@ -146,6 +146,7 @@ func (e *Endpoint) handler(protocolID string) (handler func(network.PeerID, prot
 	defer e.handlersMutex.RUnlock()
 
 	handler, exists = e.handlers[protocolID]
+
 	return
 }
 
