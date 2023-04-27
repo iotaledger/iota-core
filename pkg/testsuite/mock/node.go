@@ -262,13 +262,62 @@ func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, parents ...
 	return modelBlock
 }
 
-// func (n *Node) IssueBlock(alias string, parents ...models.BlockID) *models.Block {
-// 	tf := n.EngineTestFramework()
-//
-// 	tf.BlockDAG.CreateAndSignBlock(alias, &n.KeyPair,
-// 		models.WithStrongParents(models.NewBlockIDs(parents...)),
-// 		models.WithCommitment(n.Protocol.Engine().Storage.Settings.LatestCommitment()),
-// 	)
-// 	tf.BlockDAG.IssueBlocks(alias)
-// 	return tf.BlockDAG.Block(alias)
-// }
+func (n *Node) IssueActivity(duration time.Duration, wg *sync.WaitGroup) {
+	go func() {
+		defer wg.Done()
+
+		start := time.Now()
+		fmt.Println(n.Name, "> Starting activity")
+		var counter int
+		for {
+			if tips := n.Protocol.TipManager.Tips(1); len(tips) > 0 {
+				if !n.issueActivityBlock(fmt.Sprintf("activity %s.%d", n.Name, counter), tips...) {
+					fmt.Println(n.Name, "> Stopped activity due to block not being issued")
+					return
+				}
+				counter++
+				time.Sleep(1 * time.Second)
+				if duration > 0 && time.Since(start) > duration {
+					fmt.Println(n.Name, "> Stopped activity after", time.Since(start))
+					return
+				}
+			} else {
+				fmt.Println(n.Name, "> Skipped activity due lack of strong parents")
+			}
+		}
+	}()
+}
+
+func (n *Node) issueActivityBlock(alias string, parents ...iotago.BlockID) bool {
+	if !n.Protocol.MainEngineInstance().WasStopped() {
+
+		block, err := builder.NewBlockBuilder().
+			StrongParents(parents).
+			SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()).
+			LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
+			Payload(&iotago.TaggedData{
+				Tag: []byte("ACTIVITY"),
+			}).
+			Sign(n.AccountID, n.privateKey).
+			Build()
+
+		if err != nil {
+			panic(err)
+		}
+
+		modelBlock, err := model.BlockFromBlock(block, n.Protocol.API())
+		if err != nil {
+			panic(err)
+		}
+
+		err = n.Protocol.ProcessBlock(modelBlock, n.PeerID)
+		if err != nil {
+			panic(err)
+		}
+
+		modelBlock.ID().RegisterAlias(alias)
+
+		return true
+	}
+	return false
+}

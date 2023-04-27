@@ -133,14 +133,31 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	// Both partitions should have committed slot 8 and have different commitments
 	{
 		f.Wait()
-		require.EqualValues(t, 8, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index)
-		require.EqualValues(t, 8, node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index)
-		require.EqualValues(t, 8, node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index)
-		require.EqualValues(t, 8, node4.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index)
+		f.AssertLatestCommitmentSlotIndex(8, f.Nodes()...)
 
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment())
 		require.Equal(t, node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment(), node4.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment())
-		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment())
+		require.NotEqual(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment())
 	}
 
+	// Merge the partitions
+	{
+		f.Network.MergePartitionsToMain()
+		fmt.Println("\n=========================\nMerged network partitions\n=========================")
+	}
+
+	// TODO: engine switching is currently not yet implemented
+	// wg := &sync.WaitGroup{}
+	//
+	// // Issue blocks after merging the networks
+	// {
+	// 	wg.Add(4)
+	//
+	// 	node1.IssueActivity(25*time.Second, wg)
+	// 	node2.IssueActivity(25*time.Second, wg)
+	// 	node3.IssueActivity(25*time.Second, wg)
+	// 	node4.IssueActivity(25*time.Second, wg)
+	// }
+	//
+	// wg.Wait()
 }
