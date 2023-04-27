@@ -89,8 +89,8 @@ func (b *Booker) Queue(block *blocks.Block) (wasQueued bool, err error) {
 }
 
 func (b *Booker) Shutdown() {
-	b.workers.Shutdown()
 	b.TriggerStopped()
+	b.workers.Shutdown()
 }
 
 func (b *Booker) evict(slotIndex iotago.SlotIndex) {

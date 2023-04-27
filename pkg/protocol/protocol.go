@@ -109,7 +109,7 @@ func (p *Protocol) Run() {
 
 	// the rootCommitment is also the earliest point in the chain we can fork from. It is used to prevent
 	// solidifying and processing commitments that we won't be able to switch to.
-	if err := p.mainEngine.Storage.Settings().SetChainID(rootCommitment.MustID()); err != nil {
+	if err := p.mainEngine.Storage.Settings().SetChainID(rootCommitment.ID()); err != nil {
 		panic(fmt.Sprintln("could not load set main engine's chain using", rootCommitment))
 	}
 	p.chainManager.Initialize(rootCommitment)
@@ -146,7 +146,7 @@ func (p *Protocol) initNetworkEvents() {
 
 	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id network.PeerID) {
 		if block, exists := p.MainEngineInstance().Block(blockID); exists && !block.IsMissing() && !block.IsRootBlock() {
-			p.networkProtocol.SendBlock(block.Block(), id)
+			p.networkProtocol.SendBlock(block.ModelBlock(), id)
 		}
 	}, event.WithWorkerPool(wpBlocks))
 
@@ -155,19 +155,19 @@ func (p *Protocol) initNetworkEvents() {
 	}, event.WithWorkerPool(wpBlocks))
 
 	p.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-		p.networkProtocol.SendBlock(block.Block())
+		p.networkProtocol.SendBlock(block.ModelBlock())
 	}, event.WithWorkerPool(wpBlocks))
 
 	wpCommitments := p.Workers.CreatePool("NetworkEvents.SlotCommitments")
 
 	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source network.PeerID) {
 		// when we receive a commitment request, do not look it up in the ChainManager but in the storage, else we might answer with commitments we did not issue ourselves and for which we cannot provide attestations
-		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); err == nil && requestedCommitment.MustID() == commitmentID {
+		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); err == nil && requestedCommitment.ID() == commitmentID {
 			p.networkProtocol.SendSlotCommitment(requestedCommitment, source)
 		}
 	}, event.WithWorkerPool(wpCommitments))
 
-	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, source network.PeerID) {
+	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source network.PeerID) {
 		p.chainManager.ProcessCommitmentFromSource(commitment, source)
 	}, event.WithWorkerPool(wpCommitments))
 
@@ -175,7 +175,7 @@ func (p *Protocol) initNetworkEvents() {
 		// Check if we have the requested commitment in our storage before asking our peers for it.
 		// This can happen after we restart the node because the chain manager builds up the chain again.
 		if cm, _ := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); cm != nil {
-			if cm.MustID() == commitmentID {
+			if cm.ID() == commitmentID {
 				p.chainManager.ProcessCommitment(cm)
 				return
 			}
@@ -230,7 +230,9 @@ func (p *Protocol) initChainManager() {
 
 		// We want to evict just below the height of our new root commitment (so that the slot of the root commitment
 		// stays in memory storage and with it the root commitment itself as well).
-		p.chainManager.EvictUntil(rootCommitment.MustID().Index() - 1)
+		if rootCommitment.ID().Index() > 0 {
+			p.chainManager.EvictUntil(rootCommitment.ID().Index() - 1)
+		}
 	}, event.WithWorkerPool(wp))
 
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wp))
@@ -243,13 +245,17 @@ func (p *Protocol) ProcessOwnBlock(block *model.Block) error {
 func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	mainEngine := p.MainEngineInstance()
 
-	isSolid, chain := p.chainManager.ProcessCommitmentFromSource(block.Block().SlotCommitment, src)
+	if !mainEngine.WasInitialized() {
+		return errors.Errorf("protocol engine not yet initialized")
+	}
+
+	isSolid, chain := p.chainManager.ProcessCommitmentFromSource(block.SlotCommitment(), src)
 	if !isSolid {
-		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().MustID() {
+		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().ID() {
 			return nil
 		}
 
-		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.Block().SlotCommitment.MustID(), mainEngine.Storage.Settings().LatestCommitment().MustID(), block.ID())
+		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.Block().SlotCommitment.MustID(), mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
 
 	processed := false

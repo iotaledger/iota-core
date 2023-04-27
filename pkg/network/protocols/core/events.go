@@ -10,7 +10,7 @@ import (
 type Events struct {
 	BlockReceived                 *event.Event2[*model.Block, network.PeerID]
 	BlockRequestReceived          *event.Event2[iotago.BlockID, network.PeerID]
-	SlotCommitmentReceived        *event.Event2[*iotago.Commitment, network.PeerID]
+	SlotCommitmentReceived        *event.Event2[*model.Commitment, network.PeerID]
 	SlotCommitmentRequestReceived *event.Event2[iotago.CommitmentID, network.PeerID]
 	AttestationsReceived          *event.Event1[*AttestationsReceivedEvent]
 	AttestationsRequestReceived   *event.Event1[*AttestationsRequestReceivedEvent]
@@ -24,7 +24,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 	return &Events{
 		BlockReceived:                 event.New2[*model.Block, network.PeerID](),
 		BlockRequestReceived:          event.New2[iotago.BlockID, network.PeerID](),
-		SlotCommitmentReceived:        event.New2[*iotago.Commitment, network.PeerID](),
+		SlotCommitmentReceived:        event.New2[*model.Commitment, network.PeerID](),
 		SlotCommitmentRequestReceived: event.New2[iotago.CommitmentID, network.PeerID](),
 		AttestationsReceived:          event.New1[*AttestationsReceivedEvent](),
 		AttestationsRequestReceived:   event.New1[*AttestationsRequestReceivedEvent](),

@@ -1,9 +1,6 @@
 package model
 
 import (
-	"fmt"
-	"sync"
-
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -14,9 +11,26 @@ type Block struct {
 
 	blockID iotago.BlockID
 
-	data      []byte
-	blockOnce sync.Once
-	block     *iotago.Block
+	data       []byte
+	block      *iotago.Block
+	commitment *Commitment
+}
+
+func newBlock(blockID iotago.BlockID, iotaBlock *iotago.Block, data []byte, api iotago.API) (*Block, error) {
+	commitment, err := CommitmentFromCommitment(iotaBlock.SlotCommitment, api)
+	if err != nil {
+		return nil, err
+	}
+
+	block := &Block{
+		api:        api,
+		blockID:    blockID,
+		data:       data,
+		block:      iotaBlock,
+		commitment: commitment,
+	}
+
+	return block, nil
 }
 
 func BlockFromBlock(iotaBlock *iotago.Block, api iotago.API, opts ...serix.Option) (*Block, error) {
@@ -30,36 +44,16 @@ func BlockFromBlock(iotaBlock *iotago.Block, api iotago.API, opts ...serix.Optio
 		return nil, err
 	}
 
-	block := &Block{
-		api:     api,
-		blockID: blockID,
-		data:    data,
-	}
-
-	block.blockOnce.Do(func() {
-		block.block = iotaBlock
-	})
-
-	return block, nil
+	return newBlock(blockID, iotaBlock, data, api)
 }
 
-func BlockFromBlockIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
+func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
 	iotaBlock := new(iotago.Block)
 	if _, err := api.Decode(data, iotaBlock, opts...); err != nil {
 		return nil, err
 	}
 
-	block := &Block{
-		api:     api,
-		blockID: blockID,
-		data:    data,
-	}
-
-	block.blockOnce.Do(func() {
-		block.block = iotaBlock
-	})
-
-	return block, nil
+	return newBlock(blockID, iotaBlock, data, api)
 }
 
 func BlockFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
@@ -73,7 +67,7 @@ func BlockFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Block, 
 		return nil, err
 	}
 
-	return BlockFromBlockIDAndBytes(blockID, data, api, opts...)
+	return newBlock(blockID, iotaBlock, data, api)
 }
 
 func (blk *Block) ID() iotago.BlockID {
@@ -85,17 +79,11 @@ func (blk *Block) Data() []byte {
 }
 
 func (blk *Block) Block() *iotago.Block {
-	blk.blockOnce.Do(func() {
-		iotaBlock := new(iotago.Block)
-		// No need to verify the block again here
-		if _, err := blk.api.Decode(blk.data, iotaBlock); err != nil {
-			panic(fmt.Sprintf("failed to deserialize block: %v, error: %s", blk.blockID.ToHex(), err))
-		}
-
-		blk.block = iotaBlock
-	})
-
 	return blk.block
+}
+
+func (blk *Block) SlotCommitment() *Commitment {
+	return blk.commitment
 }
 
 // TODO: maybe move to iota.go and introduce parent type.

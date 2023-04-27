@@ -7,8 +7,6 @@ import (
 )
 
 type Filter interface {
-	Events() *Events
-
 	// ProcessReceivedBlock processes block from the given source.
 	ProcessReceivedBlock(block *model.Block, source network.PeerID)
 

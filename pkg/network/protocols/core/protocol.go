@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/bytesfilter"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
@@ -50,9 +49,9 @@ func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, ap
 	})
 }
 
-func (p *Protocol) SendBlock(block *iotago.Block, to ...network.PeerID) {
+func (p *Protocol) SendBlock(block *model.Block, to ...network.PeerID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Block{Block: &nwmodels.Block{
-		Bytes: lo.PanicOnErr(p.api.Encode(block)),
+		Bytes: block.Data(),
 	}}}, protocolID, to...)
 }
 
@@ -66,9 +65,9 @@ func (p *Protocol) RequestBlock(id iotago.BlockID, to ...network.PeerID) {
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) SendSlotCommitment(cm *iotago.Commitment, to ...network.PeerID) {
+func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...network.PeerID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitment{SlotCommitment: &nwmodels.SlotCommitment{
-		Bytes: lo.PanicOnErr(p.api.Encode(cm)),
+		Bytes: cm.Data(),
 	}}}, protocolID, to...)
 }
 
@@ -86,9 +85,9 @@ func (p *Protocol) RequestCommitment(id iotago.CommitmentID, to ...network.PeerI
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) RequestAttestations(cm *iotago.Commitment, endIndex iotago.SlotIndex, to ...network.PeerID) {
+func (p *Protocol) RequestAttestations(cm *model.Commitment, endIndex iotago.SlotIndex, to ...network.PeerID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_AttestationsRequest{AttestationsRequest: &nwmodels.AttestationsRequest{
-		Commitment: lo.PanicOnErr(p.api.Encode(cm)),
+		Commitment: cm.Data(),
 		EndIndex:   endIndex.Bytes(),
 	}}}, protocolID, to...)
 }
@@ -157,8 +156,8 @@ func (p *Protocol) onBlockRequest(idBytes []byte, id network.PeerID) {
 }
 
 func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id network.PeerID) {
-	receivedCommitment := new(iotago.Commitment)
-	if _, err := p.api.Decode(commitmentBytes, receivedCommitment, serix.WithValidation()); err != nil {
+	receivedCommitment, err := model.CommitmentFromBytes(commitmentBytes, p.api, serix.WithValidation())
+	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize slot commitment"), id)
 
 		return

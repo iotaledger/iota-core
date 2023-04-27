@@ -65,10 +65,6 @@ func New(protocolParamsFunc func() *iotago.ProtocolParameters, opts ...options.O
 	)
 }
 
-func (f *Filter) Events() *filter.Events {
-	return f.events
-}
-
 // ProcessReceivedBlock processes block from the given source.
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID) {
 	// TODO: if TX add check for TX timestamp
@@ -99,7 +95,10 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	}
 
 	// Check if the block is trying to commit to a slot that is not yet committable.
-	if f.optsMinCommittableSlotAge > 0 && block.Block().SlotCommitment.Index > 0 && block.Block().SlotCommitment.Index > block.ID().Index()-f.optsMinCommittableSlotAge {
+	if f.optsMinCommittableSlotAge > 0 &&
+		block.SlotCommitment().Index() > 0 &&
+		(block.SlotCommitment().Index() > block.ID().Index() ||
+			block.ID().Index()-block.SlotCommitment().Index() < f.optsMinCommittableSlotAge) {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
 			Reason: errors.WithMessagef(ErrCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.Block().SlotCommitment.Index),

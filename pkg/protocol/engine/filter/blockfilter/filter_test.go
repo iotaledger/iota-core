@@ -34,11 +34,11 @@ func NewTestFramework(t *testing.T, protocolParams *iotago.ProtocolParameters, o
 		}, optsFilter...),
 	}
 
-	tf.Filter.Events().BlockAllowed.Hook(func(block *model.Block) {
+	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
 		t.Logf("BlockAllowed: %s", block.ID())
 	})
 
-	tf.Filter.Events().BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
 		t.Logf("BlockFiltered: %s - %s", event.Block.ID(), event.Reason)
 	})
 
@@ -141,11 +141,11 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 		WithSignatureValidation(false),
 	)
 
-	tf.Filter.Events().BlockAllowed.Hook(func(block *model.Block) {
+	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
 		require.NotEqual(t, "tooFarAheadFuture", block.ID().Alias())
 	})
 
-	tf.Filter.Events().BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
 		require.Equal(t, "tooFarAheadFuture", event.Block.ID().Alias())
 		require.True(t, errors.Is(event.Reason, ErrBlockTimeTooFarAheadInFuture))
 	})
@@ -162,11 +162,11 @@ func TestFilter_WithSignatureValidation(t *testing.T) {
 		WithSignatureValidation(true),
 	)
 
-	tf.Filter.Events().BlockAllowed.Hook(func(block *model.Block) {
+	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
 		require.Equal(t, "valid", block.ID().Alias())
 	})
 
-	tf.Filter.Events().BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
 		require.Equal(t, "invalid", event.Block.ID().Alias())
 		require.True(t, errors.Is(event.Reason, ErrInvalidSignature))
 	})
@@ -185,11 +185,11 @@ func TestFilter_MinCommittableSlotAge(t *testing.T) {
 		WithSignatureValidation(false),
 	)
 
-	tf.Filter.Events().BlockAllowed.Hook(func(block *model.Block) {
+	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
 		require.True(t, strings.HasPrefix(block.ID().Alias(), "valid"))
 	})
 
-	tf.Filter.Events().BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
 		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
 		require.True(t, errors.Is(event.Reason, ErrCommitmentNotCommittable))
 	})
@@ -223,11 +223,11 @@ func TestFilter_MinPoW(t *testing.T) {
 		WithSignatureValidation(false),
 	)
 
-	tf.Filter.Events().BlockAllowed.Hook(func(block *model.Block) {
+	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
 		require.True(t, strings.HasPrefix(block.ID().Alias(), "valid"))
 	})
 
-	tf.Filter.Events().BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
 		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
 		require.True(t, errors.Is(event.Reason, ErrInvalidProofOfWork))
 	})

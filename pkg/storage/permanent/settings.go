@@ -9,9 +9,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/storable"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/hive.go/stringify"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -22,6 +24,8 @@ type Settings struct {
 	mutex sync.RWMutex
 
 	api iotago.API
+
+	latestCommitment *model.Commitment
 
 	module.Module
 }
@@ -46,10 +50,6 @@ func NewSettings(path string) (settings *Settings) {
 func (s *Settings) API() iotago.API {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-
-	if s.settingsModel.ProtocolParameters.Version == 0 {
-		panic("API not initialized yet")
-	}
 
 	return s.api
 }
@@ -95,22 +95,28 @@ func (s *Settings) SetProtocolParameters(params iotago.ProtocolParameters) (err 
 	return nil
 }
 
-func (s *Settings) LatestCommitment() *iotago.Commitment {
+func (s *Settings) LatestCommitment() *model.Commitment {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return s.settingsModel.LatestCommitment
+	if s.latestCommitment == nil {
+		s.latestCommitment = lo.PanicOnErr(model.CommitmentFromCommitment(s.settingsModel.LatestCommitment, s.api))
+	}
+
+	return s.latestCommitment
 }
 
-func (s *Settings) SetLatestCommitment(latestCommitment *iotago.Commitment) (err error) {
+func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.settingsModel.LatestCommitment = latestCommitment
+	s.settingsModel.LatestCommitment = latestCommitment.Commitment()
 
 	if err = s.ToFile(); err != nil {
 		return errors.Wrap(err, "failed to persist latest commitment")
 	}
+
+	s.latestCommitment = latestCommitment
 
 	return nil
 }
@@ -252,7 +258,7 @@ func (s *Settings) tryImport(reader io.ReadSeeker) (err error) {
 }
 
 func (s *Settings) UpdateAPI() {
-	s.api = iotago.V3API(&s.settingsModel.ProtocolParameters)
+	s.api = iotago.LatestAPI(&s.settingsModel.ProtocolParameters)
 	iotago.SwapInternalAPI(s.api)
 }
 
