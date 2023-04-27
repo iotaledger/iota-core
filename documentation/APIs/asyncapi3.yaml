@@ -137,12 +137,20 @@ channels:
       description: Publishes metadata of a particular block whenever its metadata changes.
       message:
         $ref: '#/components/messages/BlockMetadata'
-  block-metadata/referenced:
+  block-metadata/confirmed:
     subscribe:
       tags:
         - name: blocks
-      operationId: blockMetadataReferenced
-      description: Publishes metadata of a block whenever it gets referenced.
+      operationId: blockMetadataConfirmed
+      description: Publishes metadata of a block whenever it gets confirmed.
+      message:
+        $ref: '#/components/messages/BlockMetadata'
+  block-metadata/finalized:
+    subscribe:
+      tags:
+        - name: blocks
+      operationId: blockMetadataFinalized
+      description: Publishes metadata of a block whenever it gets finalized.
       message:
         $ref: '#/components/messages/BlockMetadata'
   'transactions/{transactionId}/included-block':
@@ -159,7 +167,7 @@ channels:
         - name: blocks
       operationId: transactionIncludedBlock
       description: >-
-        Publishes the confirmed block which carried the transaction with the
+        Publishes the earliest confirmed block which carried the transaction with the
         specified transaction id.
       message:
         $ref: '#/components/messages/Block'
