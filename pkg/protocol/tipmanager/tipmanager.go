@@ -2,6 +2,7 @@ package tipmanager
 
 import (
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -16,7 +17,7 @@ type TipManager interface {
 	RemoveTip(blockID iotago.BlockID) (removed bool)
 
 	// Tips returns up to 'count' number of tips.
-	Tips(count int) (tips iotago.BlockIDs)
+	Tips(count int) (references model.ParentReferences)
 
 	// AllTips returns all tips contained in the tip pool.
 	AllTips() (allTips []*blocks.Block)

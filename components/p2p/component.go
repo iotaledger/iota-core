@@ -207,7 +207,7 @@ func run() error {
 	if err := Component.Daemon().BackgroundWorker(fmt.Sprintf("%s-P2PManager", Component.Name), func(ctx context.Context) {
 		defer deps.P2PManager.Stop()
 		defer func() {
-			if err := deps.P2PManager.GetP2PHost().Close(); err != nil {
+			if err := deps.P2PManager.P2PHost().Close(); err != nil {
 				Component.LogWarn("Failed to close libp2p host: %+v", err)
 			}
 		}()

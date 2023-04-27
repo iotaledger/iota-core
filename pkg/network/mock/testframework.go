@@ -95,6 +95,11 @@ func NewMockedEndpoint(id network.PeerID, n *MockedNetwork, partition string) (n
 	}
 }
 
+// LocalPeerID returns the local peer ID.
+func (m *MockedEndpoint) LocalPeerID() network.PeerID {
+	return m.id
+}
+
 func (m *MockedEndpoint) RegisterProtocol(protocolID string, newMessage func() proto.Message, handler func(network.PeerID, proto.Message) error) {
 	m.handlersMutex.Lock()
 	defer m.handlersMutex.Unlock()
