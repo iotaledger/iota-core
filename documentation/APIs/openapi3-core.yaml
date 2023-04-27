@@ -449,8 +449,8 @@ paths:
     get:
       tags:
         - UTXO
-      summary: Returns the included block of a transaction.
-      description: Returns the included block of a transaction.
+      summary: Returns the earliest block containing the tranaction that get confirmed.
+      description: Returns the earliest block containing the transaction that get confirmed.
       parameters:
         - in: path
           name: transactionId
@@ -504,9 +504,9 @@ paths:
     get:
       tags:
       - UTXO
-      summary: Find the metadata of the included block of a transaction.
+      summary: Find the metadata of the earliest block containing the transaction that get confirmed.
       description: >-
-        Find the metadata of the included block of a transaction.
+        Find the metadata of the earliest block containing the tx that get confirmed.
       parameters:
         - in: path
           name: transactionId
