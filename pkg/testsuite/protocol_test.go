@@ -5,9 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -44,7 +46,20 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	node3 := f.AddValidatorNodeToPartition("node3", 25, "P2")
 	node4 := f.AddValidatorNodeToPartition("node4", 25, "P2")
 
-	f.Run()
+	f.Run(map[string][]options.Option[protocol.Protocol]{
+		"node1": {
+			protocol.WithSybilProtectionProvider(poa.NewProvider(f.Validators(), poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID))),
+		},
+		"node2": {
+			protocol.WithSybilProtectionProvider(poa.NewProvider(f.Validators(), poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID))),
+		},
+		"node3": {
+			protocol.WithSybilProtectionProvider(poa.NewProvider(f.Validators(), poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID))),
+		},
+		"node4": {
+			protocol.WithSybilProtectionProvider(poa.NewProvider(f.Validators(), poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID))),
+		},
+	})
 	f.HookLogging()
 
 	f.Wait()
@@ -59,26 +74,20 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	f.AssertStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}, f.Nodes()...)
 
-	f.AssertSybilProtection(200, 200, node1, node2, node3, node4)
-	// TODO: manually set nodes as active/inactive? then verify again
-
-	// TODO: wait for online weight
-	assert.Eventually(t, func() bool {
-		for _, node := range f.Nodes("node1", "node2") {
-			if node.Protocol.MainEngineInstance().SybilProtection.OnlineCommittee().TotalWeight() <= 150 {
-				return true
-			}
-		}
-		return false
-	}, 100*time.Second, 100*time.Millisecond)
-	assert.Eventually(t, func() bool {
-		for _, node := range f.Nodes("node3", "node4") {
-			if node.Protocol.MainEngineInstance().SybilProtection.OnlineCommittee().TotalWeight() <= 50 {
-				return true
-			}
-		}
-		return false
-	}, 100*time.Second, 100*time.Millisecond)
+	f.AssertSybilProtectionCommittee(map[iotago.AccountID]int64{
+		node1.AccountID: 75,
+		node2.AccountID: 75,
+		node3.AccountID: 25,
+		node4.AccountID: 25,
+	}, f.Nodes()...)
+	f.AssertSybilProtectionOnlineCommittee(map[iotago.AccountID]int64{
+		node1.AccountID: 75,
+		node2.AccountID: 75,
+	}, node1, node2)
+	f.AssertSybilProtectionOnlineCommittee(map[iotago.AccountID]int64{
+		node3.AccountID: 25,
+		node4.AccountID: 25,
+	}, node3, node4)
 
 	// Issue blocks on partition 1.
 	{

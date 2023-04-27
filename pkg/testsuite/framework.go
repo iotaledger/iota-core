@@ -12,14 +12,13 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
-
-const genesisSnapshot = "genesis_snapshot.bin"
 
 type Framework struct {
 	Testing *testing.T
@@ -29,16 +28,20 @@ type Framework struct {
 	nodes     map[string]*mock.Node
 	running   bool
 
-	validators map[iotago.AccountID]int64
-	blocks     *shrinkingmap.ShrinkingMap[string, *model.Block]
+	validators     map[iotago.AccountID]int64
+	validatorsOnce sync.Once
+	snapshotPath   string
+	blocks         *shrinkingmap.ShrinkingMap[string, *model.Block]
 
 	ProtocolParameters iotago.ProtocolParameters
+
+	optsSnapshotOptions []options.Option[snapshotcreator.Options]
 
 	mutex sync.RWMutex
 }
 
-func NewFramework(t *testing.T) *Framework {
-	return &Framework{
+func NewFramework(t *testing.T, snapshotOptions ...options.Option[snapshotcreator.Options]) *Framework {
+	f := &Framework{
 		Testing:   t,
 		Network:   mock.NewNetwork(),
 		Directory: utils.NewDirectory(t.TempDir()),
@@ -59,6 +62,19 @@ func NewFramework(t *testing.T) *Framework {
 			SlotDurationInSeconds: 10,
 		},
 	}
+
+	f.snapshotPath = f.Directory.Path("genesis_snapshot.bin")
+	var defaultSnapshotOptions = []options.Option[snapshotcreator.Options]{
+		snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
+		snapshotcreator.WithFilePath(f.snapshotPath),
+		snapshotcreator.WithProtocolParameters(f.ProtocolParameters),
+		snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
+			iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
+		}),
+	}
+	f.optsSnapshotOptions = append(defaultSnapshotOptions, snapshotOptions...)
+
+	return f
 }
 
 func (f *Framework) Block(alias string) *model.Block {
@@ -201,58 +217,56 @@ func (f *Framework) AddNode(name string, opts ...options.Option[protocol.Protoco
 	return f.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition, opts...)
 }
 
-func (f *Framework) Run() {
+func (f *Framework) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	f.validators = f.createValidatorsFromNodes()
-	path := f.createSnapshot()
-	f.running = true
-
-	for _, node := range f.nodes {
-		node.Initialize(
-			protocol.WithSnapshotPath(path),
-			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(f.validators, poa.WithActivityWindow(time.Second*10)),
-			),
-			protocol.WithBaseDirectory(f.Directory.PathWithCreate(node.Name)),
-		)
-	}
-}
-
-func (f *Framework) createValidatorsFromNodes() map[iotago.AccountID]int64 {
-	if f.running {
-		panic("cannot create validators from nodes: framework already running")
-	}
-
-	validators := make(map[iotago.AccountID]int64)
-	for _, node := range f.nodes {
-		if node.Weight == 0 {
-			continue
-		}
-		validators[node.AccountID] = node.Weight
-	}
-
-	return validators
-}
-
-func (f *Framework) createSnapshot() string {
-	path := f.Directory.Path(genesisSnapshot)
-	var base = []options.Option[snapshotcreator.Options]{
-		snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
-		snapshotcreator.WithFilePath(path),
-		snapshotcreator.WithProtocolParameters(f.ProtocolParameters),
-		snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
-			iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
-		}),
-	}
-
-	err := snapshotcreator.CreateSnapshot(base...)
+	err := snapshotcreator.CreateSnapshot(f.optsSnapshotOptions...)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
 
-	return path
+	for _, node := range f.nodes {
+		baseOpts := []options.Option[protocol.Protocol]{
+			protocol.WithSnapshotPath(f.snapshotPath),
+			protocol.WithBaseDirectory(f.Directory.PathWithCreate(node.Name)),
+			protocol.WithSybilProtectionProvider(
+				poa.NewProvider(f.Validators()),
+			),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+			),
+		}
+		if len(nodesOptions) == 1 {
+			if opts, exists := nodesOptions[0][node.Name]; exists {
+				baseOpts = append(baseOpts, opts...)
+			}
+		}
+
+		node.Initialize(baseOpts...)
+	}
+
+	f.running = true
+}
+
+func (f *Framework) Validators() map[iotago.AccountID]int64 {
+	f.validatorsOnce.Do(func() {
+		if f.running {
+			panic("cannot create validators from nodes: framework already running")
+		}
+
+		validators := make(map[iotago.AccountID]int64)
+		for _, node := range f.nodes {
+			if node.Weight == 0 {
+				continue
+			}
+			validators[node.AccountID] = node.Weight
+		}
+
+		f.validators = validators
+	})
+
+	return f.validators
 }
 
 func (f *Framework) HookLogging() {
