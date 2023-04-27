@@ -130,7 +130,7 @@ The following table describes the serialization of a Block:
     <td>The time the block is issued. It's a Unix-like timestamp in nanosecond.</td>
   </tr>
   <tr>
-    <td valign="top">Slot Commitment <code>oneOf</code></td>
+    <td valign="top">Slot Commitment</td>
     <td colspan="2">
       <details open="true">
         <summary>Slot Commitment</summary>
