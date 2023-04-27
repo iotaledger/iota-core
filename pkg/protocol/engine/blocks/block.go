@@ -46,6 +46,15 @@ type rootBlock struct {
 	issuingTime  time.Time
 }
 
+func (r *rootBlock) String() string {
+	builder := stringify.NewStructBuilder("rootBlock")
+	builder.AddField(stringify.NewStructField("blockID", r.blockID))
+	builder.AddField(stringify.NewStructField("commitmentID", r.commitmentID))
+	builder.AddField(stringify.NewStructField("issuingTime", r.issuingTime))
+
+	return builder.String()
+}
+
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
 	return &Block{
@@ -408,6 +417,8 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("Booked", b.booked))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
 	builder.AddField(stringify.NewStructField("Accepted", b.accepted))
+	builder.AddField(stringify.NewStructField("Ratifiers", b.ratifiers))
+	builder.AddField(stringify.NewStructField("RatifiedAccepted", b.ratifiedAccepted))
 	builder.AddField(stringify.NewStructField("Confirmed", b.confirmed))
 
 	for index, child := range b.strongChildren {

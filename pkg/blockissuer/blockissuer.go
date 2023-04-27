@@ -105,7 +105,7 @@ func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Pa
 	parentsMaxTime := time.Time{}
 	parents := lo.Flatten(lo.Map[iotago.BlockIDs, []iotago.BlockID](lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds }))
 	for _, parent := range parents {
-		if b, exists := i.protocol.MainEngineInstance().Block(parent); exists {
+		if b, exists := i.protocol.MainEngineInstance().BlockFromCache(parent); exists {
 			if b.IssuingTime().After(parentsMaxTime) {
 				parentsMaxTime = b.IssuingTime()
 			}

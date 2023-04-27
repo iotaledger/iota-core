@@ -1,6 +1,9 @@
 package model
 
 import (
+	"bytes"
+	"encoding/json"
+
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -121,4 +124,17 @@ func (blk *Block) ForEachParent(consumer func(parent Parent)) {
 			consumer(Parent{parentBlockID, ShallowLikeParentType})
 		}
 	}
+}
+
+func (blk *Block) String() string {
+	encode, err := blk.api.JSONEncode(blk.Block())
+	if err != nil {
+		panic(err)
+	}
+	var out bytes.Buffer
+	if json.Indent(&out, encode, "", "  ") != nil {
+		panic(err)
+	}
+
+	return out.String()
 }

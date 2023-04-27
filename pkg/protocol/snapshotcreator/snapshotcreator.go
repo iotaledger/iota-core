@@ -68,8 +68,5 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
 	}
 
-	if err := engineInstance.WriteSnapshot(opt.FilePath); err != nil {
-		return err
-	}
-	return nil
+	return engineInstance.WriteSnapshot(opt.FilePath)
 }

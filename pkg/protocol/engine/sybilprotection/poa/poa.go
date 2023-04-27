@@ -29,12 +29,13 @@ type SybilProtection struct {
 	clock             clock.Clock
 	workers           *workerpool.Group
 	accounts          *account.Accounts[iotago.AccountID, *iotago.AccountID]
-	onlineComittee    *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
+	onlineCommittee   *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
 	inactivityManager *timed.TaskExecutor[iotago.AccountID]
 	lastActivities    *shrinkingmap.ShrinkingMap[iotago.AccountID, time.Time]
 	mutex             sync.RWMutex
 
-	optsActivityWindow time.Duration
+	optsActivityWindow         time.Duration
+	optsOnlineCommitteeStartup []iotago.AccountID
 
 	module.Module
 }
@@ -49,13 +50,20 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 				inactivityManager: timed.NewTaskExecutor[iotago.AccountID](1),
 				lastActivities:    shrinkingmap.New[iotago.AccountID, time.Time](),
 
-				optsActivityWindow: time.Second * 30,
+				optsActivityWindow:         time.Second * 30,
+				optsOnlineCommitteeStartup: lo.Keys(weightVector),
 			}, opts, func(s *SybilProtection) {
 				s.initializeAccounts(weightVector)
-				s.onlineComittee = s.accounts.SelectAccounts()
+				s.onlineCommittee = s.accounts.SelectAccounts()
 
 				e.HookConstructed(func() {
 					s.clock = e.Clock
+
+					e.Clock.HookInitialized(func() {
+						for _, v := range s.optsOnlineCommitteeStartup {
+							s.markValidatorActive(v, e.Clock.Accepted().RelativeTime())
+						}
+					})
 
 					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
@@ -79,7 +87,7 @@ func (s *SybilProtection) Committee() *account.SelectedAccounts[iotago.AccountID
 
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
 func (s *SybilProtection) OnlineCommittee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID] {
-	return s.onlineComittee
+	return s.onlineCommittee
 }
 
 func (s *SybilProtection) LastCommittedSlot() iotago.SlotIndex {
@@ -118,7 +126,7 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 	if lastActivity, exists := s.lastActivities.Get(id); exists && lastActivity.After(activityTime) {
 		return
 	} else if !exists {
-		s.onlineComittee.Add(id)
+		s.onlineCommittee.Add(id)
 	}
 
 	s.lastActivities.Set(id, activityTime)
@@ -131,5 +139,5 @@ func (s *SybilProtection) markValidatorInactive(id iotago.AccountID) {
 	defer s.mutex.Unlock()
 
 	s.lastActivities.Delete(id)
-	s.onlineComittee.Delete(id)
+	s.onlineCommittee.Delete(id)
 }

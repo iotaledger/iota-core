@@ -123,16 +123,13 @@ func (p *Protocol) Run() {
 
 func (p *Protocol) Shutdown() {
 	if p.networkProtocol != nil {
-		p.networkProtocol.Unregister()
+		p.networkProtocol.Shutdown()
 	}
 
-	p.chainManager.Shutdown()
-
-	p.TipManager.Shutdown()
-
-	p.mainEngine.Shutdown()
-
 	p.Workers.Shutdown()
+	p.mainEngine.Shutdown()
+	p.chainManager.Shutdown()
+	p.TipManager.Shutdown()
 }
 
 func (p *Protocol) initNetworkEvents() {
@@ -145,8 +142,8 @@ func (p *Protocol) initNetworkEvents() {
 	}, event.WithWorkerPool(wpBlocks))
 
 	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id network.PeerID) {
-		if block, exists := p.MainEngineInstance().Block(blockID); exists && !block.IsMissing() && !block.IsRootBlock() {
-			p.networkProtocol.SendBlock(block.ModelBlock(), id)
+		if block, exists := p.MainEngineInstance().Block(blockID); exists {
+			p.networkProtocol.SendBlock(block, id)
 		}
 	}, event.WithWorkerPool(wpBlocks))
 
@@ -204,7 +201,7 @@ func (p *Protocol) initEngineManager() {
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("could not load active engine: %s", err))
 	}
 	p.mainEngine = mainEngine
 }
