@@ -75,6 +75,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 
 func (g *Gadget) Shutdown() {
 	g.TriggerStopped()
+	g.workers.Shutdown()
 }
 
 func (g *Gadget) LatestFinalizedSlot() iotago.SlotIndex {

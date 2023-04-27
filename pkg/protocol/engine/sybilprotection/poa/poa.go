@@ -57,8 +57,6 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 				s.onlineCommittee = s.accounts.SelectAccounts()
 
 				e.HookConstructed(func() {
-					e.HookStopped(s.stopInactivityManager)
-
 					s.clock = e.Clock
 
 					e.Clock.HookInitialized(func() {
@@ -97,8 +95,9 @@ func (s *SybilProtection) LastCommittedSlot() iotago.SlotIndex {
 }
 
 func (s *SybilProtection) Shutdown() {
-	s.stopInactivityManager()
 	s.TriggerStopped()
+	s.stopInactivityManager()
+	s.workers.Shutdown()
 }
 
 func (s *SybilProtection) initializeAccounts(weightVector map[iotago.AccountID]int64) {

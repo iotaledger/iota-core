@@ -9,21 +9,21 @@ import (
 )
 
 type Chain struct {
-	ForkingPoint *Commitment
+	ForkingPoint *ChainCommitment
 
 	latestCommitmentIndex iotago.SlotIndex
-	commitmentsByIndex    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
+	commitmentsByIndex    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ChainCommitment]
 
 	sync.RWMutex
 }
 
-func NewChain(forkingPoint *Commitment) (fork *Chain) {
-	forkingPointIndex := forkingPoint.Commitment().Index
+func NewChain(forkingPoint *ChainCommitment) (fork *Chain) {
+	forkingPointIndex := forkingPoint.Commitment().Index()
 
 	c := &Chain{
 		ForkingPoint:          forkingPoint,
 		latestCommitmentIndex: forkingPointIndex,
-		commitmentsByIndex:    shrinkingmap.New[iotago.SlotIndex, *Commitment](),
+		commitmentsByIndex:    shrinkingmap.New[iotago.SlotIndex, *ChainCommitment](),
 	}
 
 	c.commitmentsByIndex.Set(forkingPointIndex, forkingPoint)
@@ -38,7 +38,7 @@ func (c *Chain) IsSolid() (isSolid bool) {
 	return c.ForkingPoint.IsSolid()
 }
 
-func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment) {
+func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *ChainCommitment) {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -52,18 +52,18 @@ func (c *Chain) Size() int {
 	return c.commitmentsByIndex.Size()
 }
 
-func (c *Chain) LatestCommitment() *Commitment {
+func (c *Chain) LatestCommitment() *ChainCommitment {
 	c.RLock()
 	defer c.RUnlock()
 
 	return lo.Return1(c.commitmentsByIndex.Get(c.latestCommitmentIndex))
 }
 
-func (c *Chain) addCommitment(commitment *Commitment) {
+func (c *Chain) addCommitment(commitment *ChainCommitment) {
 	c.Lock()
 	defer c.Unlock()
 
-	commitmentIndex := commitment.Commitment().Index
+	commitmentIndex := commitment.Commitment().Index()
 	if commitmentIndex > c.latestCommitmentIndex {
 		c.latestCommitmentIndex = commitmentIndex
 	}
