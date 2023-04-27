@@ -11,7 +11,7 @@ This document defines core models for IOTA V3 protocol.
 * [Payloads](#payloads)
   * [Tagged Data Payload](#tagged-data-payload)
   * [Transaction](#transaction)
-  * [Outputs and Unlock blocks](#outputs-and-unlock-blocks)
+  * [Outputs and Unlocks](#outputs-and-unlocks)
 * [Signature](#signature)
   * [Ed25519 Signature](#ed25519-signature)
 
@@ -530,7 +530,7 @@ The following table describes the serialization of a Transaction Payload:
 
 Transaction validation rules follow [TIP 20 Transaction Payload with TIP-18 Output Types](https://github.com/iotaledger/tips/blob/ae7fbd336e506f907080aa6b16d6ffb0d7a5553c/tips/TIP-0020/tip-0020.md).
 
-### Outputs and Unlock blocks
+### Outputs and Unlocks
 Output and unlock designs are the same as described in [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#output-design)
 
 ## Signature
