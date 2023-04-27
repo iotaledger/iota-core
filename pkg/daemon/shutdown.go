@@ -9,8 +9,9 @@ const (
 	PriorityP2P
 	PriorityManualPeering
 	PriorityProtocol
-	PriorityActivity
-	PriorityRestAPI // depends on PriorityPoWHandler
+	PriorityBlockIssuer
+	PriorityActivity // depends on BlockIssuer
+	PriorityRestAPI  // depends on PriorityPoWHandler
 	PriorityDashboardMetrics
 	PriorityDashboard
 )

@@ -179,7 +179,7 @@ func (m *Manager) initiateStream(ctx context.Context, libp2pID libp2ppeer.ID, pr
 	if !registered {
 		return nil, errors.Errorf("cannot initiate stream protocol %s is not registered", protocolID)
 	}
-	stream, err := m.GetP2PHost().NewStream(ctx, libp2pID, protocolID)
+	stream, err := m.P2PHost().NewStream(ctx, libp2pID, protocolID)
 	if err != nil {
 		return nil, err
 	}

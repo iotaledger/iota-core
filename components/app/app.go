@@ -5,6 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/app/components/profiling"
 	"github.com/iotaledger/hive.go/app/components/shutdown"
 	"github.com/iotaledger/iota-core/components/activity"
+	"github.com/iotaledger/iota-core/components/blockissuer"
 	"github.com/iotaledger/iota-core/components/coreapi"
 	"github.com/iotaledger/iota-core/components/dashboard"
 	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
@@ -23,7 +24,7 @@ var (
 
 func App() *app.App {
 	return app.New(Name, Version,
-		//app.WithVersionCheck("iotaledger", "iota-core"),
+		// app.WithVersionCheck("iotaledger", "iota-core"),
 		app.WithInitComponent(InitComponent),
 		app.WithComponents(
 			shutdown.Component,
@@ -32,6 +33,7 @@ func App() *app.App {
 			restapi.Component,
 			coreapi.Component,
 			protocol.Component,
+			blockissuer.Component,
 			activity.Component,
 			dashboardmetrics.Component,
 			dashboard.Component,
@@ -39,9 +41,7 @@ func App() *app.App {
 	)
 }
 
-var (
-	InitComponent *app.InitComponent
-)
+var InitComponent *app.InitComponent
 
 func init() {
 	InitComponent = &app.InitComponent{

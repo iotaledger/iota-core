@@ -42,8 +42,8 @@ import (
 
 type Protocol struct {
 	Events        *Events
-	engineManager *enginemanager.EngineManager
 	TipManager    tipmanager.TipManager
+	engineManager *enginemanager.EngineManager
 	chainManager  *chainmanager.Manager
 
 	Workers         *workerpool.Group
@@ -235,6 +235,10 @@ func (p *Protocol) initChainManager() {
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wp))
 }
 
+func (p *Protocol) ProcessOwnBlock(block *model.Block) error {
+	return p.ProcessBlock(block, p.dispatcher.LocalPeerID())
+}
+
 func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	mainEngine := p.MainEngineInstance()
 
@@ -292,10 +296,6 @@ func (p *Protocol) API() iotago.API {
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	panic(fmt.Sprintf("Fork detected: %s", fork))
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// region Options //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 	return func(n *Protocol) {
@@ -386,5 +386,3 @@ func WithStorageOptions(opts ...options.Option[storage.Storage]) options.Option[
 		p.optsStorageOptions = append(p.optsStorageOptions, opts...)
 	}
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
