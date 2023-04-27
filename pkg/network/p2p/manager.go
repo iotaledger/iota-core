@@ -126,13 +126,13 @@ func (m *Manager) UnregisterProtocol(protocolID string) {
 	delete(m.registeredProtocols, protocol.ID(protocolID))
 }
 
-// GetP2PHost returns the libp2p host.
-func (m *Manager) GetP2PHost() host.Host {
+// P2PHost returns the lib-p2p host.
+func (m *Manager) P2PHost() host.Host {
 	return m.libp2pHost
 }
 
-// GetLocalPeer return the local peer.
-func (m *Manager) GetLocalPeer() *peer.Local {
+// LocalPeer return the local peer.
+func (m *Manager) LocalPeer() *peer.Local {
 	return m.local
 }
 
@@ -152,8 +152,8 @@ func (m *Manager) AddInbound(ctx context.Context, p *peer.Peer, group NeighborsG
 	return m.addNeighbor(ctx, p, group, m.acceptPeer, connectOpts)
 }
 
-// GetNeighbor returns the neighbor by its id.
-func (m *Manager) GetNeighbor(id network.PeerID) (*Neighbor, error) {
+// Neighbor returns the neighbor by its id.
+func (m *Manager) Neighbor(id network.PeerID) (*Neighbor, error) {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 	nbr, ok := m.neighbors[id]
@@ -166,7 +166,7 @@ func (m *Manager) GetNeighbor(id network.PeerID) (*Neighbor, error) {
 
 // DropNeighbor disconnects the neighbor with the given ID and the group.
 func (m *Manager) DropNeighbor(id network.PeerID, group NeighborsGroup) error {
-	nbr, err := m.getNeighborWithGroup(id, group)
+	nbr, err := m.neighborWithGroup(id, group)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -181,7 +181,7 @@ func (m *Manager) Send(packet proto.Message, protocolID string, to ...network.Pe
 	if len(to) == 0 {
 		neighbors = m.AllNeighbors()
 	} else {
-		neighbors = m.GetNeighborsByID(to)
+		neighbors = m.NeighborsByID(to)
 	}
 
 	for _, nbr := range neighbors {
@@ -212,8 +212,8 @@ func (m *Manager) AllNeighborsIDs() (ids []network.PeerID) {
 	return
 }
 
-// GetNeighborsByID returns all the neighbors that are currently connected corresponding to the supplied ids.
-func (m *Manager) GetNeighborsByID(ids []network.PeerID) []*Neighbor {
+// NeighborsByID returns all the neighbors that are currently connected corresponding to the supplied ids.
+func (m *Manager) NeighborsByID(ids []network.PeerID) []*Neighbor {
 	result := make([]*Neighbor, 0, len(ids))
 	if len(ids) == 0 {
 		return result
@@ -230,8 +230,8 @@ func (m *Manager) GetNeighborsByID(ids []network.PeerID) []*Neighbor {
 	return result
 }
 
-// getNeighborWithGroup returns neighbor by ID and group.
-func (m *Manager) getNeighborWithGroup(id network.PeerID, group NeighborsGroup) (*Neighbor, error) {
+// neighborWithGroup returns neighbor by ID and group.
+func (m *Manager) neighborWithGroup(id network.PeerID, group NeighborsGroup) (*Neighbor, error) {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 	nbr, ok := m.neighbors[id]

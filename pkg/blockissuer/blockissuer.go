@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
@@ -17,7 +18,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
-// BlockIssuer contains logic to create and references block issuer.
+// BlockIssuer contains logic to create and issue blocks signed by the given account.
 type BlockIssuer struct {
 	events *Events
 
@@ -78,12 +79,12 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	}
 }
 
-// CreateBlock creates a new block including sequence number and tip selection and returns it.
+// CreateBlock creates a new block with the given payload and an optionally defined amount of strong parents.
 func (i *BlockIssuer) CreateBlock(ctx context.Context, p iotago.Payload, parentsCount ...int) (*model.Block, error) {
 	return i.CreateBlockWithReferences(ctx, p, nil, parentsCount...)
 }
 
-// CreateBlockWithReferences creates a new block with the references submit.
+// CreateBlockWithReferences creates a new block with the given payload and parent references.
 func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Payload, references model.ParentReferences, strongParentsCountOpt ...int) (*model.Block, error) {
 	strongParentsCount := iotago.BlockMaxParents
 	if len(strongParentsCountOpt) > 0 {
@@ -101,7 +102,20 @@ func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Pa
 	slotCommitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 	lastFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 
-	// TODO: do we have to ensure that the issuing time is at least the Max (latest) of the parents' issuing times?
+	parentsMaxTime := time.Time{}
+	parents := lo.Flatten(lo.Map[iotago.BlockIDs, []iotago.BlockID](lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds }))
+	for _, parent := range parents {
+		if b, exists := i.protocol.MainEngineInstance().Block(parent); exists {
+			if b.IssuingTime().After(parentsMaxTime) {
+				parentsMaxTime = b.IssuingTime()
+			}
+		}
+	}
+
+	if parentsMaxTime.After(time.Now()) {
+		return nil, errors.Errorf("cannot issue block if the parents issuingTime is ahead of our local clock: %s vs %s", parentsMaxTime, time.Now())
+	}
+
 	block, err := builder.NewBlockBuilder().
 		StrongParents(references[model.StrongParentType]).
 		WeakParents(references[model.WeakParentType]).
