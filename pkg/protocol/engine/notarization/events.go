@@ -3,6 +3,7 @@ package notarization
 import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -26,7 +27,7 @@ var NewEvents = event.CreateGroupConstructor(func() (self *Events) {
 
 // SlotCommittedDetails contains the details of a committed slot.
 type SlotCommittedDetails struct {
-	Commitment            *iotago.Commitment
+	Commitment            *model.Commitment
 	AcceptedBlocks        *ads.Set[iotago.BlockID, *iotago.BlockID]
 	ActiveValidatorsCount int
 }

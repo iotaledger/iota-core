@@ -9,64 +9,65 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/stringify"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type Commitment struct {
+type ChainCommitment struct {
 	id         iotago.CommitmentID
-	commitment *iotago.Commitment
+	commitment *model.Commitment
 
 	solid       bool
 	mainChildID iotago.CommitmentID
-	children    *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *Commitment]
+	children    *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *ChainCommitment]
 	chain       *Chain
 
 	mutex sync.RWMutex
 }
 
-func NewCommitment(id iotago.CommitmentID) *Commitment {
-	return &Commitment{
+func NewChainCommitment(id iotago.CommitmentID) *ChainCommitment {
+	return &ChainCommitment{
 		id:       id,
-		children: shrinkingmap.New[iotago.CommitmentID, *Commitment](),
+		children: shrinkingmap.New[iotago.CommitmentID, *ChainCommitment](),
 	}
 }
 
-func (c *Commitment) ID() iotago.CommitmentID {
+func (c *ChainCommitment) ID() iotago.CommitmentID {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
 	return c.id
 }
 
-func (c *Commitment) Commitment() *iotago.Commitment {
+func (c *ChainCommitment) Commitment() *model.Commitment {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
 	return c.commitment
 }
 
-func (c *Commitment) Children() []*Commitment {
+func (c *ChainCommitment) Children() []*ChainCommitment {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
 	return c.children.Values()
 }
 
-func (c *Commitment) Chain() (chain *Chain) {
+func (c *ChainCommitment) Chain() (chain *Chain) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
 	return c.chain
 }
 
-func (c *Commitment) IsSolid() (isSolid bool) {
+func (c *ChainCommitment) IsSolid() (isSolid bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
 	return c.solid
 }
 
-func (c *Commitment) SetSolid(solid bool) (updated bool) {
+func (c *ChainCommitment) SetSolid(solid bool) (updated bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -77,7 +78,7 @@ func (c *Commitment) SetSolid(solid bool) (updated bool) {
 	return
 }
 
-func (c *Commitment) PublishCommitment(commitment *iotago.Commitment) (published bool) {
+func (c *ChainCommitment) PublishCommitment(commitment *model.Commitment) (published bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -88,7 +89,7 @@ func (c *Commitment) PublishCommitment(commitment *iotago.Commitment) (published
 	return
 }
 
-func (c *Commitment) registerChild(child *Commitment) (isSolid bool, chain *Chain, wasForked bool) {
+func (c *ChainCommitment) registerChild(child *ChainCommitment) (isSolid bool, chain *Chain, wasForked bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -103,21 +104,21 @@ func (c *Commitment) registerChild(child *Commitment) (isSolid bool, chain *Chai
 	return c.solid, c.chain, false
 }
 
-func (c *Commitment) deleteChild(child *Commitment) {
+func (c *ChainCommitment) deleteChild(child *ChainCommitment) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	c.children.Delete(child.ID())
 }
 
-func (c *Commitment) mainChild() *Commitment {
+func (c *ChainCommitment) mainChild() *ChainCommitment {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
 	return lo.Return1(c.children.Get(c.mainChildID))
 }
 
-func (c *Commitment) setMainChild(commitment *Commitment) error {
+func (c *ChainCommitment) setMainChild(commitment *ChainCommitment) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -129,7 +130,7 @@ func (c *Commitment) setMainChild(commitment *Commitment) error {
 	return nil
 }
 
-func (c *Commitment) publishChain(chain *Chain) (wasPublished bool) {
+func (c *ChainCommitment) publishChain(chain *Chain) (wasPublished bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -140,15 +141,15 @@ func (c *Commitment) publishChain(chain *Chain) (wasPublished bool) {
 	return
 }
 
-func (c *Commitment) replaceChain(chain *Chain) {
+func (c *ChainCommitment) replaceChain(chain *Chain) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	c.chain = chain
 }
 
-func (c *Commitment) String() string {
-	builder := stringify.NewStructBuilder("Commitment",
+func (c *ChainCommitment) String() string {
+	builder := stringify.NewStructBuilder("ChainCommitment",
 		stringify.NewStructField("ID", c.id),
 		stringify.NewStructField("Commitment", c.commitment),
 		stringify.NewStructField("Solid", c.solid),

@@ -12,6 +12,8 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/hive.go/serializer/v2/serix"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -80,7 +82,7 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 					// Slots are committed whenever ATT advances, start committing only when bootstrapped.
 					e.Events.Clock.AcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
 
-					m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index)
+					m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index())
 
 					m.events.AcceptedBlockRemoved.LinkTo(m.slotMutations.AcceptedBlockRemoved)
 					e.Events.Notarization.LinkTo(m.events)
@@ -106,7 +108,7 @@ func (m *Manager) tryCommitUntil(acceptanceTime time.Time) {
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 
-	if index := m.slotTimeProviderFunc().IndexFromTime(acceptanceTime); index > m.storage.Settings().LatestCommitment().Index {
+	if index := m.slotTimeProviderFunc().IndexFromTime(acceptanceTime); index > m.storage.Settings().LatestCommitment().Index() {
 		m.tryCommitSlotUntil(index)
 	}
 }
@@ -116,7 +118,7 @@ func (m *Manager) IsBootstrapped() bool {
 	// If acceptance time is in slot 10, then the latest committable index is 3 (with optsMinCommittableSlotAge=6), because there are 6 full slots between slot 10 and slot 3.
 	// All slots smaller than 4 are committable, so in order to check if slot 3 is committed it's necessary to do m.optsMinCommittableSlotAge-1,
 	// otherwise we'd expect slot 4 to be committed in order to be fully committed, which is impossible.
-	return m.storage.Settings().LatestCommitment().Index >= m.slotTimeProviderFunc().IndexFromTime(m.acceptedTimeFunc())-m.optsMinCommittableSlotAge-1
+	return m.storage.Settings().LatestCommitment().Index() >= m.slotTimeProviderFunc().IndexFromTime(m.acceptedTimeFunc())-m.optsMinCommittableSlotAge-1
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
@@ -161,7 +163,7 @@ func (m *Manager) MinCommittableSlotAge() iotago.SlotIndex {
 }
 
 func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
-	for i := m.storage.Settings().LatestCommitment().Index + 1; i <= acceptedBlockIndex; i++ {
+	for i := m.storage.Settings().LatestCommitment().Index() + 1; i <= acceptedBlockIndex; i++ {
 		if m.WasStopped() {
 			break
 		}
@@ -177,13 +179,17 @@ func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
 }
 
 func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool {
+	if acceptedBlockIndex < m.optsMinCommittableSlotAge {
+		return false
+	}
+
 	return index < acceptedBlockIndex-m.optsMinCommittableSlotAge
 }
 
 func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	latestCommitment := m.storage.Settings().LatestCommitment()
-	if index != latestCommitment.Index+1 {
-		m.events.Error.Trigger(errors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index))
+	if index != latestCommitment.Index()+1 {
+		m.events.Error.Trigger(errors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
 
 		return false
 	}
@@ -202,7 +208,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 
 	newCommitment := iotago.NewCommitment(
 		index,
-		latestCommitment.MustID(),
+		latestCommitment.ID(),
 		iotago.NewRoots(
 			iotago.Identifier(acceptedBlocks.Root()),
 			iotago.Identifier{},
@@ -210,21 +216,26 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 			iotago.Identifier{},
 			iotago.Identifier(m.slotMutations.weights.Root()),
 		).ID(),
-		m.storage.Settings().LatestCommitment().CumulativeWeight+attestationsWeight,
+		m.storage.Settings().LatestCommitment().CumulativeWeight()+uint64(attestationsWeight),
 	)
 
-	if err = m.storage.Settings().SetLatestCommitment(newCommitment); err != nil {
+	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, m.storage.Settings().API(), serix.WithValidation())
+	if err != nil {
+		return false
+	}
+
+	if err = m.storage.Settings().SetLatestCommitment(newModelCommitment); err != nil {
 		m.events.Error.Trigger(errors.Wrap(err, "failed to set latest commitment"))
 		return false
 	}
 
-	if err = m.storage.Commitments().Store(newCommitment); err != nil {
+	if err = m.storage.Commitments().Store(newModelCommitment); err != nil {
 		m.events.Error.Trigger(errors.Wrap(err, "failed to store latest commitment"))
 		return false
 	}
 
 	m.events.SlotCommitted.Trigger(&notarization.SlotCommittedDetails{
-		Commitment:            newCommitment,
+		Commitment:            newModelCommitment,
 		AcceptedBlocks:        acceptedBlocks,
 		ActiveValidatorsCount: 0,
 	})

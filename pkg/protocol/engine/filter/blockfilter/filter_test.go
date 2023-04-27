@@ -109,7 +109,7 @@ func (t *TestFramework) IssueSigned(alias string) {
 	block, err := builder.NewBlockBuilder().
 		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
 		IssuingTime(time.Now()).
-		Sign(&addr, keyPair.PrivateKey[:]).
+		Sign(iotago.AccountID(addr[:]), keyPair.PrivateKey[:]).
 		Build()
 	require.NoError(t.Test, err)
 
