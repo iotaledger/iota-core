@@ -224,7 +224,7 @@ The string format of Block ID is hexadecimal encoding of Block ID with `0x` pref
 * `Payload Type` must match one of the values described under Payloads.
   Data Fields must be correctly parsable in the context of the `Payload Type`.
   The payload itself must pass syntactic validation.
-* `Signature` must be valid, the input of a signature is concatation of `Issuing Time` bytes, `Slot Commitment ID` bytes and Block bytes (without Signature and Nonce) by order.
+* `Signature` must be valid, the input of a signature is concatation of `Issuing Time` bytes, `Slot Commitment ID` bytes and `content_hash` by order.
 * There must be no trailing bytes after all block fields have been parsed.
 
 
