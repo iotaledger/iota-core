@@ -3,7 +3,7 @@ package mempoolv1
 import (
 	"testing"
 
-	"iota-core/pkg/promise"
+	"iota-core/pkg/core/promise"
 	"iota-core/pkg/protocol/engine/ledger"
 	ledgertests "iota-core/pkg/protocol/engine/ledger/tests"
 	"iota-core/pkg/protocol/engine/mempool/tests"

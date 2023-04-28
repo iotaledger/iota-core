@@ -2,14 +2,15 @@ package mempool
 
 import (
 	"iota-core/pkg/protocol/engine/ledger"
+	"iota-core/pkg/protocol/engine/mempool/conflictdag"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type MemPool interface {
+type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 	Events() *Events
 
-	ConflictDAG() interface{}
+	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower]
 
 	AddTransaction(transaction Transaction) (metadata TransactionWithMetadata, err error)
 

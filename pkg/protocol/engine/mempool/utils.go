@@ -2,7 +2,7 @@ package mempool
 
 import (
 	"golang.org/x/xerrors"
-	"iota-core/pkg/promise"
+	"iota-core/pkg/core/promise"
 	"iota-core/pkg/protocol/engine/ledger"
 )
 

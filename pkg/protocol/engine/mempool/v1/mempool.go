@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 
 	"golang.org/x/xerrors"
-	"iota-core/pkg/promise"
+	"iota-core/pkg/core/promise"
 	"iota-core/pkg/protocol/engine/ledger"
 	"iota-core/pkg/protocol/engine/mempool"
 
@@ -93,9 +93,22 @@ func (m *MemPool) State(stateReference ledger.StateReference) (state mempool.Sta
 	return state, err
 }
 
-func (m *MemPool) SetTransactionIncluded(id iotago.TransactionID, inclusionSlot iotago.SlotIndex) error {
-	// TODO implement me
-	panic("implement me")
+func (m *MemPool) SetTransactionIncluded(id iotago.TransactionID, slot iotago.SlotIndex) error {
+	transaction, exists := m.cachedTransactions.Get(id)
+	if !exists {
+		return xerrors.Errorf("transaction not found: %w", mempool.ErrTransactionNotFound)
+	}
+
+	switch previousSlot := transaction.setInclusionSlot(slot); true {
+	case previousSlot == 0:
+		if m.conflictDAG.IsAccepted(transaction.ConflictIDs()) {
+			transaction.triggerAccepted()
+		}
+	case previousSlot < slot:
+		// trigger move to previous slot
+	}
+
+	return nil
 }
 
 func (m *MemPool) solidifyInputs(transactionMetadata *TransactionWithMetadata) {

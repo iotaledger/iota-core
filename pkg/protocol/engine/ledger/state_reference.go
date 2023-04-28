@@ -1,7 +1,7 @@
 package ledger
 
 import (
-	"iota-core/pkg/promise"
+	"iota-core/pkg/core/promise"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 )

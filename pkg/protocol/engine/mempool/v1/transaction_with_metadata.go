@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"golang.org/x/xerrors"
-	"iota-core/pkg/promise"
+	"iota-core/pkg/core/promise"
 	"iota-core/pkg/protocol/engine/ledger"
 	"iota-core/pkg/protocol/engine/mempool"
 
@@ -18,12 +18,14 @@ type TransactionWithMetadata struct {
 	inputs          []*StateWithMetadata
 	outputs         []*StateWithMetadata
 	transaction     mempool.Transaction
+	inclusionSlot   iotago.SlotIndex
 
-	booked   *promise.Event
-	solid    *promise.Event
-	executed *promise.Event
-	evicted  *promise.Event
-	invalid  *promise.Event1[error]
+	booked    *promise.Event
+	solid     *promise.Event
+	executed  *promise.Event
+	committed *promise.Event
+	evicted   *promise.Event
+	invalid   *promise.Event1[error]
 
 	mutex sync.RWMutex
 }
@@ -142,4 +144,15 @@ func (t *TransactionWithMetadata) triggerBooked() {
 
 func (t *TransactionWithMetadata) triggerInvalid(reason error) {
 	t.invalid.Trigger(reason)
+}
+
+func (t *TransactionWithMetadata) setInclusionSlot(slot iotago.SlotIndex) (previousValue iotago.SlotIndex) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	if previousValue = t.inclusionSlot; previousValue == 0 || slot < previousValue {
+		t.inclusionSlot = slot
+	}
+
+	return previousValue
 }
