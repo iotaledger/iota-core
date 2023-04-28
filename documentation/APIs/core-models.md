@@ -295,7 +295,7 @@ Slot Commitment ID denotes an identifier of a slot commitment, with type `ArrayB
 * `content` is the serialized slot commitment.
 * `slot_index` is the slot index of the slot commitment.
 
-Caculation:
+Calculation:
 1. `content_hash` = hash(`content`)
 2. And finally, `CommitmentID` = Concat(`content_hash`, `slot_index`) 
 
