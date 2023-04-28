@@ -197,7 +197,7 @@ Calculation:
 2. `data` = Concat(`Issuing Time`, `slot_commitment_ID`, `content_hash`)
 3. And sign with the Issuer PubKey, `Signature` = Sign(`data`) 
 
-Including `Issuing Time` explicitly in the signature makes the signature verification works exactly the same as a block. So one can prove the block existed, the content and Slot Commitment are correct, and the Issuing Time is valid.
+Including `Issuing Time` explicitly in the signature makes the signature verification work exactly the same as a block's. So one can prove that the block existed, the content and Slot Commitment are correct, and the Issuing Time is valid.
 
 ### Block ID
 Block ID denotes an identifier of a block, with type `ArrayBytes[40]`. It is calculated as the following steps, using BLAKE2b-256 hash function:
