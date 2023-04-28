@@ -183,7 +183,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-  /api/indexer/v1/outputs/alias:
+  /api/indexer/v2/outputs/alias:
     get:
       tags:
         - alias outputs
@@ -293,7 +293,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-  /api/indexer/v1/outputs/alias/{aliasId}:
+  /api/indexer/v2/outputs/alias/{aliasId}:
     get:
       tags:
         - alias outputs
