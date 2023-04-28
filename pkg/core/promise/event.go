@@ -16,12 +16,13 @@ func NewEvent() *Event {
 	}
 }
 
-func (f *Event) Trigger() {
+func (f *Event) Trigger() (wasTriggered bool) {
 	for _, callback := range func() (callbacks []func()) {
 		f.mutex.Lock()
 		defer f.mutex.Unlock()
 
-		if callbacks = f.triggeredCallbacks; callbacks != nil {
+		callbacks = f.triggeredCallbacks
+		if wasTriggered = callbacks != nil; wasTriggered {
 			f.triggeredCallbacks = nil
 		}
 
@@ -29,6 +30,8 @@ func (f *Event) Trigger() {
 	}() {
 		callback()
 	}
+
+	return
 }
 
 func (f *Event) OnTrigger(callback func()) {

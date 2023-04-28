@@ -6,17 +6,20 @@ import (
 	"sync/atomic"
 
 	"golang.org/x/xerrors"
-	"iota-core/pkg/core/promise"
-	"iota-core/pkg/protocol/engine/ledger"
-	"iota-core/pkg/protocol/engine/mempool"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/iota-core/pkg/core/vote"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	mockedconflictdag "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/mocked"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type MemPool struct {
+type MemPool[VotePower conflictdag.VotePowerType[VotePower]] struct {
 	events *mempool.Events
 
 	executeStateTransition mempool.VM
@@ -27,32 +30,40 @@ type MemPool struct {
 
 	cachedStateRequests *shrinkingmap.ShrinkingMap[iotago.OutputID, *promise.Promise[*StateWithMetadata]]
 
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower]
+
 	executionWorkers *workerpool.WorkerPool
 }
 
-func New(vm mempool.VM, inputResolver ledger.StateReferenceResolver, workers *workerpool.Group) *MemPool {
-	m := &MemPool{
+func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputResolver ledger.StateReferenceResolver, workers *workerpool.Group) *MemPool[VotePower] {
+	m := &MemPool[VotePower]{
 		events:                 mempool.NewEvents(),
 		executeStateTransition: vm,
 		requestInput:           inputResolver,
 		cachedTransactions:     shrinkingmap.New[iotago.TransactionID, *TransactionWithMetadata](),
 		cachedStateRequests:    shrinkingmap.New[iotago.OutputID, *promise.Promise[*StateWithMetadata]](),
 		executionWorkers:       workers.CreatePool("executionWorkers", 1),
+		conflictDAG:            mockedconflictdag.NewConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower](),
 	}
+
+	m.ConflictDAG().Events().ConflictAccepted.Hook(func(id iotago.TransactionID) {
+		if transaction, exists := m.cachedTransactions.Get(id); !exists {
+			m.tryToAccept(transaction)
+		}
+	})
 
 	return m
 }
 
-func (m *MemPool) Events() *mempool.Events {
+func (m *MemPool[VotePower]) Events() *mempool.Events {
 	return m.events
 }
 
-func (m *MemPool) ConflictDAG() interface{} {
-	// TODO implement me
-	panic("implement me")
+func (m *MemPool[VotePower]) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower] {
+	return m.conflictDAG
 }
 
-func (m *MemPool) AddTransaction(transaction mempool.Transaction) (metadata mempool.TransactionWithMetadata, err error) {
+func (m *MemPool[VotePower]) AddTransaction(transaction mempool.Transaction) (metadata mempool.TransactionWithMetadata, err error) {
 	metadataToStore, err := NewTransactionMetadata(transaction)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create transaction metadata: %w", err)
@@ -71,17 +82,17 @@ func (m *MemPool) AddTransaction(transaction mempool.Transaction) (metadata memp
 	return metadata, nil
 }
 
-func (m *MemPool) RemoveTransaction(transactionID iotago.TransactionID) {
+func (m *MemPool[VotePower]) RemoveTransaction(transactionID iotago.TransactionID) {
 	if transaction, deleted := m.cachedTransactions.DeleteAndReturn(transactionID); deleted {
 		transaction.evicted.Trigger()
 	}
 }
 
-func (m *MemPool) Transaction(id iotago.TransactionID) (transaction mempool.TransactionWithMetadata, exists bool) {
+func (m *MemPool[VotePower]) Transaction(id iotago.TransactionID) (transaction mempool.TransactionWithMetadata, exists bool) {
 	return m.cachedTransactions.Get(id)
 }
 
-func (m *MemPool) State(stateReference ledger.StateReference) (state mempool.StateWithMetadata, err error) {
+func (m *MemPool[VotePower]) State(stateReference ledger.StateReference) (state mempool.StateWithMetadata, err error) {
 	stateRequest, exists := m.cachedStateRequests.Get(stateReference.StateID())
 	if !exists || !stateRequest.WasCompleted() {
 		stateRequest = m.requestStateMetadata(stateReference)
@@ -93,25 +104,23 @@ func (m *MemPool) State(stateReference ledger.StateReference) (state mempool.Sta
 	return state, err
 }
 
-func (m *MemPool) SetTransactionIncluded(id iotago.TransactionID, slot iotago.SlotIndex) error {
+func (m *MemPool[VotePower]) SetTransactionIncluded(id iotago.TransactionID, slot iotago.SlotIndex) error {
 	transaction, exists := m.cachedTransactions.Get(id)
 	if !exists {
-		return xerrors.Errorf("transaction not found: %w", mempool.ErrTransactionNotFound)
+		return xerrors.Errorf("transaction with id %s not found: %w", id, mempool.ErrTransactionNotFound)
 	}
 
 	switch previousSlot := transaction.setInclusionSlot(slot); true {
 	case previousSlot == 0:
-		if m.conflictDAG.IsAccepted(transaction.ConflictIDs()) {
-			transaction.triggerAccepted()
-		}
+		m.tryToAccept(transaction)
 	case previousSlot < slot:
-		// trigger move to previous slot
+		//transaction.triggerInclusionSlotUpdated(previousSlot, slot)
 	}
 
 	return nil
 }
 
-func (m *MemPool) solidifyInputs(transactionMetadata *TransactionWithMetadata) {
+func (m *MemPool[VotePower]) solidifyInputs(transactionMetadata *TransactionWithMetadata) {
 	// inputsToSolidify is used by solidifyInput to keep track of how many inputs are still missing to become solid.
 	inputsToSolidify := uint64(len(transactionMetadata.inputReferences))
 
@@ -124,6 +133,12 @@ func (m *MemPool) solidifyInputs(transactionMetadata *TransactionWithMetadata) {
 
 			cancelRequest = lo.Batch(
 				request.OnSuccess(func(state *StateWithMetadata) {
+					state.accepted.OnTrigger(func() {
+						if transactionMetadata.decreaseUnacceptedInputsCount() == 0 {
+							m.tryToAccept(transactionMetadata)
+						}
+					})
+
 					if transactionMetadata.publishInput(index, state); atomic.AddUint64(&inputsToSolidify, ^uint64(0)) == 0 {
 						transactionMetadata.solid.Trigger()
 
@@ -151,7 +166,17 @@ func (m *MemPool) solidifyInputs(transactionMetadata *TransactionWithMetadata) {
 	}
 }
 
-func (m *MemPool) executeTransaction(transactionMetadata *TransactionWithMetadata) {
+func (m *MemPool[VotePower]) tryToAccept(transactionMetadata *TransactionWithMetadata) {
+	if !transactionMetadata.AllInputsAccepted() || !transactionMetadata.IsIncluded() || !m.ConflictDAG().AcceptanceState(transactionMetadata.conflictIDs).IsAccepted() {
+		return
+	}
+
+	if transactionMetadata.setAccepted() {
+		m.events.TransactionAccepted.Trigger(transactionMetadata)
+	}
+}
+
+func (m *MemPool[VotePower]) executeTransaction(transactionMetadata *TransactionWithMetadata) {
 	m.executionWorkers.Submit(func() {
 		outputStates, err := m.executeStateTransition(transactionMetadata.Transaction(), lo.Map(transactionMetadata.inputs, (*StateWithMetadata).State), context.Background())
 		if err != nil {
@@ -170,7 +195,7 @@ func (m *MemPool) executeTransaction(transactionMetadata *TransactionWithMetadat
 	})
 }
 
-func (m *MemPool) bookTransaction(transaction *TransactionWithMetadata) {
+func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionWithMetadata) {
 	// TODO: determine the branches and inherit them to the outputs
 
 	transaction.triggerBooked()
@@ -180,14 +205,14 @@ func (m *MemPool) bookTransaction(transaction *TransactionWithMetadata) {
 	m.publishOutputsToCache(transaction)
 }
 
-func (m *MemPool) publishOutputsToCache(transaction *TransactionWithMetadata) {
+func (m *MemPool[VotePower]) publishOutputsToCache(transaction *TransactionWithMetadata) {
 	for _, output := range transaction.outputs {
 		lo.Return1(m.cachedStateRequests.GetOrCreate(output.id, lo.NoVariadic(promise.New[*StateWithMetadata]))).Resolve(output)
 	}
 }
 
 // requestStateMetadata requests the state with the given reference from the ledger.
-func (m *MemPool) requestStateMetadata(stateReference ledger.StateReference, waitIfMissing ...bool) *promise.Promise[*StateWithMetadata] {
+func (m *MemPool[VotePower]) requestStateMetadata(stateReference ledger.StateReference, waitIfMissing ...bool) *promise.Promise[*StateWithMetadata] {
 	return promise.New[*StateWithMetadata](func(p *promise.Promise[*StateWithMetadata]) {
 		request := m.requestInput(stateReference)
 
@@ -205,4 +230,4 @@ func (m *MemPool) requestStateMetadata(stateReference ledger.StateReference, wai
 	})
 }
 
-var _ mempool.MemPool = new(MemPool)
+var _ mempool.MemPool[vote.MockedPower] = new(MemPool[vote.MockedPower])

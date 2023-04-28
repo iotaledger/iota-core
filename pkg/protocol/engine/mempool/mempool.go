@@ -1,9 +1,8 @@
 package mempool
 
 import (
-	"iota-core/pkg/protocol/engine/ledger"
-	"iota-core/pkg/protocol/engine/mempool/conflictdag"
-
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 

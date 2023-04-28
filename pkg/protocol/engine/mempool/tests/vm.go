@@ -4,9 +4,10 @@ import (
 	"context"
 
 	"golang.org/x/xerrors"
-	"iota-core/pkg/protocol/engine/ledger"
-	ledgertests "iota-core/pkg/protocol/engine/ledger/tests"
-	"iota-core/pkg/protocol/engine/mempool"
+
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 )
 
 func VM(inputTransaction mempool.Transaction, inputs []ledger.State, ctx context.Context) (outputs []ledger.State, err error) {

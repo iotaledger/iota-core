@@ -5,5 +5,5 @@ import (
 )
 
 type Ledger interface {
-	Output(id iotago.OutputID) (output State, exists bool, error)
+	Output(id iotago.OutputID) (output State, err error)
 }

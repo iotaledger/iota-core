@@ -1,9 +1,8 @@
 package mempooltests
 
 import (
-	"iota-core/pkg/protocol/engine/ledger"
-	"iota-core/pkg/protocol/engine/mempool"
-
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )

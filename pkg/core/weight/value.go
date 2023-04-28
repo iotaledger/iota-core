@@ -1,8 +1,8 @@
 package weight
 
 import (
-	"github.com/iotaledger/goshimmer/packages/core/acceptance"
 	"github.com/iotaledger/hive.go/stringify"
+	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 )
 
 // Value represents an immutable multi-tiered weight value, which is used to determine the order of Conflicts.

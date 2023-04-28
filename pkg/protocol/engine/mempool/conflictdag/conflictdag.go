@@ -1,11 +1,10 @@
 package conflictdag
 
 import (
-	"iota-core/pkg/core/acceptance"
-	"iota-core/pkg/core/vote"
-
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/iota-core/pkg/core/acceptance"
+	"github.com/iotaledger/iota-core/pkg/core/vote"
 )
 
 type ConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePower]] interface {

@@ -2,13 +2,15 @@ package mempoolv1
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/xerrors"
-	"iota-core/pkg/core/promise"
-	"iota-core/pkg/protocol/engine/ledger"
-	"iota-core/pkg/protocol/engine/mempool"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -18,6 +20,7 @@ type TransactionWithMetadata struct {
 	inputs          []*StateWithMetadata
 	outputs         []*StateWithMetadata
 	transaction     mempool.Transaction
+	conflictIDs     *advancedset.AdvancedSet[iotago.TransactionID]
 	inclusionSlot   iotago.SlotIndex
 
 	booked    *promise.Event
@@ -26,8 +29,19 @@ type TransactionWithMetadata struct {
 	committed *promise.Event
 	evicted   *promise.Event
 	invalid   *promise.Event1[error]
+	accepted  *promise.Event
+
+	unacceptedInputsCount uint64
 
 	mutex sync.RWMutex
+}
+
+func (t *TransactionWithMetadata) decreaseUnacceptedInputsCount() (newValue uint64) {
+	return atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0))
+}
+
+func (t *TransactionWithMetadata) AllInputsAccepted() bool {
+	return atomic.LoadUint64(&t.unacceptedInputsCount) == 0
 }
 
 func NewTransactionMetadata(transaction mempool.Transaction) (*TransactionWithMetadata, error) {
@@ -42,15 +56,18 @@ func NewTransactionMetadata(transaction mempool.Transaction) (*TransactionWithMe
 	}
 
 	return &TransactionWithMetadata{
-		id:              transactionID,
-		inputReferences: inputReferences,
-		inputs:          make([]*StateWithMetadata, len(inputReferences)),
-		transaction:     transaction,
-		booked:          promise.NewEvent(),
-		solid:           promise.NewEvent(),
-		executed:        promise.NewEvent(),
-		evicted:         promise.NewEvent(),
-		invalid:         promise.NewEvent1[error](),
+		id:                    transactionID,
+		inputReferences:       inputReferences,
+		inputs:                make([]*StateWithMetadata, len(inputReferences)),
+		transaction:           transaction,
+		conflictIDs:           advancedset.New[iotago.TransactionID](),
+		booked:                promise.NewEvent(),
+		solid:                 promise.NewEvent(),
+		executed:              promise.NewEvent(),
+		evicted:               promise.NewEvent(),
+		invalid:               promise.NewEvent1[error](),
+		accepted:              promise.NewEvent(),
+		unacceptedInputsCount: uint64(len(inputReferences)),
 	}, nil
 }
 
@@ -115,6 +132,10 @@ func (t *TransactionWithMetadata) OnEvicted(callback func()) {
 	t.evicted.OnTrigger(callback)
 }
 
+func (t *TransactionWithMetadata) OnAccepted(callback func()) {
+	t.accepted.OnTrigger(callback)
+}
+
 func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetadata) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -144,6 +165,28 @@ func (t *TransactionWithMetadata) triggerBooked() {
 
 func (t *TransactionWithMetadata) triggerInvalid(reason error) {
 	t.invalid.Trigger(reason)
+}
+
+func (t *TransactionWithMetadata) setAccepted() (updated bool) {
+	if updated = t.accepted.Trigger(); updated {
+		lo.ForEach(t.outputs, (*StateWithMetadata).setAccepted)
+	}
+
+	return updated
+}
+
+func (t *TransactionWithMetadata) InclusionSlot() iotago.SlotIndex {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	return t.inclusionSlot
+}
+
+func (t *TransactionWithMetadata) IsIncluded() bool {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	return t.inclusionSlot != 0
 }
 
 func (t *TransactionWithMetadata) setInclusionSlot(slot iotago.SlotIndex) (previousValue iotago.SlotIndex) {

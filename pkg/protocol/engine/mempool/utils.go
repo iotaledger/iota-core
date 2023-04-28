@@ -2,8 +2,9 @@ package mempool
 
 import (
 	"golang.org/x/xerrors"
-	"iota-core/pkg/core/promise"
-	"iota-core/pkg/protocol/engine/ledger"
+
+	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 )
 
 func TypedReferenceResolver(resolvers map[ledger.StateReferenceType]ledger.StateReferenceResolver) func(ledger.StateReference) *promise.Promise[ledger.State] {

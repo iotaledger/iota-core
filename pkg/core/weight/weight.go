@@ -3,10 +3,11 @@ package weight
 import (
 	"sync"
 
-	"github.com/iotaledger/goshimmer/packages/core/acceptance"
-	"github.com/iotaledger/goshimmer/packages/protocol/engine/sybilprotection"
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/stringify"
+	"github.com/iotaledger/iota-core/pkg/core/acceptance"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Weight represents a mutable multi-tiered weight value that can be updated in-place.
@@ -15,7 +16,7 @@ type Weight struct {
 	OnUpdate *event.Event1[Value]
 
 	// Validators is the set of validators that are contributing to the validators weight.
-	Validators *sybilprotection.WeightedSet
+	Validators *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
 
 	// value is the current weight Value.
 	value Value
@@ -28,9 +29,9 @@ type Weight struct {
 }
 
 // New creates a new Weight instance.
-func New(weights *sybilprotection.Weights) *Weight {
+func New(weights *account.Accounts[iotago.AccountID, *iotago.AccountID]) *Weight {
 	w := &Weight{
-		Validators: weights.NewWeightedSet(),
+		Validators: weights.SelectAccounts(),
 		OnUpdate:   event.New1[Value](),
 	}
 

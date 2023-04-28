@@ -2,7 +2,6 @@ package mempool
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Events struct {
@@ -16,7 +15,7 @@ type Events struct {
 
 	TransactionBooked *event.Event1[TransactionWithMetadata]
 
-	TransactionAccepted *event.Event1[iotago.TransactionID]
+	TransactionAccepted *event.Event1[TransactionWithMetadata]
 
 	event.Group[Events, *Events]
 }
@@ -27,7 +26,7 @@ var NewEvents = event.CreateGroupConstructor(func() *Events {
 		TransactionSolid:    event.New1[TransactionWithMetadata](),
 		TransactionExecuted: event.New1[TransactionWithMetadata](),
 		TransactionInvalid:  event.New2[TransactionWithMetadata, error](),
-		TransactionAccepted: event.New1[iotago.TransactionID](),
+		TransactionAccepted: event.New1[TransactionWithMetadata](),
 		TransactionBooked:   event.New1[TransactionWithMetadata](),
 	}
 })

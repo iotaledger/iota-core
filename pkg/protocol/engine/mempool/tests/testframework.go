@@ -6,16 +6,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"iota-core/pkg/protocol/engine/ledger"
-	"iota-core/pkg/protocol/engine/mempool"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/debug"
+	"github.com/iotaledger/iota-core/pkg/core/vote"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type TestFramework struct {
-	Instance mempool.MemPool
+	Instance mempool.MemPool[vote.MockedPower]
 
 	stateIDByAlias               map[string]iotago.OutputID
 	transactionByAlias           map[string]mempool.Transaction
@@ -27,7 +28,7 @@ type TestFramework struct {
 	mutex                        sync.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower]) *TestFramework {
 	t := &TestFramework{
 		Instance:                     instance,
 		stateIDByAlias:               make(map[string]iotago.OutputID),
