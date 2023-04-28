@@ -2342,20 +2342,6 @@ components:
         - sentHeartbeats
         - droppedPackets
 
-    MigratedFundsEntry:
-      properties:
-        tailTransactionHash:
-          type: string
-        address:
-          oneOf:
-            - $ref: '#/components/schemas/Ed25519Address'
-        deposit:
-          type: integer
-      required:
-        - tailTransactionHash
-        - address
-        - deposit
-
     ErrorResponse:
       description: The error format.
       properties:
