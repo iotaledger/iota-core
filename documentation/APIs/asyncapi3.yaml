@@ -319,18 +319,18 @@ components:
         type: object
         required:
           - index
-          - rootsID
-          - prevID
+          - rootsId
+          - prevId
         properties:
           index:
             type: integer
             description: The slot index of the commitment.
             example: 200
-          prevID:
+          prevId:
             type: string
             description: The commitment identifier of the previous slot.
             example: "0x8fb6cbb1ecf02c6b5a6a5a6a5f6c5a6a5f6c5a6a5a6a5a6a5f6c5a6a5a6a5f6c50000000000000000"
-          rootsID:
+          rootsId:
             type: string
             description: The digest of multiple merkle roots within this slot.
             example: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
