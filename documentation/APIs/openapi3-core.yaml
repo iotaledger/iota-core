@@ -1034,7 +1034,7 @@ components:
           isHealthy: true
           lastAcceptedBlockId: "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
           lastConfirmedBlockId: "0x59daaaba1cd10cd268966376e17710d100c90826fe258753d461acac99b7e3341500000000000000"
-          confirmedSlot: 100
+          finalizedSlot: 100
           ATT: 1682328545
           RATT: 1682328550
           CTT: 1682328525
@@ -2439,7 +2439,7 @@ components:
             lastConfirmedBlockId:
               description: The identifier of the latest confirmed block.
               type: string
-            confirmedSlot:
+            finalizedSlot:
               description: The index of latest confirmed slot.
               type: integer
             ATT:
@@ -2463,7 +2463,7 @@ components:
           required:
             - isHealthy
             - latestCommittedSlot
-            - confirmedSlot
+            - finalizedSlot
             - pruningSlot
         metrics:
           description: Node metrics.
