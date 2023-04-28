@@ -28,12 +28,12 @@ channels:
       description: Publishes the latest known commitment slot index and its identifier.
       message:
         $ref: '#/components/messages/CommitmentInfoResponse'
-  commitment-info/confirmed:
+  commitment-info/finalized:
     subscribe:
       tags:
         - name: commitments
-      operationId: commitmentInfoConfirmed
-      description: Publishes the newly confirmed commitment slot index and its identifier.
+      operationId: commitmentInfoFinalized
+      description: Publishes the newly finalized commitment slot index and its identifier.
       message:
         $ref: '#/components/messages/CommitmentInfoResponse'
   commitments:
@@ -318,74 +318,31 @@ components:
       payload:
         type: object
         required:
-          - type
           - index
-          - timestamp
-          - previousCommitmentId
-          - parents
-          - pastConeMerkleProof
-          - inclusionMerkleProof
-          - signatures
+          - rootsID
+          - prevID
         properties:
-          type:
-            type: number
-            description: Payload type of the commitment.
-            example: 7
           index:
-            type: number
-            description: The index of the commitment.
-            example: 242412
-          timestamp:
-            type: number
-            description: The UNIX timestamp in seconds of the commitment.
-            example: 1609950538
-          protocolVersion:
             type: integer
-            description: >-
-              Protocol version of the Commitment Payload and its encapsulating
-              block.
-            example: 2
-          previousCommitmentId:
+            description: The slot index of the commitment.
+            example: 200
+          prevID:
             type: string
-            description: >-
-              Commitment ID of the previous commitment (index - 1). Hex-encoded
-              with 0x prefix.
-            example: '0x4bd78256357630f186a4b302b3b8df7c01061260baa8d014f34187862343cf4e'
-          parents:
-            type: array
-            description: The parents where this commitment attaches to
-            example:
-              - >-
-                0xd026f8b1c856d4e844cc734bbe095429fb880ec4d93f3ccffe3b292a7de17be7
-              - >-
-                0xcf5f77d62285b9ed8d617729e9232ae346a328c1897f0939837198e93ec13e85
-          inclusionMerkleRoot:
+            description: The commitment identifier of the previous slot.
+            example: "0x8fb6cbb1ecf02c6b5a6a5a6a5f6c5a6a5f6c5a6a5a6a5a6a5f6c5a6a5a6a5f6c50000000000000000"
+          rootsID:
             type: string
-            description: >-
-              The merkle root of all directly/indirectly referenced blocks
-              (their IDs) which were newly confirmed by this commitment.
-            example: '0x014e3a82d54c1bf4e411eee30ce25ee739b0f790fca248c0036d538952d6072b'
-          appliedMerkleRoot:
-            type: string
-            description: >-
-              The merkle root of all blocks (their IDs) carrying ledger state
-              mutating transactions.
-            example: '0x07fbcf40a98cf1e1e1e0aeb7527ecf464cc8d461f617e48931c6a2096cb18d1a'
-          metadata:
-            type: string
-            descripiton: The metadata associated with this commitment.
-            example: '0x01'
-          options:
-            type: array
-            items:
-              anyOf:
-                - $ref: '#/components/schemas/ReceiptCommitmentOpt'
-                - $ref: '#/components/schemas/ProtocolParamsCommitmentOptions'
-          signatures:
-            type: array
-            items:
-              anyOf:
-                - $ref: '#/components/schemas/Ed25519Signature'
+            description: The digest of multiple merkle roots within this slot.
+            example: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
+          cumulativeWeight:
+            type: integer
+            description: 
+              The sum of previous slot commitment cumulative weight and 
+              weight of issuers of accepted blocks within this slot. 
+              It is just an indication of "committed into" this slot,
+              and can not strictly be used for evaluating the switching of a chain.
+            example: 78901
+
     CommitmentPayloadSerialized:
       contentType: application/vnd.iota.serializer-v1
       description: The commitment in its serialized form.
