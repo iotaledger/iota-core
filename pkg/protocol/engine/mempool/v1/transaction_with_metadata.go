@@ -23,28 +23,42 @@ type TransactionWithMetadata struct {
 	conflictIDs     *advancedset.AdvancedSet[iotago.TransactionID]
 	inclusionSlot   iotago.SlotIndex
 
-	booked    *promise.Event
-	solid     *promise.Event
-	executed  *promise.Event
-	committed *promise.Event
-	evicted   *promise.Event
-	invalid   *promise.Event1[error]
-	accepted  *promise.Event
+	booked            *promise.Event
+	solid             *promise.Event
+	executed          *promise.Event
+	committed         *promise.Event
+	evicted           *promise.Event
+	invalid           *promise.Event1[error]
+	allInputsAccepted *promise.Event
+	included          *promise.Event
+	accepted          *promise.Event
+	rejected          *promise.Event
 
+	unsolidInputsCount    uint64
 	unacceptedInputsCount uint64
 
 	mutex sync.RWMutex
 }
 
-func (t *TransactionWithMetadata) decreaseUnacceptedInputsCount() (newValue uint64) {
-	return atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0))
+func (t *TransactionWithMetadata) OnIncluded(callback func()) {
+	t.included.OnTrigger(callback)
+}
+
+func (t *TransactionWithMetadata) markInputAccepted() {
+	if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
+		t.allInputsAccepted.Trigger()
+	}
+}
+
+func (t *TransactionWithMetadata) OnAllInputsAccepted(callback func()) {
+	t.allInputsAccepted.OnTrigger(callback)
 }
 
 func (t *TransactionWithMetadata) AllInputsAccepted() bool {
-	return atomic.LoadUint64(&t.unacceptedInputsCount) == 0
+	return t.allInputsAccepted.WasTriggered()
 }
 
-func NewTransactionMetadata(transaction mempool.Transaction) (*TransactionWithMetadata, error) {
+func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWithMetadata, error) {
 	transactionID, transactionIDErr := transaction.ID()
 	if transactionIDErr != nil {
 		return nil, xerrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
@@ -56,19 +70,35 @@ func NewTransactionMetadata(transaction mempool.Transaction) (*TransactionWithMe
 	}
 
 	return &TransactionWithMetadata{
-		id:                    transactionID,
-		inputReferences:       inputReferences,
-		inputs:                make([]*StateWithMetadata, len(inputReferences)),
-		transaction:           transaction,
-		conflictIDs:           advancedset.New[iotago.TransactionID](),
-		booked:                promise.NewEvent(),
-		solid:                 promise.NewEvent(),
-		executed:              promise.NewEvent(),
-		evicted:               promise.NewEvent(),
-		invalid:               promise.NewEvent1[error](),
-		accepted:              promise.NewEvent(),
+		id:              transactionID,
+		inputReferences: inputReferences,
+		inputs:          make([]*StateWithMetadata, len(inputReferences)),
+		transaction:     transaction,
+		conflictIDs:     advancedset.New[iotago.TransactionID](),
+
+		booked:            promise.NewEvent(),
+		solid:             promise.NewEvent(),
+		executed:          promise.NewEvent(),
+		evicted:           promise.NewEvent(),
+		allInputsAccepted: promise.NewEvent(),
+		accepted:          promise.NewEvent(),
+		rejected:          promise.NewEvent(),
+		included:          promise.NewEvent(),
+		invalid:           promise.NewEvent1[error](),
+
+		unsolidInputsCount:    uint64(len(inputReferences)),
 		unacceptedInputsCount: uint64(len(inputReferences)),
 	}, nil
+}
+
+func (t *TransactionWithMetadata) exposeEvents(events *mempool.Events) *TransactionWithMetadata {
+	t.OnSolid(func() { events.TransactionSolid.Trigger(t) })
+	t.OnBooked(func() { events.TransactionBooked.Trigger(t) })
+	t.OnExecuted(func() { events.TransactionExecuted.Trigger(t) })
+	t.OnInvalid(func(err error) { events.TransactionInvalid.Trigger(t, err) })
+	t.OnAccepted(func() { events.TransactionAccepted.Trigger(t) })
+
+	return t
 }
 
 func (t *TransactionWithMetadata) ID() iotago.TransactionID {
@@ -112,6 +142,10 @@ func (t *TransactionWithMetadata) IsEvicted() bool {
 	return t.evicted.WasTriggered()
 }
 
+func (t *TransactionWithMetadata) IsAccepted() bool {
+	return t.accepted.WasTriggered()
+}
+
 func (t *TransactionWithMetadata) OnSolid(callback func()) {
 	t.solid.OnTrigger(callback)
 }
@@ -138,18 +172,15 @@ func (t *TransactionWithMetadata) OnAccepted(callback func()) {
 
 func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetadata) {
 	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
 	t.inputs[index] = input
+	t.mutex.Unlock()
 
-	input.OnSpent(func(spender *TransactionWithMetadata) {
-		if spender != t {
-			return
-		}
-	})
+	if atomic.AddUint64(&t.unsolidInputsCount, ^uint64(0)) == 0 {
+		t.solid.Trigger()
+	}
 }
 
-func (t *TransactionWithMetadata) publishExecutionResult(outputStates []ledger.State) {
+func (t *TransactionWithMetadata) setExecuted(outputStates []ledger.State) {
 	t.mutex.Lock()
 	for _, outputState := range outputStates {
 		t.outputs = append(t.outputs, NewStateWithMetadata(outputState, t))
@@ -159,11 +190,11 @@ func (t *TransactionWithMetadata) publishExecutionResult(outputStates []ledger.S
 	t.executed.Trigger()
 }
 
-func (t *TransactionWithMetadata) triggerBooked() {
+func (t *TransactionWithMetadata) setBooked() {
 	t.booked.Trigger()
 }
 
-func (t *TransactionWithMetadata) triggerInvalid(reason error) {
+func (t *TransactionWithMetadata) setInvalid(reason error) {
 	t.invalid.Trigger(reason)
 }
 
@@ -173,6 +204,12 @@ func (t *TransactionWithMetadata) setAccepted() (updated bool) {
 	}
 
 	return updated
+}
+
+func (t *TransactionWithMetadata) setRejected() {
+	if t.rejected.Trigger() {
+		lo.ForEach(t.outputs, (*StateWithMetadata).setRejected)
+	}
 }
 
 func (t *TransactionWithMetadata) InclusionSlot() iotago.SlotIndex {

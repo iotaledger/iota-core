@@ -15,6 +15,7 @@ type StateWithMetadata struct {
 	state             ledger.State
 
 	accepted *promise.Event
+	rejected *promise.Event
 }
 
 func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetadata) *StateWithMetadata {
@@ -24,15 +25,28 @@ func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetad
 		spenders:          advancedset.New[*TransactionWithMetadata](),
 		state:             state,
 		accepted:          promise.NewEvent(),
+		rejected:          promise.NewEvent(),
 	}
 }
 
-func (s *StateWithMetadata) OnSpent(func(spender *TransactionWithMetadata)) {
+func (s *StateWithMetadata) OnSpendAccepted(func(spender *TransactionWithMetadata)) {
 	// TODO: implement me
 }
 
 func (s *StateWithMetadata) setAccepted() {
 	s.accepted.Trigger()
+}
+
+func (s *StateWithMetadata) setRejected() {
+	s.rejected.Trigger()
+}
+
+func (s *StateWithMetadata) OnAccepted(callback func()) {
+	s.accepted.OnTrigger(callback)
+}
+
+func (s *StateWithMetadata) OnRejected(callback func()) {
+	s.rejected.OnTrigger(callback)
 }
 
 func (s *StateWithMetadata) IsAccepted() bool {

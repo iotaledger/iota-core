@@ -13,7 +13,7 @@ type ConflictDAG[ConflictID conflictdag.IDType, ResourceID conflictdag.IDType, V
 	events *conflictdag.Events[ConflictID, ResourceID]
 }
 
-func NewConflictDAG[ConflictID conflictdag.IDType, ResourceID conflictdag.IDType, VotePower conflictdag.VotePowerType[VotePower]]() *ConflictDAG[ConflictID, ResourceID, VotePower] {
+func New[ConflictID conflictdag.IDType, ResourceID conflictdag.IDType, VotePower conflictdag.VotePowerType[VotePower]]() *ConflictDAG[ConflictID, ResourceID, VotePower] {
 	return &ConflictDAG[ConflictID, ResourceID, VotePower]{
 		events: conflictdag.NewEvents[ConflictID, ResourceID](),
 	}
@@ -59,8 +59,11 @@ func (c ConflictDAG[ConflictID, ResourceID, VotePower]) CastVotes(vote *vote.Vot
 }
 
 func (c ConflictDAG[ConflictID, ResourceID, VotePower]) AcceptanceState(conflictIDs *advancedset.AdvancedSet[ConflictID]) acceptance.State {
-	//TODO implement me
-	panic("implement me")
+	if conflictIDs.IsEmpty() {
+		return acceptance.Accepted
+	}
+
+	return acceptance.Pending
 }
 
 func (c ConflictDAG[ConflictID, ResourceID, VotePower]) UnacceptedConflicts(conflictIDs *advancedset.AdvancedSet[ConflictID]) *advancedset.AdvancedSet[ConflictID] {

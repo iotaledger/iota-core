@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -59,6 +60,10 @@ func (t *TestFramework) CreateTransaction(alias string, referencedStates []strin
 	for i := uint16(0); i < transaction.outputCount; i++ {
 		t.stateIDByAlias[alias+":"+strconv.Itoa(int(i))] = iotago.OutputIDFromTransactionIDAndIndex(transactionID, i)
 	}
+}
+
+func (t *TestFramework) SetTransactionIncluded(alias string, index iotago.SlotIndex) error {
+	return t.Instance.SetTransactionIncluded(t.TransactionID(alias), index)
 }
 
 func (t *TestFramework) ProcessTransactions(alias ...string) error {
@@ -146,6 +151,16 @@ func (t *TestFramework) setupHookedEvents() {
 
 		t.markTransactionBookedTriggered(metadata.ID())
 	})
+
+	t.Instance.Events().TransactionAccepted.Hook(func(metadata mempool.TransactionWithMetadata) {
+		if debug.GetEnabled() {
+			t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
+		}
+
+		require.True(t.test, metadata.IsAccepted(), "transaction is not marked as accepted")
+
+		t.markTransactionStoredTriggered(metadata.ID())
+	})
 }
 
 func (t *TestFramework) markTransactionStoredTriggered(id iotago.TransactionID) {
@@ -190,6 +205,8 @@ func (t *TestFramework) waitBooked(transactionAliases ...string) {
 
 		transactionMetadata.OnBooked(allBooked.Done)
 	}
+
+	time.Sleep(100 * time.Millisecond)
 
 	allBooked.Wait()
 }

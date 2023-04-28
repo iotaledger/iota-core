@@ -22,6 +22,8 @@ type TransactionWithMetadata interface {
 
 	IsEvicted() bool
 
+	IsAccepted() bool
+
 	OnSolid(func())
 
 	OnExecuted(func())

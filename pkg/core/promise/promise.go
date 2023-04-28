@@ -46,163 +46,172 @@ func New[T any](optResolver ...func(p *Promise[T])) *Promise[T] {
 }
 
 // Resolve resolves the promise with the given result.
-func (f *Promise[T]) Resolve(result T) *Promise[T] {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+func (p *Promise[T]) Resolve(result T) *Promise[T] {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-	if f.complete {
-		return f
+	if p.complete {
+		return p
 	}
 
-	f.successCallbacks.ForEach(func(key CallbackID, callback func(T)) bool {
+	p.successCallbacks.ForEach(func(key CallbackID, callback func(T)) bool {
 		callback(result)
 		return true
 	})
 
-	f.completeCallbacks.ForEach(func(key CallbackID, callback func()) bool {
+	p.completeCallbacks.ForEach(func(key CallbackID, callback func()) bool {
 		callback()
 		return true
 	})
 
-	f.successCallbacks = nil
-	f.errorCallbacks = nil
-	f.completeCallbacks = nil
-	f.result = result
-	f.complete = true
+	p.successCallbacks = nil
+	p.errorCallbacks = nil
+	p.completeCallbacks = nil
+	p.result = result
+	p.complete = true
 
-	return f
+	return p
 }
 
 // Reject rejects the promise with the given error.
-func (f *Promise[T]) Reject(err error) *Promise[T] {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+func (p *Promise[T]) Reject(err error) *Promise[T] {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-	if f.complete {
-		return f
+	if p.complete {
+		return p
 	}
 
-	f.errorCallbacks.ForEach(func(key CallbackID, callback func(error)) bool {
+	p.errorCallbacks.ForEach(func(key CallbackID, callback func(error)) bool {
 		callback(err)
 		return true
 	})
 
-	f.completeCallbacks.ForEach(func(key CallbackID, callback func()) bool {
+	p.completeCallbacks.ForEach(func(key CallbackID, callback func()) bool {
 		callback()
 		return true
 	})
 
-	f.successCallbacks = nil
-	f.errorCallbacks = nil
-	f.completeCallbacks = nil
-	f.err = err
-	f.complete = true
+	p.successCallbacks = nil
+	p.errorCallbacks = nil
+	p.completeCallbacks = nil
+	p.err = err
+	p.complete = true
 
-	return f
+	return p
 }
 
 // OnSuccess registers a callback that is called when the promise is resolved.
-func (f *Promise[T]) OnSuccess(callback func(result T)) (cancel func()) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+func (p *Promise[T]) OnSuccess(callback func(result T)) (cancel func()) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-	if f.complete {
-		if f.err == nil {
-			callback(f.result)
+	if p.complete {
+		if p.err == nil {
+			callback(p.result)
 		}
 
 		return func() {}
 	}
 
 	callbackID := NewCallbackID()
-	f.successCallbacks.Set(callbackID, callback)
+	p.successCallbacks.Set(callbackID, callback)
 
 	return func() {
-		f.mutex.Lock()
-		defer f.mutex.Unlock()
+		p.mutex.Lock()
+		defer p.mutex.Unlock()
 
-		if f.successCallbacks != nil {
-			f.successCallbacks.Delete(callbackID)
+		if p.successCallbacks != nil {
+			p.successCallbacks.Delete(callbackID)
 		}
 	}
 }
 
 // OnError registers a callback that is called when the promise is rejected.
-func (f *Promise[T]) OnError(callback func(err error)) func() {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+func (p *Promise[T]) OnError(callback func(err error)) func() {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-	if f.complete {
-		if f.err != nil {
-			callback(f.err)
+	if p.complete {
+		if p.err != nil {
+			callback(p.err)
 		}
 
 		return func() {}
 	}
 
 	callbackID := NewCallbackID()
-	f.errorCallbacks.Set(callbackID, callback)
+	p.errorCallbacks.Set(callbackID, callback)
 
 	return func() {
-		f.mutex.Lock()
-		defer f.mutex.Unlock()
+		p.mutex.Lock()
+		defer p.mutex.Unlock()
 
-		if f.errorCallbacks != nil {
-			f.errorCallbacks.Delete(callbackID)
+		if p.errorCallbacks != nil {
+			p.errorCallbacks.Delete(callbackID)
 		}
 	}
 }
 
-// OnComplete registers a callback that is called when the promise is resolved or rejected.
-func (f *Promise[T]) OnComplete(callback func()) func() {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+func (p *Promise[T]) WaitComplete() {
+	var waitRequestComplete sync.WaitGroup
 
-	if f.complete {
+	waitRequestComplete.Add(1)
+	p.OnComplete(waitRequestComplete.Done)
+
+	waitRequestComplete.Wait()
+}
+
+// OnComplete registers a callback that is called when the promise is resolved or rejected.
+func (p *Promise[T]) OnComplete(callback func()) func() {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	if p.complete {
 		callback()
 
 		return func() {}
 	}
 
 	callbackID := NewCallbackID()
-	f.completeCallbacks.Set(callbackID, callback)
+	p.completeCallbacks.Set(callbackID, callback)
 
 	return func() {
-		f.mutex.Lock()
-		defer f.mutex.Unlock()
+		p.mutex.Lock()
+		defer p.mutex.Unlock()
 
-		f.completeCallbacks.Delete(callbackID)
+		p.completeCallbacks.Delete(callbackID)
 	}
 }
 
 // WasResolved returns true if the promise was resolved.
-func (f *Promise[T]) WasResolved() bool {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
+func (p *Promise[T]) WasResolved() bool {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
-	return f.complete && f.err == nil
+	return p.complete && p.err == nil
 }
 
 // WasRejected returns true if the promise was rejected.
-func (f *Promise[T]) WasRejected() bool {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
+func (p *Promise[T]) WasRejected() bool {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
-	return f.complete && f.err != nil
+	return p.complete && p.err != nil
 }
 
 // WasCompleted returns true if the promise was resolved or rejected.
-func (f *Promise[T]) WasCompleted() bool {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
+func (p *Promise[T]) WasCompleted() bool {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
-	return f.complete
+	return p.complete
 }
 
 // IsEmpty returns true if the promise has no callbacks.
-func (f *Promise[T]) IsEmpty() bool {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
+func (p *Promise[T]) IsEmpty() bool {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
-	return f.successCallbacks.IsEmpty() && f.errorCallbacks.IsEmpty() && f.completeCallbacks.IsEmpty()
+	return p.successCallbacks.IsEmpty() && p.errorCallbacks.IsEmpty() && p.completeCallbacks.IsEmpty()
 }
