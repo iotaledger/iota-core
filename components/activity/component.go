@@ -6,8 +6,8 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
+	"github.com/iotaledger/iota-core/pkg/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 )
@@ -32,13 +32,14 @@ var (
 type dependencies struct {
 	dig.In
 
-	Peer     *peer.Local
-	Protocol *protocol.Protocol
+	Protocol    *protocol.Protocol
+	BlockIssuer *blockissuer.BlockIssuer
 }
 
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
-		ticker := timeutil.NewTicker(issueActivityBlock, ParamsActivity.BroadcastInterval, ctx)
+		Component.LogInfof("Starting Activity with IssuerID: %s", deps.BlockIssuer.Account.ID())
+		ticker := timeutil.NewTicker(func() { issueActivityBlock(ctx) }, ParamsActivity.BroadcastInterval, ctx)
 		ticker.WaitForGracefulShutdown()
 
 		<-ctx.Done()

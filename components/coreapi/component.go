@@ -134,10 +134,10 @@ type dependencies struct {
 func configure() error {
 	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
 
-	//// check if RestAPI plugin is disabled
-	//if !Component.App().IsComponentEnabled(restapi.Component.Name) {
+	// // check if RestAPI plugin is disabled
+	// if !Component.App().IsComponentEnabled(restapi.Component.Name) {
 	//	Component.LogPanic("RestAPI component needs to be enabled to use the CoreAPIV3 component")
-	//}
+	// }
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
 		resp, err := info()
@@ -162,7 +162,7 @@ func configure() error {
 		// default to echo.MIMEApplicationJSON
 		switch mimeType {
 		case httpserver.MIMEApplicationVendorIOTASerializerV1:
-			return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, block.ModelBlock().Data())
+			return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, block.Data())
 
 		default:
 			j, err := deps.Protocol.API().JSONEncode(block.Block())
@@ -198,6 +198,7 @@ func configure() error {
 		if err != nil {
 			return err
 		}
+
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
@@ -208,9 +209,9 @@ func checkNodeAlmostSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// todo update with sync status
-			//if !deps.SyncManager.IsNodeAlmostSynced() {
+			// if !deps.SyncManager.IsNodeAlmostSynced() {
 			//	return errors.WithMessage(echo.ErrServiceUnavailable, "node is not synced")
-			//}
+			// }
 
 			return next(c)
 		}
@@ -221,9 +222,9 @@ func checkUpcomingUnsupportedProtocolVersion() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// todo update with protocol upgrades support
-			//if !deps.ProtocolManager.NextPendingSupported() {
+			// if !deps.ProtocolManager.NextPendingSupported() {
 			//	return errors.WithMessage(echo.ErrServiceUnavailable, "node does not support the upcoming protocol upgrade")
-			//}
+			// }
 
 			return next(c)
 		}

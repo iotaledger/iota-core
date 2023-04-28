@@ -122,16 +122,17 @@ func (e *EngineManager) CleanupNonActive() error {
 
 	dirs, err := e.directory.SubDirs()
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "unable to list subdirectories of %s", e.directory.Path())
 	}
 	for _, dir := range dirs {
 		if dir == activeDir {
 			continue
 		}
 		if err := e.directory.RemoveSubdir(dir); err != nil {
-			return err
+			return errors.Wrapf(err, "unable to remove subdirectory %s", dir)
 		}
 	}
+
 	return nil
 }
 
@@ -181,6 +182,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 		instance.Shutdown()
 		_ = instance.RemoveFromFilesystem()
 		_ = os.Remove(snapshotPath)
+
 		return nil, err
 	}
 

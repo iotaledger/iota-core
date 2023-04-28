@@ -32,8 +32,8 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 		}, opts, func(c *Clock) {
 			e.HookConstructed(func() {
 				e.Storage.Settings().HookInitialized(func() {
-					c.acceptedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index))
-					c.confirmedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index))
+					c.acceptedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index()))
+					c.confirmedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index()))
 
 					c.TriggerInitialized()
 				})

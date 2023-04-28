@@ -30,3 +30,6 @@ type Parent struct {
 	ID   iotago.BlockID
 	Type ParentsType
 }
+
+// ParentReferences is a map between parent type and block IDs.
+type ParentReferences map[ParentsType]iotago.BlockIDs

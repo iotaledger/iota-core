@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -76,8 +75,8 @@ func (g *Gadget) Events() *blockgadget.Events {
 }
 
 func (g *Gadget) Shutdown() {
-	g.workers.Shutdown()
 	g.TriggerStopped()
+	g.workers.Shutdown()
 }
 
 // IsBlockAccepted returns whether the given block is accepted.
@@ -108,7 +107,7 @@ func (g *Gadget) tryAccept(block *blocks.Block) {
 }
 
 func (g *Gadget) trackRatifierWeight(votingBlock *blocks.Block) {
-	ratifier := identity.ID(votingBlock.Block().IssuerID)
+	ratifier := votingBlock.Block().IssuerID
 
 	// Only track ratifier weight for issuers that are part of the committee.
 	if !g.sybilProtection.Committee().Has(ratifier) {
@@ -166,7 +165,7 @@ func (g *Gadget) tryRatifiedAcceptAndConfirm(block *blocks.Block) {
 	blockWeight := committee.SelectAccounts(block.Ratifiers()...).TotalWeight()
 	onlineCommitteeTotalWeight := g.sybilProtection.OnlineCommittee().TotalWeight()
 
-	// check if we reached the confirmation threshold based on the total commitee weight
+	// check if we reached the confirmation threshold based on the total committee weight.
 	if votes.IsThresholdReached(blockWeight, committeeTotalWeight, g.optsConfirmationThreshold) {
 		g.propagateRatifiedAcceptanceAndConfirmation(block, true)
 	} else if votes.IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {

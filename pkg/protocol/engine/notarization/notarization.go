@@ -4,7 +4,6 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/module"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -23,7 +22,7 @@ type Notarization interface {
 }
 
 type Attestations interface {
-	Get(index iotago.SlotIndex) (attestations *ads.Map[identity.ID, iotago.Attestation, *identity.ID, *iotago.Attestation], err error)
+	Get(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error)
 
 	// LastCommittedSlot returns the last committed slot.
 	LastCommittedSlot() (index iotago.SlotIndex)

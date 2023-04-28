@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -121,6 +119,7 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 			if ps.Protocol() != protocolID {
 				return nil, errors.Errorf("accepted stream has wrong protocol: %s != %s", ps.Protocol(), protocolID)
 			}
+
 			return ps, nil
 		case <-amCtx.Done():
 			err := amCtx.Err()
@@ -129,6 +128,7 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 				return nil, errors.WithStack(ErrTimeout)
 			}
 			m.log.Debugw("context error", "id", am.Peer.ID(), "err", err)
+
 			return nil, errors.WithStack(err)
 		}
 	}
@@ -148,6 +148,7 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 					protocolID,
 					err,
 				)
+
 				return
 			}
 			m.log.Debugw("incoming stream negotiated",
@@ -178,7 +179,7 @@ func (m *Manager) initiateStream(ctx context.Context, libp2pID libp2ppeer.ID, pr
 	if !registered {
 		return nil, errors.Errorf("cannot initiate stream protocol %s is not registered", protocolID)
 	}
-	stream, err := m.GetP2PHost().NewStream(ctx, libp2pID, protocolID)
+	stream, err := m.P2PHost().NewStream(ctx, libp2pID, protocolID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,8 +187,10 @@ func (m *Manager) initiateStream(ctx context.Context, libp2pID libp2ppeer.ID, pr
 	if err := ps.sendNegotiation(); err != nil {
 		err = errors.Wrap(err, "failed to send negotiation block")
 		stream.Close()
+
 		return nil, err
 	}
+
 	return ps, nil
 }
 
@@ -200,12 +203,14 @@ func (m *Manager) handleStream(stream network.Stream) {
 	if !registered {
 		m.log.Errorf("cannot accept stream: protocol %s is not registered", protocolID)
 		m.closeStream(stream)
+
 		return
 	}
 	ps := NewPacketsStream(stream, protocolHandler.PacketFactory)
 	if err := ps.receiveNegotiation(); err != nil {
 		m.log.Errorw("failed to receive negotiation message", "proto", protocolID, "err", err)
 		m.closeStream(stream)
+
 		return
 	}
 	am := m.matchNewStream(stream)
@@ -255,6 +260,7 @@ func (m *Manager) newAcceptMatcher(ctx context.Context, p *peer.Peer, protocolID
 			return nil, nil, nil
 		}
 		acceptMatcher.StreamCh[protocolID] = make(chan *PacketsStream)
+
 		return acceptMatcher.Ctx, acceptMatcher, nil
 	}
 
@@ -296,6 +302,7 @@ func (m *Manager) matchNewStream(stream network.Stream) *AcceptMatcher {
 	m.acceptMutex.RLock()
 	defer m.acceptMutex.RUnlock()
 	am := m.acceptMap[stream.Conn().RemotePeer()]
+
 	return am
 }
 
@@ -339,6 +346,7 @@ func (ps *PacketsStream) WritePacket(message proto.Message) error {
 		return errors.WithStack(err)
 	}
 	ps.packetsWritten.Inc()
+
 	return nil
 }
 
@@ -350,6 +358,7 @@ func (ps *PacketsStream) ReadPacket(message proto.Message) error {
 		return errors.WithStack(err)
 	}
 	ps.packetsRead.Inc()
+
 	return nil
 }
 
@@ -359,12 +368,4 @@ func (ps *PacketsStream) sendNegotiation() error {
 
 func (ps *PacketsStream) receiveNegotiation() (err error) {
 	return errors.WithStack(ps.ReadPacket(&pp.Negotiation{}))
-}
-
-func isDeadlineUnsupportedError(err error) bool {
-	return strings.Contains(err.Error(), "deadline not supported")
-}
-
-func isTimeoutError(err error) bool {
-	return os.IsTimeout(errors.Unwrap(err))
 }

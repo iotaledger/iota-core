@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -67,11 +67,11 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 		}
 		result.Block = blk
 
-		//addr, err := findAddress(search)
-		//if err != nil {
+		// addr, err := findAddress(search)
+		// if err != nil {
 		//	return fmt.Errorf("can't find address %s: %w", search, err)
-		//}
-		//result.Address = addr
+		// }
+		// result.Address = addr
 
 		return c.JSON(http.StatusOK, result)
 	})
@@ -93,7 +93,7 @@ func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 	return
 }
 
-func createExplorerBlock(block *blocks.Block) *ExplorerBlock {
+func createExplorerBlock(block *model.Block) *ExplorerBlock {
 	// TODO: fill in missing fields
 	iotaBlk := block.Block()
 

@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -43,8 +42,8 @@ import (
 
 type Protocol struct {
 	Events        *Events
-	engineManager *enginemanager.EngineManager
 	TipManager    tipmanager.TipManager
+	engineManager *enginemanager.EngineManager
 	chainManager  *chainmanager.Manager
 
 	Workers         *workerpool.Group
@@ -82,7 +81,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsTipManagerProvider:      trivialtipmanager.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
-		optsSybilProtectionProvider: poa.NewProvider(map[identity.ID]int64{}),
+		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
@@ -110,7 +109,7 @@ func (p *Protocol) Run() {
 
 	// the rootCommitment is also the earliest point in the chain we can fork from. It is used to prevent
 	// solidifying and processing commitments that we won't be able to switch to.
-	if err := p.mainEngine.Storage.Settings().SetChainID(rootCommitment.MustID()); err != nil {
+	if err := p.mainEngine.Storage.Settings().SetChainID(rootCommitment.ID()); err != nil {
 		panic(fmt.Sprintln("could not load set main engine's chain using", rootCommitment))
 	}
 	p.chainManager.Initialize(rootCommitment)
@@ -124,30 +123,27 @@ func (p *Protocol) Run() {
 
 func (p *Protocol) Shutdown() {
 	if p.networkProtocol != nil {
-		p.networkProtocol.Unregister()
+		p.networkProtocol.Shutdown()
 	}
 
-	p.chainManager.Shutdown()
-
-	p.TipManager.Shutdown()
-
-	p.mainEngine.Shutdown()
-
 	p.Workers.Shutdown()
+	p.mainEngine.Shutdown()
+	p.chainManager.Shutdown()
+	p.TipManager.Shutdown()
 }
 
 func (p *Protocol) initNetworkEvents() {
 	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks
 
-	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id identity.ID) {
+	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {
 		if err := p.ProcessBlock(block, id); err != nil {
 			p.Events.Error.Trigger(err)
 		}
 	}, event.WithWorkerPool(wpBlocks))
 
-	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id identity.ID) {
-		if block, exists := p.MainEngineInstance().Block(blockID); exists && !block.IsMissing() && !block.IsRootBlock() {
-			p.networkProtocol.SendBlock(block.Block(), id)
+	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id network.PeerID) {
+		if block, exists := p.MainEngineInstance().Block(blockID); exists {
+			p.networkProtocol.SendBlock(block, id)
 		}
 	}, event.WithWorkerPool(wpBlocks))
 
@@ -156,19 +152,19 @@ func (p *Protocol) initNetworkEvents() {
 	}, event.WithWorkerPool(wpBlocks))
 
 	p.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-		p.networkProtocol.SendBlock(block.Block())
+		p.networkProtocol.SendBlock(block.ModelBlock())
 	}, event.WithWorkerPool(wpBlocks))
 
 	wpCommitments := p.Workers.CreatePool("NetworkEvents.SlotCommitments")
 
-	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
+	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source network.PeerID) {
 		// when we receive a commitment request, do not look it up in the ChainManager but in the storage, else we might answer with commitments we did not issue ourselves and for which we cannot provide attestations
-		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); err == nil && requestedCommitment.MustID() == commitmentID {
+		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); err == nil && requestedCommitment.ID() == commitmentID {
 			p.networkProtocol.SendSlotCommitment(requestedCommitment, source)
 		}
 	}, event.WithWorkerPool(wpCommitments))
 
-	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *iotago.Commitment, source identity.ID) {
+	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source network.PeerID) {
 		p.chainManager.ProcessCommitmentFromSource(commitment, source)
 	}, event.WithWorkerPool(wpCommitments))
 
@@ -176,7 +172,7 @@ func (p *Protocol) initNetworkEvents() {
 		// Check if we have the requested commitment in our storage before asking our peers for it.
 		// This can happen after we restart the node because the chain manager builds up the chain again.
 		if cm, _ := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); cm != nil {
-			if cm.MustID() == commitmentID {
+			if cm.ID() == commitmentID {
 				p.chainManager.ProcessCommitment(cm)
 				return
 			}
@@ -205,7 +201,7 @@ func (p *Protocol) initEngineManager() {
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("could not load active engine: %s", err))
 	}
 	p.mainEngine = mainEngine
 }
@@ -231,22 +227,32 @@ func (p *Protocol) initChainManager() {
 
 		// We want to evict just below the height of our new root commitment (so that the slot of the root commitment
 		// stays in memory storage and with it the root commitment itself as well).
-		p.chainManager.EvictUntil(rootCommitment.MustID().Index() - 1)
+		if rootCommitment.ID().Index() > 0 {
+			p.chainManager.EvictUntil(rootCommitment.ID().Index() - 1)
+		}
 	}, event.WithWorkerPool(wp))
 
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wp))
 }
 
-func (p *Protocol) ProcessBlock(block *model.Block, src identity.ID) error {
+func (p *Protocol) ProcessOwnBlock(block *model.Block) error {
+	return p.ProcessBlock(block, p.dispatcher.LocalPeerID())
+}
+
+func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	mainEngine := p.MainEngineInstance()
 
-	isSolid, chain := p.chainManager.ProcessCommitmentFromSource(block.Block().SlotCommitment, src)
+	if !mainEngine.WasInitialized() {
+		return errors.Errorf("protocol engine not yet initialized")
+	}
+
+	isSolid, chain := p.chainManager.ProcessCommitmentFromSource(block.SlotCommitment(), src)
 	if !isSolid {
-		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().MustID() {
+		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().ID() {
 			return nil
 		}
 
-		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.Block().SlotCommitment.MustID(), mainEngine.Storage.Settings().LatestCommitment().MustID(), block.ID())
+		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.Block().SlotCommitment.MustID(), mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
 
 	processed := false
@@ -290,10 +296,6 @@ func (p *Protocol) API() iotago.API {
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	panic(fmt.Sprintf("Fork detected: %s", fork))
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// region Options //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 	return func(n *Protocol) {
@@ -384,5 +386,3 @@ func WithStorageOptions(opts ...options.Option[storage.Storage]) options.Option[
 		p.optsStorageOptions = append(p.optsStorageOptions, opts...)
 	}
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

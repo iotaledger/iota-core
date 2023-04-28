@@ -5,11 +5,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 )
 
-func blockByID(c echo.Context) (*blocks.Block, error) {
+func blockByID(c echo.Context) (*model.Block, error) {
 	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
@@ -42,12 +42,12 @@ func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
 	return bmResponse, nil
 }
 
-func blockIssuance(c echo.Context) (*blockIssuanceResponse, error) {
-	// todo
+func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
+	//nolint:nilnil // temporary nil,nil
 	return nil, nil
 }
 
-func sendBlock(c echo.Context) (*blockCreatedResponse, error) {
-	// todo
+func sendBlock(_ echo.Context) (*blockCreatedResponse, error) {
+	//nolint:nilnil // temporary nil,nil
 	return nil, nil
 }

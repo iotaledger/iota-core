@@ -196,6 +196,7 @@ func run() error {
 				Component.LogErrorf("Failed to stop the manager", "err", err)
 			}
 		}()
+		//nolint:contextcheck // false positive
 		addPeersFromConfigToManager(deps.ManualPeeringMgr)
 		<-ctx.Done()
 
@@ -206,7 +207,7 @@ func run() error {
 	if err := Component.Daemon().BackgroundWorker(fmt.Sprintf("%s-P2PManager", Component.Name), func(ctx context.Context) {
 		defer deps.P2PManager.Stop()
 		defer func() {
-			if err := deps.P2PManager.GetP2PHost().Close(); err != nil {
+			if err := deps.P2PManager.P2PHost().Close(); err != nil {
 				Component.LogWarn("Failed to close libp2p host: %+v", err)
 			}
 		}()
@@ -254,5 +255,6 @@ func getKnownPeersFromConfig() ([]*manualpeering.KnownPeerToAdd, error) {
 	if err := json.Unmarshal([]byte(ParamsPeers.KnownPeers), &peers); err != nil {
 		return nil, errors.Wrap(err, "can't parse peers from json")
 	}
+
 	return peers, nil
 }

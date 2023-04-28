@@ -11,8 +11,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/autopeering/peer"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/iota-core/pkg/network"
 )
 
 // ConnectPeerOption defines an option for the DialPeer and AcceptPeer methods.
@@ -25,7 +25,7 @@ type connectPeerConfig struct {
 // ProtocolHandler holds callbacks to handle a protocol.
 type ProtocolHandler struct {
 	PacketFactory func() proto.Message
-	PacketHandler func(identity.ID, proto.Message) error
+	PacketHandler func(network.PeerID, proto.Message) error
 }
 
 func buildConnectPeerConfig(opts []ConnectPeerOption) *connectPeerConfig {
@@ -35,6 +35,7 @@ func buildConnectPeerConfig(opts []ConnectPeerOption) *connectPeerConfig {
 	for _, o := range opts {
 		o(conf)
 	}
+
 	return conf
 }
 
@@ -59,7 +60,7 @@ type Manager struct {
 	stopMutex sync.RWMutex
 	isStopped bool
 
-	neighbors      map[identity.ID]*Neighbor
+	neighbors      map[network.PeerID]*Neighbor
 	neighborsMutex sync.RWMutex
 
 	registeredProtocolsMutex sync.RWMutex
@@ -77,7 +78,7 @@ func NewManager(libp2pHost host.Host, local *peer.Local, log *logger.Logger) *Ma
 			NeighborsGroupAuto:   NewNeighborGroupEvents(),
 			NeighborsGroupManual: NewNeighborGroupEvents(),
 		},
-		neighbors:           map[identity.ID]*Neighbor{},
+		neighbors:           map[network.PeerID]*Neighbor{},
 		registeredProtocols: map[protocol.ID]*ProtocolHandler{},
 	}
 }
@@ -99,8 +100,13 @@ func (m *Manager) NeighborGroupEvents(group NeighborsGroup) *NeighborGroupEvents
 	return m.neighborGroupEvents[group]
 }
 
+// LocalPeerID returns the local peer ID.
+func (m *Manager) LocalPeerID() network.PeerID {
+	return m.local.ID()
+}
+
 // RegisterProtocol registers a new protocol.
-func (m *Manager) RegisterProtocol(protocolID string, factory func() proto.Message, handler func(identity.ID, proto.Message) error) {
+func (m *Manager) RegisterProtocol(protocolID string, factory func() proto.Message, handler func(network.PeerID, proto.Message) error) {
 	m.registeredProtocolsMutex.Lock()
 	defer m.registeredProtocolsMutex.Unlock()
 
@@ -120,9 +126,14 @@ func (m *Manager) UnregisterProtocol(protocolID string) {
 	delete(m.registeredProtocols, protocol.ID(protocolID))
 }
 
-// GetP2PHost returns the libp2p host.
-func (m *Manager) GetP2PHost() host.Host {
+// P2PHost returns the lib-p2p host.
+func (m *Manager) P2PHost() host.Host {
 	return m.libp2pHost
+}
+
+// LocalPeer return the local peer.
+func (m *Manager) LocalPeer() *peer.Local {
+	return m.local
 }
 
 // AddOutbound tries to add a neighbor by connecting to that peer.
@@ -141,34 +152,36 @@ func (m *Manager) AddInbound(ctx context.Context, p *peer.Peer, group NeighborsG
 	return m.addNeighbor(ctx, p, group, m.acceptPeer, connectOpts)
 }
 
-// GetNeighbor returns the neighbor by its id.
-func (m *Manager) GetNeighbor(id identity.ID) (*Neighbor, error) {
+// Neighbor returns the neighbor by its id.
+func (m *Manager) Neighbor(id network.PeerID) (*Neighbor, error) {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 	nbr, ok := m.neighbors[id]
 	if !ok {
 		return nil, ErrUnknownNeighbor
 	}
+
 	return nbr, nil
 }
 
 // DropNeighbor disconnects the neighbor with the given ID and the group.
-func (m *Manager) DropNeighbor(id identity.ID, group NeighborsGroup) error {
-	nbr, err := m.getNeighborWithGroup(id, group)
+func (m *Manager) DropNeighbor(id network.PeerID, group NeighborsGroup) error {
+	nbr, err := m.neighborWithGroup(id, group)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	nbr.Close()
+
 	return nil
 }
 
 // Send sends a message with the specific protocol to a set of neighbors.
-func (m *Manager) Send(packet proto.Message, protocolID string, to ...identity.ID) {
+func (m *Manager) Send(packet proto.Message, protocolID string, to ...network.PeerID) {
 	var neighbors []*Neighbor
 	if len(to) == 0 {
 		neighbors = m.AllNeighbors()
 	} else {
-		neighbors = m.GetNeighborsByID(to)
+		neighbors = m.NeighborsByID(to)
 	}
 
 	for _, nbr := range neighbors {
@@ -184,21 +197,23 @@ func (m *Manager) AllNeighbors() []*Neighbor {
 	for _, n := range m.neighbors {
 		result = append(result, n)
 	}
+
 	return result
 }
 
 // AllNeighborsIDs returns all the ids of the neighbors that are currently connected.
-func (m *Manager) AllNeighborsIDs() (ids []identity.ID) {
-	ids = make([]identity.ID, 0)
+func (m *Manager) AllNeighborsIDs() (ids []network.PeerID) {
+	ids = make([]network.PeerID, 0)
 	neighbors := m.AllNeighbors()
 	for _, nbr := range neighbors {
 		ids = append(ids, nbr.ID())
 	}
+
 	return
 }
 
-// GetNeighborsByID returns all the neighbors that are currently connected corresponding to the supplied ids.
-func (m *Manager) GetNeighborsByID(ids []identity.ID) []*Neighbor {
+// NeighborsByID returns all the neighbors that are currently connected corresponding to the supplied ids.
+func (m *Manager) NeighborsByID(ids []network.PeerID) []*Neighbor {
 	result := make([]*Neighbor, 0, len(ids))
 	if len(ids) == 0 {
 		return result
@@ -211,17 +226,19 @@ func (m *Manager) GetNeighborsByID(ids []identity.ID) []*Neighbor {
 			result = append(result, n)
 		}
 	}
+
 	return result
 }
 
-// getNeighborWithGroup returns neighbor by ID and group.
-func (m *Manager) getNeighborWithGroup(id identity.ID, group NeighborsGroup) (*Neighbor, error) {
+// neighborWithGroup returns neighbor by ID and group.
+func (m *Manager) neighborWithGroup(id network.PeerID, group NeighborsGroup) (*Neighbor, error) {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 	nbr, ok := m.neighbors[id]
 	if !ok || nbr.Group != group {
 		return nil, ErrUnknownNeighbor
 	}
+
 	return nbr, nil
 }
 
@@ -268,6 +285,7 @@ func (m *Manager) addNeighbor(ctx context.Context, p *peer.Peer, group Neighbors
 				nbr.Log.Errorw("error closing stream", "err", resetErr)
 			}
 		}
+
 		return errors.WithStack(err)
 	}
 	nbr.readLoop()
@@ -278,10 +296,11 @@ func (m *Manager) addNeighbor(ctx context.Context, p *peer.Peer, group Neighbors
 	return nil
 }
 
-func (m *Manager) neighborExists(id identity.ID) bool {
+func (m *Manager) neighborExists(id network.PeerID) bool {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 	_, exists := m.neighbors[id]
+
 	return exists
 }
 
@@ -298,6 +317,7 @@ func (m *Manager) setNeighbor(nbr *Neighbor) error {
 		return errors.WithStack(ErrDuplicateNeighbor)
 	}
 	m.neighbors[nbr.ID()] = nbr
+
 	return nil
 }
 

@@ -1,7 +1,6 @@
 package slottracker
 
 import (
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/event"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -20,7 +19,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 })
 
 type VoterUpdatedEvent struct {
-	Voter               identity.ID
+	Voter               iotago.AccountID
 	NewLatestSlotIndex  iotago.SlotIndex
 	PrevLatestSlotIndex iotago.SlotIndex
 }

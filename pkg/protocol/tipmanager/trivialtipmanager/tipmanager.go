@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
@@ -141,7 +142,7 @@ func (t *TipManager) RemoveTip(blockID iotago.BlockID) (removed bool) {
 }
 
 // Tips returns count number of tips, maximum MaxParentsCount.
-func (t *TipManager) Tips(count int) (tips iotago.BlockIDs) {
+func (t *TipManager) Tips(count int) (references model.ParentReferences) {
 	if count > iotago.BlockMaxParents {
 		count = iotago.BlockMinParents
 	}
@@ -149,7 +150,9 @@ func (t *TipManager) Tips(count int) (tips iotago.BlockIDs) {
 		count = iotago.BlockMinParents
 	}
 
-	return t.selectTips(count)
+	return model.ParentReferences{
+		model.StrongParentType: t.selectTips(count),
+	}
 }
 
 // AllTips returns a list of all tips that are stored in the TipManger.
@@ -201,6 +204,7 @@ func (t *TipManager) removeTip(block *blocks.Block) (deleted bool) {
 		// t.TipsConflictTracker.RemoveTip(block)
 		t.events.TipRemoved.Trigger(block)
 	}
+
 	return
 }
 
@@ -213,11 +217,11 @@ func (t *TipManager) removeStrongParents(block *blocks.Block) {
 	}
 }
 
-func (t *TipManager) selectTips(count int) (parents iotago.BlockIDs) {
+func (t *TipManager) selectTips(count int) (strongParents iotago.BlockIDs) {
 	t.mutex.Lock() // RemoveTip might get called, so we need a write-lock here
 	defer t.mutex.Unlock()
 
-	parents = make(iotago.BlockIDs, 0)
+	strongParents = make(iotago.BlockIDs, 0)
 	tips := t.tips.RandomUniqueEntries(count)
 
 	// We obtain up to 8 latest root blocks if there is no valid tip and we submit them to the TSC check as some
@@ -235,7 +239,7 @@ func (t *TipManager) selectTips(count int) (parents iotago.BlockIDs) {
 
 	for _, tip := range tips {
 		if err := t.isValidTip(tip); err == nil {
-			parents = append(parents, tip.ID())
+			strongParents = append(strongParents, tip.ID())
 		} else {
 			t.removeTip(tip)
 
@@ -247,10 +251,11 @@ func (t *TipManager) selectTips(count int) (parents iotago.BlockIDs) {
 		}
 	}
 
-	return parents
+	return strongParents
 }
 
 // checkMonotonicity returns true if the block has any accepted or scheduled child.
+// nolint:revive,unparam // code is commented out
 func (t *TipManager) checkMonotonicity(block *blocks.Block) (anyScheduledOrAccepted bool) {
 	//for _, child := range block.Children() {
 	//	if child.IsOrphaned() {

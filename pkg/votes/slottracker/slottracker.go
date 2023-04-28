@@ -1,7 +1,6 @@
 package slottracker
 
 import (
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -12,30 +11,31 @@ import (
 type SlotTracker struct {
 	Events *Events
 
-	votesPerIdentity *shrinkingmap.ShrinkingMap[identity.ID, *latestvotes.LatestVotes[iotago.SlotIndex, SlotVotePower]]
-	votersPerSlot    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *advancedset.AdvancedSet[identity.ID]]
+	votesPerIdentity *shrinkingmap.ShrinkingMap[iotago.AccountID, *latestvotes.LatestVotes[iotago.SlotIndex, SlotVotePower]]
+	votersPerSlot    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.AccountID]]
 
 	cutoffIndexCallback func() iotago.SlotIndex
 }
 
 func NewSlotTracker(cutoffIndexCallback func() iotago.SlotIndex) *SlotTracker {
 	return &SlotTracker{
-		votesPerIdentity: shrinkingmap.New[identity.ID, *latestvotes.LatestVotes[iotago.SlotIndex, SlotVotePower]](),
-		votersPerSlot:    shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[identity.ID]](),
+		votesPerIdentity: shrinkingmap.New[iotago.AccountID, *latestvotes.LatestVotes[iotago.SlotIndex, SlotVotePower]](),
+		votersPerSlot:    shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.AccountID]](),
 
 		cutoffIndexCallback: cutoffIndexCallback,
 		Events:              NewEvents(),
 	}
 }
 
-func (s *SlotTracker) slotVoters(slotIndex iotago.SlotIndex) *advancedset.AdvancedSet[identity.ID] {
-	slotVoters, _ := s.votersPerSlot.GetOrCreate(slotIndex, func() *advancedset.AdvancedSet[identity.ID] {
-		return advancedset.New[identity.ID]()
+func (s *SlotTracker) slotVoters(slotIndex iotago.SlotIndex) *advancedset.AdvancedSet[iotago.AccountID] {
+	slotVoters, _ := s.votersPerSlot.GetOrCreate(slotIndex, func() *advancedset.AdvancedSet[iotago.AccountID] {
+		return advancedset.New[iotago.AccountID]()
 	})
+
 	return slotVoters
 }
 
-func (s *SlotTracker) TrackVotes(slotIndex iotago.SlotIndex, voterID identity.ID, power SlotVotePower) {
+func (s *SlotTracker) TrackVotes(slotIndex iotago.SlotIndex, voterID iotago.AccountID, power SlotVotePower) {
 	slotVoters := s.slotVoters(slotIndex)
 	if slotVoters.Has(voterID) {
 		// We already tracked the voter for this slot, so no need to update anything
@@ -62,15 +62,15 @@ func (s *SlotTracker) TrackVotes(slotIndex iotago.SlotIndex, voterID identity.ID
 	})
 }
 
-func (s *SlotTracker) Voters(slotIndex iotago.SlotIndex) *advancedset.AdvancedSet[identity.ID] {
-	voters := advancedset.New[identity.ID]()
+func (s *SlotTracker) Voters(slotIndex iotago.SlotIndex) *advancedset.AdvancedSet[iotago.AccountID] {
+	voters := advancedset.New[iotago.AccountID]()
 
 	slotVoters, exists := s.votersPerSlot.Get(slotIndex)
 	if !exists {
 		return voters
 	}
 
-	_ = slotVoters.ForEach(func(identityID identity.ID) error {
+	_ = slotVoters.ForEach(func(identityID iotago.AccountID) error {
 		voters.Add(identityID)
 		return nil
 	})
@@ -84,8 +84,8 @@ func (s *SlotTracker) EvictSlot(indexToEvict iotago.SlotIndex) {
 		return
 	}
 
-	var identitiesToPrune []identity.ID
-	_ = identities.ForEach(func(identity identity.ID) error {
+	var identitiesToPrune []iotago.AccountID
+	_ = identities.ForEach(func(identity iotago.AccountID) error {
 		votesForIdentity, has := s.votesPerIdentity.Get(identity)
 		if !has {
 			return nil
@@ -97,6 +97,7 @@ func (s *SlotTracker) EvictSlot(indexToEvict iotago.SlotIndex) {
 		if power.Index <= indexToEvict {
 			identitiesToPrune = append(identitiesToPrune, identity)
 		}
+
 		return nil
 	})
 
@@ -114,9 +115,9 @@ type SlotVotePower struct {
 }
 
 func (p SlotVotePower) Compare(other SlotVotePower) int {
-	if p.Index-other.Index < 0 {
+	if other.Index > p.Index {
 		return -1
-	} else if p.Index-other.Index > 0 {
+	} else if other.Index < p.Index {
 		return 1
 	} else {
 		return 0

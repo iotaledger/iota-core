@@ -9,11 +9,12 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestManager(t *testing.T) {
-	tf := NewTestFramework(t)
+	tf := NewTestFramework(t, iotago.LatestAPI(&iotago.ProtocolParameters{}))
 	tf.CreateCommitment("1", "Genesis")
 	tf.CreateCommitment("2", "1")
 	tf.CreateCommitment("3", "2")
@@ -29,8 +30,8 @@ func TestManager(t *testing.T) {
 	forkDetected := make(chan struct{}, 1)
 	tf.Instance.Events.ForkDetected.Hook(func(fork *Fork) {
 		// The ForkDetected event should only be triggered once and only if the fork is deep enough
-		require.Equal(t, fork.Commitment.MustID(), tf.SlotCommitment("7*"))
-		require.Equal(t, fork.ForkingPoint.MustID(), tf.SlotCommitment("4*"))
+		require.Equal(t, fork.Commitment.ID(), tf.SlotCommitment("7*"))
+		require.Equal(t, fork.ForkingPoint.ID(), tf.SlotCommitment("4*"))
 		forkDetected <- struct{}{}
 		close(forkDetected) // closing channel here so that we are sure no second event with the same data is triggered
 	})
@@ -157,7 +158,7 @@ func TestManager(t *testing.T) {
 	{
 		commitments, err := tf.Instance.Commitments(tf.SlotCommitment("8*"), 10)
 		require.Error(t, err)
-		require.EqualValues(t, []*Commitment(nil), commitments)
+		require.EqualValues(t, []*ChainCommitment(nil), commitments)
 	}
 
 	{
@@ -175,7 +176,7 @@ func TestManager(t *testing.T) {
 }
 
 func TestManagerForkDetectedAgain(t *testing.T) {
-	tf := NewTestFramework(t)
+	tf := NewTestFramework(t, iotago.LatestAPI(&iotago.ProtocolParameters{}))
 	tf.CreateCommitment("1", "Genesis")
 	tf.CreateCommitment("2", "1")
 	tf.CreateCommitment("3", "2")
@@ -195,13 +196,13 @@ func TestManagerForkDetectedAgain(t *testing.T) {
 		tf.SlotCommitment("9*"): types.Void,
 	}
 	tf.Instance.Events.ForkDetected.Hook(func(fork *Fork) {
-		if _, has := expectedForks[fork.Commitment.MustID()]; !has {
-			t.Fatalf("unexpected fork at: %s", fork.Commitment.MustID())
+		if _, has := expectedForks[fork.Commitment.ID()]; !has {
+			t.Fatalf("unexpected fork at: %s", fork.Commitment.ID())
 		}
-		t.Logf("fork detected at %s", fork.Commitment.MustID())
-		delete(expectedForks, fork.Commitment.MustID())
+		t.Logf("fork detected at %s", fork.Commitment.ID())
+		delete(expectedForks, fork.Commitment.ID())
 
-		require.Equal(t, fork.ForkingPoint.MustID(), tf.SlotCommitment("4*"))
+		require.Equal(t, fork.ForkingPoint.ID(), tf.SlotCommitment("4*"))
 		if len(expectedForks) == 0 {
 			forkRedetected <- struct{}{}
 		}
@@ -255,11 +256,15 @@ func TestManagerForkDetectedAgain(t *testing.T) {
 
 func TestEvaluateAgainstRootCommitment(t *testing.T) {
 	rootCommitment := iotago.NewCommitment(1, iotago.SlotIdentifierRepresentingData(1, []byte{9}), iotago.Identifier{}, 0)
+
+	modelRootCommitment, err := model.CommitmentFromCommitment(rootCommitment, iotago.LatestAPI(&iotago.ProtocolParameters{}))
+	require.NoError(t, err)
+
 	m := &Manager{
-		rootCommitment: NewCommitment(rootCommitment.MustID()),
+		rootCommitment: NewChainCommitment(modelRootCommitment.ID()),
 	}
 
-	m.rootCommitment.PublishCommitment(rootCommitment)
+	m.rootCommitment.PublishCommitment(modelRootCommitment)
 
 	isBelow, isRootCommitment := m.evaluateAgainstRootCommitment(iotago.NewCommitment(0, iotago.SlotIdentifierRepresentingData(0, []byte{}), iotago.Identifier{}, 0))
 	require.True(t, isBelow, "commitment with index 0 should be below root commitment")
@@ -283,7 +288,7 @@ func TestEvaluateAgainstRootCommitment(t *testing.T) {
 }
 
 func TestProcessCommitment(t *testing.T) {
-	tf := NewTestFramework(t)
+	tf := NewTestFramework(t, iotago.LatestAPI(&iotago.ProtocolParameters{}))
 	tf.CreateCommitment("1", "Genesis")
 	tf.CreateCommitment("2", "1")
 
@@ -313,7 +318,7 @@ func TestProcessCommitment(t *testing.T) {
 	tf.Instance.EvictUntil(2 - 1)
 
 	{
-		require.Equal(t, tf.commitment("2").MustID(), tf.Instance.rootCommitment.ID())
+		require.Equal(t, tf.commitment("2").ID(), tf.Instance.rootCommitment.ID())
 	}
 
 	// Should not be processed after 2 becomes rootCommitment

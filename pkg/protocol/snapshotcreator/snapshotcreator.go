@@ -5,10 +5,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
@@ -34,18 +34,20 @@ import (
 func CreateSnapshot(opts ...options.Option[Options]) error {
 	opt := NewOptions(opts...)
 
+	api := iotago.LatestAPI(&opt.ProtocolParameters)
+
 	workers := workerpool.NewGroup("CreateSnapshot")
 	defer workers.Shutdown()
 	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion)
 	defer s.Shutdown()
 
-	if err := s.Commitments().Store(iotago.NewEmptyCommitment()); err != nil {
+	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
 		return errors.Wrap(err, "failed to store empty commitment")
 	}
 	if err := s.Settings().SetProtocolParameters(opt.ProtocolParameters); err != nil {
 		return errors.Wrap(err, "failed to set the genesis time")
 	}
-	if err := s.Settings().SetChainID(lo.PanicOnErr(s.Commitments().Load(0)).MustID()); err != nil {
+	if err := s.Settings().SetChainID(lo.PanicOnErr(s.Commitments().Load(0)).ID()); err != nil {
 		return errors.Wrap(err, "failed to set chainID")
 	}
 
@@ -55,7 +57,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		inmemoryblockdag.NewProvider(),
 		inmemorybooker.NewProvider(),
 		blocktime.NewProvider(),
-		poa.NewProvider(map[identity.ID]int64{}),
+		poa.NewProvider(map[iotago.AccountID]int64{}),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
 		slotnotarization.NewProvider(),
@@ -66,8 +68,5 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
 	}
 
-	if err := engineInstance.WriteSnapshot(opt.FilePath); err != nil {
-		return err
-	}
-	return nil
+	return engineInstance.WriteSnapshot(opt.FilePath)
 }

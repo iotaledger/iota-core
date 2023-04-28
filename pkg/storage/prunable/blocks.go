@@ -27,13 +27,14 @@ func (b *Blocks) Load(id iotago.BlockID) (*model.Block, error) {
 	blockBytes, err := b.store.Get(id[:])
 	if err != nil {
 		if errors.Is(err, kvstore.ErrKeyNotFound) {
+			//nolint:nilnil // expected behavior
 			return nil, nil
 		}
 
 		return nil, errors.Wrapf(err, "failed to get block %s", id)
 	}
 
-	return model.BlockFromBlockIDAndBytes(id, blockBytes, b.api)
+	return model.BlockFromIDAndBytes(id, blockBytes, b.api)
 }
 
 func (b *Blocks) Store(block *model.Block) error {

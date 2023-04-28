@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/core/account"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -29,39 +28,45 @@ const (
 type SybilProtection struct {
 	clock             clock.Clock
 	workers           *workerpool.Group
-	accounts          *account.Accounts
-	onlineComittee    *account.SelectedAccounts
-	inactivityManager *timed.TaskExecutor[identity.ID]
-	lastActivities    *shrinkingmap.ShrinkingMap[identity.ID, time.Time]
+	accounts          *account.Accounts[iotago.AccountID, *iotago.AccountID]
+	onlineCommittee   *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
+	inactivityManager *timed.TaskExecutor[iotago.AccountID]
+	lastActivities    *shrinkingmap.ShrinkingMap[iotago.AccountID, time.Time]
 	mutex             sync.RWMutex
 
-	optsActivityWindow time.Duration
+	optsActivityWindow         time.Duration
+	optsOnlineCommitteeStartup []iotago.AccountID
 
 	module.Module
 }
 
 // NewProvider returns a new sybil protection provider that uses the ProofOfStake module.
-func NewProvider(weightVector map[identity.ID]int64, opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
+func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
 	return module.Provide(func(e *engine.Engine) sybilprotection.SybilProtection {
 		return options.Apply(
 			&SybilProtection{
 				workers:           e.Workers.CreateGroup("SybilProtection"),
-				accounts:          account.NewAccounts(e.Storage.SybilProtection(PrefixWeights)),
-				inactivityManager: timed.NewTaskExecutor[identity.ID](1),
-				lastActivities:    shrinkingmap.New[identity.ID, time.Time](),
+				accounts:          account.NewAccounts[iotago.AccountID](e.Storage.SybilProtection(PrefixWeights)),
+				inactivityManager: timed.NewTaskExecutor[iotago.AccountID](1),
+				lastActivities:    shrinkingmap.New[iotago.AccountID, time.Time](),
 
-				optsActivityWindow: time.Second * 30,
+				optsActivityWindow:         time.Second * 30,
+				optsOnlineCommitteeStartup: lo.Keys(weightVector),
 			}, opts, func(s *SybilProtection) {
 				s.initializeAccounts(weightVector)
-				s.onlineComittee = s.accounts.SelectAccounts()
+				s.onlineCommittee = s.accounts.SelectAccounts()
 
 				e.HookConstructed(func() {
-					e.HookStopped(s.stopInactivityManager)
-
 					s.clock = e.Clock
 
+					e.Clock.HookInitialized(func() {
+						for _, v := range s.optsOnlineCommitteeStartup {
+							s.markValidatorActive(v, e.Clock.Accepted().RelativeTime())
+						}
+					})
+
 					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-						s.markValidatorActive(identity.ID(block.Block().IssuerID[:]), block.IssuingTime())
+						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
 					}, event.WithWorkerPool(s.workers.CreatePool("SybilProtection", 1)))
 				})
 			})
@@ -71,18 +76,18 @@ func NewProvider(weightVector map[identity.ID]int64, opts ...options.Option[Sybi
 var _ sybilprotection.SybilProtection = &SybilProtection{}
 
 // Accounts returns all the known validators.
-func (s *SybilProtection) Accounts() *account.Accounts {
+func (s *SybilProtection) Accounts() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
 	return s.accounts
 }
 
 // Committee returns the set of validators selected to be part of the committee.
-func (s *SybilProtection) Committee() *account.SelectedAccounts {
+func (s *SybilProtection) Committee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID] {
 	return s.accounts.SelectAccounts(lo.Keys(lo.PanicOnErr(s.accounts.Map()))...)
 }
 
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
-func (s *SybilProtection) OnlineCommittee() *account.SelectedAccounts {
-	return s.onlineComittee
+func (s *SybilProtection) OnlineCommittee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID] {
+	return s.onlineCommittee
 }
 
 func (s *SybilProtection) LastCommittedSlot() iotago.SlotIndex {
@@ -90,11 +95,12 @@ func (s *SybilProtection) LastCommittedSlot() iotago.SlotIndex {
 }
 
 func (s *SybilProtection) Shutdown() {
-	s.stopInactivityManager()
 	s.TriggerStopped()
+	s.stopInactivityManager()
+	s.workers.Shutdown()
 }
 
-func (s *SybilProtection) initializeAccounts(weightVector map[identity.ID]int64) {
+func (s *SybilProtection) initializeAccounts(weightVector map[iotago.AccountID]int64) {
 	for id, weight := range weightVector {
 		s.accounts.Update(id, weight)
 	}
@@ -104,7 +110,7 @@ func (s *SybilProtection) stopInactivityManager() {
 	s.inactivityManager.Shutdown(timed.CancelPendingElements)
 }
 
-func (s *SybilProtection) markValidatorActive(id identity.ID, activityTime time.Time) {
+func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime time.Time) {
 	if s.clock.WasStopped() {
 		return
 	}
@@ -120,7 +126,7 @@ func (s *SybilProtection) markValidatorActive(id identity.ID, activityTime time.
 	if lastActivity, exists := s.lastActivities.Get(id); exists && lastActivity.After(activityTime) {
 		return
 	} else if !exists {
-		s.onlineComittee.Add(id)
+		s.onlineCommittee.Add(id)
 	}
 
 	s.lastActivities.Set(id, activityTime)
@@ -128,10 +134,10 @@ func (s *SybilProtection) markValidatorActive(id identity.ID, activityTime time.
 	s.inactivityManager.ExecuteAfter(id, func() { s.markValidatorInactive(id) }, activityTime.Add(s.optsActivityWindow).Sub(s.clock.Accepted().RelativeTime()))
 }
 
-func (s *SybilProtection) markValidatorInactive(id identity.ID) {
+func (s *SybilProtection) markValidatorInactive(id iotago.AccountID) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	s.lastActivities.Delete(id)
-	s.onlineComittee.Delete(id)
+	s.onlineCommittee.Delete(id)
 }

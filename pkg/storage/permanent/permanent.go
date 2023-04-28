@@ -35,9 +35,9 @@ type Permanent struct {
 // New returns a new permanent storage instance.
 func New(baseDir *utils.Directory, dbConfig database.Config, opts ...options.Option[Permanent]) *Permanent {
 	return options.Apply(&Permanent{
-		settings:    NewSettings(baseDir.Path("settings.bin")),
-		commitments: NewCommitments(baseDir.Path("commitments.bin")),
+		settings: NewSettings(baseDir.Path("settings.bin")),
 	}, opts, func(p *Permanent) {
+		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.API())
 		p.logger = logger.NewWrappedLogger(p.optsLogger)
 
 		var err error

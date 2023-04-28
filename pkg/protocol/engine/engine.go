@@ -11,13 +11,13 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -80,7 +80,7 @@ func New(
 		&Engine{
 			Events:        NewEvents(),
 			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance.RootBlocks, storageInstance.Settings().LatestCommitment().Index),
+			EvictionState: eviction.NewState(storageInstance.RootBlocks, storageInstance.Settings().LatestCommitment().Index()),
 			Workers:       workers,
 
 			optsBootstrappedThreshold: 10 * time.Second,
@@ -116,20 +116,51 @@ func (e *Engine) Shutdown() {
 		e.TriggerStopped()
 
 		e.BlockRequester.Shutdown()
-		e.Workers.Shutdown()
+		e.Notarization.Shutdown()
 		e.Booker.Shutdown()
 		e.BlockDAG.Shutdown()
+		e.BlockDAG.Shutdown()
+		e.BlockGadget.Shutdown()
+		e.SlotGadget.Shutdown()
+		e.Clock.Shutdown()
+		e.SybilProtection.Shutdown()
+		e.Filter.Shutdown()
 		e.Storage.Shutdown()
+		e.Workers.Shutdown()
 	}
 }
 
-func (e *Engine) ProcessBlockFromPeer(block *model.Block, source identity.ID) {
+func (e *Engine) ProcessBlockFromPeer(block *model.Block, source network.PeerID) {
 	e.Filter.ProcessReceivedBlock(block, source)
 	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
-func (e *Engine) Block(id iotago.BlockID) (block *blocks.Block, exists bool) {
+func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {
 	return e.BlockCache.Block(id)
+}
+
+func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
+	cachedBlock, exists := e.BlockCache.Block(id)
+	if exists && !cachedBlock.IsRootBlock() {
+		return cachedBlock.ModelBlock(), !cachedBlock.IsMissing()
+	}
+
+	// The block should've been in the block cache, so there's no need to check the storage.
+	if !exists && id.Index() > e.Storage.Settings().LatestCommitment().Index() {
+		return nil, false
+	}
+
+	s := e.Storage.Blocks(id.Index())
+	if s == nil {
+		return nil, false
+	}
+	modelBlock, err := s.Load(id)
+	if err != nil {
+		// TODO: log error?
+		return nil, false
+	}
+
+	return modelBlock, modelBlock != nil
 }
 
 func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
@@ -167,7 +198,7 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		e.Storage.Settings().UpdateAPI()
 		e.Storage.Settings().TriggerInitialized()
 		e.Storage.Commitments().TriggerInitialized()
-		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index)
+		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
 
 		// e.Notarization.attestations().SetLastCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 		// e.Notarization.attestations().TriggerInitialized()
@@ -184,7 +215,7 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
 	if len(targetSlot) == 0 {
-		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index)
+		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index())
 	}
 
 	if fileHandle, err := os.Create(filePath); err != nil {
@@ -269,7 +300,7 @@ func (e *Engine) setupEvictionState() {
 					e.Events.Error.Trigger(errors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
 					return
 				}
-				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.SlotCommitmentID())
+				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.Block().SlotCommitment.MustID())
 			}
 		})
 	}, event.WithWorkerPool(wp))
@@ -322,7 +353,7 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 // EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
 // commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
 // from being processed as their chain will be deemed unsolid.
-func (e *Engine) EarliestRootCommitment() *iotago.Commitment {
+func (e *Engine) EarliestRootCommitment() *model.Commitment {
 	earliestRootCommitmentID := e.EvictionState.EarliestRootCommitmentID()
 	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentID.Index())
 	if err != nil {

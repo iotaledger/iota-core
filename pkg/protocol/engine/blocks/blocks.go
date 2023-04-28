@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -19,7 +18,7 @@ type Blocks struct {
 	evictionMutex        sync.RWMutex
 }
 
-func New(evictionState *eviction.State, slotTimeProviderFunc func() *iotago.SlotTimeProvider, opts ...options.Option[Blocks]) *Blocks {
+func New(evictionState *eviction.State, slotTimeProviderFunc func() *iotago.SlotTimeProvider) *Blocks {
 	return &Blocks{
 		Evict:                event.New1[iotago.SlotIndex](),
 		blocks:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *Block](),
@@ -57,7 +56,7 @@ func (b *Blocks) StoreOrUpdate(data *model.Block) (storedBlock *Block, evicted, 
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if b.evictionState.LastEvictedSlot() >= data.ID().Index() {
+	if evictedIndex, valid := b.evictionState.LastEvictedSlot(); valid && evictedIndex >= data.ID().Index() {
 		return nil, true, false
 	}
 
@@ -74,11 +73,12 @@ func (b *Blocks) GetOrCreate(blockID iotago.BlockID, createFunc func() *Block) (
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if b.evictionState.LastEvictedSlot() >= blockID.Index() {
+	if evictedIndex, valid := b.evictionState.LastEvictedSlot(); valid && evictedIndex >= blockID.Index() {
 		return nil, false
 	}
 
 	storage := b.blocks.Get(blockID.Index(), true)
+
 	return storage.GetOrCreate(blockID, createFunc)
 }
 
@@ -86,10 +86,11 @@ func (b *Blocks) StoreBlock(block *Block) (stored bool) {
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if b.evictionState.LastEvictedSlot() >= block.ID().Index() {
+	if evictedIndex, valid := b.evictionState.LastEvictedSlot(); valid && evictedIndex >= block.ID().Index() {
 		return false
 	}
 
 	storage := b.blocks.Get(block.ID().Index(), true)
+
 	return storage.Set(block.ID(), block)
 }

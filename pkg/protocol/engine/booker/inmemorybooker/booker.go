@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -28,8 +27,7 @@ type Booker struct {
 
 	workers *workerpool.Group
 
-	blockCache         *blocks.Blocks
-	setInvalidCallback func(*blocks.Block, error) bool
+	blockCache *blocks.Blocks
 
 	module.Module
 }
@@ -68,7 +66,7 @@ func New(workers *workerpool.Group, sybilProtection sybilprotection.SybilProtect
 			blockCache.Block,
 			(*blocks.Block).IsBooked,
 			b.book,
-			func(block *blocks.Block, _ error) { block.SetInvalid() },
+			b.markInvalid,
 			(*blocks.Block).Parents,
 			causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](isReferenceValid),
 		)
@@ -86,19 +84,20 @@ func (b *Booker) Queue(block *blocks.Block) (wasQueued bool, err error) {
 	}
 
 	b.bookingOrder.Queue(block)
+
 	return true, nil
 }
 
 func (b *Booker) Shutdown() {
-	b.workers.Shutdown()
 	b.TriggerStopped()
+	b.workers.Shutdown()
 }
 
 func (b *Booker) evict(slotIndex iotago.SlotIndex) {
 	b.bookingOrder.EvictUntil(slotIndex)
 }
 
-func (b *Booker) isPayloadSolid(block *blocks.Block) (isPayloadSolid bool, err error) {
+func (b *Booker) isPayloadSolid(_ *blocks.Block) (isPayloadSolid bool, err error) {
 	return true, nil
 }
 
@@ -107,11 +106,12 @@ func (b *Booker) book(block *blocks.Block) error {
 	b.events.BlockBooked.Trigger(block)
 
 	b.trackWitnessWeight(block)
+
 	return nil
 }
 
 func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
-	witness := identity.ID(votingBlock.Block().IssuerID)
+	witness := votingBlock.Block().IssuerID
 
 	// Only track witness weight for issuers that are part of the committee.
 	if !b.sybilProtection.Committee().Has(witness) {
@@ -167,8 +167,10 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
 	}
 }
 
-func (b *Booker) markInvalid(block *blocks.Block, reason error) {
-	b.setInvalidCallback(block, errors.Wrap(reason, "block marked as invalid in Booker"))
+func (b *Booker) markInvalid(block *blocks.Block, err error) {
+	if block.SetInvalid() {
+		b.events.BlockInvalid.Trigger(block, errors.Wrap(err, "block marked as invalid in Booker"))
+	}
 }
 
 // isReferenceValid checks if the reference between the child and its parent is valid.
