@@ -6,9 +6,11 @@ import (
 
 	"golang.org/x/xerrors"
 
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -111,18 +113,17 @@ func (m *MemPool[VotePower]) SetTransactionIncluded(id iotago.TransactionID, slo
 		return xerrors.Errorf("transaction with id %s not found: %w", id, mempool.ErrTransactionNotFound)
 	}
 
-	switch previousSlot := transaction.setInclusionSlot(slot); true {
-	case previousSlot == 0:
-		m.updateAcceptance(transaction)
-	case previousSlot < slot:
-		//transaction.triggerInclusionSlotUpdated(previousSlot, slot)
-	}
+	transaction.setInclusionSlot(slot)
 
 	return nil
 }
 
 func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionWithMetadata) *TransactionWithMetadata {
-	transaction.exposeEvents(m.events)
+	transaction.OnSolid(func() { m.events.TransactionSolid.Trigger(transaction) })
+	transaction.OnBooked(func() { m.events.TransactionBooked.Trigger(transaction) })
+	transaction.OnExecuted(func() { m.events.TransactionExecuted.Trigger(transaction) })
+	transaction.OnInvalid(func(err error) { m.events.TransactionInvalid.Trigger(transaction, err) })
+	transaction.OnAccepted(func() { m.events.TransactionAccepted.Trigger(transaction) })
 
 	transaction.OnSolid(func() { m.executeTransaction(transaction) })
 	transaction.OnExecuted(func() { m.bookTransaction(transaction) })
@@ -135,6 +136,7 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionWithMetada
 }
 
 func (m *MemPool[VotePower]) setupInput(transaction *TransactionWithMetadata, input *StateWithMetadata) *StateWithMetadata {
+	input.markSpent()
 	input.OnAccepted(transaction.markInputAccepted)
 	input.OnRejected(transaction.setRejected)
 	input.OnSpendAccepted(func(spender *TransactionWithMetadata) {
@@ -142,8 +144,20 @@ func (m *MemPool[VotePower]) setupInput(transaction *TransactionWithMetadata, in
 			transaction.setRejected()
 		}
 	})
+	input.OnDoubleSpent(func() { m.forkTransaction(transaction, input) })
 
 	return input
+}
+
+func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionWithMetadata, input *StateWithMetadata) {
+	switch err := m.conflictDAG.CreateConflict(transaction.ID(), transaction.conflictIDs, advancedset.New(input.ID()), acceptance.Pending); {
+	case errors.Is(err, conflictdag.ErrConflictExists):
+		m.conflictDAG.JoinConflictSets(transaction.ID(), advancedset.New(input.ID()))
+	case err != nil:
+		panic(err)
+	default:
+		//transaction.setConflicting()
+	}
 }
 
 func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionWithMetadata) {

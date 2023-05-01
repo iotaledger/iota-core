@@ -208,7 +208,7 @@ func (p *Promise[T]) WasCompleted() bool {
 	return p.complete
 }
 
-// IsEmpty returns true if the promise has no callbacks.
+// IsEmpty returns true if the promise has no updateCallbacks.
 func (p *Promise[T]) IsEmpty() bool {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()

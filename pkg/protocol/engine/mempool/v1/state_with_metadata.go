@@ -1,7 +1,8 @@
 package mempoolv1
 
 import (
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"sync/atomic"
+
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -11,26 +12,43 @@ import (
 type StateWithMetadata struct {
 	id                iotago.OutputID
 	sourceTransaction *TransactionWithMetadata
-	spenders          *advancedset.AdvancedSet[*TransactionWithMetadata]
+	spenderCount      uint64
 	state             ledger.State
 
-	accepted *promise.Event
-	rejected *promise.Event
+	accepted      *promise.Event
+	rejected      *promise.Event
+	doubleSpent   *promise.Event
+	spendAccepted *promise.Event1[*TransactionWithMetadata]
 }
 
 func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetadata) *StateWithMetadata {
 	return &StateWithMetadata{
 		id:                state.ID(),
 		sourceTransaction: lo.First(optSource),
-		spenders:          advancedset.New[*TransactionWithMetadata](),
 		state:             state,
 		accepted:          promise.NewEvent(),
 		rejected:          promise.NewEvent(),
+		doubleSpent:       promise.NewEvent(),
+		spendAccepted:     promise.NewEvent1[*TransactionWithMetadata](),
 	}
 }
 
-func (s *StateWithMetadata) OnSpendAccepted(func(spender *TransactionWithMetadata)) {
-	// TODO: implement me
+func (s *StateWithMetadata) OnDoubleSpent(callback func()) {
+	s.doubleSpent.OnTrigger(callback)
+}
+
+func (s *StateWithMetadata) OnSpendAccepted(callback func(spender *TransactionWithMetadata)) {
+	s.spendAccepted.OnTrigger(callback)
+}
+
+func (s *StateWithMetadata) markSpent() {
+	if atomic.AddUint64(&s.spenderCount, 1) == 2 {
+		s.doubleSpent.Trigger()
+	}
+}
+
+func (s *StateWithMetadata) acceptSpend(spender *TransactionWithMetadata) {
+	s.spendAccepted.Trigger(spender)
 }
 
 func (s *StateWithMetadata) setAccepted() {
@@ -62,5 +80,5 @@ func (s *StateWithMetadata) State() ledger.State {
 }
 
 func (s *StateWithMetadata) IsSpent() bool {
-	return s.spenders.Size() > 0
+	return atomic.LoadUint64(&s.spenderCount) > 0
 }

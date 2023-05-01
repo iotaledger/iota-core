@@ -91,16 +91,6 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 	}, nil
 }
 
-func (t *TransactionWithMetadata) exposeEvents(events *mempool.Events) *TransactionWithMetadata {
-	t.OnSolid(func() { events.TransactionSolid.Trigger(t) })
-	t.OnBooked(func() { events.TransactionBooked.Trigger(t) })
-	t.OnExecuted(func() { events.TransactionExecuted.Trigger(t) })
-	t.OnInvalid(func(err error) { events.TransactionInvalid.Trigger(t, err) })
-	t.OnAccepted(func() { events.TransactionAccepted.Trigger(t) })
-
-	return t
-}
-
 func (t *TransactionWithMetadata) ID() iotago.TransactionID {
 	return t.id
 }
@@ -171,9 +161,7 @@ func (t *TransactionWithMetadata) OnAccepted(callback func()) {
 }
 
 func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetadata) {
-	t.mutex.Lock()
 	t.inputs[index] = input
-	t.mutex.Unlock()
 
 	if atomic.AddUint64(&t.unsolidInputsCount, ^uint64(0)) == 0 {
 		t.solid.Trigger()
@@ -200,6 +188,10 @@ func (t *TransactionWithMetadata) setInvalid(reason error) {
 
 func (t *TransactionWithMetadata) setAccepted() (updated bool) {
 	if updated = t.accepted.Trigger(); updated {
+		for _, input := range t.inputs {
+			input.acceptSpend(t)
+		}
+
 		lo.ForEach(t.outputs, (*StateWithMetadata).setAccepted)
 	}
 
@@ -220,18 +212,21 @@ func (t *TransactionWithMetadata) InclusionSlot() iotago.SlotIndex {
 }
 
 func (t *TransactionWithMetadata) IsIncluded() bool {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
-	return t.inclusionSlot != 0
+	return t.included.WasTriggered()
 }
 
 func (t *TransactionWithMetadata) setInclusionSlot(slot iotago.SlotIndex) (previousValue iotago.SlotIndex) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	if previousValue = t.inclusionSlot; previousValue == 0 || slot < previousValue {
+	switch previousValue = t.inclusionSlot; {
+	case previousValue == 0:
 		t.inclusionSlot = slot
+		t.included.Trigger()
+	case slot < previousValue:
+		t.inclusionSlot = slot
+		// TODO: IMPLEMENT t.inclusionSlotUpdated.Trigger()
+
 	}
 
 	return previousValue

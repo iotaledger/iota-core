@@ -5,9 +5,14 @@ import (
 )
 
 type Event struct {
+	// triggeredCallbacks is nil if the event was already triggered.
 	triggeredCallbacks []func()
 
-	mutex sync.RWMutex
+	// triggeredCallbacksMutex is used to synchronize access to the triggeredCallbacks slice.
+	triggeredCallbacksMutex sync.RWMutex
+
+	// callbackOrderMutex is used to ensure that updateCallbacks queued before the event was triggered are executed first.
+	callbackOrderMutex sync.RWMutex
 }
 
 func NewEvent() *Event {
@@ -17,9 +22,12 @@ func NewEvent() *Event {
 }
 
 func (f *Event) Trigger() (wasTriggered bool) {
+	f.callbackOrderMutex.Lock()
+	defer f.callbackOrderMutex.Unlock()
+
 	for _, callback := range func() (callbacks []func()) {
-		f.mutex.Lock()
-		defer f.mutex.Unlock()
+		f.triggeredCallbacksMutex.Lock()
+		defer f.triggeredCallbacksMutex.Unlock()
 
 		callbacks = f.triggeredCallbacks
 		if wasTriggered = callbacks != nil; wasTriggered {
@@ -34,24 +42,29 @@ func (f *Event) Trigger() (wasTriggered bool) {
 	return
 }
 
+func (f *Event) queueCallback(callback func()) (callbackQueued bool) {
+	f.triggeredCallbacksMutex.Lock()
+	defer f.triggeredCallbacksMutex.Unlock()
+
+	if callbackQueued = f.triggeredCallbacks != nil; callbackQueued {
+		f.triggeredCallbacks = append(f.triggeredCallbacks, callback)
+	}
+
+	return callbackQueued
+}
+
 func (f *Event) OnTrigger(callback func()) {
-	if func() (triggeredAlready bool) {
-		f.mutex.Lock()
-		defer f.mutex.Unlock()
+	if !f.queueCallback(callback) {
+		f.callbackOrderMutex.RLock()
+		defer f.callbackOrderMutex.RUnlock()
 
-		if triggeredAlready = f.triggeredCallbacks == nil; !triggeredAlready {
-			f.triggeredCallbacks = append(f.triggeredCallbacks, callback)
-		}
-
-		return triggeredAlready
-	}() {
 		callback()
 	}
 }
 
 func (f *Event) WasTriggered() bool {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
+	f.triggeredCallbacksMutex.RLock()
+	defer f.triggeredCallbacksMutex.RUnlock()
 
 	return f.triggeredCallbacks == nil
 }
