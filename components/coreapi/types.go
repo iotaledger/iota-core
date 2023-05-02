@@ -1,6 +1,8 @@
 package coreapi
 
 import (
+	"time"
+
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -112,18 +114,24 @@ type nodeMetrics struct {
 
 // blockMetadataResponse defines the response of a GET block metadata REST API call.
 type blockMetadataResponse struct {
-	// The hex encoded block ID of the block.
+	// BlockID The hex encoded block ID of the block.
 	BlockID string `json:"blockId"`
+	// StrongParents are the strong parents of the block.
+	StrongParents []string `json:"strongParents"`
+	// WeakParents are the weak parents of the block.
+	WeakParents []string `json:"weakParents"`
+	// ShallowLikeParents are the shallow like parents of the block.
+	ShallowLikeParents []string `json:"shallowLikeParents"`
 	// BlockState might be pending, confirmed, finalized.
 	BlockState string `json:"blockState"`
 	// TxState might be pending, conflicting, confirmed, finalized, rejected.
 	TxState string `json:"txState,omitempty"`
-	// BlockError if applicable indicates the error that occurred during the block processing.
-	BlockError string `json:"blockError,omitempty"`
-	// TxError if applicable indicates the error that occurred during the transaction processing.
-	TxError string `json:"txError,omitempty"`
-	// Whether the block should be reissued.
-	ShouldReissue *bool `json:"shouldReattach,omitempty"`
+	// BlockStateReason if applicable indicates the error that occurred during the block processing.
+	BlockStateReason string `json:"blockStateReason,omitempty"`
+	// TxStateReason if applicable indicates the error that occurred during the transaction processing.
+	TxStateReason string `json:"txStateReason,omitempty"`
+	// ReissuePayload whether the block should be reissued.
+	ReissuePayload *bool `json:"reissuePayload,omitempty"`
 }
 
 type blockIssuanceResponse struct {

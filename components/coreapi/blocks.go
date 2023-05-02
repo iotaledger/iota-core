@@ -1,12 +1,17 @@
 package coreapi
 
 import (
+	"io"
+	"time"
+
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func blockByID(c echo.Context) (*model.Block, error) {
@@ -28,13 +33,17 @@ func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	bmResponse := &blockMetadataResponse{
-		BlockID:    block.ID().ToHex(),
-		BlockState: blockStatePending.String(),
+		BlockID:            block.ID().ToHex(),
+		StrongParents:      block.Block().StrongParents.ToHex(),
+		WeakParents:        block.Block().WeakParents.ToHex(),
+		ShallowLikeParents: block.Block().ShallowLikeParents.ToHex(),
+		BlockState:         blockStatePending.String(),
 	}
 	_, exists := deps.Protocol.MainEngineInstance().Block(block.ID())
 	if !exists {
-		bmResponse.BlockError = "block not found"
+		bmResponse.BlockStateReason = "block not found"
 	}
 
 	// todo set states and error
