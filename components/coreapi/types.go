@@ -135,11 +135,14 @@ type blockMetadataResponse struct {
 }
 
 type blockIssuanceResponse struct {
-	StrongParents       iotago.StrongParentsIDs     `json:"strongParents"`
-	WeakParents         iotago.WeakParentsIDs       `json:"weakParents"`
-	ShallowParents      iotago.ShallowLikeParentIDs `json:"shallowParents"`
-	LatestConfirmedSlot iotago.SlotIndex            `json:"latestConfirmedSlot"`
-	Commitment          iotago.Commitment           `json:"commitment"`
+	// StrongParents are the strong parents of the block.
+	StrongParents []string `json:"strongParents"`
+	// WeakParents are the weak parents of the block.
+	WeakParents []string `json:"weakParents"`
+	// ShallowLikeParents are the shallow like parents of the block.
+	ShallowLikeParents  []string           `json:"shallowLikeParents"`
+	LatestFinalizedSlot iotago.SlotIndex   `json:"latestFinalizedSlot"`
+	Commitment          *iotago.Commitment `json:"commitment"`
 }
 
 // blockCreatedResponse defines the response of a POST blocks REST API call.
