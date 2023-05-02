@@ -119,15 +119,31 @@ func (m *MemPool[VotePower]) SetTransactionIncluded(id iotago.TransactionID, slo
 }
 
 func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionWithMetadata) *TransactionWithMetadata {
-	transaction.OnSolid(func() { m.events.TransactionSolid.Trigger(transaction) })
-	transaction.OnBooked(func() { m.events.TransactionBooked.Trigger(transaction) })
-	transaction.OnExecuted(func() { m.events.TransactionExecuted.Trigger(transaction) })
-	transaction.OnInvalid(func(err error) { m.events.TransactionInvalid.Trigger(transaction, err) })
-	transaction.OnAccepted(func() { m.events.TransactionAccepted.Trigger(transaction) })
+	transaction.OnSolid(func() {
+		m.events.TransactionSolid.Trigger(transaction)
 
-	transaction.OnSolid(func() { m.executeTransaction(transaction) })
-	transaction.OnExecuted(func() { m.bookTransaction(transaction) })
-	transaction.OnBooked(func() { m.publishOutputs(transaction) })
+		m.executeTransaction(transaction)
+	})
+
+	transaction.OnExecuted(func() {
+		m.events.TransactionExecuted.Trigger(transaction)
+
+		m.bookTransaction(transaction)
+	})
+
+	transaction.OnBooked(func() {
+		m.events.TransactionBooked.Trigger(transaction)
+
+		m.publishOutputs(transaction)
+	})
+
+	transaction.OnInvalid(func(err error) {
+		m.events.TransactionInvalid.Trigger(transaction, err)
+	})
+
+	transaction.OnAccepted(func() {
+		m.events.TransactionAccepted.Trigger(transaction)
+	})
 
 	transaction.OnIncluded(func() { m.updateAcceptance(transaction) })
 	transaction.OnAllInputsAccepted(func() { m.updateAcceptance(transaction) })
