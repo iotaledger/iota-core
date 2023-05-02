@@ -348,7 +348,8 @@ paths:
           required: true
           description: >-
             Identifier of the output encoded in hex. An output is identified by
-            the concatenation of `transactionId+outputIndex`. Hex-encoded with 0x prefix.
+            the concatenation of `transactionId+outputIndex` where `outputIndex` needs to be converted to little endian first.
+            Hex-encoded with 0x prefix.
           example: "0xfa0de75d225cca2799395e5fc340702fc7eac821d2bdd79911126f131ae097a20100"
       responses:
         '200':
@@ -405,7 +406,8 @@ paths:
           required: true
           description: >-
             Identifier of the output encoded in hex. An output is identified by
-            the concatenation of `transactionId+outputIndex`. Hex-encoded with 0x prefix.
+            the concatenation of `transactionId+outputIndex` where `outputIndex` (u16) needs to be converted to little endian first.
+            Hex-encoded with 0x prefix.
           example: "0xfa0de75d225cca2799395e5fc340702fc7eac821d2bdd79911126f131ae097a20100"
       responses:
         '200':
@@ -1988,7 +1990,7 @@ components:
       properties:
         type:
           type: integer
-          description: Set to value 1 to denote an Dust Deposit Return Unlock Condition.
+          description: Set to value 1 to denote a Storage Deposit Return Unlock Condition.
         returnAddress:
           oneOf:
             - $ref: '#/components/schemas/Ed25519Address'
@@ -2752,7 +2754,7 @@ components:
               * `255` - denotes that the semantic validation failed.
         reissuePayload:
           type: boolean
-          description: Tells if the block should be issued again.
+          description: Tells if the payload should be issued again.
       required:
         - blockId
         - strongParents
