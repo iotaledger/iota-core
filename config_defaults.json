@@ -36,10 +36,17 @@
   },
   "restAPI": {
     "enabled": true,
-    "bindAddress": "0.0.0.0:14265",
+    "bindAddress": "0.0.0.0:8080",
     "publicRoutes": [
       "/health",
-      "/api/routes"
+      "/api/routes",
+      "/api/core/v3/info",
+      "/api/core/v3/blocks*",
+      "/api/core/v3/transactions*",
+      "/api/core/v3/commitments*",
+      "/api/core/v3/outputs*",
+      "/api/debug/v1/*",
+      "/api/indexer/v1/*"
     ],
     "protectedRoutes": [
       "/api/*"
@@ -68,13 +75,39 @@
       "path": "./snapshot.bin",
       "depth": 5
     },
+    "notarization": {
+      "minSlotCommittableAge": 6
+    },
+    "filter": {
+      "maxAllowedClockDrift": "5s"
+    },
     "sybilProtection": {
       "committee": null
     }
   },
+  "blockIssuer": {
+    "enabled": true,
+    "tipSelectionTimeout": "10s",
+    "tipSelectionRetryInterval": "200ms",
+    "issuerAccount": "",
+    "privateKey": ""
+  },
   "activity": {
     "enabled": true,
     "broadcastInterval": "2s",
-    "parentsCount": 8
+    "parentsCount": 8,
+    "ignoreBootstrapped": false
+  },
+  "dashboard": {
+    "enabled": true,
+    "bindAddress": "0.0.0.0:8081",
+    "basicAuth": {
+      "enabled": false,
+      "username": "goshimmer",
+      "password": "goshimmer"
+    },
+    "conflicts": {
+      "maxCount": 100
+    }
   }
 }
