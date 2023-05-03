@@ -174,6 +174,10 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		return fmt.Errorf("unable to read LS ledger index: %w", err)
 	}
 
+	if err := m.StoreLedgerIndexWithoutLocking(iotago.SlotIndex(snapshotLedgerIndex)); err != nil {
+		return err
+	}
+
 	var outputCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &outputCount); err != nil {
 		return fmt.Errorf("unable to read LS output count: %w", err)
@@ -201,15 +205,13 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 			return err
 		}
 
-		if slotDiff.Index != iotago.SlotIndex(snapshotLedgerIndex-1) {
-			return fmt.Errorf("invalid LS slot index. %d vs %d", slotDiff.Index, snapshotLedgerIndex-1)
+		if slotDiff.Index != iotago.SlotIndex(snapshotLedgerIndex-i) {
+			return fmt.Errorf("invalid LS slot index. %d vs %d", slotDiff.Index, snapshotLedgerIndex-i)
 		}
 
-		if err := m.RollbackConfirmation(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
+		if err := m.RollbackConfirmationWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
 			return err
 		}
-
-		snapshotLedgerIndex--
 	}
 
 	return nil
@@ -264,7 +266,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 		outputCount++
 	}
 
-	for diffIndex := ledgerIndex; diffIndex >= targetIndex; diffIndex-- {
+	for diffIndex := ledgerIndex; diffIndex > targetIndex; diffIndex-- {
 		slotDiff, err := m.SlotDiffWithoutLocking(diffIndex)
 		if err != nil {
 			return err
