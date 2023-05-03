@@ -13,9 +13,7 @@ import (
 )
 
 func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
-	manager := ledgerstate.New(mapdb.NewMapDB(), func() iotago.API {
-		return tpkg.API
-	})
+	manager := ledgerstate.New(mapdb.NewMapDB(), tpkg.API)
 
 	outputs := ledgerstate.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),
@@ -82,9 +80,7 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 }
 
 func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
-	manager := ledgerstate.New(mapdb.NewMapDB(), func() iotago.API {
-		return tpkg.API
-	})
+	manager := ledgerstate.New(mapdb.NewMapDB(), tpkg.API)
 
 	previousOutputs := ledgerstate.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),

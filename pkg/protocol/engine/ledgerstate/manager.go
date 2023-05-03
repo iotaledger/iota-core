@@ -104,11 +104,15 @@ func storeLedgerIndex(index iotago.SlotIndex, mutations kvstore.BatchedMutations
 	return mutations.Set([]byte{StoreKeyPrefixLedgerSlotIndex}, index.Bytes())
 }
 
+func (m *Manager) StoreLedgerIndexWithoutLocking(index iotago.SlotIndex) error {
+	return m.store.Set([]byte{StoreKeyPrefixLedgerSlotIndex}, index.Bytes())
+}
+
 func (m *Manager) StoreLedgerIndex(index iotago.SlotIndex) error {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
-	return m.store.Set([]byte{StoreKeyPrefixLedgerSlotIndex}, index.Bytes())
+	return m.StoreLedgerIndexWithoutLocking(index)
 }
 
 func (m *Manager) ReadLedgerIndexWithoutLocking() (iotago.SlotIndex, error) {

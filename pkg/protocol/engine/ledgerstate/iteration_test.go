@@ -13,9 +13,7 @@ import (
 )
 
 func TestUTXOComputeBalance(t *testing.T) {
-	manager := ledgerstate.New(mapdb.NewMapDB(), func() iotago.API {
-		return tpkg.API
-	})
+	manager := ledgerstate.New(mapdb.NewMapDB(), tpkg.API)
 
 	initialOutput := tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressEd25519), 2_134_656_365)
 	require.NoError(t, manager.AddUnspentOutput(initialOutput))
@@ -51,9 +49,7 @@ func TestUTXOComputeBalance(t *testing.T) {
 }
 
 func TestUTXOIteration(t *testing.T) {
-	manager := ledgerstate.New(mapdb.NewMapDB(), func() iotago.API {
-		return tpkg.API
-	})
+	manager := ledgerstate.New(mapdb.NewMapDB(), tpkg.API)
 
 	outputs := ledgerstate.Outputs{
 		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressEd25519)),

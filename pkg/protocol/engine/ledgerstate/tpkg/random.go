@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	ProtocolParams = &iotago.ProtocolParameters{
+	protocolParams = &iotago.ProtocolParameters{
 		Version:     3,
 		NetworkName: RandString(255),
 		Bech32HRP:   iotago.NetworkPrefix(RandString(3)),
@@ -26,8 +26,16 @@ var (
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
 	}
-	API = iotago.LatestAPI(ProtocolParams)
+	api = iotago.LatestAPI(protocolParams)
 )
+
+func ProtocolParams() *iotago.ProtocolParameters {
+	return protocolParams
+}
+
+func API() iotago.API {
+	return api
+}
 
 func RandomRead(p []byte) (n int, err error) {
 	return rand.Read(p)
@@ -256,15 +264,15 @@ func RandLedgerStateOutput() *ledgerstate.Output {
 }
 
 func RandLedgerStateOutputWithType(outputType iotago.OutputType) *ledgerstate.Output {
-	return ledgerstate.CreateOutput(API, RandOutputID(), RandBlockID(), RandSlotIndex(), RandTimestamp(), RandOutput(outputType))
+	return ledgerstate.CreateOutput(api, RandOutputID(), RandBlockID(), RandSlotIndex(), RandTimestamp(), RandOutput(outputType))
 }
 
 func RandLedgerStateOutputOnAddress(outputType iotago.OutputType, address iotago.Address) *ledgerstate.Output {
-	return ledgerstate.CreateOutput(API, RandOutputID(), RandBlockID(), RandSlotIndex(), RandTimestamp(), RandOutputOnAddress(outputType, address))
+	return ledgerstate.CreateOutput(api, RandOutputID(), RandBlockID(), RandSlotIndex(), RandTimestamp(), RandOutputOnAddress(outputType, address))
 }
 
 func RandLedgerStateOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.Address, amount uint64) *ledgerstate.Output {
-	return ledgerstate.CreateOutput(API, RandOutputID(), RandBlockID(), RandSlotIndex(), RandTimestamp(), RandOutputOnAddressWithAmount(outputType, address, amount))
+	return ledgerstate.CreateOutput(api, RandOutputID(), RandBlockID(), RandSlotIndex(), RandTimestamp(), RandOutputOnAddressWithAmount(outputType, address, amount))
 }
 
 func RandLedgerStateSpent(indexSpent iotago.SlotIndex, timestampSpent time.Time) *ledgerstate.Spent {

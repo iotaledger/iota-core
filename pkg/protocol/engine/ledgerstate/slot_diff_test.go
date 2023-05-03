@@ -20,7 +20,7 @@ func TestSimpleMilestoneDiffSerialization(t *testing.T) {
 	indexBooked := iotago.SlotIndex(255975)
 	timestampCreated := tpkg.RandTimestamp()
 
-	api := tpkg.API
+	api := tpkg.API()
 	outputID := tpkg.RandOutputID()
 	blockID := tpkg.RandBlockID()
 	address := tpkg.RandAddress(iotago.AddressEd25519)
@@ -58,9 +58,7 @@ func TestSimpleMilestoneDiffSerialization(t *testing.T) {
 }
 
 func TestMilestoneDiffSerialization(t *testing.T) {
-	manager := ledgerstate.New(mapdb.NewMapDB(), func() iotago.API {
-		return tpkg.API
-	})
+	manager := ledgerstate.New(mapdb.NewMapDB(), tpkg.API)
 
 	outputs := ledgerstate.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),

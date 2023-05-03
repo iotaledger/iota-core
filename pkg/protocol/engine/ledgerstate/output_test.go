@@ -21,9 +21,7 @@ import (
 
 func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *ledgerstate.Output, spent *ledgerstate.Spent) {
 	outputID := output.OutputID()
-	manager := ledgerstate.New(mapdb.NewMapDB(), func() iotago.API {
-		return tpkg.API
-	})
+	manager := ledgerstate.New(mapdb.NewMapDB(), tpkg.API)
 
 	require.NoError(t, manager.AddUnspentOutput(output))
 
@@ -116,7 +114,7 @@ func CreateSpentAndAssertSerialization(t *testing.T, output *ledgerstate.Output)
 }
 
 func TestExtendedOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.T) {
-	api := tpkg.API
+	api := tpkg.API()
 	outputID := tpkg.RandOutputID()
 	blockID := tpkg.RandBlockID()
 	address := tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
@@ -151,7 +149,7 @@ func TestExtendedOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.
 }
 
 func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) {
-	api := tpkg.API
+	api := tpkg.API()
 	outputID := tpkg.RandOutputID()
 	blockID := tpkg.RandBlockID()
 	address := tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
@@ -185,7 +183,7 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 }
 
 func TestNFTOutputSerialization(t *testing.T) {
-	api := tpkg.API
+	api := tpkg.API()
 	outputID := tpkg.RandOutputID()
 	blockID := tpkg.RandBlockID()
 	address := tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
@@ -217,7 +215,7 @@ func TestNFTOutputSerialization(t *testing.T) {
 }
 
 func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
-	api := tpkg.API
+	api := tpkg.API()
 	outputID := tpkg.RandOutputID()
 	blockID := tpkg.RandBlockID()
 	address := tpkg.RandNFTID()
@@ -257,7 +255,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 }
 
 func TestAliasOutputSerialization(t *testing.T) {
-	api := tpkg.API
+	api := tpkg.API()
 	outputID := tpkg.RandOutputID()
 	blockID := tpkg.RandBlockID()
 	aliasID := tpkg.RandAliasID()
@@ -300,7 +298,7 @@ func TestAliasOutputSerialization(t *testing.T) {
 }
 
 func TestFoundryOutputSerialization(t *testing.T) {
-	api := tpkg.API
+	api := tpkg.API()
 	outputID := tpkg.RandOutputID()
 	blockID := tpkg.RandBlockID()
 	aliasID := tpkg.RandAliasID()
