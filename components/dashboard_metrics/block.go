@@ -17,9 +17,6 @@ var (
 
 	// counter for the received BPS (for dashboard).
 	mpsAttachedSinceLastMeasurement atomic.Uint64
-
-	lastAcceptedBlock  = NewLatestBlockTracker()
-	lastConfirmedBlock = NewLatestBlockTracker()
 )
 
 // blockCountSinceStartPerComponentDashboard returns a map of block count per component types and their count since last time the value was read.
