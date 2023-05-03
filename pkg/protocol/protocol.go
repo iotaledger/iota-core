@@ -299,6 +299,10 @@ func (p *Protocol) API() iotago.API {
 	return p.MainEngineInstance().API()
 }
 
+func (p *Protocol) SupportedVersions() Versions {
+	return SupportedVersions
+}
+
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	panic(fmt.Sprintf("Fork detected: %s", fork))
 }

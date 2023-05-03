@@ -22,6 +22,13 @@ type ParametersRestAPI struct {
 		Salt string `default:"IOTA" usage:"salt used inside the JWT tokens for the REST API. Change this to a different value to invalidate JWT tokens not matching this new value"`
 	} `name:"jwtAuth"`
 
+	PoW struct {
+		// whether the node does PoW if blocks are received via API
+		Enabled bool `default:"false" usage:"whether the node does PoW if blocks are received via API"`
+		// the amount of workers used for calculating PoW when issuing blocks via API
+		WorkerCount int `default:"1" usage:"the amount of workers used for calculating PoW when issuing blocks via API"`
+	} `name:"pow"`
+
 	Limits struct {
 		// the maximum number of characters that the body of an API call may contain
 		MaxBodyLength string `default:"1M" usage:"the maximum number of characters that the body of an API call may contain"`

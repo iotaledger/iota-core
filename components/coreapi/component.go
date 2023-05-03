@@ -2,8 +2,10 @@ package coreapi
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/pkg/errors"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
@@ -121,6 +123,8 @@ func init() {
 var (
 	Component *app.Component
 	deps      dependencies
+
+	features = []string{}
 )
 
 type dependencies struct {
@@ -132,12 +136,18 @@ type dependencies struct {
 }
 
 func configure() error {
+	// check if RestAPI plugin is disabled
+	if Component.App().IsComponentEnabled(restapi.Component.Name) {
+		Component.LogPanic("RestAPI plugin needs to be enabled to use the CoreAPIV3 plugin")
+	}
+
 	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
 
-	// // check if RestAPI plugin is disabled
-	// if !Component.App().IsComponentEnabled(restapi.Component.Name) {
-	//	Component.LogPanic("RestAPI component needs to be enabled to use the CoreAPIV3 component")
-	// }
+	// Check for features
+	if restapi.ParamsRestAPI.PoW.Enabled {
+		AddFeature("pow")
+		// todo: add pow supports to block issuer
+	}
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
 		resp, err := info()
@@ -203,6 +213,11 @@ func configure() error {
 	})
 
 	return nil
+}
+
+// AddFeature adds a feature to the RouteInfo endpoint.
+func AddFeature(feature string) {
+	features = append(features, strings.ToLower(feature))
 }
 
 func checkNodeSynced() echo.MiddlewareFunc {

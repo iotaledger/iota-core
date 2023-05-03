@@ -20,5 +20,8 @@ func info() (*infoResponse, error) {
 			LastAcceptedBlockID:  syncStatus.LastAcceptedBlockID.ToHex(),
 			LastConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
 		},
+		SupportedProtocolVersions: deps.Protocol.SupportedVersions(),
+		ProtocolParameters:        deps.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(),
+		Features:                  features,
 	}, nil
 }

@@ -78,16 +78,18 @@ type infoResponse struct {
 	Name string `json:"name"`
 	// The server version of the node software.
 	Version string `json:"version"`
+	// The ID of the node
+	IssuerID string `json:"issuerID"`
 	// The current status of this node.
 	Status nodeStatus `json:"status"`
+	// The metrics of this node.
+	Metrics nodeMetrics `json:"metrics"`
 	// The protocol versions this node supports.
 	SupportedProtocolVersions protocol.Versions `json:"supportedProtocolVersions"`
 	// The protocol parameters used by this node.
 	ProtocolParameters *iotago.ProtocolParameters `json:"protocol"`
 	// todo The base token of the network.
 	//BaseToken *protocfg.BaseToken `json:"baseToken"`
-	// The metrics of this node.
-	Metrics nodeMetrics `json:"metrics"`
 	// The features this node exposes.
 	Features []string `json:"features"`
 }
@@ -95,12 +97,24 @@ type infoResponse struct {
 type nodeStatus struct {
 	// Whether the node is healthy.
 	IsHealthy bool `json:"isHealthy"`
+	// The blockID of last accepted block.
+	LastAcceptedBlockID string `json:"lastAcceptedBlockID"`
+	// The blockID of the last confirmed block
+	LastConfirmedBlockID string `json:"lastConfirmedBlockID"`
+	// The latest finalized slot.
+	FinalizedSlot iotago.SlotIndex `json:"latestFinalizedSlot"`
+	// The Accepted Tangle Time
+	ATT time.Time `json:"ATT"`
+	// The Relative Accepted Tangle Time
+	RATT time.Time `json:"RATT"`
+	// The Confirmed Tangle Time
+	CTT time.Time `json:"CTT"`
+	// The Relative Confirmed Tangle Time
+	RCTT time.Time `json:"RCTT"`
 	// The latest known committed slot info.
-	LatestCommittedSlot slotInfoResponse `json:"latestCommittedSlot"`
-	// The latest confirmed slot.
-	ConfirmedSlot slotInfoResponse `json:"latestConfirmedSlot"`
+	LatestCommittedSlot iotago.SlotIndex `json:"latestCommittedSlot"`
 	// The milestone index at which the last pruning commenced.
-	PruningIndex iotago.SlotIndex `json:"pruningIndex"`
+	PruningSlot iotago.SlotIndex `json:"pruningSlot"`
 }
 
 type nodeMetrics struct {
