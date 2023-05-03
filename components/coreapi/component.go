@@ -181,7 +181,7 @@ func configure() error {
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeAlmostSynced())
+	}, checkNodeSynced())
 
 	routeGroup.POST(RouteBlocks, func(c echo.Context) error {
 		resp, err := sendBlock(c)
@@ -191,7 +191,7 @@ func configure() error {
 		c.Response().Header().Set(echo.HeaderLocation, resp.BlockID)
 
 		return httpserver.JSONResponse(c, http.StatusCreated, resp)
-	}, checkNodeAlmostSynced(), checkUpcomingUnsupportedProtocolVersion())
+	}, checkNodeSynced(), checkUpcomingUnsupportedProtocolVersion())
 
 	routeGroup.GET(RouteBlockIssuance, func(c echo.Context) error {
 		resp, err := blockIssuance(c)
@@ -205,13 +205,13 @@ func configure() error {
 	return nil
 }
 
-func checkNodeAlmostSynced() echo.MiddlewareFunc {
+func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// todo update with sync status
-			// if !deps.SyncManager.IsNodeAlmostSynced() {
-			//	return errors.WithMessage(echo.ErrServiceUnavailable, "node is not synced")
-			// }
+			if !deps.Protocol.SyncManager.IsNodeSynced() {
+				return errors.WithMessage(echo.ErrServiceUnavailable, "node is not synced")
+			}
 
 			return next(c)
 		}

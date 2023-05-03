@@ -32,6 +32,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -43,6 +45,7 @@ import (
 type Protocol struct {
 	Events        *Events
 	TipManager    tipmanager.TipManager
+	SyncManager   syncmanager.SyncManager
 	engineManager *enginemanager.EngineManager
 	chainManager  *chainmanager.Manager
 
@@ -69,6 +72,7 @@ type Protocol struct {
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
+	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -85,6 +89,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
+		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 
 		optsBaseDirectory:    "",
 		optsPruningThreshold: 6 * 60, // 1 hour given that slot duration is 10 seconds
@@ -100,6 +105,7 @@ func (p *Protocol) Run() {
 	p.Events.Engine.LinkTo(p.mainEngine.Events)
 	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
 	p.Events.TipManager.LinkTo(p.TipManager.Events())
+	p.SyncManager = p.optsSyncManagerProvider(p.mainEngine)
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
 		panic(err)
