@@ -1,8 +1,6 @@
 package dashboardmetrics
 
 import (
-	"go.uber.org/atomic"
-
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
 
@@ -14,9 +12,6 @@ var (
 
 	// protect map from concurrent read/write.
 	blockCountPerComponentMutex syncutils.RWMutex
-
-	// counter for the received BPS (for dashboard).
-	mpsAttachedSinceLastMeasurement atomic.Uint64
 )
 
 // blockCountSinceStartPerComponentDashboard returns a map of block count per component types and their count since last time the value was read.
@@ -47,21 +42,4 @@ func measurePerComponentCounter() {
 
 	// trigger events for outside listeners
 	Events.ComponentCounterUpdated.Trigger(&ComponentCounterUpdatedEvent{ComponentStatus: componentCounters})
-}
-
-// measures the received BPS value.
-func measureAttachedBPS() {
-	// sample the current counter value into a measured BPS value
-	sampledBPS := mpsAttachedSinceLastMeasurement.Load()
-
-	// reset the counter
-	mpsAttachedSinceLastMeasurement.Store(0)
-
-	// trigger events for outside listeners
-	Events.AttachedBPSUpdated.Trigger(&AttachedBPSUpdatedEvent{BPS: sampledBPS})
-}
-
-// increases the received BPS counter.
-func increaseReceivedBPSCounter() {
-	mpsAttachedSinceLastMeasurement.Inc()
 }

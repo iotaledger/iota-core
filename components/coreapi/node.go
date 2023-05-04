@@ -4,6 +4,7 @@ package coreapi
 func info() (*infoResponse, error) {
 	cl := deps.Protocol.MainEngineInstance().Clock
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
+	metrics := deps.Protocol.MetricsTracker.NodeMetrics()
 
 	return &infoResponse{
 		Name:     deps.AppInfo.Name,
@@ -19,6 +20,11 @@ func info() (*infoResponse, error) {
 			FinalizedSlot:        syncStatus.FinalizedSlot,
 			LastAcceptedBlockID:  syncStatus.LastAcceptedBlockID.ToHex(),
 			LastConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
+		},
+		Metrics: nodeMetrics{
+			BlocksPerSecond:           metrics.BlocksPerSecond,
+			ReferencedBlocksPerSecond: metrics.ConfirmedBlocksPerSecond,
+			ReferencedRate:            metrics.ConfirmedRate,
 		},
 		SupportedProtocolVersions: deps.Protocol.SupportedVersions(),
 		ProtocolParameters:        deps.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(),

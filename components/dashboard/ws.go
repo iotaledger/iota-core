@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/timeutil"
 	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 )
@@ -46,7 +47,7 @@ func runWebSocketStreams(component *app.Component) {
 	// todo connect when protocol is ready
 	process := func(msg interface{}) {
 		switch x := msg.(type) {
-		case uint64:
+		case float64:
 			broadcastWsBlock(&wsblk{MsgTypeBPSMetric, x})
 			broadcastWsBlock(&wsblk{MsgTypeNodeStatus, currentNodeStatus()})
 			broadcastWsBlock(&wsblk{MsgTypeNeighborMetric, neighborMetrics()})
@@ -64,10 +65,6 @@ func runWebSocketStreams(component *app.Component) {
 		defer log.Info("Stopping Dashboard[StatusUpdate] ... done")
 
 		unhook := lo.Batch(
-			dashboardmetrics.Events.AttachedBPSUpdated.Hook(func(event *dashboardmetrics.AttachedBPSUpdatedEvent) {
-				process(event.BPS)
-			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-
 			dashboardmetrics.Events.ComponentCounterUpdated.Hook(func(event *dashboardmetrics.ComponentCounterUpdatedEvent) {
 				process(&componentsmetric{
 					Store:      event.ComponentStatus[dashboardmetrics.Attached],
@@ -77,6 +74,11 @@ func runWebSocketStreams(component *app.Component) {
 				})
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
 		)
+		timeutil.NewTicker(func() {
+			bpsInfo := deps.Protocol.MetricsTracker.NodeMetrics()
+			process(bpsInfo.BlocksPerSecond)
+		}, 2*time.Second, ctx)
+
 		<-ctx.Done()
 		log.Info("Stopping Dashboard[StatusUpdate] ...")
 		unhook()
