@@ -56,6 +56,10 @@ func (s *StateWithMetadata) setEvicted() {
 	s.evicted.Trigger()
 }
 
+func (s *StateWithMetadata) OnCommitted(callback func()) {
+	s.committed.OnTrigger(callback)
+}
+
 func (s *StateWithMetadata) OnEvicted(callback func()) {
 	s.evicted.OnTrigger(callback)
 }
@@ -94,6 +98,10 @@ func (s *StateWithMetadata) AllConsumersEvicted() bool {
 
 func (s *StateWithMetadata) ConsumerCount() uint64 {
 	return atomic.LoadUint64(&s.consumerCount)
+}
+
+func (s *StateWithMetadata) HasNoConsumers() bool {
+	return atomic.LoadUint64(&s.consumerCount) == 0
 }
 
 func (s *StateWithMetadata) acceptSpend(spender *TransactionWithMetadata) {

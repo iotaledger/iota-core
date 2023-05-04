@@ -51,7 +51,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 		return nil, xerrors.Errorf("failed to retrieve inputReferences of transaction %s: %w", transactionID, inputsErr)
 	}
 
-	return &TransactionWithMetadata{
+	t := &TransactionWithMetadata{
 		id:              transactionID,
 		inputReferences: inputReferences,
 		inputs:          make([]*StateWithMetadata, len(inputReferences)),
@@ -72,7 +72,11 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 
 		unsolidInputsCount:    uint64(len(inputReferences)),
 		unacceptedInputsCount: uint64(len(inputReferences)),
-	}, nil
+	}
+
+	t.attachments.OnAllAttachmentsEvicted(t.setEvicted)
+
+	return t, nil
 }
 
 func (t *TransactionWithMetadata) ID() iotago.TransactionID {
@@ -142,19 +146,9 @@ func (t *TransactionWithMetadata) OnEvicted(callback func()) {
 	t.evicted.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) markInputAccepted() {
-	if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
-		t.allInputsAccepted.Trigger()
-	}
-}
-
 func (t *TransactionWithMetadata) setAccepted() {
 	if t.accepted.Trigger() {
 		lo.ForEach(t.outputs, (*StateWithMetadata).setAccepted)
-
-		lo.ForEach(t.inputs, func(input *StateWithMetadata) {
-			input.acceptSpend(t)
-		})
 	}
 }
 
@@ -167,11 +161,6 @@ func (t *TransactionWithMetadata) setRejected() {
 func (t *TransactionWithMetadata) setCommitted() {
 	if t.committed.Trigger() {
 		lo.ForEach(t.outputs, (*StateWithMetadata).setCommitted)
-
-		lo.ForEach(t.inputs, func(input *StateWithMetadata) {
-			input.commitSpend(t)
-			input.decreaseConsumerCount()
-		})
 	}
 }
 
@@ -230,6 +219,41 @@ func (t *TransactionWithMetadata) setStored() {
 }
 
 func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetadata) {
+	input.increaseConsumerCount()
+
+	t.OnAccepted(func() {
+		input.acceptSpend(t)
+	})
+
+	t.OnCommitted(func() {
+		input.commitSpend(t)
+		input.decreaseConsumerCount()
+	})
+
+	t.OnEvicted(input.decreaseConsumerCount)
+
+	input.OnAccepted(func() {
+		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
+			t.allInputsAccepted.Trigger()
+		}
+	})
+
+	input.OnRejected(t.setRejected)
+
+	input.OnEvicted(t.setEvicted)
+
+	input.OnSpendAccepted(func(spender *TransactionWithMetadata) {
+		if spender != t {
+			t.setRejected()
+		}
+	})
+
+	input.OnSpendCommitted(func(spender *TransactionWithMetadata) {
+		if spender != t {
+			t.setEvicted()
+		}
+	})
+
 	t.inputs[index] = input
 
 	if atomic.AddUint64(&t.unsolidInputsCount, ^uint64(0)) == 0 {
