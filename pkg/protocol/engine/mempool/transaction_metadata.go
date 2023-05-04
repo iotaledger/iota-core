@@ -20,9 +20,9 @@ type TransactionWithMetadata interface {
 
 	IsInvalid() bool
 
-	WasEvicted() bool
+	IsEvicted() bool
 
-	WasAccepted() bool
+	IsAccepted() bool
 
 	OnSolid(func())
 

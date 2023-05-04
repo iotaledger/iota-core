@@ -100,6 +100,10 @@ func (s *StateWithMetadata) acceptSpend(spender *TransactionWithMetadata) {
 	s.spendAccepted.Trigger(spender)
 }
 
+func (s *StateWithMetadata) commitSpend(spender *TransactionWithMetadata) {
+	s.spendCommitted.Trigger(spender)
+}
+
 func (s *StateWithMetadata) setAccepted() {
 	s.accepted.Trigger()
 }

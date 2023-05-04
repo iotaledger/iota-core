@@ -176,7 +176,7 @@ func (t *TestFramework) setupHookedEvents() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
 		}
 
-		require.True(t.test, metadata.WasAccepted(), "transaction is not marked as accepted")
+		require.True(t.test, metadata.IsAccepted(), "transaction is not marked as accepted")
 
 		t.markTransactionStoredTriggered(metadata.ID())
 	})

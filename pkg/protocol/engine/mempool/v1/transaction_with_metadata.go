@@ -34,8 +34,8 @@ type TransactionWithMetadata struct {
 	unsolidInputsCount uint64
 	solid              *promise.Event
 	executed           *promise.Event
-	booked             *promise.Event
 	invalid            *promise.Event1[error]
+	booked             *promise.Event
 
 	mutex sync.RWMutex
 }
@@ -110,7 +110,7 @@ func (t *TransactionWithMetadata) OnAllInputsAccepted(callback func()) {
 	t.allInputsAccepted.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) WasAccepted() bool {
+func (t *TransactionWithMetadata) IsAccepted() bool {
 	return t.accepted.WasTriggered()
 }
 
@@ -118,7 +118,7 @@ func (t *TransactionWithMetadata) OnAccepted(callback func()) {
 	t.accepted.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) WasRejected() bool {
+func (t *TransactionWithMetadata) IsRejected() bool {
 	return t.rejected.WasTriggered()
 }
 
@@ -126,7 +126,7 @@ func (t *TransactionWithMetadata) OnRejected(callback func()) {
 	t.rejected.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) WasCommitted() bool {
+func (t *TransactionWithMetadata) IsCommitted() bool {
 	return t.committed.WasTriggered()
 }
 
@@ -134,7 +134,7 @@ func (t *TransactionWithMetadata) OnCommitted(callback func()) {
 	t.committed.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) WasEvicted() bool {
+func (t *TransactionWithMetadata) IsEvicted() bool {
 	return t.evicted.WasTriggered()
 }
 
@@ -151,6 +151,10 @@ func (t *TransactionWithMetadata) markInputAccepted() {
 func (t *TransactionWithMetadata) setAccepted() {
 	if t.accepted.Trigger() {
 		lo.ForEach(t.outputs, (*StateWithMetadata).setAccepted)
+
+		lo.ForEach(t.inputs, func(input *StateWithMetadata) {
+			input.acceptSpend(t)
+		})
 	}
 }
 
@@ -163,6 +167,11 @@ func (t *TransactionWithMetadata) setRejected() {
 func (t *TransactionWithMetadata) setCommitted() {
 	if t.committed.Trigger() {
 		lo.ForEach(t.outputs, (*StateWithMetadata).setCommitted)
+
+		lo.ForEach(t.inputs, func(input *StateWithMetadata) {
+			input.commitSpend(t)
+			input.decreaseConsumerCount()
+		})
 	}
 }
 
@@ -200,20 +209,20 @@ func (t *TransactionWithMetadata) OnExecuted(callback func()) {
 	t.executed.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) IsBooked() bool {
-	return t.booked.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnBooked(callback func()) {
-	t.booked.OnTrigger(callback)
-}
-
 func (t *TransactionWithMetadata) IsInvalid() bool {
 	return t.invalid.WasTriggered()
 }
 
 func (t *TransactionWithMetadata) OnInvalid(callback func(error)) {
 	t.invalid.OnTrigger(callback)
+}
+
+func (t *TransactionWithMetadata) IsBooked() bool {
+	return t.booked.WasTriggered()
+}
+
+func (t *TransactionWithMetadata) OnBooked(callback func()) {
+	t.booked.OnTrigger(callback)
 }
 
 func (t *TransactionWithMetadata) setStored() {

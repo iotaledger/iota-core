@@ -174,7 +174,7 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionWithMetada
 	transaction.attachments.OnEarliestIncludedSlotUpdated(func(index iotago.SlotIndex) {
 		switch index {
 		case 0:
-			if transaction.WasAccepted() {
+			if transaction.IsAccepted() {
 				// roll back acceptance in diff + mark tx as orphaned
 			}
 		default:
@@ -189,12 +189,14 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionWithMetada
 
 	transaction.OnCommitted(func() {
 		if m.cachedTransactions.Delete(transaction.ID()) {
-
+			// TODO ? m.events.TransactionEvicted.Trigger(transaction)
 		}
 	})
 
 	transaction.OnEvicted(func() {
-		m.cachedTransactions.Delete(transaction.ID())
+		if m.cachedTransactions.Delete(transaction.ID()) {
+			// TODO ? m.events.TransactionEvicted.Trigger(transaction)
+		}
 	})
 
 	return transaction
@@ -203,11 +205,12 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionWithMetada
 func (m *MemPool[VotePower]) setupInput(transaction *TransactionWithMetadata, input *StateWithMetadata) *StateWithMetadata {
 	input.increaseConsumerCount()
 	transaction.OnEvicted(input.decreaseConsumerCount)
+	transaction.OnCommitted(input.decreaseConsumerCount)
 
 	input.OnAccepted(transaction.markInputAccepted)
 	input.OnRejected(transaction.setRejected)
 	input.OnEvicted(func() {
-		if transaction.WasRejected() {
+		if transaction.IsRejected() {
 			transaction.setEvicted()
 		}
 	})
