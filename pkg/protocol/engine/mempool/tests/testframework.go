@@ -21,6 +21,7 @@ type TestFramework struct {
 
 	stateIDByAlias               map[string]iotago.OutputID
 	transactionByAlias           map[string]mempool.Transaction
+	blockIDsByAlias              map[string]iotago.BlockID
 	globalStoredEventTriggered   map[iotago.TransactionID]bool
 	globalSolidEventTriggered    map[iotago.TransactionID]bool
 	globalExecutedEventTriggered map[iotago.TransactionID]bool
@@ -34,6 +35,7 @@ func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower
 		Instance:                     instance,
 		stateIDByAlias:               make(map[string]iotago.OutputID),
 		transactionByAlias:           make(map[string]mempool.Transaction),
+		blockIDsByAlias:              make(map[string]iotago.BlockID),
 		globalStoredEventTriggered:   make(map[iotago.TransactionID]bool),
 		globalSolidEventTriggered:    make(map[iotago.TransactionID]bool),
 		globalBookedEventTriggered:   make(map[iotago.TransactionID]bool),
@@ -62,18 +64,35 @@ func (t *TestFramework) CreateTransaction(alias string, referencedStates []strin
 	}
 }
 
-func (t *TestFramework) SetTransactionIncluded(alias string, index iotago.SlotIndex) error {
-	return t.Instance.SetTransactionIncluded(t.TransactionID(alias), index)
+func (t *TestFramework) MarkAttachmentIncluded(alias string) error {
+	return t.Instance.MarkAttachmentIncluded(t.BlockID(alias))
 }
 
-func (t *TestFramework) ProcessTransactions(alias ...string) error {
-	for _, alias := range alias {
-		transaction, transactionExists := t.transactionByAlias[alias]
-		require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", alias)
+func (t *TestFramework) BlockID(alias string) iotago.BlockID {
+	blockID, exists := t.blockIDsByAlias[alias]
+	require.True(t.test, exists, "block ID with alias '%s' does not exist", alias)
 
-		if _, err := t.Instance.AddTransaction(transaction); err != nil {
+	return blockID
+}
+
+func (t *TestFramework) AttachTransactions(transactionAlias ...string) error {
+	for _, alias := range transactionAlias {
+		if err := t.AttachTransaction(alias, alias, 1); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, slotIndex iotago.SlotIndex) error {
+	transaction, transactionExists := t.transactionByAlias[transactionAlias]
+	require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", transactionAlias)
+
+	t.blockIDsByAlias[blockAlias] = iotago.SlotIdentifierRepresentingData(slotIndex, []byte(blockAlias))
+
+	if _, err := t.Instance.AttachTransaction(transaction, t.blockIDsByAlias[blockAlias]); err != nil {
+		return err
 	}
 
 	return nil
@@ -157,7 +176,7 @@ func (t *TestFramework) setupHookedEvents() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
 		}
 
-		require.True(t.test, metadata.IsAccepted(), "transaction is not marked as accepted")
+		require.True(t.test, metadata.WasAccepted(), "transaction is not marked as accepted")
 
 		t.markTransactionStoredTriggered(metadata.ID())
 	})

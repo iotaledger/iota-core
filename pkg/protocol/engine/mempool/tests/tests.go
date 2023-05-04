@@ -23,7 +23,7 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
 	tf.CreateTransaction("tx2", []string{"tx1:0"}, 1)
 
-	require.NoError(t, tf.ProcessTransactions("tx1", "tx2"))
+	require.NoError(t, tf.AttachTransactions("tx1", "tx2"))
 
 	tf.RequireBooked("tx1", "tx2")
 }
@@ -33,9 +33,9 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	tf.CreateTransaction("tx2", []string{"tx1:0"}, 1)
 	tf.CreateTransaction("tx3", []string{"tx2:0"}, 1)
 
-	require.NoError(t, tf.ProcessTransactions("tx3"))
-	require.NoError(t, tf.ProcessTransactions("tx2"))
-	require.NoError(t, tf.ProcessTransactions("tx1"))
+	require.NoError(t, tf.AttachTransactions("tx3"))
+	require.NoError(t, tf.AttachTransactions("tx2"))
+	require.NoError(t, tf.AttachTransactions("tx1"))
 
 	tf.RequireBooked("tx1", "tx2", "tx3")
 }
@@ -47,17 +47,19 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tf.CreateTransaction("tx2", []string{"tx1:0"}, 1)
 	tf.CreateTransaction("tx3", []string{"tx2:0"}, 1)
 
-	require.NoError(t, tf.ProcessTransactions("tx3"))
-	require.NoError(t, tf.ProcessTransactions("tx2"))
-	require.NoError(t, tf.ProcessTransactions("tx1"))
+	require.NoError(t, tf.AttachTransaction("tx3", "block3", 3))
+	require.NoError(t, tf.AttachTransaction("tx2", "block2", 2))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1", 1))
 
 	tf.RequireBooked("tx1", "tx2", "tx3")
 
-	tf.SetTransactionIncluded("tx2", 1)
+	require.NoError(t, tf.MarkAttachmentIncluded("block2"))
 
 	time.Sleep(1 * time.Second)
 
-	tf.SetTransactionIncluded("tx1", 1)
+	require.NoError(t, tf.MarkAttachmentIncluded("block1"))
+
+	tf.Instance.Evict(1)
 
 	time.Sleep(5 * time.Second)
 }

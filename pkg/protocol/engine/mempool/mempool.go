@@ -11,7 +11,7 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower]
 
-	AddTransaction(transaction Transaction) (metadata TransactionWithMetadata, err error)
+	AttachTransaction(transaction Transaction, blockID iotago.BlockID) (metadata TransactionWithMetadata, err error)
 
 	RemoveTransaction(id iotago.TransactionID)
 
@@ -19,5 +19,7 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 
 	State(reference ledger.StateReference) (state StateWithMetadata, err error)
 
-	SetTransactionIncluded(id iotago.TransactionID, inclusionSlot iotago.SlotIndex) error
+	MarkAttachmentIncluded(blockID iotago.BlockID) error
+
+	Evict(slotIndex iotago.SlotIndex)
 }

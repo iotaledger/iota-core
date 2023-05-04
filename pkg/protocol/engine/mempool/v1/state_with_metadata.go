@@ -12,13 +12,20 @@ import (
 type StateWithMetadata struct {
 	id                iotago.OutputID
 	sourceTransaction *TransactionWithMetadata
-	spenderCount      uint64
+	consumerCount     uint64
 	state             ledger.State
 
-	accepted      *promise.Event
-	rejected      *promise.Event
-	doubleSpent   *promise.Event
-	spendAccepted *promise.Event1[*TransactionWithMetadata]
+	accepted  *promise.Event
+	committed *promise.Event
+	rejected  *promise.Event
+	evicted   *promise.Event
+
+	spent          *promise.Event
+	doubleSpent    *promise.Event
+	spendAccepted  *promise.Event1[*TransactionWithMetadata]
+	spendCommitted *promise.Event1[*TransactionWithMetadata]
+
+	allConsumersEvicted *promise.Event
 }
 
 func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetadata) *StateWithMetadata {
@@ -26,11 +33,31 @@ func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetad
 		id:                state.ID(),
 		sourceTransaction: lo.First(optSource),
 		state:             state,
-		accepted:          promise.NewEvent(),
-		rejected:          promise.NewEvent(),
-		doubleSpent:       promise.NewEvent(),
-		spendAccepted:     promise.NewEvent1[*TransactionWithMetadata](),
+
+		accepted:  promise.NewEvent(),
+		committed: promise.NewEvent(),
+		rejected:  promise.NewEvent(),
+		evicted:   promise.NewEvent(),
+
+		spent:          promise.NewEvent(),
+		doubleSpent:    promise.NewEvent(),
+		spendAccepted:  promise.NewEvent1[*TransactionWithMetadata](),
+		spendCommitted: promise.NewEvent1[*TransactionWithMetadata](),
+
+		allConsumersEvicted: promise.NewEvent(),
 	}
+}
+
+func (s *StateWithMetadata) setCommitted() {
+	s.committed.Trigger()
+}
+
+func (s *StateWithMetadata) setEvicted() {
+	s.evicted.Trigger()
+}
+
+func (s *StateWithMetadata) OnEvicted(callback func()) {
+	s.evicted.OnTrigger(callback)
 }
 
 func (s *StateWithMetadata) OnDoubleSpent(callback func()) {
@@ -41,10 +68,32 @@ func (s *StateWithMetadata) OnSpendAccepted(callback func(spender *TransactionWi
 	s.spendAccepted.OnTrigger(callback)
 }
 
-func (s *StateWithMetadata) markSpent() {
-	if atomic.AddUint64(&s.spenderCount, 1) == 2 {
+func (s *StateWithMetadata) OnSpendCommitted(callback func(spender *TransactionWithMetadata)) {
+	s.spendCommitted.OnTrigger(callback)
+}
+
+func (s *StateWithMetadata) increaseConsumerCount() {
+	if atomic.AddUint64(&s.consumerCount, 1) == 2 {
 		s.doubleSpent.Trigger()
 	}
+}
+
+func (s *StateWithMetadata) decreaseConsumerCount() {
+	if atomic.AddUint64(&s.consumerCount, ^uint64(0)) == 0 {
+		s.allConsumersEvicted.Trigger()
+	}
+}
+
+func (s *StateWithMetadata) OnAllConsumersEvicted(callback func()) {
+	s.allConsumersEvicted.OnTrigger(callback)
+}
+
+func (s *StateWithMetadata) AllConsumersEvicted() bool {
+	return s.allConsumersEvicted.WasTriggered()
+}
+
+func (s *StateWithMetadata) ConsumerCount() uint64 {
+	return atomic.LoadUint64(&s.consumerCount)
 }
 
 func (s *StateWithMetadata) acceptSpend(spender *TransactionWithMetadata) {
@@ -80,5 +129,5 @@ func (s *StateWithMetadata) State() ledger.State {
 }
 
 func (s *StateWithMetadata) IsSpent() bool {
-	return atomic.LoadUint64(&s.spenderCount) > 0
+	return atomic.LoadUint64(&s.consumerCount) > 0
 }

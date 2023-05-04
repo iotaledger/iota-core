@@ -4,16 +4,12 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/ds/orderedmap"
-	"github.com/iotaledger/hive.go/lo"
 )
 
 // Value is a value that can be updated and notifies registered updateCallbacks about updates.
 type Value[T comparable] struct {
 	// value is the current value.
 	value T
-
-	// zeroValue is the zero value of the value type.
-	zeroValue T
 
 	// updateCallbacks are called when the value is updated.
 	updateCallbacks *orderedmap.OrderedMap[CallbackID, func(T)]
@@ -29,10 +25,8 @@ type Value[T comparable] struct {
 }
 
 // NewValue creates a new Value.
-func NewValue[T comparable](optZeroValue ...T) *Value[T] {
+func NewValue[T comparable]() *Value[T] {
 	return &Value[T]{
-		value:           lo.First(optZeroValue),
-		zeroValue:       lo.First(optZeroValue),
 		updateCallbacks: orderedmap.New[CallbackID, func(T)](),
 	}
 }
@@ -83,9 +77,7 @@ func (v *Value[T]) OnUpdate(callback func(value T)) (unsubscribe func()) {
 	callbackID := NewCallbackID()
 	v.updateCallbacks.Set(callbackID, callback)
 
-	if v.value != v.zeroValue {
-		callback(v.value)
-	}
+	callback(v.value)
 
 	return func() {
 		v.updateCallbacksMutex.Lock()

@@ -6,6 +6,7 @@ import (
 
 	"golang.org/x/xerrors"
 
+	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -27,6 +28,8 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] struct {
 
 	requestInput ledger.StateReferenceResolver
 
+	attachments *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionWithMetadata]
+
 	cachedTransactions *shrinkingmap.ShrinkingMap[iotago.TransactionID, *TransactionWithMetadata]
 
 	cachedStateRequests *shrinkingmap.ShrinkingMap[iotago.OutputID, *promise.Promise[*StateWithMetadata]]
@@ -41,6 +44,7 @@ func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputRes
 		events:                 mempool.NewEvents(),
 		executeStateTransition: vm,
 		requestInput:           inputResolver,
+		attachments:            memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionWithMetadata](),
 		cachedTransactions:     shrinkingmap.New[iotago.TransactionID, *TransactionWithMetadata](),
 		cachedStateRequests:    shrinkingmap.New[iotago.OutputID, *promise.Promise[*StateWithMetadata]](),
 		executionWorkers:       workers.CreatePool("executionWorkers", 1),
@@ -56,6 +60,18 @@ func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputRes
 	return m
 }
 
+func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
+	attachmentsInSlot := m.attachments.Evict(slotIndex)
+	if attachmentsInSlot == nil {
+		return
+	}
+
+	attachmentsInSlot.ForEach(func(blockID iotago.BlockID, transaction *TransactionWithMetadata) bool {
+		transaction.attachments.Evict(blockID)
+		return true
+	})
+}
+
 func (m *MemPool[VotePower]) Events() *mempool.Events {
 	return m.events
 }
@@ -64,24 +80,27 @@ func (m *MemPool[VotePower]) ConflictDAG() conflictdag.ConflictDAG[iotago.Transa
 	return m.conflictDAG
 }
 
-func (m *MemPool[VotePower]) AddTransaction(transaction mempool.Transaction) (metadata mempool.TransactionWithMetadata, err error) {
+func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (metadata mempool.TransactionWithMetadata, err error) {
 	newMetadata, err := NewTransactionWithMetadata(transaction)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create transaction metadata: %w", err)
 	}
 
-	metadata, stored := m.cachedTransactions.GetOrCreate(newMetadata.ID(), func() *TransactionWithMetadata {
+	newMetadata, stored := m.cachedTransactions.GetOrCreate(newMetadata.ID(), func() *TransactionWithMetadata {
 		return m.setupTransaction(newMetadata)
 	})
+
+	// TODO CLEANUP GLOBAL attachments
+	m.attachments.Get(blockID.Index(), true).Set(blockID, newMetadata)
+	newMetadata.attachments.Add(blockID)
+
 	if !stored {
 		return metadata, xerrors.Errorf("transaction with id %s already exists: %w", newMetadata.ID(), mempool.ErrTransactionExistsAlready)
 	}
 
-	m.events.TransactionStored.Trigger(metadata)
+	newMetadata.setStored()
 
-	m.solidifyInputs(newMetadata)
-
-	return metadata, nil
+	return newMetadata, nil
 }
 
 func (m *MemPool[VotePower]) RemoveTransaction(transactionID iotago.TransactionID) {
@@ -107,33 +126,40 @@ func (m *MemPool[VotePower]) State(stateReference ledger.StateReference) (state 
 	return state, err
 }
 
-func (m *MemPool[VotePower]) SetTransactionIncluded(id iotago.TransactionID, slot iotago.SlotIndex) error {
-	transaction, exists := m.cachedTransactions.Get(id)
-	if !exists {
-		return xerrors.Errorf("transaction with id %s not found: %w", id, mempool.ErrTransactionNotFound)
+func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) error {
+	attachmentsBySlotIndex := m.attachments.Get(blockID.Index())
+	if attachmentsBySlotIndex == nil {
+		return xerrors.Errorf("no attachments found for block id %s: %w", blockID, mempool.ErrAttachmentNotFound)
 	}
 
-	transaction.setInclusionSlot(slot)
+	transaction, exists := attachmentsBySlotIndex.Get(blockID)
+	if !exists {
+		return xerrors.Errorf("no attachments found for block id %s: %w", blockID, mempool.ErrAttachmentNotFound)
+	}
+
+	transaction.attachments.MarkIncluded(blockID)
 
 	return nil
 }
 
 func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionWithMetadata) *TransactionWithMetadata {
+	transaction.OnStored(func() {
+		m.events.TransactionStored.Trigger(transaction)
+		m.solidifyInputs(transaction)
+	})
+
 	transaction.OnSolid(func() {
 		m.events.TransactionSolid.Trigger(transaction)
-
 		m.executeTransaction(transaction)
 	})
 
 	transaction.OnExecuted(func() {
 		m.events.TransactionExecuted.Trigger(transaction)
-
 		m.bookTransaction(transaction)
 	})
 
 	transaction.OnBooked(func() {
 		m.events.TransactionBooked.Trigger(transaction)
-
 		m.publishOutputs(transaction)
 	})
 
@@ -145,22 +171,62 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionWithMetada
 		m.events.TransactionAccepted.Trigger(transaction)
 	})
 
-	transaction.OnIncluded(func() { m.updateAcceptance(transaction) })
+	transaction.attachments.OnEarliestIncludedSlotUpdated(func(index iotago.SlotIndex) {
+		switch index {
+		case 0:
+			if transaction.WasAccepted() {
+				// roll back acceptance in diff + mark tx as orphaned
+			}
+		default:
+			m.updateAcceptance(transaction)
+		}
+	})
 	transaction.OnAllInputsAccepted(func() { m.updateAcceptance(transaction) })
+
+	transaction.attachments.OnAllAttachmentsEvicted(func() {
+		transaction.setEvicted()
+	})
+
+	transaction.OnCommitted(func() {
+		if m.cachedTransactions.Delete(transaction.ID()) {
+
+		}
+	})
+
+	transaction.OnEvicted(func() {
+		m.cachedTransactions.Delete(transaction.ID())
+	})
 
 	return transaction
 }
 
 func (m *MemPool[VotePower]) setupInput(transaction *TransactionWithMetadata, input *StateWithMetadata) *StateWithMetadata {
-	input.markSpent()
+	input.increaseConsumerCount()
+	transaction.OnEvicted(input.decreaseConsumerCount)
+
 	input.OnAccepted(transaction.markInputAccepted)
 	input.OnRejected(transaction.setRejected)
+	input.OnEvicted(func() {
+		if transaction.WasRejected() {
+			transaction.setEvicted()
+		}
+	})
+
+	input.OnDoubleSpent(func() {
+		m.forkTransaction(transaction, input)
+	})
+
 	input.OnSpendAccepted(func(spender *TransactionWithMetadata) {
 		if spender != transaction {
 			transaction.setRejected()
 		}
 	})
-	input.OnDoubleSpent(func() { m.forkTransaction(transaction, input) })
+
+	input.OnSpendCommitted(func(spender *TransactionWithMetadata) {
+		if spender != transaction {
+			transaction.setEvicted()
+		}
+	})
 
 	return input
 }
@@ -178,25 +244,25 @@ func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionWithMetadat
 
 func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionWithMetadata) {
 	for i, input := range transaction.inputReferences {
-		solidificationRequest, cancelRequest := func(input ledger.StateReference, index int) (request *promise.Promise[*StateWithMetadata], cancelRequest func()) {
-			return m.cachedStateRequests.Compute(input.StateID(), func(request *promise.Promise[*StateWithMetadata], exists bool) *promise.Promise[*StateWithMetadata] {
+		currentIndex := i
+
+		m.cachedStateRequests.Compute(input.StateID(), func(request *promise.Promise[*StateWithMetadata], exists bool) *promise.Promise[*StateWithMetadata] {
+			if !exists {
+				request = m.requestState(input, true)
+			}
+
+			request.OnSuccess(func(input *StateWithMetadata) {
 				if !exists {
-					request = m.requestState(input, true)
+					input.OnAllConsumersEvicted(func() {
+						m.cachedStateRequests.Delete(input.ID(), input.AllConsumersEvicted)
+					})
 				}
 
-				cancelRequest = lo.Batch(
-					request.OnSuccess(func(input *StateWithMetadata) { transaction.publishInput(index, m.setupInput(transaction, input)) }),
-					request.OnError(transaction.setInvalid),
-				)
+				transaction.publishInput(currentIndex, m.setupInput(transaction, input))
+			})
+			request.OnError(transaction.setInvalid)
 
-				return request
-			}), cancelRequest
-		}(input, i)
-
-		transaction.OnEvicted(func() {
-			if cancelRequest(); solidificationRequest.IsEmpty() {
-				m.cachedStateRequests.Delete(input.StateID(), solidificationRequest.IsEmpty)
-			}
+			return request
 		})
 	}
 }
@@ -218,6 +284,10 @@ func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionWithMetadat
 func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionWithMetadata) {
 	for _, output := range transaction.outputs {
 		lo.Return1(m.cachedStateRequests.GetOrCreate(output.id, lo.NoVariadic(promise.New[*StateWithMetadata]))).Resolve(output)
+
+		output.OnAllConsumersEvicted(func() {
+			m.cachedStateRequests.Delete(output.id, output.AllConsumersEvicted)
+		})
 	}
 }
 
@@ -243,7 +313,7 @@ func (m *MemPool[VotePower]) requestState(stateReference ledger.StateReference, 
 }
 
 func (m *MemPool[VotePower]) updateAcceptance(transaction *TransactionWithMetadata) {
-	if transaction.AllInputsAccepted() && transaction.IsIncluded() && m.conflictDAG.AcceptanceState(transaction.conflictIDs).IsAccepted() {
+	if transaction.AllInputsAccepted() && transaction.Attachments().WasIncluded() && m.conflictDAG.AcceptanceState(transaction.conflictIDs).IsAccepted() {
 		transaction.setAccepted()
 	}
 }
