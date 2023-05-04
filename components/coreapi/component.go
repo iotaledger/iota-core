@@ -214,6 +214,46 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
+	routeGroup.GET(RouteCommitmentByID, func(c echo.Context) error {
+		_, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
+		if err != nil {
+			return err
+		}
+
+		// get commitment
+		return httpserver.JSONResponse(c, http.StatusOK, &commitmentInfoResponse{})
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteCommitmentByIDUTXOChanges, func(c echo.Context) error {
+		_, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
+		if err != nil {
+			return err
+		}
+
+		// get commitment utxos
+		return httpserver.JSONResponse(c, http.StatusOK, &slotUTXOResponse{})
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteSlotByIndex, func(c echo.Context) error {
+		_, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
+		if err != nil {
+			return err
+		}
+
+		// get commitment
+		return httpserver.JSONResponse(c, http.StatusOK, &commitmentInfoResponse{})
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteSlotByIndexUTXOChanges, func(c echo.Context) error {
+		_, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
+		if err != nil {
+			return err
+		}
+
+		// get utxo changes
+		return httpserver.JSONResponse(c, http.StatusOK, &slotUTXOResponse{})
+	}, checkNodeSynced())
+
 	return nil
 }
 

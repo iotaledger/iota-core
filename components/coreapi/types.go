@@ -58,18 +58,25 @@ func (b blockState) String() string {
 	}
 }
 
-// slotInfoResponse defines the slot info response.
-type slotInfoResponse struct {
-	// The index of the latest commitment.
+// commitmentInfoResponse defines the commitment info response.
+type commitmentInfoResponse struct {
+	// The index of the requested commitment.
 	Index iotago.SlotIndex `json:"index"`
-	// The unix time of the milestone payload.
-	// The timestamp can be omitted if the milestone is not available
-	// (no milestone received yet after starting from snapshot).
-	Timestamp uint32 `json:"timestamp,omitempty"`
-	// The ID of the commitment.
-	// The ID can be omitted if the commitment is not available.
-	// (no commitment created yet after starting from snapshot).
-	CommitmentID string `json:"commitmentId,omitempty"`
+	// The commitment ID of previous commitment.
+	PrevID string `json:"prevId"`
+	// The roots ID of merkle trees within the requested commitment.
+	RootsID string `json:"rootsId"`
+	// The cumulative weight of the requested slot.
+	CumulativeWeight uint64 `json:"cumulativeWeight"`
+}
+
+type slotUTXOResponse struct {
+	// The index of the requested commitment.
+	Index iotago.SlotIndex `json:"index"`
+	// The outputs that are created in this slot.
+	CreatedOutputs []string `json:"createdOutputs"`
+	// The outputs that are consumed in this slot.
+	ConsumedOutputs []string `json:"consumedOutputs"`
 }
 
 // infoResponse defines the response of a GET info REST API call.
