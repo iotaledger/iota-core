@@ -219,6 +219,34 @@ func (t *TransactionWithMetadata) setStored() {
 }
 
 func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetadata) {
+	t.inputs[index] = input
+
+	t.setupInputLifecycle(input)
+
+	if atomic.AddUint64(&t.unsolidInputsCount, ^uint64(0)) == 0 {
+		t.solid.Trigger()
+	}
+}
+
+func (t *TransactionWithMetadata) setBooked() {
+	t.booked.Trigger()
+}
+
+func (t *TransactionWithMetadata) setExecuted(outputStates []ledger.State) {
+	t.mutex.Lock()
+	for _, outputState := range outputStates {
+		t.outputs = append(t.outputs, NewStateWithMetadata(outputState, t))
+	}
+	t.mutex.Unlock()
+
+	t.executed.Trigger()
+}
+
+func (t *TransactionWithMetadata) setInvalid(reason error) {
+	t.invalid.Trigger(reason)
+}
+
+func (t *TransactionWithMetadata) setupInputLifecycle(input *StateWithMetadata) {
 	input.increaseConsumerCount()
 
 	t.OnAccepted(func() {
@@ -253,30 +281,6 @@ func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetada
 			t.setEvicted()
 		}
 	})
-
-	t.inputs[index] = input
-
-	if atomic.AddUint64(&t.unsolidInputsCount, ^uint64(0)) == 0 {
-		t.solid.Trigger()
-	}
-}
-
-func (t *TransactionWithMetadata) setBooked() {
-	t.booked.Trigger()
-}
-
-func (t *TransactionWithMetadata) setExecuted(outputStates []ledger.State) {
-	t.mutex.Lock()
-	for _, outputState := range outputStates {
-		t.outputs = append(t.outputs, NewStateWithMetadata(outputState, t))
-	}
-	t.mutex.Unlock()
-
-	t.executed.Trigger()
-}
-
-func (t *TransactionWithMetadata) setInvalid(reason error) {
-	t.invalid.Trigger(reason)
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
