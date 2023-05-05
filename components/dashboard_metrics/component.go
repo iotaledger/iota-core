@@ -2,18 +2,36 @@ package dashboardmetrics
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
+	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
+	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/labstack/echo/v4"
+)
+
+const (
+	// RouteNodeInfoExtended is the route to get additional info about the node.
+	// GET returns the extended info of the node.
+	RouteNodeInfoExtended = "/info"
+
+	// RouteDatabaseSizes is the route to get the size of the databases.
+	// GET returns the sizes of the databases.
+	RouteDatabaseSizes = "/database/sizes"
+
+	// RouteGossipMetrics is the route to get metrics about gossip.
+	// GET returns the gossip metrics.
+	RouteGossipMetrics = "/gossip"
 )
 
 func init() {
@@ -38,6 +56,8 @@ type dependencies struct {
 
 	Protocol         *protocol.Protocol
 	RestRouteManager *restapi.RestRouteManager
+	AppInfo          *app.Info
+	LocalPeer        *peer.Local
 }
 
 func configure() error {
@@ -45,21 +65,21 @@ func configure() error {
 	// if !Component.App().IsComponentEnabled(restapi.Component.Name) {
 	// 	Component.LogPanic("RestAPI plugin needs to be enabled to use the CoreAPIV3 plugin")
 	// }
+	configureComponentCountersEvents()
 
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ identity.ID) {
-		incComponentCounter(Received)
+	routeGroup := deps.RestRouteManager.AddRoute("dashboard-metrics/v2")
+
+	routeGroup.GET(RouteNodeInfoExtended, func(c echo.Context) error {
+		return httpserver.JSONResponse(c, http.StatusOK, nodeInfoExtended())
 	})
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
-		incComponentCounter(Attached)
-	})
+	routeGroup.GET(RouteDatabaseSizes, func(c echo.Context) error {
+		resp, err := databaseSizesMetrics()
+		if err != nil {
+			return err
+		}
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(b *blocks.Block) {
-		incComponentCounter(Solidified)
-	})
-
-	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(b *blocks.Block) {
-		incComponentCounter(Booked)
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
 	return nil
@@ -81,4 +101,22 @@ func run() error {
 	}
 
 	return nil
+}
+
+func configureComponentCountersEvents() {
+	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ identity.ID) {
+		incComponentCounter(Received)
+	})
+
+	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
+		incComponentCounter(Attached)
+	})
+
+	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(b *blocks.Block) {
+		incComponentCounter(Solidified)
+	})
+
+	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(b *blocks.Block) {
+		incComponentCounter(Booked)
+	})
 }
