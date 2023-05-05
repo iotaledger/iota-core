@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -36,17 +38,20 @@ type TestSuite struct {
 	ProtocolParameters iotago.ProtocolParameters
 
 	optsSnapshotOptions []options.Option[snapshotcreator.Options]
+	optsWaitFor         time.Duration
+	optsTick            time.Duration
 
 	mutex sync.RWMutex
 }
 
-func NewTestSuite(testingT *testing.T, snapshotOptions ...options.Option[snapshotcreator.Options]) *TestSuite {
-	t := &TestSuite{
+func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
+	return options.Apply(&TestSuite{
 		Testing:   testingT,
 		Network:   mock.NewNetwork(),
 		Directory: utils.NewDirectory(testingT.TempDir()),
 		nodes:     make(map[string]*mock.Node),
 		blocks:    shrinkingmap.New[string, *model.Block](),
+
 		ProtocolParameters: iotago.ProtocolParameters{
 			Version:     3,
 			NetworkName: testingT.Name(),
@@ -58,23 +63,23 @@ func NewTestSuite(testingT *testing.T, snapshotOptions ...options.Option[snapsho
 				VBFactorKey:  10,
 			},
 			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*10),
+			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*100),
 			SlotDurationInSeconds: 10,
 		},
-	}
-
-	t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
-	var defaultSnapshotOptions = []options.Option[snapshotcreator.Options]{
-		snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
-		snapshotcreator.WithFilePath(t.snapshotPath),
-		snapshotcreator.WithProtocolParameters(t.ProtocolParameters),
-		snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
-			iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
-		}),
-	}
-	t.optsSnapshotOptions = append(defaultSnapshotOptions, snapshotOptions...)
-
-	return t
+		optsWaitFor: 10 * time.Second,
+		optsTick:    1 * time.Millisecond,
+	}, opts, func(t *TestSuite) {
+		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
+		var defaultSnapshotOptions = []options.Option[snapshotcreator.Options]{
+			snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
+			snapshotcreator.WithFilePath(t.snapshotPath),
+			snapshotcreator.WithProtocolParameters(t.ProtocolParameters),
+			snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
+				iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
+			}),
+		}
+		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
+	})
 }
 
 func (t *TestSuite) Block(alias string) *model.Block {
@@ -281,8 +286,30 @@ func (t *TestSuite) HookLogging() {
 	}
 }
 
+func (t *TestSuite) Eventuallyf(condition func() bool, msg string, args ...any) {
+	require.Eventuallyf(t.Testing, condition, t.optsWaitFor, t.optsTick, msg, args...)
+}
+
 func mustNodes(nodes []*mock.Node) {
 	if len(nodes) == 0 {
 		panic("no nodes provided")
+	}
+}
+
+func WithWaitFor(waitFor time.Duration) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsWaitFor = waitFor
+	}
+}
+
+func WithTick(tick time.Duration) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsTick = tick
+	}
+}
+
+func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Options]) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsSnapshotOptions = snapshotOptions
 	}
 }

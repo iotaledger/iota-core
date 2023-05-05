@@ -230,8 +230,8 @@ func (n *Node) IssueBlock() iotago.BlockID {
 
 func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, parents ...iotago.BlockID) *model.Block {
 	slotTimeProvider := n.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
-	issuingTime := time.Unix(slotTimeProvider.GenesisUnixTime()+int64(slot-1)*slotTimeProvider.Duration(), 0)
-	require.True(n.Testing, issuingTime.Before(time.Now()), "issued block is in the current or future slot")
+	issuingTime := slotTimeProvider.StartTime(slot)
+	require.Truef(n.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", n.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
 
 	block, err := builder.NewBlockBuilder().
 		StrongParents(parents).

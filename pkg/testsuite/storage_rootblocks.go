@@ -1,10 +1,10 @@
 package testsuite
 
 import (
-	"github.com/stretchr/testify/require"
-
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func (t *TestSuite) AssertStorageRootBlocks(blocks []*model.Block, nodes ...*mock.Node) {
@@ -12,14 +12,23 @@ func (t *TestSuite) AssertStorageRootBlocks(blocks []*model.Block, nodes ...*moc
 
 	for _, node := range nodes {
 		for _, block := range blocks {
-			storage := node.Protocol.MainEngineInstance().Storage.RootBlocks(block.ID().Index())
-			require.NotNilf(t.Testing, storage, "%s: storage for %s is nil", node.Name, block.ID().Index())
+			var storage *prunable.RootBlocks
+			t.Eventuallyf(func() bool {
+				storage = node.Protocol.MainEngineInstance().Storage.RootBlocks(block.ID().Index())
+				return storage != nil
+			}, "AssertStorageRootBlocks: %s: storage for %s is nil", node.Name, block.ID().Index())
 
-			loadedBlockID, commitmentID, err := storage.Load(block.ID())
-			require.NoError(t.Testing, err, "%s: failed to load root block %s", node.Name, block.ID())
+			var loadedBlockID iotago.BlockID
+			var commitmentID iotago.CommitmentID
+			var err error
+			t.Eventuallyf(func() bool {
+				loadedBlockID, commitmentID, err = storage.Load(block.ID())
+				return err == nil
+			}, "AssertStorageRootBlocks: %s: failed to load root block %s: %s", node.Name, block.ID(), err)
 
-			require.Equalf(t.Testing, block.ID(), loadedBlockID, "%s: block %s expected %s, got %s", node.Name, block.ID(), block.ID(), loadedBlockID)
-			require.Equalf(t.Testing, block.SlotCommitment().ID(), commitmentID, "%s: block %s expected %s, got %s", node.Name, block.ID(), block.SlotCommitment().ID(), commitmentID)
+			t.Eventuallyf(func() bool {
+				return block.ID() == loadedBlockID && block.SlotCommitment().ID() == commitmentID
+			}, "AssertStorageRootBlocks: %s: block %s expected %s, got %s; slot commitment expected %s, got %s", node.Name, block.ID(), block.ID(), loadedBlockID, block.SlotCommitment().ID(), commitmentID)
 		}
 	}
 }

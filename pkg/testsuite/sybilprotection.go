@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/core/account"
@@ -13,7 +14,7 @@ func (t *TestSuite) AssertSybilProtectionCommittee(weightVector map[iotago.Accou
 	mustNodes(nodes)
 
 	for _, node := range nodes {
-		t.assertSybilProtectionCustomCommittee(weightVector, node.Protocol.MainEngineInstance().SybilProtection.Committee, node)
+		t.assertSybilProtectionCustomCommittee("Committee", weightVector, node.Protocol.MainEngineInstance().SybilProtection.Committee, node)
 	}
 }
 
@@ -21,13 +22,18 @@ func (t *TestSuite) AssertSybilProtectionOnlineCommittee(weightVector map[iotago
 	mustNodes(nodes)
 
 	for _, node := range nodes {
-		t.assertSybilProtectionCustomCommittee(weightVector, node.Protocol.MainEngineInstance().SybilProtection.OnlineCommittee, node)
+		t.assertSybilProtectionCustomCommittee("Online", weightVector, node.Protocol.MainEngineInstance().SybilProtection.OnlineCommittee, node)
 	}
 }
 
-func (t *TestSuite) assertSybilProtectionCustomCommittee(weightVector map[iotago.AccountID]int64, committeeFunc func() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], node *mock.Node) {
-	require.ElementsMatchf(t.Testing, lo.Keys(weightVector), committeeFunc().Members().Slice(), "AssertSybilProtectionCommittee: %s: expected %d, got %d", node.Name, lo.Keys(weightVector), committeeFunc().Members().Slice())
-	require.Equalf(t.Testing, lo.Sum(lo.Values(weightVector)...), committeeFunc().TotalWeight(), "AssertSybilProtectionCommittee: %s: expected %d, got %d", node.Name, lo.Sum(lo.Values(weightVector)...), committeeFunc().TotalWeight())
+func (t *TestSuite) assertSybilProtectionCustomCommittee(customCommitteeType string, weightVector map[iotago.AccountID]int64, committeeFunc func() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], node *mock.Node) {
+	t.Eventuallyf(func() bool {
+		return cmp.Equal(lo.Keys(weightVector), committeeFunc().Members().Slice())
+	}, "AssertSybilProtectionCommittee(%s): %s: expected %d, got %d", customCommitteeType, node.Name, lo.Keys(weightVector), committeeFunc().Members().Slice())
+
+	t.Eventuallyf(func() bool {
+		return cmp.Equal(lo.Sum(lo.Values(weightVector)...), committeeFunc().TotalWeight())
+	}, "AssertSybilProtectionCommittee(%s): %s: expected %d, got %d", customCommitteeType, node.Name, lo.Sum(lo.Values(weightVector)...), committeeFunc().TotalWeight())
 
 	require.NoError(t.Testing, committeeFunc().ForEach(func(accountID iotago.AccountID, weight int64) error {
 		require.Equalf(t.Testing, weightVector[accountID], weight, "AssertSybilProtectionCommittee: %s: expected %d, got %d", node.Name, weightVector[accountID], weight)

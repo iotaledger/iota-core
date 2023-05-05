@@ -1,10 +1,9 @@
 package testsuite
 
 import (
-	"fmt"
+	"github.com/google/go-cmp/cmp"
 
-	"github.com/stretchr/testify/require"
-
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -14,11 +13,17 @@ func (t *TestSuite) AssertStorageCommitments(commitments []*iotago.Commitment, n
 
 	for _, node := range nodes {
 		for _, commitment := range commitments {
-			storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(commitment.Index)
-			if err != nil {
-				panic(fmt.Sprintf("failed to load commitment %s: %s", commitment.MustID(), err.Error()))
-			}
-			require.Equalf(t.Testing, *commitment, *storedCommitment.Commitment(), "%s: expected %s, got %s", node.Name, commitment, storedCommitment)
+			var storedCommitment *model.Commitment
+			var err error
+			t.Eventuallyf(func() bool {
+				storedCommitment, err = node.Protocol.MainEngineInstance().Storage.Commitments().Load(commitment.Index)
+				return err == nil
+			}, "AssertStorageCommitments: %s: error loading commitment: %s", node.Name, commitment.MustID(), err)
+
+			t.Eventuallyf(func() bool {
+				storedCommitment, err = node.Protocol.MainEngineInstance().Storage.Commitments().Load(commitment.Index)
+				return cmp.Equal(*commitment, *storedCommitment.Commitment())
+			}, "AssertStorageCommitments: %s: expected %s, got %s", node.Name, commitment, storedCommitment)
 		}
 	}
 }
