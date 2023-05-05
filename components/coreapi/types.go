@@ -68,6 +68,7 @@ type commitmentInfoResponse struct {
 	RootsID string `json:"rootsId"`
 	// The cumulative weight of the requested slot.
 	CumulativeWeight uint64 `json:"cumulativeWeight"`
+	// TODO: decide what else to add here.
 }
 
 type slotUTXOResponse struct {

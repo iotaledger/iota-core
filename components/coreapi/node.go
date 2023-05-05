@@ -20,6 +20,7 @@ func info() (*infoResponse, error) {
 			FinalizedSlot:        syncStatus.FinalizedSlot,
 			LastAcceptedBlockID:  syncStatus.LastAcceptedBlockID.ToHex(),
 			LastConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
+			// TODO: fill in pruningSlot
 		},
 		Metrics: nodeMetrics{
 			BlocksPerSecond:           metrics.BlocksPerSecond,
