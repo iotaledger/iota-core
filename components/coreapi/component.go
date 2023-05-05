@@ -24,7 +24,7 @@ const (
 
 	// RouteBlockIssuance is the route for getting all needed information for block creation.
 	// GET returns the data needed toa attach block.
-	RouteBlockIssuance = "/issuance/block-header"
+	RouteBlockIssuance = "/blocks/issuance"
 
 	// RouteBlock is the route for getting a block by its blockID.
 	// GET returns the block based on the given type in the request "Accept" header.
