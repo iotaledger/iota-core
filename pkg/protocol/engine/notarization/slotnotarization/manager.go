@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -32,6 +33,8 @@ type Manager struct {
 	attestations  *Attestations
 
 	workers *workerpool.Group
+
+	ledger therealledger.Ledger
 
 	storage         *storage.Storage
 	commitmentMutex sync.RWMutex
@@ -69,6 +72,8 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 				e.HookConstructed(func() {
 					m.storage = e.Storage
 					m.acceptedTimeFunc = e.Clock.Accepted().Time
+
+					m.ledger = e.Ledger
 
 					wpBlocks := m.workers.CreatePool("Blocks", 1)           // Using just 1 worker to avoid contention
 					wpCommitments := m.workers.CreatePool("Commitments", 1) // Using just 1 worker to avoid contention
@@ -206,14 +211,20 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
+	stateRoot, mutationRoot, err := m.ledger.CommitSlot(index)
+	if err != nil {
+		m.events.Error.Trigger(errors.Wrap(err, "failed to commit ledger"))
+		return false
+	}
+
 	newCommitment := iotago.NewCommitment(
 		index,
 		latestCommitment.ID(),
 		iotago.NewRoots(
 			iotago.Identifier(acceptedBlocks.Root()),
-			iotago.Identifier{},
+			mutationRoot,
 			iotago.Identifier(attestations.Root()),
-			iotago.Identifier{},
+			stateRoot,
 			iotago.Identifier(m.slotMutations.weights.Root()),
 		).ID(),
 		m.storage.Settings().LatestCommitment().CumulativeWeight()+uint64(attestationsWeight),

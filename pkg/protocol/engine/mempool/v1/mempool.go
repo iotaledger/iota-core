@@ -3,6 +3,7 @@ package mempoolv1
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"golang.org/x/xerrors"
 
@@ -294,6 +295,10 @@ func (m *MemPool[VotePower]) updateAcceptance(transaction *TransactionWithMetada
 	if transaction.AllInputsAccepted() && transaction.Attachments().WasIncluded() && m.conflictDAG.AcceptanceState(transaction.conflictIDs).IsAccepted() {
 		transaction.setAccepted()
 	}
+}
+
+func (m *MemPool[VotePower]) StateDiff(index iotago.SlotIndex) (*mempool.StateDiff, error) {
+	return nil, fmt.Errorf("not implemented yet")
 }
 
 var _ mempool.MemPool[vote.MockedPower] = new(MemPool[vote.MockedPower])

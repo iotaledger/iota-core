@@ -22,4 +22,6 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 	MarkAttachmentIncluded(blockID iotago.BlockID) error
 
 	Evict(slotIndex iotago.SlotIndex)
+
+	StateDiff(index iotago.SlotIndex) (*StateDiff, error)
 }

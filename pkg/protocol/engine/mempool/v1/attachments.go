@@ -17,18 +17,18 @@ const (
 )
 
 type Attachments struct {
-	attachments           *shrinkingmap.ShrinkingMap[iotago.BlockID, AttachmentStatus]
-	earliestIncludedSlot  *promise.Value[iotago.SlotIndex]
-	allAttachmentsEvicted *promise.Event
+	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, AttachmentStatus]
+	earliestIncludedAttachment *promise.Value[iotago.BlockID]
+	allAttachmentsEvicted      *promise.Event
 
 	mutex sync.RWMutex
 }
 
 func NewAttachments() *Attachments {
 	return &Attachments{
-		attachments:           shrinkingmap.New[iotago.BlockID, AttachmentStatus](),
-		earliestIncludedSlot:  promise.NewValue[iotago.SlotIndex](),
-		allAttachmentsEvicted: promise.NewEvent(),
+		attachments:                shrinkingmap.New[iotago.BlockID, AttachmentStatus](),
+		earliestIncludedAttachment: promise.NewValue[iotago.BlockID](),
+		allAttachmentsEvicted:      promise.NewEvent(),
 	}
 }
 
@@ -51,8 +51,8 @@ func (a *Attachments) MarkIncluded(blockID iotago.BlockID) bool {
 
 	a.attachments.Set(blockID, AttachmentIncluded)
 
-	if lowestSlotIndex := a.earliestIncludedSlot.Get(); lowestSlotIndex == 0 || blockID.Index() < lowestSlotIndex {
-		a.earliestIncludedSlot.Set(blockID.Index())
+	if lowestSlotIndex := a.earliestIncludedAttachment.Get(); lowestSlotIndex.Index() == 0 || blockID.Index() < lowestSlotIndex.Index() {
+		a.earliestIncludedAttachment.Set(blockID)
 	}
 
 	return true
@@ -69,19 +69,19 @@ func (a *Attachments) MarkOrphaned(blockID iotago.BlockID) (orphaned bool) {
 
 	a.attachments.Set(blockID, AttachmentOrphaned)
 
-	if previousState == AttachmentIncluded && blockID.Index() == a.earliestIncludedSlot.Get() {
-		a.earliestIncludedSlot.Set(a.findLowestIncludedSlotIndex())
+	if previousState == AttachmentIncluded && blockID.Index() == a.earliestIncludedAttachment.Get().Index() {
+		a.earliestIncludedAttachment.Set(a.findLowestIncludedAttachment())
 	}
 
 	return true
 }
 
-func (a *Attachments) EarliestIncludedSlot() iotago.SlotIndex {
-	return a.earliestIncludedSlot.Get()
+func (a *Attachments) EarliestIncludedAttachment() iotago.BlockID {
+	return a.earliestIncludedAttachment.Get()
 }
 
-func (a *Attachments) OnEarliestIncludedSlotUpdated(callback func(iotago.SlotIndex)) (unsubscribe func()) {
-	return a.earliestIncludedSlot.OnUpdate(callback)
+func (a *Attachments) OnEarliestIncludedSlotUpdated(callback func(id iotago.BlockID)) (unsubscribe func()) {
+	return a.earliestIncludedAttachment.OnUpdate(callback)
 }
 
 func (a *Attachments) OnAllAttachmentsEvicted(callback func()) {
@@ -98,19 +98,20 @@ func (a *Attachments) Evict(id iotago.BlockID) {
 }
 
 func (a *Attachments) WasIncluded() bool {
-	return a.EarliestIncludedSlot() != 0
+	return a.EarliestIncludedAttachment().Index() != 0
 }
 
-func (a *Attachments) findLowestIncludedSlotIndex() iotago.SlotIndex {
-	var lowestIncludedSlotIndex iotago.SlotIndex
+func (a *Attachments) findLowestIncludedAttachment() iotago.BlockID {
+	//TODO: we might need a deterministic sort here
+	var lowestIncludedAttachment iotago.BlockID
 
 	a.attachments.ForEach(func(blockID iotago.BlockID, status AttachmentStatus) bool {
-		if status != AttachmentIncluded && (lowestIncludedSlotIndex == 0 || blockID.Index() < lowestIncludedSlotIndex) {
-			lowestIncludedSlotIndex = blockID.Index()
+		if status != AttachmentIncluded && (lowestIncludedAttachment.Index() == 0 || blockID.Index() < lowestIncludedAttachment.Index()) {
+			lowestIncludedAttachment = blockID
 		}
 
 		return true
 	})
 
-	return lowestIncludedSlotIndex
+	return lowestIncludedAttachment
 }

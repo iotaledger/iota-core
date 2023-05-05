@@ -10,6 +10,8 @@ type TransactionWithMetadata interface {
 
 	Transaction() Transaction
 
+	EarliestIncludedAttachment() iotago.BlockID
+
 	Outputs() *advancedset.AdvancedSet[StateWithMetadata]
 
 	IsSolid() bool

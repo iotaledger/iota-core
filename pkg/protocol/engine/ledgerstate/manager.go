@@ -31,6 +31,10 @@ func New(store kvstore.KVStore, apiProviderFunc func() iotago.API) *Manager {
 	}
 }
 
+func (m *Manager) API() iotago.API {
+	return m.apiProviderFunc()
+}
+
 // KVStore returns the underlying KVStore.
 func (m *Manager) KVStore() kvstore.KVStore {
 	return m.store
