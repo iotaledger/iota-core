@@ -128,9 +128,9 @@ type nodeStatus struct {
 type nodeMetrics struct {
 	// The current rate of new blocks per second.
 	BlocksPerSecond float64 `json:"blocksPerSecond"`
-	// The current rate of referenced blocks per second.
+	// The current rate of confirmed blocks per second.
 	ConfirmedBlocksPerSecond float64 `json:"confirmedBlocksPerSecond"`
-	// The ratio of referenced blocks in relation to new blocks of the last confirmed milestone.
+	// The ratio of confirmed blocks in relation to new blocks of the last confirmed milestone.
 	ConfirmedRate float64 `json:"confirmedRate"`
 }
 
