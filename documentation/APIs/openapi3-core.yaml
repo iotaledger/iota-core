@@ -558,7 +558,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceUnavailableResponse'
 
-  '/api/core/v3/commitment/{commitmentId}':
+  '/api/core/v3/commitments/{commitmentId}':
     get:
       tags:
         - commitments
@@ -616,7 +616,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
-  '/api/core/v3/commitment/{commitmentId}/utxo-changes':
+  '/api/core/v3/commitments/{commitmentId}/utxo-changes':
     get:
       tags:
         - commitments
@@ -665,7 +665,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
-  '/api/core/v3/commitment/by-index/{index}':
+  '/api/core/v3/commitments/by-index/{index}':
     get:
       tags:
         - commitments
@@ -723,7 +723,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
-  '/api/core/v3/commitment/by-index/{index}/utxo-changes':
+  '/api/core/v3/commitments/by-index/{index}/utxo-changes':
     get:
       tags:
         - commitments
