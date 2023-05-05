@@ -1,6 +1,7 @@
 package mempoolv1
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -73,7 +74,14 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 		unacceptedInputsCount: uint64(len(inputReferences)),
 	}
 
-	t.attachments.OnAllAttachmentsEvicted(t.setEvicted)
+	t.attachments.OnAllAttachmentsEvicted(func() {
+		if !t.IsAccepted() {
+			t.setEvicted()
+		} else if !t.IsCommitted() {
+			// FIXME: how do we define orphanage? should this case be orphanage?
+			fmt.Println("WHAT TO DO? last attachment evicted of a transaction that is accepted but not committed", t.ID())
+		}
+	})
 
 	return t, nil
 }
@@ -145,16 +153,16 @@ func (t *TransactionWithMetadata) OnEvicted(callback func()) {
 	t.evicted.OnTrigger(callback)
 }
 
+func (t *TransactionWithMetadata) SetCommitted() {
+	t.committed.Trigger()
+}
+
 func (t *TransactionWithMetadata) setAccepted() {
 	t.accepted.Trigger()
 }
 
 func (t *TransactionWithMetadata) setRejected() {
 	t.rejected.Trigger()
-}
-
-func (t *TransactionWithMetadata) setCommitted() {
-	t.committed.Trigger()
 }
 
 func (t *TransactionWithMetadata) setEvicted() {

@@ -3,6 +3,7 @@ package mempoolv1
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"golang.org/x/xerrors"
 
@@ -186,6 +187,11 @@ func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionW
 	})
 
 	transaction.OnCommitted(func() {
+		transaction.Attachments().attachments.ForEach(func(blockID iotago.BlockID, _ AttachmentStatus) bool {
+			m.attachments.Get(blockID.Index(), false).Delete(blockID)
+			return true
+		})
+
 		m.cachedTransactions.Delete(transaction.ID())
 	})
 
@@ -198,11 +204,15 @@ func (m *MemPool[VotePower]) setupStateLifecycle(state *StateWithMetadata) {
 	var deleteOnceNoConsumers func()
 	deleteOnceNoConsumers = func() {
 		if !state.HasNoConsumers() || !m.cachedStateRequests.Delete(state.ID(), state.HasNoConsumers) {
+			fmt.Println("deleteOnceNoConsumers", state.ID())
 			state.OnAllConsumersEvicted(deleteOnceNoConsumers)
 		}
 	}
 
-	state.OnCommitted(deleteOnceNoConsumers)
+	state.OnCommitted(func() {
+		fmt.Println("state.OnCommitted", state.ID(), state.consumerCount)
+		deleteOnceNoConsumers()
+	})
 	state.OnEvicted(func() { m.cachedStateRequests.Delete(state.ID()) })
 }
 
@@ -228,8 +238,9 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionWithMetadata
 
 			request.OnSuccess(func(input *StateWithMetadata) {
 				transaction.publishInput(currentIndex, input)
-
+				fmt.Println("consumer count", input.consumerCount)
 				if !exists {
+					fmt.Println("input setupStateLifecycle", input.ID())
 					m.setupStateLifecycle(input)
 				}
 			})
@@ -262,9 +273,13 @@ func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionWithMetadat
 
 func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionWithMetadata) {
 	for _, output := range transaction.outputs {
-		lo.Return1(m.cachedStateRequests.GetOrCreate(output.id, lo.NoVariadic(promise.New[*StateWithMetadata]))).Resolve(output)
+		outputRequest, exists := m.cachedStateRequests.GetOrCreate(output.id, lo.NoVariadic(promise.New[*StateWithMetadata]))
 
-		m.setupStateLifecycle(output)
+		outputRequest.Resolve(output)
+		if !exists {
+			fmt.Println("output setupStateLifecycle", output.ID())
+			m.setupStateLifecycle(output)
+		}
 	}
 }
 
