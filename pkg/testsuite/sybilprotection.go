@@ -1,8 +1,8 @@
 package testsuite
 
 import (
-	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/lo"
@@ -27,16 +27,26 @@ func (t *TestSuite) AssertSybilProtectionOnlineCommittee(weightVector map[iotago
 }
 
 func (t *TestSuite) assertSybilProtectionCustomCommittee(customCommitteeType string, weightVector map[iotago.AccountID]int64, committeeFunc func() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], node *mock.Node) {
-	t.Eventuallyf(func() bool {
-		return cmp.Equal(lo.Keys(weightVector), committeeFunc().Members().Slice())
-	}, "AssertSybilProtectionCommittee(%s): %s: expected %d, got %d", customCommitteeType, node.Name, lo.Keys(weightVector), committeeFunc().Members().Slice())
+	t.Eventually(func() error {
+		if !assert.ElementsMatch(t.fakeTesting, lo.Keys(weightVector), committeeFunc().Members().Slice()) {
+			return errors.Errorf("AssertSybilProtectionCommittee(%s): %s: expected %s, got %s", customCommitteeType, node.Name, lo.Keys(weightVector), committeeFunc().Members().Slice())
+		}
 
-	t.Eventuallyf(func() bool {
-		return cmp.Equal(lo.Sum(lo.Values(weightVector)...), committeeFunc().TotalWeight())
-	}, "AssertSybilProtectionCommittee(%s): %s: expected %d, got %d", customCommitteeType, node.Name, lo.Sum(lo.Values(weightVector)...), committeeFunc().TotalWeight())
+		if lo.Sum(lo.Values(weightVector)...) != committeeFunc().TotalWeight() {
+			return errors.Errorf("AssertSybilProtectionCommittee(%s): %s: expected %v, got %v", customCommitteeType, node.Name, lo.Sum(lo.Values(weightVector)...), committeeFunc().TotalWeight())
+		}
 
-	require.NoError(t.Testing, committeeFunc().ForEach(func(accountID iotago.AccountID, weight int64) error {
-		require.Equalf(t.Testing, weightVector[accountID], weight, "AssertSybilProtectionCommittee: %s: expected %d, got %d", node.Name, weightVector[accountID], weight)
+		err := committeeFunc().ForEach(func(accountID iotago.AccountID, weight int64) error {
+			if weightVector[accountID] != weight {
+				return errors.Errorf("AssertSybilProtectionCommittee(%s): %s: expected %d, got %d for %s", customCommitteeType, node.Name, weightVector[accountID], weight, accountID)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
 		return nil
-	}))
+	})
 }

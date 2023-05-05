@@ -23,8 +23,9 @@ import (
 )
 
 type TestSuite struct {
-	Testing *testing.T
-	Network *mock.Network
+	Testing     *testing.T
+	fakeTesting *testing.T
+	Network     *mock.Network
 
 	Directory *utils.Directory
 	nodes     map[string]*mock.Node
@@ -46,11 +47,12 @@ type TestSuite struct {
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
 	return options.Apply(&TestSuite{
-		Testing:   testingT,
-		Network:   mock.NewNetwork(),
-		Directory: utils.NewDirectory(testingT.TempDir()),
-		nodes:     make(map[string]*mock.Node),
-		blocks:    shrinkingmap.New[string, *model.Block](),
+		Testing:     testingT,
+		fakeTesting: &testing.T{},
+		Network:     mock.NewNetwork(),
+		Directory:   utils.NewDirectory(testingT.TempDir()),
+		nodes:       make(map[string]*mock.Node),
+		blocks:      shrinkingmap.New[string, *model.Block](),
 
 		ProtocolParameters: iotago.ProtocolParameters{
 			Version:     3,
@@ -66,7 +68,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*100),
 			SlotDurationInSeconds: 10,
 		},
-		optsWaitFor: 10 * time.Second,
+		optsWaitFor: 2 * time.Second,
 		optsTick:    1 * time.Millisecond,
 	}, opts, func(t *TestSuite) {
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
@@ -200,7 +202,7 @@ func (t *TestSuite) Shutdown() {
 	}
 }
 
-func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string, opts ...options.Option[protocol.Protocol]) *mock.Node {
+func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string) *mock.Node {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -208,21 +210,21 @@ func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, parti
 		panic(fmt.Sprintf("cannot add validator node %s to partition %s with weight %d: framework already running", name, partition, weight))
 	}
 
-	t.nodes[name] = mock.NewNode(t.Testing, t.Network, partition, name, weight, opts...)
+	t.nodes[name] = mock.NewNode(t.Testing, t.Network, partition, name, weight)
 
 	return t.nodes[name]
 }
 
-func (t *TestSuite) AddValidatorNode(name string, weight int64, opts ...options.Option[protocol.Protocol]) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition, opts...)
+func (t *TestSuite) AddValidatorNode(name string, weight int64) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition)
 }
 
-func (t *TestSuite) AddNodeToPartition(name string, partition string, opts ...options.Option[protocol.Protocol]) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, partition, opts...)
+func (t *TestSuite) AddNodeToPartition(name string, partition string) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, 0, partition)
 }
 
-func (t *TestSuite) AddNode(name string, opts ...options.Option[protocol.Protocol]) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition, opts...)
+func (t *TestSuite) AddNode(name string) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition)
 }
 
 func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
@@ -286,8 +288,35 @@ func (t *TestSuite) HookLogging() {
 	}
 }
 
-func (t *TestSuite) Eventuallyf(condition func() bool, msg string, args ...any) {
-	require.Eventuallyf(t.Testing, condition, t.optsWaitFor, t.optsTick, msg, args...)
+// Eventually asserts that given condition will be met in opts.waitFor time,
+// periodically checking target function each opts.tick.
+//
+//	assert.Eventually(t, func() bool { return true; }, time.Second, 10*time.Millisecond)
+func (t *TestSuite) Eventually(condition func() error) {
+	ch := make(chan error, 1)
+
+	timer := time.NewTimer(t.optsWaitFor)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(t.optsTick)
+	defer ticker.Stop()
+
+	var lastErr error
+	for tick := ticker.C; ; {
+		select {
+		case <-timer.C:
+			require.FailNow(t.Testing, "condition never satisfied", lastErr)
+		case <-tick:
+			tick = nil
+			go func() { ch <- condition() }()
+		case lastErr = <-ch:
+			// The condition is satisfied, we can exit.
+			if lastErr == nil {
+				return
+			}
+			tick = ticker.C
+		}
+	}
 }
 
 func mustNodes(nodes []*mock.Node) {

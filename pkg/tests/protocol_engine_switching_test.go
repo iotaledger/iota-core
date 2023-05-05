@@ -3,7 +3,6 @@ package tests
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -38,8 +37,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		},
 	})
 	ts.HookLogging()
-
-	ts.Wait()
 
 	// Verify all nodes have the expected states.
 	ts.AssertSnapshotImported(true, ts.Nodes()...)
@@ -82,13 +79,11 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.Wait()
 		ts.IssueBlockAtSlot("P1.G", 11, node1, ts.Block("P1.F").ID())
 
-		ts.WaitWithDelay(1 * time.Second) // Give some time for the blocks to arrive over the network
-
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, node1, node2)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, node3, node4)
 
-		ts.AssertBlocksAccepted(ts.Blocks("P1.A", "P1.B", "P1.C", "P1.D", "P1.E", "P1.F"), true, node1, node2)
-		ts.AssertBlocksAccepted(ts.Blocks("P1.G"), false, node1, node2) // block not referenced yet
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.A", "P1.B", "P1.C", "P1.D", "P1.E", "P1.F"), true, node1, node2)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.G"), false, node1, node2) // block not referenced yet
 	}
 
 	// Issue blocks on partition 2.
@@ -107,18 +102,15 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.Wait()
 		ts.IssueBlockAtSlot("P2.G", 11, node3, ts.Block("P2.F").ID())
 
-		ts.WaitWithDelay(1 * time.Second) // Give some time for the blocks to arrive over the network
-
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, node3, node4)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
 
-		ts.AssertBlocksAccepted(ts.Blocks("P2.A", "P2.B", "P2.C", "P2.D", "P2.E", "P2.F"), true, node3, node4)
-		ts.AssertBlocksAccepted(ts.Blocks("P2.G"), false, node3, node4) // block not referenced yet
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.A", "P2.B", "P2.C", "P2.D", "P2.E", "P2.F"), true, node3, node4)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.G"), false, node3, node4) // block not referenced yet
 	}
 
 	// Both partitions should have committed slot 8 and have different commitments
 	{
-		ts.Wait()
 		ts.AssertLatestCommitmentSlotIndex(8, ts.Nodes()...)
 
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())

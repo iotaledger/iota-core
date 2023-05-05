@@ -58,8 +58,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.WaitWithDelay(2 * time.Second)
 
 		ts.AssertBlocksExist(ts.Blocks("1.1", "1.2", "1.1*", "2.2", "2.2*"), true, ts.Nodes()...)
-		ts.AssertBlocksAccepted(ts.Blocks("1.1", "1.2", "1.1*"), true, ts.Nodes()...)
-		ts.AssertBlocksAccepted(ts.Blocks("2.2", "2.2*"), false, ts.Nodes()...)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("1.1", "1.2", "1.1*"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("2.2", "2.2*"), false, ts.Nodes()...)
 
 		// Slot 3
 		ts.IssueBlockAtSlot("3.1", 3, node1, ts.BlockIDs("2.2", "2.2*")...)
@@ -69,8 +69,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.WaitWithDelay(2 * time.Second)
 
 		ts.AssertBlocksExist(ts.Blocks("3.1", "4.2"), true, ts.Nodes()...)
-		ts.AssertBlocksAccepted(ts.Blocks("2.2", "2.2*", "3.1"), true, ts.Nodes()...)
-		ts.AssertBlocksAccepted(ts.Blocks("4.2"), false, ts.Nodes()...)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("2.2", "2.2*", "3.1"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("4.2"), false, ts.Nodes()...)
 
 		// Slot 1 should be committed.
 		ts.AssertLatestCommitmentSlotIndex(1, ts.Nodes()...)
@@ -90,8 +90,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.WaitWithDelay(2 * time.Second)
 
 		ts.AssertBlocksExist(ts.Blocks("5.1", "6.2", "7.1", "8.2"), true, ts.Nodes()...)
-		ts.AssertBlocksAccepted(ts.Blocks("4.2", "5.1", "6.2", "7.1"), true, ts.Nodes()...)
-		ts.AssertBlocksAccepted(ts.Blocks("8.2"), false, ts.Nodes()...)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("4.2", "5.1", "6.2", "7.1"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("8.2"), false, ts.Nodes()...)
 
 		// We evicted rootblocks of epoch 1, as the rootBlock delay is 4, and we are committing 5.
 		ts.AssertLatestCommitmentSlotIndex(5, ts.Nodes()...)

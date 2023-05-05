@@ -38,12 +38,10 @@ type Node struct {
 	Endpoint *Endpoint
 	Workers  *workerpool.Group
 
-	optsProtocolOptions []options.Option[protocol.Protocol]
-
 	Protocol *protocol.Protocol
 }
 
-func NewNode(t *testing.T, net *Network, partition string, name string, weight int64, opts ...options.Option[protocol.Protocol]) *Node {
+func NewNode(t *testing.T, net *Network, partition string, name string, weight int64) *Node {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		panic(err)
@@ -65,16 +63,15 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 		AccountID:  accountID,
 		PeerID:     peerID,
 
-		Endpoint:            net.Join(peerID, partition),
-		Workers:             workerpool.NewGroup(name),
-		optsProtocolOptions: opts,
+		Endpoint: net.Join(peerID, partition),
+		Workers:  workerpool.NewGroup(name),
 	}
 }
 
 func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 	n.Protocol = protocol.New(n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
-		append(opts, n.optsProtocolOptions...)...,
+		opts...,
 	)
 
 	n.Protocol.Run()
