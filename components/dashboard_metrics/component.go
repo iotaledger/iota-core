@@ -7,10 +7,13 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
+	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/daemon"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 
 func init() {
@@ -39,9 +42,25 @@ type dependencies struct {
 
 func configure() error {
 	// check if RestAPI plugin is disabled
-	//if !Component.App().IsComponentEnabled(restapi.Component.Name) {
-	//	Component.LogPanic("RestAPI plugin needs to be enabled to use the dashboard metrics plugin")
-	//}
+	// if !Component.App().IsComponentEnabled(restapi.Component.Name) {
+	// 	Component.LogPanic("RestAPI plugin needs to be enabled to use the CoreAPIV3 plugin")
+	// }
+
+	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ identity.ID) {
+		incComponentCounter(Received)
+	})
+
+	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
+		incComponentCounter(Attached)
+	})
+
+	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(b *blocks.Block) {
+		incComponentCounter(Solidified)
+	})
+
+	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(b *blocks.Block) {
+		incComponentCounter(Booked)
+	})
 
 	return nil
 }

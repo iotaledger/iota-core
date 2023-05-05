@@ -14,6 +14,13 @@ var (
 	blockCountPerComponentMutex syncutils.RWMutex
 )
 
+func incComponentCounter(key ComponentType) {
+	blockCountPerComponentMutex.Lock()
+	defer blockCountPerComponentMutex.Unlock()
+
+	blockCountPerComponentDashboard[key]++
+}
+
 // blockCountSinceStartPerComponentDashboard returns a map of block count per component types and their count since last time the value was read.
 func blockCountSinceStartPerComponentDashboard() map[ComponentType]uint64 {
 	blockCountPerComponentMutex.RLock()
