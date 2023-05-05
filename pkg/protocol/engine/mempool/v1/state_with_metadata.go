@@ -10,10 +10,9 @@ import (
 )
 
 type StateWithMetadata struct {
-	id                iotago.OutputID
-	sourceTransaction *TransactionWithMetadata
-	consumerCount     uint64
-	state             ledger.State
+	id            iotago.OutputID
+	consumerCount uint64
+	state         ledger.State
 
 	accepted  *promise.Event
 	committed *promise.Event
@@ -29,10 +28,9 @@ type StateWithMetadata struct {
 }
 
 func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetadata) *StateWithMetadata {
-	return &StateWithMetadata{
-		id:                state.ID(),
-		sourceTransaction: lo.First(optSource),
-		state:             state,
+	s := &StateWithMetadata{
+		id:    state.ID(),
+		state: state,
 
 		accepted:  promise.NewEvent(),
 		committed: promise.NewEvent(),
@@ -46,6 +44,15 @@ func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetad
 
 		allConsumersEvicted: promise.NewEvent(),
 	}
+
+	if source := lo.First(optSource); source != nil {
+		source.OnAccepted(s.setAccepted)
+		source.OnRejected(s.setRejected)
+		source.OnCommitted(s.setCommitted)
+		source.OnEvicted(s.setEvicted)
+	}
+
+	return s
 }
 
 func (s *StateWithMetadata) setCommitted() {
