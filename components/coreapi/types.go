@@ -129,9 +129,9 @@ type nodeMetrics struct {
 	// The current rate of new blocks per second.
 	BlocksPerSecond float64 `json:"blocksPerSecond"`
 	// The current rate of referenced blocks per second.
-	ReferencedBlocksPerSecond float64 `json:"referencedBlocksPerSecond"`
+	ConfirmedBlocksPerSecond float64 `json:"confirmedBlocksPerSecond"`
 	// The ratio of referenced blocks in relation to new blocks of the last confirmed milestone.
-	ReferencedRate float64 `json:"referencedRate"`
+	ConfirmedRate float64 `json:"confirmedRate"`
 }
 
 // blockMetadataResponse defines the response of a GET block metadata REST API call.

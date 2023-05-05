@@ -23,9 +23,9 @@ func info() (*infoResponse, error) {
 			// TODO: fill in pruningSlot
 		},
 		Metrics: nodeMetrics{
-			BlocksPerSecond:           metrics.BlocksPerSecond,
-			ReferencedBlocksPerSecond: metrics.ConfirmedBlocksPerSecond,
-			ReferencedRate:            metrics.ConfirmedRate,
+			BlocksPerSecond:          metrics.BlocksPerSecond,
+			ConfirmedBlocksPerSecond: metrics.ConfirmedBlocksPerSecond,
+			ConfirmedRate:            metrics.ConfirmedRate,
 		},
 		SupportedProtocolVersions: deps.Protocol.SupportedVersions(),
 		ProtocolParameters:        deps.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(),
