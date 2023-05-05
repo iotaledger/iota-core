@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
@@ -67,21 +68,21 @@ const (
 	// GET returns the commitment.
 	// MIMEApplicationJSON => json.
 	// MIMEVendorIOTASerializer => bytes.
-	RouteCommitmentByID = "/commitment/:" + restapipkg.ParameterCommitmentID
+	RouteCommitmentByID = "/commitments/:" + restapipkg.ParameterCommitmentID
 
 	// RouteCommitmentByIDUTXOChanges is the route for getting all UTXO changes of a milestone by its ID.
 	// GET returns the output IDs of all UTXO changes.
-	RouteCommitmentByIDUTXOChanges = "/commitment/:" + restapipkg.ParameterCommitmentID + "/utxo-changes"
+	RouteCommitmentByIDUTXOChanges = "/commitments/:" + restapipkg.ParameterCommitmentID + "/utxo-changes"
 
 	// RouteSlotByIndex is the route for getting a milestone by its milestoneIndex.
 	// GET returns the milestone.
 	// MIMEApplicationJSON => json.
 	// MIMEVendorIOTASerializer => bytes.
-	RouteSlotByIndex = "/commitment/by-index/:" + restapipkg.ParameterSlotIndex
+	RouteSlotByIndex = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex
 
 	// RouteSlotByIndexUTXOChanges is the route for getting all UTXO changes of a milestone by its milestoneIndex.
 	// GET returns the output IDs of all UTXO changes.
-	RouteSlotByIndexUTXOChanges = "/commitment/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
+	RouteSlotByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
 	// RouteAccountsByAcciuntID is the route for getting an account by its accountID.
 	// GET returns the account details.
@@ -215,13 +216,18 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteCommitmentByID, func(c echo.Context) error {
-		_, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
+		commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
+		if err != nil {
+			return err
+		}
+		index := commitmentID.Index()
+
+		resp, err := getCommitment(index)
 		if err != nil {
 			return err
 		}
 
-		// get commitment
-		return httpserver.JSONResponse(c, http.StatusOK, &commitmentInfoResponse{})
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteCommitmentByIDUTXOChanges, func(c echo.Context) error {
@@ -235,13 +241,17 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteSlotByIndex, func(c echo.Context) error {
-		_, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
+		indexUint64, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
 		}
 
-		// get commitment
-		return httpserver.JSONResponse(c, http.StatusOK, &commitmentInfoResponse{})
+		resp, err := getCommitment(iotago.SlotIndex(indexUint64))
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteSlotByIndexUTXOChanges, func(c echo.Context) error {
