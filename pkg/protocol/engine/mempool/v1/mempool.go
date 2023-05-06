@@ -3,7 +3,6 @@ package mempoolv1
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"golang.org/x/xerrors"
 
@@ -192,28 +191,29 @@ func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionW
 			return true
 		})
 
-		m.cachedTransactions.Delete(transaction.ID())
+		go m.cachedTransactions.Delete(transaction.ID())
 	})
 
 	transaction.OnEvicted(func() {
-		m.cachedTransactions.Delete(transaction.ID())
+		go m.cachedTransactions.Delete(transaction.ID())
 	})
 }
 
 func (m *MemPool[VotePower]) setupStateLifecycle(state *StateWithMetadata) {
-	var deleteOnceNoConsumers func()
-	deleteOnceNoConsumers = func() {
-		if !state.HasNoConsumers() || !m.cachedStateRequests.Delete(state.ID(), state.HasNoConsumers) {
-			fmt.Println("deleteOnceNoConsumers", state.ID())
-			state.OnAllConsumersEvicted(deleteOnceNoConsumers)
+	deleteIfNoConsumers := func() {
+		if !m.cachedStateRequests.Delete(state.ID(), state.HasNoConsumers) && m.cachedStateRequests.Has(state.ID()) {
+			state.OnAllConsumersEvicted(func() {
+				m.cachedStateRequests.Delete(state.ID(), state.HasNoConsumers)
+			})
 		}
 	}
 
 	state.OnCommitted(func() {
-		fmt.Println("state.OnCommitted", state.ID(), state.consumerCount)
-		deleteOnceNoConsumers()
+		go deleteIfNoConsumers()
 	})
-	state.OnEvicted(func() { m.cachedStateRequests.Delete(state.ID()) })
+	state.OnEvicted(func() {
+		go m.cachedStateRequests.Delete(state.ID())
+	})
 }
 
 func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionWithMetadata, input *StateWithMetadata) {
@@ -238,9 +238,8 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionWithMetadata
 
 			request.OnSuccess(func(input *StateWithMetadata) {
 				transaction.publishInput(currentIndex, input)
-				fmt.Println("consumer count", input.consumerCount)
+
 				if !exists {
-					fmt.Println("input setupStateLifecycle", input.ID())
 					m.setupStateLifecycle(input)
 				}
 			})
@@ -277,7 +276,6 @@ func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionWithMetadata
 
 		outputRequest.Resolve(output)
 		if !exists {
-			fmt.Println("output setupStateLifecycle", output.ID())
 			m.setupStateLifecycle(output)
 		}
 	}

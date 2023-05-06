@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -24,7 +25,7 @@ type StateWithMetadata struct {
 	spendAccepted  *promise.Event1[*TransactionWithMetadata]
 	spendCommitted *promise.Event1[*TransactionWithMetadata]
 
-	allConsumersEvicted *promise.Event
+	allConsumersEvicted *event.Event
 }
 
 func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetadata) *StateWithMetadata {
@@ -42,7 +43,7 @@ func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetad
 		spendAccepted:  promise.NewEvent1[*TransactionWithMetadata](),
 		spendCommitted: promise.NewEvent1[*TransactionWithMetadata](),
 
-		allConsumersEvicted: promise.NewEvent(),
+		allConsumersEvicted: event.New(),
 	}
 
 	if source := lo.First(optSource); source != nil {
@@ -95,8 +96,8 @@ func (s *StateWithMetadata) decreaseConsumerCount() {
 	}
 }
 
-func (s *StateWithMetadata) OnAllConsumersEvicted(callback func()) {
-	s.allConsumersEvicted.OnTrigger(callback)
+func (s *StateWithMetadata) OnAllConsumersEvicted(callback func()) (unsubscribe func()) {
+	return s.allConsumersEvicted.Hook(callback).Unhook
 }
 
 func (s *StateWithMetadata) AllConsumersEvicted() bool {

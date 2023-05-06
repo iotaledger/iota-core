@@ -2,6 +2,7 @@ package mempooltests
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -124,6 +125,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	//require.True(t, exists)
 
 	tx1Metadata.SetCommitted()
+	time.Sleep(1 * time.Second)
 	tf.RequireDeleted("tx1")
 
 	tf.Instance.Evict(1)
@@ -131,6 +133,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tf.RequireBooked("tx3")
 
 	tx2Metadata.SetCommitted()
+	time.Sleep(1 * time.Second)
 	tf.RequireDeleted("tx1", "tx2")
 
 	tf.Instance.Evict(2)
