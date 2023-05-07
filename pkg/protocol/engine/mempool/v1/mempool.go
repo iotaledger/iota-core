@@ -86,21 +86,17 @@ func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, 
 		return nil, xerrors.Errorf("failed to create transaction metadata: %w", err)
 	}
 
-	newMetadata, stored := m.cachedTransactions.GetOrCreate(newMetadata.ID(), func() *TransactionWithMetadata {
-		m.setupTransactionLifecycle(newMetadata)
-
-		return newMetadata
-	})
+	newMetadata, stored := m.cachedTransactions.GetOrCreate(newMetadata.ID(), func() *TransactionWithMetadata { return newMetadata })
 
 	// TODO CLEANUP GLOBAL attachments
 	m.attachments.Get(blockID.Index(), true).Set(blockID, newMetadata)
 	newMetadata.attachments.Add(blockID)
 
-	if !stored {
-		return metadata, xerrors.Errorf("transaction with id %s already exists: %w", newMetadata.ID(), mempool.ErrTransactionExistsAlready)
-	}
+	if stored {
+		m.setupTransactionLifecycle(newMetadata)
 
-	newMetadata.setStored()
+		newMetadata.setStored()
+	}
 
 	return newMetadata, nil
 }
@@ -191,11 +187,11 @@ func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionW
 			return true
 		})
 
-		go m.cachedTransactions.Delete(transaction.ID())
+		m.cachedTransactions.Delete(transaction.ID())
 	})
 
 	transaction.OnEvicted(func() {
-		go m.cachedTransactions.Delete(transaction.ID())
+		m.cachedTransactions.Delete(transaction.ID())
 	})
 }
 
@@ -209,10 +205,10 @@ func (m *MemPool[VotePower]) setupStateLifecycle(state *StateWithMetadata) {
 	}
 
 	state.OnCommitted(func() {
-		go deleteIfNoConsumers()
+		deleteIfNoConsumers()
 	})
 	state.OnEvicted(func() {
-		go m.cachedStateRequests.Delete(state.ID())
+		m.cachedStateRequests.Delete(state.ID())
 	})
 }
 
@@ -228,25 +224,28 @@ func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionWithMetadat
 }
 
 func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionWithMetadata) {
-	for i, inputReference := range transaction.inputReferences {
-		currentIndex := i
-
-		m.cachedStateRequests.Compute(inputReference.StateID(), func(request *promise.Promise[*StateWithMetadata], exists bool) *promise.Promise[*StateWithMetadata] {
-			if !exists {
-				request = m.requestState(inputReference, true)
-			}
-
-			request.OnSuccess(func(input *StateWithMetadata) {
-				transaction.publishInput(currentIndex, input)
-
-				if !exists {
-					m.setupStateLifecycle(input)
-				}
-			})
-			request.OnError(transaction.setInvalid)
-
-			return request
+	solidifyInput := func(stateReference ledger.StateReference, index int) {
+		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[*StateWithMetadata] {
+			return m.requestState(stateReference, true)
 		})
+
+		request.OnSuccess(func(input *StateWithMetadata) {
+			transaction.publishInput(index, input)
+
+			if created {
+				m.setupStateLifecycle(input)
+			}
+		})
+
+		request.OnError(func(err error) {
+			transaction.setInvalid(err)
+
+			m.cachedStateRequests.Delete(stateReference.StateID())
+		})
+	}
+
+	for i, inputReference := range transaction.inputReferences {
+		solidifyInput(inputReference, i)
 	}
 }
 
@@ -294,11 +293,9 @@ func (m *MemPool[VotePower]) requestState(stateReference ledger.StateReference, 
 		})
 
 		request.OnError(func(err error) {
-			if lo.First(waitIfMissing) && errors.Is(err, ledger.ErrStateNotFound) {
-				return
+			if !lo.First(waitIfMissing) || !errors.Is(err, ledger.ErrStateNotFound) {
+				p.Reject(err)
 			}
-
-			p.Reject(err)
 		})
 	})
 }
