@@ -3,6 +3,7 @@ package mempoolv1
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"golang.org/x/xerrors"
 
@@ -37,6 +38,10 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] struct {
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower]
 
 	executionWorkers *workerpool.WorkerPool
+
+	lastEvictedSlot iotago.SlotIndex
+
+	evictionMutex sync.RWMutex
 }
 
 func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputResolver ledger.StateReferenceResolver, workers *workerpool.Group) *MemPool[VotePower] {
@@ -61,15 +66,22 @@ func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputRes
 }
 
 func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
-	attachmentsInSlot := m.attachments.Evict(slotIndex)
-	if attachmentsInSlot == nil {
-		return
+	evict := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *TransactionWithMetadata] {
+		m.evictionMutex.Lock()
+		defer m.evictionMutex.Unlock()
+
+		m.lastEvictedSlot = slotIndex
+
+		return m.attachments.Evict(slotIndex)
 	}
 
-	attachmentsInSlot.ForEach(func(blockID iotago.BlockID, transaction *TransactionWithMetadata) bool {
-		transaction.attachments.Evict(blockID)
-		return true
-	})
+	if attachmentsInSlot := evict(); attachmentsInSlot != nil {
+		attachmentsInSlot.ForEach(func(blockID iotago.BlockID, transaction *TransactionWithMetadata) bool {
+			transaction.attachments.Evict(blockID)
+
+			return true
+		})
+	}
 }
 
 func (m *MemPool[VotePower]) Events() *mempool.Events {
@@ -81,21 +93,13 @@ func (m *MemPool[VotePower]) ConflictDAG() conflictdag.ConflictDAG[iotago.Transa
 }
 
 func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (metadata mempool.TransactionWithMetadata, err error) {
-	newMetadata, err := NewTransactionWithMetadata(transaction)
+	newMetadata, isNew, err := m.storeTransaction(transaction, blockID)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create transaction metadata: %w", err)
+		return nil, xerrors.Errorf("failed to store transaction: %w", err)
 	}
 
-	newMetadata, stored := m.cachedTransactions.GetOrCreate(newMetadata.ID(), func() *TransactionWithMetadata { return newMetadata })
-
-	// TODO CLEANUP GLOBAL attachments
-	m.attachments.Get(blockID.Index(), true).Set(blockID, newMetadata)
-	newMetadata.attachments.Add(blockID)
-
-	if stored {
+	if isNew {
 		m.setupTransactionLifecycle(newMetadata)
-
-		newMetadata.setStored()
 	}
 
 	return newMetadata, nil
@@ -212,15 +216,29 @@ func (m *MemPool[VotePower]) setupStateLifecycle(state *StateWithMetadata) {
 	})
 }
 
-func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionWithMetadata, input *StateWithMetadata) {
-	switch err := m.conflictDAG.CreateConflict(transaction.ID(), transaction.conflictIDs, advancedset.New(input.ID()), acceptance.Pending); {
-	case errors.Is(err, conflictdag.ErrConflictExists):
-		m.conflictDAG.JoinConflictSets(transaction.ID(), advancedset.New(input.ID()))
-	case err != nil:
-		panic(err)
-	default:
-		//transaction.setConflicting()
+func (m *MemPool[VotePower]) storeTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (storedTransaction *TransactionWithMetadata, stored bool, err error) {
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
+	if m.lastEvictedSlot >= blockID.Index() {
+		return nil, false, xerrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
 	}
+
+	newMetadata, err := NewTransactionWithMetadata(transaction)
+	if err != nil {
+		return nil, false, xerrors.Errorf("failed to create transaction metadata: %w", err)
+	}
+
+	storedMetadata, isNew := m.cachedTransactions.GetOrCreate(newMetadata.ID(), func() *TransactionWithMetadata {
+		newMetadata.setStored()
+
+		return newMetadata
+	})
+
+	storedMetadata.attachments.Add(blockID)
+	m.attachments.Get(blockID.Index(), true).Set(blockID, storedMetadata)
+
+	return storedMetadata, isNew, nil
 }
 
 func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionWithMetadata) {
@@ -298,6 +316,17 @@ func (m *MemPool[VotePower]) requestState(stateReference ledger.StateReference, 
 			}
 		})
 	})
+}
+
+func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionWithMetadata, input *StateWithMetadata) {
+	switch err := m.conflictDAG.CreateConflict(transaction.ID(), transaction.conflictIDs, advancedset.New(input.ID()), acceptance.Pending); {
+	case errors.Is(err, conflictdag.ErrConflictExists):
+		m.conflictDAG.JoinConflictSets(transaction.ID(), advancedset.New(input.ID()))
+	case err != nil:
+		panic(err)
+	default:
+		//transaction.setConflicting()
+	}
 }
 
 func (m *MemPool[VotePower]) updateAcceptance(transaction *TransactionWithMetadata) {

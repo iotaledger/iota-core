@@ -1,7 +1,6 @@
 package mempoolv1
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -75,11 +74,8 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 	}
 
 	t.attachments.OnAllAttachmentsEvicted(func() {
-		if !t.IsAccepted() {
+		if !t.IsCommitted() {
 			t.setEvicted()
-		} else if !t.IsCommitted() {
-			// FIXME: how do we define orphanage? should this case be orphanage?
-			fmt.Println("WHAT TO DO? last attachment evicted of a transaction that is accepted but not committed", t.ID())
 		}
 	})
 
