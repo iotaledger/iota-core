@@ -80,7 +80,7 @@ func (a *Attachments) EarliestIncludedAttachment() iotago.BlockID {
 	return a.earliestIncludedAttachment.Get()
 }
 
-func (a *Attachments) OnEarliestIncludedAttachmentUpdated(callback func(id iotago.BlockID)) (unsubscribe func()) {
+func (a *Attachments) OnEarliestIncludedAttachmentUpdated(callback func(prevID, newID iotago.BlockID)) (unsubscribe func()) {
 	return a.earliestIncludedAttachment.OnUpdate(callback)
 }
 
@@ -102,7 +102,7 @@ func (a *Attachments) WasIncluded() bool {
 }
 
 func (a *Attachments) findLowestIncludedAttachment() iotago.BlockID {
-	//TODO: we might need a deterministic sort here
+	// TODO: we might need a deterministic sort here
 	var lowestIncludedAttachment iotago.BlockID
 
 	a.attachments.ForEach(func(blockID iotago.BlockID, status AttachmentStatus) bool {
