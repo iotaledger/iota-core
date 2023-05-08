@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -61,6 +62,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
 		slotnotarization.NewProvider(),
+		utxoledger.NewProvider(),
 	)
 	defer engineInstance.Shutdown()
 
