@@ -52,6 +52,10 @@ func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
 	references := deps.Protocol.TipManager.Tips(iotago.BlockMaxParents)
 	slotCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
+	if len(references[model.StrongParentType]) == 0 {
+		return nil, errors.Errorf("could not get references")
+	}
+
 	resp := &blockIssuanceResponse{
 		StrongParents:       references[model.StrongParentType].ToHex(),
 		WeakParents:         references[model.WeakParentType].ToHex(),
