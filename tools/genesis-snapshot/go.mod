@@ -7,7 +7,7 @@ replace github.com/iotaledger/iota-core => ../../
 require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230508112151-8c7153cf6d91
 	github.com/iotaledger/iota-core v0.0.0-20230414140919-e676d4aef341
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230508114415-c26bc1637e4b
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230508160006-c272d9d04f77
 	github.com/spf13/pflag v1.0.5
 )
 
@@ -22,7 +22,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/ethereum/go-ethereum v1.11.6 // indirect
-	github.com/getsentry/sentry-go v0.20.0 // indirect
+	github.com/getsentry/sentry-go v0.21.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/holiman/uint256 v1.2.2 // indirect

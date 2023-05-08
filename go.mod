@@ -77,7 +77,6 @@ require (
 	github.com/huin/goupnp v1.1.0 // indirect
 	github.com/iancoleman/orderedmap v0.2.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/hive.go/objectstorage v0.0.0-20230508112151-8c7153cf6d91 // indirect
 	github.com/iotaledger/iota.go v1.0.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
