@@ -153,9 +153,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		tx.SetCommitted()
 		return true
 	})
-
-	// TODO: add missing State tree
-	return iotago.Identifier{}, iotago.Identifier(stateDiff.Mutations().Root()), nil
+	
+	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), nil
 }
 
 func (l *Ledger) attachTransaction(block *blocks.Block) {
