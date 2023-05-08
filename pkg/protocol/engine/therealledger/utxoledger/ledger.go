@@ -149,9 +149,10 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	}
 
 	// Mark the transactions as committed so the mempool can evict it.
-	for it := stateDiff.Transactions.Iterator(); it.HasNext(); {
-		it.Next().SetCommitted()
-	}
+	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, tx mempool.TransactionWithMetadata) bool {
+		tx.SetCommitted()
+		return true
+	})
 
 	// TODO: add missing State tree
 	return iotago.Identifier{}, iotago.Identifier(stateDiff.Mutations().Root()), nil
@@ -173,9 +174,7 @@ func (l *Ledger) attachTransaction(block *blocks.Block) {
 func (l *Ledger) blockAccepted(block *blocks.Block) {
 	switch block.Block().Payload.(type) {
 	case *iotago.Transaction:
-		if err := l.memPool.MarkAttachmentIncluded(block.ID()); err != nil {
-			l.errorHandler(err)
-		}
+		l.memPool.MarkAttachmentIncluded(block.ID())
 
 	default:
 		return

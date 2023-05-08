@@ -36,7 +36,7 @@ require (
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/getsentry/sentry-go v0.20.0 // indirect
+	github.com/getsentry/sentry-go v0.21.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -58,17 +58,17 @@ require (
 	github.com/iotaledger/hive.go/autopeering v0.0.0-20230508112151-8c7153cf6d91 // indirect
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230508112151-8c7153cf6d91 // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230508112151-8c7153cf6d91 // indirect
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230427083408-bac1dd903fc0 // indirect
-	github.com/iotaledger/hive.go/ds v0.0.0-20230427083408-bac1dd903fc0 // indirect
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230427083408-bac1dd903fc0 // indirect
-	github.com/iotaledger/hive.go/lo v0.0.0-20230427083408-bac1dd903fc0 // indirect
-	github.com/iotaledger/hive.go/logger v0.0.0-20230427083408-bac1dd903fc0 // indirect
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230427083408-bac1dd903fc0 // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230427083408-bac1dd903fc0 // indirect
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230427083408-bac1dd903fc0 // indirect
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230508112151-8c7153cf6d91 // indirect
+	github.com/iotaledger/hive.go/ds v0.0.0-20230508112151-8c7153cf6d91 // indirect
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230508112151-8c7153cf6d91 // indirect
+	github.com/iotaledger/hive.go/lo v0.0.0-20230508112151-8c7153cf6d91 // indirect
+	github.com/iotaledger/hive.go/logger v0.0.0-20230508112151-8c7153cf6d91 // indirect
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230508112151-8c7153cf6d91 // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230508112151-8c7153cf6d91 // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230508112151-8c7153cf6d91 // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230414063201-6891da12467e // indirect
 	github.com/iotaledger/iota.go v1.0.0 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230508114415-c26bc1637e4b // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230508160006-c272d9d04f77 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
