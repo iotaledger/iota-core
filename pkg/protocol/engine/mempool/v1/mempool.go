@@ -242,7 +242,9 @@ func (m *MemPool[VotePower]) storeTransaction(transaction mempool.Transaction, b
 }
 
 func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionWithMetadata) {
-	solidifyInput := func(stateReference ledger.StateReference, index int) {
+	for i, inputReference := range transaction.inputReferences {
+		stateReference, index := inputReference, i
+
 		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[*StateWithMetadata] {
 			return m.requestState(stateReference, true)
 		})
@@ -255,15 +257,7 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionWithMetadata
 			}
 		})
 
-		request.OnError(func(err error) {
-			transaction.setInvalid(err)
-
-			m.cachedStateRequests.Delete(stateReference.StateID())
-		})
-	}
-
-	for i, inputReference := range transaction.inputReferences {
-		solidifyInput(inputReference, i)
+		request.OnError(transaction.setInvalid)
 	}
 }
 
