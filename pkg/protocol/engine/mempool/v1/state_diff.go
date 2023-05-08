@@ -1,8 +1,6 @@
 package mempoolv1
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"

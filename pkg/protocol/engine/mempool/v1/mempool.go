@@ -3,7 +3,6 @@ package mempoolv1
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 
 	"golang.org/x/xerrors"
