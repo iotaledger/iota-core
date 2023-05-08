@@ -16,6 +16,7 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 		"TestSetInclusionSlot":              TestSetInclusionSlot,
 		"TestSetTxOrphanage":                TestSetTxOrphanage,
 		"TestSetTxOrphanage2":               TestSetTxOrphanage2,
+		"TestStateDiff":                     TestStateDiff,
 	} {
 		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
 	}
@@ -231,4 +232,34 @@ func TestSetTxOrphanage2(t *testing.T, tf *TestFramework) {
 	require.True(t, tx3Metadata.IsEvicted())
 
 	tf.RequireDeleted("tx1", "tx2", "tx3")
+}
+
+func TestStateDiff(t *testing.T, tf *TestFramework) {
+	debug.SetEnabled(true)
+	defer debug.SetEnabled(false)
+	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateTransaction("tx3", []string{"tx2:0"}, 1)
+
+	require.NoError(t, tf.AttachTransaction("tx3", "block3", 1))
+	require.NoError(t, tf.AttachTransaction("tx2", "block2", 1))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1", 1))
+
+	tf.RequireBooked("tx1", "tx2", "tx3")
+
+	require.True(t, tf.MarkAttachmentIncluded("block1"))
+	tf.RequireAccepted("tx1")
+
+	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
+
+	require.True(t, tf.MarkAttachmentIncluded("block2"))
+	tf.RequireAccepted("tx1", "tx2")
+
+	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx2:0"}, []string{"tx1", "tx2"})
+
+	require.True(t, tf.MarkAttachmentIncluded("block3"))
+	tf.RequireAccepted("tx1", "tx2", "tx3")
+
+	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx3:0"}, []string{"tx1", "tx2", "tx3"})
+
 }

@@ -10,6 +10,8 @@ type TransactionWithMetadata interface {
 
 	Transaction() Transaction
 
+	Inputs() *advancedset.AdvancedSet[StateWithMetadata]
+
 	Outputs() *advancedset.AdvancedSet[StateWithMetadata]
 
 	SetCommitted()
@@ -29,6 +31,8 @@ type TransactionWithMetadata interface {
 	OnSolid(func())
 
 	OnExecuted(func())
+
+	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func())
 
 	OnBooked(func())
 

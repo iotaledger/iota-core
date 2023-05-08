@@ -12,7 +12,7 @@ type Value[T comparable] struct {
 	value T
 
 	// updateCallbacks are called when the value is updated.
-	updateCallbacks *orderedmap.OrderedMap[CallbackID, func(T)]
+	updateCallbacks *orderedmap.OrderedMap[CallbackID, func(T, T)]
 
 	// valueMutex is used to synchronize access to the value.
 	valueMutex sync.RWMutex
@@ -27,7 +27,7 @@ type Value[T comparable] struct {
 // NewValue creates a new Value.
 func NewValue[T comparable]() *Value[T] {
 	return &Value[T]{
-		updateCallbacks: orderedmap.New[CallbackID, func(T)](),
+		updateCallbacks: orderedmap.New[CallbackID, func(T, T)](),
 	}
 }
 
@@ -59,8 +59,8 @@ func (v *Value[T]) Set(value T) (previousValue T) {
 	defer v.updateOrderMutex.Unlock()
 
 	if previousValue = setValue(value); previousValue != value {
-		v.updateCallbacks.ForEach(func(_ CallbackID, callback func(value T)) bool {
-			callback(value)
+		v.updateCallbacks.ForEach(func(_ CallbackID, callback func(prevValue, newValue T)) bool {
+			callback(previousValue, value)
 			return true
 		})
 	}
@@ -70,14 +70,15 @@ func (v *Value[T]) Set(value T) (previousValue T) {
 
 // OnUpdate registers a callback that gets called when the value is updated. The callback is called immediately with the
 // current value if it is not the zero value.
-func (v *Value[T]) OnUpdate(callback func(value T)) (unsubscribe func()) {
+func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe func()) {
 	v.updateCallbacksMutex.Lock()
 	defer v.updateCallbacksMutex.Unlock()
 
 	callbackID := NewCallbackID()
 	v.updateCallbacks.Set(callbackID, callback)
 
-	callback(v.value)
+	var zeroValue T
+	callback(zeroValue, v.value)
 
 	return func() {
 		v.updateCallbacksMutex.Lock()

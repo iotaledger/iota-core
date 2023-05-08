@@ -80,7 +80,7 @@ func (a *Attachments) EarliestIncludedSlot() iotago.SlotIndex {
 	return a.earliestIncludedSlot.Get()
 }
 
-func (a *Attachments) OnEarliestIncludedSlotUpdated(callback func(iotago.SlotIndex)) (unsubscribe func()) {
+func (a *Attachments) OnEarliestIncludedSlotUpdated(callback func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func()) {
 	return a.earliestIncludedSlot.OnUpdate(callback)
 }
 
