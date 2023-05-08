@@ -36,11 +36,11 @@ func (s *StateDiff) Index() iotago.SlotIndex {
 	return s.index
 }
 
-func (s *StateDiff) SpentOutputs() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateWithMetadata] {
+func (s *StateDiff) DestroyedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateWithMetadata] {
 	return s.spentOutputs
 }
 
-func (s *StateDiff) CreatedOutputs() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateWithMetadata] {
+func (s *StateDiff) CreatedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateWithMetadata] {
 	return s.createdOutputs
 }
 

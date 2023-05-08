@@ -299,8 +299,8 @@ func (t *TestFramework) requireDeleted(transactionAliases ...string) {
 func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAliases, createdOutputAliases, transactionAliases []string) {
 	stateDiff := t.Instance.StateDiff(index)
 
-	require.Equal(t.test, len(spentOutputAliases), stateDiff.SpentOutputs().Size())
-	require.Equal(t.test, len(createdOutputAliases), stateDiff.CreatedOutputs().Size())
+	require.Equal(t.test, len(spentOutputAliases), stateDiff.DestroyedStates().Size())
+	require.Equal(t.test, len(createdOutputAliases), stateDiff.CreatedStates().Size())
 	require.Equal(t.test, len(transactionAliases), stateDiff.ExecutedTransactions().Size())
 	require.Equal(t.test, len(transactionAliases), stateDiff.Mutations().Size())
 
@@ -310,11 +310,11 @@ func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAlias
 	}
 
 	for _, createdOutputAlias := range createdOutputAliases {
-		require.True(t.test, stateDiff.CreatedOutputs().Has(t.StateID(createdOutputAlias)))
+		require.True(t.test, stateDiff.CreatedStates().Has(t.StateID(createdOutputAlias)))
 	}
 
 	for _, spentOutputAlias := range spentOutputAliases {
-		require.True(t.test, stateDiff.SpentOutputs().Has(t.StateID(spentOutputAlias)))
+		require.True(t.test, stateDiff.DestroyedStates().Has(t.StateID(spentOutputAlias)))
 	}
 
 }
