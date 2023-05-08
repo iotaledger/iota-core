@@ -2,10 +2,10 @@ package ledgerv1
 
 import (
 	"golang.org/x/xerrors"
-	"iota-core/pkg/core/promise"
-	"iota-core/pkg/protocol/engine/ledger"
 
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 

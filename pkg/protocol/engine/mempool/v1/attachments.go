@@ -106,7 +106,7 @@ func (a *Attachments) findLowestIncludedAttachment() iotago.BlockID {
 	var lowestIncludedAttachment iotago.BlockID
 
 	a.attachments.ForEach(func(blockID iotago.BlockID, status AttachmentStatus) bool {
-		if status != AttachmentIncluded && (lowestIncludedAttachment.Index() == 0 || blockID.Index() < lowestIncludedAttachment.Index()) {
+		if status == AttachmentIncluded && (lowestIncludedAttachment.Index() == 0 || blockID.Index() < lowestIncludedAttachment.Index()) {
 			lowestIncludedAttachment = blockID
 		}
 

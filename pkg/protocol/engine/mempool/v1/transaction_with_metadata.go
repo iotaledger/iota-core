@@ -73,7 +73,11 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 		unacceptedInputsCount: uint64(len(inputReferences)),
 	}
 
-	t.attachments.OnAllAttachmentsEvicted(t.setEvicted)
+	t.attachments.OnAllAttachmentsEvicted(func() {
+		if !t.IsCommitted() {
+			t.setEvicted()
+		}
+	})
 
 	return t, nil
 }
@@ -149,16 +153,16 @@ func (t *TransactionWithMetadata) OnEvicted(callback func()) {
 	t.evicted.OnTrigger(callback)
 }
 
+func (t *TransactionWithMetadata) SetCommitted() {
+	t.committed.Trigger()
+}
+
 func (t *TransactionWithMetadata) setAccepted() {
 	t.accepted.Trigger()
 }
 
 func (t *TransactionWithMetadata) setRejected() {
 	t.rejected.Trigger()
-}
-
-func (t *TransactionWithMetadata) setCommitted() {
-	t.committed.Trigger()
 }
 
 func (t *TransactionWithMetadata) setEvicted() {

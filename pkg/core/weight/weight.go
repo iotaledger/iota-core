@@ -35,12 +35,13 @@ func New(weights *account.Accounts[iotago.AccountID, *iotago.AccountID]) *Weight
 		OnUpdate:   event.New1[Value](),
 	}
 
-	w.validatorsHook = w.Validators.OnTotalWeightUpdated.Hook(func(totalWeight int64) {
-		w.mutex.Lock()
-		defer w.mutex.Unlock()
-
-		w.updateValidatorsWeight(totalWeight)
-	})
+	// TODO: FIX THIS WITH A CORRECT IMPLEMENTATION
+	// w.validatorsHook = w.Validators.OnTotalWeightUpdated.Hook(func(totalWeight int64) {
+	//	w.mutex.Lock()
+	//	defer w.mutex.Unlock()
+	//
+	//	w.updateValidatorsWeight(totalWeight)
+	// })
 
 	return w
 }

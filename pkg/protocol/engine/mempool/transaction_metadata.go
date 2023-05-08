@@ -14,6 +14,8 @@ type TransactionWithMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateWithMetadata]
 
+	SetCommitted()
+
 	IsSolid() bool
 
 	IsExecuted() bool

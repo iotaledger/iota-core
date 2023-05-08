@@ -9,4 +9,8 @@ type StateWithMetadata interface {
 	ID() iotago.OutputID
 
 	State() ledger.State
+
+	IsSpent() bool
+
+	IsAccepted() bool
 }
