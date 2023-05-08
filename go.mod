@@ -20,7 +20,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230427083408-bac1dd903fc0
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230427083408-bac1dd903fc0
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230427083408-bac1dd903fc0
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230414063201-6891da12467e
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230505140033-037b26225f31
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230426143214-044069a86e1b
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/labstack/gommon v0.4.0
