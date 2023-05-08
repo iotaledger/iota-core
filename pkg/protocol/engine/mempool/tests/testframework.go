@@ -68,8 +68,12 @@ func (t *TestFramework) CreateTransaction(alias string, referencedStates []strin
 	}
 }
 
-func (t *TestFramework) MarkAttachmentIncluded(alias string) error {
+func (t *TestFramework) MarkAttachmentIncluded(alias string) bool {
 	return t.Instance.MarkAttachmentIncluded(t.BlockID(alias))
+}
+
+func (t *TestFramework) MarkAttachmentOrphaned(alias string) bool {
+	return t.Instance.MarkAttachmentOrphaned(t.BlockID(alias))
 }
 
 func (t *TestFramework) BlockID(alias string) iotago.BlockID {

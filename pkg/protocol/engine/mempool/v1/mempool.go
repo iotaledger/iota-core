@@ -78,10 +78,16 @@ func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, 
 	return storedTransaction, nil
 }
 
-func (m *MemPool[VotePower]) RemoveTransaction(transactionID iotago.TransactionID) {
-	if transaction, deleted := m.cachedTransactions.DeleteAndReturn(transactionID); deleted {
-		transaction.evicted.Trigger()
-	}
+func (m *MemPool[VotePower]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool {
+	transaction, exists := m.transactionByAttachment(blockID)
+
+	return exists && transaction.attachments.MarkOrphaned(blockID)
+}
+
+func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) bool {
+	transaction, exists := m.transactionByAttachment(blockID)
+
+	return exists && transaction.attachments.MarkIncluded(blockID)
 }
 
 func (m *MemPool[VotePower]) Transaction(id iotago.TransactionID) (transaction mempool.TransactionWithMetadata, exists bool) {
@@ -101,20 +107,8 @@ func (m *MemPool[VotePower]) State(stateReference ledger.StateReference) (state 
 	return state, err
 }
 
-func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) error {
-	attachmentsBySlotIndex := m.attachments.Get(blockID.Index())
-	if attachmentsBySlotIndex == nil {
-		return xerrors.Errorf("no attachments found for block id %s: %w", blockID, mempool.ErrAttachmentNotFound)
-	}
-
-	transaction, exists := attachmentsBySlotIndex.Get(blockID)
-	if !exists {
-		return xerrors.Errorf("no attachments found for block id %s: %w", blockID, mempool.ErrAttachmentNotFound)
-	}
-
-	transaction.attachments.MarkIncluded(blockID)
-
-	return nil
+func (m *MemPool[VotePower]) TransactionByAttachment(blockID iotago.BlockID) (mempool.TransactionWithMetadata, bool) {
+	return m.transactionByAttachment(blockID)
 }
 
 func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
@@ -321,6 +315,19 @@ func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionWithMetadat
 	default:
 		//transaction.setConflicting()
 	}
+}
+
+func (m *MemPool[VotePower]) transactionByAttachment(blockID iotago.BlockID) (*TransactionWithMetadata, bool) {
+	attachmentsBySlotIndex := m.attachments.Get(blockID.Index())
+	if attachmentsBySlotIndex == nil {
+		return nil, false
+	}
+
+	transaction, exists := attachmentsBySlotIndex.Get(blockID)
+	if !exists {
+		return nil, false
+	}
+	return transaction, true
 }
 
 func (m *MemPool[VotePower]) updateAcceptance(transaction *TransactionWithMetadata) {
