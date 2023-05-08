@@ -19,6 +19,8 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 
 	MarkAttachmentIncluded(blockID iotago.BlockID) bool
 
+	StateDiff(index iotago.SlotIndex) StateDiff
+
 	Evict(slotIndex iotago.SlotIndex)
 
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower]

@@ -90,6 +90,11 @@ func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) bool
 	return exists && transaction.attachments.MarkIncluded(blockID)
 }
 
+func (m *MemPool[VotePower]) StateDiff(index iotago.SlotIndex) mempool.StateDiff {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *MemPool[VotePower]) Transaction(id iotago.TransactionID) (transaction mempool.TransactionWithMetadata, exists bool) {
 	return m.cachedTransactions.Get(id)
 }
