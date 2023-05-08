@@ -23,7 +23,7 @@ type SlotMutations struct {
 	ratifiedAcceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[iotago.BlockID, *iotago.BlockID]]
 
 	// acceptedTransactionsBySlot stores the accepted transactions per slot.
-	acceptedTransactionsBySlot *shrinkingmap.ShrinkingMap[slot.Index, *ads.Set[utxo.TransactionID, *utxo.TransactionID]]
+	//acceptedTransactionsBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[utxo.TransactionID, *utxo.TransactionID]]
 
 	// latestCommittedIndex stores the index of the latest committed slot.
 	latestCommittedIndex iotago.SlotIndex
@@ -31,7 +31,6 @@ type SlotMutations struct {
 	evictionMutex sync.RWMutex
 }
 
-// TODO: weights should be replaced with accounts
 // NewSlotMutations creates a new SlotMutations instance.
 func NewSlotMutations(weights *account.Accounts[iotago.AccountID, *iotago.AccountID], lastCommittedSlot iotago.SlotIndex) (newMutationFactory *SlotMutations) {
 	return &SlotMutations{

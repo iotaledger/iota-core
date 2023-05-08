@@ -37,8 +37,10 @@ type Manager struct {
 	errorHandler func(error)
 
 	ledger ledger.Ledger
+	bic    *account.Accounts[iotago.AccountID, *iotago.AccountID]
 
-	storage         *storage.Storage
+	storage *storage.Storage
+
 	commitmentMutex sync.RWMutex
 
 	acceptedTimeFunc          func() time.Time
@@ -72,6 +74,7 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 
 				e.HookConstructed(func() {
 					m.storage = e.Storage
+					m.bic = e.Accounts.BIC()
 					m.acceptedTimeFunc = e.Clock.RatifiedAccepted().Time
 
 					m.ledger = e.Ledger
@@ -198,6 +201,13 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	if index != latestCommitment.Index()+1 {
 		m.errorHandler(errors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
 
+		return false
+	}
+
+	// TODO update the ledger with state diff
+	// TODO update the BIC vector
+	if err := m.bic.Update(index); err != nil {
+		m.events.Error.Trigger(errors.Wrap(err, "failed to update weights"))
 		return false
 	}
 

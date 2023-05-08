@@ -15,6 +15,7 @@ type Events struct {
 	Engine       *engine.Events
 	TipManager   *tipmanager.Events
 	ChainManager *chainmanager.Events
+	//Mempool      *mempool.Events
 
 	event.Group[Events, *Events]
 }
@@ -27,5 +28,6 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		Engine:       engine.NewEvents(),
 		TipManager:   tipmanager.NewEvents(),
 		ChainManager: chainmanager.NewEvents(),
+		//Mempool:      mempool.NewEvents(),
 	}
 })
