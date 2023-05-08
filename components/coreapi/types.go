@@ -102,6 +102,7 @@ type infoResponse struct {
 	Features []string `json:"features"`
 }
 
+//nolint:tagliatelle
 type nodeStatus struct {
 	// Whether the node is healthy.
 	IsHealthy bool `json:"isHealthy"`
