@@ -3,14 +3,15 @@ package mempoolv1
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 
 	"golang.org/x/xerrors"
 
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
@@ -331,7 +332,11 @@ func (m *MemPool[VotePower]) updateAcceptance(transaction *TransactionWithMetada
 }
 
 func (m *MemPool[VotePower]) StateDiff(index iotago.SlotIndex) (*mempool.StateDiff, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	return &mempool.StateDiff{
+		Index:         index,
+		StateMutation: ads.NewSet[iotago.TransactionID, *iotago.TransactionID](mapdb.NewMapDB()),
+		Transactions:  advancedset.New[mempool.TransactionWithMetadata](),
+	}, nil
 }
 
 var _ mempool.MemPool[vote.MockedPower] = new(MemPool[vote.MockedPower])

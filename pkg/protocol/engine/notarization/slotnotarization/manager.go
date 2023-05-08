@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -91,6 +92,7 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 
 					m.events.AcceptedBlockRemoved.LinkTo(m.slotMutations.AcceptedBlockRemoved)
 					e.Events.Notarization.LinkTo(m.events)
+					m.events.Error.Hook(e.Events.Error.Trigger)
 
 					m.TriggerInitialized()
 				})
@@ -131,7 +133,7 @@ func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 		return errors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
-	if _, err = m.attestations.Add(iotago.NewAttestation(block.Block(), m.slotTimeProviderFunc())); err != nil {
+	if _, err = m.attestations.Add(iotago.NewAttestation(block.Block())); err != nil {
 		return errors.Wrap(err, "failed to add block to attestations")
 	}
 
@@ -199,16 +201,30 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	acceptedBlocks, err := m.slotMutations.Evict(index)
-	if err != nil {
-		m.events.Error.Trigger(errors.Wrap(err, "failed to commit mutations"))
-		return false
-	}
+	// set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
+	acceptedBlocks := m.slotMutations.AcceptedBlocks(index, true)
 
-	attestations, attestationsWeight, err := m.attestations.Commit(index)
-	if err != nil {
-		m.events.Error.Trigger(errors.Wrap(err, "failed to commit attestations"))
-		return false
+	var err error
+	var attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation]
+	var attestationsWeight int64
+
+	if m.attestations.LastCommittedSlot() == index {
+		attestations, err = m.attestations.Get(index)
+		if err != nil {
+			m.events.Error.Trigger(errors.Wrap(err, "failed to get committed attestations"))
+			return false
+		}
+		attestationsWeight, err = m.attestations.Weight(index)
+		if err != nil {
+			m.events.Error.Trigger(errors.Wrap(err, "failed to get committed attestations weight"))
+			return false
+		}
+	} else {
+		attestations, attestationsWeight, err = m.attestations.Commit(index)
+		if err != nil {
+			m.events.Error.Trigger(errors.Wrap(err, "failed to commit attestations"))
+			return false
+		}
 	}
 
 	stateRoot, mutationRoot, err := m.ledger.CommitSlot(index)
@@ -250,6 +266,10 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		AcceptedBlocks:        acceptedBlocks,
 		ActiveValidatorsCount: 0,
 	})
+
+	if err = m.slotMutations.Evict(index); err != nil {
+		m.events.Error.Trigger(errors.Wrapf(err, "failed to evict slotMutations at index: %d", index))
+	}
 
 	return true
 }

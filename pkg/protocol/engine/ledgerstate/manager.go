@@ -5,10 +5,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -17,9 +21,33 @@ var (
 	ErrOutputsSumNotEqualTotalSupply = errors.New("accumulated output balance is not equal to total supply")
 )
 
+type stateTreeMetadata struct {
+	Time time.Time
+}
+
+func (s *stateTreeMetadata) FromBytes(b []byte) (int, error) {
+	ms := marshalutil.New(b)
+	ts, err := ms.ReadInt64()
+	if err != nil {
+		return 0, err
+	}
+
+	s.Time = time.Unix(0, ts)
+
+	return 8, nil
+}
+
+func (s stateTreeMetadata) Bytes() ([]byte, error) {
+	ms := marshalutil.New(8)
+	ms.WriteInt64(s.Time.UnixNano())
+	return ms.Bytes(), nil
+}
+
 type Manager struct {
 	store     kvstore.KVStore
 	storeLock sync.RWMutex
+
+	stateTree *ads.Map[iotago.OutputID, stateTreeMetadata, *iotago.OutputID, *stateTreeMetadata]
 
 	apiProviderFunc func() iotago.API
 }
@@ -27,12 +55,17 @@ type Manager struct {
 func New(store kvstore.KVStore, apiProviderFunc func() iotago.API) *Manager {
 	return &Manager{
 		store:           store,
+		stateTree:       ads.NewMap[iotago.OutputID, stateTreeMetadata](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree}))),
 		apiProviderFunc: apiProviderFunc,
 	}
 }
 
 func (m *Manager) API() iotago.API {
 	return m.apiProviderFunc()
+}
+
+func (m *Manager) StateTreeRoot() iotago.Identifier {
+	return iotago.Identifier(m.stateTree.Root())
 }
 
 // KVStore returns the underlying KVStore.
@@ -185,7 +218,18 @@ func (m *Manager) ApplyConfirmationWithoutLocking(index iotago.SlotIndex, newOut
 		return err
 	}
 
-	return mutations.Commit()
+	if err := mutations.Commit(); err != nil {
+		return err
+	}
+
+	for _, output := range newOutputs {
+		m.stateTree.Set(output.OutputID(), &stateTreeMetadata{Time: output.TimestampCreated()})
+	}
+	for _, spent := range newSpents {
+		m.stateTree.Delete(spent.OutputID())
+	}
+
+	return nil
 }
 
 func (m *Manager) ApplyConfirmation(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
@@ -242,7 +286,18 @@ func (m *Manager) RollbackConfirmationWithoutLocking(index iotago.SlotIndex, new
 		return err
 	}
 
-	return mutations.Commit()
+	if err := mutations.Commit(); err != nil {
+		return err
+	}
+
+	for _, spent := range newSpents {
+		m.stateTree.Set(spent.OutputID(), &stateTreeMetadata{Time: spent.Output().TimestampCreated()})
+	}
+	for _, output := range newOutputs {
+		m.stateTree.Delete(output.OutputID())
+	}
+
+	return nil
 }
 
 func (m *Manager) RollbackConfirmation(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
@@ -283,7 +338,13 @@ func (m *Manager) AddUnspentOutputWithoutLocking(unspentOutput *Output) error {
 		return err
 	}
 
-	return mutations.Commit()
+	if err := mutations.Commit(); err != nil {
+		return err
+	}
+
+	m.stateTree.Set(unspentOutput.OutputID(), &stateTreeMetadata{Time: unspentOutput.TimestampCreated()})
+
+	return nil
 }
 
 func (m *Manager) AddUnspentOutput(unspentOutput *Output) error {

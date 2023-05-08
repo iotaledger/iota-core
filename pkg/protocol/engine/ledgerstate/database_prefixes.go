@@ -12,6 +12,8 @@ const (
 
 	// StoreKeyPrefixSlotDiffs defines the prefix for Slot diffs.
 	StoreKeyPrefixSlotDiffs byte = 4
+
+	StoreKeyPrefixStateTree byte = 5
 )
 
 /*

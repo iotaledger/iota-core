@@ -51,7 +51,7 @@ func (m *SlotMutations) AddAcceptedBlock(block *blocks.Block) (err error) {
 		return errors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
 	}
 
-	m.acceptedBlocks(blockID.Index(), true).Add(blockID)
+	m.AcceptedBlocks(blockID.Index(), true).Add(blockID)
 
 	return
 }
@@ -66,7 +66,7 @@ func (m *SlotMutations) RemoveAcceptedBlock(block *blocks.Block) (err error) {
 		return errors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
 	}
 
-	m.acceptedBlocks(blockID.Index()).Delete(blockID)
+	m.AcceptedBlocks(blockID.Index()).Delete(blockID)
 
 	m.AcceptedBlockRemoved.Trigger(blockID)
 
@@ -74,17 +74,17 @@ func (m *SlotMutations) RemoveAcceptedBlock(block *blocks.Block) (err error) {
 }
 
 // Evict evicts the given slot and returns the corresponding mutation sets.
-func (m *SlotMutations) Evict(index iotago.SlotIndex) (acceptedBlocks *ads.Set[iotago.BlockID, *iotago.BlockID], err error) {
+func (m *SlotMutations) Evict(index iotago.SlotIndex) error {
 	m.evictionMutex.Lock()
 	defer m.evictionMutex.Unlock()
 
 	if index <= m.latestCommittedIndex {
-		return nil, errors.Errorf("cannot commit slot %d: already committed", index)
+		return errors.Errorf("cannot commit slot %d: already committed", index)
 	}
 
-	defer m.evictUntil(index)
+	m.evictUntil(index)
 
-	return m.acceptedBlocks(index), nil
+	return nil
 }
 
 func (m *SlotMutations) Reset(index iotago.SlotIndex) {
@@ -98,8 +98,8 @@ func (m *SlotMutations) Reset(index iotago.SlotIndex) {
 	m.latestCommittedIndex = index
 }
 
-// acceptedBlocks returns the set of accepted blocks for the given slot.
-func (m *SlotMutations) acceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) *ads.Set[iotago.BlockID, *iotago.BlockID] {
+// AcceptedBlocks returns the set of accepted blocks for the given slot.
+func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) *ads.Set[iotago.BlockID, *iotago.BlockID] {
 	if len(createIfMissing) > 0 && createIfMissing[0] {
 		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, newSet[iotago.BlockID, *iotago.BlockID]))
 	}

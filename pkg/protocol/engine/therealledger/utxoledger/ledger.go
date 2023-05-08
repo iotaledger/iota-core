@@ -1,6 +1,8 @@
 package utxoledger
 
 import (
+	"fmt"
+
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/kvstore"
@@ -93,6 +95,15 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
+	ledgerIndex, err := l.ledgerState.ReadLedgerIndex()
+	if err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, err
+	}
+
+	if index != ledgerIndex+1 {
+		panic(fmt.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex, index))
+	}
+
 	var outputs ledgerstate.Outputs
 	var spents ledgerstate.Spents
 
@@ -130,6 +141,11 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
+	// Mark the transactions as committed so the mempool can evict it.
+	for it := stateDiff.Transactions.Iterator(); it.HasNext(); {
+		it.Next().SetCommitted()
+	}
+
 	//TODO: add missing State tree
 	return iotago.Identifier{}, iotago.Identifier(stateDiff.StateMutation.Root()), nil
 }
@@ -148,7 +164,13 @@ func (l *Ledger) attachTransaction(block *blocks.Block) {
 }
 
 func (l *Ledger) blockAccepted(block *blocks.Block) {
-	if err := l.memPool.MarkAttachmentIncluded(block.ID()); err != nil {
-		l.errorHandler(err)
+	switch block.Block().Payload.(type) {
+	case *iotago.Transaction:
+		if err := l.memPool.MarkAttachmentIncluded(block.ID()); err != nil {
+			l.errorHandler(err)
+		}
+
+	default:
+		return
 	}
 }

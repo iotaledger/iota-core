@@ -68,7 +68,12 @@ func (a *Attestations) Add(attestation *iotago.Attestation) (added bool, err err
 		return shrinkingmap.New[iotago.BlockID, *iotago.Attestation]()
 	})
 
-	return issuerStorage.Set(attestation.BlockID, attestation), nil
+	blockID, err := attestation.BlockID(a.slotTimeProviderFunc())
+	if err != nil {
+		return false, err
+	}
+
+	return issuerStorage.Set(blockID, attestation), nil
 }
 
 func (a *Attestations) Delete(attestation *iotago.Attestation) (deleted bool, err error) {
@@ -91,7 +96,12 @@ func (a *Attestations) Delete(attestation *iotago.Attestation) (deleted bool, er
 		return false, nil
 	}
 
-	return issuerStorage.Delete(attestation.BlockID), nil
+	blockID, err := attestation.BlockID(a.slotTimeProviderFunc())
+	if err != nil {
+		return false, err
+	}
+
+	return issuerStorage.Delete(blockID), nil
 }
 
 func (a *Attestations) Commit(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], weight int64, err error) {
