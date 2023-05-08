@@ -4,7 +4,6 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
@@ -29,8 +28,7 @@ type Ledger struct {
 
 func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) therealledger.Ledger {
-		//TODO: pass correct storage
-		l := New(e.Workers.CreateGroup("Ledger"), mapdb.NewMapDB(), e.API, e.Events.Error.Trigger)
+		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.Events.Error.Trigger)
 		e.Events.Booker.BlockBooked.Hook(l.attachTransaction)
 		e.Events.BlockGadget.BlockAccepted.Hook(l.blockAccepted)
 
