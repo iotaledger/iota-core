@@ -5,14 +5,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -20,28 +18,6 @@ var (
 	// ErrOutputsSumNotEqualTotalSupply is returned if the sum of the output deposits is not equal the total supply of tokens.
 	ErrOutputsSumNotEqualTotalSupply = errors.New("accumulated output balance is not equal to total supply")
 )
-
-type stateTreeMetadata struct {
-	Time time.Time
-}
-
-func (s *stateTreeMetadata) FromBytes(b []byte) (int, error) {
-	ms := marshalutil.New(b)
-	ts, err := ms.ReadInt64()
-	if err != nil {
-		return 0, err
-	}
-
-	s.Time = time.Unix(0, ts)
-
-	return 8, nil
-}
-
-func (s stateTreeMetadata) Bytes() ([]byte, error) {
-	ms := marshalutil.New(8)
-	ms.WriteInt64(s.Time.UnixNano())
-	return ms.Bytes(), nil
-}
 
 type Manager struct {
 	store     kvstore.KVStore
@@ -62,10 +38,6 @@ func New(store kvstore.KVStore, apiProviderFunc func() iotago.API) *Manager {
 
 func (m *Manager) API() iotago.API {
 	return m.apiProviderFunc()
-}
-
-func (m *Manager) StateTreeRoot() iotago.Identifier {
-	return iotago.Identifier(m.stateTree.Root())
 }
 
 // KVStore returns the underlying KVStore.
@@ -223,7 +195,7 @@ func (m *Manager) ApplyConfirmationWithoutLocking(index iotago.SlotIndex, newOut
 	}
 
 	for _, output := range newOutputs {
-		m.stateTree.Set(output.OutputID(), &stateTreeMetadata{Time: output.TimestampCreated()})
+		m.stateTree.Set(output.OutputID(), newStateMetadata(output))
 	}
 	for _, spent := range newSpents {
 		m.stateTree.Delete(spent.OutputID())
@@ -291,7 +263,7 @@ func (m *Manager) RollbackConfirmationWithoutLocking(index iotago.SlotIndex, new
 	}
 
 	for _, spent := range newSpents {
-		m.stateTree.Set(spent.OutputID(), &stateTreeMetadata{Time: spent.Output().TimestampCreated()})
+		m.stateTree.Set(spent.OutputID(), newStateMetadata(spent.Output()))
 	}
 	for _, output := range newOutputs {
 		m.stateTree.Delete(output.OutputID())
@@ -342,7 +314,7 @@ func (m *Manager) AddUnspentOutputWithoutLocking(unspentOutput *Output) error {
 		return err
 	}
 
-	m.stateTree.Set(unspentOutput.OutputID(), &stateTreeMetadata{Time: unspentOutput.TimestampCreated()})
+	m.stateTree.Set(unspentOutput.OutputID(), newStateMetadata(unspentOutput))
 
 	return nil
 }
@@ -387,6 +359,16 @@ func (m *Manager) LedgerStateSHA256Sum() ([]byte, error) {
 		if _, err := ledgerStateHash.Write(output.KVStorableValue()); err != nil {
 			return nil, err
 		}
+	}
+
+	// Add root of the state tree
+	stateTreeBytes, err := m.StateTreeRoot().Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := ledgerStateHash.Write(stateTreeBytes); err != nil {
+		return nil, err
 	}
 
 	// calculate sha256 hash

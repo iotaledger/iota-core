@@ -34,6 +34,9 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 
 	require.NoError(t, manager.ApplyConfirmationWithoutLocking(index, outputs, spents))
 
+	require.NotEqual(t, manager.StateTreeRoot(), iotago.Identifier{})
+	require.True(t, manager.CheckStateTree())
+
 	var outputCount int
 	require.NoError(t, manager.ForEachOutput(func(_ *ledgerstate.Output) bool {
 		outputCount++
@@ -77,6 +80,9 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 
 		return true
 	}))
+
+	require.Equal(t, manager.StateTreeRoot(), iotago.Identifier{})
+	require.True(t, manager.CheckStateTree())
 }
 
 func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
@@ -94,6 +100,8 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[1], previousMsIndex, previousMsTimestamp),
 	}
 	require.NoError(t, manager.ApplyConfirmationWithoutLocking(previousMsIndex, previousOutputs, previousSpents))
+
+	require.True(t, manager.CheckStateTree())
 
 	ledgerIndex, err := manager.ReadLedgerIndex()
 	require.NoError(t, err)
@@ -113,6 +121,8 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, tpkg.RandTimestamp()),
 	}
 	require.NoError(t, manager.ApplyConfirmationWithoutLocking(index, outputs, spents))
+
+	require.True(t, manager.CheckStateTree())
 
 	ledgerIndex, err = manager.ReadLedgerIndex()
 	require.NoError(t, err)
@@ -177,6 +187,8 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 	require.Equal(t, 3, spentCount)
 
 	require.NoError(t, manager.RollbackConfirmationWithoutLocking(index, outputs, spents))
+
+	require.True(t, manager.CheckStateTree())
 
 	ledgerIndex, err = manager.ReadLedgerIndex()
 	require.NoError(t, err)
