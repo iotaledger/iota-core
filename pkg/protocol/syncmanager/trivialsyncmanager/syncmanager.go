@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -39,7 +38,7 @@ type SyncManager struct {
 }
 
 // NewProvider creates a new SyncManager provider.
-func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.Engine, syncmanager.SyncManager] {
+func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 	return module.Provide(func(e *engine.Engine) syncmanager.SyncManager {
 		s := New(e.IsBootstrapped)
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("SyncManager", 1))

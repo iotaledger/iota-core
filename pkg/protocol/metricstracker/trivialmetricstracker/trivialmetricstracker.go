@@ -6,7 +6,6 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/metrics"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -38,7 +37,7 @@ type MetricsTracker struct {
 }
 
 // NewProvider creates a new MetricsTracker provider.
-func NewProvider(opts ...options.Option[MetricsTracker]) module.Provider[*engine.Engine, metricstracker.MetricsTracker] {
+func NewProvider() module.Provider[*engine.Engine, metricstracker.MetricsTracker] {
 	return module.Provide(func(e *engine.Engine) metricstracker.MetricsTracker {
 		m := New(e.IsBootstrapped)
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("MetricsTracker", 1))
