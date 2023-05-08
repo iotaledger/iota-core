@@ -90,12 +90,23 @@ func (t *TransactionWithMetadata) Transaction() mempool.Transaction {
 	return t.transaction
 }
 
+func (t *TransactionWithMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateWithMetadata] {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	inputs := advancedset.New[mempool.StateWithMetadata]()
+	for _, input := range t.inputs {
+		inputs.Add(input)
+	}
+
+	return inputs
+}
+
 func (t *TransactionWithMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateWithMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
 	outputs := advancedset.New[mempool.StateWithMetadata]()
-
 	for _, output := range t.outputs {
 		outputs.Add(output)
 	}
@@ -119,6 +130,10 @@ func (t *TransactionWithMetadata) AllInputsAccepted() bool {
 
 func (t *TransactionWithMetadata) OnAllInputsAccepted(callback func()) {
 	t.allInputsAccepted.OnTrigger(callback)
+}
+
+func (t *TransactionWithMetadata) OnEarliestIncludedAttachmentUpdated(callback func(prevID, newID iotago.BlockID)) (unsubscribe func()) {
+	return t.attachments.earliestIncludedAttachment.OnUpdate(callback)
 }
 
 func (t *TransactionWithMetadata) IsAccepted() bool {

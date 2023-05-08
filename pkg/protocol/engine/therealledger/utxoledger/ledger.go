@@ -51,8 +51,8 @@ func New(workers *workerpool.Group, store kvstore.KVStore, apiProviderFunc func(
 
 func (l *Ledger) Shutdown() {
 	l.TriggerStopped()
-	//TODO:
-	//l.memPool.Shutdown()
+	// TODO:
+	// l.memPool.Shutdown()
 }
 
 func (l *Ledger) resolveState(stateRef ledger.StateReference) *promise.Promise[ledger.State] {
@@ -90,11 +90,6 @@ func (l *Ledger) Output(id iotago.OutputID) (*ledgerstate.Output, error) {
 }
 
 func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, err error) {
-	stateDiff, err := l.memPool.StateDiff(index)
-	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, err
-	}
-
 	ledgerIndex, err := l.ledgerState.ReadLedgerIndex()
 	if err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, err
@@ -104,37 +99,49 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		panic(fmt.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex, index))
 	}
 
+	stateDiff := l.memPool.StateDiff(index)
+
 	var outputs ledgerstate.Outputs
 	var spents ledgerstate.Spents
 
-	for it := stateDiff.Transactions.Iterator(); it.HasNext(); {
-		txWithMeta := it.Next()
-
+	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionWithMetadata) bool {
 		tx := txWithMeta.Transaction().(*Transaction)
 		txCreationTime := tx.Transaction.Essence.CreationTime
 
-		inputs, err := tx.Inputs()
-		if err != nil {
-			return iotago.Identifier{}, iotago.Identifier{}, err
+		inputs, errInput := tx.Inputs()
+		if errInput != nil {
+			err = errInput
+
+			return false
 		}
 		for _, input := range inputs {
-			inputOutput, err := l.Output(input.StateID())
-			if err != nil {
-				return iotago.Identifier{}, iotago.Identifier{}, err
+			inputOutput, outputErr := l.Output(input.StateID())
+			if outputErr != nil {
+				err = outputErr
+
+				return false
 			}
 
 			spent := ledgerstate.NewSpent(inputOutput, txWithMeta.ID(), txCreationTime, index)
 			spents = append(spents, spent)
 		}
 
-		if err := txWithMeta.Outputs().ForEach(func(element mempool.StateWithMetadata) error {
+		if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateWithMetadata) error {
 			state := element.State().(*State)
 			output := ledgerstate.CreateOutput(l.ledgerState.API(), state.outputID, iotago.EmptyBlockID(), index, txCreationTime, state.output)
 			outputs = append(outputs, output)
 			return nil
-		}); err != nil {
-			return iotago.Identifier{}, iotago.Identifier{}, err
+		}); createOutputErr != nil {
+			err = createOutputErr
+
+			return false
 		}
+
+		return true
+	})
+
+	if err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
 	if err := l.ledgerState.ApplyConfirmation(index, outputs, spents); err != nil {
@@ -146,8 +153,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		it.Next().SetCommitted()
 	}
 
-	//TODO: add missing State tree
-	return iotago.Identifier{}, iotago.Identifier(stateDiff.StateMutation.Root()), nil
+	// TODO: add missing State tree
+	return iotago.Identifier{}, iotago.Identifier(stateDiff.Mutations().Root()), nil
 }
 
 func (l *Ledger) attachTransaction(block *blocks.Block) {

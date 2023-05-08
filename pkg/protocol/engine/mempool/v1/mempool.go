@@ -7,11 +7,9 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
@@ -37,6 +35,8 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] struct {
 
 	cachedStateRequests *shrinkingmap.ShrinkingMap[iotago.OutputID, *promise.Promise[*StateWithMetadata]]
 
+	stateDiffs *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *StateDiff]
+
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower]
 
 	executionWorkers *workerpool.WorkerPool
@@ -54,6 +54,7 @@ func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputRes
 		attachments:            memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionWithMetadata](),
 		cachedTransactions:     shrinkingmap.New[iotago.TransactionID, *TransactionWithMetadata](),
 		cachedStateRequests:    shrinkingmap.New[iotago.OutputID, *promise.Promise[*StateWithMetadata]](),
+		stateDiffs:             shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
 		executionWorkers:       workers.CreatePool("executionWorkers", 1),
 		conflictDAG:            mockedconflictdag.New[iotago.TransactionID, iotago.OutputID, VotePower](),
 	}
@@ -80,10 +81,37 @@ func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, 
 	return storedTransaction, nil
 }
 
-func (m *MemPool[VotePower]) RemoveTransaction(transactionID iotago.TransactionID) {
-	if transaction, deleted := m.cachedTransactions.DeleteAndReturn(transactionID); deleted {
-		transaction.evicted.Trigger()
+func (m *MemPool[VotePower]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool {
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
+	if m.lastEvictedSlot >= blockID.Index() {
+		return false
 	}
+	transaction, exists := m.transactionByAttachment(blockID)
+
+	return exists && transaction.attachments.MarkOrphaned(blockID)
+}
+
+func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) bool {
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
+	if m.lastEvictedSlot >= blockID.Index() {
+		return false
+	}
+
+	transaction, exists := m.transactionByAttachment(blockID)
+
+	return exists && transaction.attachments.MarkIncluded(blockID)
+}
+
+func (m *MemPool[VotePower]) StateDiff(index iotago.SlotIndex) mempool.StateDiff {
+	if stateDiff, exists := m.stateDiffs.Get(index); exists {
+		return stateDiff
+	}
+
+	return NewStateDiff(index)
 }
 
 func (m *MemPool[VotePower]) Transaction(id iotago.TransactionID) (transaction mempool.TransactionWithMetadata, exists bool) {
@@ -103,20 +131,8 @@ func (m *MemPool[VotePower]) State(stateReference ledger.StateReference) (state 
 	return state, err
 }
 
-func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) error {
-	attachmentsBySlotIndex := m.attachments.Get(blockID.Index())
-	if attachmentsBySlotIndex == nil {
-		return xerrors.Errorf("no attachments found for block id %s: %w", blockID, mempool.ErrAttachmentNotFound)
-	}
-
-	transaction, exists := attachmentsBySlotIndex.Get(blockID)
-	if !exists {
-		return xerrors.Errorf("no attachments found for block id %s: %w", blockID, mempool.ErrAttachmentNotFound)
-	}
-
-	transaction.attachments.MarkIncluded(blockID)
-
-	return nil
+func (m *MemPool[VotePower]) TransactionByAttachment(blockID iotago.BlockID) (mempool.TransactionWithMetadata, bool) {
+	return m.transactionByAttachment(blockID)
 }
 
 func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
@@ -173,12 +189,21 @@ func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionW
 
 	transaction.OnAccepted(func() {
 		m.events.TransactionAccepted.Trigger(transaction)
+
+		slotIndex := transaction.Attachments().EarliestIncludedAttachment().Index()
+		lo.Return1(m.stateDiffs.GetOrCreate(slotIndex, func() *StateDiff { return NewStateDiff(slotIndex) })).AddTransaction(transaction)
 	})
 
-	transaction.Attachments().OnEarliestIncludedAttachmentUpdated(func(blockID iotago.BlockID) {
-		if blockID.Index() == 0 && transaction.IsAccepted() {
-			// TODO: roll back acceptance in diff + mark tx as orphaned
-		} else if blockID.Index() > 0 && !transaction.IsAccepted() {
+	transaction.Attachments().OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID) {
+		if transaction.IsAccepted() {
+			if prevSlot, exists := m.stateDiffs.Get(prevID.Index()); exists {
+				prevSlot.RollbackTransaction(transaction)
+			}
+			if newID.Index() != 0 {
+				lo.Return1(m.stateDiffs.GetOrCreate(newID.Index(), func() *StateDiff { return NewStateDiff(newID.Index()) })).AddTransaction(transaction)
+			}
+
+		} else if newID.Index() > 0 && !transaction.IsAccepted() {
 			m.updateAcceptance(transaction)
 		}
 	})
@@ -321,22 +346,28 @@ func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionWithMetadat
 	case err != nil:
 		panic(err)
 	default:
-		//transaction.setConflicting()
+		// transaction.setConflicting()
 	}
+}
+
+func (m *MemPool[VotePower]) transactionByAttachment(blockID iotago.BlockID) (*TransactionWithMetadata, bool) {
+	attachmentsBySlotIndex := m.attachments.Get(blockID.Index())
+	if attachmentsBySlotIndex == nil {
+		return nil, false
+	}
+
+	transaction, exists := attachmentsBySlotIndex.Get(blockID)
+	if !exists {
+		return nil, false
+	}
+
+	return transaction, true
 }
 
 func (m *MemPool[VotePower]) updateAcceptance(transaction *TransactionWithMetadata) {
 	if transaction.AllInputsAccepted() && transaction.Attachments().WasIncluded() && m.conflictDAG.AcceptanceState(transaction.conflictIDs).IsAccepted() {
 		transaction.setAccepted()
 	}
-}
-
-func (m *MemPool[VotePower]) StateDiff(index iotago.SlotIndex) (*mempool.StateDiff, error) {
-	return &mempool.StateDiff{
-		Index:         index,
-		StateMutation: ads.NewSet[iotago.TransactionID, *iotago.TransactionID](mapdb.NewMapDB()),
-		Transactions:  advancedset.New[mempool.TransactionWithMetadata](),
-	}, nil
 }
 
 var _ mempool.MemPool[vote.MockedPower] = new(MemPool[vote.MockedPower])
