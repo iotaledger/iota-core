@@ -1,6 +1,7 @@
 package coreapi
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -95,7 +96,7 @@ type infoResponse struct {
 	// The protocol versions this node supports.
 	SupportedProtocolVersions protocol.Versions `json:"supportedProtocolVersions"`
 	// The protocol parameters used by this node.
-	ProtocolParameters *iotago.ProtocolParameters `json:"protocol"`
+	ProtocolParameters json.RawMessage `json:"protocol"`
 	// todo The base token of the network.
 	//BaseToken *protocfg.BaseToken `json:"baseToken"`
 	// The features this node exposes.
@@ -163,9 +164,9 @@ type blockIssuanceResponse struct {
 	// WeakParents are the weak parents of the block.
 	WeakParents []string `json:"weakParents"`
 	// ShallowLikeParents are the shallow like parents of the block.
-	ShallowLikeParents  []string           `json:"shallowLikeParents"`
-	LatestFinalizedSlot iotago.SlotIndex   `json:"latestFinalizedSlot"`
-	Commitment          *iotago.Commitment `json:"commitment"`
+	ShallowLikeParents  []string         `json:"shallowLikeParents"`
+	LatestFinalizedSlot iotago.SlotIndex `json:"latestFinalizedSlot"`
+	Commitment          json.RawMessage  `json:"commitment"`
 }
 
 // blockCreatedResponse defines the response of a POST blocks REST API call.

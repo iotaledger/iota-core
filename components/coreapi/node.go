@@ -5,6 +5,12 @@ func info() (*infoResponse, error) {
 	cl := deps.Protocol.MainEngineInstance().Clock
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 	metrics := deps.Protocol.MetricsTracker.NodeMetrics()
+	protoParams := deps.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters()
+
+	protoParamsBytes, err := deps.Protocol.API().JSONEncode(protoParams)
+	if err != nil {
+		return nil, err
+	}
 
 	return &infoResponse{
 		Name:     deps.AppInfo.Name,
@@ -28,7 +34,7 @@ func info() (*infoResponse, error) {
 			ConfirmedRate:            metrics.ConfirmedRate,
 		},
 		SupportedProtocolVersions: deps.Protocol.SupportedVersions(),
-		ProtocolParameters:        deps.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(),
+		ProtocolParameters:        protoParamsBytes,
 		Features:                  features,
 	}, nil
 }

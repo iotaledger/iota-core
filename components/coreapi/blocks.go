@@ -56,12 +56,17 @@ func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
 		return nil, errors.Errorf("could not get references")
 	}
 
+	cBytes, err := deps.Protocol.API().JSONEncode(slotCommitment.Commitment())
+	if err != nil {
+		return nil, err
+	}
+
 	resp := &blockIssuanceResponse{
 		StrongParents:       references[model.StrongParentType].ToHex(),
 		WeakParents:         references[model.WeakParentType].ToHex(),
 		ShallowLikeParents:  references[model.ShallowLikeParentType].ToHex(),
 		LatestFinalizedSlot: deps.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot(),
-		Commitment:          slotCommitment.Commitment(),
+		Commitment:          cBytes,
 	}
 
 	return resp, nil
