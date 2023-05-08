@@ -87,7 +87,7 @@ type infoResponse struct {
 	// The server version of the node software.
 	Version string `json:"version"`
 	// The ID of the node
-	IssuerID string `json:"issuerID"`
+	IssuerID string `json:"issuerId"`
 	// The current status of this node.
 	Status nodeStatus `json:"status"`
 	// The metrics of this node.
@@ -106,9 +106,9 @@ type nodeStatus struct {
 	// Whether the node is healthy.
 	IsHealthy bool `json:"isHealthy"`
 	// The blockID of last accepted block.
-	LastAcceptedBlockID string `json:"lastAcceptedBlockID"`
+	LastAcceptedBlockID string `json:"lastAcceptedBlockId"`
 	// The blockID of the last confirmed block
-	LastConfirmedBlockID string `json:"lastConfirmedBlockID"`
+	LastConfirmedBlockID string `json:"lastConfirmedBlockId"`
 	// The latest finalized slot.
 	FinalizedSlot iotago.SlotIndex `json:"latestFinalizedSlot"`
 	// The Accepted Tangle Time
