@@ -1,4 +1,4 @@
-package eviction
+package eviction_test
 
 import (
 	"encoding/binary"
@@ -9,13 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type TestFramework struct {
 	Testing         *testing.T
-	Instance        *State
+	Instance        *eviction.State
 	prunableStorage *prunable.Prunable
 
 	rootBlockIDs  *shrinkingmap.ShrinkingMap[string, iotago.BlockID]
@@ -25,7 +26,7 @@ type TestFramework struct {
 	mutex     sync.RWMutex
 }
 
-func NewTestFramework(testing *testing.T, prunableStorage *prunable.Prunable, instance *State) *TestFramework {
+func NewTestFramework(testing *testing.T, prunableStorage *prunable.Prunable, instance *eviction.State) *TestFramework {
 	return &TestFramework{
 		Testing:         testing,
 		prunableStorage: prunableStorage,

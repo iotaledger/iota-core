@@ -1,7 +1,6 @@
 package eviction
 
 import (
-	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -60,14 +59,10 @@ func (s *State) EvictUntil(index iotago.SlotIndex) {
 	s.evictionMutex.Lock()
 
 	nextIndex := s.lastEvictedSlot.NextIndex()
-	fmt.Println("EvictUntil", nextIndex, index)
-
 	for currentIndex := nextIndex; currentIndex <= index; currentIndex++ {
 		s.lastEvictedSlot.MarkEvicted(index)
-		fmt.Println("EvictUntil", currentIndex)
 
 		delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(currentIndex)
-		fmt.Println("EvictUntil delayed", delayedIndex, shouldEvictRootBlocks)
 		if shouldEvictRootBlocks {
 			s.rootBlocks.Evict(delayedIndex)
 		}
@@ -132,7 +127,6 @@ func (s *State) ActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
 	activeRootBlocks := make(map[iotago.BlockID]iotago.CommitmentID)
 	for id, commitmentID := range allRootBlocks {
 		if !s.IsRootBlock(id) {
-			fmt.Println("not root block", id)
 			continue
 		}
 		activeRootBlocks[id] = commitmentID
@@ -176,7 +170,6 @@ func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	fmt.Println("IsRootBlock:", id, "s.inRootBlockEvictedSlot(id)", s.inRootBlockEvictedSlot(id.Index()), "s.lastEvictedSlot.IsEvicted(id.Index())", s.lastEvictedSlot.IsEvicted(id.Index()))
 	if !s.withinActiveIndexRange(id.Index()) {
 		return false
 	}
@@ -191,7 +184,6 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	fmt.Println("RootBlockCommitmentID:", id, "s.inRootBlockEvictedSlot(id)", s.inRootBlockEvictedSlot(id.Index()), "s.lastEvictedSlot.IsEvicted(id.Index())", s.lastEvictedSlot.IsEvicted(id.Index()))
 	if !s.withinActiveIndexRange(id.Index()) {
 		return iotago.CommitmentID{}, false
 	}
