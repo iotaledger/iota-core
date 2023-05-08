@@ -132,8 +132,8 @@ func (t *TransactionWithMetadata) OnAllInputsAccepted(callback func()) {
 	t.allInputsAccepted.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) OnEarliestIncludedSlotUpdated(callback func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func()) {
-	return t.attachments.earliestIncludedSlot.OnUpdate(callback)
+func (t *TransactionWithMetadata) OnEarliestIncludedAttachmentUpdated(callback func(prevID, newID iotago.BlockID)) (unsubscribe func()) {
+	return t.attachments.earliestIncludedAttachment.OnUpdate(callback)
 }
 
 func (t *TransactionWithMetadata) IsAccepted() bool {

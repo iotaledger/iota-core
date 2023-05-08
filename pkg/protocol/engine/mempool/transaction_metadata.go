@@ -34,7 +34,7 @@ type TransactionWithMetadata interface {
 
 	OnExecuted(func())
 
-	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func())
+	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID)) (unsubscribe func())
 
 	OnBooked(func())
 

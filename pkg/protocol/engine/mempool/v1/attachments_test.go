@@ -22,7 +22,7 @@ func TestAttachments(t *testing.T) {
 
 	var earliestInclusionIndex, earliestInclusionIndex1, earliestInclusionIndex2 iotago.SlotIndex
 
-	attachments.OnEarliestIncludedAttachmentUpdated(func(includedBlock iotago.BlockID) {
+	attachments.OnEarliestIncludedAttachmentUpdated(func(_, includedBlock iotago.BlockID) {
 		earliestInclusionIndex = includedBlock.Index()
 	})
 	require.Equal(t, iotago.SlotIndex(0), earliestInclusionIndex)
@@ -32,7 +32,7 @@ func TestAttachments(t *testing.T) {
 	attachments.MarkIncluded(blockIDs["1"])
 	require.Equal(t, iotago.SlotIndex(1), earliestInclusionIndex)
 
-	attachments.OnEarliestIncludedAttachmentUpdated(func(includedBlock iotago.BlockID) {
+	attachments.OnEarliestIncludedAttachmentUpdated(func(_, includedBlock iotago.BlockID) {
 		earliestInclusionIndex1 = includedBlock.Index()
 	})
 
@@ -48,7 +48,7 @@ func TestAttachments(t *testing.T) {
 	require.Equal(t, iotago.SlotIndex(0), earliestInclusionIndex)
 	require.Equal(t, iotago.SlotIndex(0), earliestInclusionIndex1)
 
-	attachments.OnEarliestIncludedAttachmentUpdated(func(includedBlock iotago.BlockID) {
+	attachments.OnEarliestIncludedAttachmentUpdated(func(_, includedBlock iotago.BlockID) {
 		earliestInclusionIndex2 = includedBlock.Index()
 	})
 	require.Equal(t, iotago.SlotIndex(0), earliestInclusionIndex2)
