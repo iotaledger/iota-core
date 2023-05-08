@@ -103,6 +103,10 @@ func (t *TransactionWithMetadata) Attachments() *Attachments {
 	return t.attachments
 }
 
+func (t *TransactionWithMetadata) EarliestIncludedAttachment() iotago.BlockID {
+	return t.attachments.EarliestIncludedAttachment()
+}
+
 // region InclusionState ///////////////////////////////////////////////////////////////////////////////////////////////
 
 func (t *TransactionWithMetadata) AllInputsAccepted() bool {

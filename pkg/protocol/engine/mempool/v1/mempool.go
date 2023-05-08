@@ -174,10 +174,10 @@ func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionW
 		m.events.TransactionAccepted.Trigger(transaction)
 	})
 
-	transaction.Attachments().OnEarliestIncludedSlotUpdated(func(index iotago.SlotIndex) {
-		if index == 0 && transaction.IsAccepted() {
+	transaction.Attachments().OnEarliestIncludedAttachmentUpdated(func(blockID iotago.BlockID) {
+		if blockID.Index() == 0 && transaction.IsAccepted() {
 			// TODO: roll back acceptance in diff + mark tx as orphaned
-		} else if index > 0 && !transaction.IsAccepted() {
+		} else if blockID.Index() > 0 && !transaction.IsAccepted() {
 			m.updateAcceptance(transaction)
 		}
 	})

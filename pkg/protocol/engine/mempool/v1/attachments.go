@@ -80,7 +80,7 @@ func (a *Attachments) EarliestIncludedAttachment() iotago.BlockID {
 	return a.earliestIncludedAttachment.Get()
 }
 
-func (a *Attachments) OnEarliestIncludedSlotUpdated(callback func(id iotago.BlockID)) (unsubscribe func()) {
+func (a *Attachments) OnEarliestIncludedAttachmentUpdated(callback func(id iotago.BlockID)) (unsubscribe func()) {
 	return a.earliestIncludedAttachment.OnUpdate(callback)
 }
 
