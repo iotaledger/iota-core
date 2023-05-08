@@ -68,8 +68,12 @@ func (t *TestFramework) CreateTransaction(alias string, referencedStates []strin
 	}
 }
 
-func (t *TestFramework) MarkAttachmentIncluded(alias string) error {
+func (t *TestFramework) MarkAttachmentIncluded(alias string) bool {
 	return t.Instance.MarkAttachmentIncluded(t.BlockID(alias))
+}
+
+func (t *TestFramework) MarkAttachmentOrphaned(alias string) bool {
+	return t.Instance.MarkAttachmentOrphaned(t.BlockID(alias))
 }
 
 func (t *TestFramework) BlockID(alias string) iotago.BlockID {
@@ -290,4 +294,27 @@ func (t *TestFramework) requireDeleted(transactionAliases ...string) {
 
 		require.False(t.test, transactionMetadataExists, "transaction %s was not deleted", transactionAlias)
 	}
+}
+
+func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAliases, createdOutputAliases, transactionAliases []string) {
+	stateDiff := t.Instance.StateDiff(index)
+
+	require.Equal(t.test, len(spentOutputAliases), stateDiff.SpentOutputs().Size())
+	require.Equal(t.test, len(createdOutputAliases), stateDiff.CreatedOutputs().Size())
+	require.Equal(t.test, len(transactionAliases), stateDiff.ExecutedTransactions().Size())
+	require.Equal(t.test, len(transactionAliases), stateDiff.Mutations().Size())
+
+	for _, transactionAlias := range transactionAliases {
+		require.True(t.test, stateDiff.ExecutedTransactions().Has(t.TransactionID(transactionAlias)))
+		require.True(t.test, stateDiff.Mutations().Has(t.TransactionID(transactionAlias)))
+	}
+
+	for _, createdOutputAlias := range createdOutputAliases {
+		require.True(t.test, stateDiff.CreatedOutputs().Has(t.StateID(createdOutputAlias)))
+	}
+
+	for _, spentOutputAlias := range spentOutputAliases {
+		require.True(t.test, stateDiff.SpentOutputs().Has(t.StateID(spentOutputAlias)))
+	}
+
 }

@@ -45,7 +45,7 @@ func (a *Attachments) Add(blockID iotago.BlockID) (added bool) {
 	return true
 }
 
-func (a *Attachments) MarkIncluded(blockID iotago.BlockID) bool {
+func (a *Attachments) MarkIncluded(blockID iotago.BlockID) (included bool) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
