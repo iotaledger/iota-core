@@ -14,29 +14,11 @@ type TransactionWithMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateWithMetadata]
 
+	Inclusion() InclusionState
+
+	Lifecycle() LifecycleState
+
 	SetCommitted()
 
-	IsSolid() bool
-
-	IsExecuted() bool
-
-	IsBooked() bool
-
-	IsInvalid() bool
-
-	IsEvicted() bool
-
-	IsAccepted() bool
-
-	OnSolid(func())
-
-	OnExecuted(func())
-
 	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func())
-
-	OnBooked(func())
-
-	OnInvalid(func(error))
-
-	OnEvicted(func())
 }

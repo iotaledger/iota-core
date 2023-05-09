@@ -35,8 +35,8 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
-		require.False(t, state.IsAccepted())
-		require.True(t, state.IsSpent())
+		require.False(t, state.InclusionState().IsAccepted())
+		require.True(t, state.SpentState().IsSpent())
 
 		return nil
 	})
@@ -45,8 +45,8 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
-		require.False(t, state.IsAccepted())
-		require.False(t, state.IsSpent())
+		require.False(t, state.InclusionState().IsAccepted())
+		require.False(t, state.SpentState().IsSpent())
 
 		return nil
 	})
@@ -67,8 +67,8 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
-		require.False(t, state.IsAccepted())
-		require.True(t, state.IsSpent())
+		require.False(t, state.InclusionState().IsAccepted())
+		require.True(t, state.SpentState().IsSpent())
 
 		return nil
 	})
@@ -77,8 +77,8 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
-		require.False(t, state.IsAccepted())
-		require.True(t, state.IsSpent())
+		require.False(t, state.InclusionState().IsAccepted())
+		require.True(t, state.SpentState().IsSpent())
 
 		return nil
 	})
@@ -87,8 +87,8 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx3Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
-		require.False(t, state.IsAccepted())
-		require.False(t, state.IsSpent())
+		require.False(t, state.InclusionState().IsAccepted())
+		require.False(t, state.SpentState().IsSpent())
 
 		return nil
 	})
@@ -147,9 +147,9 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tx3Metadata.SetCommitted()
 	//time.Sleep(1 * time.Second)
 	tf.RequireDeleted("tx1", "tx2", "tx3")
-	require.False(t, tx1Metadata.IsEvicted())
-	require.False(t, tx2Metadata.IsEvicted())
-	require.False(t, tx3Metadata.IsEvicted())
+	require.False(t, tx1Metadata.Inclusion().IsEvicted())
+	require.False(t, tx2Metadata.Inclusion().IsEvicted())
+	require.False(t, tx3Metadata.Inclusion().IsEvicted())
 
 	// TODO: would be nice to make sure that all attachments are removed as well in the underlying structure
 }
@@ -179,14 +179,14 @@ func TestSetTxOrphanage(t *testing.T, tf *TestFramework) {
 
 	require.True(t, tf.MarkAttachmentIncluded("block3"))
 
-	require.False(t, tx2Metadata.IsAccepted())
-	require.False(t, tx3Metadata.IsAccepted())
+	require.False(t, tx2Metadata.Inclusion().IsAccepted())
+	require.False(t, tx3Metadata.Inclusion().IsAccepted())
 	tf.Instance.Evict(1)
 	tf.RequireDeleted("tx1", "tx2", "tx3")
 
-	require.True(t, tx1Metadata.IsEvicted())
-	require.True(t, tx2Metadata.IsEvicted())
-	require.True(t, tx3Metadata.IsEvicted())
+	require.True(t, tx1Metadata.Inclusion().IsEvicted())
+	require.True(t, tx2Metadata.Inclusion().IsEvicted())
+	require.True(t, tx3Metadata.Inclusion().IsEvicted())
 }
 
 func TestSetTxOrphanage2(t *testing.T, tf *TestFramework) {
@@ -216,20 +216,20 @@ func TestSetTxOrphanage2(t *testing.T, tf *TestFramework) {
 
 	require.True(t, tf.MarkAttachmentIncluded("block3"))
 
-	require.False(t, tx2Metadata.IsAccepted())
-	require.False(t, tx3Metadata.IsAccepted())
+	require.False(t, tx2Metadata.Inclusion().IsAccepted())
+	require.False(t, tx3Metadata.Inclusion().IsAccepted())
 
 	tf.Instance.Evict(1)
 
-	require.False(t, tx1Metadata.IsEvicted())
-	require.False(t, tx2Metadata.IsEvicted())
-	require.False(t, tx3Metadata.IsEvicted())
+	require.False(t, tx1Metadata.Inclusion().IsEvicted())
+	require.False(t, tx2Metadata.Inclusion().IsEvicted())
+	require.False(t, tx3Metadata.Inclusion().IsEvicted())
 
 	tf.Instance.Evict(2)
 
-	require.True(t, tx1Metadata.IsEvicted())
-	require.True(t, tx2Metadata.IsEvicted())
-	require.True(t, tx3Metadata.IsEvicted())
+	require.True(t, tx1Metadata.Inclusion().IsEvicted())
+	require.True(t, tx2Metadata.Inclusion().IsEvicted())
+	require.True(t, tx3Metadata.Inclusion().IsEvicted())
 
 	tf.RequireDeleted("tx1", "tx2", "tx3")
 }

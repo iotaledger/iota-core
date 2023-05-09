@@ -10,7 +10,7 @@ type StateWithMetadata interface {
 
 	State() ledger.State
 
-	IsSpent() bool
+	InclusionState() InclusionState
 
-	IsAccepted() bool
+	SpentState() SpentState
 }

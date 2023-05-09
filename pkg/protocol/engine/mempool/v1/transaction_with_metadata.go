@@ -22,19 +22,12 @@ type TransactionWithMetadata struct {
 	attachments     *Attachments
 	conflictIDs     *advancedset.AdvancedSet[iotago.TransactionID]
 
+	unsolidInputsCount    uint64
 	unacceptedInputsCount uint64
 	allInputsAccepted     *promise.Event
-	accepted              *promise.Event
-	rejected              *promise.Event
-	committed             *promise.Event
-	evicted               *promise.Event
 
-	stored             *promise.Event
-	unsolidInputsCount uint64
-	solid              *promise.Event
-	executed           *promise.Event
-	invalid            *promise.Event1[error]
-	booked             *promise.Event
+	inclusion *InclusionState
+	lifecycle *LifecycleState
 
 	mutex sync.RWMutex
 }
@@ -58,24 +51,18 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 		conflictIDs:     advancedset.New[iotago.TransactionID](),
 		attachments:     NewAttachments(),
 
-		booked:            promise.NewEvent(),
-		solid:             promise.NewEvent(),
-		executed:          promise.NewEvent(),
-		evicted:           promise.NewEvent(),
+		inclusion: NewInclusionState(),
+		lifecycle: NewLifecycleState(),
+
 		allInputsAccepted: promise.NewEvent(),
-		accepted:          promise.NewEvent(),
-		committed:         promise.NewEvent(),
-		rejected:          promise.NewEvent(),
-		stored:            promise.NewEvent(),
-		invalid:           promise.NewEvent1[error](),
 
 		unsolidInputsCount:    uint64(len(inputReferences)),
 		unacceptedInputsCount: uint64(len(inputReferences)),
 	}
 
 	t.attachments.OnAllAttachmentsEvicted(func() {
-		if !t.IsCommitted() {
-			t.setEvicted()
+		if !t.inclusion.IsCommitted() {
+			t.inclusion.setEvicted()
 		}
 	})
 
@@ -118,6 +105,22 @@ func (t *TransactionWithMetadata) Attachments() *Attachments {
 	return t.attachments
 }
 
+// region Attachments //////////////////////////////////////////////////////////////////////////////////////////////////
+
+func (t *TransactionWithMetadata) OnEarliestIncludedSlotUpdated(callback func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func()) {
+	return t.attachments.earliestIncludedSlot.OnUpdate(callback)
+}
+
+func (t *TransactionWithMetadata) MarkIncluded(blockID iotago.BlockID) bool {
+	return t.attachments.MarkIncluded(blockID)
+}
+
+func (t *TransactionWithMetadata) MarkOrphaned(blockID iotago.BlockID) bool {
+	return t.attachments.MarkOrphaned(blockID)
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // region InclusionState ///////////////////////////////////////////////////////////////////////////////////////////////
 
 func (t *TransactionWithMetadata) AllInputsAccepted() bool {
@@ -128,104 +131,20 @@ func (t *TransactionWithMetadata) OnAllInputsAccepted(callback func()) {
 	t.allInputsAccepted.OnTrigger(callback)
 }
 
-func (t *TransactionWithMetadata) OnEarliestIncludedSlotUpdated(callback func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func()) {
-	return t.attachments.earliestIncludedSlot.OnUpdate(callback)
-}
-
-func (t *TransactionWithMetadata) IsAccepted() bool {
-	return t.accepted.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnAccepted(callback func()) {
-	t.accepted.OnTrigger(callback)
-}
-
-func (t *TransactionWithMetadata) IsRejected() bool {
-	return t.rejected.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnRejected(callback func()) {
-	t.rejected.OnTrigger(callback)
-}
-
-func (t *TransactionWithMetadata) IsCommitted() bool {
-	return t.committed.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnCommitted(callback func()) {
-	t.committed.OnTrigger(callback)
-}
-
-func (t *TransactionWithMetadata) IsEvicted() bool {
-	return t.evicted.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnEvicted(callback func()) {
-	t.evicted.OnTrigger(callback)
+func (t *TransactionWithMetadata) Inclusion() mempool.InclusionState {
+	return t.inclusion
 }
 
 func (t *TransactionWithMetadata) SetCommitted() {
-	t.committed.Trigger()
-}
-
-func (t *TransactionWithMetadata) setAccepted() {
-	t.accepted.Trigger()
-}
-
-func (t *TransactionWithMetadata) setRejected() {
-	t.rejected.Trigger()
-}
-
-func (t *TransactionWithMetadata) setEvicted() {
-	t.evicted.Trigger()
+	t.inclusion.setCommitted()
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // region Lifecycle ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (t *TransactionWithMetadata) IsStored() bool {
-	return t.stored.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnStored(callback func()) {
-	t.stored.OnTrigger(callback)
-}
-
-func (t *TransactionWithMetadata) IsSolid() bool {
-	return t.solid.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnSolid(callback func()) {
-	t.solid.OnTrigger(callback)
-}
-
-func (t *TransactionWithMetadata) IsExecuted() bool {
-	return t.executed.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnExecuted(callback func()) {
-	t.executed.OnTrigger(callback)
-}
-
-func (t *TransactionWithMetadata) IsInvalid() bool {
-	return t.invalid.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnInvalid(callback func(error)) {
-	t.invalid.OnTrigger(callback)
-}
-
-func (t *TransactionWithMetadata) IsBooked() bool {
-	return t.booked.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnBooked(callback func()) {
-	t.booked.OnTrigger(callback)
-}
-
-func (t *TransactionWithMetadata) setStored() {
-	t.stored.Trigger()
+func (t *TransactionWithMetadata) Lifecycle() mempool.LifecycleState {
+	return t.lifecycle
 }
 
 func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetadata) {
@@ -234,12 +153,8 @@ func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetada
 	t.setupInputLifecycle(input)
 
 	if atomic.AddUint64(&t.unsolidInputsCount, ^uint64(0)) == 0 {
-		t.solid.Trigger()
+		t.lifecycle.setSolid()
 	}
-}
-
-func (t *TransactionWithMetadata) setBooked() {
-	t.booked.Trigger()
 }
 
 func (t *TransactionWithMetadata) setExecuted(outputStates []ledger.State) {
@@ -249,46 +164,42 @@ func (t *TransactionWithMetadata) setExecuted(outputStates []ledger.State) {
 	}
 	t.mutex.Unlock()
 
-	t.executed.Trigger()
-}
-
-func (t *TransactionWithMetadata) setInvalid(reason error) {
-	t.invalid.Trigger(reason)
+	t.lifecycle.executed.Trigger()
 }
 
 func (t *TransactionWithMetadata) setupInputLifecycle(input *StateWithMetadata) {
-	input.increaseConsumerCount()
+	input.spentState.increaseSpenderCount()
 
-	t.OnAccepted(func() {
-		input.acceptSpend(t)
+	t.inclusion.OnAccepted(func() {
+		input.spentState.acceptSpend(t)
 	})
 
-	t.OnCommitted(func() {
-		input.commitSpend(t)
-		input.decreaseConsumerCount()
+	t.inclusion.OnCommitted(func() {
+		input.spentState.commitSpend(t)
+		input.spentState.decreaseSpenderCount()
 	})
 
-	t.OnEvicted(input.decreaseConsumerCount)
+	t.inclusion.OnEvicted(input.spentState.decreaseSpenderCount)
 
-	input.OnAccepted(func() {
+	input.inclusionState.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			t.allInputsAccepted.Trigger()
 		}
 	})
 
-	input.OnRejected(t.setRejected)
+	input.inclusionState.OnRejected(t.inclusion.setRejected)
 
-	input.OnEvicted(t.setEvicted)
+	input.inclusionState.OnEvicted(t.inclusion.setEvicted)
 
-	input.OnSpendAccepted(func(spender *TransactionWithMetadata) {
+	input.spentState.OnSpendAccepted(func(spender mempool.TransactionWithMetadata) {
 		if spender != t {
-			t.setRejected()
+			t.inclusion.setRejected()
 		}
 	})
 
-	input.OnSpendCommitted(func(spender *TransactionWithMetadata) {
+	input.spentState.OnSpendCommitted(func(spender mempool.TransactionWithMetadata) {
 		if spender != t {
-			t.setEvicted()
+			t.inclusion.setEvicted()
 		}
 	})
 }

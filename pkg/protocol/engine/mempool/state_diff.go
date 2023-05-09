@@ -7,7 +7,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// StateDiff is a collection of changes that happened in a certain slot and that need to be applied to the ledger state.
+// StateDiff is a collection of changes that happened in a certain slot and that can be applied to the ledger state.
 type StateDiff interface {
 	// Index returns the slot index of the state diff.
 	Index() iotago.SlotIndex
