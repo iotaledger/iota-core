@@ -143,6 +143,10 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
 	})
 
+	events.Clock.RatifiedAcceptedTimeUpdated.Hook(func(newTime time.Time) {
+		fmt.Printf("%s > [%s] Clock.RatifiedAcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
+	})
+
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
 		fmt.Printf("%s > [%s] Filter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
 	})
@@ -170,6 +174,10 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+	})
+
+	events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockRatifiedAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
 
 	events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
