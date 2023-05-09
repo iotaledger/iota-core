@@ -55,6 +55,8 @@ type Engine struct {
 	isBootstrapped      bool
 	isBootstrappedMutex sync.Mutex
 
+	chainID iotago.CommitmentID
+
 	optsBootstrappedThreshold time.Duration
 	optsEntryPointsDepth      int
 	optsSnapshotDepth         int
@@ -272,6 +274,14 @@ func (e *Engine) RemoveFromFilesystem() error {
 
 func (e *Engine) Name() string {
 	return filepath.Base(e.Storage.Directory())
+}
+
+func (e *Engine) ChainID() iotago.CommitmentID {
+	return e.chainID
+}
+
+func (e *Engine) SetChainID(chainID iotago.CommitmentID) {
+	e.chainID = chainID
 }
 
 func (e *Engine) setupBlockStorage() {

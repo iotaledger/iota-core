@@ -107,11 +107,11 @@ func (p *Protocol) Run() {
 
 	rootCommitment := p.mainEngine.EarliestRootCommitment()
 
-	// the rootCommitment is also the earliest point in the chain we can fork from. It is used to prevent
-	// solidifying and processing commitments that we won't be able to switch to.
-	if err := p.mainEngine.Storage.Settings().SetChainID(rootCommitment.ID()); err != nil {
-		panic(fmt.Sprintln("could not load set main engine's chain using", rootCommitment))
-	}
+	// The root commitment is the earliest commitment we will ever need to know to solidify commitment chains, we can
+	// then initialize the chain manager with it, and identify our engine to be on such chain.
+	// Upon engine restart, such chain will be loaded with the latest finalized slot, and the chain manager, not needing
+	// persistant storage, will be able to continue from there.
+	p.mainEngine.SetChainID(rootCommitment.ID())
 	p.chainManager.Initialize(rootCommitment)
 
 	// p.linkTo(p.mainEngine) -> CC and TipManager
@@ -257,7 +257,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 
 	processed := false
 
-	if mainChain := mainEngine.Storage.Settings().ChainID(); chain.ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
+	if mainChain := mainEngine.ChainID(); chain.ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
 		mainEngine.ProcessBlockFromPeer(block, src)
 		processed = true
 	}

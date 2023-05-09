@@ -209,6 +209,38 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+
+		// Slot 14
+		{
+			slot8Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(8)).Commitment()
+			ts.IssueBlockAtSlot("14.2", 14, slot8Commitment, node2, ts.BlockID("13.1"))
+
+			ts.AssertBlocksExist(ts.Blocks("14.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("13.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("14.2"), false, ts.Nodes()...)
+
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("11.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("11.1"), true, ts.Nodes()...)
+		}
+
+		// Verify nodes' states:
+		// - Slot 10 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 12.
+		// - 10.2 is ratified accepted and commits to slot 5 -> slot 5 should be evicted.
+		// - rootblocks are evicted until slot 2 as RootBlocksEvictionDelay is 3.
+		// - slot 5 is finalized: there is a supermajority of ratified accepted blocks that commits to it.
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithSnapshotImported(true),
+			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithLatestCommitmentSlotIndex(9),
+			testsuite.WithLatestStateMutationSlot(0),
+			testsuite.WithLatestFinalizedSlot(3),
+			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithSybilProtectionCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
+		)
+		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
 
 	// Verify that node1 and node2 pruned until their respective slots.
@@ -231,17 +263,19 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			),
 		)
 		ts.Wait()
+
+		slot1Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 		ts.AssertNodeState(ts.Nodes("node2.1"),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
-			testsuite.WithLatestCommitmentSlotIndex(8),
+			testsuite.WithLatestCommitmentSlotIndex(9),
 			testsuite.WithLatestStateMutationSlot(0),
 			testsuite.WithLatestFinalizedSlot(3),
-			// testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithChainID(slot1Commitment.MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
+			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
@@ -265,7 +299,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		)
 		ts.Wait()
 
-		latestCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(8)).Commitment()
+		slot1Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
+		latestCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(9)).Commitment()
 		// Verify node3 state:
 		// - Commitment at slot 8 should be the latest commitment.
 		// - 8-3 (RootBlocksEvictionDelay) = 5 -> rootblocks from slot 6 until 8 (count of 3).
@@ -274,15 +309,15 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes("node3"),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
-			testsuite.WithLatestCommitmentSlotIndex(8),
+			testsuite.WithLatestCommitmentSlotIndex(9),
 			testsuite.WithLatestCommitment(latestCommitment),
 			testsuite.WithLatestStateMutationSlot(0),
 			testsuite.WithLatestFinalizedSlot(3),
-			// TODO: depends on rootblocks testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithChainID(slot1Commitment.MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
+			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}

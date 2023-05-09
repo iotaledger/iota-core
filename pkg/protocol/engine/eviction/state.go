@@ -83,7 +83,7 @@ func (s *State) EarliestRootCommitmentID() (earliestCommitment iotago.Commitment
 		}
 
 		storage.ForEach(func(id iotago.BlockID, commitmentID iotago.CommitmentID) bool {
-			fmt.Println(id, "EarliestRootCommitmentID: ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
+			//fmt.Println(id, "EarliestRootCommitmentID: ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
 			if commitmentID.Index() < earliestCommitment.Index() {
 				earliestCommitment = commitmentID
 			}

@@ -101,8 +101,8 @@ func (t *TestSuite) AssertChainID(chainID iotago.CommitmentID, nodes ...*mock.No
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if chainID != node.Protocol.MainEngineInstance().Storage.Settings().ChainID() {
-				return errors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, chainID.String(), chainID.Index(), node.Protocol.MainEngineInstance().Storage.Settings().ChainID().String(), node.Protocol.MainEngineInstance().Storage.Settings().ChainID().Index())
+			if chainID != node.Protocol.MainEngineInstance().ChainID() {
+				return errors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, chainID.String(), chainID.Index(), node.Protocol.MainEngineInstance().EvictionState.EarliestRootCommitmentID().String(), node.Protocol.MainEngineInstance().EvictionState.EarliestRootCommitmentID().Index())
 			}
 
 			return nil
