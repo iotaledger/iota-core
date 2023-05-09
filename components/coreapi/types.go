@@ -123,16 +123,16 @@ type nodeStatus struct {
 	RCTT time.Time `json:"RCTT"`
 	// The latest known committed slot info.
 	LatestCommittedSlot iotago.SlotIndex `json:"latestCommittedSlot"`
-	// The milestone index at which the last pruning commenced.
+	// The slot index at which the last pruning commenced.
 	PruningSlot iotago.SlotIndex `json:"pruningSlot"`
 }
 
 type nodeMetrics struct {
-	// The current rate of new blocks per second.
+	// The current rate of new blocks per second, it's updated when a commitment is committed.
 	BlocksPerSecond float64 `json:"blocksPerSecond"`
-	// The current rate of confirmed blocks per second.
+	// The current rate of confirmed blocks per second, it's updated when a commitment is committed.
 	ConfirmedBlocksPerSecond float64 `json:"confirmedBlocksPerSecond"`
-	// The ratio of confirmed blocks in relation to new blocks of the last confirmed milestone.
+	// The ratio of confirmed blocks in relation to new blocks up until the latest commitment is committed.
 	ConfirmedRate float64 `json:"confirmedRate"`
 }
 

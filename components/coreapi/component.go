@@ -54,13 +54,13 @@ const (
 	// GET returns the output metadata.
 	RouteOutputMetadata = "/outputs/:" + restapipkg.ParameterOutputID + "/metadata"
 
-	// RouteTransactionsIncludedBlock is the route for getting the block that was included in the ledger for a given transaction ID.
+	// RouteTransactionsIncludedBlock is the route for getting the block that was first confirmed for a given transaction ID.
 	// GET returns the block based on the given type in the request "Accept" header.
 	// MIMEApplicationJSON => json.
 	// MIMEVendorIOTASerializer => bytes.
 	RouteTransactionsIncludedBlock = "/transactions/:" + restapipkg.ParameterTransactionID + "/included-block"
 
-	// RouteTransactionsIncludedBlockMetadata is the route for getting the block metadata that was included in the ledger for a given transaction ID.
+	// RouteTransactionsIncludedBlockMetadata is the route for getting the block metadata that was first confirmed in the ledger for a given transaction ID.
 	// GET returns block metadata (including info about "promotion/reattachment needed").
 	RouteTransactionsIncludedBlockMetadata = "/transactions/:" + restapipkg.ParameterTransactionID + "/included-block/metadata"
 
@@ -70,17 +70,17 @@ const (
 	// MIMEVendorIOTASerializer => bytes.
 	RouteCommitmentByID = "/commitments/:" + restapipkg.ParameterCommitmentID
 
-	// RouteCommitmentByIDUTXOChanges is the route for getting all UTXO changes of a milestone by its ID.
+	// RouteCommitmentByIDUTXOChanges is the route for getting all UTXO changes of a commitment by its ID.
 	// GET returns the output IDs of all UTXO changes.
 	RouteCommitmentByIDUTXOChanges = "/commitments/:" + restapipkg.ParameterCommitmentID + "/utxo-changes"
 
-	// RouteSlotByIndex is the route for getting a milestone by its milestoneIndex.
-	// GET returns the milestone.
+	// RouteSlotByIndex is the route for getting a commitment by its SlotIndex.
+	// GET returns the commitment.
 	// MIMEApplicationJSON => json.
 	// MIMEVendorIOTASerializer => bytes.
 	RouteSlotByIndex = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex
 
-	// RouteSlotByIndexUTXOChanges is the route for getting all UTXO changes of a milestone by its milestoneIndex.
+	// RouteSlotByIndexUTXOChanges is the route for getting all UTXO changes of a commitment by its SlotIndex.
 	// GET returns the output IDs of all UTXO changes.
 	RouteSlotByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
