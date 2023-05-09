@@ -78,10 +78,9 @@ func New(
 ) (engine *Engine) {
 	return options.Apply(
 		&Engine{
-			Events:  NewEvents(),
-			Storage: storageInstance,
-			// TODO: storageInstance.Settings() is not yet available
-			EvictionState: eviction.NewState(storageInstance.RootBlocks, storageInstance.Settings().LatestCommitment().Index()),
+			Events:        NewEvents(),
+			Storage:       storageInstance,
+			EvictionState: eviction.NewState(storageInstance.RootBlocks),
 			Workers:       workers,
 
 			optsBootstrappedThreshold: 10 * time.Second,
@@ -104,6 +103,10 @@ func New(
 				e.Storage.Settings().TriggerInitialized,
 				e.Storage.Commitments().TriggerInitialized,
 			))
+
+			e.Storage.Settings().HookInitialized(func() {
+				e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Index())
+			})
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,

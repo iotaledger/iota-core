@@ -10,7 +10,6 @@ import (
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
-	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
@@ -34,7 +33,7 @@ type State struct {
 }
 
 // NewState creates a new eviction State.
-func NewState(rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks, lastEvictedSlot iotago.SlotIndex, opts ...options.Option[State]) (state *State) {
+func NewState(rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks, opts ...options.Option[State]) (state *State) {
 	return options.Apply(&State{
 		Events:                      NewEvents(),
 		rootBlocks:                  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID](),
@@ -42,13 +41,13 @@ func NewState(rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks, 
 		rootBlockStorageFunc:        rootBlockStorageFunc,
 		lastEvictedSlot:             model.NewEvictionIndex(),
 		optsRootBlocksEvictionDelay: 3,
-	}, opts,
-		func(s *State) {
-			if lastEvictedSlot > 0 {
-				s.lastEvictedSlot.MarkEvicted(lastEvictedSlot)
-			}
-		},
-	)
+	}, opts)
+}
+
+func (s *State) Initialize(lastEvictedSlot iotago.SlotIndex) {
+	if lastEvictedSlot > 0 {
+		s.lastEvictedSlot.MarkEvicted(lastEvictedSlot)
+	}
 }
 
 // EvictUntil triggers the SlotEvicted event for every evicted slot and evicts all root blocks until the delayed
@@ -84,11 +83,16 @@ func (s *State) LastEvictedSlot() (index iotago.SlotIndex, valid bool) {
 }
 
 // EarliestRootCommitmentID returns the earliest commitment that rootblocks are committing to across all rootblocks.
-// TODO: this implementation is naive, as it iterates over all rootblocks. It would be better to consider only the currently active rootblocks.
 func (s *State) EarliestRootCommitmentID() (earliestCommitment iotago.CommitmentID) {
 	earliestCommitment = iotago.NewSlotIdentifier(math.MaxInt64, [32]byte{})
 
-	s.rootBlocks.ForEach(func(index iotago.SlotIndex, storage *shrinkingmap.ShrinkingMap[iotago.BlockID, iotago.CommitmentID]) {
+	start, end := s.activeIndexRange()
+	for index := start; index <= end; index++ {
+		storage := s.rootBlocks.Get(index)
+		if storage == nil {
+			continue
+		}
+
 		storage.ForEach(func(id iotago.BlockID, commitmentID iotago.CommitmentID) bool {
 			fmt.Println(id, "EarliestRootCommitmentID: ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
 			if commitmentID.Index() < earliestCommitment.Index() {
@@ -97,7 +101,7 @@ func (s *State) EarliestRootCommitmentID() (earliestCommitment iotago.Commitment
 
 			return true
 		})
-	})
+	}
 
 	if earliestCommitment.Index() == math.MaxInt64 {
 		return iotago.NewEmptyCommitment().MustID()
@@ -118,21 +122,20 @@ func (s *State) ActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	allRootBlocks := make(map[iotago.BlockID]iotago.CommitmentID)
-	s.rootBlocks.ForEach(func(index iotago.SlotIndex, storage *shrinkingmap.ShrinkingMap[iotago.BlockID, iotago.CommitmentID]) {
+	activeRootBlocks := make(map[iotago.BlockID]iotago.CommitmentID)
+	start, end := s.activeIndexRange()
+	fmt.Println("ActiveRootBlocks: ", start, " ", end)
+	for index := start; index <= end; index++ {
+		storage := s.rootBlocks.Get(index)
+		if storage == nil {
+			continue
+		}
+
 		storage.ForEach(func(id iotago.BlockID, commitmentID iotago.CommitmentID) bool {
-			allRootBlocks[id] = commitmentID
+			activeRootBlocks[id] = commitmentID
 
 			return true
 		})
-	})
-
-	activeRootBlocks := make(map[iotago.BlockID]iotago.CommitmentID)
-	for id, commitmentID := range allRootBlocks {
-		if !s.IsRootBlock(id) {
-			continue
-		}
-		activeRootBlocks[id] = commitmentID
 	}
 
 	return activeRootBlocks
@@ -143,10 +146,12 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	fmt.Println("AddRootBlock: ", id.String(), s.inRootBlockEvictedSlot(id.Index()), lo.Return1(s.lastEvictedSlot.Index()))
-	if s.inRootBlockEvictedSlot(id.Index()) {
+	// The rootblock is too old, ignore it.
+	if id.Index() < lo.Return1(s.activeIndexRange()) {
+		fmt.Println("ignore AddRootBlock: ", id.String(), id.Index(), lo.Return1(s.activeIndexRange()))
 		return
 	}
+	fmt.Println("AddRootBlock: ", id.String(), id.Index(), lo.Return1(s.activeIndexRange()))
 
 	if s.rootBlocks.Get(id.Index(), true).Set(id, commitmentID) {
 		if err := s.rootBlockStorageFunc(id.Index()).Store(id, commitmentID); err != nil {
@@ -188,6 +193,8 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
+	start, end := s.activeIndexRange()
+	fmt.Println("RootBlockCommitmentID: ", id.String(), id.Index(), start, end)
 	if !s.withinActiveIndexRange(id.Index()) {
 		return iotago.CommitmentID{}, false
 	}
@@ -212,8 +219,14 @@ func (s *State) LatestRootBlocks() iotago.BlockIDs {
 
 // Export exports the root blocks to the given writer.
 func (s *State) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
+	s.evictionMutex.RLock()
+	defer s.evictionMutex.RUnlock()
+
+	start, _ := s.activeIndexRange()
+
 	return stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
-		for currentSlot := lo.Return1(s.delayedBlockEvictionThreshold(targetSlot)); currentSlot <= targetSlot; currentSlot++ {
+		for currentSlot := start; currentSlot <= targetSlot; currentSlot++ {
+			fmt.Println("Export: ", currentSlot)
 			if err = s.rootBlockStorageFunc(currentSlot).Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
 				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
 					return errors.Wrapf(err, "failed to write root block ID %s", rootBlockID)
@@ -266,31 +279,25 @@ func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 	}
 }
 
-func (s *State) withinActiveIndexRange(index iotago.SlotIndex) bool {
-	_, valid := s.lastEvictedSlot.Index()
+func (s *State) activeIndexRange() (start, end iotago.SlotIndex) {
+	evictedSlot, _ := s.lastEvictedSlot.Index()
+	delayed, valid := s.delayedBlockEvictionThreshold(evictedSlot)
+
 	if !valid {
-		return index == 0
+		return 0, evictedSlot
 	}
 
-	// Check whether index is in the window of lastEvictedSlot-optsRootBlocksEvictionDelay (>=) and lastEvictedSlot (<=).
-	if s.inRootBlockEvictedSlot(index) || !s.lastEvictedSlot.IsEvicted(index) {
-		return false
+	if delayed+1 > evictedSlot {
+		return delayed, evictedSlot
 	}
 
-	return true
+	return delayed + 1, evictedSlot
 }
 
-func (s *State) inRootBlockEvictedSlot(index iotago.SlotIndex) bool {
-	evictedSlot, valid := s.lastEvictedSlot.Index()
-	if !valid {
-		return false
-	}
+func (s *State) withinActiveIndexRange(index iotago.SlotIndex) bool {
+	start, end := s.activeIndexRange()
 
-	if index < lo.Return1(s.delayedBlockEvictionThreshold(evictedSlot)) {
-		return true
-	}
-
-	return false
+	return index >= start && index <= end
 }
 
 // delayedBlockEvictionThreshold returns the slot index that is the threshold for delayed rootblocks eviction.

@@ -6,6 +6,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -46,7 +47,7 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 		return options.Apply(
 			&SybilProtection{
 				workers:           e.Workers.CreateGroup("SybilProtection"),
-				accounts:          account.NewAccounts[iotago.AccountID](e.Storage.SybilProtection(PrefixWeights)),
+				accounts:          account.NewAccounts[iotago.AccountID](mapdb.NewMapDB()),
 				inactivityManager: timed.NewTaskExecutor[iotago.AccountID](1),
 				lastActivities:    shrinkingmap.New[iotago.AccountID, time.Time](),
 
@@ -102,7 +103,7 @@ func (s *SybilProtection) Shutdown() {
 
 func (s *SybilProtection) initializeAccounts(weightVector map[iotago.AccountID]int64) {
 	for id, weight := range weightVector {
-		s.accounts.Update(id, weight)
+		s.accounts.Set(id, weight)
 	}
 }
 

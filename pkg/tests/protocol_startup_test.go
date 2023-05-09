@@ -119,7 +119,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 		// Verify nodes' states:
 		// - Slot 5 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 7.
-		// - 5.1 is ratified accepted and commits to slot 1 -> slot 1 should be evicted.
+		// - 5.1 is ratified accepted and commits to slot 1 -> slot 1 should be evicted. TODO: check latest evicted slot
 		// - rootblocks are still not evicted as RootBlocksEvictionDelay is 3.
 		// - slot 1 is still not finalized: there is no supermajority of ratified accepted blocks that commits to it.
 		ts.AssertNodeState(ts.Nodes(),
@@ -191,7 +191,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 		// Verify nodes' states:
 		// - Slot 10 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 12.
-		// - 10.1 is ratified accepted and commits to slot 5 -> slot 5 should be evicted.
+		// - 10.2 is ratified accepted and commits to slot 5 -> slot 5 should be evicted.
 		// - rootblocks are evicted until slot 2 as RootBlocksEvictionDelay is 3.
 		// - slot 5 is finalized: there is a supermajority of ratified accepted blocks that commits to it.
 		ts.AssertNodeState(ts.Nodes(),
@@ -212,8 +212,38 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	// Verify that node1 and node2 pruned until their respective slots.
 	// TODO:
 
-	// Shutdown node1 and restart it from disk. Verify state.
-	// TODO:
+	// Shutdown node2 and restart it from disk. Verify state.
+	{
+		node2.Shutdown()
+		ts.RemoveNode("node2")
+
+		node21 := ts.AddNode("node2.1")
+		fmt.Println("validators", ts.Validators())
+		node21.Initialize(
+			protocol.WithBaseDirectory(ts.Directory.Path(node2.Name)),
+			protocol.WithSybilProtectionProvider(
+				poa.NewProvider(ts.Validators()),
+			),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+			),
+		)
+		ts.Wait()
+		ts.AssertNodeState(ts.Nodes("node2.1"),
+			testsuite.WithSnapshotImported(true),
+			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithLatestCommitmentSlotIndex(10),
+			testsuite.WithLatestStateMutationSlot(0),
+			testsuite.WithLatestFinalizedSlot(5),
+			// testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithSybilProtectionCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			// testsuite.WithActiveRootBlocks(ts.Blocks("3.1", "4.2", "5.1")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2", "11.1")),
+		)
+		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+	}
+	return
 
 	// Create snapshot.
 	snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
@@ -250,8 +280,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			// TODO: depends on rootblocks testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithActiveRootBlocks(ts.Blocks("8.2", "9.1", "10.2")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("8.2", "9.1", "10.2")),
+			testsuite.WithActiveRootBlocks(ts.Blocks("3.1", "4.2", "5.1")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}

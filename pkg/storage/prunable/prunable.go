@@ -62,3 +62,7 @@ func (p *Prunable) Size() int64 {
 func (p *Prunable) Shutdown() {
 	p.manager.Shutdown()
 }
+
+func (p *Prunable) LastPrunedSlot() (index iotago.SlotIndex, hasPruned bool) {
+	return p.manager.LastPrunedSlot()
+}

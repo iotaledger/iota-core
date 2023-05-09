@@ -19,7 +19,7 @@ type Manager struct {
 	openDBs      *cache.Cache[iotago.SlotIndex, *dbInstance]
 	openDBsMutex sync.Mutex
 
-	lastPrunedSlot model.EvictionIndex
+	lastPrunedSlot *model.EvictionIndex
 	pruningMutex   sync.RWMutex
 
 	dbConfig database.Config
@@ -40,6 +40,7 @@ func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Mana
 		optsMaxOpenDBs:  10,
 		dbConfig:        dbConfig,
 		dbSizes:         shrinkingmap.New[iotago.SlotIndex, int64](),
+		lastPrunedSlot:  model.NewEvictionIndex(),
 	}, opts, func(m *Manager) {
 		m.logger = logger.NewWrappedLogger(m.optsLogger)
 
@@ -104,6 +105,13 @@ func (m *Manager) Shutdown() {
 	m.openDBs.Each(func(index iotago.SlotIndex, db *dbInstance) {
 		db.Close()
 	})
+}
+
+func (m *Manager) LastPrunedSlot() (index iotago.SlotIndex, hasPruned bool) {
+	m.pruningMutex.RLock()
+	defer m.pruningMutex.RUnlock()
+
+	return m.lastPrunedSlot.Index()
 }
 
 // PrunableStorageSize returns the size of the prunable storage containing all db instances.

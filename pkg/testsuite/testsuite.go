@@ -231,6 +231,9 @@ func (t *TestSuite) AddNodeToPartition(name string, partition string) *mock.Node
 func (t *TestSuite) AddNode(name string) *mock.Node {
 	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition)
 }
+func (t *TestSuite) RemoveNode(name string) {
+	delete(t.nodes, name)
+}
 
 func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
 	t.mutex.Lock()

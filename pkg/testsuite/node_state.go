@@ -46,6 +46,7 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.activeRootBlocks != nil {
 		t.AssertActiveRootBlocks(*state.activeRootBlocks, nodes...)
 	}
+
 }
 
 type NodeState struct {
@@ -64,6 +65,9 @@ type NodeState struct {
 
 	storageRootBlocks *[]*blocks.Block
 	activeRootBlocks  *[]*blocks.Block
+
+	// TODO: add pruning
+	//   TODO: check latest evicted slot
 }
 
 func WithSnapshotImported(snapshotImported bool) options.Option[NodeState] {

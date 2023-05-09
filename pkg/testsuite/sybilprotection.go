@@ -1,6 +1,8 @@
 package testsuite
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
@@ -31,6 +33,8 @@ func (t *TestSuite) assertSybilProtectionCustomCommittee(customCommitteeType str
 		if !assert.ElementsMatch(t.fakeTesting, lo.Keys(weightVector), committeeFunc().Members().Slice()) {
 			return errors.Errorf("AssertSybilProtectionCommittee(%s): %s: expected %s, got %s", customCommitteeType, node.Name, lo.Keys(weightVector), committeeFunc().Members().Slice())
 		}
+		committee := committeeFunc()
+		fmt.Println("committee", committee.Members().Slice(), committee.TotalWeight())
 
 		if lo.Sum(lo.Values(weightVector)...) != committeeFunc().TotalWeight() {
 			return errors.Errorf("AssertSybilProtectionCommittee(%s): %s: expected %v, got %v", customCommitteeType, node.Name, lo.Sum(lo.Values(weightVector)...), committeeFunc().TotalWeight())
