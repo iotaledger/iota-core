@@ -15,7 +15,8 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 		"TestProcessTransaction":                TestProcessTransaction,
 		"TestProcessTransactionsOutOfOrder":     TestProcessTransactionsOutOfOrder,
 		"TestSetInclusionSlot":                  TestSetInclusionSlot,
-		"TestSetTxOrphanage":                    TestSetTxOrphanage,
+		"TestSetTransactionOrphanage":           TestSetTransactionOrphanage,
+		"TestSetAllAttachmentsOrphaned":         TestSetAllAttachmentsOrphaned,
 		"TestSetTxOrphanageMultipleAttachments": TestSetTxOrphanageMultipleAttachments,
 		"TestStateDiff":                         TestStateDiff,
 	} {
@@ -130,10 +131,10 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tx1Metadata.SetCommitted()
 	//time.Sleep(1 * time.Second)
 	transactionDeletionState := map[string]bool{"tx1": true, "tx2": false, "tx3": false}
-	tf.RequireTransactionsDeleted(transactionDeletionState)
+	tf.RequireTransactionsEvicted(transactionDeletionState)
 
 	attachmentDeletionState := map[string]bool{"block1": true, "block2": false, "block3": false}
-	tf.RequireAttachmentsDeleted(attachmentDeletionState)
+	tf.RequireAttachmentsEvicted(attachmentDeletionState)
 
 	tf.Instance.Evict(1)
 
@@ -142,8 +143,8 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 
 	tx2Metadata.SetCommitted()
 	//time.Sleep(1 * time.Second)
-	tf.RequireTransactionsDeleted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx2": true}))
-	tf.RequireAttachmentsDeleted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block2": true}))
+	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx2": true}))
+	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block2": true}))
 
 	tf.Instance.Evict(2)
 	tf.RequireBooked("tx3")
@@ -153,17 +154,127 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 
 	tx3Metadata.SetCommitted()
 	//time.Sleep(1 * time.Second)
-	tf.RequireTransactionsDeleted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx3": true}))
+	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx3": true}))
 
 	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
 	require.False(t, tx2Metadata.Inclusion().IsOrphaned())
 	require.False(t, tx3Metadata.Inclusion().IsOrphaned())
 
-	tf.RequireAttachmentsDeleted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block3": true}))
+	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block3": true}))
 
 }
 
-func TestSetTxOrphanage(t *testing.T, tf *TestFramework) {
+func TestSetAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
+	debug.SetEnabled(true)
+	defer debug.SetEnabled(false)
+	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
+
+	require.NoError(t, tf.AttachTransaction("tx1", "block1.2", 2))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1.1", 1))
+
+	tf.RequireBooked("tx1")
+
+	tx1Metadata, exists := tf.TransactionMetadata("tx1")
+	require.True(t, exists)
+
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedSlot())
+
+	require.True(t, tf.MarkAttachmentIncluded("block1.2"))
+
+	require.True(t, tx1Metadata.Inclusion().IsAccepted())
+	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedSlot())
+	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
+	tf.AssertStateDiff(2, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
+
+	require.True(t, tf.MarkAttachmentIncluded("block1.1"))
+
+	require.True(t, tx1Metadata.Inclusion().IsAccepted())
+	require.EqualValues(t, 1, tx1Metadata.EarliestIncludedSlot())
+	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
+	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
+
+	require.True(t, tf.MarkAttachmentOrphaned("block1.1"))
+
+	require.True(t, tx1Metadata.Inclusion().IsAccepted())
+	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
+	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedSlot())
+	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
+	tf.AssertStateDiff(2, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
+
+	require.True(t, tf.MarkAttachmentOrphaned("block1.2"))
+
+	require.True(t, tx1Metadata.Inclusion().IsOrphaned())
+	require.True(t, tx1Metadata.Inclusion().IsAccepted())
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedSlot())
+
+	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
+	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
+
+}
+
+func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
+	debug.SetEnabled(true)
+	defer debug.SetEnabled(false)
+	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
+
+	require.NoError(t, tf.AttachTransaction("tx1", "block1.6", 6))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1.5", 5))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1.4", 4))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1.3", 3))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1.2", 2))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1.1", 1))
+
+	tf.RequireBooked("tx1")
+
+	tx1Metadata, exists := tf.TransactionMetadata("tx1")
+	require.True(t, exists)
+
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedSlot())
+
+	require.True(t, tf.MarkAttachmentIncluded("block1.2"))
+
+	tf.Instance.Evict(1)
+
+	require.True(t, tx1Metadata.Inclusion().IsAccepted())
+	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
+	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedSlot())
+	tf.AssertStateDiff(2, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
+
+	require.True(t, tf.MarkAttachmentOrphaned("block1.2"))
+
+	require.True(t, tx1Metadata.Inclusion().IsAccepted())
+	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedSlot())
+	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
+
+	require.True(t, tf.MarkAttachmentIncluded("block1.4"))
+
+	require.True(t, tx1Metadata.Inclusion().IsAccepted())
+	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
+	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedSlot())
+	tf.AssertStateDiff(4, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
+
+	tf.Instance.Evict(2)
+	tf.Instance.Evict(3)
+
+	require.True(t, tx1Metadata.Inclusion().IsAccepted())
+	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
+	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedSlot())
+	tf.AssertStateDiff(4, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
+
+	tf.Instance.Evict(4)
+
+	require.True(t, tf.MarkAttachmentIncluded("block1.5"))
+
+	require.True(t, tx1Metadata.Inclusion().IsAccepted())
+	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
+	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedSlot())
+	tf.AssertStateDiff(4, []string{}, []string{}, []string{})
+	tf.AssertStateDiff(5, []string{}, []string{}, []string{})
+
+}
+
+func TestSetTransactionOrphanage(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
 	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
@@ -192,13 +303,13 @@ func TestSetTxOrphanage(t *testing.T, tf *TestFramework) {
 
 	tf.Instance.Evict(1)
 
-	tf.RequireTransactionsDeleted(map[string]bool{"tx1": true, "tx2": true, "tx3": true})
+	tf.RequireTransactionsEvicted(map[string]bool{"tx1": true, "tx2": true, "tx3": true})
 
 	require.True(t, tx1Metadata.Inclusion().IsOrphaned())
 	require.True(t, tx2Metadata.Inclusion().IsOrphaned())
 	require.True(t, tx3Metadata.Inclusion().IsOrphaned())
 
-	tf.RequireAttachmentsDeleted(map[string]bool{"block1": true, "block2": true, "block3": true})
+	tf.RequireAttachmentsEvicted(map[string]bool{"block1": true, "block2": true, "block3": true})
 }
 
 func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
@@ -243,9 +354,9 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 	require.True(t, tx2Metadata.Inclusion().IsOrphaned())
 	require.True(t, tx3Metadata.Inclusion().IsOrphaned())
 
-	tf.RequireTransactionsDeleted(map[string]bool{"tx1": true, "tx2": true, "tx3": true})
+	tf.RequireTransactionsEvicted(map[string]bool{"tx1": true, "tx2": true, "tx3": true})
 
-	tf.RequireAttachmentsDeleted(map[string]bool{"block1.1": true, "block1.2": true, "block2": true, "block3": true})
+	tf.RequireAttachmentsEvicted(map[string]bool{"block1.1": true, "block1.2": true, "block2": true, "block3": true})
 }
 
 func TestStateDiff(t *testing.T, tf *TestFramework) {

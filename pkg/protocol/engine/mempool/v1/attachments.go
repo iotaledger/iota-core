@@ -66,7 +66,13 @@ func (a *Attachments) MarkOrphaned(blockID iotago.BlockID) (orphaned bool) {
 		return false
 	}
 
-	a.Evict(blockID)
+	// TODO: need to handle the case where the only attachment of a transaction is orphaned and additional actions need to be performed:
+	// * mark the transaction as unaccepted
+	// * update the UTXO future cone's acceptance status, because now not all inputs are accepted and the future transactions cannot be accepted either
+	// * remove all transactions that became un-accepted from StateDiffs (that might already be done partially)
+	// * optionally, trigger global TransactionUnaccepted event.
+
+	a.evict(blockID)
 
 	if previousState == AttachmentIncluded && blockID.Index() == a.earliestIncludedSlot.Get() {
 		a.earliestIncludedSlot.Set(a.findLowestIncludedSlotIndex())
@@ -91,6 +97,10 @@ func (a *Attachments) Evict(id iotago.BlockID) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
+	a.evict(id)
+}
+
+func (a *Attachments) evict(id iotago.BlockID) {
 	if a.attachments.Delete(id) && a.attachments.IsEmpty() {
 		a.allAttachmentsEvicted.Trigger()
 	}

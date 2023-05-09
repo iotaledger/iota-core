@@ -83,7 +83,7 @@ func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, 
 
 func (m *MemPool[VotePower]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool {
 	if attachmentSlot := m.attachments.Get(blockID.Index(), false); attachmentSlot != nil {
-		attachmentSlot.Delete(blockID)
+		defer attachmentSlot.Delete(blockID)
 	}
 
 	return m.updateAttachment(blockID, (*TransactionWithMetadata).MarkAttachmentOrphaned)

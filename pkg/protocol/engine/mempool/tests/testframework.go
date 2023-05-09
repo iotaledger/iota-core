@@ -151,17 +151,17 @@ func (t *TestFramework) RequireAccepted(transactionAliases map[string]bool) {
 	t.requireMarkedAccepted(transactionAliases)
 }
 
-func (t *TestFramework) RequireTransactionsDeleted(transactionAliases map[string]bool) {
+func (t *TestFramework) RequireTransactionsEvicted(transactionAliases map[string]bool) {
 	for transactionAlias, deleted := range transactionAliases {
 		_, exists := t.Instance.Transaction(t.TransactionID(transactionAlias))
-		require.Equal(t.test, deleted, !exists, "transaction %s has incorrect deletion state", transactionAlias)
+		require.Equal(t.test, deleted, !exists, "transaction %s has incorrect eviction state", transactionAlias)
 	}
 }
 
-func (t *TestFramework) RequireAttachmentsDeleted(attachmentAliases map[string]bool) {
+func (t *TestFramework) RequireAttachmentsEvicted(attachmentAliases map[string]bool) {
 	for attachmentAlias, deleted := range attachmentAliases {
 		_, exists := t.Instance.TransactionByAttachment(t.BlockID(attachmentAlias))
-		require.Equal(t.test, deleted, !exists, "attachment %s has incorrect deletion state", attachmentAlias)
+		require.Equal(t.test, deleted, !exists, "attachment %s has incorrect eviction state", attachmentAlias)
 	}
 }
 

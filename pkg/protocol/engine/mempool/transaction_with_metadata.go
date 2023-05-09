@@ -21,4 +21,6 @@ type TransactionWithMetadata interface {
 	SetCommitted()
 
 	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func())
+
+	EarliestIncludedSlot() iotago.SlotIndex
 }

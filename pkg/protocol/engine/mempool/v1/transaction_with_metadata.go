@@ -77,6 +77,10 @@ func (t *TransactionWithMetadata) Transaction() mempool.Transaction {
 	return t.transaction
 }
 
+func (t *TransactionWithMetadata) EarliestIncludedSlot() iotago.SlotIndex {
+	return t.attachments.EarliestIncludedSlot()
+}
+
 func (t *TransactionWithMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateWithMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
