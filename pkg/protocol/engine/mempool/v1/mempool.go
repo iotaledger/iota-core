@@ -82,11 +82,15 @@ func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, 
 }
 
 func (m *MemPool[VotePower]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool {
-	return m.updateAttachment(blockID, (*TransactionWithMetadata).MarkOrphaned)
+	if attachmentSlot := m.attachments.Get(blockID.Index(), false); attachmentSlot != nil {
+		attachmentSlot.Delete(blockID)
+	}
+
+	return m.updateAttachment(blockID, (*TransactionWithMetadata).MarkAttachmentOrphaned)
 }
 
 func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) bool {
-	return m.updateAttachment(blockID, (*TransactionWithMetadata).MarkIncluded)
+	return m.updateAttachment(blockID, (*TransactionWithMetadata).MarkAttachmentIncluded)
 }
 
 func (m *MemPool[VotePower]) Transaction(id iotago.TransactionID) (transaction mempool.TransactionWithMetadata, exists bool) {
@@ -124,6 +128,8 @@ func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
 		defer m.evictionMutex.Unlock()
 
 		m.lastEvictedSlot = slotIndex
+
+		m.stateDiffs.Delete(slotIndex)
 
 		return m.attachments.Evict(slotIndex)
 	}(); evictedAttachments != nil {
@@ -193,11 +199,11 @@ func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionW
 	})
 
 	transaction.inclusion.OnCommitted(func() {
-		m.cachedTransactions.Delete(transaction.ID())
+		m.removeTransaction(transaction)
 	})
 
-	transaction.inclusion.OnEvicted(func() {
-		m.cachedTransactions.Delete(transaction.ID())
+	transaction.inclusion.OnOrphaned(func() {
+		m.removeTransaction(transaction)
 	})
 }
 
@@ -214,7 +220,7 @@ func (m *MemPool[VotePower]) setupStateLifecycle(state *StateWithMetadata) {
 		deleteIfNoConsumers()
 	})
 
-	state.inclusionState.OnEvicted(func() {
+	state.inclusionState.OnOrphaned(func() {
 		m.cachedStateRequests.Delete(state.ID())
 	})
 }
@@ -293,6 +299,18 @@ func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionWithMetadata
 			m.setupStateLifecycle(output)
 		}
 	}
+}
+
+func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionWithMetadata) {
+	transaction.Attachments().attachments.ForEach(func(blockID iotago.BlockID, _ AttachmentStatus) bool {
+		if slotAttachments := m.attachments.Get(blockID.Index(), false); slotAttachments != nil {
+			slotAttachments.Delete(blockID)
+		}
+
+		return true
+	})
+
+	m.cachedTransactions.Delete(transaction.ID())
 }
 
 func (m *MemPool[VotePower]) requestStateWithMetadata(stateReference ledger.StateReference, waitIfMissing ...bool) *promise.Promise[*StateWithMetadata] {

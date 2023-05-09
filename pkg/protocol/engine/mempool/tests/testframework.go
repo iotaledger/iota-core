@@ -110,6 +110,14 @@ func (t *TestFramework) TransactionMetadata(alias string) (mempool.TransactionWi
 	return t.Instance.Transaction(t.TransactionID(alias))
 }
 
+func (t *TestFramework) TransactionByAttachment(alias string) (mempool.TransactionWithMetadata, bool) {
+	return t.Instance.TransactionByAttachment(t.BlockID(alias))
+}
+
+func (t *TestFramework) State(alias string) (mempool.StateWithMetadata, error) {
+	return t.Instance.State(t.stateReference(alias))
+}
+
 func (t *TestFramework) StateID(alias string) iotago.OutputID {
 	if alias == "genesis" {
 		return iotago.OutputID{}
@@ -138,13 +146,23 @@ func (t *TestFramework) RequireBooked(transactionAliases ...string) {
 	t.requireMarkedBooked(transactionAliases...)
 }
 
-func (t *TestFramework) RequireAccepted(transactionAliases ...string) {
-	t.requireAcceptedTriggered(transactionAliases...)
-	t.requireMarkedAccepted(transactionAliases...)
+func (t *TestFramework) RequireAccepted(transactionAliases map[string]bool) {
+	t.requireAcceptedTriggered(transactionAliases)
+	t.requireMarkedAccepted(transactionAliases)
 }
 
-func (t *TestFramework) RequireDeleted(transactionAliases ...string) {
-	t.requireDeleted(transactionAliases...)
+func (t *TestFramework) RequireTransactionsDeleted(transactionAliases map[string]bool) {
+	for transactionAlias, deleted := range transactionAliases {
+		_, exists := t.Instance.Transaction(t.TransactionID(transactionAlias))
+		require.Equal(t.test, deleted, !exists, "transaction %s has incorrect deletion state", transactionAlias)
+	}
+}
+
+func (t *TestFramework) RequireAttachmentsDeleted(attachmentAliases map[string]bool) {
+	for attachmentAlias, deleted := range attachmentAliases {
+		_, exists := t.Instance.TransactionByAttachment(t.BlockID(attachmentAlias))
+		require.Equal(t.test, deleted, !exists, "attachment %s has incorrect deletion state", attachmentAlias)
+	}
 }
 
 func (t *TestFramework) setupHookedEvents() {
@@ -267,32 +285,26 @@ func (t *TestFramework) requireMarkedBooked(transactionAliases ...string) {
 	for _, transactionAlias := range transactionAliases {
 		transactionMetadata, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
 
-		require.True(t.test, transactionMetadataExists && transactionMetadata.Lifecycle().IsBooked(), "transaction %s was not booked", transactionAlias)
+		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
+		require.True(t.test, transactionMetadata.Lifecycle().IsBooked(), "transaction %s was not booked", transactionAlias)
 	}
 }
 
-func (t *TestFramework) requireAcceptedTriggered(transactionAliases ...string) {
+func (t *TestFramework) requireAcceptedTriggered(transactionAliases map[string]bool) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	for _, transactionAlias := range transactionAliases {
-		require.True(t.test, t.globalAcceptedEventTriggered[t.TransactionID(transactionAlias)], "transaction '%s' was not accepted", transactionAlias)
+	for transactionAlias, accepted := range transactionAliases {
+		require.Equal(t.test, accepted, t.globalAcceptedEventTriggered[t.TransactionID(transactionAlias)], "transaction '%s' trigger has incorrect state", transactionAlias)
 	}
 }
 
-func (t *TestFramework) requireMarkedAccepted(transactionAliases ...string) {
-	for _, transactionAlias := range transactionAliases {
+func (t *TestFramework) requireMarkedAccepted(transactionAliases map[string]bool) {
+	for transactionAlias, accepted := range transactionAliases {
 		transactionMetadata, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
 
-		require.True(t.test, transactionMetadataExists && transactionMetadata.Inclusion().IsAccepted(), "transaction %s was not accepted", transactionAlias)
-	}
-}
-
-func (t *TestFramework) requireDeleted(transactionAliases ...string) {
-	for _, transactionAlias := range transactionAliases {
-		_, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
-
-		require.False(t.test, transactionMetadataExists, "transaction %s was not deleted", transactionAlias)
+		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
+		require.Equal(t.test, accepted, transactionMetadata.Inclusion().IsAccepted(), "transaction %s was incorrectly accepted", transactionAlias)
 	}
 }
 

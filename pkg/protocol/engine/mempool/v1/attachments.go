@@ -13,7 +13,6 @@ type AttachmentStatus uint8
 const (
 	AttachmentPending AttachmentStatus = iota
 	AttachmentIncluded
-	AttachmentOrphaned
 )
 
 type Attachments struct {
@@ -63,11 +62,11 @@ func (a *Attachments) MarkOrphaned(blockID iotago.BlockID) (orphaned bool) {
 	defer a.mutex.Unlock()
 
 	previousState, exists := a.attachments.Get(blockID)
-	if !exists || previousState == AttachmentOrphaned {
+	if !exists {
 		return false
 	}
 
-	a.attachments.Set(blockID, AttachmentOrphaned)
+	a.Evict(blockID)
 
 	if previousState == AttachmentIncluded && blockID.Index() == a.earliestIncludedSlot.Get() {
 		a.earliestIncludedSlot.Set(a.findLowestIncludedSlotIndex())

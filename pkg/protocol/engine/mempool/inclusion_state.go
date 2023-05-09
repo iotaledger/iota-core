@@ -13,7 +13,7 @@ type InclusionState interface {
 
 	OnRejected(callback func())
 
-	IsEvicted() bool
+	IsOrphaned() bool
 
-	OnEvicted(callback func())
+	OnOrphaned(callback func())
 }

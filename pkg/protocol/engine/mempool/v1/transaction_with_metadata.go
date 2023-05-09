@@ -62,7 +62,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 
 	t.attachments.OnAllAttachmentsEvicted(func() {
 		if !t.inclusion.IsCommitted() {
-			t.inclusion.setEvicted()
+			t.inclusion.setOrphaned()
 		}
 	})
 
@@ -111,11 +111,11 @@ func (t *TransactionWithMetadata) OnEarliestIncludedSlotUpdated(callback func(pr
 	return t.attachments.earliestIncludedSlot.OnUpdate(callback)
 }
 
-func (t *TransactionWithMetadata) MarkIncluded(blockID iotago.BlockID) bool {
+func (t *TransactionWithMetadata) MarkAttachmentIncluded(blockID iotago.BlockID) bool {
 	return t.attachments.MarkIncluded(blockID)
 }
 
-func (t *TransactionWithMetadata) MarkOrphaned(blockID iotago.BlockID) bool {
+func (t *TransactionWithMetadata) MarkAttachmentOrphaned(blockID iotago.BlockID) bool {
 	return t.attachments.MarkOrphaned(blockID)
 }
 
@@ -179,7 +179,7 @@ func (t *TransactionWithMetadata) setupInputLifecycle(input *StateWithMetadata) 
 		input.spentState.decreaseSpenderCount()
 	})
 
-	t.inclusion.OnEvicted(input.spentState.decreaseSpenderCount)
+	t.inclusion.OnOrphaned(input.spentState.decreaseSpenderCount)
 
 	input.inclusionState.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
@@ -189,7 +189,7 @@ func (t *TransactionWithMetadata) setupInputLifecycle(input *StateWithMetadata) 
 
 	input.inclusionState.OnRejected(t.inclusion.setRejected)
 
-	input.inclusionState.OnEvicted(t.inclusion.setEvicted)
+	input.inclusionState.OnOrphaned(t.inclusion.setOrphaned)
 
 	input.spentState.OnSpendAccepted(func(spender mempool.TransactionWithMetadata) {
 		if spender != t {
@@ -199,7 +199,7 @@ func (t *TransactionWithMetadata) setupInputLifecycle(input *StateWithMetadata) 
 
 	input.spentState.OnSpendCommitted(func(spender mempool.TransactionWithMetadata) {
 		if spender != t {
-			t.inclusion.setEvicted()
+			t.inclusion.setOrphaned()
 		}
 	})
 }

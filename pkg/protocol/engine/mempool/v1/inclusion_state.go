@@ -6,7 +6,7 @@ type InclusionState struct {
 	accepted  *promise.Event
 	committed *promise.Event
 	rejected  *promise.Event
-	evicted   *promise.Event
+	orphaned  *promise.Event
 }
 
 func NewInclusionState() *InclusionState {
@@ -14,7 +14,7 @@ func NewInclusionState() *InclusionState {
 		accepted:  promise.NewEvent(),
 		committed: promise.NewEvent(),
 		rejected:  promise.NewEvent(),
-		evicted:   promise.NewEvent(),
+		orphaned:  promise.NewEvent(),
 	}
 }
 
@@ -46,12 +46,12 @@ func (s *InclusionState) OnRejected(callback func()) {
 	s.rejected.OnTrigger(callback)
 }
 
-func (s *InclusionState) IsEvicted() bool {
-	return s.evicted.WasTriggered()
+func (s *InclusionState) IsOrphaned() bool {
+	return s.orphaned.WasTriggered()
 }
 
-func (s *InclusionState) OnEvicted(callback func()) {
-	s.evicted.OnTrigger(callback)
+func (s *InclusionState) OnOrphaned(callback func()) {
+	s.orphaned.OnTrigger(callback)
 }
 
 func (s *InclusionState) setAccepted() {
@@ -62,6 +62,6 @@ func (s *InclusionState) setRejected() {
 	s.rejected.Trigger()
 }
 
-func (s *InclusionState) setEvicted() {
-	s.evicted.Trigger()
+func (s *InclusionState) setOrphaned() {
+	s.orphaned.Trigger()
 }

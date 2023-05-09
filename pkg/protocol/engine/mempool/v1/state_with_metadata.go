@@ -28,7 +28,7 @@ func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetad
 		source.inclusion.OnAccepted(s.inclusionState.setAccepted)
 		source.inclusion.OnRejected(s.inclusionState.setRejected)
 		source.inclusion.OnCommitted(s.inclusionState.setCommitted)
-		source.inclusion.OnEvicted(s.inclusionState.setEvicted)
+		source.inclusion.OnOrphaned(s.inclusionState.setOrphaned)
 	}
 
 	return s
