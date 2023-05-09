@@ -21,5 +21,7 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedPower](mempooltests.VM, func(reference ledger.StateReference) *promise.Promise[ledger.State] {
 		return ledgerState.ResolveState(reference.StateID())
-	}, workerpool.NewGroup(t.Name())))
+	}, workerpool.NewGroup(t.Name())), func() {
+		ledgerState.Cleanup()
+	})
 }

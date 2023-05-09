@@ -1,13 +1,20 @@
 package mempooltests
 
 import (
+	"fmt"
+	"runtime"
+	memleakdebug "runtime/debug"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/debug"
+
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
@@ -19,6 +26,7 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 		"TestSetAllAttachmentsOrphaned":         TestSetAllAttachmentsOrphaned,
 		"TestSetTxOrphanageMultipleAttachments": TestSetTxOrphanageMultipleAttachments,
 		"TestStateDiff":                         TestStateDiff,
+		"TestMempool_MemLeak":                   TestMempool_MemLeak,
 	} {
 		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
 	}
@@ -388,4 +396,50 @@ func TestStateDiff(t *testing.T, tf *TestFramework) {
 
 	tf.RequireAccepted(lo.MergeMaps(acceptanceState, map[string]bool{"tx3": true}))
 	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx3:0"}, []string{"tx1", "tx2", "tx3"})
+}
+
+func TestMempool_MemLeak(t *testing.T, tf *TestFramework) {
+	prevStateAlias := "genesis"
+	txIndex := 1
+	issueTransactions := func(startIndex, transactionCount int, prevStateAlias string) (int, string) {
+		index := startIndex
+		for ; index < startIndex+transactionCount; index++ {
+			txAlias := fmt.Sprintf("tx%d", index)
+			blockAlias := fmt.Sprintf("block%d", index)
+			tf.CreateTransaction(txAlias, []string{prevStateAlias}, 2)
+
+			require.NoError(t, tf.AttachTransaction(txAlias, blockAlias, iotago.SlotIndex(index)))
+
+			prevStateAlias = fmt.Sprintf("tx%d:0", index)
+
+			tf.Instance.Evict(iotago.SlotIndex(index))
+		}
+		return index, prevStateAlias
+	}
+
+	memStatsStart := memStats()
+
+	txIndex, prevStateAlias = issueTransactions(txIndex, 100000, prevStateAlias)
+
+	time.Sleep(1 * time.Second)
+
+	txIndex, prevStateAlias = issueTransactions(txIndex, 100000, prevStateAlias)
+
+	tf.Cleanup()
+	tf = nil
+	memStatsEnd := memStats()
+
+	fmt.Println(memStatsEnd.HeapObjects, memStatsStart.HeapObjects)
+
+	assert.Less(t, float64(memStatsEnd.HeapObjects), 1.1*float64(memStatsStart.HeapObjects), "the objects in the heap should not grow by more than 10%")
+}
+
+func memStats() *runtime.MemStats {
+	runtime.GC()
+	memleakdebug.FreeOSMemory()
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	return &memStats
 }

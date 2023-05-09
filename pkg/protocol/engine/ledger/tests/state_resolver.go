@@ -31,3 +31,7 @@ func (s *StateResolver) ResolveState(id iotago.OutputID) *promise.Promise[ledger
 
 	return promise.New[ledger.State]().Resolve(output)
 }
+
+func (s *StateResolver) Cleanup() {
+	s.statesByID = make(map[iotago.OutputID]ledger.State)
+}

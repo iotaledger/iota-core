@@ -28,11 +28,13 @@ type TestFramework struct {
 	globalBookedEventTriggered   map[iotago.TransactionID]bool
 	globalAcceptedEventTriggered map[iotago.TransactionID]bool
 
+	cleanupCallback func()
+
 	test  *testing.T
 	mutex sync.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower]) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower], cleanupCallback func()) *TestFramework {
 	t := &TestFramework{
 		Instance:                     instance,
 		stateIDByAlias:               make(map[string]iotago.OutputID),
@@ -44,7 +46,8 @@ func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower
 		globalExecutedEventTriggered: make(map[iotago.TransactionID]bool),
 		globalAcceptedEventTriggered: make(map[iotago.TransactionID]bool),
 
-		test: test,
+		cleanupCallback: cleanupCallback,
+		test:            test,
 	}
 
 	t.setupHookedEvents()
@@ -329,4 +332,17 @@ func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAlias
 		require.True(t.test, stateDiff.DestroyedStates().Has(t.StateID(spentOutputAlias)))
 	}
 
+}
+
+func (t *TestFramework) Cleanup() {
+	t.cleanupCallback()
+
+	t.stateIDByAlias = make(map[string]iotago.OutputID)
+	t.transactionByAlias = make(map[string]mempool.Transaction)
+	t.blockIDsByAlias = make(map[string]iotago.BlockID)
+	t.globalStoredEventTriggered = make(map[iotago.TransactionID]bool)
+	t.globalSolidEventTriggered = make(map[iotago.TransactionID]bool)
+	t.globalExecutedEventTriggered = make(map[iotago.TransactionID]bool)
+	t.globalBookedEventTriggered = make(map[iotago.TransactionID]bool)
+	t.globalAcceptedEventTriggered = make(map[iotago.TransactionID]bool)
 }
