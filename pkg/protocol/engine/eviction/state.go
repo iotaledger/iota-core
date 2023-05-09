@@ -70,6 +70,9 @@ func (s *State) LastEvictedSlot() (index iotago.SlotIndex, hasEvicted bool) {
 
 // EarliestRootCommitmentID returns the earliest commitment that rootblocks are committing to across all rootblocks.
 func (s *State) EarliestRootCommitmentID() (earliestCommitment iotago.CommitmentID) {
+	s.evictionMutex.RLock()
+	defer s.evictionMutex.RUnlock()
+
 	earliestCommitment = iotago.NewSlotIdentifier(math.MaxInt64, [32]byte{})
 
 	start, end := s.activeIndexRange()
@@ -266,9 +269,6 @@ func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 }
 
 func (s *State) activeIndexRange() (start, end iotago.SlotIndex) {
-	s.evictionMutex.RLock()
-	defer s.evictionMutex.RUnlock()
-
 	lastCommitted := s.lastCommittedSlot
 	delayed, valid := s.delayedBlockEvictionThreshold(lastCommitted)
 
