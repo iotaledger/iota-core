@@ -31,8 +31,8 @@ type BIC struct {
 	module.Module
 }
 
-func NewProvider(opts ...options.Option[BIC]) module.Provider[*engine.Engine, Weights] {
-	return module.Provide(func(e *engine.Engine) Weights {
+func NewProvider(opts ...options.Option[BIC]) module.Provider[*engine.Engine, BlockIssuanceCredits] {
+	return module.Provide(func(e *engine.Engine) BlockIssuanceCredits {
 		return options.Apply(
 			&BIC{
 				workers:  e.Workers.CreateGroup("BIC"),
@@ -58,7 +58,7 @@ func (b *BIC) BIC() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
 	return b.balances
 }
 
-func (b *BIC) AccountBIC(id iotago.AccountID) (account *iotago.AccountID, err error) {
+func (b *BIC) AccountBIC(id iotago.AccountID) (account *Account, err error) {
 	return nil, nil
 }
 

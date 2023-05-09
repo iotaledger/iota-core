@@ -12,11 +12,11 @@ type BIC struct {
 	*account.Accounts[iotago.AccountID, *iotago.AccountID]
 }
 
-func (b BIC) AccountBIC(id iotago.AccountID) (account accounts.Weight, err error) {
+func (b BIC) AccountBIC(id iotago.AccountID) (account accounts.Credits, err error) {
 	// todo store last updated time
 	val, exists := b.Get(id)
 	if exists {
-		return accounts.Weight{Value: val}, nil
+		return accounts.Credits{Value: val}, nil
 	}
-	return accounts.Weight{}, errors.Errorf("account not found: %s", id)
+	return accounts.Credits{}, errors.Errorf("account not found: %s", id)
 }

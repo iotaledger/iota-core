@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -37,7 +38,7 @@ type Manager struct {
 	errorHandler func(error)
 
 	ledger ledger.Ledger
-	bic    *account.Accounts[iotago.AccountID, *iotago.AccountID]
+	bic    accounts.BlockIssuanceCredits
 
 	storage *storage.Storage
 
@@ -74,7 +75,7 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 
 				e.HookConstructed(func() {
 					m.storage = e.Storage
-					m.bic = e.Accounts.BIC()
+					m.bic = e.BIC
 					m.acceptedTimeFunc = e.Clock.RatifiedAccepted().Time
 
 					m.ledger = e.Ledger
