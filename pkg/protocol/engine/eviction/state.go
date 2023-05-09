@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -25,9 +24,8 @@ type State struct {
 	rootBlocks           *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID]
 	latestRootBlocks     *ringbuffer.RingBuffer[iotago.BlockID]
 	rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks
-	lastEvictedSlot      *model.EvictionIndex
+	lastCommittedSlot    iotago.SlotIndex
 	evictionMutex        sync.RWMutex
-	triggerMutex         sync.Mutex
 
 	optsRootBlocksEvictionDelay iotago.SlotIndex
 }
@@ -39,47 +37,35 @@ func NewState(rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks, 
 		rootBlocks:                  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID](),
 		latestRootBlocks:            ringbuffer.NewRingBuffer[iotago.BlockID](8),
 		rootBlockStorageFunc:        rootBlockStorageFunc,
-		lastEvictedSlot:             model.NewEvictionIndex(),
 		optsRootBlocksEvictionDelay: 3,
 	}, opts)
 }
 
-func (s *State) Initialize(lastEvictedSlot iotago.SlotIndex) {
-	if lastEvictedSlot > 0 {
-		s.lastEvictedSlot.MarkEvicted(lastEvictedSlot)
-	}
+func (s *State) Initialize(lastCommittedSlot iotago.SlotIndex) {
+	s.lastCommittedSlot = lastCommittedSlot
 }
 
-// EvictUntil triggers the SlotEvicted event for every evicted slot and evicts all root blocks until the delayed
-// root blocks eviction threshold.
-func (s *State) EvictUntil(index iotago.SlotIndex) {
-	s.triggerMutex.Lock()
-	defer s.triggerMutex.Unlock()
-
+func (s *State) AdvanceActiveWindowToIndex(index iotago.SlotIndex) {
 	s.evictionMutex.Lock()
+	s.lastCommittedSlot = index
 
-	nextIndex := s.lastEvictedSlot.NextIndex()
-	for currentIndex := nextIndex; currentIndex <= index; currentIndex++ {
-		s.lastEvictedSlot.MarkEvicted(index)
-
-		delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(currentIndex)
-		if shouldEvictRootBlocks {
-			s.rootBlocks.Evict(delayedIndex)
-		}
+	delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(index)
+	if shouldEvictRootBlocks {
+		s.rootBlocks.Evict(delayedIndex)
 	}
+
 	s.evictionMutex.Unlock()
 
-	for currentIndex := nextIndex; currentIndex <= index; currentIndex++ {
-		s.Events.SlotEvicted.Trigger(currentIndex)
+	if shouldEvictRootBlocks {
+		s.Events.SlotEvicted.Trigger(delayedIndex)
 	}
 }
 
-// LastEvictedSlot returns the last evicted slot.
-func (s *State) LastEvictedSlot() (index iotago.SlotIndex, valid bool) {
+func (s *State) LastEvictedSlot() (index iotago.SlotIndex, hasEvicted bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	return s.lastEvictedSlot.Index()
+	return s.delayedBlockEvictionThreshold(s.lastCommittedSlot)
 }
 
 // EarliestRootCommitmentID returns the earliest commitment that rootblocks are committing to across all rootblocks.
@@ -110,12 +96,12 @@ func (s *State) EarliestRootCommitmentID() (earliestCommitment iotago.Commitment
 	return earliestCommitment
 }
 
-// InEvictedSlot checks if the Block associated with the given id is too old (in a pruned slot).
-func (s *State) InEvictedSlot(id iotago.BlockID) bool {
+// InRootBlockSlot checks if the Block associated with the given id is too old.
+func (s *State) InRootBlockSlot(id iotago.BlockID) bool {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	return s.lastEvictedSlot.IsEvicted(id.Index())
+	return s.withinActiveIndexRange(id.Index())
 }
 
 func (s *State) ActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
@@ -280,18 +266,21 @@ func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 }
 
 func (s *State) activeIndexRange() (start, end iotago.SlotIndex) {
-	evictedSlot, _ := s.lastEvictedSlot.Index()
-	delayed, valid := s.delayedBlockEvictionThreshold(evictedSlot)
+	s.evictionMutex.RLock()
+	defer s.evictionMutex.RUnlock()
+
+	lastCommitted := s.lastCommittedSlot
+	delayed, valid := s.delayedBlockEvictionThreshold(lastCommitted)
 
 	if !valid {
-		return 0, evictedSlot
+		return 0, lastCommitted
 	}
 
-	if delayed+1 > evictedSlot {
-		return delayed, evictedSlot
+	if delayed+1 > lastCommitted {
+		return delayed, lastCommitted
 	}
 
-	return delayed + 1, evictedSlot
+	return delayed + 1, lastCommitted
 }
 
 func (s *State) withinActiveIndexRange(index iotago.SlotIndex) bool {

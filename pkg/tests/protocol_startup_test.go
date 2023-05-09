@@ -65,7 +65,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("2.2", "2.2*"), false, ts.Nodes()...)
 		}
 
-		// Slot 3-4
+		// Slot 3-6
 		{
 			// Slot 3
 			ts.IssueBlockAtSlot("3.1", 3, iotago.NewEmptyCommitment(), node1, ts.BlockIDs("2.2", "2.2*")...)
@@ -73,12 +73,18 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			// Slot 4
 			ts.IssueBlockAtSlot("4.2", 4, iotago.NewEmptyCommitment(), node2, ts.BlockID("3.1"))
 
-			ts.AssertBlocksExist(ts.Blocks("3.1", "4.2"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("2.2", "2.2*", "3.1"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("4.2"), false, ts.Nodes()...)
+			// Slot 5
+			ts.IssueBlockAtSlot("5.1", 5, iotago.NewEmptyCommitment(), node1, ts.BlockID("4.2"))
 
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("1.1", "1.2", "1.1*"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheConfirmed(ts.Blocks("1.1", "1.2", "1.1*"), true, ts.Nodes()...)
+			// Slot 6
+			ts.IssueBlockAtSlot("6.2", 6, iotago.NewEmptyCommitment(), node2, ts.BlockID("5.1"))
+
+			ts.AssertBlocksExist(ts.Blocks("3.1", "4.2", "5.1", "6.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("6.2"), false, ts.Nodes()...)
+
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("1.1", "1.2", "1.1*", "2.2", "2.2*", "3.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("1.1", "1.2", "1.1*", "2.2", "2.2*", "3.1"), true, ts.Nodes()...)
 		}
 
 		// Verify nodes' states: Slot 1 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 3.
@@ -91,26 +97,22 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
+			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
-		// Slot 5-8
+		// Slot 7-8
 		{
 			slot1Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 
-			// Slot 5
-			ts.IssueBlockAtSlot("5.1", 5, slot1Commitment, node1, ts.BlockID("4.2"))
-			// Slot 6
-			ts.IssueBlockAtSlot("6.2", 6, slot1Commitment, node2, ts.BlockID("5.1"))
 			// Slot 7
 			ts.IssueBlockAtSlot("7.1", 7, slot1Commitment, node1, ts.BlockID("6.2"))
 			// Slot 8
 			ts.IssueBlockAtSlot("8.2", 8, slot1Commitment, node2, ts.BlockID("7.1"))
 
-			ts.AssertBlocksExist(ts.Blocks("5.1", "6.2", "7.1", "8.2"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("4.2", "5.1", "6.2", "7.1"), true, ts.Nodes()...)
+			ts.AssertBlocksExist(ts.Blocks("7.1", "8.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("6.2", "7.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("8.2"), false, ts.Nodes()...)
 
 			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1"), true, ts.Nodes()...)
@@ -118,39 +120,39 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		}
 
 		// Verify nodes' states:
-		// - Slot 5 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 7.
+		// - Slot 3 should be committed as the MinCommittableSlotAge is 1, and we ratified accepted a block at slot 5.
 		// - 5.1 is ratified accepted and commits to slot 1 -> slot 1 should be evicted. TODO: check latest evicted slot
 		// - rootblocks are still not evicted as RootBlocksEvictionDelay is 3.
 		// - slot 1 is still not finalized: there is no supermajority of ratified accepted blocks that commits to it.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
-			testsuite.WithLatestCommitmentSlotIndex(5),
+			testsuite.WithLatestCommitmentSlotIndex(3),
 			testsuite.WithLatestStateMutationSlot(0),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1")),
+			testsuite.WithActiveRootBlocks(ts.Blocks("1.1", "1.1*", "2.2", "2.2*", "3.1")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// Slot 9-12
 		{
-			slot5Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(5)).Commitment()
+			slot3Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(3)).Commitment()
 
 			// Slot 9
-			ts.IssueBlockAtSlot("9.1", 9, slot5Commitment, node1, ts.BlockID("8.2"))
+			ts.IssueBlockAtSlot("9.1", 9, slot3Commitment, node1, ts.BlockID("8.2"))
 			// Slot 10
-			ts.IssueBlockAtSlot("10.2", 10, slot5Commitment, node2, ts.BlockID("9.1"))
+			ts.IssueBlockAtSlot("10.2", 10, slot3Commitment, node2, ts.BlockID("9.1"))
 			// Slot 11
-			ts.IssueBlockAtSlot("11.1", 11, slot5Commitment, node1, ts.BlockID("10.2"))
+			ts.IssueBlockAtSlot("11.1", 11, slot3Commitment, node1, ts.BlockID("10.2"))
 			// Slot 12
-			ts.IssueBlockAtSlot("12.2", 12, slot5Commitment, node2, ts.BlockID("11.1"))
+			ts.IssueBlockAtSlot("12.2", 12, slot3Commitment, node2, ts.BlockID("11.1"))
 
 			ts.AssertBlocksExist(ts.Blocks("9.1", "10.2", "11.1", "12.2"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("8.2", "9.1", "11.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("8.2", "9.1", "10.2", "11.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("12.2"), false, ts.Nodes()...)
 
 			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("6.2", "7.1", "8.2", "9.1"), true, ts.Nodes()...)
@@ -165,21 +167,21 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
-			testsuite.WithLatestCommitmentSlotIndex(9),
+			testsuite.WithLatestCommitmentSlotIndex(7),
 			testsuite.WithLatestStateMutationSlot(0),
 			testsuite.WithLatestFinalizedSlot(1),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithActiveRootBlocks(ts.Blocks("3.1", "4.2", "5.1")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
+			testsuite.WithActiveRootBlocks(ts.Blocks("5.1", "6.2", "7.1")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// Slot 13
 		{
-			slot9Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(9)).Commitment()
-			ts.IssueBlockAtSlot("13.1", 13, slot9Commitment, node1, ts.BlockID("12.2"))
+			slot7Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(7)).Commitment()
+			ts.IssueBlockAtSlot("13.1", 13, slot7Commitment, node1, ts.BlockID("12.2"))
 
 			ts.AssertBlocksExist(ts.Blocks("13.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("12.2"), true, ts.Nodes()...)
@@ -197,14 +199,14 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
-			testsuite.WithLatestCommitmentSlotIndex(10),
+			testsuite.WithLatestCommitmentSlotIndex(8),
 			testsuite.WithLatestStateMutationSlot(0),
-			testsuite.WithLatestFinalizedSlot(5),
+			testsuite.WithLatestFinalizedSlot(3),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithActiveRootBlocks(ts.Blocks("3.1", "4.2", "5.1")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2", "11.1")),
+			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
@@ -232,14 +234,14 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes("node2.1"),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
-			testsuite.WithLatestCommitmentSlotIndex(10),
+			testsuite.WithLatestCommitmentSlotIndex(8),
 			testsuite.WithLatestStateMutationSlot(0),
-			testsuite.WithLatestFinalizedSlot(5),
+			testsuite.WithLatestFinalizedSlot(3),
 			// testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			// testsuite.WithActiveRootBlocks(ts.Blocks("3.1", "4.2", "5.1")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2", "11.1")),
+			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
