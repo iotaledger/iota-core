@@ -245,7 +245,6 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
-	return
 
 	// Create snapshot.
 	snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
@@ -266,25 +265,25 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		)
 		ts.Wait()
 
-		latestCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(10)).Commitment()
+		latestCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(8)).Commitment()
 		// Verify node3 state:
-		// - Commitment at slot 10 should be the latest commitment.
-		// - 10-3 (RootBlocksEvictionDelay) = 7 -> rootblocks from slot 8 until 10 (count of 3).
+		// - Commitment at slot 8 should be the latest commitment.
+		// - 8-3 (RootBlocksEvictionDelay) = 5 -> rootblocks from slot 6 until 8 (count of 3).
 		// - ChainID is defined by the earliest commitment of the rootblocks -> block 8.2 commits to slot 1.
-		// - slot 5 is finalized as per snapshot.
+		// - slot 3 is finalized as per snapshot.
 		ts.AssertNodeState(ts.Nodes("node3"),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
-			testsuite.WithLatestCommitmentSlotIndex(10),
+			testsuite.WithLatestCommitmentSlotIndex(8),
 			testsuite.WithLatestCommitment(latestCommitment),
 			testsuite.WithLatestStateMutationSlot(0),
-			testsuite.WithLatestFinalizedSlot(5),
+			testsuite.WithLatestFinalizedSlot(3),
 			// TODO: depends on rootblocks testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithActiveRootBlocks(ts.Blocks("3.1", "4.2", "5.1")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
+			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
 		)
-		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
 }
