@@ -137,29 +137,29 @@ func (s *SyncManager) IsNodeSynced() bool {
 }
 
 func (s *SyncManager) LastAcceptedBlock() iotago.BlockID {
-	s.lastAcceptedBlockIDLock.Lock()
-	defer s.lastAcceptedBlockIDLock.Unlock()
+	s.lastAcceptedBlockIDLock.RLock()
+	defer s.lastAcceptedBlockIDLock.RUnlock()
 
 	return s.lastAcceptedBlockID
 }
 
 func (s *SyncManager) LastConfirmedBlock() iotago.BlockID {
-	s.lastConfirmedBlockIDLock.Lock()
-	defer s.lastConfirmedBlockIDLock.Unlock()
+	s.lastConfirmedBlockIDLock.RLock()
+	defer s.lastConfirmedBlockIDLock.RUnlock()
 
 	return s.lastConfirmedBlockID
 }
 
 func (s *SyncManager) FinalizedSlot() iotago.SlotIndex {
-	s.finalizedSlotLock.Lock()
-	defer s.finalizedSlotLock.Unlock()
+	s.finalizedSlotLock.RLock()
+	defer s.finalizedSlotLock.RUnlock()
 
 	return s.finalizedSlot
 }
 
 func (s *SyncManager) LatestCommittedSlot() iotago.SlotIndex {
-	s.latestCommittedSlotLock.Lock()
-	defer s.latestCommittedSlotLock.Unlock()
+	s.latestCommittedSlotLock.RLock()
+	defer s.latestCommittedSlotLock.RUnlock()
 
 	return s.latestCommittedSlot
 }
