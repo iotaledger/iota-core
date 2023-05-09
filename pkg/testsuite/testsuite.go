@@ -69,13 +69,13 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			SlotDurationInSeconds: 10,
 		},
 		optsWaitFor: 1 * time.Second,
-		optsTick:    1 * time.Millisecond,
+		optsTick:    10 * time.Millisecond,
 	}, opts, func(t *TestSuite) {
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
 
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
-		var defaultSnapshotOptions = []options.Option[snapshotcreator.Options]{
+		defaultSnapshotOptions := []options.Option[snapshotcreator.Options]{
 			snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
 			snapshotcreator.WithFilePath(t.snapshotPath),
 			snapshotcreator.WithProtocolParameters(t.ProtocolParameters),
@@ -231,6 +231,7 @@ func (t *TestSuite) AddNodeToPartition(name string, partition string) *mock.Node
 func (t *TestSuite) AddNode(name string) *mock.Node {
 	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition)
 }
+
 func (t *TestSuite) RemoveNode(name string) {
 	delete(t.nodes, name)
 }
