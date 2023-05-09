@@ -12,8 +12,8 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
@@ -34,7 +34,7 @@ type TestSuite struct {
 	validators     map[iotago.AccountID]int64
 	validatorsOnce sync.Once
 	snapshotPath   string
-	blocks         *shrinkingmap.ShrinkingMap[string, *model.Block]
+	blocks         *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 
 	ProtocolParameters iotago.ProtocolParameters
 
@@ -52,7 +52,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		Network:     mock.NewNetwork(),
 		Directory:   utils.NewDirectory(testingT.TempDir()),
 		nodes:       make(map[string]*mock.Node),
-		blocks:      shrinkingmap.New[string, *model.Block](),
+		blocks:      shrinkingmap.New[string, *blocks.Block](),
 
 		ProtocolParameters: iotago.ProtocolParameters{
 			Version:     3,
@@ -68,9 +68,12 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*100),
 			SlotDurationInSeconds: 10,
 		},
-		optsWaitFor: 2 * time.Second,
+		optsWaitFor: 1 * time.Second,
 		optsTick:    1 * time.Millisecond,
 	}, opts, func(t *TestSuite) {
+		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
+		t.RegisterBlock("Genesis", genesisBlock)
+
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
 		var defaultSnapshotOptions = []options.Option[snapshotcreator.Options]{
 			snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
@@ -84,7 +87,9 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 	})
 }
 
-func (t *TestSuite) Block(alias string) *model.Block {
+// Block returns the block with the given alias. Important to note that this blocks.Block is a placeholder and is
+// thus not the same as the blocks.Block that is created by a node.
+func (t *TestSuite) Block(alias string) *blocks.Block {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
@@ -106,41 +111,41 @@ func (t *TestSuite) BlockIDs(aliases ...string) []iotago.BlockID {
 	})
 }
 
-func (t *TestSuite) Blocks(aliases ...string) []*model.Block {
-	return lo.Map(aliases, func(alias string) *model.Block {
+func (t *TestSuite) Blocks(aliases ...string) []*blocks.Block {
+	return lo.Map(aliases, func(alias string) *blocks.Block {
 		return t.Block(alias)
 	})
 }
 
-func (t *TestSuite) BlocksWithPrefix(prefix string) []*model.Block {
+func (t *TestSuite) BlocksWithPrefix(prefix string) []*blocks.Block {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	blocks := make([]*model.Block, 0)
+	b := make([]*blocks.Block, 0)
 
-	t.blocks.ForEach(func(alias string, block *model.Block) bool {
+	t.blocks.ForEach(func(alias string, block *blocks.Block) bool {
 		if strings.HasPrefix(alias, prefix) {
-			blocks = append(blocks, block)
+			b = append(b, block)
 		}
 
 		return true
 	})
 
-	return blocks
+	return b
 }
 
-func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, node *mock.Node, parents ...iotago.BlockID) *model.Block {
+func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, node *mock.Node, parents ...iotago.BlockID) *blocks.Block {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := node.IssueBlockAtSlot(alias, slot, parents...)
+	block := node.IssueBlockAtSlot(alias, slot, slotCommitment, parents...)
 
 	t.blocks.Set(alias, block)
 
 	return block
 }
 
-func (t *TestSuite) RegisterBlock(alias string, block *model.Block) {
+func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 

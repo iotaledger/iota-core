@@ -1,6 +1,7 @@
 package eviction
 
 import (
+	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -83,11 +84,13 @@ func (s *State) LastEvictedSlot() (index iotago.SlotIndex, valid bool) {
 }
 
 // EarliestRootCommitmentID returns the earliest commitment that rootblocks are committing to across all rootblocks.
+// TODO: this implementation is naive, as it iterates over all rootblocks. It would be better to consider only the currently active rootblocks.
 func (s *State) EarliestRootCommitmentID() (earliestCommitment iotago.CommitmentID) {
 	earliestCommitment = iotago.NewSlotIdentifier(math.MaxInt64, [32]byte{})
 
 	s.rootBlocks.ForEach(func(index iotago.SlotIndex, storage *shrinkingmap.ShrinkingMap[iotago.BlockID, iotago.CommitmentID]) {
 		storage.ForEach(func(id iotago.BlockID, commitmentID iotago.CommitmentID) bool {
+			fmt.Println(id, "EarliestRootCommitmentID: ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
 			if commitmentID.Index() < earliestCommitment.Index() {
 				earliestCommitment = commitmentID
 			}
@@ -140,6 +143,7 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
+	fmt.Println("AddRootBlock: ", id.String(), s.inRootBlockEvictedSlot(id.Index()), lo.Return1(s.lastEvictedSlot.Index()))
 	if s.inRootBlockEvictedSlot(id.Index()) {
 		return
 	}
@@ -244,6 +248,7 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 			return errors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
 		}
 
+		fmt.Println("importing root block", rootBlockID, commitmentID)
 		s.AddRootBlock(rootBlockID, commitmentID)
 
 		return nil

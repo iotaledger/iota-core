@@ -6,10 +6,11 @@ import (
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 )
 
-func (t *TestSuite) AssertBlock(block *model.Block, node *mock.Node) *model.Block {
+func (t *TestSuite) AssertBlock(block *blocks.Block, node *mock.Node) *model.Block {
 	var loadedBlock *model.Block
 	t.Eventually(func() error {
 		var exists bool
@@ -21,8 +22,8 @@ func (t *TestSuite) AssertBlock(block *model.Block, node *mock.Node) *model.Bloc
 		if block.ID() != loadedBlock.ID() {
 			return errors.Errorf("AssertBlock: %s: expected %s, got %s", node.Name, block.ID(), loadedBlock.ID())
 		}
-		if !cmp.Equal(block.Data(), loadedBlock.Data()) {
-			return errors.Errorf("AssertBlock: %s: expected %s, got %s", node.Name, block.Data(), loadedBlock.Data())
+		if !cmp.Equal(block.ModelBlock().Data(), loadedBlock.Data()) {
+			return errors.Errorf("AssertBlock: %s: expected %s, got %s", node.Name, block.ModelBlock().Data(), loadedBlock.Data())
 		}
 
 		return nil
@@ -31,7 +32,7 @@ func (t *TestSuite) AssertBlock(block *model.Block, node *mock.Node) *model.Bloc
 	return loadedBlock
 }
 
-func (t *TestSuite) AssertBlocksExist(blocks []*model.Block, expectedExist bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertBlocksExist(blocks []*blocks.Block, expectedExist bool, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -51,7 +52,7 @@ func (t *TestSuite) AssertBlocksExist(blocks []*model.Block, expectedExist bool,
 	}
 }
 
-func (t *TestSuite) AssertBlocksInCacheAccepted(expectedBlocks []*model.Block, expectedAccepted bool, nodes ...*mock.Node) {
+func (t *TestSuite) assertBlocksInCacheWithFunc(expectedBlocks []*blocks.Block, expectedPropertyState bool, propertyFunc func(*blocks.Block) bool, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -59,11 +60,11 @@ func (t *TestSuite) AssertBlocksInCacheAccepted(expectedBlocks []*model.Block, e
 			t.Eventually(func() error {
 				blockFromCache, exists := node.Protocol.MainEngineInstance().BlockFromCache(block.ID())
 				if !exists {
-					return errors.Errorf("AssertBlocksInCacheAccepted: %s: block %s does not exist", node.Name, block.ID())
+					return errors.Errorf("assertBlocksInCacheWithFunc: %s: block %s does not exist", node.Name, block.ID())
 				}
 
-				if expectedAccepted != blockFromCache.IsAccepted() {
-					return errors.Errorf("AssertBlocksInCacheAccepted: %s: block %s expected %v, got %v", node.Name, blockFromCache.ID(), expectedAccepted, blockFromCache.IsAccepted())
+				if expectedPropertyState != propertyFunc(blockFromCache) {
+					return errors.Errorf("assertBlocksInCacheWithFunc: %s: block %s: expected %v, got %v", node.Name, blockFromCache.ID(), expectedPropertyState, propertyFunc(blockFromCache))
 				}
 
 				return nil
@@ -72,4 +73,20 @@ func (t *TestSuite) AssertBlocksInCacheAccepted(expectedBlocks []*model.Block, e
 			t.AssertBlock(block, node)
 		}
 	}
+}
+
+func (t *TestSuite) AssertBlocksInCacheAccepted(expectedBlocks []*blocks.Block, expectedAccepted bool, nodes ...*mock.Node) {
+	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedAccepted, (*blocks.Block).IsAccepted, nodes...)
+}
+
+func (t *TestSuite) AssertBlocksInCacheRatifiedAccepted(expectedBlocks []*blocks.Block, expectedRatifiedAccepted bool, nodes ...*mock.Node) {
+	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedRatifiedAccepted, (*blocks.Block).IsRatifiedAccepted, nodes...)
+}
+
+func (t *TestSuite) AssertBlocksInCacheConfirmed(expectedBlocks []*blocks.Block, expectedConfirmed bool, nodes ...*mock.Node) {
+	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedConfirmed, (*blocks.Block).IsConfirmed, nodes...)
+}
+
+func (t *TestSuite) AssertBlocksInCacheRootBlock(expectedBlocks []*blocks.Block, expectedRootBlock bool, nodes ...*mock.Node) {
+	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedRootBlock, (*blocks.Block).IsRootBlock, nodes...)
 }

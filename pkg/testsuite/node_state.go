@@ -2,6 +2,7 @@ package testsuite
 
 import (
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -30,6 +31,21 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.chainID != nil {
 		t.AssertChainID(*state.chainID, nodes...)
 	}
+	if state.sybilProtectionCommittee != nil {
+		t.AssertSybilProtectionCommittee(*state.sybilProtectionCommittee, nodes...)
+	}
+	if state.sybilProtectionOnlineCommittee != nil {
+		t.AssertSybilProtectionOnlineCommittee(*state.sybilProtectionOnlineCommittee, nodes...)
+	}
+	if state.storageCommitments != nil {
+		t.AssertStorageCommitments(*state.storageCommitments, nodes...)
+	}
+	if state.storageRootBlocks != nil {
+		t.AssertStorageRootBlocks(*state.storageRootBlocks, nodes...)
+	}
+	if state.activeRootBlocks != nil {
+		t.AssertActiveRootBlocks(*state.activeRootBlocks, nodes...)
+	}
 }
 
 type NodeState struct {
@@ -41,7 +57,13 @@ type NodeState struct {
 	latestFinalizedSlot       *iotago.SlotIndex
 	chainID                   *iotago.CommitmentID
 
-	// TODO: add commitments, root blocks, sybil protection etc
+	sybilProtectionCommittee       *map[iotago.AccountID]int64
+	sybilProtectionOnlineCommittee *map[iotago.AccountID]int64
+
+	storageCommitments *[]*iotago.Commitment
+
+	storageRootBlocks *[]*blocks.Block
+	activeRootBlocks  *[]*blocks.Block
 }
 
 func WithSnapshotImported(snapshotImported bool) options.Option[NodeState] {
@@ -83,5 +105,35 @@ func WithLatestFinalizedSlot(slotIndex iotago.SlotIndex) options.Option[NodeStat
 func WithChainID(chainID iotago.CommitmentID) options.Option[NodeState] {
 	return func(state *NodeState) {
 		state.chainID = &chainID
+	}
+}
+
+func WithSybilProtectionCommittee(committee map[iotago.AccountID]int64) options.Option[NodeState] {
+	return func(state *NodeState) {
+		state.sybilProtectionCommittee = &committee
+	}
+}
+
+func WithSybilProtectionOnlineCommittee(committee map[iotago.AccountID]int64) options.Option[NodeState] {
+	return func(state *NodeState) {
+		state.sybilProtectionOnlineCommittee = &committee
+	}
+}
+
+func WithStorageCommitments(commitments []*iotago.Commitment) options.Option[NodeState] {
+	return func(state *NodeState) {
+		state.storageCommitments = &commitments
+	}
+}
+
+func WithStorageRootBlocks(blocks []*blocks.Block) options.Option[NodeState] {
+	return func(state *NodeState) {
+		state.storageRootBlocks = &blocks
+	}
+}
+
+func WithActiveRootBlocks(blocks []*blocks.Block) options.Option[NodeState] {
+	return func(state *NodeState) {
+		state.activeRootBlocks = &blocks
 	}
 }

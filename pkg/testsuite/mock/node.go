@@ -225,15 +225,18 @@ func (n *Node) IssueBlock() iotago.BlockID {
 	return modelBlock.ID()
 }
 
-func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, parents ...iotago.BlockID) *model.Block {
+func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, parents ...iotago.BlockID) *blocks.Block {
 	slotTimeProvider := n.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
 	issuingTime := slotTimeProvider.StartTime(slot)
 	require.Truef(n.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", n.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
 
+	n.checkParentsCommitmentMonotonicity(slotCommitment, parents)
+	n.checkParentsTimeMonotonicity(issuingTime, parents)
+
 	block, err := builder.NewBlockBuilder().
 		StrongParents(parents).
 		IssuingTime(issuingTime).
-		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()).
+		SlotCommitment(slotCommitment).
 		LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
 		Payload(&iotago.TaggedData{
 			Tag: []byte("ACTIVITY"),
@@ -258,7 +261,40 @@ func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, parents ...
 	modelBlock.ID().RegisterAlias(alias)
 	fmt.Printf("Issued block: %s - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
 
-	return modelBlock
+	return blocks.NewBlock(modelBlock)
+}
+
+// TODO: this should be part of the blockIssuer and the blockissuer being reused here:
+//  make it possible to issue blocks with a specific issuing time and slot commitment. maybe using options?
+
+func (n *Node) checkParentsTimeMonotonicity(issuingTime time.Time, parents iotago.BlockIDs) {
+	parentsMaxTime := time.Time{}
+	for _, parentBlockID := range parents {
+		if b, exists := n.Protocol.MainEngineInstance().BlockFromCache(parentBlockID); exists {
+			if b.IssuingTime().After(parentsMaxTime) {
+				parentsMaxTime = b.IssuingTime()
+			}
+		}
+	}
+
+	if parentsMaxTime.After(issuingTime) {
+		panic(fmt.Sprintf("cannot issue block if parent's time is not monotonic: %s vs %s", issuingTime, parentsMaxTime))
+	}
+}
+
+func (n *Node) checkParentsCommitmentMonotonicity(commitment *iotago.Commitment, parents iotago.BlockIDs) {
+	parentsMaxCommitmentIndex := iotago.SlotIndex(0)
+	for _, parentBlockID := range parents {
+		if b, exists := n.Protocol.MainEngineInstance().BlockFromCache(parentBlockID); exists {
+			if b.SlotCommitmentID().Index() > parentsMaxCommitmentIndex {
+				parentsMaxCommitmentIndex = b.SlotCommitmentID().Index()
+			}
+		}
+	}
+
+	if parentsMaxCommitmentIndex > commitment.Index {
+		panic(fmt.Sprintf("cannot issue block if parent's commitment is not monotonic: %d vs %d", commitment.Index, parentsMaxCommitmentIndex))
+	}
 }
 
 func (n *Node) IssueActivity(duration time.Duration, wg *sync.WaitGroup) {

@@ -3,11 +3,11 @@ package testsuite
 import (
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 )
 
-func (t *TestSuite) AssertStorageRootBlocks(blocks []*model.Block, nodes ...*mock.Node) {
+func (t *TestSuite) AssertStorageRootBlocks(blocks []*blocks.Block, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -27,8 +27,8 @@ func (t *TestSuite) AssertStorageRootBlocks(blocks []*model.Block, nodes ...*moc
 					return errors.Errorf("AssertStorageRootBlocks: %s: expected block %s, got %s", node.Name, block.ID(), loadedBlockID)
 				}
 
-				if block.SlotCommitment().ID() != loadedCommitmentID {
-					return errors.Errorf("AssertStorageRootBlocks: %s: expected slot commitment %s, got %s", node.Name, block.SlotCommitment().ID(), loadedCommitmentID)
+				if block.SlotCommitmentID() != loadedCommitmentID {
+					return errors.Errorf("AssertStorageRootBlocks: %s: expected slot commitment %s, got %s for block %s", node.Name, block.SlotCommitmentID(), loadedCommitmentID, block.ID())
 				}
 
 				return nil

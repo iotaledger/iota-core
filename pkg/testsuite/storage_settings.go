@@ -83,8 +83,12 @@ func (t *TestSuite) AssertLatestFinalizedSlot(slot iotago.SlotIndex, nodes ...*m
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
+			if slot != node.Protocol.MainEngineInstance().SlotGadget.LatestFinalizedSlot() {
+				return errors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d from slot gadget", node.Name, slot, node.Protocol.MainEngineInstance().SlotGadget.LatestFinalizedSlot())
+			}
+
 			if slot != node.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot() {
-				return errors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot())
+				return errors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d from settings", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot())
 			}
 
 			return nil
@@ -98,7 +102,7 @@ func (t *TestSuite) AssertChainID(chainID iotago.CommitmentID, nodes ...*mock.No
 	for _, node := range nodes {
 		t.Eventually(func() error {
 			if chainID != node.Protocol.MainEngineInstance().Storage.Settings().ChainID() {
-				return errors.Errorf("AssertChainID: %s: expected %s, got %s", node.Name, chainID.String(), node.Protocol.MainEngineInstance().Storage.Settings().ChainID().String())
+				return errors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, chainID.String(), chainID.Index(), node.Protocol.MainEngineInstance().Storage.Settings().ChainID().String(), node.Protocol.MainEngineInstance().Storage.Settings().ChainID().Index())
 			}
 
 			return nil

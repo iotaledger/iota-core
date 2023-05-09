@@ -78,8 +78,9 @@ func New(
 ) (engine *Engine) {
 	return options.Apply(
 		&Engine{
-			Events:        NewEvents(),
-			Storage:       storageInstance,
+			Events:  NewEvents(),
+			Storage: storageInstance,
+			// TODO: storageInstance.Settings() is not yet available
 			EvictionState: eviction.NewState(storageInstance.RootBlocks, storageInstance.Settings().LatestCommitment().Index()),
 			Workers:       workers,
 
@@ -305,7 +306,7 @@ func (e *Engine) setupEvictionState() {
 		})
 	}, event.WithWorkerPool(wp))
 
-	// In order to still have the root blocks when when ratifying a block, we need to evict a slot when the supermajority
+	// In order to still have the root blocks when ratifying a block, we need to evict a slot when the supermajority
 	// of the online committee have accepted a block committing to such slot.
 	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
 		e.EvictionState.EvictUntil(block.SlotCommitmentID().Index())
