@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -28,13 +28,13 @@ type TestFramework struct {
 	globalBookedEventTriggered   map[iotago.TransactionID]bool
 	globalAcceptedEventTriggered map[iotago.TransactionID]bool
 
-	cleanupCallback func()
+	ledgerState *ledgertests.StateResolver
 
 	test  *testing.T
 	mutex sync.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower], cleanupCallback func()) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower], ledgerState *ledgertests.StateResolver) *TestFramework {
 	t := &TestFramework{
 		Instance:                     instance,
 		stateIDByAlias:               make(map[string]iotago.OutputID),
@@ -46,8 +46,8 @@ func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower
 		globalExecutedEventTriggered: make(map[iotago.TransactionID]bool),
 		globalAcceptedEventTriggered: make(map[iotago.TransactionID]bool),
 
-		cleanupCallback: cleanupCallback,
-		test:            test,
+		ledgerState: ledgerState,
+		test:        test,
 	}
 
 	t.setupHookedEvents()
@@ -107,6 +107,28 @@ func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, s
 	}
 
 	return nil
+}
+
+func (t *TestFramework) CommitSlot(slotIndex iotago.SlotIndex) {
+	stateDiff := t.Instance.StateDiff(slotIndex)
+
+	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.StateWithMetadata) bool {
+		t.ledgerState.AddState(state)
+
+		return true
+	})
+
+	stateDiff.DestroyedStates().ForEach(func(id iotago.OutputID, _ mempool.StateWithMetadata) bool {
+		t.ledgerState.DestroyState(id)
+
+		return true
+	})
+
+	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, transaction mempool.TransactionWithMetadata) bool {
+		transaction.Commit()
+
+		return true
+	})
 }
 
 func (t *TestFramework) TransactionMetadata(alias string) (mempool.TransactionWithMetadata, bool) {
@@ -270,8 +292,6 @@ func (t *TestFramework) waitBooked(transactionAliases ...string) {
 		transactionMetadata.OnBooked(allBooked.Done)
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
 	allBooked.Wait()
 }
 
@@ -335,7 +355,7 @@ func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAlias
 }
 
 func (t *TestFramework) Cleanup() {
-	t.cleanupCallback()
+	t.ledgerState.Cleanup()
 
 	t.stateIDByAlias = make(map[string]iotago.OutputID)
 	t.transactionByAlias = make(map[string]mempool.Transaction)
