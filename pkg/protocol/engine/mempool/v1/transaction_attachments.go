@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -28,13 +29,7 @@ func (a *Attachments) Add(blockID iotago.BlockID) (added bool) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	if a.attachments.Has(blockID) {
-		return false
-	}
-
-	a.attachments.Set(blockID, false)
-
-	return true
+	return lo.Return2(a.attachments.GetOrCreate(blockID, func() bool { return false }))
 }
 
 func (a *Attachments) MarkIncluded(blockID iotago.BlockID) (included bool) {
