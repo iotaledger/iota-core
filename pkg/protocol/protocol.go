@@ -201,10 +201,10 @@ func (p *Protocol) initEngineManager() {
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		// TODO: fix pruning
-		// if index < p.optsPruningThreshold {
-		// 	return
-		// }
-		// p.MainEngineInstance().Storage.PruneUntilSlot(index - p.optsPruningThreshold)
+		if index < p.optsPruningThreshold {
+			return
+		}
+		p.MainEngineInstance().Storage.PruneUntilSlot(index - p.optsPruningThreshold)
 	}, event.WithWorkerPool(p.Workers.CreatePool("PruneEngine", 2)))
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()

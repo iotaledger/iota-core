@@ -84,12 +84,15 @@ func (m *Manager) PruneUntilSlot(index iotago.SlotIndex) {
 	m.pruningMutex.Lock()
 	defer m.pruningMutex.Unlock()
 
+	computedIndex := m.computeDBBaseIndex(index)
 	var baseIndexToPrune iotago.SlotIndex
-	if m.computeDBBaseIndex(index)+iotago.SlotIndex(m.optsGranularity)-1 == index {
-		// Upper bound of the DB instance should be pruned. So we can delete the entire DB file.
+
+	if computedIndex+iotago.SlotIndex(m.optsGranularity)-1 == index {
 		baseIndexToPrune = index
+	} else if computedIndex > 1 {
+		baseIndexToPrune = computedIndex - 1
 	} else {
-		baseIndexToPrune = m.computeDBBaseIndex(index) - 1
+		return
 	}
 
 	for currentIndex := m.lastPrunedSlot.NextIndex(); currentIndex <= baseIndexToPrune; currentIndex += iotago.SlotIndex(m.optsGranularity) {

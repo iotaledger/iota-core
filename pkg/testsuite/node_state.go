@@ -50,7 +50,7 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 		t.AssertEvictedSlot(*state.evictedSlot, nodes...)
 	}
 	if state.prunedSlot != nil {
-		t.AssertPrunedSlot(*state.prunedSlot, nodes...)
+		t.AssertPrunedSlot(*state.prunedSlot, state.hasPruned, nodes...)
 	}
 }
 
@@ -73,6 +73,7 @@ type NodeState struct {
 
 	evictedSlot *iotago.SlotIndex
 	prunedSlot  *iotago.SlotIndex
+	hasPruned   bool
 }
 
 func WithSnapshotImported(snapshotImported bool) options.Option[NodeState] {
@@ -153,8 +154,9 @@ func WithEvictedSlot(slotIndex iotago.SlotIndex) options.Option[NodeState] {
 	}
 }
 
-func WithPrunedSlot(slotIndex iotago.SlotIndex) options.Option[NodeState] {
+func WithPrunedSlot(slotIndex iotago.SlotIndex, hasPruned bool) options.Option[NodeState] {
 	return func(state *NodeState) {
 		state.prunedSlot = &slotIndex
+		state.hasPruned = hasPruned
 	}
 }

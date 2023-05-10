@@ -12,6 +12,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -26,6 +28,9 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
 			protocol.WithPruningThreshold(2),
+			protocol.WithStorageOptions(
+				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+			),
 		},
 		"node2": {
 			protocol.WithPruningThreshold(4),
@@ -208,6 +213,17 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - 10.2 is ratified accepted and commits to slot 5 -> slot 5 should be evicted.
 		// - rootblocks are evicted until slot 2 as RootBlocksEvictionDelay is 3.
 		// - slot 5 is finalized: there is a supermajority of ratified accepted blocks that commits to it.
+
+		ts.AssertNodeState(ts.Nodes("node1"),
+			testsuite.WithStorageRootBlocks(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
+			testsuite.WithPrunedSlot(1, true),
+		)
+
+		ts.AssertNodeState(ts.Nodes("node2"),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
+			testsuite.WithPrunedSlot(0, false),
+		)
+
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -219,7 +235,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(5),
 			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
+			// testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
@@ -241,6 +257,16 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - 10.2 is ratified accepted and commits to slot 5 -> slot 5 should be evicted.
 		// - rootblocks are evicted until slot 2 as RootBlocksEvictionDelay is 3.
 		// - slot 5 is finalized: there is a supermajority of ratified accepted blocks that commits to it.
+		ts.AssertNodeState(ts.Nodes("node1"),
+			testsuite.WithStorageRootBlocks(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
+			testsuite.WithPrunedSlot(1, true),
+		)
+
+		ts.AssertNodeState(ts.Nodes("node2"),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
+			testsuite.WithPrunedSlot(0, false),
+		)
+
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -252,14 +278,11 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(6),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
+			// testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
 
-	// Verify that node1 and node2 pruned until their respective slots.
-	ts.AssertPrunedSlot(1, node1)
-	ts.AssertPrunedSlot(0, node2)
 	// TODO: verify after restart again and from snapshot loaded node
 
 	// Shutdown node2 and restart it from disk. Verify state.
