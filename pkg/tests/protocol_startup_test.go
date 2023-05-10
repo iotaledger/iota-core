@@ -361,5 +361,20 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
 
-	// TODO: issue some blocks and see if all nodes continue and agree on the same state.
+	{
+		// Slot 15
+		{
+			node3 := ts.Node("node3")
+			slot9Commitment := lo.PanicOnErr(node3.Protocol.MainEngineInstance().Storage.Commitments().Load(9)).Commitment()
+			ts.IssueBlockAtSlot("15.1", 15, slot9Commitment, node3, ts.BlockID("14.2"))
+			ts.IssueBlockAtSlot("16.2", 16, slot9Commitment, node3, ts.BlockID("15.1"))
+
+			ts.AssertBlocksExist(ts.Blocks("15.1", "16.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("14.2", "15.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("16.2"), false, ts.Nodes()...)
+
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("13.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("13.1"), true, ts.Nodes()...)
+		}
+	}
 }
