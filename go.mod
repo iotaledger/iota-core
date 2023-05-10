@@ -21,7 +21,7 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230427083408-bac1dd903fc0
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230427083408-bac1dd903fc0
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230414063201-6891da12467e
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230428115928-4da87d6827ce
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230510103734-f95a132d437d
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.27.1
@@ -32,7 +32,7 @@ require (
 	github.com/zyedidia/generic v1.2.1
 	go.uber.org/atomic v1.10.0
 	go.uber.org/dig v1.16.1
-	golang.org/x/crypto v0.8.0
+	golang.org/x/crypto v0.9.0
 	google.golang.org/protobuf v1.30.0
 )
 
@@ -148,9 +148,9 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/exp v0.0.0-20230419192730-864b3d6c5c2c // indirect
 	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/net v0.9.0 // indirect
+	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect

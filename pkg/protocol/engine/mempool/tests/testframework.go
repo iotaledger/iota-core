@@ -357,6 +357,8 @@ func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAlias
 func (t *TestFramework) Cleanup() {
 	t.ledgerState.Cleanup()
 
+	iotago.UnregisterIdentifierAliases()
+
 	t.stateIDByAlias = make(map[string]iotago.OutputID)
 	t.transactionByAlias = make(map[string]mempool.Transaction)
 	t.blockIDsByAlias = make(map[string]iotago.BlockID)
