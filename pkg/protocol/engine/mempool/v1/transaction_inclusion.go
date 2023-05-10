@@ -11,14 +11,14 @@ type TransactionInclusion struct {
 	unacceptedInputsCount uint64
 	allInputsAccepted     *promise.Event
 
-	*InclusionState
+	*Inclusion
 }
 
 func NewTransactionInclusion(inputCount int) *TransactionInclusion {
 	return &TransactionInclusion{
 		unacceptedInputsCount: uint64(inputCount),
 		allInputsAccepted:     promise.NewEvent(),
-		InclusionState:        NewInclusionState(),
+		Inclusion:             NewInclusion(),
 	}
 }
 
@@ -34,7 +34,7 @@ func (t *TransactionInclusion) OnAllInputsAccepted(callback func()) {
 	t.allInputsAccepted.OnTrigger(callback)
 }
 
-func (t *TransactionInclusion) dependsOnInput(input *StateWithMetadata) {
+func (t *TransactionInclusion) dependsOnInput(input *StateMetadata) {
 	input.OnRejected(t.setRejected)
 	input.OnOrphaned(t.setOrphaned)
 

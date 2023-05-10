@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 )
 
-type LifecycleState struct {
+type TransactionLifecycle struct {
 	unsolidInputsCount uint64
 	stored             *promise.Event
 	solid              *promise.Event
@@ -15,8 +15,8 @@ type LifecycleState struct {
 	booked             *promise.Event
 }
 
-func NewLifecycleState(inputsCount int) *LifecycleState {
-	return &LifecycleState{
+func NewTransactionLifecycle(inputsCount int) *TransactionLifecycle {
+	return &TransactionLifecycle{
 		unsolidInputsCount: uint64(inputsCount),
 		stored:             promise.NewEvent(),
 		booked:             promise.NewEvent(),
@@ -26,63 +26,63 @@ func NewLifecycleState(inputsCount int) *LifecycleState {
 	}
 }
 
-func (t *LifecycleState) IsStored() bool {
+func (t *TransactionLifecycle) IsStored() bool {
 	return t.stored.WasTriggered()
 }
 
-func (t *LifecycleState) OnStored(callback func()) {
+func (t *TransactionLifecycle) OnStored(callback func()) {
 	t.stored.OnTrigger(callback)
 }
 
-func (t *LifecycleState) IsSolid() bool {
+func (t *TransactionLifecycle) IsSolid() bool {
 	return t.solid.WasTriggered()
 }
 
-func (t *LifecycleState) OnSolid(callback func()) {
+func (t *TransactionLifecycle) OnSolid(callback func()) {
 	t.solid.OnTrigger(callback)
 }
 
-func (t *LifecycleState) IsExecuted() bool {
+func (t *TransactionLifecycle) IsExecuted() bool {
 	return t.executed.WasTriggered()
 }
 
-func (t *LifecycleState) OnExecuted(callback func()) {
+func (t *TransactionLifecycle) OnExecuted(callback func()) {
 	t.executed.OnTrigger(callback)
 }
 
-func (t *LifecycleState) IsInvalid() bool {
+func (t *TransactionLifecycle) IsInvalid() bool {
 	return t.invalid.WasTriggered()
 }
 
-func (t *LifecycleState) OnInvalid(callback func(error)) {
+func (t *TransactionLifecycle) OnInvalid(callback func(error)) {
 	t.invalid.OnTrigger(callback)
 }
 
-func (t *LifecycleState) IsBooked() bool {
+func (t *TransactionLifecycle) IsBooked() bool {
 	return t.booked.WasTriggered()
 }
 
-func (t *LifecycleState) OnBooked(callback func()) {
+func (t *TransactionLifecycle) OnBooked(callback func()) {
 	t.booked.OnTrigger(callback)
 }
 
-func (t *LifecycleState) setStored() {
+func (t *TransactionLifecycle) setStored() {
 	t.stored.Trigger()
 }
 
-func (t *LifecycleState) setSolid() {
+func (t *TransactionLifecycle) setSolid() {
 	t.solid.Trigger()
 }
 
-func (t *LifecycleState) setBooked() {
+func (t *TransactionLifecycle) setBooked() {
 	t.booked.Trigger()
 }
 
-func (t *LifecycleState) setInvalid(reason error) {
+func (t *TransactionLifecycle) setInvalid(reason error) {
 	t.invalid.Trigger(reason)
 }
 
-func (t *LifecycleState) markInputSolid() {
+func (t *TransactionLifecycle) markInputSolid() {
 	if atomic.AddUint64(&t.unsolidInputsCount, ^uint64(0)) == 0 {
 		t.setSolid()
 	}

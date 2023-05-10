@@ -6,28 +6,28 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type StateWithMetadata struct {
+type StateMetadata struct {
 	id    iotago.OutputID
 	state ledger.State
 
 	*StateInclusion
-	*SpentState
+	*StateLifecycle
 }
 
-func NewStateWithMetadata(state ledger.State, optSource ...*TransactionMetadata) *StateWithMetadata {
-	return &StateWithMetadata{
+func NewStateMetadata(state ledger.State, optSource ...*TransactionMetadata) *StateMetadata {
+	return &StateMetadata{
 		id:    state.ID(),
 		state: state,
 
 		StateInclusion: NewStateInclusion().dependsOnCreatingTransaction(lo.First(optSource)),
-		SpentState:     NewSpentState(),
+		StateLifecycle: NewStateLifecycle(),
 	}
 }
 
-func (s *StateWithMetadata) ID() iotago.OutputID {
+func (s *StateMetadata) ID() iotago.OutputID {
 	return s.id
 }
 
-func (s *StateWithMetadata) State() ledger.State {
+func (s *StateMetadata) State() ledger.State {
 	return s.state
 }

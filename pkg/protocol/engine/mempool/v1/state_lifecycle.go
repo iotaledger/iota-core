@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 )
 
-type SpentState struct {
+type StateLifecycle struct {
 	spenderCount       uint64
 	spent              *promise.Event
 	doubleSpent        *promise.Event
@@ -17,8 +17,8 @@ type SpentState struct {
 	allSpendersRemoved *event.Event
 }
 
-func NewSpentState() *SpentState {
-	return &SpentState{
+func NewStateLifecycle() *StateLifecycle {
+	return &StateLifecycle{
 		spent:              promise.NewEvent(),
 		doubleSpent:        promise.NewEvent(),
 		spendAccepted:      promise.NewEvent1[mempool.TransactionWithMetadata](),
@@ -27,69 +27,61 @@ func NewSpentState() *SpentState {
 	}
 }
 
-func (s *SpentState) IsSpent() bool {
+func (s *StateLifecycle) IsSpent() bool {
 	return atomic.LoadUint64(&s.spenderCount) > 0
 }
 
-func (s *SpentState) OnDoubleSpent(callback func()) {
+func (s *StateLifecycle) OnDoubleSpent(callback func()) {
 	s.doubleSpent.OnTrigger(callback)
 }
 
-func (s *SpentState) OnSpendAccepted(callback func(spender mempool.TransactionWithMetadata)) {
+func (s *StateLifecycle) OnSpendAccepted(callback func(spender mempool.TransactionWithMetadata)) {
 	s.spendAccepted.OnTrigger(callback)
 }
 
-func (s *SpentState) OnSpendCommitted(callback func(spender mempool.TransactionWithMetadata)) {
+func (s *StateLifecycle) OnSpendCommitted(callback func(spender mempool.TransactionWithMetadata)) {
 	s.spendCommitted.OnTrigger(callback)
 }
 
-func (s *SpentState) AllSpendersRemoved() bool {
+func (s *StateLifecycle) AllSpendersRemoved() bool {
 	return s.allSpendersRemoved.WasTriggered()
 }
 
-func (s *SpentState) OnAllSpendersRemoved(callback func()) (unsubscribe func()) {
+func (s *StateLifecycle) OnAllSpendersRemoved(callback func()) (unsubscribe func()) {
 	return s.allSpendersRemoved.Hook(callback).Unhook
 }
 
-func (s *SpentState) SpenderCount() uint64 {
+func (s *StateLifecycle) SpenderCount() uint64 {
 	return atomic.LoadUint64(&s.spenderCount)
 }
 
-func (s *SpentState) HasNoSpenders() bool {
+func (s *StateLifecycle) HasNoSpenders() bool {
 	return atomic.LoadUint64(&s.spenderCount) == 0
 }
 
-func (s *SpentState) increaseSpenderCount() {
-	if spenders := atomic.AddUint64(&s.spenderCount, 1); spenders == 1 {
+func (s *StateLifecycle) increaseSpenderCount() {
+	if spenderCount := atomic.AddUint64(&s.spenderCount, 1); spenderCount == 1 {
 		s.spent.Trigger()
-	} else if spenders == 2 {
+	} else if spenderCount == 2 {
 		s.doubleSpent.Trigger()
 	}
 }
 
-func (s *SpentState) decreaseSpenderCount() {
+func (s *StateLifecycle) decreaseSpenderCount() {
 	if atomic.AddUint64(&s.spenderCount, ^uint64(0)) == 0 {
 		s.allSpendersRemoved.Trigger()
 	}
 }
 
-func (s *SpentState) acceptSpend(spender *TransactionMetadata) {
-	s.spendAccepted.Trigger(spender)
-}
-
-func (s *SpentState) commitSpend(spender *TransactionMetadata) {
-	s.spendCommitted.Trigger(spender)
-}
-
-func (s *SpentState) dependsOnSpender(spender *TransactionMetadata) {
+func (s *StateLifecycle) dependsOnSpender(spender *TransactionMetadata) {
 	s.increaseSpenderCount()
 
 	spender.OnAccepted(func() {
-		s.acceptSpend(spender)
+		s.spendAccepted.Trigger(spender)
 	})
 
 	spender.OnCommitted(func() {
-		s.commitSpend(spender)
+		s.spendCommitted.Trigger(spender)
 
 		s.decreaseSpenderCount()
 	})

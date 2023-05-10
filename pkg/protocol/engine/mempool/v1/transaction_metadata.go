@@ -14,12 +14,12 @@ import (
 type TransactionMetadata struct {
 	id              iotago.TransactionID
 	inputReferences []ledger.StateReference
-	inputs          []*StateWithMetadata
-	outputs         []*StateWithMetadata
+	inputs          []*StateMetadata
+	outputs         []*StateMetadata
 	transaction     mempool.Transaction
 	conflictIDs     *advancedset.AdvancedSet[iotago.TransactionID]
 
-	*LifecycleState
+	*TransactionLifecycle
 	*TransactionInclusion
 	*Attachments
 
@@ -40,12 +40,12 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 	t := &TransactionMetadata{
 		id:              transactionID,
 		inputReferences: inputReferences,
-		inputs:          make([]*StateWithMetadata, len(inputReferences)),
+		inputs:          make([]*StateMetadata, len(inputReferences)),
 		transaction:     transaction,
 		conflictIDs:     advancedset.New[iotago.TransactionID](),
 		Attachments:     NewAttachments(),
 
-		LifecycleState:       NewLifecycleState(len(inputReferences)),
+		TransactionLifecycle: NewTransactionLifecycle(len(inputReferences)),
 		TransactionInclusion: NewTransactionInclusion(len(inputReferences)),
 	}
 
@@ -87,24 +87,24 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateWi
 }
 
 func (t *TransactionMetadata) Lifecycle() mempool.TransactionLifecycle {
-	return t.LifecycleState
+	return t.TransactionLifecycle
 }
 
-func (t *TransactionMetadata) publishInput(index int, input *StateWithMetadata) {
+func (t *TransactionMetadata) publishInput(index int, input *StateMetadata) {
 	t.inputs[index] = input
 
 	input.dependsOnSpender(t)
 	t.dependsOnInput(input)
 
-	t.LifecycleState.markInputSolid()
+	t.TransactionLifecycle.markInputSolid()
 }
 
 func (t *TransactionMetadata) setExecuted(outputStates []ledger.State) {
 	t.mutex.Lock()
 	for _, outputState := range outputStates {
-		t.outputs = append(t.outputs, NewStateWithMetadata(outputState, t))
+		t.outputs = append(t.outputs, NewStateMetadata(outputState, t))
 	}
 	t.mutex.Unlock()
 
-	t.LifecycleState.executed.Trigger()
+	t.TransactionLifecycle.executed.Trigger()
 }

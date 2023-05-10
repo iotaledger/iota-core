@@ -33,7 +33,7 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] struct {
 
 	cachedTransactions *shrinkingmap.ShrinkingMap[iotago.TransactionID, *TransactionMetadata]
 
-	cachedStateRequests *shrinkingmap.ShrinkingMap[iotago.OutputID, *promise.Promise[*StateWithMetadata]]
+	cachedStateRequests *shrinkingmap.ShrinkingMap[iotago.OutputID, *promise.Promise[*StateMetadata]]
 
 	stateDiffs *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *StateDiff]
 
@@ -53,7 +53,7 @@ func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputRes
 		requestInput:           inputResolver,
 		attachments:            memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata](),
 		cachedTransactions:     shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
-		cachedStateRequests:    shrinkingmap.New[iotago.OutputID, *promise.Promise[*StateWithMetadata]](),
+		cachedStateRequests:    shrinkingmap.New[iotago.OutputID, *promise.Promise[*StateMetadata]](),
 		stateDiffs:             shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
 		executionWorkers:       workers.CreatePool("executionWorkers", 1),
 		conflictDAG:            mockedconflictdag.New[iotago.TransactionID, iotago.OutputID, VotePower](),
@@ -107,7 +107,7 @@ func (m *MemPool[VotePower]) State(stateReference ledger.StateReference) (state 
 		stateRequest = m.requestStateWithMetadata(stateReference)
 	}
 
-	stateRequest.OnSuccess(func(loadedState *StateWithMetadata) { state = loadedState })
+	stateRequest.OnSuccess(func(loadedState *StateMetadata) { state = loadedState })
 	stateRequest.OnError(func(requestErr error) { err = xerrors.Errorf("failed to request state: %w", requestErr) })
 	stateRequest.WaitComplete()
 
@@ -154,31 +154,31 @@ func (m *MemPool[VotePower]) Events() *mempool.Events {
 }
 
 func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionMetadata) {
-	transaction.LifecycleState.OnStored(func() {
+	transaction.OnStored(func() {
 		m.events.TransactionStored.Trigger(transaction)
 
 		m.solidifyInputs(transaction)
 	})
 
-	transaction.LifecycleState.OnSolid(func() {
+	transaction.OnSolid(func() {
 		m.events.TransactionSolid.Trigger(transaction)
 
 		m.executeTransaction(transaction)
 	})
 
-	transaction.LifecycleState.OnExecuted(func() {
+	transaction.OnExecuted(func() {
 		m.events.TransactionExecuted.Trigger(transaction)
 
 		m.bookTransaction(transaction)
 	})
 
-	transaction.LifecycleState.OnBooked(func() {
+	transaction.OnBooked(func() {
 		m.events.TransactionBooked.Trigger(transaction)
 
 		m.publishOutputs(transaction)
 	})
 
-	transaction.LifecycleState.OnInvalid(func(err error) {
+	transaction.OnInvalid(func(err error) {
 		m.events.TransactionInvalid.Trigger(transaction, err)
 	})
 
@@ -211,7 +211,7 @@ func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionM
 	})
 }
 
-func (m *MemPool[VotePower]) setupStateLifecycle(state *StateWithMetadata) {
+func (m *MemPool[VotePower]) setupStateLifecycle(state *StateMetadata) {
 	deleteIfNoConsumers := func() {
 		if !m.cachedStateRequests.Delete(state.ID(), state.HasNoSpenders) && m.cachedStateRequests.Has(state.ID()) {
 			state.OnAllSpendersRemoved(func() {
@@ -243,7 +243,7 @@ func (m *MemPool[VotePower]) storeTransaction(transaction mempool.Transaction, b
 	}
 
 	storedTransaction, isNew = m.cachedTransactions.GetOrCreate(newTransaction.ID(), func() *TransactionMetadata {
-		newTransaction.LifecycleState.setStored()
+		newTransaction.setStored()
 
 		return newTransaction
 	})
@@ -258,11 +258,11 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 	for i, inputReference := range transaction.inputReferences {
 		stateReference, index := inputReference, i
 
-		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[*StateWithMetadata] {
+		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[*StateMetadata] {
 			return m.requestStateWithMetadata(stateReference, true)
 		})
 
-		request.OnSuccess(func(input *StateWithMetadata) {
+		request.OnSuccess(func(input *StateMetadata) {
 			transaction.publishInput(index, input)
 
 			if created {
@@ -270,14 +270,14 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 			}
 		})
 
-		request.OnError(transaction.LifecycleState.setInvalid)
+		request.OnError(transaction.setInvalid)
 	}
 }
 
 func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
-		if outputStates, err := m.executeStateTransition(transaction.Transaction(), lo.Map(transaction.inputs, (*StateWithMetadata).State), context.Background()); err != nil {
-			transaction.LifecycleState.setInvalid(err)
+		if outputStates, err := m.executeStateTransition(transaction.Transaction(), lo.Map(transaction.inputs, (*StateMetadata).State), context.Background()); err != nil {
+			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)
 		}
@@ -285,18 +285,18 @@ func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata
 }
 
 func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
-	lo.ForEach(transaction.inputs, func(input *StateWithMetadata) {
+	lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 		input.OnDoubleSpent(func() {
 			m.forkTransaction(transaction, input)
 		})
 	})
 
-	transaction.LifecycleState.setBooked()
+	transaction.setBooked()
 }
 
 func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionMetadata) {
 	for _, output := range transaction.outputs {
-		outputRequest, isNew := m.cachedStateRequests.GetOrCreate(output.id, lo.NoVariadic(promise.New[*StateWithMetadata]))
+		outputRequest, isNew := m.cachedStateRequests.GetOrCreate(output.id, lo.NoVariadic(promise.New[*StateMetadata]))
 		outputRequest.Resolve(output)
 
 		if isNew {
@@ -317,12 +317,12 @@ func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionMetadata)
 	m.cachedTransactions.Delete(transaction.ID())
 }
 
-func (m *MemPool[VotePower]) requestStateWithMetadata(stateReference ledger.StateReference, waitIfMissing ...bool) *promise.Promise[*StateWithMetadata] {
-	return promise.New[*StateWithMetadata](func(p *promise.Promise[*StateWithMetadata]) {
+func (m *MemPool[VotePower]) requestStateWithMetadata(stateReference ledger.StateReference, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
+	return promise.New[*StateMetadata](func(p *promise.Promise[*StateMetadata]) {
 		request := m.requestInput(stateReference)
 
 		request.OnSuccess(func(state ledger.State) {
-			stateWithMetadata := NewStateWithMetadata(state)
+			stateWithMetadata := NewStateMetadata(state)
 			stateWithMetadata.setAccepted()
 			stateWithMetadata.setCommitted()
 
@@ -337,7 +337,7 @@ func (m *MemPool[VotePower]) requestStateWithMetadata(stateReference ledger.Stat
 	})
 }
 
-func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, input *StateWithMetadata) {
+func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, input *StateMetadata) {
 	switch err := m.conflictDAG.CreateConflict(transaction.ID(), transaction.conflictIDs, advancedset.New(input.ID()), acceptance.Pending); {
 	case errors.Is(err, conflictdag.ErrConflictExists):
 		m.conflictDAG.JoinConflictSets(transaction.ID(), advancedset.New(input.ID()))
