@@ -49,16 +49,13 @@ func (s *State) AdvanceActiveWindowToIndex(index iotago.SlotIndex) {
 	s.evictionMutex.Lock()
 	s.lastCommittedSlot = index
 
-	delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(index)
-	if shouldEvictRootBlocks {
+	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(index); shouldEvictRootBlocks {
 		s.rootBlocks.Evict(delayedIndex)
 	}
 
 	s.evictionMutex.Unlock()
 
-	if shouldEvictRootBlocks {
-		s.Events.SlotEvicted.Trigger(delayedIndex)
-	}
+	s.Events.SlotEvicted.Trigger(index)
 }
 
 func (s *State) LastEvictedSlot() (index iotago.SlotIndex, hasEvicted bool) {
@@ -83,7 +80,7 @@ func (s *State) EarliestRootCommitmentID() (earliestCommitment iotago.Commitment
 		}
 
 		storage.ForEach(func(id iotago.BlockID, commitmentID iotago.CommitmentID) bool {
-			//fmt.Println(id, "EarliestRootCommitmentID: ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
+			// fmt.Println(id, "EarliestRootCommitmentID: ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
 			if commitmentID.Index() < earliestCommitment.Index() {
 				earliestCommitment = commitmentID
 			}

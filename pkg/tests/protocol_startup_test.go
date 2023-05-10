@@ -283,8 +283,6 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
 
-	// TODO: verify after restart again and from snapshot loaded node
-
 	// Shutdown node2 and restart it from disk. Verify state.
 	{
 		node2.Shutdown()
