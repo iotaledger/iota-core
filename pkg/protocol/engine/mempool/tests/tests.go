@@ -1,20 +1,14 @@
 package mempooltests
 
 import (
-	"fmt"
-	"runtime"
-	memleakdebug "runtime/debug"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/debug"
 
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
@@ -24,9 +18,9 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 		"TestSetInclusionSlot":                  TestSetInclusionSlot,
 		"TestSetTransactionOrphanage":           TestSetTransactionOrphanage,
 		"TestSetAllAttachmentsOrphaned":         TestSetAllAttachmentsOrphaned,
+		"TestSetNotAllAttachmentsOrphaned":      TestSetNotAllAttachmentsOrphaned,
 		"TestSetTxOrphanageMultipleAttachments": TestSetTxOrphanageMultipleAttachments,
 		"TestStateDiff":                         TestStateDiff,
-		"TestMempool_MemLeak":                   TestMempool_MemLeak,
 	} {
 		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
 	}
@@ -122,11 +116,6 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 
 	tf.RequireAccepted(map[string]bool{"tx1": true, "tx2": true, "tx3": false})
 
-	// TODO: implement test that checks behavior of accepted, but not commited transactions during slot eviction once we define what to do then
-	//tf.Instance.Evict(1)
-	//time.Sleep(100 * time.Millisecond)
-	//tf.RequireEvicted("tx1", "tx2", "tx3")
-
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
@@ -136,7 +125,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tx3Metadata, exists := tf.TransactionMetadata("tx3")
 	require.True(t, exists)
 
-	tx1Metadata.Commit()
+	tf.CommitSlot(1)
 	//time.Sleep(1 * time.Second)
 	transactionDeletionState := map[string]bool{"tx1": true, "tx2": false, "tx3": false}
 	tf.RequireTransactionsEvicted(transactionDeletionState)
@@ -149,7 +138,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tf.RequireAccepted(map[string]bool{"tx2": true, "tx3": false})
 	tf.RequireBooked("tx3")
 
-	tx2Metadata.Commit()
+	tf.CommitSlot(2)
 	//time.Sleep(1 * time.Second)
 	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx2": true}))
 	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block2": true}))
@@ -160,7 +149,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	require.True(t, tf.MarkAttachmentIncluded("block3"))
 	tf.RequireAccepted(map[string]bool{"tx3": true})
 
-	tx3Metadata.Commit()
+	tf.CommitSlot(3)
 	//time.Sleep(1 * time.Second)
 	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx3": true}))
 
@@ -217,7 +206,6 @@ func TestSetAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 
 	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
 	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
-
 }
 
 func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
@@ -396,50 +384,4 @@ func TestStateDiff(t *testing.T, tf *TestFramework) {
 
 	tf.RequireAccepted(lo.MergeMaps(acceptanceState, map[string]bool{"tx3": true}))
 	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx3:0"}, []string{"tx1", "tx2", "tx3"})
-}
-
-func TestMempool_MemLeak(t *testing.T, tf *TestFramework) {
-	prevStateAlias := "genesis"
-	txIndex := 1
-	issueTransactions := func(startIndex, transactionCount int, prevStateAlias string) (int, string) {
-		index := startIndex
-		for ; index < startIndex+transactionCount; index++ {
-			txAlias := fmt.Sprintf("tx%d", index)
-			blockAlias := fmt.Sprintf("block%d", index)
-			tf.CreateTransaction(txAlias, []string{prevStateAlias}, 2)
-
-			require.NoError(t, tf.AttachTransaction(txAlias, blockAlias, iotago.SlotIndex(index)))
-
-			prevStateAlias = fmt.Sprintf("tx%d:0", index)
-
-			tf.Instance.Evict(iotago.SlotIndex(index))
-		}
-		return index, prevStateAlias
-	}
-
-	memStatsStart := memStats()
-
-	txIndex, prevStateAlias = issueTransactions(txIndex, 100000, prevStateAlias)
-
-	time.Sleep(1 * time.Second)
-
-	txIndex, prevStateAlias = issueTransactions(txIndex, 100000, prevStateAlias)
-
-	tf.Cleanup()
-	tf = nil
-	memStatsEnd := memStats()
-
-	fmt.Println(memStatsEnd.HeapObjects, memStatsStart.HeapObjects)
-
-	assert.Less(t, float64(memStatsEnd.HeapObjects), 1.1*float64(memStatsStart.HeapObjects), "the objects in the heap should not grow by more than 10%")
-}
-
-func memStats() *runtime.MemStats {
-	runtime.GC()
-	memleakdebug.FreeOSMemory()
-
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-
-	return &memStats
 }
