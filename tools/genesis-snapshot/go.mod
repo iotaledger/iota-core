@@ -5,11 +5,9 @@ go 1.20
 replace github.com/iotaledger/iota-core => ../../
 
 require (
-	github.com/iotaledger/hive.go/lo v0.0.0-20230427083408-bac1dd903fc0
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230427083408-bac1dd903fc0
 	github.com/iotaledger/iota-core v0.0.0-20230414140919-e676d4aef341
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230426143214-044069a86e1b
-	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.5
 )
 
@@ -36,6 +34,7 @@ require (
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230427083408-bac1dd903fc0 // indirect
 	github.com/iotaledger/hive.go/ds v0.0.0-20230427083408-bac1dd903fc0 // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230427083408-bac1dd903fc0 // indirect
+	github.com/iotaledger/hive.go/lo v0.0.0-20230427083408-bac1dd903fc0 // indirect
 	github.com/iotaledger/hive.go/logger v0.0.0-20230427083408-bac1dd903fc0 // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230427083408-bac1dd903fc0 // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230427083408-bac1dd903fc0 // indirect
@@ -47,6 +46,7 @@ require (
 	github.com/oasisprotocol/ed25519 v0.0.0-20210505154701-76d8c688d86e // indirect
 	github.com/pelletier/go-toml/v2 v2.0.7 // indirect
 	github.com/petermattis/goid v0.0.0-20230317030725-371a4b8eda08 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
