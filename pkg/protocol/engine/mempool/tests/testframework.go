@@ -125,7 +125,7 @@ func (t *TestFramework) CommitSlot(slotIndex iotago.SlotIndex) {
 	})
 
 	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, transaction mempool.TransactionWithMetadata) bool {
-		transaction.Inclusion().Commit()
+		transaction.Commit()
 
 		return true
 	})
