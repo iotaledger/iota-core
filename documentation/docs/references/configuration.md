@@ -151,15 +151,15 @@ Example:
 
 ## <a id="restapi"></a> 5. RestAPI
 
-| Name                        | Description                                                                                    | Type    | Default value           |
-| --------------------------- | ---------------------------------------------------------------------------------------------- | ------- | ----------------------- |
-| enabled                     | Whether the REST API plugin is enabled                                                         | boolean | true                    |
-| bindAddress                 | The bind address on which the REST API listens on                                              | string  | "0.0.0.0:14265"         |
-| publicRoutes                | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes |
-| protectedRoutes             | The HTTP REST routes which need to be called with authorization. Wildcards using \* are allowed | array   | /api/\*                  |
-| debugRequestLoggerEnabled   | Whether the debug logging for requests should be enabled                                       | boolean | false                   |
-| [jwtAuth](#restapi_jwtauth) | Configuration for jwtAuth                                                                      | object  |                         |
-| [limits](#restapi_limits)   | Configuration for limits                                                                       | object  |                         |
+| Name                        | Description                                                                                    | Type    | Default value                                                                                                                                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| enabled                     | Whether the REST API plugin is enabled                                                         | boolean | true                                                                                                                                                                                                    |
+| bindAddress                 | The bind address on which the REST API listens on                                              | string  | "0.0.0.0:8080"                                                                                                                                                                                          |
+| publicRoutes                | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes<br/>/api/core/v3/info<br/>/api/core/v3/blocks\*<br/>/api/core/v3/transactions\*<br/>/api/core/v3/commitments\*<br/>/api/core/v3/outputs\*<br/>/api/debug/v1/\*<br/>/api/indexer/v1/\* |
+| protectedRoutes             | The HTTP REST routes which need to be called with authorization. Wildcards using \* are allowed | array   | /api/\*                                                                                                                                                                                                  |
+| debugRequestLoggerEnabled   | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                   |
+| [jwtAuth](#restapi_jwtauth) | Configuration for jwtAuth                                                                      | object  |                                                                                                                                                                                                         |
+| [limits](#restapi_limits)   | Configuration for limits                                                                       | object  |                                                                                                                                                                                                         |
 
 ### <a id="restapi_jwtauth"></a> JwtAuth
 
@@ -180,10 +180,17 @@ Example:
   {
     "restAPI": {
       "enabled": true,
-      "bindAddress": "0.0.0.0:14265",
+      "bindAddress": "0.0.0.0:8080",
       "publicRoutes": [
         "/health",
-        "/api/routes"
+        "/api/routes",
+        "/api/core/v3/info",
+        "/api/core/v3/blocks*",
+        "/api/core/v3/transactions*",
+        "/api/core/v3/commitments*",
+        "/api/core/v3/outputs*",
+        "/api/debug/v1/*",
+        "/api/indexer/v1/*"
       ],
       "protectedRoutes": [
         "/api/*"
@@ -239,6 +246,8 @@ Example:
 | Name                                         | Description                       | Type   | Default value |
 | -------------------------------------------- | --------------------------------- | ------ | ------------- |
 | [snapshot](#protocol_snapshot)               | Configuration for snapshot        | object |               |
+| [notarization](#protocol_notarization)       | Configuration for notarization    | object |               |
+| [filter](#protocol_filter)                   | Configuration for filter          | object |               |
 | [sybilProtection](#protocol_sybilprotection) | Configuration for sybilProtection | object |               |
 
 ### <a id="protocol_snapshot"></a> Snapshot
@@ -247,6 +256,18 @@ Example:
 | ----- | ------------------------------------------------------------------------------------------ | ------ | ---------------- |
 | path  | The path of the snapshot file                                                              | string | "./snapshot.bin" |
 | depth | Defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate | int    | 5                |
+
+### <a id="protocol_notarization"></a> Notarization
+
+| Name                  | Description                                    | Type | Default value |
+| --------------------- | ---------------------------------------------- | ---- | ------------- |
+| minSlotCommittableAge | Min age of a committable slot denoted in slots | int  | 6             |
+
+### <a id="protocol_filter"></a> Filter
+
+| Name                 | Description                                                                                | Type   | Default value |
+| -------------------- | ------------------------------------------------------------------------------------------ | ------ | ------------- |
+| maxAllowedClockDrift | The maximum drift our wall clock can have to future blocks being received from the network | string | "5s"          |
 
 ### <a id="protocol_sybilprotection"></a> SybilProtection
 
@@ -270,6 +291,12 @@ Example:
         "path": "./snapshot.bin",
         "depth": 5
       },
+      "notarization": {
+        "minSlotCommittableAge": 6
+      },
+      "filter": {
+        "maxAllowedClockDrift": "5s"
+      },
       "sybilProtection": {
         "committee": null
       }
@@ -277,13 +304,38 @@ Example:
   }
 ```
 
-## <a id="activity"></a> 8. Activity
+## <a id="blockissuer"></a> 8. BlockIssuer
 
-| Name              | Description                                                         | Type    | Default value |
-| ----------------- | ------------------------------------------------------------------- | ------- | ------------- |
-| enabled           | Whether the Activity component is enabled                           | boolean | true          |
-| broadcastInterval | The interval at which the node will broadcast its activity block    | string  | "2s"          |
-| parentsCount      | The number of parents that node will choose for its activity blocks | int     | 8             |
+| Name                      | Description                                               | Type    | Default value |
+| ------------------------- | --------------------------------------------------------- | ------- | ------------- |
+| enabled                   | Whether the BlockIssuer component is enabled              | boolean | true          |
+| tipSelectionTimeout       | The timeout for tip selection                             | string  | "10s"         |
+| tipSelectionRetryInterval | The interval for retrying tip selection                   | string  | "200ms"       |
+| issuerAccount             | The account ID of the account that will issue the blocks  | string  | ""            |
+| privateKey                | The private key of the account that will issue the blocks | string  | ""            |
+
+Example:
+
+```json
+  {
+    "blockIssuer": {
+      "enabled": true,
+      "tipSelectionTimeout": "10s",
+      "tipSelectionRetryInterval": "200ms",
+      "issuerAccount": "",
+      "privateKey": ""
+    }
+  }
+```
+
+## <a id="activity"></a> 9. Activity
+
+| Name               | Description                                                                                                | Type    | Default value |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- | ------- | ------------- |
+| enabled            | Whether the Activity component is enabled                                                                  | boolean | true          |
+| broadcastInterval  | The interval at which the node will broadcast its activity block                                           | string  | "2s"          |
+| parentsCount       | The number of parents that node will choose for its activity blocks                                        | int     | 8             |
+| ignoreBootstrapped | Whether the Activity component should start issuing activity blocks before the main engine is bootstrapped | boolean | false         |
 
 Example:
 
@@ -292,7 +344,50 @@ Example:
     "activity": {
       "enabled": true,
       "broadcastInterval": "2s",
-      "parentsCount": 8
+      "parentsCount": 8,
+      "ignoreBootstrapped": false
+    }
+  }
+```
+
+## <a id="dashboard"></a> 10. Dashboard
+
+| Name                              | Description                             | Type    | Default value  |
+| --------------------------------- | --------------------------------------- | ------- | -------------- |
+| enabled                           | Whether the dashboard plugin is enabled | boolean | true           |
+| bindAddress                       | The bind address of the dashboard       | string  | "0.0.0.0:8081" |
+| [basicAuth](#dashboard_basicauth) | Configuration for basicAuth             | object  |                |
+| [conflicts](#dashboard_conflicts) | Configuration for conflicts             | object  |                |
+
+### <a id="dashboard_basicauth"></a> BasicAuth
+
+| Name     | Description                       | Type    | Default value |
+| -------- | --------------------------------- | ------- | ------------- |
+| enabled  | Whether to enable HTTP basic auth | boolean | false         |
+| username | HTTP basic auth username          | string  | "goshimmer"   |
+| password | HTTP basic auth password          | string  | "goshimmer"   |
+
+### <a id="dashboard_conflicts"></a> Conflicts
+
+| Name     | Description                                     | Type | Default value |
+| -------- | ----------------------------------------------- | ---- | ------------- |
+| maxCount | Max number of conflicts stored on the dashboard | int  | 100           |
+
+Example:
+
+```json
+  {
+    "dashboard": {
+      "enabled": true,
+      "bindAddress": "0.0.0.0:8081",
+      "basicAuth": {
+        "enabled": false,
+        "username": "goshimmer",
+        "password": "goshimmer"
+      },
+      "conflicts": {
+        "maxCount": 100
+      }
     }
   }
 ```
