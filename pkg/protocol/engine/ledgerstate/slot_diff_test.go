@@ -75,7 +75,7 @@ func TestMilestoneDiffSerialization(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, tpkg.RandTimestamp()),
 	}
 
-	require.NoError(t, manager.ApplyConfirmationWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
 
 	readDiff, err := manager.SlotDiffWithoutLocking(index)
 	require.NoError(t, err)

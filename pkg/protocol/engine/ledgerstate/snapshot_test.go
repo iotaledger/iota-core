@@ -209,7 +209,7 @@ func TestManager_Import(t *testing.T) {
 	require.NoError(t, kvstore.Copy(mapDB, mapDBAtIndex0))
 
 	output2 := tpkg.RandLedgerStateOutput()
-	require.NoError(t, manager.ApplyConfirmation(1,
+	require.NoError(t, manager.ApplyDiff(1,
 		ledgerstate.Outputs{
 			output2,
 			tpkg.RandLedgerStateOutput(),
@@ -224,7 +224,7 @@ func TestManager_Import(t *testing.T) {
 	mapDBAtIndex1 := mapdb.NewMapDB()
 	require.NoError(t, kvstore.Copy(mapDB, mapDBAtIndex1))
 
-	require.NoError(t, manager.ApplyConfirmation(2,
+	require.NoError(t, manager.ApplyDiff(2,
 		ledgerstate.Outputs{
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
@@ -299,7 +299,7 @@ func TestManager_Export(t *testing.T) {
 	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutput()))
 
 	output2 := tpkg.RandLedgerStateOutput()
-	require.NoError(t, manager.ApplyConfirmation(1,
+	require.NoError(t, manager.ApplyDiff(1,
 		ledgerstate.Outputs{
 			output2,
 			tpkg.RandLedgerStateOutput(),
@@ -311,7 +311,7 @@ func TestManager_Export(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, iotago.SlotIndex(1), ledgerIndex)
 
-	require.NoError(t, manager.ApplyConfirmation(2,
+	require.NoError(t, manager.ApplyDiff(2,
 		ledgerstate.Outputs{
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),

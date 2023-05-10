@@ -32,7 +32,7 @@ func TestUTXOComputeBalance(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(initialOutput, index, tpkg.RandTimestamp()),
 	}
 
-	require.NoError(t, manager.ApplyConfirmationWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
 
 	spent, err := manager.SpentOutputs()
 	require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestUTXOIteration(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(outputs[9], index, tpkg.RandTimestamp()),
 	}
 
-	require.NoError(t, manager.ApplyConfirmationWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
 
 	// Prepare values to check
 	outputByID := make(map[string]struct{})
