@@ -34,8 +34,8 @@ const (
              1 byte         +     34 bytes
 
    Value:
-       BlockID   +   SlotIndex  + CreationTimestamp (time.Time) + iotago.Output.Serialized()
-       40 bytes  +    8 bytes   +             8 bytes           +   1 byte type + X bytes
+       BlockID   +   SlotIndex  + TransactionCreationTimestamp (time.Time) + iotago.Output.Serialized()
+       40 bytes  +    8 bytes   +                  8 byte      s           +   1 byte type + X bytes
 
    Spent Output:
    ================
@@ -44,8 +44,8 @@ const (
             1 byte         +     34 bytes
 
    Value:
-       TargetTransactionID (iotago.TransactionID) + ConfirmationIndex (iotago.SlotIndex) + ConfirmationTimestamp (time.Time)
-                  32 bytes                        +            8 bytes                   +       8 bytes
+       TargetTransactionID (iotago.TransactionID) + TransactionAcceptedSlotIndex (iotago.SlotIndex) + TransactionCreationTimestamp (time.Time)
+                  32 bytes                        +                    8 bytes                      +       8 bytes
 
    Unspent Output:
    ===============
@@ -60,8 +60,8 @@ const (
    Slot diffs:
    ================
    Key:
-       StoreKeyPrefixMilestoneDiffs + iotago.SlotIndex
-                 1 byte             +     8 bytes
+       StoreKeyPrefixSlotDiffs + iotago.SlotIndex
+                 1 byte        +     8 bytes
 
    Value:
        OutputCount  +  OutputCount  *  iotago.OutputID   + SpentCount +  SpentCount *    iotago.OutputID
