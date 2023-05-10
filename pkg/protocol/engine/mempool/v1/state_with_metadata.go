@@ -16,19 +16,13 @@ type StateWithMetadata struct {
 }
 
 func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetadata) *StateWithMetadata {
-	s := &StateWithMetadata{
+	return &StateWithMetadata{
 		id:    state.ID(),
 		state: state,
 
-		inclusionState: NewInclusionState(),
+		inclusionState: NewInclusionState().dependsOnCreatingTransaction(lo.First(optSource)),
 		spentState:     NewSpentState(),
 	}
-
-	if source := lo.First(optSource); source != nil {
-		s.inclusionState.inheritFrom(source.inclusionState.InclusionState)
-	}
-
-	return s
 }
 
 func (s *StateWithMetadata) ID() iotago.OutputID {

@@ -80,3 +80,19 @@ func (s *SpentState) acceptSpend(spender *TransactionWithMetadata) {
 func (s *SpentState) commitSpend(spender *TransactionWithMetadata) {
 	s.spendCommitted.Trigger(spender)
 }
+
+func (s *SpentState) dependsOnSpender(spender *TransactionWithMetadata) {
+	s.increaseSpenderCount()
+
+	spender.inclusionState.OnAccepted(func() {
+		s.acceptSpend(spender)
+	})
+
+	spender.inclusionState.OnCommitted(func() {
+		s.commitSpend(spender)
+
+		s.decreaseSpenderCount()
+	})
+
+	spender.inclusionState.OnOrphaned(s.decreaseSpenderCount)
+}

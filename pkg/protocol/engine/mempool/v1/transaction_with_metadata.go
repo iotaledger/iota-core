@@ -48,11 +48,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 		lifecycle:      NewLifecycleState(len(inputReferences)),
 	}
 
-	t.attachments.OnAllAttachmentsEvicted(func() {
-		if !t.inclusionState.IsCommitted() {
-			t.inclusionState.setOrphaned()
-		}
-	})
+	t.inclusionState.dependsOnAttachments(t.attachments)
 
 	return t, nil
 }
@@ -104,7 +100,8 @@ func (t *TransactionWithMetadata) Inclusion() mempool.TransactionInclusion {
 func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetadata) {
 	t.inputs[index] = input
 
-	t.setupInputLifecycle(input)
+	input.spentState.dependsOnSpender(t)
+	t.inclusionState.dependsOnInput(input)
 
 	t.lifecycle.markInputSolid()
 }
@@ -117,37 +114,4 @@ func (t *TransactionWithMetadata) setExecuted(outputStates []ledger.State) {
 	t.mutex.Unlock()
 
 	t.lifecycle.executed.Trigger()
-}
-
-func (t *TransactionWithMetadata) setupInputLifecycle(input *StateWithMetadata) {
-	input.spentState.increaseSpenderCount()
-
-	t.inclusionState.OnAccepted(func() {
-		input.spentState.acceptSpend(t)
-	})
-
-	t.inclusionState.OnCommitted(func() {
-		input.spentState.commitSpend(t)
-		input.spentState.decreaseSpenderCount()
-	})
-
-	t.inclusionState.OnOrphaned(input.spentState.decreaseSpenderCount)
-
-	input.inclusionState.OnAccepted(t.inclusionState.markInputAccepted)
-
-	input.inclusionState.OnRejected(t.inclusionState.setRejected)
-
-	input.inclusionState.OnOrphaned(t.inclusionState.setOrphaned)
-
-	input.spentState.OnSpendAccepted(func(spender mempool.TransactionWithMetadata) {
-		if spender != t {
-			t.inclusionState.setRejected()
-		}
-	})
-
-	input.spentState.OnSpendCommitted(func(spender mempool.TransactionWithMetadata) {
-		if spender != t {
-			t.inclusionState.setOrphaned()
-		}
-	})
 }
