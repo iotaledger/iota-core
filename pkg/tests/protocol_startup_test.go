@@ -84,21 +84,42 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			// Slot 3
 			ts.IssueBlockAtSlot("3.1", 3, iotago.NewEmptyCommitment(), node1, ts.BlockIDs("2.2", "2.2*")...)
 
+			ts.AssertBlocksExist(ts.Blocks("3.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("2.2", "2.2*"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("3.1"), false, ts.Nodes()...)
+
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("1.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("1.2"), true, ts.Nodes()...)
+
 			// Slot 4
 			ts.IssueBlockAtSlot("4.2", 4, iotago.NewEmptyCommitment(), node2, ts.BlockID("3.1"))
+
+			ts.AssertBlocksExist(ts.Blocks("4.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("3.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("4.2"), false, ts.Nodes()...)
+
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("1.1", "1.1*"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("1.1", "1.1*"), true, ts.Nodes()...)
 
 			// Slot 5
 			ts.IssueBlockAtSlot("5.1", 5, iotago.NewEmptyCommitment(), node1, ts.BlockID("4.2"))
 
+			ts.AssertBlocksExist(ts.Blocks("5.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("4.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("5.1"), false, ts.Nodes()...)
+
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("2.2", "2.2*"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("2.2", "2.2*"), true, ts.Nodes()...)
+
 			// Slot 6
 			ts.IssueBlockAtSlot("6.2", 6, iotago.NewEmptyCommitment(), node2, ts.BlockID("5.1"))
 
-			ts.AssertBlocksExist(ts.Blocks("3.1", "4.2", "5.1", "6.2"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1"), true, ts.Nodes()...)
+			ts.AssertBlocksExist(ts.Blocks("6.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("5.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("6.2"), false, ts.Nodes()...)
 
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("1.1", "1.2", "1.1*", "2.2", "2.2*", "3.1"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheConfirmed(ts.Blocks("1.1", "1.2", "1.1*", "2.2", "2.2*", "3.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("3.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("3.1"), true, ts.Nodes()...)
 		}
 
 		// Verify nodes' states: Slot 1 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 3.
