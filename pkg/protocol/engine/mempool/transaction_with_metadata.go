@@ -14,9 +14,9 @@ type TransactionWithMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateWithMetadata]
 
-	Inclusion() TransactionInclusion
+	TransactionInclusion
 
-	Lifecycle() TransactionLifecycle
+	TransactionLifecycle
 
-	Attachments() Attachments
+	Attachments
 }

@@ -184,7 +184,7 @@ func (t *TestFramework) setupHookedEvents() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionSolid with '%s'", metadata.ID())
 		}
 
-		require.True(t.test, metadata.Lifecycle().IsSolid(), "transaction is not marked as solid")
+		require.True(t.test, metadata.IsSolid(), "transaction is not marked as solid")
 
 		t.markTransactionSolidTriggered(metadata.ID())
 	})
@@ -194,7 +194,7 @@ func (t *TestFramework) setupHookedEvents() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionExecuted with '%s'", metadata.ID())
 		}
 
-		require.True(t.test, metadata.Lifecycle().IsExecuted(), "transaction is not marked as executed")
+		require.True(t.test, metadata.IsExecuted(), "transaction is not marked as executed")
 
 		t.markTransactionExecutedTriggered(metadata.ID())
 	})
@@ -204,7 +204,7 @@ func (t *TestFramework) setupHookedEvents() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionBooked with '%s'", metadata.ID())
 		}
 
-		require.True(t.test, metadata.Lifecycle().IsBooked(), "transaction is not marked as booked")
+		require.True(t.test, metadata.IsBooked(), "transaction is not marked as booked")
 
 		t.markTransactionBookedTriggered(metadata.ID())
 	})
@@ -214,7 +214,7 @@ func (t *TestFramework) setupHookedEvents() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
 		}
 
-		require.True(t.test, metadata.Inclusion().IsAccepted(), "transaction is not marked as accepted")
+		require.True(t.test, metadata.IsAccepted(), "transaction is not marked as accepted")
 
 		t.markTransactionAcceptedTriggered(metadata.ID())
 	})
@@ -267,7 +267,7 @@ func (t *TestFramework) waitBooked(transactionAliases ...string) {
 		transactionMetadata, exists := t.TransactionMetadata(transactionAlias)
 		require.True(t.test, exists, "transaction '%s' does not exist", transactionAlias)
 
-		transactionMetadata.Lifecycle().OnBooked(allBooked.Done)
+		transactionMetadata.OnBooked(allBooked.Done)
 	}
 
 	time.Sleep(100 * time.Millisecond)
@@ -289,7 +289,7 @@ func (t *TestFramework) requireMarkedBooked(transactionAliases ...string) {
 		transactionMetadata, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
 
 		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
-		require.True(t.test, transactionMetadata.Lifecycle().IsBooked(), "transaction %s was not booked", transactionAlias)
+		require.True(t.test, transactionMetadata.IsBooked(), "transaction %s was not booked", transactionAlias)
 	}
 }
 
@@ -307,7 +307,7 @@ func (t *TestFramework) requireMarkedAccepted(transactionAliases map[string]bool
 		transactionMetadata, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
 
 		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
-		require.Equal(t.test, accepted, transactionMetadata.Inclusion().IsAccepted(), "transaction %s was incorrectly accepted", transactionAlias)
+		require.Equal(t.test, accepted, transactionMetadata.IsAccepted(), "transaction %s was incorrectly accepted", transactionAlias)
 	}
 }
 

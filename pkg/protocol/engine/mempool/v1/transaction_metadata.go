@@ -11,21 +11,22 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type TransactionWithMetadata struct {
+type TransactionMetadata struct {
 	id              iotago.TransactionID
 	inputReferences []ledger.StateReference
 	inputs          []*StateWithMetadata
 	outputs         []*StateWithMetadata
 	transaction     mempool.Transaction
 	conflictIDs     *advancedset.AdvancedSet[iotago.TransactionID]
-	attachments     *Attachments
-	inclusionState  *TransactionInclusion
-	lifecycle       *LifecycleState
+
+	*LifecycleState
+	*TransactionInclusion
+	*Attachments
 
 	mutex sync.RWMutex
 }
 
-func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWithMetadata, error) {
+func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMetadata, error) {
 	transactionID, transactionIDErr := transaction.ID()
 	if transactionIDErr != nil {
 		return nil, xerrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
@@ -36,32 +37,32 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 		return nil, xerrors.Errorf("failed to retrieve inputReferences of transaction %s: %w", transactionID, inputsErr)
 	}
 
-	t := &TransactionWithMetadata{
+	t := &TransactionMetadata{
 		id:              transactionID,
 		inputReferences: inputReferences,
 		inputs:          make([]*StateWithMetadata, len(inputReferences)),
 		transaction:     transaction,
 		conflictIDs:     advancedset.New[iotago.TransactionID](),
-		attachments:     NewAttachments(),
+		Attachments:     NewAttachments(),
 
-		inclusionState: NewTransactionInclusion(len(inputReferences)),
-		lifecycle:      NewLifecycleState(len(inputReferences)),
+		LifecycleState:       NewLifecycleState(len(inputReferences)),
+		TransactionInclusion: NewTransactionInclusion(len(inputReferences)),
 	}
 
-	t.inclusionState.dependsOnAttachments(t.attachments)
+	t.dependsOnAttachments(t.Attachments)
 
 	return t, nil
 }
 
-func (t *TransactionWithMetadata) ID() iotago.TransactionID {
+func (t *TransactionMetadata) ID() iotago.TransactionID {
 	return t.id
 }
 
-func (t *TransactionWithMetadata) Transaction() mempool.Transaction {
+func (t *TransactionMetadata) Transaction() mempool.Transaction {
 	return t.transaction
 }
 
-func (t *TransactionWithMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateWithMetadata] {
+func (t *TransactionMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateWithMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
@@ -73,7 +74,7 @@ func (t *TransactionWithMetadata) Inputs() *advancedset.AdvancedSet[mempool.Stat
 	return inputs
 }
 
-func (t *TransactionWithMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateWithMetadata] {
+func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateWithMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
@@ -85,33 +86,25 @@ func (t *TransactionWithMetadata) Outputs() *advancedset.AdvancedSet[mempool.Sta
 	return outputs
 }
 
-func (t *TransactionWithMetadata) Lifecycle() mempool.TransactionLifecycle {
-	return t.lifecycle
+func (t *TransactionMetadata) Lifecycle() mempool.TransactionLifecycle {
+	return t.LifecycleState
 }
 
-func (t *TransactionWithMetadata) Attachments() mempool.Attachments {
-	return t.attachments
-}
-
-func (t *TransactionWithMetadata) Inclusion() mempool.TransactionInclusion {
-	return t.inclusionState
-}
-
-func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetadata) {
+func (t *TransactionMetadata) publishInput(index int, input *StateWithMetadata) {
 	t.inputs[index] = input
 
-	input.spentState.dependsOnSpender(t)
-	t.inclusionState.dependsOnInput(input)
+	input.dependsOnSpender(t)
+	t.dependsOnInput(input)
 
-	t.lifecycle.markInputSolid()
+	t.LifecycleState.markInputSolid()
 }
 
-func (t *TransactionWithMetadata) setExecuted(outputStates []ledger.State) {
+func (t *TransactionMetadata) setExecuted(outputStates []ledger.State) {
 	t.mutex.Lock()
 	for _, outputState := range outputStates {
 		t.outputs = append(t.outputs, NewStateWithMetadata(outputState, t))
 	}
 	t.mutex.Unlock()
 
-	t.lifecycle.executed.Trigger()
+	t.LifecycleState.executed.Trigger()
 }

@@ -35,23 +35,23 @@ func (t *TransactionInclusion) OnAllInputsAccepted(callback func()) {
 }
 
 func (t *TransactionInclusion) dependsOnInput(input *StateWithMetadata) {
-	input.inclusionState.OnRejected(t.setRejected)
-	input.inclusionState.OnOrphaned(t.setOrphaned)
+	input.OnRejected(t.setRejected)
+	input.OnOrphaned(t.setOrphaned)
 
-	input.inclusionState.OnAccepted(func() {
+	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			t.allInputsAccepted.Trigger()
 		}
 	})
 
-	input.spentState.OnSpendAccepted(func(spender mempool.TransactionWithMetadata) {
-		if spender.Inclusion() != t {
+	input.OnSpendAccepted(func(spender mempool.TransactionWithMetadata) {
+		if spender.(*TransactionMetadata).TransactionInclusion != t {
 			t.setRejected()
 		}
 	})
 
-	input.spentState.OnSpendCommitted(func(spender mempool.TransactionWithMetadata) {
-		if spender.Inclusion() != t {
+	input.OnSpendCommitted(func(spender mempool.TransactionWithMetadata) {
+		if spender.(*TransactionMetadata).TransactionInclusion != t {
 			t.setOrphaned()
 		}
 	})

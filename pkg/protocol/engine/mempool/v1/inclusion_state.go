@@ -4,6 +4,27 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 )
 
+type StateInclusion struct {
+	*InclusionState
+}
+
+func NewStateInclusion() *StateInclusion {
+	return &StateInclusion{
+		InclusionState: NewInclusionState(),
+	}
+}
+
+func (s *StateInclusion) dependsOnCreatingTransaction(transaction *TransactionMetadata) *StateInclusion {
+	if transaction != nil {
+		transaction.OnAccepted(s.setAccepted)
+		transaction.OnRejected(s.setRejected)
+		transaction.OnCommitted(s.setCommitted)
+		transaction.OnOrphaned(s.setOrphaned)
+	}
+
+	return s
+}
+
 type InclusionState struct {
 	accepted  *promise.Event
 	committed *promise.Event
@@ -66,15 +87,4 @@ func (s *InclusionState) setCommitted() {
 
 func (s *InclusionState) setOrphaned() {
 	s.orphaned.Trigger()
-}
-
-func (s *InclusionState) dependsOnCreatingTransaction(transaction *TransactionWithMetadata) *InclusionState {
-	if transaction != nil {
-		transaction.inclusionState.OnAccepted(s.setAccepted)
-		transaction.inclusionState.OnRejected(s.setRejected)
-		transaction.inclusionState.OnCommitted(s.setCommitted)
-		transaction.inclusionState.OnOrphaned(s.setOrphaned)
-	}
-
-	return s
 }

@@ -44,8 +44,8 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
-		require.False(t, state.Inclusion().IsAccepted())
-		require.True(t, state.Lifecycle().IsSpent())
+		require.False(t, state.IsAccepted())
+		require.True(t, state.IsSpent())
 
 		return nil
 	})
@@ -54,8 +54,8 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
-		require.False(t, state.Inclusion().IsAccepted())
-		require.False(t, state.Lifecycle().IsSpent())
+		require.False(t, state.IsAccepted())
+		require.False(t, state.IsSpent())
 
 		return nil
 	})
@@ -76,8 +76,8 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
-		require.False(t, state.Inclusion().IsAccepted())
-		require.True(t, state.Lifecycle().IsSpent())
+		require.False(t, state.IsAccepted())
+		require.True(t, state.IsSpent())
 
 		return nil
 	})
@@ -86,8 +86,8 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
-		require.False(t, state.Inclusion().IsAccepted())
-		require.True(t, state.Lifecycle().IsSpent())
+		require.False(t, state.IsAccepted())
+		require.True(t, state.IsSpent())
 
 		return nil
 	})
@@ -96,8 +96,8 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx3Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
-		require.False(t, state.Inclusion().IsAccepted())
-		require.False(t, state.Lifecycle().IsSpent())
+		require.False(t, state.IsAccepted())
+		require.False(t, state.IsSpent())
 
 		return nil
 	})
@@ -136,7 +136,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tx3Metadata, exists := tf.TransactionMetadata("tx3")
 	require.True(t, exists)
 
-	tx1Metadata.Inclusion().Commit()
+	tx1Metadata.Commit()
 	//time.Sleep(1 * time.Second)
 	transactionDeletionState := map[string]bool{"tx1": true, "tx2": false, "tx3": false}
 	tf.RequireTransactionsEvicted(transactionDeletionState)
@@ -149,7 +149,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tf.RequireAccepted(map[string]bool{"tx2": true, "tx3": false})
 	tf.RequireBooked("tx3")
 
-	tx2Metadata.Inclusion().Commit()
+	tx2Metadata.Commit()
 	//time.Sleep(1 * time.Second)
 	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx2": true}))
 	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block2": true}))
@@ -160,13 +160,13 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	require.True(t, tf.MarkAttachmentIncluded("block3"))
 	tf.RequireAccepted(map[string]bool{"tx3": true})
 
-	tx3Metadata.Inclusion().Commit()
+	tx3Metadata.Commit()
 	//time.Sleep(1 * time.Second)
 	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx3": true}))
 
-	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.False(t, tx2Metadata.Inclusion().IsOrphaned())
-	require.False(t, tx3Metadata.Inclusion().IsOrphaned())
+	require.False(t, tx1Metadata.IsOrphaned())
+	require.False(t, tx2Metadata.IsOrphaned())
+	require.False(t, tx3Metadata.IsOrphaned())
 
 	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block3": true}))
 
@@ -185,35 +185,35 @@ func TestSetAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
-	require.EqualValues(t, 0, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedSlot())
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.2"))
 
-	require.True(t, tx1Metadata.Inclusion().IsAccepted())
-	require.EqualValues(t, 2, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.True(t, tx1Metadata.IsAccepted())
+	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedSlot())
 	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
 	tf.AssertStateDiff(2, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.1"))
 
-	require.True(t, tx1Metadata.Inclusion().IsAccepted())
-	require.EqualValues(t, 1, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.True(t, tx1Metadata.IsAccepted())
+	require.EqualValues(t, 1, tx1Metadata.EarliestIncludedSlot())
 	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
 
 	require.True(t, tf.MarkAttachmentOrphaned("block1.1"))
 
-	require.True(t, tx1Metadata.Inclusion().IsAccepted())
-	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.EqualValues(t, 2, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.True(t, tx1Metadata.IsAccepted())
+	require.False(t, tx1Metadata.IsOrphaned())
+	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedSlot())
 	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
 	tf.AssertStateDiff(2, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
 	require.True(t, tf.MarkAttachmentOrphaned("block1.2"))
 
-	require.True(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.True(t, tx1Metadata.Inclusion().IsAccepted())
-	require.EqualValues(t, 0, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.True(t, tx1Metadata.IsOrphaned())
+	require.True(t, tx1Metadata.IsAccepted())
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedSlot())
 
 	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
 	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
@@ -237,46 +237,46 @@ func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
-	require.EqualValues(t, 0, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedSlot())
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.2"))
 
 	tf.Instance.Evict(1)
 
-	require.True(t, tx1Metadata.Inclusion().IsAccepted())
-	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.EqualValues(t, 2, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.True(t, tx1Metadata.IsAccepted())
+	require.False(t, tx1Metadata.IsOrphaned())
+	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedSlot())
 	tf.AssertStateDiff(2, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
 	require.True(t, tf.MarkAttachmentOrphaned("block1.2"))
 
-	require.True(t, tx1Metadata.Inclusion().IsAccepted())
-	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.EqualValues(t, 0, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.True(t, tx1Metadata.IsAccepted())
+	require.False(t, tx1Metadata.IsOrphaned())
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedSlot())
 	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.4"))
 
-	require.True(t, tx1Metadata.Inclusion().IsAccepted())
-	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.EqualValues(t, 4, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.True(t, tx1Metadata.IsAccepted())
+	require.False(t, tx1Metadata.IsOrphaned())
+	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedSlot())
 	tf.AssertStateDiff(4, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
 	tf.Instance.Evict(2)
 	tf.Instance.Evict(3)
 
-	require.True(t, tx1Metadata.Inclusion().IsAccepted())
-	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.EqualValues(t, 4, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.True(t, tx1Metadata.IsAccepted())
+	require.False(t, tx1Metadata.IsOrphaned())
+	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedSlot())
 	tf.AssertStateDiff(4, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
 	tf.Instance.Evict(4)
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.5"))
 
-	require.True(t, tx1Metadata.Inclusion().IsAccepted())
-	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.EqualValues(t, 4, tx1Metadata.Attachments().EarliestIncludedSlot())
+	require.True(t, tx1Metadata.IsAccepted())
+	require.False(t, tx1Metadata.IsOrphaned())
+	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedSlot())
 	tf.AssertStateDiff(4, []string{}, []string{}, []string{})
 	tf.AssertStateDiff(5, []string{}, []string{}, []string{})
 
@@ -306,16 +306,16 @@ func TestSetTransactionOrphanage(t *testing.T, tf *TestFramework) {
 	require.True(t, tf.MarkAttachmentIncluded("block2"))
 	require.True(t, tf.MarkAttachmentIncluded("block3"))
 
-	require.False(t, tx2Metadata.Inclusion().IsAccepted())
-	require.False(t, tx3Metadata.Inclusion().IsAccepted())
+	require.False(t, tx2Metadata.IsAccepted())
+	require.False(t, tx3Metadata.IsAccepted())
 
 	tf.Instance.Evict(1)
 
 	tf.RequireTransactionsEvicted(map[string]bool{"tx1": true, "tx2": true, "tx3": true})
 
-	require.True(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.True(t, tx2Metadata.Inclusion().IsOrphaned())
-	require.True(t, tx3Metadata.Inclusion().IsOrphaned())
+	require.True(t, tx1Metadata.IsOrphaned())
+	require.True(t, tx2Metadata.IsOrphaned())
+	require.True(t, tx3Metadata.IsOrphaned())
 
 	tf.RequireAttachmentsEvicted(map[string]bool{"block1": true, "block2": true, "block3": true})
 }
@@ -347,20 +347,20 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 
 	require.True(t, tf.MarkAttachmentIncluded("block3"))
 
-	require.False(t, tx2Metadata.Inclusion().IsAccepted())
-	require.False(t, tx3Metadata.Inclusion().IsAccepted())
+	require.False(t, tx2Metadata.IsAccepted())
+	require.False(t, tx3Metadata.IsAccepted())
 
 	tf.Instance.Evict(1)
 
-	require.False(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.False(t, tx2Metadata.Inclusion().IsOrphaned())
-	require.False(t, tx3Metadata.Inclusion().IsOrphaned())
+	require.False(t, tx1Metadata.IsOrphaned())
+	require.False(t, tx2Metadata.IsOrphaned())
+	require.False(t, tx3Metadata.IsOrphaned())
 
 	tf.Instance.Evict(2)
 
-	require.True(t, tx1Metadata.Inclusion().IsOrphaned())
-	require.True(t, tx2Metadata.Inclusion().IsOrphaned())
-	require.True(t, tx3Metadata.Inclusion().IsOrphaned())
+	require.True(t, tx1Metadata.IsOrphaned())
+	require.True(t, tx2Metadata.IsOrphaned())
+	require.True(t, tx3Metadata.IsOrphaned())
 
 	tf.RequireTransactionsEvicted(map[string]bool{"tx1": true, "tx2": true, "tx3": true})
 

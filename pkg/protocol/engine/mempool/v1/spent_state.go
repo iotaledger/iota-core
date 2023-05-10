@@ -73,26 +73,26 @@ func (s *SpentState) decreaseSpenderCount() {
 	}
 }
 
-func (s *SpentState) acceptSpend(spender *TransactionWithMetadata) {
+func (s *SpentState) acceptSpend(spender *TransactionMetadata) {
 	s.spendAccepted.Trigger(spender)
 }
 
-func (s *SpentState) commitSpend(spender *TransactionWithMetadata) {
+func (s *SpentState) commitSpend(spender *TransactionMetadata) {
 	s.spendCommitted.Trigger(spender)
 }
 
-func (s *SpentState) dependsOnSpender(spender *TransactionWithMetadata) {
+func (s *SpentState) dependsOnSpender(spender *TransactionMetadata) {
 	s.increaseSpenderCount()
 
-	spender.inclusionState.OnAccepted(func() {
+	spender.OnAccepted(func() {
 		s.acceptSpend(spender)
 	})
 
-	spender.inclusionState.OnCommitted(func() {
+	spender.OnCommitted(func() {
 		s.commitSpend(spender)
 
 		s.decreaseSpenderCount()
 	})
 
-	spender.inclusionState.OnOrphaned(s.decreaseSpenderCount)
+	spender.OnOrphaned(s.decreaseSpenderCount)
 }

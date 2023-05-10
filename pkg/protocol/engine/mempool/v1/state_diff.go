@@ -52,7 +52,7 @@ func (s *StateDiff) Mutations() *ads.Set[iotago.TransactionID, *iotago.Transacti
 	return s.mutations
 }
 
-func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionWithMetadata, direction int) {
+func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata, direction int) {
 	transaction.Inputs().Range(func(input mempool.StateWithMetadata) {
 		s.compactStateChanges(input, s.stateUsageCounters.Compute(input.ID(), func(currentValue int, _ bool) int {
 			return currentValue - direction
@@ -66,13 +66,13 @@ func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionWithMeta
 	})
 }
 
-func (s *StateDiff) AddTransaction(transaction *TransactionWithMetadata) {
+func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) {
 	s.executedTransactions.Set(transaction.ID(), transaction)
 	s.mutations.Add(transaction.ID())
 	s.updateCompactedStateChanges(transaction, 1)
 }
 
-func (s *StateDiff) RollbackTransaction(transaction *TransactionWithMetadata) {
+func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) {
 	s.executedTransactions.Delete(transaction.ID())
 	s.mutations.Delete(transaction.ID())
 	s.updateCompactedStateChanges(transaction, -1)

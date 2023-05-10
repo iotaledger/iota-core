@@ -10,7 +10,7 @@ type StateWithMetadata interface {
 
 	State() ledger.State
 
-	Inclusion() InclusionState
+	InclusionState
 
-	Lifecycle() StateLifecycle
+	StateLifecycle
 }
