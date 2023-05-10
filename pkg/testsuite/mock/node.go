@@ -198,6 +198,13 @@ func (n *Node) Shutdown() {
 	n.Workers.Shutdown()
 }
 
+func (n *Node) CopyIdentityFromNode(otherNode *Node) {
+	n.AccountID = otherNode.AccountID
+	n.pubKey = otherNode.pubKey
+	n.privateKey = otherNode.privateKey
+	n.AccountID.RegisterAlias(n.Name)
+}
+
 // TODO: the block Issuance should be improved once the protocol has a better way to issue blocks.
 
 func (n *Node) IssueBlock() iotago.BlockID {

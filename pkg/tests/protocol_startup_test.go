@@ -310,6 +310,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.RemoveNode("node2")
 
 		node21 := ts.AddNode("node2.1")
+		node21.CopyIdentityFromNode(node2)
 		fmt.Println("validators", ts.Validators())
 		node21.Initialize(
 			protocol.WithBaseDirectory(ts.Directory.Path(node2.Name)),
@@ -385,10 +386,10 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	{
 		// Slot 15
 		{
-			node3 := ts.Node("node3")
-			slot9Commitment := lo.PanicOnErr(node3.Protocol.MainEngineInstance().Storage.Commitments().Load(9)).Commitment()
-			ts.IssueBlockAtSlot("15.1", 15, slot9Commitment, node3, ts.BlockID("14.2"))
-			ts.IssueBlockAtSlot("16.2", 16, slot9Commitment, node3, ts.BlockID("15.1"))
+			node21 := ts.Node("node2.1")
+			slot9Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(9)).Commitment()
+			ts.IssueBlockAtSlot("15.1", 15, slot9Commitment, node1, ts.BlockID("14.2"))
+			ts.IssueBlockAtSlot("16.2", 16, slot9Commitment, node21, ts.BlockID("15.1"))
 
 			ts.AssertBlocksExist(ts.Blocks("15.1", "16.2"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("14.2", "15.1"), true, ts.Nodes()...)
