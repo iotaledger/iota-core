@@ -5,18 +5,18 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type TransactionWithMetadata interface {
+type TransactionMetadata interface {
 	ID() iotago.TransactionID
 
 	Transaction() Transaction
 
-	Inputs() *advancedset.AdvancedSet[StateWithMetadata]
+	Inputs() *advancedset.AdvancedSet[StateMetadata]
 
-	Outputs() *advancedset.AdvancedSet[StateWithMetadata]
+	Outputs() *advancedset.AdvancedSet[StateMetadata]
 
 	TransactionInclusion
 
 	TransactionLifecycle
 
-	Attachments
+	TransactionAttachments
 }

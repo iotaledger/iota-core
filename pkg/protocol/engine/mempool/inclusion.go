@@ -1,6 +1,6 @@
 package mempool
 
-type InclusionState interface {
+type Inclusion interface {
 	IsAccepted() bool
 
 	OnAccepted(callback func())

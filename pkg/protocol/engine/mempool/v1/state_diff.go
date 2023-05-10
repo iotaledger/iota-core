@@ -12,10 +12,10 @@ import (
 type StateDiff struct {
 	index iotago.SlotIndex
 
-	spentOutputs   *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateWithMetadata]
-	createdOutputs *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateWithMetadata]
+	spentOutputs   *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateMetadata]
+	createdOutputs *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateMetadata]
 
-	executedTransactions *orderedmap.OrderedMap[iotago.TransactionID, mempool.TransactionWithMetadata]
+	executedTransactions *orderedmap.OrderedMap[iotago.TransactionID, mempool.TransactionMetadata]
 
 	stateUsageCounters *shrinkingmap.ShrinkingMap[iotago.OutputID, int]
 
@@ -24,9 +24,9 @@ type StateDiff struct {
 
 func NewStateDiff(index iotago.SlotIndex) *StateDiff {
 	return &StateDiff{index: index,
-		spentOutputs:         shrinkingmap.New[iotago.OutputID, mempool.StateWithMetadata](),
-		createdOutputs:       shrinkingmap.New[iotago.OutputID, mempool.StateWithMetadata](),
-		executedTransactions: orderedmap.New[iotago.TransactionID, mempool.TransactionWithMetadata](),
+		spentOutputs:         shrinkingmap.New[iotago.OutputID, mempool.StateMetadata](),
+		createdOutputs:       shrinkingmap.New[iotago.OutputID, mempool.StateMetadata](),
+		executedTransactions: orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata](),
 		stateUsageCounters:   shrinkingmap.New[iotago.OutputID, int](),
 		mutations:            ads.NewSet[iotago.TransactionID, *iotago.TransactionID](mapdb.NewMapDB()),
 	}
@@ -36,15 +36,15 @@ func (s *StateDiff) Index() iotago.SlotIndex {
 	return s.index
 }
 
-func (s *StateDiff) DestroyedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateWithMetadata] {
+func (s *StateDiff) DestroyedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateMetadata] {
 	return s.spentOutputs
 }
 
-func (s *StateDiff) CreatedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateWithMetadata] {
+func (s *StateDiff) CreatedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateMetadata] {
 	return s.createdOutputs
 }
 
-func (s *StateDiff) ExecutedTransactions() *orderedmap.OrderedMap[iotago.TransactionID, mempool.TransactionWithMetadata] {
+func (s *StateDiff) ExecutedTransactions() *orderedmap.OrderedMap[iotago.TransactionID, mempool.TransactionMetadata] {
 	return s.executedTransactions
 }
 
@@ -53,13 +53,13 @@ func (s *StateDiff) Mutations() *ads.Set[iotago.TransactionID, *iotago.Transacti
 }
 
 func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata, direction int) {
-	transaction.Inputs().Range(func(input mempool.StateWithMetadata) {
+	transaction.Inputs().Range(func(input mempool.StateMetadata) {
 		s.compactStateChanges(input, s.stateUsageCounters.Compute(input.ID(), func(currentValue int, _ bool) int {
 			return currentValue - direction
 		}))
 	})
 
-	transaction.Outputs().Range(func(output mempool.StateWithMetadata) {
+	transaction.Outputs().Range(func(output mempool.StateMetadata) {
 		s.compactStateChanges(output, s.stateUsageCounters.Compute(output.ID(), func(currentValue int, _ bool) int {
 			return currentValue + direction
 		}))
@@ -78,7 +78,7 @@ func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) {
 	s.updateCompactedStateChanges(transaction, -1)
 }
 
-func (s *StateDiff) compactStateChanges(output mempool.StateWithMetadata, newValue int) {
+func (s *StateDiff) compactStateChanges(output mempool.StateMetadata, newValue int) {
 	switch {
 	case newValue > 0:
 		s.createdOutputs.Set(output.ID(), output)

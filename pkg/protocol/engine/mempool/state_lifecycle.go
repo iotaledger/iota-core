@@ -5,9 +5,9 @@ type StateLifecycle interface {
 
 	OnDoubleSpent(callback func())
 
-	OnSpendAccepted(callback func(spender TransactionWithMetadata))
+	OnSpendAccepted(callback func(spender TransactionMetadata))
 
-	OnSpendCommitted(callback func(spender TransactionWithMetadata))
+	OnSpendCommitted(callback func(spender TransactionMetadata))
 
 	AllSpendersRemoved() bool
 

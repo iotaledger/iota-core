@@ -62,11 +62,11 @@ func (t *TransactionMetadata) Transaction() mempool.Transaction {
 	return t.transaction
 }
 
-func (t *TransactionMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateWithMetadata] {
+func (t *TransactionMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	inputs := advancedset.New[mempool.StateWithMetadata]()
+	inputs := advancedset.New[mempool.StateMetadata]()
 	for _, input := range t.inputs {
 		inputs.Add(input)
 	}
@@ -74,11 +74,11 @@ func (t *TransactionMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateWit
 	return inputs
 }
 
-func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateWithMetadata] {
+func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	outputs := advancedset.New[mempool.StateWithMetadata]()
+	outputs := advancedset.New[mempool.StateMetadata]()
 	for _, output := range t.outputs {
 		outputs.Add(output)
 	}
@@ -96,7 +96,7 @@ func (t *TransactionMetadata) publishInput(index int, input *StateMetadata) {
 	input.dependsOnSpender(t)
 	t.dependsOnInput(input)
 
-	t.TransactionLifecycle.markInputSolid()
+	t.markInputSolid()
 }
 
 func (t *TransactionMetadata) setExecuted(outputStates []ledger.State) {

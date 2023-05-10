@@ -7,5 +7,5 @@ type TransactionInclusion interface {
 
 	Commit()
 
-	InclusionState
+	Inclusion
 }

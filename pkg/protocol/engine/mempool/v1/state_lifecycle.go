@@ -12,8 +12,8 @@ type StateLifecycle struct {
 	spenderCount       uint64
 	spent              *promise.Event
 	doubleSpent        *promise.Event
-	spendAccepted      *promise.Event1[mempool.TransactionWithMetadata]
-	spendCommitted     *promise.Event1[mempool.TransactionWithMetadata]
+	spendAccepted      *promise.Event1[mempool.TransactionMetadata]
+	spendCommitted     *promise.Event1[mempool.TransactionMetadata]
 	allSpendersRemoved *event.Event
 }
 
@@ -21,8 +21,8 @@ func NewStateLifecycle() *StateLifecycle {
 	return &StateLifecycle{
 		spent:              promise.NewEvent(),
 		doubleSpent:        promise.NewEvent(),
-		spendAccepted:      promise.NewEvent1[mempool.TransactionWithMetadata](),
-		spendCommitted:     promise.NewEvent1[mempool.TransactionWithMetadata](),
+		spendAccepted:      promise.NewEvent1[mempool.TransactionMetadata](),
+		spendCommitted:     promise.NewEvent1[mempool.TransactionMetadata](),
 		allSpendersRemoved: event.New(),
 	}
 }
@@ -35,11 +35,11 @@ func (s *StateLifecycle) OnDoubleSpent(callback func()) {
 	s.doubleSpent.OnTrigger(callback)
 }
 
-func (s *StateLifecycle) OnSpendAccepted(callback func(spender mempool.TransactionWithMetadata)) {
+func (s *StateLifecycle) OnSpendAccepted(callback func(spender mempool.TransactionMetadata)) {
 	s.spendAccepted.OnTrigger(callback)
 }
 
-func (s *StateLifecycle) OnSpendCommitted(callback func(spender mempool.TransactionWithMetadata)) {
+func (s *StateLifecycle) OnSpendCommitted(callback func(spender mempool.TransactionMetadata)) {
 	s.spendCommitted.OnTrigger(callback)
 }
 

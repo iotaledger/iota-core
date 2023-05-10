@@ -37,7 +37,7 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
-	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
+	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.True(t, state.IsSpent())
 
@@ -47,7 +47,7 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	tx2Metadata, exists := tf.TransactionMetadata("tx2")
 	require.True(t, exists)
 
-	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
+	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.False(t, state.IsSpent())
 
@@ -69,7 +69,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
-	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
+	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.True(t, state.IsSpent())
 
@@ -79,7 +79,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	tx2Metadata, exists := tf.TransactionMetadata("tx2")
 	require.True(t, exists)
 
-	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
+	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.True(t, state.IsSpent())
 
@@ -89,7 +89,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	tx3Metadata, exists := tf.TransactionMetadata("tx3")
 	require.True(t, exists)
 
-	_ = tx3Metadata.Outputs().ForEach(func(state mempool.StateWithMetadata) error {
+	_ = tx3Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.False(t, state.IsSpent())
 

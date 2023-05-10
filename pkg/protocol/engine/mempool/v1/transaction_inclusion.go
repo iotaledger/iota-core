@@ -44,13 +44,13 @@ func (t *TransactionInclusion) dependsOnInput(input *StateMetadata) {
 		}
 	})
 
-	input.OnSpendAccepted(func(spender mempool.TransactionWithMetadata) {
+	input.OnSpendAccepted(func(spender mempool.TransactionMetadata) {
 		if spender.(*TransactionMetadata).TransactionInclusion != t {
 			t.setRejected()
 		}
 	})
 
-	input.OnSpendCommitted(func(spender mempool.TransactionWithMetadata) {
+	input.OnSpendCommitted(func(spender mempool.TransactionMetadata) {
 		if spender.(*TransactionMetadata).TransactionInclusion != t {
 			t.setOrphaned()
 		}

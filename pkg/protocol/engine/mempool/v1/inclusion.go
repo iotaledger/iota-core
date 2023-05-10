@@ -6,10 +6,17 @@ import (
 
 // Inclusion represents important flags and events that relate to the inclusion of an entity in the distributed ledger.
 type Inclusion struct {
-	accepted  *promise.Event
+	// accepted gets triggered when the entity gets marked as accepted.
+	accepted *promise.Event
+
+	// committed gets triggered when the entity gets marked as committed.
 	committed *promise.Event
-	rejected  *promise.Event
-	orphaned  *promise.Event
+
+	// rejected gets triggered when the entity gets marked as rejected.
+	rejected *promise.Event
+
+	// orphaned gets triggered when the entity gets marked as orphaned.
+	orphaned *promise.Event
 }
 
 // NewInclusion creates a new Inclusion instance.

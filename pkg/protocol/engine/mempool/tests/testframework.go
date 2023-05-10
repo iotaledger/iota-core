@@ -112,34 +112,34 @@ func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, s
 func (t *TestFramework) CommitSlot(slotIndex iotago.SlotIndex) {
 	stateDiff := t.Instance.StateDiff(slotIndex)
 
-	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.StateWithMetadata) bool {
+	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.StateMetadata) bool {
 		t.ledgerState.AddState(state)
 
 		return true
 	})
 
-	stateDiff.DestroyedStates().ForEach(func(id iotago.OutputID, _ mempool.StateWithMetadata) bool {
+	stateDiff.DestroyedStates().ForEach(func(id iotago.OutputID, _ mempool.StateMetadata) bool {
 		t.ledgerState.DestroyState(id)
 
 		return true
 	})
 
-	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, transaction mempool.TransactionWithMetadata) bool {
+	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, transaction mempool.TransactionMetadata) bool {
 		transaction.Commit()
 
 		return true
 	})
 }
 
-func (t *TestFramework) TransactionMetadata(alias string) (mempool.TransactionWithMetadata, bool) {
+func (t *TestFramework) TransactionMetadata(alias string) (mempool.TransactionMetadata, bool) {
 	return t.Instance.Transaction(t.TransactionID(alias))
 }
 
-func (t *TestFramework) TransactionByAttachment(alias string) (mempool.TransactionWithMetadata, bool) {
+func (t *TestFramework) TransactionByAttachment(alias string) (mempool.TransactionMetadata, bool) {
 	return t.Instance.TransactionByAttachment(t.BlockID(alias))
 }
 
-func (t *TestFramework) State(alias string) (mempool.StateWithMetadata, error) {
+func (t *TestFramework) State(alias string) (mempool.StateMetadata, error) {
 	return t.Instance.State(t.stateReference(alias))
 }
 
@@ -191,7 +191,7 @@ func (t *TestFramework) RequireAttachmentsEvicted(attachmentAliases map[string]b
 }
 
 func (t *TestFramework) setupHookedEvents() {
-	t.Instance.Events().TransactionStored.Hook(func(metadata mempool.TransactionWithMetadata) {
+	t.Instance.Events().TransactionStored.Hook(func(metadata mempool.TransactionMetadata) {
 		if debug.GetEnabled() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionStored with '%s'", metadata.ID())
 		}
@@ -201,7 +201,7 @@ func (t *TestFramework) setupHookedEvents() {
 		t.markTransactionStoredTriggered(metadata.ID())
 	})
 
-	t.Instance.Events().TransactionSolid.Hook(func(metadata mempool.TransactionWithMetadata) {
+	t.Instance.Events().TransactionSolid.Hook(func(metadata mempool.TransactionMetadata) {
 		if debug.GetEnabled() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionSolid with '%s'", metadata.ID())
 		}
@@ -211,7 +211,7 @@ func (t *TestFramework) setupHookedEvents() {
 		t.markTransactionSolidTriggered(metadata.ID())
 	})
 
-	t.Instance.Events().TransactionExecuted.Hook(func(metadata mempool.TransactionWithMetadata) {
+	t.Instance.Events().TransactionExecuted.Hook(func(metadata mempool.TransactionMetadata) {
 		if debug.GetEnabled() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionExecuted with '%s'", metadata.ID())
 		}
@@ -221,7 +221,7 @@ func (t *TestFramework) setupHookedEvents() {
 		t.markTransactionExecutedTriggered(metadata.ID())
 	})
 
-	t.Instance.Events().TransactionBooked.Hook(func(metadata mempool.TransactionWithMetadata) {
+	t.Instance.Events().TransactionBooked.Hook(func(metadata mempool.TransactionMetadata) {
 		if debug.GetEnabled() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionBooked with '%s'", metadata.ID())
 		}
@@ -231,7 +231,7 @@ func (t *TestFramework) setupHookedEvents() {
 		t.markTransactionBookedTriggered(metadata.ID())
 	})
 
-	t.Instance.Events().TransactionAccepted.Hook(func(metadata mempool.TransactionWithMetadata) {
+	t.Instance.Events().TransactionAccepted.Hook(func(metadata mempool.TransactionMetadata) {
 		if debug.GetEnabled() {
 			t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
 		}

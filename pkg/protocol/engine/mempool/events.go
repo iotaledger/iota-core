@@ -5,28 +5,28 @@ import (
 )
 
 type Events struct {
-	TransactionStored *event.Event1[TransactionWithMetadata]
+	TransactionStored *event.Event1[TransactionMetadata]
 
-	TransactionSolid *event.Event1[TransactionWithMetadata]
+	TransactionSolid *event.Event1[TransactionMetadata]
 
-	TransactionExecuted *event.Event1[TransactionWithMetadata]
+	TransactionExecuted *event.Event1[TransactionMetadata]
 
-	TransactionInvalid *event.Event2[TransactionWithMetadata, error]
+	TransactionInvalid *event.Event2[TransactionMetadata, error]
 
-	TransactionBooked *event.Event1[TransactionWithMetadata]
+	TransactionBooked *event.Event1[TransactionMetadata]
 
-	TransactionAccepted *event.Event1[TransactionWithMetadata]
+	TransactionAccepted *event.Event1[TransactionMetadata]
 
 	event.Group[Events, *Events]
 }
 
 var NewEvents = event.CreateGroupConstructor(func() *Events {
 	return &Events{
-		TransactionStored:   event.New1[TransactionWithMetadata](),
-		TransactionSolid:    event.New1[TransactionWithMetadata](),
-		TransactionExecuted: event.New1[TransactionWithMetadata](),
-		TransactionInvalid:  event.New2[TransactionWithMetadata, error](),
-		TransactionAccepted: event.New1[TransactionWithMetadata](),
-		TransactionBooked:   event.New1[TransactionWithMetadata](),
+		TransactionStored:   event.New1[TransactionMetadata](),
+		TransactionSolid:    event.New1[TransactionMetadata](),
+		TransactionExecuted: event.New1[TransactionMetadata](),
+		TransactionInvalid:  event.New2[TransactionMetadata, error](),
+		TransactionAccepted: event.New1[TransactionMetadata](),
+		TransactionBooked:   event.New1[TransactionMetadata](),
 	}
 })

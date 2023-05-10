@@ -68,7 +68,7 @@ func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputRes
 	return m
 }
 
-func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (metadata mempool.TransactionWithMetadata, err error) {
+func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (metadata mempool.TransactionMetadata, err error) {
 	storedTransaction, isNew, err := m.storeTransaction(transaction, blockID)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to store transaction: %w", err)
@@ -87,21 +87,21 @@ func (m *MemPool[VotePower]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool
 	}
 
 	return m.updateAttachment(blockID, func(transaction *TransactionMetadata, blockID iotago.BlockID) bool {
-		return transaction.Attachments.MarkOrphaned(blockID)
+		return transaction.MarkOrphaned(blockID)
 	})
 }
 
 func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) bool {
 	return m.updateAttachment(blockID, func(transaction *TransactionMetadata, blockID iotago.BlockID) bool {
-		return transaction.Attachments.MarkIncluded(blockID)
+		return transaction.MarkIncluded(blockID)
 	})
 }
 
-func (m *MemPool[VotePower]) Transaction(id iotago.TransactionID) (transaction mempool.TransactionWithMetadata, exists bool) {
+func (m *MemPool[VotePower]) Transaction(id iotago.TransactionID) (transaction mempool.TransactionMetadata, exists bool) {
 	return m.cachedTransactions.Get(id)
 }
 
-func (m *MemPool[VotePower]) State(stateReference ledger.StateReference) (state mempool.StateWithMetadata, err error) {
+func (m *MemPool[VotePower]) State(stateReference ledger.StateReference) (state mempool.StateMetadata, err error) {
 	stateRequest, exists := m.cachedStateRequests.Get(stateReference.StateID())
 	if !exists || !stateRequest.WasCompleted() {
 		stateRequest = m.requestStateWithMetadata(stateReference)
@@ -114,7 +114,7 @@ func (m *MemPool[VotePower]) State(stateReference ledger.StateReference) (state 
 	return state, err
 }
 
-func (m *MemPool[VotePower]) TransactionByAttachment(blockID iotago.BlockID) (mempool.TransactionWithMetadata, bool) {
+func (m *MemPool[VotePower]) TransactionByAttachment(blockID iotago.BlockID) (mempool.TransactionMetadata, bool) {
 	return m.transactionByAttachment(blockID)
 }
 
@@ -138,7 +138,7 @@ func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
 		return m.attachments.Evict(slotIndex)
 	}(); evictedAttachments != nil {
 		evictedAttachments.ForEach(func(blockID iotago.BlockID, transaction *TransactionMetadata) bool {
-			transaction.Attachments.Evict(blockID)
+			transaction.Evict(blockID)
 
 			return true
 		})
@@ -211,7 +211,7 @@ func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionM
 	})
 }
 
-func (m *MemPool[VotePower]) setupStateLifecycle(state *StateMetadata) {
+func (m *MemPool[VotePower]) setupStateEviction(state *StateMetadata) {
 	deleteIfNoConsumers := func() {
 		if !m.cachedStateRequests.Delete(state.ID(), state.HasNoSpenders) && m.cachedStateRequests.Has(state.ID()) {
 			state.OnAllSpendersRemoved(func() {
@@ -248,7 +248,7 @@ func (m *MemPool[VotePower]) storeTransaction(transaction mempool.Transaction, b
 		return newTransaction
 	})
 
-	storedTransaction.Attachments.Add(blockID)
+	storedTransaction.Add(blockID)
 	m.attachments.Get(blockID.Index(), true).Set(blockID, storedTransaction)
 
 	return storedTransaction, isNew, nil
@@ -266,7 +266,7 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 			transaction.publishInput(index, input)
 
 			if created {
-				m.setupStateLifecycle(input)
+				m.setupStateEviction(input)
 			}
 		})
 
@@ -300,13 +300,13 @@ func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionMetadata) {
 		outputRequest.Resolve(output)
 
 		if isNew {
-			m.setupStateLifecycle(output)
+			m.setupStateEviction(output)
 		}
 	}
 }
 
 func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionMetadata) {
-	transaction.Attachments.attachments.ForEach(func(blockID iotago.BlockID, _ AttachmentStatus) bool {
+	transaction.attachments.ForEach(func(blockID iotago.BlockID, _ AttachmentStatus) bool {
 		if slotAttachments := m.attachments.Get(blockID.Index(), false); slotAttachments != nil {
 			slotAttachments.Delete(blockID)
 		}
@@ -370,7 +370,7 @@ func (m *MemPool[VotePower]) transactionByAttachment(blockID iotago.BlockID) (*T
 }
 
 func (m *MemPool[VotePower]) updateAcceptance(transaction *TransactionMetadata) {
-	if transaction.AllInputsAccepted() && transaction.Attachments.WasIncluded() && m.conflictDAG.AcceptanceState(transaction.conflictIDs).IsAccepted() {
+	if transaction.AllInputsAccepted() && transaction.WasIncluded() && m.conflictDAG.AcceptanceState(transaction.conflictIDs).IsAccepted() {
 		transaction.setAccepted()
 	}
 }
