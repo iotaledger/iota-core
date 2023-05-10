@@ -1,6 +1,6 @@
 package mempool
 
-type LifecycleState interface {
+type TransactionLifecycle interface {
 	IsSolid() bool
 
 	OnSolid(func())

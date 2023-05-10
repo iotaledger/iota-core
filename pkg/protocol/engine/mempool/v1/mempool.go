@@ -86,11 +86,15 @@ func (m *MemPool[VotePower]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool
 		defer attachmentSlot.Delete(blockID)
 	}
 
-	return m.updateAttachment(blockID, (*TransactionWithMetadata).MarkAttachmentOrphaned)
+	return m.updateAttachment(blockID, func(transaction *TransactionWithMetadata, blockID iotago.BlockID) bool {
+		return transaction.attachments.MarkOrphaned(blockID)
+	})
 }
 
 func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) bool {
-	return m.updateAttachment(blockID, (*TransactionWithMetadata).MarkAttachmentIncluded)
+	return m.updateAttachment(blockID, func(transaction *TransactionWithMetadata, blockID iotago.BlockID) bool {
+		return transaction.attachments.MarkIncluded(blockID)
+	})
 }
 
 func (m *MemPool[VotePower]) Transaction(id iotago.TransactionID) (transaction mempool.TransactionWithMetadata, exists bool) {
@@ -178,7 +182,7 @@ func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionW
 		m.events.TransactionInvalid.Trigger(transaction, err)
 	})
 
-	transaction.inclusion.OnAccepted(func() {
+	transaction.inclusionState.OnAccepted(func() {
 		m.events.TransactionAccepted.Trigger(transaction)
 
 		if slotIndex := transaction.Attachments().EarliestIncludedSlot(); slotIndex > 0 {
@@ -187,22 +191,22 @@ func (m *MemPool[VotePower]) setupTransactionLifecycle(transaction *TransactionW
 	})
 
 	transaction.Attachments().OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex) {
-		if transaction.inclusion.IsAccepted() {
+		if transaction.inclusionState.IsAccepted() {
 			m.updateStateDiffs(transaction, prevIndex, newIndex)
 		} else if newIndex > 0 {
 			m.updateAcceptance(transaction)
 		}
 	})
 
-	transaction.OnAllInputsAccepted(func() {
+	transaction.Inclusion().OnAllInputsAccepted(func() {
 		m.updateAcceptance(transaction)
 	})
 
-	transaction.inclusion.OnCommitted(func() {
+	transaction.inclusionState.OnCommitted(func() {
 		m.removeTransaction(transaction)
 	})
 
-	transaction.inclusion.OnOrphaned(func() {
+	transaction.inclusionState.OnOrphaned(func() {
 		m.removeTransaction(transaction)
 	})
 }
@@ -302,7 +306,7 @@ func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionWithMetadata
 }
 
 func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionWithMetadata) {
-	transaction.Attachments().attachments.ForEach(func(blockID iotago.BlockID, _ AttachmentStatus) bool {
+	transaction.attachments.attachments.ForEach(func(blockID iotago.BlockID, _ AttachmentStatus) bool {
 		if slotAttachments := m.attachments.Get(blockID.Index(), false); slotAttachments != nil {
 			slotAttachments.Delete(blockID)
 		}
@@ -366,8 +370,8 @@ func (m *MemPool[VotePower]) transactionByAttachment(blockID iotago.BlockID) (*T
 }
 
 func (m *MemPool[VotePower]) updateAcceptance(transaction *TransactionWithMetadata) {
-	if transaction.AllInputsAccepted() && transaction.Attachments().WasIncluded() && m.conflictDAG.AcceptanceState(transaction.conflictIDs).IsAccepted() {
-		transaction.inclusion.setAccepted()
+	if transaction.Inclusion().AllInputsAccepted() && transaction.attachments.WasIncluded() && m.conflictDAG.AcceptanceState(transaction.conflictIDs).IsAccepted() {
+		transaction.inclusionState.setAccepted()
 	}
 }
 

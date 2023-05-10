@@ -1,6 +1,6 @@
 package mempool
 
-type SpentState interface {
+type StateLifecycle interface {
 	IsSpent() bool
 
 	OnDoubleSpent(callback func())

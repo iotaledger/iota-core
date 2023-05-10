@@ -25,10 +25,7 @@ func NewStateWithMetadata(state ledger.State, optSource ...*TransactionWithMetad
 	}
 
 	if source := lo.First(optSource); source != nil {
-		source.inclusion.OnAccepted(s.inclusionState.setAccepted)
-		source.inclusion.OnRejected(s.inclusionState.setRejected)
-		source.inclusion.OnCommitted(s.inclusionState.setCommitted)
-		source.inclusion.OnOrphaned(s.inclusionState.setOrphaned)
+		s.inclusionState.inheritFrom(source.inclusionState.InclusionState)
 	}
 
 	return s
@@ -42,10 +39,10 @@ func (s *StateWithMetadata) State() ledger.State {
 	return s.state
 }
 
-func (s *StateWithMetadata) InclusionState() mempool.InclusionState {
+func (s *StateWithMetadata) Inclusion() mempool.InclusionState {
 	return s.inclusionState
 }
 
-func (s *StateWithMetadata) SpentState() mempool.SpentState {
+func (s *StateWithMetadata) Lifecycle() mempool.StateLifecycle {
 	return s.spentState
 }

@@ -1,6 +1,43 @@
 package mempoolv1
 
-import "github.com/iotaledger/iota-core/pkg/core/promise"
+import (
+	"sync/atomic"
+
+	"github.com/iotaledger/iota-core/pkg/core/promise"
+)
+
+type TransactionInclusion struct {
+	unacceptedInputsCount uint64
+	allInputsAccepted     *promise.Event
+
+	*InclusionState
+}
+
+func NewTransactionInclusion(inputCount int) *TransactionInclusion {
+	return &TransactionInclusion{
+		unacceptedInputsCount: uint64(inputCount),
+		allInputsAccepted:     promise.NewEvent(),
+		InclusionState:        NewInclusionState(),
+	}
+}
+
+func (t *TransactionInclusion) Commit() {
+	t.setCommitted()
+}
+
+func (t *TransactionInclusion) AllInputsAccepted() bool {
+	return t.allInputsAccepted.WasTriggered()
+}
+
+func (t *TransactionInclusion) OnAllInputsAccepted(callback func()) {
+	t.allInputsAccepted.OnTrigger(callback)
+}
+
+func (t *TransactionInclusion) markInputAccepted() {
+	if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
+		t.allInputsAccepted.Trigger()
+	}
+}
 
 type InclusionState struct {
 	accepted  *promise.Event
@@ -64,4 +101,11 @@ func (s *InclusionState) setRejected() {
 
 func (s *InclusionState) setOrphaned() {
 	s.orphaned.Trigger()
+}
+
+func (s *InclusionState) inheritFrom(source *InclusionState) {
+	source.OnAccepted(s.setAccepted)
+	source.OnRejected(s.setRejected)
+	source.OnCommitted(s.setCommitted)
+	source.OnOrphaned(s.setOrphaned)
 }

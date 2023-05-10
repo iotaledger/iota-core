@@ -1,22 +1,28 @@
 package mempoolv1
 
-import "github.com/iotaledger/iota-core/pkg/core/promise"
+import (
+	"sync/atomic"
+
+	"github.com/iotaledger/iota-core/pkg/core/promise"
+)
 
 type LifecycleState struct {
-	stored   *promise.Event
-	solid    *promise.Event
-	executed *promise.Event
-	invalid  *promise.Event1[error]
-	booked   *promise.Event
+	unsolidInputsCount uint64
+	stored             *promise.Event
+	solid              *promise.Event
+	executed           *promise.Event
+	invalid            *promise.Event1[error]
+	booked             *promise.Event
 }
 
-func NewLifecycleState() *LifecycleState {
+func NewLifecycleState(inputsCount int) *LifecycleState {
 	return &LifecycleState{
-		stored:   promise.NewEvent(),
-		booked:   promise.NewEvent(),
-		solid:    promise.NewEvent(),
-		executed: promise.NewEvent(),
-		invalid:  promise.NewEvent1[error](),
+		unsolidInputsCount: uint64(inputsCount),
+		stored:             promise.NewEvent(),
+		booked:             promise.NewEvent(),
+		solid:              promise.NewEvent(),
+		executed:           promise.NewEvent(),
+		invalid:            promise.NewEvent1[error](),
 	}
 }
 
@@ -74,4 +80,10 @@ func (t *LifecycleState) setBooked() {
 
 func (t *LifecycleState) setInvalid(reason error) {
 	t.invalid.Trigger(reason)
+}
+
+func (t *LifecycleState) markInputSolid() {
+	if atomic.AddUint64(&t.unsolidInputsCount, ^uint64(0)) == 0 {
+		t.setSolid()
+	}
 }

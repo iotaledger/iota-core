@@ -2,12 +2,10 @@ package mempoolv1
 
 import (
 	"sync"
-	"sync/atomic"
 
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -19,15 +17,10 @@ type TransactionWithMetadata struct {
 	inputs          []*StateWithMetadata
 	outputs         []*StateWithMetadata
 	transaction     mempool.Transaction
-	attachments     *Attachments
 	conflictIDs     *advancedset.AdvancedSet[iotago.TransactionID]
-
-	unsolidInputsCount    uint64
-	unacceptedInputsCount uint64
-	allInputsAccepted     *promise.Event
-
-	inclusion *InclusionState
-	lifecycle *LifecycleState
+	attachments     *Attachments
+	inclusionState  *TransactionInclusion
+	lifecycle       *LifecycleState
 
 	mutex sync.RWMutex
 }
@@ -51,18 +44,13 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionWi
 		conflictIDs:     advancedset.New[iotago.TransactionID](),
 		attachments:     NewAttachments(),
 
-		inclusion: NewInclusionState(),
-		lifecycle: NewLifecycleState(),
-
-		allInputsAccepted: promise.NewEvent(),
-
-		unsolidInputsCount:    uint64(len(inputReferences)),
-		unacceptedInputsCount: uint64(len(inputReferences)),
+		inclusionState: NewTransactionInclusion(len(inputReferences)),
+		lifecycle:      NewLifecycleState(len(inputReferences)),
 	}
 
 	t.attachments.OnAllAttachmentsEvicted(func() {
-		if !t.inclusion.IsCommitted() {
-			t.inclusion.setOrphaned()
+		if !t.inclusionState.IsCommitted() {
+			t.inclusionState.setOrphaned()
 		}
 	})
 
@@ -75,10 +63,6 @@ func (t *TransactionWithMetadata) ID() iotago.TransactionID {
 
 func (t *TransactionWithMetadata) Transaction() mempool.Transaction {
 	return t.transaction
-}
-
-func (t *TransactionWithMetadata) EarliestIncludedSlot() iotago.SlotIndex {
-	return t.attachments.EarliestIncludedSlot()
 }
 
 func (t *TransactionWithMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateWithMetadata] {
@@ -105,50 +89,16 @@ func (t *TransactionWithMetadata) Outputs() *advancedset.AdvancedSet[mempool.Sta
 	return outputs
 }
 
-func (t *TransactionWithMetadata) Attachments() *Attachments {
+func (t *TransactionWithMetadata) Lifecycle() mempool.TransactionLifecycle {
+	return t.lifecycle
+}
+
+func (t *TransactionWithMetadata) Attachments() mempool.Attachments {
 	return t.attachments
 }
 
-// region Attachments //////////////////////////////////////////////////////////////////////////////////////////////////
-
-func (t *TransactionWithMetadata) OnEarliestIncludedSlotUpdated(callback func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func()) {
-	return t.attachments.earliestIncludedSlot.OnUpdate(callback)
-}
-
-func (t *TransactionWithMetadata) MarkAttachmentIncluded(blockID iotago.BlockID) bool {
-	return t.attachments.MarkIncluded(blockID)
-}
-
-func (t *TransactionWithMetadata) MarkAttachmentOrphaned(blockID iotago.BlockID) bool {
-	return t.attachments.MarkOrphaned(blockID)
-}
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// region InclusionState ///////////////////////////////////////////////////////////////////////////////////////////////
-
-func (t *TransactionWithMetadata) AllInputsAccepted() bool {
-	return t.allInputsAccepted.WasTriggered()
-}
-
-func (t *TransactionWithMetadata) OnAllInputsAccepted(callback func()) {
-	t.allInputsAccepted.OnTrigger(callback)
-}
-
-func (t *TransactionWithMetadata) Inclusion() mempool.InclusionState {
-	return t.inclusion
-}
-
-func (t *TransactionWithMetadata) SetCommitted() {
-	t.inclusion.setCommitted()
-}
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// region Lifecycle ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func (t *TransactionWithMetadata) Lifecycle() mempool.LifecycleState {
-	return t.lifecycle
+func (t *TransactionWithMetadata) Inclusion() mempool.TransactionInclusion {
+	return t.inclusionState
 }
 
 func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetadata) {
@@ -156,9 +106,7 @@ func (t *TransactionWithMetadata) publishInput(index int, input *StateWithMetada
 
 	t.setupInputLifecycle(input)
 
-	if atomic.AddUint64(&t.unsolidInputsCount, ^uint64(0)) == 0 {
-		t.lifecycle.setSolid()
-	}
+	t.lifecycle.markInputSolid()
 }
 
 func (t *TransactionWithMetadata) setExecuted(outputStates []ledger.State) {
@@ -174,38 +122,32 @@ func (t *TransactionWithMetadata) setExecuted(outputStates []ledger.State) {
 func (t *TransactionWithMetadata) setupInputLifecycle(input *StateWithMetadata) {
 	input.spentState.increaseSpenderCount()
 
-	t.inclusion.OnAccepted(func() {
+	t.inclusionState.OnAccepted(func() {
 		input.spentState.acceptSpend(t)
 	})
 
-	t.inclusion.OnCommitted(func() {
+	t.inclusionState.OnCommitted(func() {
 		input.spentState.commitSpend(t)
 		input.spentState.decreaseSpenderCount()
 	})
 
-	t.inclusion.OnOrphaned(input.spentState.decreaseSpenderCount)
+	t.inclusionState.OnOrphaned(input.spentState.decreaseSpenderCount)
 
-	input.inclusionState.OnAccepted(func() {
-		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
-			t.allInputsAccepted.Trigger()
-		}
-	})
+	input.inclusionState.OnAccepted(t.inclusionState.markInputAccepted)
 
-	input.inclusionState.OnRejected(t.inclusion.setRejected)
+	input.inclusionState.OnRejected(t.inclusionState.setRejected)
 
-	input.inclusionState.OnOrphaned(t.inclusion.setOrphaned)
+	input.inclusionState.OnOrphaned(t.inclusionState.setOrphaned)
 
 	input.spentState.OnSpendAccepted(func(spender mempool.TransactionWithMetadata) {
 		if spender != t {
-			t.inclusion.setRejected()
+			t.inclusionState.setRejected()
 		}
 	})
 
 	input.spentState.OnSpendCommitted(func(spender mempool.TransactionWithMetadata) {
 		if spender != t {
-			t.inclusion.setOrphaned()
+			t.inclusionState.setOrphaned()
 		}
 	})
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

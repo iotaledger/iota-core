@@ -14,13 +14,9 @@ type TransactionWithMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateWithMetadata]
 
-	Inclusion() InclusionState
+	Inclusion() TransactionInclusion
 
-	Lifecycle() LifecycleState
+	Lifecycle() TransactionLifecycle
 
-	SetCommitted()
-
-	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func())
-
-	EarliestIncludedSlot() iotago.SlotIndex
+	Attachments() Attachments
 }
