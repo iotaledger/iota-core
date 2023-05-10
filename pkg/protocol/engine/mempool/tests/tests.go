@@ -208,7 +208,7 @@ func TestSetAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 	require.True(t, tf.MarkAttachmentOrphaned("block1.2"))
 
 	require.True(t, tx1Metadata.IsOrphaned())
-	require.True(t, tx1Metadata.IsAccepted())
+	require.False(t, tx1Metadata.IsAccepted())
 	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedSlot())
 
 	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
@@ -245,7 +245,7 @@ func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 
 	require.True(t, tf.MarkAttachmentOrphaned("block1.2"))
 
-	require.True(t, tx1Metadata.IsAccepted())
+	require.False(t, tx1Metadata.IsAccepted())
 	require.False(t, tx1Metadata.IsOrphaned())
 	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedSlot())
 	tf.AssertStateDiff(2, []string{}, []string{}, []string{})

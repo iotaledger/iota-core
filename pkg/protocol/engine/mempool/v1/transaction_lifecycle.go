@@ -66,12 +66,12 @@ func (t *TransactionLifecycle) OnBooked(callback func()) {
 	t.booked.OnTrigger(callback)
 }
 
-func (t *TransactionLifecycle) setStored() {
-	t.stored.Trigger()
+func (t *TransactionLifecycle) setStored() bool {
+	return t.stored.Trigger()
 }
 
-func (t *TransactionLifecycle) setSolid() {
-	t.solid.Trigger()
+func (t *TransactionLifecycle) setSolid() bool {
+	return t.solid.Trigger()
 }
 
 func (t *TransactionLifecycle) setBooked() {
@@ -82,8 +82,10 @@ func (t *TransactionLifecycle) setInvalid(reason error) {
 	t.invalid.Trigger(reason)
 }
 
-func (t *TransactionLifecycle) markInputSolid() {
+func (t *TransactionLifecycle) markInputSolid() (allInputsSolid bool) {
 	if atomic.AddUint64(&t.unsolidInputsCount, ^uint64(0)) == 0 {
-		t.setSolid()
+		return t.setSolid()
 	}
+
+	return false
 }

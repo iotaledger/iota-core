@@ -86,17 +86,13 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	return outputs
 }
 
-func (t *TransactionMetadata) Lifecycle() mempool.TransactionLifecycle {
-	return t.TransactionLifecycle
-}
-
-func (t *TransactionMetadata) publishInput(index int, input *StateMetadata) {
+func (t *TransactionMetadata) publishInput(index int, input *StateMetadata) (allInputsSolid bool) {
 	t.inputs[index] = input
 
-	input.dependsOnSpender(t)
-	t.dependsOnInput(input)
+	input.StateLifecycle.dependsOnSpender(t)
+	t.TransactionInclusion.dependsOnInput(input)
 
-	t.markInputSolid()
+	return t.TransactionLifecycle.markInputSolid()
 }
 
 func (t *TransactionMetadata) setExecuted(outputStates []ledger.State) {

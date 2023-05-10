@@ -106,10 +106,6 @@ func (a *Attachments) evict(id iotago.BlockID) {
 	}
 }
 
-func (a *Attachments) WasIncluded() bool {
-	return a.EarliestIncludedSlot() != 0
-}
-
 func (a *Attachments) findLowestIncludedSlotIndex() iotago.SlotIndex {
 	var lowestIncludedSlotIndex iotago.SlotIndex
 

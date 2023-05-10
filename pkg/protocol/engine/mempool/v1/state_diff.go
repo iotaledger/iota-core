@@ -67,15 +67,17 @@ func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata
 }
 
 func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) {
-	s.executedTransactions.Set(transaction.ID(), transaction)
-	s.mutations.Add(transaction.ID())
-	s.updateCompactedStateChanges(transaction, 1)
+	if _, exists := s.executedTransactions.Set(transaction.ID(), transaction); !exists {
+		s.mutations.Add(transaction.ID())
+		s.updateCompactedStateChanges(transaction, 1)
+	}
 }
 
 func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) {
-	s.executedTransactions.Delete(transaction.ID())
-	s.mutations.Delete(transaction.ID())
-	s.updateCompactedStateChanges(transaction, -1)
+	if s.executedTransactions.Delete(transaction.ID()) {
+		s.mutations.Delete(transaction.ID())
+		s.updateCompactedStateChanges(transaction, -1)
+	}
 }
 
 func (s *StateDiff) compactStateChanges(output mempool.StateMetadata, newValue int) {

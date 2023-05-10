@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -132,15 +133,15 @@ func (t *TestFramework) CommitSlot(slotIndex iotago.SlotIndex) {
 }
 
 func (t *TestFramework) TransactionMetadata(alias string) (mempool.TransactionMetadata, bool) {
-	return t.Instance.Transaction(t.TransactionID(alias))
+	return t.Instance.TransactionMetadata(t.TransactionID(alias))
 }
 
-func (t *TestFramework) TransactionByAttachment(alias string) (mempool.TransactionMetadata, bool) {
-	return t.Instance.TransactionByAttachment(t.BlockID(alias))
+func (t *TestFramework) TransactionMetadataByAttachment(alias string) (mempool.TransactionMetadata, bool) {
+	return t.Instance.TransactionMetadataByAttachment(t.BlockID(alias))
 }
 
-func (t *TestFramework) State(alias string) (mempool.StateMetadata, error) {
-	return t.Instance.State(t.stateReference(alias))
+func (t *TestFramework) StateMetadata(alias string) (mempool.StateMetadata, error) {
+	return t.Instance.StateMetadata(t.stateReference(alias))
 }
 
 func (t *TestFramework) StateID(alias string) iotago.OutputID {
@@ -167,8 +168,13 @@ func (t *TestFramework) TransactionID(alias string) iotago.TransactionID {
 func (t *TestFramework) RequireBooked(transactionAliases ...string) {
 	t.waitBooked(transactionAliases...)
 
-	t.requireBookedTriggered(transactionAliases...)
 	t.requireMarkedBooked(transactionAliases...)
+}
+
+func (t *TestFramework) RequireGlobalBookedEventTriggered(transactionAliases ...string) {
+	t.waitGlobalBookedTriggered(transactionAliases...)
+
+	t.requireBookedTriggered(transactionAliases...)
 }
 
 func (t *TestFramework) RequireAccepted(transactionAliases map[string]bool) {
@@ -178,14 +184,14 @@ func (t *TestFramework) RequireAccepted(transactionAliases map[string]bool) {
 
 func (t *TestFramework) RequireTransactionsEvicted(transactionAliases map[string]bool) {
 	for transactionAlias, deleted := range transactionAliases {
-		_, exists := t.Instance.Transaction(t.TransactionID(transactionAlias))
+		_, exists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
 		require.Equal(t.test, deleted, !exists, "transaction %s has incorrect eviction state", transactionAlias)
 	}
 }
 
 func (t *TestFramework) RequireAttachmentsEvicted(attachmentAliases map[string]bool) {
 	for attachmentAlias, deleted := range attachmentAliases {
-		_, exists := t.Instance.TransactionByAttachment(t.BlockID(attachmentAlias))
+		_, exists := t.Instance.TransactionMetadataByAttachment(t.BlockID(attachmentAlias))
 		require.Equal(t.test, deleted, !exists, "attachment %s has incorrect eviction state", attachmentAlias)
 	}
 }
@@ -281,6 +287,18 @@ func (t *TestFramework) stateReference(alias string) ledger.StateReference {
 	return ledger.StoredStateReference(t.StateID(alias))
 }
 
+func (t *TestFramework) waitGlobalBookedTriggered(transactionAliases ...string) {
+	require.Eventually(t.test, func() bool {
+		for _, transactionAlias := range transactionAliases {
+			if !t.globalBookedEventTriggered[t.TransactionID(transactionAlias)] {
+				return false
+			}
+		}
+
+		return true
+	}, 5*time.Second, 10*time.Millisecond, "not all transactions triggered the booked event in time")
+}
+
 func (t *TestFramework) waitBooked(transactionAliases ...string) {
 	var allBooked sync.WaitGroup
 
@@ -306,7 +324,7 @@ func (t *TestFramework) requireBookedTriggered(transactionAliases ...string) {
 
 func (t *TestFramework) requireMarkedBooked(transactionAliases ...string) {
 	for _, transactionAlias := range transactionAliases {
-		transactionMetadata, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
+		transactionMetadata, transactionMetadataExists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
 
 		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
 		require.True(t.test, transactionMetadata.IsBooked(), "transaction %s was not booked", transactionAlias)
@@ -324,7 +342,7 @@ func (t *TestFramework) requireAcceptedTriggered(transactionAliases map[string]b
 
 func (t *TestFramework) requireMarkedAccepted(transactionAliases map[string]bool) {
 	for transactionAlias, accepted := range transactionAliases {
-		transactionMetadata, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
+		transactionMetadata, transactionMetadataExists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
 
 		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
 		require.Equal(t.test, accepted, transactionMetadata.IsAccepted(), "transaction %s was incorrectly accepted", transactionAlias)

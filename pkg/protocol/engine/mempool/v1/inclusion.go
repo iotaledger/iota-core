@@ -7,7 +7,7 @@ import (
 // Inclusion represents important flags and events that relate to the inclusion of an entity in the distributed ledger.
 type Inclusion struct {
 	// accepted gets triggered when the entity gets marked as accepted.
-	accepted *promise.Event
+	accepted *promise.Value[bool]
 
 	// committed gets triggered when the entity gets marked as committed.
 	committed *promise.Event
@@ -22,7 +22,7 @@ type Inclusion struct {
 // NewInclusion creates a new Inclusion instance.
 func NewInclusion() *Inclusion {
 	return &Inclusion{
-		accepted:  promise.NewEvent(),
+		accepted:  promise.NewValue[bool](),
 		committed: promise.NewEvent(),
 		rejected:  promise.NewEvent(),
 		orphaned:  promise.NewEvent(),
@@ -31,12 +31,25 @@ func NewInclusion() *Inclusion {
 
 // IsAccepted returns true if the entity was accepted.
 func (s *Inclusion) IsAccepted() bool {
-	return s.accepted.WasTriggered()
+	return s.accepted.Get()
 }
 
 // OnAccepted registers a callback that gets triggered when the entity gets accepted.
 func (s *Inclusion) OnAccepted(callback func()) {
-	s.accepted.OnTrigger(callback)
+	s.accepted.OnUpdate(func(wasAccepted, isAccepted bool) {
+		if isAccepted && !wasAccepted {
+			callback()
+		}
+	})
+}
+
+// OnPending registers a callback that gets triggered when the entity gets pending.
+func (s *Inclusion) OnPending(callback func()) {
+	s.accepted.OnUpdate(func(wasAccepted, isAccepted bool) {
+		if !isAccepted && wasAccepted {
+			callback()
+		}
+	})
 }
 
 // IsRejected returns true if the entity was rejected.
@@ -71,7 +84,12 @@ func (s *Inclusion) OnOrphaned(callback func()) {
 
 // setAccepted marks the entity as accepted.
 func (s *Inclusion) setAccepted() {
-	s.accepted.Trigger()
+	s.accepted.Set(true)
+}
+
+// setPending marks the entity as pending.
+func (s *Inclusion) setPending() {
+	s.accepted.Set(false)
 }
 
 // setRejected marks the entity as rejected.

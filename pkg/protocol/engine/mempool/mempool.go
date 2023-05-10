@@ -9,11 +9,11 @@ import (
 type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 	AttachTransaction(transaction Transaction, blockID iotago.BlockID) (storedTransaction TransactionMetadata, err error)
 
-	State(reference ledger.StateReference) (state StateMetadata, err error)
+	StateMetadata(reference ledger.StateReference) (state StateMetadata, err error)
 
-	Transaction(id iotago.TransactionID) (transaction TransactionMetadata, exists bool)
+	TransactionMetadata(id iotago.TransactionID) (transaction TransactionMetadata, exists bool)
 
-	TransactionByAttachment(blockID iotago.BlockID) (transaction TransactionMetadata, exists bool)
+	TransactionMetadataByAttachment(blockID iotago.BlockID) (transaction TransactionMetadata, exists bool)
 
 	MarkAttachmentOrphaned(blockID iotago.BlockID) bool
 

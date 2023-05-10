@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
+	mockedconflictdag "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/mocked"
 	mempooltests "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -29,7 +30,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 
 	mempoolInstance := New[vote.MockedPower](mempooltests.VM, func(reference ledger.StateReference) *promise.Promise[ledger.State] {
 		return ledgerState.ResolveState(reference.StateID())
-	}, workerpool.NewGroup(t.Name()))
+	}, workerpool.NewGroup(t.Name()), mockedconflictdag.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower]())
 
 	tf := mempooltests.NewTestFramework(t, mempoolInstance, ledgerState)
 
@@ -94,5 +95,5 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedPower](mempooltests.VM, func(reference ledger.StateReference) *promise.Promise[ledger.State] {
 		return ledgerState.ResolveState(reference.StateID())
-	}, workerpool.NewGroup(t.Name())), ledgerState)
+	}, workerpool.NewGroup(t.Name()), mockedconflictdag.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower]()), ledgerState)
 }
