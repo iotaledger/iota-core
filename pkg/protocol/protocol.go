@@ -54,7 +54,7 @@ type Protocol struct {
 
 	optsBaseDirectory    string
 	optsSnapshotPath     string
-	optsPruningThreshold uint64
+	optsPruningThreshold iotago.SlotIndex
 
 	optsEngineOptions       []options.Option[engine.Engine]
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
@@ -87,7 +87,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
 
 		optsBaseDirectory:    "",
-		optsPruningThreshold: 6 * 60, // 1 hour given that slot duration is 10 seconds
+		optsPruningThreshold: 360,
 	}, opts,
 		(*Protocol).initNetworkEvents,
 		(*Protocol).initEngineManager,
@@ -199,6 +199,14 @@ func (p *Protocol) initEngineManager() {
 		p.optsNotarizationProvider,
 	)
 
+	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		// TODO: fix pruning
+		// if index < p.optsPruningThreshold {
+		// 	return
+		// }
+		// p.MainEngineInstance().Storage.PruneUntilSlot(index - p.optsPruningThreshold)
+	}, event.WithWorkerPool(p.Workers.CreatePool("PruneEngine", 2)))
+
 	mainEngine, err := p.engineManager.LoadActiveEngine()
 	if err != nil {
 		panic(fmt.Sprintf("could not load active engine: %s", err))
@@ -303,7 +311,7 @@ func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 	}
 }
 
-func WithPruningThreshold(pruningThreshold uint64) options.Option[Protocol] {
+func WithPruningThreshold(pruningThreshold iotago.SlotIndex) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsPruningThreshold = pruningThreshold
 	}

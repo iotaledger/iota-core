@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
@@ -22,7 +23,14 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	node1 := ts.AddValidatorNode("node1", 50)
 	node2 := ts.AddValidatorNode("node2", 50)
 
-	ts.Run()
+	ts.Run(map[string][]options.Option[protocol.Protocol]{
+		"node1": {
+			protocol.WithPruningThreshold(2),
+		},
+		"node2": {
+			protocol.WithPruningThreshold(4),
+		},
+	})
 	ts.HookLogging()
 
 	ts.Wait()
@@ -43,6 +51,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
 		testsuite.WithSybilProtectionCommittee(expectedCommittee),
 		testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
 	)
@@ -97,6 +106,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(0),
 			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*")),
 		)
@@ -121,7 +131,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 		// Verify nodes' states:
 		// - Slot 3 should be committed as the MinCommittableSlotAge is 1, and we ratified accepted a block at slot 5.
-		// - 5.1 is ratified accepted and commits to slot 1 -> slot 1 should be evicted. TODO: check latest evicted slot
+		// - 5.1 is ratified accepted and commits to slot 1 -> slot 1 should be evicted.
 		// - rootblocks are still not evicted as RootBlocksEvictionDelay is 3.
 		// - slot 1 is still not finalized: there is no supermajority of ratified accepted blocks that commits to it.
 		ts.AssertNodeState(ts.Nodes(),
@@ -133,6 +143,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(0),
 			testsuite.WithActiveRootBlocks(ts.Blocks("1.1", "1.1*", "2.2", "2.2*", "3.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2")),
 		)
@@ -173,6 +184,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(4),
 			testsuite.WithActiveRootBlocks(ts.Blocks("5.1", "6.2", "7.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2")),
 		)
@@ -205,6 +217,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(5),
 			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
 		)
@@ -237,6 +250,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(6),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
 		)
@@ -244,7 +258,9 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 
 	// Verify that node1 and node2 pruned until their respective slots.
-	// TODO:
+	ts.AssertPrunedSlot(1, node1)
+	ts.AssertPrunedSlot(0, node2)
+	// TODO: verify after restart again and from snapshot loaded node
 
 	// Shutdown node2 and restart it from disk. Verify state.
 	{
@@ -274,6 +290,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(slot1Commitment.MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(6),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
 		)
@@ -316,9 +333,12 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(slot1Commitment.MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(6),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
+
+	// TODO: issue some blocks and see if all nodes continue and agree on the same state.
 }

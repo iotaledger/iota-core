@@ -46,7 +46,12 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.activeRootBlocks != nil {
 		t.AssertActiveRootBlocks(*state.activeRootBlocks, nodes...)
 	}
-
+	if state.evictedSlot != nil {
+		t.AssertEvictedSlot(*state.evictedSlot, nodes...)
+	}
+	if state.prunedSlot != nil {
+		t.AssertPrunedSlot(*state.prunedSlot, nodes...)
+	}
 }
 
 type NodeState struct {
@@ -66,8 +71,8 @@ type NodeState struct {
 	storageRootBlocks *[]*blocks.Block
 	activeRootBlocks  *[]*blocks.Block
 
-	// TODO: add pruning
-	//   TODO: check latest evicted slot
+	evictedSlot *iotago.SlotIndex
+	prunedSlot  *iotago.SlotIndex
 }
 
 func WithSnapshotImported(snapshotImported bool) options.Option[NodeState] {
@@ -139,5 +144,17 @@ func WithStorageRootBlocks(blocks []*blocks.Block) options.Option[NodeState] {
 func WithActiveRootBlocks(blocks []*blocks.Block) options.Option[NodeState] {
 	return func(state *NodeState) {
 		state.activeRootBlocks = &blocks
+	}
+}
+
+func WithEvictedSlot(slotIndex iotago.SlotIndex) options.Option[NodeState] {
+	return func(state *NodeState) {
+		state.evictedSlot = &slotIndex
+	}
+}
+
+func WithPrunedSlot(slotIndex iotago.SlotIndex) options.Option[NodeState] {
+	return func(state *NodeState) {
+		state.prunedSlot = &slotIndex
 	}
 }
