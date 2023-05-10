@@ -49,7 +49,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		TransactionInclusion: NewTransactionInclusion(len(inputReferences)),
 	}
 
-	t.dependsOnAttachments(t.Attachments)
+	t.TransactionInclusion.setupAttachmentsDependencies(t.Attachments)
 
 	return t, nil
 }
@@ -90,7 +90,7 @@ func (t *TransactionMetadata) publishInput(index int, input *StateMetadata) (all
 	t.inputs[index] = input
 
 	input.StateLifecycle.dependsOnSpender(t)
-	t.TransactionInclusion.dependsOnInput(input)
+	t.TransactionInclusion.setupInputDependencies(input)
 
 	return t.TransactionLifecycle.markInputSolid()
 }

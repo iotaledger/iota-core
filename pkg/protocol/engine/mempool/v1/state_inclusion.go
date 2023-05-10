@@ -6,19 +6,17 @@ type StateInclusion struct {
 }
 
 // NewStateInclusion creates a new StateInclusion.
-func NewStateInclusion() *StateInclusion {
-	return &StateInclusion{
+func NewStateInclusion(creatingTransaction ...*TransactionMetadata) *StateInclusion {
+	s := &StateInclusion{
 		Inclusion: NewInclusion(),
 	}
-}
 
-// dependsOnCreatingTransaction sets the callbacks on the given transaction to update this StateInclusion.
-func (s *StateInclusion) dependsOnCreatingTransaction(transaction *TransactionMetadata) *StateInclusion {
-	if transaction != nil {
-		transaction.OnAccepted(s.setAccepted)
-		transaction.OnRejected(s.setRejected)
-		transaction.OnCommitted(s.setCommitted)
-		transaction.OnOrphaned(s.setOrphaned)
+	if len(creatingTransaction) > 0 {
+		creatingTransaction[0].OnPending(s.setPending)
+		creatingTransaction[0].OnAccepted(s.setAccepted)
+		creatingTransaction[0].OnRejected(s.setRejected)
+		creatingTransaction[0].OnCommitted(s.setCommitted)
+		creatingTransaction[0].OnOrphaned(s.setOrphaned)
 	}
 
 	return s

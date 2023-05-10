@@ -263,7 +263,7 @@ func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionMetadata) {
 }
 
 func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionMetadata) {
-	transaction.attachments.ForEach(func(blockID iotago.BlockID, _ AttachmentStatus) bool {
+	transaction.attachments.ForEach(func(blockID iotago.BlockID, _ bool) bool {
 		if slotAttachments := m.attachments.Get(blockID.Index(), false); slotAttachments != nil {
 			slotAttachments.Delete(blockID)
 		}

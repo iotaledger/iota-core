@@ -19,7 +19,7 @@ type TransactionInclusion struct {
 }
 
 func NewTransactionInclusion(inputCount int) *TransactionInclusion {
-	t := &TransactionInclusion{
+	return &TransactionInclusion{
 		unacceptedInputsCount: uint64(inputCount),
 		allInputsAccepted:     promise.NewEvent(),
 		conflicting:           promise.NewEvent(),
@@ -27,28 +27,6 @@ func NewTransactionInclusion(inputCount int) *TransactionInclusion {
 		included:              promise.NewValue[bool](),
 		Inclusion:             NewInclusion(),
 	}
-
-	t.OnConflictAccepted(func() {
-		if t.AllInputsAccepted() && t.IsIncluded() {
-			t.setAccepted()
-		}
-	})
-
-	t.OnAllInputsAccepted(func() {
-		if t.IsConflictAccepted() && t.IsIncluded() {
-			t.setAccepted()
-		}
-	})
-
-	t.OnIncludedUpdated(func(_, isIncluded bool) {
-		if !isIncluded {
-			t.setPending()
-		} else if t.AllInputsAccepted() && t.IsConflictAccepted() {
-			t.setAccepted()
-		}
-	})
-
-	return t
 }
 
 func (t *TransactionInclusion) Commit() {
@@ -92,36 +70,41 @@ func (t *TransactionInclusion) setConflicting() {
 }
 
 func (t *TransactionInclusion) setConflictAccepted() {
-	t.conflictAccepted.Trigger()
-}
-
-func (t *TransactionInclusion) decreaseUnacceptedInputsCount() {
-	if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
-		t.allInputsAccepted.Trigger()
+	if t.conflictAccepted.Trigger() {
+		if t.AllInputsAccepted() && t.IsIncluded() {
+			t.setAccepted()
+		}
 	}
 }
 
-func (t *TransactionInclusion) rejectIfLosingSpend(spender mempool.TransactionMetadata) {
-	if spender.(*TransactionMetadata).TransactionInclusion != t {
-		t.setRejected()
-	}
-}
-
-func (t *TransactionInclusion) orphanIfLosingSpend(spender mempool.TransactionMetadata) {
-	if spender.(*TransactionMetadata).TransactionInclusion != t {
-		t.setOrphaned()
-	}
-}
-
-func (t *TransactionInclusion) dependsOnInput(input *StateMetadata) {
+func (t *TransactionInclusion) setupInputDependencies(input *StateMetadata) {
 	input.OnRejected(t.setRejected)
 	input.OnOrphaned(t.setOrphaned)
-	input.OnAccepted(t.decreaseUnacceptedInputsCount)
-	input.OnSpendAccepted(t.rejectIfLosingSpend)
-	input.OnSpendCommitted(t.orphanIfLosingSpend)
+
+	input.OnAccepted(func() {
+		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
+			if t.allInputsAccepted.Trigger() {
+				if t.IsConflictAccepted() && t.IsIncluded() {
+					t.setAccepted()
+				}
+			}
+		}
+	})
+
+	input.OnSpendAccepted(func(spender mempool.TransactionMetadata) {
+		if spender.(*TransactionMetadata).TransactionInclusion != t {
+			t.setRejected()
+		}
+	})
+
+	input.OnSpendCommitted(func(spender mempool.TransactionMetadata) {
+		if spender.(*TransactionMetadata).TransactionInclusion != t {
+			t.setOrphaned()
+		}
+	})
 }
 
-func (t *TransactionInclusion) dependsOnAttachments(attachments *Attachments) {
+func (t *TransactionInclusion) setupAttachmentsDependencies(attachments *Attachments) {
 	attachments.OnAllAttachmentsEvicted(func() {
 		if !t.IsCommitted() {
 			t.setOrphaned()
@@ -129,6 +112,12 @@ func (t *TransactionInclusion) dependsOnAttachments(attachments *Attachments) {
 	})
 
 	attachments.OnEarliestIncludedSlotUpdated(func(_, newIndex iotago.SlotIndex) {
-		t.included.Set(newIndex != 0)
+		if isIncluded := newIndex != 0; isIncluded != t.included.Set(newIndex != 0) {
+			if !isIncluded {
+				t.setPending()
+			} else if t.AllInputsAccepted() && t.IsConflictAccepted() {
+				t.setAccepted()
+			}
+		}
 	})
 }

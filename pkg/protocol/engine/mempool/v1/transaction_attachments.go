@@ -8,15 +8,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type AttachmentStatus uint8
-
-const (
-	AttachmentPending AttachmentStatus = iota
-	AttachmentIncluded
-)
-
 type Attachments struct {
-	attachments           *shrinkingmap.ShrinkingMap[iotago.BlockID, AttachmentStatus]
+	attachments           *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
 	earliestIncludedSlot  *promise.Value[iotago.SlotIndex]
 	allAttachmentsEvicted *promise.Event
 
@@ -25,7 +18,7 @@ type Attachments struct {
 
 func NewAttachments() *Attachments {
 	return &Attachments{
-		attachments:           shrinkingmap.New[iotago.BlockID, AttachmentStatus](),
+		attachments:           shrinkingmap.New[iotago.BlockID, bool](),
 		earliestIncludedSlot:  promise.NewValue[iotago.SlotIndex](),
 		allAttachmentsEvicted: promise.NewEvent(),
 	}
@@ -39,7 +32,7 @@ func (a *Attachments) Add(blockID iotago.BlockID) (added bool) {
 		return false
 	}
 
-	a.attachments.Set(blockID, AttachmentPending)
+	a.attachments.Set(blockID, false)
 
 	return true
 }
@@ -48,7 +41,7 @@ func (a *Attachments) MarkIncluded(blockID iotago.BlockID) (included bool) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	a.attachments.Set(blockID, AttachmentIncluded)
+	a.attachments.Set(blockID, true)
 
 	if lowestSlotIndex := a.earliestIncludedSlot.Get(); lowestSlotIndex == 0 || blockID.Index() < lowestSlotIndex {
 		a.earliestIncludedSlot.Set(blockID.Index())
@@ -66,15 +59,9 @@ func (a *Attachments) MarkOrphaned(blockID iotago.BlockID) (orphaned bool) {
 		return false
 	}
 
-	// TODO: need to handle the case where the only attachment of a transaction is orphaned and additional actions need to be performed:
-	// * mark the transaction as unaccepted
-	// * update the UTXO future cone's acceptance status, because now not all inputs are accepted and the future transactions cannot be accepted either
-	// * remove all transactions that became un-accepted from StateDiffs (that might already be done partially)
-	// * optionally, trigger global TransactionUnaccepted event.
-
 	a.evict(blockID)
 
-	if previousState == AttachmentIncluded && blockID.Index() == a.earliestIncludedSlot.Get() {
+	if previousState && blockID.Index() == a.earliestIncludedSlot.Get() {
 		a.earliestIncludedSlot.Set(a.findLowestIncludedSlotIndex())
 	}
 
@@ -109,8 +96,8 @@ func (a *Attachments) evict(id iotago.BlockID) {
 func (a *Attachments) findLowestIncludedSlotIndex() iotago.SlotIndex {
 	var lowestIncludedSlotIndex iotago.SlotIndex
 
-	a.attachments.ForEach(func(blockID iotago.BlockID, status AttachmentStatus) bool {
-		if status == AttachmentIncluded && (lowestIncludedSlotIndex == 0 || blockID.Index() < lowestIncludedSlotIndex) {
+	a.attachments.ForEach(func(blockID iotago.BlockID, included bool) bool {
+		if included && (lowestIncludedSlotIndex == 0 || blockID.Index() < lowestIncludedSlotIndex) {
 			lowestIncludedSlotIndex = blockID.Index()
 		}
 

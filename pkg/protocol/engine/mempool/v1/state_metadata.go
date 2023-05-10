@@ -1,7 +1,6 @@
 package mempoolv1
 
 import (
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -19,7 +18,7 @@ func NewStateMetadata(state ledger.State, optSource ...*TransactionMetadata) *St
 		id:    state.ID(),
 		state: state,
 
-		StateInclusion: NewStateInclusion().dependsOnCreatingTransaction(lo.First(optSource)),
+		StateInclusion: NewStateInclusion(optSource...),
 		StateLifecycle: NewStateLifecycle(),
 	}
 }
