@@ -59,7 +59,7 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] struct {
 
 // New is the constructor of the MemPool.
 func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputResolver ledger.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower]) *MemPool[VotePower] {
-	m := &MemPool[VotePower]{
+	return (&MemPool[VotePower]{
 		events:                 mempool.NewEvents(),
 		executeStateTransition: vm,
 		requestInput:           inputResolver,
@@ -69,15 +69,7 @@ func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputRes
 		stateDiffs:             shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
 		executionWorkers:       workers.CreatePool("executionWorkers", 1),
 		conflictDAG:            conflictDAG,
-	}
-
-	m.ConflictDAG().Events().ConflictAccepted.Hook(func(id iotago.TransactionID) {
-		if transaction, exists := m.cachedTransactions.Get(id); !exists {
-			transaction.setConflictAccepted()
-		}
-	})
-
-	return m
+	}).setup()
 }
 
 // AttachTransaction adds a transaction to the MemPool that was attached by the given block.
@@ -156,7 +148,7 @@ func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
 		return m.attachments.Evict(slotIndex)
 	}(); evictedAttachments != nil {
 		evictedAttachments.ForEach(func(blockID iotago.BlockID, transaction *TransactionMetadata) bool {
-			transaction.Evict(blockID)
+			transaction.EvictAttachment(blockID)
 
 			return true
 		})
@@ -188,7 +180,7 @@ func (m *MemPool[VotePower]) storeTransaction(transaction mempool.Transaction, b
 
 	storedTransaction, isNew = m.cachedTransactions.GetOrCreate(newTransaction.ID(), func() *TransactionMetadata { return newTransaction })
 	if isNew {
-		m.setupTransactionEvents(storedTransaction)
+		m.setupTransaction(storedTransaction)
 	}
 
 	storedTransaction.Add(blockID)
@@ -213,7 +205,7 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 			}
 
 			if created {
-				m.setupStateEviction(input)
+				m.setupState(input)
 			}
 		})
 
@@ -257,7 +249,7 @@ func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionMetadata) {
 		outputRequest.Resolve(output)
 
 		if isNew {
-			m.setupStateEviction(output)
+			m.setupState(output)
 		}
 	}
 }
@@ -342,7 +334,17 @@ func (m *MemPool[VotePower]) updateStateDiffs(transaction *TransactionMetadata, 
 	}
 }
 
-func (m *MemPool[VotePower]) setupTransactionEvents(transaction *TransactionMetadata) {
+func (m *MemPool[VotePower]) setup() (self *MemPool[VotePower]) {
+	m.ConflictDAG().Events().ConflictAccepted.Hook(func(id iotago.TransactionID) {
+		if transaction, exists := m.cachedTransactions.Get(id); !exists {
+			transaction.setConflictAccepted()
+		}
+	})
+
+	return m
+}
+
+func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
 		m.events.TransactionAccepted.Trigger(transaction)
 
@@ -364,7 +366,7 @@ func (m *MemPool[VotePower]) setupTransactionEvents(transaction *TransactionMeta
 	})
 }
 
-func (m *MemPool[VotePower]) setupStateEviction(state *StateMetadata) {
+func (m *MemPool[VotePower]) setupState(state *StateMetadata) {
 	state.OnCommitted(func() {
 		if !m.cachedStateRequests.Delete(state.ID(), state.HasNoSpenders) && m.cachedStateRequests.Has(state.ID()) {
 			state.OnAllSpendersRemoved(func() { m.cachedStateRequests.Delete(state.ID(), state.HasNoSpenders) })

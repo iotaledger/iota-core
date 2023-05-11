@@ -61,7 +61,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		return nil, xerrors.Errorf("failed to retrieve inputReferences of transaction %s: %w", transactionID, inputsErr)
 	}
 
-	t := &TransactionMetadata{
+	return (&TransactionMetadata{
 		id:              transactionID,
 		inputReferences: inputReferences,
 		inputs:          make([]*StateMetadata, len(inputReferences)),
@@ -85,11 +85,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		allAttachmentsEvicted: promise.NewEvent(),
 
 		Inclusion: NewInclusion(),
-	}
-
-	t.setupBehavior()
-
-	return t, nil
+	}).setup(), nil
 }
 
 func (t *TransactionMetadata) ID() iotago.TransactionID {
@@ -127,8 +123,8 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 func (t *TransactionMetadata) publishInput(index int, input *StateMetadata) (allInputsSolid bool) {
 	t.inputs[index] = input
 
-	input.StateLifecycle.dependsOnSpender(t)
-	t.setupInputDependencies(input)
+	input.setupSpender(t)
+	t.setupInput(input)
 
 	return t.markInputSolid()
 }
@@ -251,7 +247,7 @@ func (t *TransactionMetadata) setConflictAccepted() {
 	}
 }
 
-func (t *TransactionMetadata) setupInputDependencies(input *StateMetadata) {
+func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	input.OnRejected(t.setRejected)
 	input.OnOrphaned(t.setOrphaned)
 
@@ -278,7 +274,7 @@ func (t *TransactionMetadata) setupInputDependencies(input *StateMetadata) {
 	})
 }
 
-func (t *TransactionMetadata) setupBehavior() (self *TransactionMetadata) {
+func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	t.OnAllAttachmentsEvicted(func() {
 		if !t.IsCommitted() {
 			t.setOrphaned()
@@ -327,7 +323,7 @@ func (t *TransactionMetadata) MarkOrphaned(blockID iotago.BlockID) (orphaned boo
 		return false
 	}
 
-	t.evict(blockID)
+	t.evictAttachment(blockID)
 
 	if previousState && blockID.Index() == t.earliestIncludedSlot.Get() {
 		t.earliestIncludedSlot.Set(t.findLowestIncludedSlotIndex())
@@ -348,14 +344,14 @@ func (t *TransactionMetadata) OnAllAttachmentsEvicted(callback func()) {
 	t.allAttachmentsEvicted.OnTrigger(callback)
 }
 
-func (t *TransactionMetadata) Evict(id iotago.BlockID) {
+func (t *TransactionMetadata) EvictAttachment(id iotago.BlockID) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
-	t.evict(id)
+	t.evictAttachment(id)
 }
 
-func (t *TransactionMetadata) evict(id iotago.BlockID) {
+func (t *TransactionMetadata) evictAttachment(id iotago.BlockID) {
 	if t.attachments.Delete(id) && t.attachments.IsEmpty() {
 		t.allAttachmentsEvicted.Trigger()
 	}
