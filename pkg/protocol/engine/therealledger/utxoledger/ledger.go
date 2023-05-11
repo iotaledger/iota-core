@@ -144,7 +144,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
-	if err := l.ledgerState.ApplyConfirmation(index, outputs, spents); err != nil {
+	if err := l.ledgerState.ApplyDiff(index, outputs, spents); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, err
 	}
 

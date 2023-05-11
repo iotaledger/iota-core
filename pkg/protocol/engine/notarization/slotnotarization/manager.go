@@ -203,7 +203,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	// set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
-	acceptedBlocks := m.slotMutations.AcceptedBlocks(index, true)
+	ratifiedAcceptedBlocks := m.slotMutations.RatifiedAcceptedBlocks(index, true)
 
 	var err error
 	var attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation]
@@ -238,7 +238,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		index,
 		latestCommitment.ID(),
 		iotago.NewRoots(
-			iotago.Identifier(acceptedBlocks.Root()),
+			iotago.Identifier(ratifiedAcceptedBlocks.Root()),
 			mutationRoot,
 			iotago.Identifier(attestations.Root()),
 			stateRoot,
@@ -263,9 +263,9 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	m.events.SlotCommitted.Trigger(&notarization.SlotCommittedDetails{
-		Commitment:            newModelCommitment,
-		AcceptedBlocks:        acceptedBlocks,
-		ActiveValidatorsCount: 0,
+		Commitment:             newModelCommitment,
+		RatifiedAcceptedBlocks: ratifiedAcceptedBlocks,
+		ActiveValidatorsCount:  0,
 	})
 
 	if err = m.slotMutations.Evict(index); err != nil {

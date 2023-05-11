@@ -508,8 +508,8 @@ github.com/iotaledger/inx/go v1.0.0-rc.2 h1:SjHGHQ1pEe7/B0bnVIHCa1zQBvcC0QRwcYPz
 github.com/iotaledger/iota.go v1.0.0 h1:tqm1FxJ/zOdzbrAaQ5BQpVF8dUy2eeGlSeWlNG8GoXY=
 github.com/iotaledger/iota.go v1.0.0/go.mod h1:RiKYwDyY7aCD1L0YRzHSjOsJ5mUR9yvQpvhZncNcGQI=
 github.com/iotaledger/iota.go/v3 v3.0.0-rc.2 h1:WuMlZ/ba+ZJHSQ6OEOId0rIk4ixZGKa62/v9d67+MHk=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230426143214-044069a86e1b h1:dh8ENsOfFQVlAElMHfGMNOkf5Ky7apsuyPxmDL+M/dA=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230426143214-044069a86e1b/go.mod h1:oTJ5J8gGf3BpKUEmHlh7Mw1WGWxb+KOjPSuMKLBFMus=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230510103734-f95a132d437d h1:a65aNItDzZ43nAALXZl2CHCVj0kJkynmCfUhyMOvreE=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230510103734-f95a132d437d/go.mod h1:wubeI88qUUevg49VrOMjAbsw/IM3WMI2b98EQpzPTKM=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
 github.com/ipfs/go-cid v0.4.1/go.mod h1:uQHwDeX4c6CtyrFwdqyhpNcxVewur1M7l7fNU7LKwZk=
 github.com/ipfs/go-datastore v0.6.0 h1:JKyz+Gvz1QEZw0LsX1IBn+JFCJQH4SJVFtM4uWU0Myk=
