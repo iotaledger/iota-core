@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
@@ -23,8 +24,7 @@ import (
 
 // MemPool is a component that manages the state of transactions that are not yet included in the ledger state.
 type MemPool[VotePower conflictdag.VotePowerType[VotePower]] struct {
-	// events is the event dispatcher of the MemPool.
-	events *mempool.Events
+	transactionAttached *event.Event1[mempool.TransactionMetadata]
 
 	// executeStateTransition is the VM that is used to execute the state transition of transactions.
 	executeStateTransition mempool.VM
@@ -60,7 +60,7 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] struct {
 // New is the constructor of the MemPool.
 func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputResolver ledger.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower]) *MemPool[VotePower] {
 	return (&MemPool[VotePower]{
-		events:                 mempool.NewEvents(),
+		transactionAttached:    event.New1[mempool.TransactionMetadata](),
 		executeStateTransition: vm,
 		requestInput:           inputResolver,
 		attachments:            memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata](),
@@ -79,13 +79,17 @@ func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, 
 		return nil, xerrors.Errorf("failed to store transaction: %w", err)
 	}
 
-	if isNew && storedTransaction.setStored() {
-		m.events.TransactionStored.Trigger(storedTransaction)
+	if isNew {
+		m.transactionAttached.Trigger(storedTransaction)
 
 		m.solidifyInputs(storedTransaction)
 	}
 
 	return storedTransaction, nil
+}
+
+func (m *MemPool[VotePower]) HookTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) (unhook func()) {
+	return m.transactionAttached.Hook(handler, opts...).Unhook
 }
 
 // MarkAttachmentOrphaned marks the attachment of the given block as orphaned.
@@ -155,16 +159,6 @@ func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
 	}
 }
 
-// ConflictDAG returns the ConflictDAG of the MemPool.
-func (m *MemPool[VotePower]) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower] {
-	return m.conflictDAG
-}
-
-// Events returns the events of the MemPool.
-func (m *MemPool[VotePower]) Events() *mempool.Events {
-	return m.events
-}
-
 func (m *MemPool[VotePower]) storeTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (storedTransaction *TransactionMetadata, isNew bool, err error) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
@@ -199,8 +193,6 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 
 		request.OnSuccess(func(input *StateMetadata) {
 			if transaction.publishInput(index, input) {
-				m.events.TransactionSolid.Trigger(transaction)
-
 				m.executeTransaction(transaction)
 			}
 
@@ -217,12 +209,8 @@ func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata
 	m.executionWorkers.Submit(func() {
 		if outputStates, err := m.executeStateTransition(transaction.Transaction(), lo.Map(transaction.inputs, (*StateMetadata).State), context.Background()); err != nil {
 			transaction.setInvalid(err)
-
-			m.events.TransactionInvalid.Trigger(transaction, err)
 		} else {
 			transaction.setExecuted(outputStates)
-
-			m.events.TransactionExecuted.Trigger(transaction)
 
 			m.bookTransaction(transaction)
 		}
@@ -237,8 +225,6 @@ func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
 	})
 
 	if transaction.setBooked() {
-		m.events.TransactionBooked.Trigger(transaction)
-
 		m.publishOutputs(transaction)
 	}
 }
@@ -335,7 +321,7 @@ func (m *MemPool[VotePower]) updateStateDiffs(transaction *TransactionMetadata, 
 }
 
 func (m *MemPool[VotePower]) setup() (self *MemPool[VotePower]) {
-	m.ConflictDAG().Events().ConflictAccepted.Hook(func(id iotago.TransactionID) {
+	m.conflictDAG.Events().ConflictAccepted.Hook(func(id iotago.TransactionID) {
 		if transaction, exists := m.cachedTransactions.Get(id); !exists {
 			transaction.setConflictAccepted()
 		}
@@ -346,8 +332,6 @@ func (m *MemPool[VotePower]) setup() (self *MemPool[VotePower]) {
 
 func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
-		m.events.TransactionAccepted.Trigger(transaction)
-
 		if slotIndex := transaction.EarliestIncludedSlot(); slotIndex > 0 {
 			lo.Return1(m.stateDiffs.GetOrCreate(slotIndex, func() *StateDiff { return NewStateDiff(slotIndex) })).AddTransaction(transaction)
 		}

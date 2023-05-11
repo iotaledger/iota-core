@@ -25,7 +25,6 @@ type TransactionMetadata struct {
 
 	// lifecycle events
 	unsolidInputsCount uint64
-	stored             *promise.Event
 	solid              *promise.Event
 	executed           *promise.Event
 	invalid            *promise.Event1[error]
@@ -69,7 +68,6 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		conflictIDs:     advancedset.New[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
-		stored:             promise.NewEvent(),
 		booked:             promise.NewEvent(),
 		solid:              promise.NewEvent(),
 		executed:           promise.NewEvent(),
@@ -139,14 +137,6 @@ func (t *TransactionMetadata) setExecuted(outputStates []ledger.State) {
 	t.executed.Trigger()
 }
 
-func (t *TransactionMetadata) IsStored() bool {
-	return t.stored.WasTriggered()
-}
-
-func (t *TransactionMetadata) OnStored(callback func()) {
-	t.stored.OnTrigger(callback)
-}
-
 func (t *TransactionMetadata) IsSolid() bool {
 	return t.solid.WasTriggered()
 }
@@ -177,10 +167,6 @@ func (t *TransactionMetadata) IsBooked() bool {
 
 func (t *TransactionMetadata) OnBooked(callback func()) {
 	t.booked.OnTrigger(callback)
-}
-
-func (t *TransactionMetadata) setStored() bool {
-	return t.stored.Trigger()
 }
 
 func (t *TransactionMetadata) setSolid() bool {

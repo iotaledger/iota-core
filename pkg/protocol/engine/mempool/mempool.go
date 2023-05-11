@@ -1,6 +1,7 @@
 package mempool
 
 import (
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -8,6 +9,8 @@ import (
 
 type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 	AttachTransaction(transaction Transaction, blockID iotago.BlockID) (storedTransaction TransactionMetadata, err error)
+
+	HookTransactionAttached(callback func(metadata TransactionMetadata), opts ...event.Option) (unhook func())
 
 	StateMetadata(reference ledger.StateReference) (state StateMetadata, err error)
 
@@ -22,8 +25,4 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 	StateDiff(index iotago.SlotIndex) StateDiff
 
 	Evict(slotIndex iotago.SlotIndex)
-
-	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower]
-
-	Events() *Events
 }

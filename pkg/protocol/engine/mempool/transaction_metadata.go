@@ -40,5 +40,27 @@ type TransactionMetadata interface {
 
 	EarliestIncludedSlot() iotago.SlotIndex
 
-	Inclusion
+	inclusionFlags
+}
+
+type inclusionFlags interface {
+	IsPending() bool
+
+	OnPending(callback func())
+
+	IsAccepted() bool
+
+	OnAccepted(callback func())
+
+	IsCommitted() bool
+
+	OnCommitted(callback func())
+
+	IsRejected() bool
+
+	OnRejected(callback func())
+
+	IsOrphaned() bool
+
+	OnOrphaned(callback func())
 }
