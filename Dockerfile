@@ -25,8 +25,8 @@ COPY ./iota.go ./iota.go
 COPY ./hive.go ./hive.go
 COPY ./inx/go ./inx/go
 COPY ./inx-app ./inx-app
-COPY ./go.work ./
-COPY ./go.work.sum ./
+COPY ./iota-core/go.work ./iota-core/
+COPY ./iota-core/go.work.sum ./iota-core/
 
 FROM env-with-go-work-${WITH_GO_WORK} AS build
 ARG WITH_GO_WORK=0

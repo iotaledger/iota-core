@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
+	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
@@ -21,6 +22,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -55,10 +58,23 @@ func provide(c *dig.Container) error {
 			validators[iotago.AccountID(hex[:])] = validator.Weight
 		}
 
+		dbEngine := hivedb.EngineRocksDB
+		if ParamsDatabase.InMemory {
+			dbEngine = hivedb.EngineMapDB
+		}
+
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
 			p2pManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Directory),
+			protocol.WithPruningDelay(iotago.SlotIndex(ParamsDatabase.PruningThreshold)),
+			protocol.WithStorageOptions(
+				storage.WithDBEngine(dbEngine),
+				storage.WithPrunableManagerOptions(
+					prunable.WithGranularity(ParamsDatabase.DBGranularity),
+					prunable.WithMaxOpenDBs(ParamsDatabase.MaxOpenDBs),
+				),
+			),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(validators),
@@ -127,6 +143,10 @@ func configure() error {
 
 	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
 		Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
+	})
+
+	deps.Protocol.Events.Engine.Clock.RatifiedAcceptedTimeUpdated.Hook(func(time time.Time) {
+		Component.LogInfof("RatifiedAcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
 	})
 
 	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {

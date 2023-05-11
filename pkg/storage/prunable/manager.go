@@ -19,7 +19,7 @@ type Manager struct {
 	openDBs      *cache.Cache[iotago.SlotIndex, *dbInstance]
 	openDBsMutex sync.Mutex
 
-	lastPrunedSlot model.EvictionIndex
+	lastPrunedSlot *model.EvictionIndex
 	pruningMutex   sync.RWMutex
 
 	dbConfig database.Config
@@ -40,6 +40,7 @@ func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Mana
 		optsMaxOpenDBs:  10,
 		dbConfig:        dbConfig,
 		dbSizes:         shrinkingmap.New[iotago.SlotIndex, int64](),
+		lastPrunedSlot:  model.NewEvictionIndex(),
 	}, opts, func(m *Manager) {
 		m.logger = logger.NewWrappedLogger(m.optsLogger)
 
@@ -54,7 +55,7 @@ func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Mana
 
 			m.dbSizes.Set(baseIndex, size)
 		})
-	}, (*Manager).restoreFromDisk)
+	})
 }
 
 // IsTooOld checks if the index is in a pruned slot.
@@ -83,12 +84,15 @@ func (m *Manager) PruneUntilSlot(index iotago.SlotIndex) {
 	m.pruningMutex.Lock()
 	defer m.pruningMutex.Unlock()
 
+	computedIndex := m.computeDBBaseIndex(index)
 	var baseIndexToPrune iotago.SlotIndex
-	if m.computeDBBaseIndex(index)+iotago.SlotIndex(m.optsGranularity)-1 == index {
-		// Upper bound of the DB instance should be pruned. So we can delete the entire DB file.
+
+	if computedIndex+iotago.SlotIndex(m.optsGranularity)-1 == index {
 		baseIndexToPrune = index
+	} else if computedIndex > 1 {
+		baseIndexToPrune = computedIndex - 1
 	} else {
-		baseIndexToPrune = m.computeDBBaseIndex(index) - 1
+		return
 	}
 
 	for currentIndex := m.lastPrunedSlot.NextIndex(); currentIndex <= baseIndexToPrune; currentIndex += iotago.SlotIndex(m.optsGranularity) {
@@ -104,6 +108,13 @@ func (m *Manager) Shutdown() {
 	m.openDBs.Each(func(index iotago.SlotIndex, db *dbInstance) {
 		db.Close()
 	})
+}
+
+func (m *Manager) LastPrunedSlot() (index iotago.SlotIndex, hasPruned bool) {
+	m.pruningMutex.RLock()
+	defer m.pruningMutex.RUnlock()
+
+	return m.lastPrunedSlot.Index()
 }
 
 // PrunableStorageSize returns the size of the prunable storage containing all db instances.
@@ -131,7 +142,7 @@ func (m *Manager) PrunableStorageSize() int64 {
 	return sum
 }
 
-func (m *Manager) restoreFromDisk() {
+func (m *Manager) RestoreFromDisk() {
 	dbInfos := getSortedDBInstancesFromDisk(m.dbConfig.Directory)
 
 	// There are no dbInstances on disk -> nothing to restore.

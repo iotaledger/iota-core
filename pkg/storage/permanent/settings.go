@@ -38,7 +38,6 @@ func NewSettings(path string) (settings *Settings) {
 			LatestCommitment:        iotago.NewEmptyCommitment(),
 			LatestStateMutationSlot: 0,
 			LatestFinalizedSlot:     0,
-			ChainID:                 iotago.CommitmentID{},
 		}, path),
 	}
 
@@ -100,6 +99,9 @@ func (s *Settings) LatestCommitment() *model.Commitment {
 	defer s.mutex.RUnlock()
 
 	if s.latestCommitment == nil {
+		if s.api.SlotTimeProvider().Duration() == 0 {
+			panic("accessing the LatestCommitment before the settings are initialized")
+		}
 		s.latestCommitment = lo.PanicOnErr(model.CommitmentFromCommitment(s.settingsModel.LatestCommitment, s.api))
 	}
 
@@ -161,26 +163,6 @@ func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
 	return nil
 }
 
-func (s *Settings) ChainID() iotago.CommitmentID {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	return s.settingsModel.ChainID
-}
-
-func (s *Settings) SetChainID(id iotago.CommitmentID) (err error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.settingsModel.ChainID = id
-
-	if err = s.ToFile(); err != nil {
-		return errors.Wrap(err, "failed to persist chain ID")
-	}
-
-	return nil
-}
-
 func (s *Settings) Export(writer io.WriteSeeker) (err error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -221,7 +203,6 @@ func (s *Settings) String() string {
 	builder.AddField(stringify.NewStructField("LatestCommitment", s.settingsModel.LatestCommitment))
 	builder.AddField(stringify.NewStructField("LatestStateMutationSlot", s.settingsModel.LatestStateMutationSlot))
 	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.settingsModel.LatestFinalizedSlot))
-	builder.AddField(stringify.NewStructField("ChainID", s.settingsModel.ChainID))
 
 	return builder.String()
 }
@@ -272,7 +253,6 @@ type settingsModel struct {
 	LatestCommitment        *iotago.Commitment        `serix:"2"`
 	LatestStateMutationSlot iotago.SlotIndex          `serix:"3"`
 	LatestFinalizedSlot     iotago.SlotIndex          `serix:"4"`
-	ChainID                 iotago.CommitmentID       `serix:"5"`
 
 	storable.Struct[settingsModel, *settingsModel]
 }
