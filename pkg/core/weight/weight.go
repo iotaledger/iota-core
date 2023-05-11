@@ -21,8 +21,8 @@ type Weight struct {
 	// value is the current weight Value.
 	value Value
 
-	// validatorsHook is the hook that is triggered when the validators weight is updated.
-	validatorsHook *event.Hook[func(int64)]
+	//// validatorsHook is the hook that is triggered when the validators weight is updated.
+	//validatorsHook *event.Hook[func(int64)]
 
 	// mutex is used to synchronize access to the weight value.
 	mutex sync.RWMutex
@@ -150,14 +150,14 @@ func (w *Weight) String() string {
 	)
 }
 
-// updateValidatorsWeight updates the validators weight of the Weight.
-func (w *Weight) updateValidatorsWeight(weight int64) {
-	if w.value.ValidatorsWeight() != weight {
-		w.value = w.value.SetValidatorsWeight(weight)
-
-		w.OnUpdate.Trigger(w.value)
-	}
-}
+//// updateValidatorsWeight updates the validators weight of the Weight.
+//func (w *Weight) updateValidatorsWeight(weight int64) {
+//	if w.value.ValidatorsWeight() != weight {
+//		w.value = w.value.SetValidatorsWeight(weight)
+//
+//		w.OnUpdate.Trigger(w.value)
+//	}
+//}
 
 // setAcceptanceState sets the acceptance state of the weight and returns the previous acceptance state.
 func (w *Weight) setAcceptanceState(acceptanceState acceptance.State) (previousState acceptance.State) {

@@ -1,15 +1,20 @@
 package tests
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -64,50 +69,42 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}, node3, node4)
 
 	// Issue blocks on partition 1.
-	// {
-	// 	ts.IssueBlockAtSlot("P1.A", 5, node1, iotago.EmptyBlockID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P1.B", 6, node2, ts.Block("P1.A").ID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P1.C", 7, node1, ts.Block("P1.B").ID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P1.D", 8, node2, ts.Block("P1.C").ID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P1.E", 9, node1, ts.Block("P1.D").ID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P1.F", 10, node2, ts.Block("P1.E").ID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P1.G", 11, node1, ts.Block("P1.F").ID())
-	//
-	// 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, node1, node2)
-	// 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, node3, node4)
-	//
-	// 	ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.A", "P1.B", "P1.C", "P1.D", "P1.E", "P1.F"), true, node1, node2)
-	// 	ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.G"), false, node1, node2) // block not referenced yet
-	// }
+	{
+		ts.IssueBlockAtSlot("P1.A", 5, iotago.NewEmptyCommitment(), node1, iotago.EmptyBlockID())
+		ts.IssueBlockAtSlot("P1.B", 6, iotago.NewEmptyCommitment(), node2, ts.Block("P1.A").ID())
+		ts.IssueBlockAtSlot("P1.C", 7, iotago.NewEmptyCommitment(), node1, ts.Block("P1.B").ID())
+		ts.IssueBlockAtSlot("P1.D", 8, iotago.NewEmptyCommitment(), node2, ts.Block("P1.C").ID())
+		ts.IssueBlockAtSlot("P1.E", 9, iotago.NewEmptyCommitment(), node1, ts.Block("P1.D").ID())
+		ts.IssueBlockAtSlot("P1.F", 10, iotago.NewEmptyCommitment(), node2, ts.Block("P1.E").ID())
+		ts.IssueBlockAtSlot("P1.G", 11, iotago.NewEmptyCommitment(), node1, ts.Block("P1.F").ID())
+		ts.IssueBlockAtSlot("P1.H", 12, iotago.NewEmptyCommitment(), node2, ts.Block("P1.G").ID())
+		ts.IssueBlockAtSlot("P1.I", 13, iotago.NewEmptyCommitment(), node1, ts.Block("P1.H").ID())
+
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, node1, node2)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, node3, node4)
+
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.A", "P1.B", "P1.C", "P1.D", "P1.E", "P1.F", "P1.G", "P1.H"), true, node1, node2)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.I"), false, node1, node2) // block not referenced yet
+	}
 
 	// Issue blocks on partition 2.
-	// {
-	// 	ts.IssueBlockAtSlot("P2.A", 5, node3, iotago.EmptyBlockID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P2.B", 6, node4, ts.Block("P2.A").ID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P2.C", 7, node3, ts.Block("P2.B").ID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P2.D", 8, node4, ts.Block("P2.C").ID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P2.E", 9, node3, ts.Block("P2.D").ID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P2.F", 10, node4, ts.Block("P2.E").ID())
-	// 	ts.Wait()
-	// 	ts.IssueBlockAtSlot("P2.G", 11, node3, ts.Block("P2.F").ID())
-	//
-	// 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, node3, node4)
-	// 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
-	//
-	// 	ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.A", "P2.B", "P2.C", "P2.D", "P2.E", "P2.F"), true, node3, node4)
-	// 	ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.G"), false, node3, node4) // block not referenced yet
-	// }
+	{
+		ts.IssueBlockAtSlot("P2.A", 5, iotago.NewEmptyCommitment(), node3, iotago.EmptyBlockID())
+		ts.IssueBlockAtSlot("P2.B", 6, iotago.NewEmptyCommitment(), node4, ts.Block("P2.A").ID())
+		ts.IssueBlockAtSlot("P2.C", 7, iotago.NewEmptyCommitment(), node3, ts.Block("P2.B").ID())
+		ts.IssueBlockAtSlot("P2.D", 8, iotago.NewEmptyCommitment(), node4, ts.Block("P2.C").ID())
+		ts.IssueBlockAtSlot("P2.E", 9, iotago.NewEmptyCommitment(), node3, ts.Block("P2.D").ID())
+		ts.IssueBlockAtSlot("P2.F", 10, iotago.NewEmptyCommitment(), node4, ts.Block("P2.E").ID())
+		ts.IssueBlockAtSlot("P2.G", 11, iotago.NewEmptyCommitment(), node3, ts.Block("P2.F").ID())
+		ts.IssueBlockAtSlot("P2.H", 12, iotago.NewEmptyCommitment(), node4, ts.Block("P2.G").ID())
+		ts.IssueBlockAtSlot("P2.I", 13, iotago.NewEmptyCommitment(), node3, ts.Block("P2.H").ID())
+
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, node3, node4)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
+
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.A", "P2.B", "P2.C", "P2.D", "P2.E", "P2.F", "P2.G", "P2.H"), true, node3, node4)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.I"), false, node3, node4) // block not referenced yet
+	}
 
 	// Both partitions should have committed slot 8 and have different commitments
 	{
@@ -124,18 +121,52 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		fmt.Println("\n=========================\nMerged network partitions\n=========================")
 	}
 
-	// TODO: engine switching is currently not yet implemented
-	// wg := &sync.WaitGroup{}
-	//
-	// // Issue blocks after merging the networks
-	// {
-	// 	wg.Add(4)
-	//
-	// 	node1.IssueActivity(25*time.Second, wg)
-	// 	node2.IssueActivity(25*time.Second, wg)
-	// 	node3.IssueActivity(25*time.Second, wg)
-	// 	node4.IssueActivity(25*time.Second, wg)
-	// }
-	//
-	// wg.Wait()
+	wg := &sync.WaitGroup{}
+
+	detectFork := func(node *mock.Node, done func()) {
+		forkDetected := make(chan struct{}, 1)
+		node.Protocol.Events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
+			forkDetected <- struct{}{}
+		})
+
+		go func() {
+			require.Eventually(t, func() bool {
+				select {
+				case <-forkDetected:
+					done()
+					return true
+				default:
+					return false
+				}
+			}, 25*time.Second, 10*time.Millisecond)
+		}()
+	}
+	node1Ctx, node1Cancel := context.WithCancel(context.Background())
+	defer node1Cancel()
+
+	node2Ctx, node2Cancel := context.WithCancel(context.Background())
+	defer node2Cancel()
+
+	node3Ctx, node3Cancel := context.WithCancel(context.Background())
+	defer node3Cancel()
+
+	node4Ctx, node4Cancel := context.WithCancel(context.Background())
+	defer node4Cancel()
+
+	detectFork(node1, node1Cancel)
+	detectFork(node2, node2Cancel)
+	detectFork(node3, node3Cancel)
+	detectFork(node4, node4Cancel)
+
+	// Issue blocks after merging the networks
+	{
+		wg.Add(4)
+
+		node1.IssueActivity(node1Ctx, 25*time.Second, wg)
+		node2.IssueActivity(node2Ctx, 25*time.Second, wg)
+		node3.IssueActivity(node3Ctx, 25*time.Second, wg)
+		node4.IssueActivity(node4Ctx, 25*time.Second, wg)
+	}
+
+	wg.Wait()
 }

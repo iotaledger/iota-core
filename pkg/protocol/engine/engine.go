@@ -28,6 +28,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -47,6 +48,7 @@ type Engine struct {
 	BlockGadget     blockgadget.Gadget
 	SlotGadget      slotgadget.Gadget
 	Notarization    notarization.Notarization
+	Ledger          therealledger.Ledger
 
 	Workers *workerpool.Group
 
@@ -76,6 +78,7 @@ func New(
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
+	ledgerProvider module.Provider[*Engine, therealledger.Ledger],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -100,6 +103,7 @@ func New(
 			e.BlockGadget = blockGadgetProvider(e)
 			e.SlotGadget = slotGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
+			e.Ledger = ledgerProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings().TriggerInitialized,
@@ -245,8 +249,8 @@ func (e *Engine) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to import settings")
 	} else if err = e.Storage.Commitments().Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import commitments")
-		// } else if err = e.Ledger.Import(reader); err != nil {
-		// 	return errors.Wrap(err, "failed to import ledger")
+	} else if err = e.Ledger.Import(reader); err != nil {
+		return errors.Wrap(err, "failed to import ledger")
 	} else if err = e.EvictionState.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import eviction state")
 		// } else if err = e.Notarization.Import(reader); err != nil {
@@ -261,8 +265,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export settings")
 	} else if err = e.Storage.Commitments().Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export commitments")
-		// } else if err = e.Ledger.Export(writer, targetSlot); err != nil {
-		// 	return errors.Wrap(err, "failed to export ledger")
+	} else if err = e.Ledger.Export(writer, targetSlot); err != nil {
+		return errors.Wrap(err, "failed to export ledger")
 	} else if err = e.EvictionState.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export eviction state")
 		// } else if err = e.Notarization.Export(writer, targetSlot); err != nil {

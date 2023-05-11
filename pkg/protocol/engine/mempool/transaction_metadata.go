@@ -40,9 +40,9 @@ type TransactionMetadata interface {
 
 	OnConflicting(func())
 
-	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex))
+	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID))
 
-	EarliestIncludedSlot() iotago.SlotIndex
+	EarliestIncludedAttachment() iotago.BlockID
 
 	inclusionFlags
 }

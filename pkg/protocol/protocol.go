@@ -31,6 +31,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/metricstracker"
 	"github.com/iotaledger/iota-core/pkg/protocol/metricstracker/trivialmetricstracker"
@@ -77,6 +79,7 @@ type Protocol struct {
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsMetricsTrackerProvider  module.Provider[*engine.Engine, metricstracker.MetricsTracker]
+	optsLedgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -95,6 +98,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsMetricsTrackerProvider:  trivialmetricstracker.NewProvider(),
+		optsLedgerProvider:          utxoledger.NewProvider(),
 
 		optsBaseDirectory: "",
 		optsPruningDelay:  360,
@@ -209,6 +213,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsBlockGadgetProvider,
 		p.optsSlotGadgetProvider,
 		p.optsNotarizationProvider,
+		p.optsLedgerProvider,
 	)
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
@@ -318,7 +323,7 @@ func (p *Protocol) SupportedVersions() Versions {
 }
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
-	panic(fmt.Sprintf("Fork detected: %s", fork))
+	fmt.Printf("================================================================\nFork detected: %s\n================================================================\n", fork)
 }
 
 func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
@@ -390,6 +395,12 @@ func WithSlotGadgetProvider(optsSlotGadgetProvider module.Provider[*engine.Engin
 func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.Engine, notarization.Notarization]) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsNotarizationProvider = optsNotarizationProvider
+	}
+}
+
+func WithLedgerProvider(optsLedgerProvider module.Provider[*engine.Engine, therealledger.Ledger]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsLedgerProvider = optsLedgerProvider
 	}
 }
 

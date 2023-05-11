@@ -47,23 +47,23 @@ func (m *SlotMutations) AddRatifiedAcceptedBlock(block *blocks.Block) (err error
 		return errors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
 	}
 
-	m.ratifiedAcceptedBlocks(blockID.Index(), true).Add(blockID)
+	m.RatifiedAcceptedBlocks(blockID.Index(), true).Add(blockID)
 
 	return
 }
 
 // Evict evicts the given slot and returns the corresponding mutation sets.
-func (m *SlotMutations) Evict(index iotago.SlotIndex) (acceptedBlocks *ads.Set[iotago.BlockID, *iotago.BlockID], err error) {
+func (m *SlotMutations) Evict(index iotago.SlotIndex) error {
 	m.evictionMutex.Lock()
 	defer m.evictionMutex.Unlock()
 
 	if index <= m.latestCommittedIndex {
-		return nil, errors.Errorf("cannot commit slot %d: already committed", index)
+		return errors.Errorf("cannot commit slot %d: already committed", index)
 	}
 
-	defer m.evictUntil(index)
+	m.evictUntil(index)
 
-	return m.ratifiedAcceptedBlocks(index), nil
+	return nil
 }
 
 func (m *SlotMutations) Reset(index iotago.SlotIndex) {
@@ -77,8 +77,8 @@ func (m *SlotMutations) Reset(index iotago.SlotIndex) {
 	m.latestCommittedIndex = index
 }
 
-// ratifiedAcceptedBlocks returns the set of ratified accepted blocks for the given slot.
-func (m *SlotMutations) ratifiedAcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) *ads.Set[iotago.BlockID, *iotago.BlockID] {
+// RatifiedAcceptedBlocks returns the set of ratified accepted blocks for the given slot.
+func (m *SlotMutations) RatifiedAcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) *ads.Set[iotago.BlockID, *iotago.BlockID] {
 	if len(createIfMissing) > 0 && createIfMissing[0] {
 		return lo.Return1(m.ratifiedAcceptedBlocksBySlot.GetOrCreate(index, newSet[iotago.BlockID, *iotago.BlockID]))
 	}

@@ -6,4 +6,4 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 )
 
-type VM func(stateTransition Transaction, inputs []ledger.State, ctx context.Context) (outputs []ledger.State, err error)
+type VM func(ctx context.Context, stateTransition Transaction, inputs []ledger.State) (outputs []ledger.State, err error)
