@@ -52,6 +52,9 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.prunedSlot != nil {
 		t.AssertPrunedSlot(*state.prunedSlot, state.hasPruned, nodes...)
 	}
+	if state.chainManagerSolid != nil && *state.chainManagerSolid {
+		t.AssertChainManagerIsSolid(nodes...)
+	}
 }
 
 type NodeState struct {
@@ -74,6 +77,8 @@ type NodeState struct {
 	evictedSlot *iotago.SlotIndex
 	prunedSlot  *iotago.SlotIndex
 	hasPruned   bool
+
+	chainManagerSolid *bool
 }
 
 func WithSnapshotImported(snapshotImported bool) options.Option[NodeState] {
@@ -158,5 +163,12 @@ func WithPrunedSlot(slotIndex iotago.SlotIndex, hasPruned bool) options.Option[N
 	return func(state *NodeState) {
 		state.prunedSlot = &slotIndex
 		state.hasPruned = hasPruned
+	}
+}
+
+func WithChainManagerIsSolid() options.Option[NodeState] {
+	return func(state *NodeState) {
+		solid := true
+		state.chainManagerSolid = &solid
 	}
 }

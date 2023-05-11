@@ -44,7 +44,7 @@ type Protocol struct {
 	Events        *Events
 	TipManager    tipmanager.TipManager
 	engineManager *enginemanager.EngineManager
-	chainManager  *chainmanager.Manager
+	ChainManager  *chainmanager.Manager
 
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
@@ -112,12 +112,12 @@ func (p *Protocol) Run() {
 	// Upon engine restart, such chain will be loaded with the latest finalized slot, and the chain manager, not needing
 	// persistant storage, will be able to continue from there.
 	p.mainEngine.SetChainID(rootCommitment.ID())
-	p.chainManager.Initialize(rootCommitment)
+	p.ChainManager.Initialize(rootCommitment)
 
 	// Fill the chain manager with all our known commitments so that the chain is solid
 	for i := rootCommitment.Index(); i <= p.mainEngine.Storage.Settings().LatestCommitment().Index(); i++ {
 		if cm, err := p.mainEngine.Storage.Commitments().Load(i); err == nil {
-			p.chainManager.ProcessCommitment(cm)
+			p.ChainManager.ProcessCommitment(cm)
 		}
 	}
 
@@ -135,7 +135,7 @@ func (p *Protocol) Shutdown() {
 
 	p.Workers.Shutdown()
 	p.mainEngine.Shutdown()
-	p.chainManager.Shutdown()
+	p.ChainManager.Shutdown()
 	p.TipManager.Shutdown()
 }
 
@@ -172,7 +172,7 @@ func (p *Protocol) initNetworkEvents() {
 	}, event.WithWorkerPool(wpCommitments))
 
 	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source network.PeerID) {
-		p.chainManager.ProcessCommitmentFromSource(commitment, source)
+		p.ChainManager.ProcessCommitmentFromSource(commitment, source)
 	}, event.WithWorkerPool(wpCommitments))
 
 	p.Events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
@@ -213,13 +213,13 @@ func (p *Protocol) initEngineManager() {
 }
 
 func (p *Protocol) initChainManager() {
-	p.chainManager = chainmanager.NewManager(p.optsChainManagerOptions...)
-	p.Events.ChainManager.LinkTo(p.chainManager.Events)
+	p.ChainManager = chainmanager.NewManager(p.optsChainManagerOptions...)
+	p.Events.ChainManager.LinkTo(p.ChainManager.Events)
 
 	wp := p.Workers.CreatePool("ChainManager", 1) // Using just 1 worker to avoid contention
 
 	p.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		p.chainManager.ProcessCommitment(details.Commitment)
+		p.ChainManager.ProcessCommitment(details.Commitment)
 	}, event.WithWorkerPool(wp))
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
@@ -229,12 +229,12 @@ func (p *Protocol) initChainManager() {
 		// we first specify the chain's cut-off point, and only then evict the state. It is also important to
 		// note that no multiple goroutines should be allowed to perform this operation at once, hence the
 		// hooking worker pool should always have a single worker or these two calls should be protected by a lock.
-		p.chainManager.SetRootCommitment(rootCommitment)
+		p.ChainManager.SetRootCommitment(rootCommitment)
 
 		// We want to evict just below the height of our new root commitment (so that the slot of the root commitment
 		// stays in memory storage and with it the root commitment itself as well).
 		if rootCommitment.ID().Index() > 0 {
-			p.chainManager.EvictUntil(rootCommitment.ID().Index() - 1)
+			p.ChainManager.EvictUntil(rootCommitment.ID().Index() - 1)
 		}
 	}, event.WithWorkerPool(wp))
 
@@ -252,7 +252,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 		return errors.Errorf("protocol engine not yet initialized")
 	}
 
-	isSolid, chain := p.chainManager.ProcessCommitmentFromSource(block.SlotCommitment(), src)
+	isSolid, chain := p.ChainManager.ProcessCommitmentFromSource(block.SlotCommitment(), src)
 	if !isSolid {
 		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().ID() {
 			return nil

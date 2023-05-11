@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/stringify"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -82,4 +83,13 @@ func (c *Chain) dropCommitmentsAfter(index iotago.SlotIndex) {
 	if index < c.latestCommitmentIndex {
 		c.latestCommitmentIndex = index
 	}
+}
+
+func (c *Chain) String() string {
+	builder := stringify.NewStructBuilder("Chain",
+		stringify.NewStructField("ForkingPoint", c.ForkingPoint.ID()),
+		stringify.NewStructField("LatestCommitmentIndex", c.latestCommitmentIndex),
+	)
+
+	return builder.String()
 }

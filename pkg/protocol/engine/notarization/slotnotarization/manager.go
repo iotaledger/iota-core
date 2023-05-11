@@ -82,11 +82,13 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 					// Slots are committed whenever RatifiedATT advances, start committing only when bootstrapped.
 					e.Events.Clock.RatifiedAcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
 
-					m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index())
-
 					e.Events.Notarization.LinkTo(m.events)
 
 					m.TriggerInitialized()
+				})
+
+				e.Storage.Settings().HookInitialized(func() {
+					m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index())
 				})
 			},
 			(*Manager).TriggerConstructed)

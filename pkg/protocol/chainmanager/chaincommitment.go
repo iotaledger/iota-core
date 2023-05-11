@@ -151,10 +151,9 @@ func (c *ChainCommitment) replaceChain(chain *Chain) {
 func (c *ChainCommitment) String() string {
 	builder := stringify.NewStructBuilder("ChainCommitment",
 		stringify.NewStructField("ID", c.id),
-		stringify.NewStructField("Commitment", c.commitment),
+		stringify.NewStructField("Commitment", c.commitment.String()),
 		stringify.NewStructField("Solid", c.solid),
 		stringify.NewStructField("Chain", c.chain),
-		stringify.NewStructField("MainChildID", c.mainChildID),
 		stringify.NewStructField("MainChildID", c.mainChildID),
 	)
 
