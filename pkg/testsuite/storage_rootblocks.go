@@ -1,25 +1,38 @@
 package testsuite
 
 import (
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
 
-	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 )
 
-func (t *TestSuite) AssertStorageRootBlocks(blocks []*model.Block, nodes ...*mock.Node) {
+func (t *TestSuite) AssertStorageRootBlocks(blocks []*blocks.Block, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
 		for _, block := range blocks {
-			storage := node.Protocol.MainEngineInstance().Storage.RootBlocks(block.ID().Index())
-			require.NotNilf(t.Testing, storage, "%s: storage for %s is nil", node.Name, block.ID().Index())
+			t.Eventually(func() error {
+				storage := node.Protocol.MainEngineInstance().Storage.RootBlocks(block.ID().Index())
+				if storage == nil {
+					return errors.Errorf("AssertStorageRootBlocks: %s: storage for %s is nil", node.Name, block.ID().Index())
+				}
 
-			loadedBlockID, commitmentID, err := storage.Load(block.ID())
-			require.NoError(t.Testing, err, "%s: failed to load root block %s", node.Name, block.ID())
+				loadedBlockID, loadedCommitmentID, err := storage.Load(block.ID())
+				if err != nil {
+					return errors.Wrapf(err, "AssertStorageRootBlocks: %s: failed to load root block %s", node.Name, block.ID())
+				}
 
-			require.Equalf(t.Testing, block.ID(), loadedBlockID, "%s: block %s expected %s, got %s", node.Name, block.ID(), block.ID(), loadedBlockID)
-			require.Equalf(t.Testing, block.SlotCommitment().ID(), commitmentID, "%s: block %s expected %s, got %s", node.Name, block.ID(), block.SlotCommitment().ID(), commitmentID)
+				if block.ID() != loadedBlockID {
+					return errors.Errorf("AssertStorageRootBlocks: %s: expected block %s, got %s", node.Name, block.ID(), loadedBlockID)
+				}
+
+				if block.SlotCommitmentID() != loadedCommitmentID {
+					return errors.Errorf("AssertStorageRootBlocks: %s: expected slot commitment %s, got %s for block %s", node.Name, block.SlotCommitmentID(), loadedCommitmentID, block.ID())
+				}
+
+				return nil
+			})
 		}
 	}
 }

@@ -266,7 +266,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 
 // canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
 func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
-	if b.evictionState.InEvictedSlot(data.ID()) && !b.evictionState.IsRootBlock(data.ID()) {
+	if b.evictionState.InRootBlockSlot(data.ID()) && !b.evictionState.IsRootBlock(data.ID()) {
 		return false, errors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.Block().IssuingTime)
 	}
 
@@ -289,7 +289,7 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 // this condition but exists as a missing entry, we mark it as invalid.
 func (b *BlockDAG) canAttachToParents(data *model.Block) (parentsValid bool, err error) {
 	for _, parentID := range data.Parents() {
-		if b.evictionState.InEvictedSlot(parentID) && !b.evictionState.IsRootBlock(parentID) {
+		if b.evictionState.InRootBlockSlot(parentID) && !b.evictionState.IsRootBlock(parentID) {
 			return false, errors.Errorf("parent %s of block %s is too old", parentID, data.ID())
 		}
 	}

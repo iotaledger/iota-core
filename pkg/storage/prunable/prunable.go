@@ -28,6 +28,10 @@ func (p *Prunable) Initialize(a iotago.API) {
 	p.api = a
 }
 
+func (p *Prunable) RestoreFromDisk() {
+	p.manager.RestoreFromDisk()
+}
+
 func (p *Prunable) Blocks(slot iotago.SlotIndex) *Blocks {
 	store := p.manager.Get(slot, kvstore.Realm{blocksPrefix})
 	if store == nil {
@@ -61,4 +65,8 @@ func (p *Prunable) Size() int64 {
 
 func (p *Prunable) Shutdown() {
 	p.manager.Shutdown()
+}
+
+func (p *Prunable) LastPrunedSlot() (index iotago.SlotIndex, hasPruned bool) {
+	return p.manager.LastPrunedSlot()
 }

@@ -47,9 +47,6 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	if err := s.Settings().SetProtocolParameters(opt.ProtocolParameters); err != nil {
 		return errors.Wrap(err, "failed to set the genesis time")
 	}
-	if err := s.Settings().SetChainID(lo.PanicOnErr(s.Commitments().Load(0)).ID()); err != nil {
-		return errors.Wrap(err, "failed to set chainID")
-	}
 
 	engineInstance := engine.New(workers.CreateGroup("Engine"),
 		s,

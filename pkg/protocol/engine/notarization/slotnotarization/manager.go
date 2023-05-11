@@ -73,21 +73,22 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 					wpBlocks := m.workers.CreatePool("Blocks", 1)           // Using just 1 worker to avoid contention
 					wpCommitments := m.workers.CreatePool("Commitments", 1) // Using just 1 worker to avoid contention
 
-					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-						if err := m.notarizeAcceptedBlock(block); err != nil {
+					e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+						if err := m.notarizeRatifiedAcceptedBlock(block); err != nil {
 							e.Events.Error.Trigger(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 						}
 					}, event.WithWorkerPool(wpBlocks))
 
-					// Slots are committed whenever ATT advances, start committing only when bootstrapped.
-					e.Events.Clock.AcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
+					// Slots are committed whenever RatifiedATT advances, start committing only when bootstrapped.
+					e.Events.Clock.RatifiedAcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
 
-					m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index())
-
-					m.events.AcceptedBlockRemoved.LinkTo(m.slotMutations.AcceptedBlockRemoved)
 					e.Events.Notarization.LinkTo(m.events)
 
 					m.TriggerInitialized()
+				})
+
+				e.Storage.Settings().HookInitialized(func() {
+					m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index())
 				})
 			},
 			(*Manager).TriggerConstructed)
@@ -121,8 +122,8 @@ func (m *Manager) IsBootstrapped() bool {
 	return m.storage.Settings().LatestCommitment().Index() >= m.slotTimeProviderFunc().IndexFromTime(m.acceptedTimeFunc())-m.optsMinCommittableSlotAge-1
 }
 
-func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
-	if err = m.slotMutations.AddAcceptedBlock(block); err != nil {
+func (m *Manager) notarizeRatifiedAcceptedBlock(block *blocks.Block) (err error) {
+	if err = m.slotMutations.AddRatifiedAcceptedBlock(block); err != nil {
 		return errors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
