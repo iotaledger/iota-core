@@ -8,7 +8,9 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -21,14 +23,21 @@ type Manager struct {
 	store     kvstore.KVStore
 	storeLock sync.RWMutex
 
+	stateTree *ads.Map[iotago.OutputID, stateTreeMetadata, *iotago.OutputID, *stateTreeMetadata]
+
 	apiProviderFunc func() iotago.API
 }
 
 func New(store kvstore.KVStore, apiProviderFunc func() iotago.API) *Manager {
 	return &Manager{
 		store:           store,
+		stateTree:       ads.NewMap[iotago.OutputID, stateTreeMetadata](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree}))),
 		apiProviderFunc: apiProviderFunc,
 	}
+}
+
+func (m *Manager) API() iotago.API {
+	return m.apiProviderFunc()
 }
 
 // KVStore returns the underlying KVStore.
@@ -181,7 +190,18 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 		return err
 	}
 
-	return mutations.Commit()
+	if err := mutations.Commit(); err != nil {
+		return err
+	}
+
+	for _, output := range newOutputs {
+		m.stateTree.Set(output.OutputID(), newStateMetadata(output))
+	}
+	for _, spent := range newSpents {
+		m.stateTree.Delete(spent.OutputID())
+	}
+
+	return nil
 }
 
 func (m *Manager) ApplyDiff(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
@@ -238,7 +258,18 @@ func (m *Manager) RollbackDiffWithoutLocking(index iotago.SlotIndex, newOutputs 
 		return err
 	}
 
-	return mutations.Commit()
+	if err := mutations.Commit(); err != nil {
+		return err
+	}
+
+	for _, spent := range newSpents {
+		m.stateTree.Set(spent.OutputID(), newStateMetadata(spent.Output()))
+	}
+	for _, output := range newOutputs {
+		m.stateTree.Delete(output.OutputID())
+	}
+
+	return nil
 }
 
 func (m *Manager) RollbackDiff(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
@@ -279,7 +310,13 @@ func (m *Manager) AddUnspentOutputWithoutLocking(unspentOutput *Output) error {
 		return err
 	}
 
-	return mutations.Commit()
+	if err := mutations.Commit(); err != nil {
+		return err
+	}
+
+	m.stateTree.Set(unspentOutput.OutputID(), newStateMetadata(unspentOutput))
+
+	return nil
 }
 
 func (m *Manager) AddUnspentOutput(unspentOutput *Output) error {
@@ -322,6 +359,16 @@ func (m *Manager) LedgerStateSHA256Sum() ([]byte, error) {
 		if _, err := ledgerStateHash.Write(output.KVStorableValue()); err != nil {
 			return nil, err
 		}
+	}
+
+	// Add root of the state tree
+	stateTreeBytes, err := m.StateTreeRoot().Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := ledgerStateHash.Write(stateTreeBytes); err != nil {
+		return nil, err
 	}
 
 	// calculate sha256 hash

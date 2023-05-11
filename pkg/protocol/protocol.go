@@ -31,6 +31,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
@@ -69,6 +71,7 @@ type Protocol struct {
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
+	optsLedgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -85,6 +88,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
+		optsLedgerProvider:          utxoledger.NewProvider(),
 
 		optsBaseDirectory: "",
 		optsPruningDelay:  360,
@@ -195,6 +199,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsBlockGadgetProvider,
 		p.optsSlotGadgetProvider,
 		p.optsNotarizationProvider,
+		p.optsLedgerProvider,
 	)
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
@@ -300,7 +305,7 @@ func (p *Protocol) API() iotago.API {
 }
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
-	panic(fmt.Sprintf("Fork detected: %s", fork))
+	fmt.Printf("================================================================\nFork detected: %s\n================================================================\n", fork)
 }
 
 func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
@@ -372,6 +377,12 @@ func WithSlotGadgetProvider(optsSlotGadgetProvider module.Provider[*engine.Engin
 func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.Engine, notarization.Notarization]) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsNotarizationProvider = optsNotarizationProvider
+	}
+}
+
+func WithLedgerProvider(optsLedgerProvider module.Provider[*engine.Engine, therealledger.Ledger]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsLedgerProvider = optsLedgerProvider
 	}
 }
 

@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"crypto/ed25519"
 	"fmt"
 	"sync"
@@ -313,7 +314,7 @@ func (n *Node) checkParentsCommitmentMonotonicity(commitment *iotago.Commitment,
 	}
 }
 
-func (n *Node) IssueActivity(duration time.Duration, wg *sync.WaitGroup) {
+func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sync.WaitGroup) {
 	go func() {
 		defer wg.Done()
 
@@ -321,6 +322,11 @@ func (n *Node) IssueActivity(duration time.Duration, wg *sync.WaitGroup) {
 		fmt.Println(n.Name, "> Starting activity")
 		var counter int
 		for {
+			if ctx.Err() != nil {
+				fmt.Println(n.Name, "> Stopped activity due to canceled context")
+				return
+			}
+
 			if references := n.Protocol.TipManager.Tips(iotago.BlockMaxParents); len(references[model.StrongParentType]) > 0 {
 				if !n.issueActivityBlock(fmt.Sprintf("activity %s.%d", n.Name, counter), references[model.StrongParentType]...) {
 					fmt.Println(n.Name, "> Stopped activity due to block not being issued")
