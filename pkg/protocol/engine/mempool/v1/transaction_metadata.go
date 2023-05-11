@@ -311,7 +311,7 @@ func (t *TransactionMetadata) MarkOrphaned(blockID iotago.BlockID) (orphaned boo
 
 	t.evictAttachment(blockID)
 
-	if previousState && blockID.Index() == t.earliestIncludedAttachment.Get().Index() {
+	if previousState && blockID == t.earliestIncludedAttachment.Get() {
 		t.earliestIncludedAttachment.Set(t.findLowestIncludedAttachment())
 	}
 
