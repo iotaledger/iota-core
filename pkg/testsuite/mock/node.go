@@ -268,12 +268,13 @@ func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitm
 		panic(err)
 	}
 
+	modelBlock.ID().RegisterAlias(alias)
+
 	err = n.Protocol.ProcessBlock(modelBlock, n.PeerID)
 	if err != nil {
 		panic(err)
 	}
 
-	modelBlock.ID().RegisterAlias(alias)
 	fmt.Printf("Issued block: %s - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
 
 	return blocks.NewBlock(modelBlock)
