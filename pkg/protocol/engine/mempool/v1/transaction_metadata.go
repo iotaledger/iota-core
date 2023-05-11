@@ -47,7 +47,7 @@ type TransactionMetadata struct {
 
 	attachmentsMutex sync.RWMutex
 
-	*Inclusion
+	*inclusionFlags
 }
 
 func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMetadata, error) {
@@ -84,7 +84,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		earliestIncludedSlot:  promise.NewValue[iotago.SlotIndex](),
 		allAttachmentsEvicted: promise.NewEvent(),
 
-		Inclusion: NewInclusion(),
+		inclusionFlags: newInclusionFlags(),
 	}).setup(), nil
 }
 

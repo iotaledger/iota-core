@@ -22,7 +22,7 @@ type StateMetadata struct {
 	spendCommitted     *promise.Event1[mempool.TransactionMetadata]
 	allSpendersRemoved *event.Event
 
-	*Inclusion
+	*inclusionFlags
 }
 
 func NewStateMetadata(state ledger.State, optSource ...*TransactionMetadata) *StateMetadata {
@@ -36,7 +36,7 @@ func NewStateMetadata(state ledger.State, optSource ...*TransactionMetadata) *St
 		spendCommitted:     promise.NewEvent1[mempool.TransactionMetadata](),
 		allSpendersRemoved: event.New(),
 
-		Inclusion: NewInclusion(),
+		inclusionFlags: newInclusionFlags(),
 	}).setup(optSource...)
 }
 

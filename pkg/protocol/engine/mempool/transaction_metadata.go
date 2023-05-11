@@ -14,9 +14,31 @@ type TransactionMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateMetadata]
 
-	TransactionInclusion
+	AllInputsAccepted() bool
 
-	TransactionLifecycle
+	OnAllInputsAccepted(callback func())
 
-	TransactionAttachments
+	Commit()
+
+	IsSolid() bool
+
+	OnSolid(func())
+
+	IsExecuted() bool
+
+	OnExecuted(func())
+
+	IsInvalid() bool
+
+	OnInvalid(func(error))
+
+	IsBooked() bool
+
+	OnBooked(func())
+
+	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func())
+
+	EarliestIncludedSlot() iotago.SlotIndex
+
+	Inclusion
 }
