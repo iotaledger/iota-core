@@ -27,13 +27,16 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
-			protocol.WithPruningThreshold(2),
+			protocol.WithPruningDelay(2),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 			),
 		},
 		"node2": {
-			protocol.WithPruningThreshold(4),
+			protocol.WithPruningDelay(1),
+			protocol.WithStorageOptions(
+				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+			),
 		},
 	})
 	ts.HookLogging()
@@ -212,9 +215,18 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(7),
 			testsuite.WithActiveRootBlocks(ts.Blocks("5.1", "6.2", "7.1")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+
+		ts.AssertNodeState(ts.Nodes("node1"),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2")),
+			testsuite.WithPrunedSlot(0, false),
+		)
+
+		ts.AssertNodeState(ts.Nodes("node2"),
+			testsuite.WithStorageRootBlocks(ts.Blocks("1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2")),
+			testsuite.WithPrunedSlot(0, true),
+		)
 
 		// Slot 13
 		{
@@ -235,16 +247,6 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - rootblocks are evicted until slot 2 as RootBlocksEvictionDelay is 3.
 		// - slot 5 is finalized: there is a supermajority of ratified accepted blocks that commits to it.
 
-		ts.AssertNodeState(ts.Nodes("node1"),
-			testsuite.WithStorageRootBlocks(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(1, true),
-		)
-
-		ts.AssertNodeState(ts.Nodes("node2"),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(0, false),
-		)
-
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -256,9 +258,18 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(8),
 			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
-			// testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+
+		ts.AssertNodeState(ts.Nodes("node1"),
+			testsuite.WithStorageRootBlocks(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
+			testsuite.WithPrunedSlot(1, true),
+		)
+
+		ts.AssertNodeState(ts.Nodes("node2"),
+			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
+			testsuite.WithPrunedSlot(2, true),
+		)
 
 		// Slot 14
 		{
@@ -278,15 +289,6 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - 10.2 is ratified accepted and commits to slot 5 -> slot 5 should be evicted.
 		// - rootblocks are evicted until slot 2 as RootBlocksEvictionDelay is 3.
 		// - slot 5 is finalized: there is a supermajority of ratified accepted blocks that commits to it.
-		ts.AssertNodeState(ts.Nodes("node1"),
-			testsuite.WithStorageRootBlocks(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(1, true),
-		)
-
-		ts.AssertNodeState(ts.Nodes("node2"),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(0, false),
-		)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
@@ -299,9 +301,18 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(9),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
-			// testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+
+		ts.AssertNodeState(ts.Nodes("node1"),
+			testsuite.WithStorageRootBlocks(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
+			testsuite.WithPrunedSlot(1, true),
+		)
+
+		ts.AssertNodeState(ts.Nodes("node2"),
+			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
+			testsuite.WithPrunedSlot(2, true),
+		)
 	}
 
 	// Shutdown node2 and restart it from disk. Verify state.
@@ -320,6 +331,10 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
 			),
+			protocol.WithPruningDelay(1),
+			protocol.WithStorageOptions(
+				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+			),
 		)
 		ts.Wait()
 
@@ -335,7 +350,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(9),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
+			testsuite.WithPrunedSlot(2, true),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
@@ -356,7 +372,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
 			),
-			protocol.WithPruningThreshold(2),
+			protocol.WithPruningDelay(2),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 			),

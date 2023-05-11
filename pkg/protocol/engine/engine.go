@@ -208,6 +208,7 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		e.Storage.Settings().UpdateAPI()
 		e.Storage.Settings().TriggerInitialized()
 		e.Storage.Commitments().TriggerInitialized()
+		e.Storage.Prunable.RestoreFromDisk()
 		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
 
 		// e.Notarization.attestations().SetLastCommittedSlot(e.Storage.Settings().LatestCommitment().Index())

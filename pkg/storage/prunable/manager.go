@@ -55,7 +55,7 @@ func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Mana
 
 			m.dbSizes.Set(baseIndex, size)
 		})
-	}, (*Manager).restoreFromDisk)
+	})
 }
 
 // IsTooOld checks if the index is in a pruned slot.
@@ -142,7 +142,7 @@ func (m *Manager) PrunableStorageSize() int64 {
 	return sum
 }
 
-func (m *Manager) restoreFromDisk() {
+func (m *Manager) RestoreFromDisk() {
 	dbInfos := getSortedDBInstancesFromDisk(m.dbConfig.Directory)
 
 	// There are no dbInstances on disk -> nothing to restore.

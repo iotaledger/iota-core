@@ -52,9 +52,9 @@ type Protocol struct {
 
 	mainEngine *engine.Engine
 
-	optsBaseDirectory    string
-	optsSnapshotPath     string
-	optsPruningThreshold iotago.SlotIndex
+	optsBaseDirectory string
+	optsSnapshotPath  string
+	optsPruningDelay  iotago.SlotIndex
 
 	optsEngineOptions       []options.Option[engine.Engine]
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
@@ -86,8 +86,8 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
 
-		optsBaseDirectory:    "",
-		optsPruningThreshold: 360,
+		optsBaseDirectory: "",
+		optsPruningDelay:  360,
 	}, opts,
 		(*Protocol).initNetworkEvents,
 		(*Protocol).initEngineManager,
@@ -201,10 +201,10 @@ func (p *Protocol) initEngineManager() {
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		// TODO: fix pruning
-		if index < p.optsPruningThreshold {
+		if index < p.optsPruningDelay {
 			return
 		}
-		p.MainEngineInstance().Storage.PruneUntilSlot(index - p.optsPruningThreshold)
+		p.MainEngineInstance().Storage.PruneUntilSlot(index - p.optsPruningDelay)
 	}, event.WithWorkerPool(p.Workers.CreatePool("PruneEngine", 2)))
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
@@ -311,9 +311,9 @@ func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 	}
 }
 
-func WithPruningThreshold(pruningThreshold iotago.SlotIndex) options.Option[Protocol] {
+func WithPruningDelay(pruningDelay iotago.SlotIndex) options.Option[Protocol] {
 	return func(n *Protocol) {
-		n.optsPruningThreshold = pruningThreshold
+		n.optsPruningDelay = pruningDelay
 	}
 }
 
