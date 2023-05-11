@@ -24,7 +24,7 @@ type State struct {
 	rootBlocks           *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID]
 	latestRootBlocks     *ringbuffer.RingBuffer[iotago.BlockID]
 	rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks
-	lastCommittedSlot    iotago.SlotIndex
+	lastEvictedSlot      iotago.SlotIndex
 	evictionMutex        sync.RWMutex
 
 	optsRootBlocksEvictionDelay iotago.SlotIndex
@@ -42,12 +42,13 @@ func NewState(rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks, 
 }
 
 func (s *State) Initialize(lastCommittedSlot iotago.SlotIndex) {
-	s.lastCommittedSlot = lastCommittedSlot
+	// This marks the slot from which we only have root blocks, so starting with 0 is valid here, since we only have a root block for genesis.
+	s.lastEvictedSlot = lastCommittedSlot
 }
 
 func (s *State) AdvanceActiveWindowToIndex(index iotago.SlotIndex) {
 	s.evictionMutex.Lock()
-	s.lastCommittedSlot = index
+	s.lastEvictedSlot = index
 
 	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(index); shouldEvictRootBlocks {
 		s.rootBlocks.Evict(delayedIndex)
@@ -58,11 +59,11 @@ func (s *State) AdvanceActiveWindowToIndex(index iotago.SlotIndex) {
 	s.Events.SlotEvicted.Trigger(index)
 }
 
-func (s *State) LastEvictedSlot() (index iotago.SlotIndex, hasEvicted bool) {
+func (s *State) LastEvictedSlot() iotago.SlotIndex {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	return s.delayedBlockEvictionThreshold(s.lastCommittedSlot)
+	return s.lastEvictedSlot
 }
 
 // EarliestRootCommitmentID returns the earliest commitment that rootblocks are committing to across all rootblocks.
@@ -266,7 +267,7 @@ func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 }
 
 func (s *State) activeIndexRange() (start, end iotago.SlotIndex) {
-	lastCommitted := s.lastCommittedSlot
+	lastCommitted := s.lastEvictedSlot
 	delayed, valid := s.delayedBlockEvictionThreshold(lastCommitted)
 
 	if !valid {

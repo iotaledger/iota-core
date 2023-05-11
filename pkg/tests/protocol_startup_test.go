@@ -132,7 +132,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithEvictedSlot(0),
+			testsuite.WithEvictedSlot(1),
 			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*")),
 		)
@@ -169,7 +169,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithEvictedSlot(0),
+			testsuite.WithEvictedSlot(3),
 			testsuite.WithActiveRootBlocks(ts.Blocks("1.1", "1.1*", "2.2", "2.2*", "3.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2")),
 		)
@@ -210,7 +210,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithEvictedSlot(4),
+			testsuite.WithEvictedSlot(7),
 			testsuite.WithActiveRootBlocks(ts.Blocks("5.1", "6.2", "7.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2")),
 		)
@@ -254,7 +254,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithEvictedSlot(5),
+			testsuite.WithEvictedSlot(8),
 			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "7.1", "8.2")),
 			// testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
 		)
@@ -297,7 +297,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithEvictedSlot(6),
+			testsuite.WithEvictedSlot(9),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
 			// testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
 		)
@@ -333,7 +333,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(slot1Commitment.MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithEvictedSlot(6),
+			testsuite.WithEvictedSlot(9),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
 		)
@@ -356,6 +356,10 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
 			),
+			protocol.WithPruningThreshold(2),
+			protocol.WithStorageOptions(
+				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+			),
 		)
 		ts.Wait()
 
@@ -376,10 +380,12 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithChainID(slot1Commitment.MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
-			testsuite.WithEvictedSlot(6),
+			testsuite.WithEvictedSlot(9),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
+			testsuite.WithPrunedSlot(3, true),
 		)
+		require.Nil(t, node3.Protocol.MainEngineInstance().Storage.RootBlocks(2))
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 	}
 
