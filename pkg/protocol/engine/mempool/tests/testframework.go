@@ -180,7 +180,7 @@ func (t *TestFramework) RequireAttachmentsEvicted(attachmentAliases map[string]b
 }
 
 func (t *TestFramework) setupHookedEvents() {
-	t.Instance.HookTransactionAttached(func(metadata mempool.TransactionMetadata) {
+	t.Instance.OnTransactionAttached(func(metadata mempool.TransactionMetadata) {
 		if debug.GetEnabled() {
 			t.test.Logf("[TRIGGERED] mempool.TransactionAttached with '%s'", metadata.ID())
 		}

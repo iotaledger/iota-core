@@ -10,17 +10,17 @@ import (
 type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 	AttachTransaction(transaction Transaction, blockID iotago.BlockID) (storedTransaction TransactionMetadata, err error)
 
-	HookTransactionAttached(callback func(metadata TransactionMetadata), opts ...event.Option) (unhook func())
+	OnTransactionAttached(callback func(metadata TransactionMetadata), opts ...event.Option)
+
+	MarkAttachmentOrphaned(blockID iotago.BlockID) bool
+
+	MarkAttachmentIncluded(blockID iotago.BlockID) bool
 
 	StateMetadata(reference ledger.StateReference) (state StateMetadata, err error)
 
 	TransactionMetadata(id iotago.TransactionID) (transaction TransactionMetadata, exists bool)
 
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transaction TransactionMetadata, exists bool)
-
-	MarkAttachmentOrphaned(blockID iotago.BlockID) bool
-
-	MarkAttachmentIncluded(blockID iotago.BlockID) bool
 
 	StateDiff(index iotago.SlotIndex) StateDiff
 

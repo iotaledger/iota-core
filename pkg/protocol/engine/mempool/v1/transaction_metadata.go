@@ -322,8 +322,8 @@ func (t *TransactionMetadata) EarliestIncludedSlot() iotago.SlotIndex {
 	return t.earliestIncludedSlot.Get()
 }
 
-func (t *TransactionMetadata) OnEarliestIncludedSlotUpdated(callback func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func()) {
-	return t.earliestIncludedSlot.OnUpdate(callback)
+func (t *TransactionMetadata) OnEarliestIncludedSlotUpdated(callback func(prevIndex, newIndex iotago.SlotIndex)) {
+	t.earliestIncludedSlot.OnUpdate(callback)
 }
 
 func (t *TransactionMetadata) OnAllAttachmentsEvicted(callback func()) {

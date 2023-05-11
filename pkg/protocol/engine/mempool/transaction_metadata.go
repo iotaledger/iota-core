@@ -36,7 +36,11 @@ type TransactionMetadata interface {
 
 	OnBooked(func())
 
-	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex)) (unsubscribe func())
+	IsConflicting() bool
+
+	OnConflicting(func())
+
+	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex))
 
 	EarliestIncludedSlot() iotago.SlotIndex
 

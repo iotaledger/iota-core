@@ -88,8 +88,8 @@ func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, 
 	return storedTransaction, nil
 }
 
-func (m *MemPool[VotePower]) HookTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) (unhook func()) {
-	return m.transactionAttached.Hook(handler, opts...).Unhook
+func (m *MemPool[VotePower]) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
+	m.transactionAttached.Hook(handler, opts...)
 }
 
 // MarkAttachmentOrphaned marks the attachment of the given block as orphaned.
