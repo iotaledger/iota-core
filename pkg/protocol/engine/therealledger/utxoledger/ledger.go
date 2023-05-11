@@ -2,6 +2,7 @@ package utxoledger
 
 import (
 	"fmt"
+	"io"
 
 	"golang.org/x/xerrors"
 
@@ -53,6 +54,14 @@ func (l *Ledger) Shutdown() {
 	l.TriggerStopped()
 	// TODO:
 	// l.memPool.Shutdown()
+}
+
+func (l *Ledger) Import(reader io.ReadSeeker) error {
+	return l.ledgerState.Import(reader)
+}
+
+func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error {
+	return l.ledgerState.Export(writer, targetIndex)
 }
 
 func (l *Ledger) resolveState(stateRef ledger.StateReference) *promise.Promise[ledger.State] {

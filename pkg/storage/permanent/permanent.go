@@ -91,7 +91,7 @@ func (p *Permanent) Attestations(optRealm ...byte) kvstore.KVStore {
 // Ledger returns the ledger storage (or a specialized sub-storage if a realm is provided).
 func (p *Permanent) Ledger(optRealm ...byte) kvstore.KVStore {
 	if len(optRealm) == 0 {
-		return p.sybilProtection
+		return p.ledger
 	}
 
 	return lo.PanicOnErr(p.ledger.WithExtendedRealm(optRealm))

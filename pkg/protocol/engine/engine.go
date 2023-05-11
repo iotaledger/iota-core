@@ -249,8 +249,8 @@ func (e *Engine) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to import settings")
 	} else if err = e.Storage.Commitments().Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import commitments")
-		// } else if err = e.Ledger.Import(reader); err != nil {
-		// 	return errors.Wrap(err, "failed to import ledger")
+	} else if err = e.Ledger.Import(reader); err != nil {
+		return errors.Wrap(err, "failed to import ledger")
 	} else if err = e.EvictionState.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import eviction state")
 		// } else if err = e.Notarization.Import(reader); err != nil {
@@ -265,8 +265,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export settings")
 	} else if err = e.Storage.Commitments().Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export commitments")
-		// } else if err = e.Ledger.Export(writer, targetSlot); err != nil {
-		// 	return errors.Wrap(err, "failed to export ledger")
+	} else if err = e.Ledger.Export(writer, targetSlot); err != nil {
+		return errors.Wrap(err, "failed to export ledger")
 	} else if err = e.EvictionState.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export eviction state")
 		// } else if err = e.Notarization.Export(writer, targetSlot); err != nil {
