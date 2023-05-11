@@ -1,3 +1,4 @@
+//nolint:revive //temporary mock full of TODOs
 package mockedconflictdag
 
 import (

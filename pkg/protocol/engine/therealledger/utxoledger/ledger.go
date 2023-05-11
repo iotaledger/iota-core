@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/kvstore"
@@ -21,6 +22,10 @@ import (
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	iotago "github.com/iotaledger/iota.go/v4"
+)
+
+var (
+	ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
 )
 
 type Ledger struct {
@@ -96,8 +101,17 @@ func (l *Ledger) Output(id iotago.OutputID) (*ledgerstate.Output, error) {
 	}
 
 	earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
-	state := stateWithMetadata.State().(*State)
-	txCreationTime := txWithMetadata.Transaction().(*Transaction).Transaction.Essence.CreationTime
+	state, ok := stateWithMetadata.State().(*State)
+	if !ok {
+		return nil, ErrUnexpectedUnderlyingType
+	}
+
+	tx, ok := txWithMetadata.Transaction().(*Transaction)
+	if !ok {
+		return nil, ErrUnexpectedUnderlyingType
+	}
+
+	txCreationTime := tx.Transaction.Essence.CreationTime
 
 	return ledgerstate.CreateOutput(l.ledgerState.API(), state.outputID, earliestAttachment, earliestAttachment.Index(), txCreationTime, state.output), nil
 }
@@ -114,24 +128,27 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 	stateDiff := l.memPool.StateDiff(index)
 
+	var innerErr error
 	var outputs ledgerstate.Outputs
 	var spents ledgerstate.Spents
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
-		tx := txWithMeta.Transaction().(*Transaction)
+		tx, ok := txWithMeta.Transaction().(*Transaction)
+		if !ok {
+			innerErr = ErrUnexpectedUnderlyingType
+			return false
+		}
 		txCreationTime := tx.Transaction.Essence.CreationTime
 
 		inputs, errInput := tx.Inputs()
 		if errInput != nil {
-			err = errInput
-
+			innerErr = errInput
 			return false
 		}
 		for _, input := range inputs {
 			inputOutput, outputErr := l.Output(input.StateID())
 			if outputErr != nil {
-				err = outputErr
-
+				innerErr = outputErr
 				return false
 			}
 
@@ -140,21 +157,24 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		}
 
 		if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateMetadata) error {
-			state := element.State().(*State)
+			state, ok := element.State().(*State)
+			if !ok {
+				return ErrUnexpectedUnderlyingType
+			}
 			output := ledgerstate.CreateOutput(l.ledgerState.API(), state.outputID, txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, state.output)
 			outputs = append(outputs, output)
+
 			return nil
 		}); createOutputErr != nil {
-			err = createOutputErr
-
+			innerErr = createOutputErr
 			return false
 		}
 
 		return true
 	})
 
-	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, err
+	if innerErr != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, innerErr
 	}
 
 	if err := l.ledgerState.ApplyDiff(index, outputs, spents); err != nil {

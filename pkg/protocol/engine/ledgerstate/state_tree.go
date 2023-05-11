@@ -35,6 +35,7 @@ func (s *stateTreeMetadata) FromBytes(b []byte) (int, error) {
 func (s stateTreeMetadata) Bytes() ([]byte, error) {
 	ms := marshalutil.New(8)
 	ms.WriteInt64(s.Time.UnixNano())
+
 	return ms.Bytes(), nil
 }
 

@@ -10,13 +10,21 @@ import (
 	"github.com/iotaledger/iota.go/v4/vm/stardust"
 )
 
-func (l *Ledger) executeStardustVM(stateTransition mempool.Transaction, inputs []ledger.State, ctx context.Context) (outputs []ledger.State, err error) {
-	tx := stateTransition.(*Transaction)
+func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputs []ledger.State) (outputs []ledger.State, err error) {
+	tx, ok := stateTransition.(*Transaction)
+	if !ok {
+		return nil, ErrUnexpectedUnderlyingType
+	}
+
 	txCreationTime := tx.Transaction.Essence.CreationTime
 
 	inputSet := iotago.OutputSet{}
 	for _, input := range inputs {
-		s := input.(*State)
+		s, ok := input.(*State)
+		if !ok {
+			return nil, ErrUnexpectedUnderlyingType
+		}
+
 		inputSet[s.outputID] = s.output
 	}
 
@@ -36,7 +44,7 @@ func (l *Ledger) executeStardustVM(stateTransition mempool.Transaction, inputs [
 		return nil, err
 	}
 
-	var created []ledger.State
+	created := make([]ledger.State, len(outputSet))
 	for outputID, output := range outputSet {
 		created = append(created, &State{
 			outputID: outputID,

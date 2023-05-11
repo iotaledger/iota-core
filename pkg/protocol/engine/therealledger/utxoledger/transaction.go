@@ -15,10 +15,16 @@ func (t *Transaction) ID() (iotago.TransactionID, error) {
 }
 
 func (t *Transaction) Inputs() ([]ledger.StateReference, error) {
-	var references []ledger.StateReference
-	for _, input := range t.Transaction.Essence.Inputs {
-		references = append(references, ledger.StoredStateReference(input.(iotago.IndexedUTXOReferencer).Ref()))
+	references := make([]ledger.StateReference, len(t.Transaction.Essence.Inputs))
+	for i, input := range t.Transaction.Essence.Inputs {
+		inputReferencer, ok := input.(iotago.IndexedUTXOReferencer)
+		if !ok {
+			return nil, ErrUnexpectedUnderlyingType
+		}
+
+		references[i] = ledger.StoredStateReference(inputReferencer.Ref())
 	}
+
 	return references, nil
 }
 
