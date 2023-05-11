@@ -200,6 +200,10 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		if err = e.readSnapshot(snapshot[0]); err != nil {
 			return errors.Wrapf(err, "failed to read snapshot from file '%s'", snapshot)
 		}
+		if e.Storage.Settings().LatestFinalizedSlot() > 0 {
+			// Only mark any pruning indexes if we loaded a non-genesis snapshot
+			e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
+		}
 	} else {
 		e.Storage.Settings().UpdateAPI()
 		e.Storage.Settings().TriggerInitialized()
