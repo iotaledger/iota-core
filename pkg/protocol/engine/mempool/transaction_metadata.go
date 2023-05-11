@@ -40,9 +40,13 @@ type TransactionMetadata interface {
 
 	OnConflicting(func())
 
-	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex))
+	IsConflictAccepted() bool
+
+	OnConflictAccepted(callback func())
 
 	EarliestIncludedSlot() iotago.SlotIndex
+
+	OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex))
 
 	inclusionFlags
 }

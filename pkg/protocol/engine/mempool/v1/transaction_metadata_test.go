@@ -17,10 +17,10 @@ func TestAttachments(t *testing.T) {
 
 	attachments, err := NewTransactionWithMetadata(mempooltests.NewTransaction(2))
 	require.NoError(t, err)
-	require.True(t, attachments.Add(blockIDs["1"]))
-	require.True(t, attachments.Add(blockIDs["2"]))
+	require.True(t, attachments.addAttachment(blockIDs["1"]))
+	require.True(t, attachments.addAttachment(blockIDs["2"]))
 
-	require.False(t, attachments.Add(blockIDs["1"]))
+	require.False(t, attachments.addAttachment(blockIDs["1"]))
 
 	var earliestInclusionIndex, earliestInclusionIndex1, earliestInclusionIndex2 iotago.SlotIndex
 
@@ -29,24 +29,24 @@ func TestAttachments(t *testing.T) {
 	})
 	require.Equal(t, iotago.SlotIndex(0), earliestInclusionIndex)
 
-	attachments.MarkIncluded(blockIDs["2"])
+	attachments.markAttachmentIncluded(blockIDs["2"])
 	require.Equal(t, iotago.SlotIndex(2), earliestInclusionIndex)
-	attachments.MarkIncluded(blockIDs["1"])
+	attachments.markAttachmentIncluded(blockIDs["1"])
 	require.Equal(t, iotago.SlotIndex(1), earliestInclusionIndex)
 
 	attachments.OnEarliestIncludedSlotUpdated(func(_, includedIndex iotago.SlotIndex) {
 		earliestInclusionIndex1 = includedIndex
 	})
 
-	require.True(t, attachments.MarkOrphaned(blockIDs["1"]))
+	require.True(t, attachments.markAttachmentOrphaned(blockIDs["1"]))
 	require.Equal(t, iotago.SlotIndex(2), earliestInclusionIndex)
 	require.Equal(t, iotago.SlotIndex(2), earliestInclusionIndex1)
 
-	require.False(t, attachments.MarkOrphaned(blockIDs["1"]))
+	require.False(t, attachments.markAttachmentOrphaned(blockIDs["1"]))
 	require.Equal(t, iotago.SlotIndex(2), earliestInclusionIndex)
 	require.Equal(t, iotago.SlotIndex(2), earliestInclusionIndex1)
 
-	attachments.MarkOrphaned(blockIDs["2"])
+	attachments.markAttachmentOrphaned(blockIDs["2"])
 	require.Equal(t, iotago.SlotIndex(0), earliestInclusionIndex)
 	require.Equal(t, iotago.SlotIndex(0), earliestInclusionIndex1)
 

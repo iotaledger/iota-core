@@ -10,21 +10,11 @@ type StateMetadata interface {
 
 	State() ledger.State
 
-	IsSpent() bool
+	PendingSpenderCount() int
 
-	OnDoubleSpent(callback func())
+	AcceptedSpender() (TransactionMetadata, bool)
 
-	OnSpendAccepted(callback func(spender TransactionMetadata))
-
-	OnSpendCommitted(callback func(spender TransactionMetadata))
-
-	AllSpendersRemoved() bool
-
-	OnAllSpendersRemoved(callback func()) (unsubscribe func())
-
-	SpenderCount() uint64
-
-	HasNoSpenders() bool
+	OnAcceptedSpenderUpdated(callback func(spender TransactionMetadata))
 
 	inclusionFlags
 }

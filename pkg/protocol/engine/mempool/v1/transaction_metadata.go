@@ -209,10 +209,6 @@ func (t *TransactionMetadata) OnConflictAccepted(callback func()) {
 	t.conflictAccepted.OnTrigger(callback)
 }
 
-func (t *TransactionMetadata) IsIncluded() bool {
-	return t.earliestIncludedSlot.Get() != 0
-}
-
 func (t *TransactionMetadata) AllInputsAccepted() bool {
 	return t.allInputsAccepted.WasTriggered()
 }
@@ -227,7 +223,7 @@ func (t *TransactionMetadata) setConflicting() {
 
 func (t *TransactionMetadata) setConflictAccepted() {
 	if t.conflictAccepted.Trigger() {
-		if t.AllInputsAccepted() && t.IsIncluded() {
+		if t.AllInputsAccepted() && t.EarliestIncludedSlot() != 0 {
 			t.setAccepted()
 		}
 	}
@@ -240,14 +236,15 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			if t.allInputsAccepted.Trigger() {
-				if t.IsConflictAccepted() && t.IsIncluded() {
+				if t.IsConflictAccepted() && t.EarliestIncludedSlot() != 0 {
 					t.setAccepted()
 				}
 			}
 		}
 	})
 
-	input.OnSpendAccepted(func(spender mempool.TransactionMetadata) {
+	input.OnAcceptedSpenderUpdated(func(spender mempool.TransactionMetadata) {
+		// TODO: REORG REJECTED STUFF?
 		if spender != t {
 			t.setRejected()
 		}
@@ -261,7 +258,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 }
 
 func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
-	t.OnAllAttachmentsEvicted(func() {
+	t.allAttachmentsEvicted.OnTrigger(func() {
 		if !t.IsCommitted() {
 			t.setOrphaned()
 		}
@@ -280,14 +277,14 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	return t
 }
 
-func (t *TransactionMetadata) Add(blockID iotago.BlockID) (added bool) {
+func (t *TransactionMetadata) addAttachment(blockID iotago.BlockID) (added bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
 	return lo.Return2(t.attachments.GetOrCreate(blockID, func() bool { return false }))
 }
 
-func (t *TransactionMetadata) MarkIncluded(blockID iotago.BlockID) (included bool) {
+func (t *TransactionMetadata) markAttachmentIncluded(blockID iotago.BlockID) (included bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
@@ -300,7 +297,7 @@ func (t *TransactionMetadata) MarkIncluded(blockID iotago.BlockID) (included boo
 	return true
 }
 
-func (t *TransactionMetadata) MarkOrphaned(blockID iotago.BlockID) (orphaned bool) {
+func (t *TransactionMetadata) markAttachmentOrphaned(blockID iotago.BlockID) (orphaned bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
@@ -324,17 +321,6 @@ func (t *TransactionMetadata) EarliestIncludedSlot() iotago.SlotIndex {
 
 func (t *TransactionMetadata) OnEarliestIncludedSlotUpdated(callback func(prevIndex, newIndex iotago.SlotIndex)) {
 	t.earliestIncludedSlot.OnUpdate(callback)
-}
-
-func (t *TransactionMetadata) OnAllAttachmentsEvicted(callback func()) {
-	t.allAttachmentsEvicted.OnTrigger(callback)
-}
-
-func (t *TransactionMetadata) EvictAttachment(id iotago.BlockID) {
-	t.attachmentsMutex.Lock()
-	defer t.attachmentsMutex.Unlock()
-
-	t.evictAttachment(id)
 }
 
 func (t *TransactionMetadata) evictAttachment(id iotago.BlockID) {

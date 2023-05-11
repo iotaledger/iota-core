@@ -98,12 +98,12 @@ func (m *MemPool[VotePower]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool
 		defer attachmentSlot.Delete(blockID)
 	}
 
-	return m.updateAttachment(blockID, (*TransactionMetadata).MarkOrphaned)
+	return m.updateAttachment(blockID, (*TransactionMetadata).markAttachmentOrphaned)
 }
 
 // MarkAttachmentIncluded marks the attachment of the given block as included.
 func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) bool {
-	return m.updateAttachment(blockID, (*TransactionMetadata).MarkIncluded)
+	return m.updateAttachment(blockID, (*TransactionMetadata).markAttachmentIncluded)
 }
 
 // TransactionMetadata returns the metadata of the transaction with the given ID.
@@ -152,7 +152,7 @@ func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
 		return m.attachments.Evict(slotIndex)
 	}(); evictedAttachments != nil {
 		evictedAttachments.ForEach(func(blockID iotago.BlockID, transaction *TransactionMetadata) bool {
-			transaction.EvictAttachment(blockID)
+			transaction.evictAttachment(blockID)
 
 			return true
 		})
@@ -177,7 +177,7 @@ func (m *MemPool[VotePower]) storeTransaction(transaction mempool.Transaction, b
 		m.setupTransaction(storedTransaction)
 	}
 
-	storedTransaction.Add(blockID)
+	storedTransaction.addAttachment(blockID)
 	m.attachments.Get(blockID.Index(), true).Set(blockID, storedTransaction)
 
 	return storedTransaction, isNew, nil
@@ -353,7 +353,7 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) 
 func (m *MemPool[VotePower]) setupState(state *StateMetadata) {
 	state.OnCommitted(func() {
 		if !m.cachedStateRequests.Delete(state.ID(), state.HasNoSpenders) && m.cachedStateRequests.Has(state.ID()) {
-			state.OnAllSpendersRemoved(func() { m.cachedStateRequests.Delete(state.ID(), state.HasNoSpenders) })
+			state.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(state.ID(), state.HasNoSpenders) })
 		}
 	})
 
