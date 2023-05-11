@@ -56,7 +56,7 @@ func (b *Blocks) StoreOrUpdate(data *model.Block) (storedBlock *Block, evicted, 
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if evictedIndex, valid := b.evictionState.LastEvictedSlot(); valid && evictedIndex >= data.ID().Index() {
+	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= data.ID().Index() {
 		return nil, true, false
 	}
 
@@ -73,7 +73,7 @@ func (b *Blocks) GetOrCreate(blockID iotago.BlockID, createFunc func() *Block) (
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if evictedIndex, valid := b.evictionState.LastEvictedSlot(); valid && evictedIndex >= blockID.Index() {
+	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= blockID.Index() {
 		return nil, false
 	}
 
@@ -86,7 +86,7 @@ func (b *Blocks) StoreBlock(block *Block) (stored bool) {
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if evictedIndex, valid := b.evictionState.LastEvictedSlot(); valid && evictedIndex >= block.ID().Index() {
+	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= block.ID().Index() {
 		return false
 	}
 

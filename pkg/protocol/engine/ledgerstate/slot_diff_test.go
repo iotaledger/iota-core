@@ -16,7 +16,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func TestSimpleMilestoneDiffSerialization(t *testing.T) {
+func TestSimpleSlotDiffSerialization(t *testing.T) {
 	indexBooked := iotago.SlotIndex(255975)
 	timestampCreated := tpkg.RandTimestamp()
 
@@ -57,7 +57,7 @@ func TestSimpleMilestoneDiffSerialization(t *testing.T) {
 	require.Equal(t, outputID[:], value[42:76])
 }
 
-func TestMilestoneDiffSerialization(t *testing.T) {
+func TestSlotDiffSerialization(t *testing.T) {
 	manager := ledgerstate.New(mapdb.NewMapDB(), tpkg.API)
 
 	outputs := ledgerstate.Outputs{
@@ -75,7 +75,7 @@ func TestMilestoneDiffSerialization(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, tpkg.RandTimestamp()),
 	}
 
-	require.NoError(t, manager.ApplyConfirmationWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
 
 	readDiff, err := manager.SlotDiffWithoutLocking(index)
 	require.NoError(t, err)

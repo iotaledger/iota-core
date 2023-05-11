@@ -209,7 +209,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 			return fmt.Errorf("invalid LS slot index. %d vs %d", slotDiff.Index, snapshotLedgerIndex-i)
 		}
 
-		if err := m.RollbackConfirmationWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
+		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
 			return err
 		}
 	}

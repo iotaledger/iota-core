@@ -38,12 +38,10 @@ type Node struct {
 	Endpoint *Endpoint
 	Workers  *workerpool.Group
 
-	optsProtocolOptions []options.Option[protocol.Protocol]
-
 	Protocol *protocol.Protocol
 }
 
-func NewNode(t *testing.T, net *Network, partition string, name string, weight int64, opts ...options.Option[protocol.Protocol]) *Node {
+func NewNode(t *testing.T, net *Network, partition string, name string, weight int64) *Node {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		panic(err)
@@ -65,16 +63,15 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 		AccountID:  accountID,
 		PeerID:     peerID,
 
-		Endpoint:            net.Join(peerID, partition),
-		Workers:             workerpool.NewGroup(name),
-		optsProtocolOptions: opts,
+		Endpoint: net.Join(peerID, partition),
+		Workers:  workerpool.NewGroup(name),
 	}
 }
 
 func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 	n.Protocol = protocol.New(n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
-		append(opts, n.optsProtocolOptions...)...,
+		opts...,
 	)
 
 	n.Protocol.Run()
@@ -146,6 +143,10 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
 	})
 
+	events.Clock.RatifiedAcceptedTimeUpdated.Hook(func(newTime time.Time) {
+		fmt.Printf("%s > [%s] Clock.RatifiedAcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
+	})
+
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
 		fmt.Printf("%s > [%s] Filter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
 	})
@@ -175,6 +176,10 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
 
+	events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockRatifiedAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+	})
+
 	events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
@@ -191,6 +196,13 @@ func (n *Node) Wait() {
 func (n *Node) Shutdown() {
 	n.Protocol.Shutdown()
 	n.Workers.Shutdown()
+}
+
+func (n *Node) CopyIdentityFromNode(otherNode *Node) {
+	n.AccountID = otherNode.AccountID
+	n.pubKey = otherNode.pubKey
+	n.privateKey = otherNode.privateKey
+	n.AccountID.RegisterAlias(n.Name)
 }
 
 // TODO: the block Issuance should be improved once the protocol has a better way to issue blocks.
@@ -228,15 +240,18 @@ func (n *Node) IssueBlock() iotago.BlockID {
 	return modelBlock.ID()
 }
 
-func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, parents ...iotago.BlockID) *model.Block {
+func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, parents ...iotago.BlockID) *blocks.Block {
 	slotTimeProvider := n.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
-	issuingTime := time.Unix(slotTimeProvider.GenesisUnixTime()+int64(slot-1)*slotTimeProvider.Duration(), 0)
-	require.True(n.Testing, issuingTime.Before(time.Now()), "issued block is in the current or future slot")
+	issuingTime := slotTimeProvider.StartTime(slot)
+	require.Truef(n.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", n.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
+
+	n.checkParentsCommitmentMonotonicity(slotCommitment, parents)
+	n.checkParentsTimeMonotonicity(issuingTime, parents)
 
 	block, err := builder.NewBlockBuilder().
 		StrongParents(parents).
 		IssuingTime(issuingTime).
-		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()).
+		SlotCommitment(slotCommitment).
 		LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
 		Payload(&iotago.TaggedData{
 			Tag: []byte("ACTIVITY"),
@@ -253,15 +268,49 @@ func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, parents ...
 		panic(err)
 	}
 
+	modelBlock.ID().RegisterAlias(alias)
+
 	err = n.Protocol.ProcessBlock(modelBlock, n.PeerID)
 	if err != nil {
 		panic(err)
 	}
 
-	modelBlock.ID().RegisterAlias(alias)
 	fmt.Printf("Issued block: %s - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
 
-	return modelBlock
+	return blocks.NewBlock(modelBlock)
+}
+
+// TODO: this should be part of the blockIssuer and the blockissuer being reused here:
+//  make it possible to issue blocks with a specific issuing time and slot commitment. maybe using options?
+
+func (n *Node) checkParentsTimeMonotonicity(issuingTime time.Time, parents iotago.BlockIDs) {
+	parentsMaxTime := time.Time{}
+	for _, parentBlockID := range parents {
+		if b, exists := n.Protocol.MainEngineInstance().BlockFromCache(parentBlockID); exists {
+			if b.IssuingTime().After(parentsMaxTime) {
+				parentsMaxTime = b.IssuingTime()
+			}
+		}
+	}
+
+	if parentsMaxTime.After(issuingTime) {
+		panic(fmt.Sprintf("cannot issue block if parent's time is not monotonic: %s vs %s", issuingTime, parentsMaxTime))
+	}
+}
+
+func (n *Node) checkParentsCommitmentMonotonicity(commitment *iotago.Commitment, parents iotago.BlockIDs) {
+	parentsMaxCommitmentIndex := iotago.SlotIndex(0)
+	for _, parentBlockID := range parents {
+		if b, exists := n.Protocol.MainEngineInstance().BlockFromCache(parentBlockID); exists {
+			if b.SlotCommitmentID().Index() > parentsMaxCommitmentIndex {
+				parentsMaxCommitmentIndex = b.SlotCommitmentID().Index()
+			}
+		}
+	}
+
+	if parentsMaxCommitmentIndex > commitment.Index {
+		panic(fmt.Sprintf("cannot issue block if parent's commitment is not monotonic: %d vs %d", commitment.Index, parentsMaxCommitmentIndex))
+	}
 }
 
 func (n *Node) IssueActivity(duration time.Duration, wg *sync.WaitGroup) {

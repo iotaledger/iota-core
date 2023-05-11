@@ -13,23 +13,23 @@ import (
 )
 
 type Commitments struct {
-	api      iotago.API
-	slice    *storable.ByteSlice
-	filePath string
+	apiProviderFunc func() iotago.API
+	slice           *storable.ByteSlice
+	filePath        string
 
 	module.Module
 }
 
-func NewCommitments(path string, api iotago.API) *Commitments {
-	commitmentsSlice, err := storable.NewByteSlice(path, uint64(len(model.NewEmptyCommitment(api).Data())))
+func NewCommitments(path string, apiProviderFunc func() iotago.API) *Commitments {
+	commitmentsSlice, err := storable.NewByteSlice(path, uint64(len(model.NewEmptyCommitment(apiProviderFunc()).Data())))
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create commitments file"))
 	}
 
 	return &Commitments{
-		api:      api,
-		slice:    commitmentsSlice,
-		filePath: path,
+		apiProviderFunc: apiProviderFunc,
+		slice:           commitmentsSlice,
+		filePath:        path,
 	}
 }
 
@@ -51,7 +51,7 @@ func (c *Commitments) Load(index iotago.SlotIndex) (commitment *model.Commitment
 		return nil, errors.Wrapf(err, "failed to get commitment for slot %d", index)
 	}
 
-	return model.CommitmentFromBytes(bytes, c.api)
+	return model.CommitmentFromBytes(bytes, c.apiProviderFunc())
 }
 
 func (c *Commitments) Close() (err error) {
@@ -95,7 +95,7 @@ func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
 			return errors.Wrapf(err, "failed to read commitment bytes for slot %d", slotIndex)
 		}
 
-		newCommitment, err := model.CommitmentFromBytes(commitmentBytes, c.api)
+		newCommitment, err := model.CommitmentFromBytes(commitmentBytes, c.apiProviderFunc())
 		if err != nil {
 			return errors.Wrapf(err, "failed to parse commitment of slot %d", slotIndex)
 		}

@@ -145,7 +145,7 @@ func (m *Manager) ReadLedgerIndex() (iotago.SlotIndex, error) {
 	return m.ReadLedgerIndexWithoutLocking()
 }
 
-func (m *Manager) ApplyConfirmationWithoutLocking(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
+func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
 	mutations, err := m.store.Batched()
 	if err != nil {
 		return err
@@ -204,14 +204,14 @@ func (m *Manager) ApplyConfirmationWithoutLocking(index iotago.SlotIndex, newOut
 	return nil
 }
 
-func (m *Manager) ApplyConfirmation(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
+func (m *Manager) ApplyDiff(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
-	return m.ApplyConfirmationWithoutLocking(index, newOutputs, newSpents)
+	return m.ApplyDiffWithoutLocking(index, newOutputs, newSpents)
 }
 
-func (m *Manager) RollbackConfirmationWithoutLocking(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
+func (m *Manager) RollbackDiffWithoutLocking(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
 	mutations, err := m.store.Batched()
 	if err != nil {
 		return err
@@ -272,11 +272,11 @@ func (m *Manager) RollbackConfirmationWithoutLocking(index iotago.SlotIndex, new
 	return nil
 }
 
-func (m *Manager) RollbackConfirmation(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
+func (m *Manager) RollbackDiff(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
-	return m.RollbackConfirmationWithoutLocking(index, newOutputs, newSpents)
+	return m.RollbackDiffWithoutLocking(index, newOutputs, newSpents)
 }
 
 func (m *Manager) CheckLedgerState(tokenSupply uint64) error {

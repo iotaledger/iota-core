@@ -32,7 +32,7 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, tpkg.RandTimestamp()),
 	}
 
-	require.NoError(t, manager.ApplyConfirmationWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
 
 	require.NotEqual(t, manager.StateTreeRoot(), iotago.Identifier{})
 	require.True(t, manager.CheckStateTree())
@@ -61,7 +61,7 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 	}))
 	require.Equal(t, 2, spentCount)
 
-	require.NoError(t, manager.RollbackConfirmationWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.RollbackDiffWithoutLocking(index, outputs, spents))
 
 	require.NoError(t, manager.ForEachOutput(func(_ *ledgerstate.Output) bool {
 		require.Fail(t, "should not be called")
@@ -99,7 +99,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 	previousSpents := ledgerstate.Spents{
 		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[1], previousMsIndex, previousMsTimestamp),
 	}
-	require.NoError(t, manager.ApplyConfirmationWithoutLocking(previousMsIndex, previousOutputs, previousSpents))
+	require.NoError(t, manager.ApplyDiffWithoutLocking(previousMsIndex, previousOutputs, previousSpents))
 
 	require.True(t, manager.CheckStateTree())
 
@@ -120,7 +120,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[2], index, tpkg.RandTimestamp()),
 		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, tpkg.RandTimestamp()),
 	}
-	require.NoError(t, manager.ApplyConfirmationWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
 
 	require.True(t, manager.CheckStateTree())
 
@@ -186,7 +186,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 	require.Empty(t, spentByOutputID)
 	require.Equal(t, 3, spentCount)
 
-	require.NoError(t, manager.RollbackConfirmationWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.RollbackDiffWithoutLocking(index, outputs, spents))
 
 	require.True(t, manager.CheckStateTree())
 
