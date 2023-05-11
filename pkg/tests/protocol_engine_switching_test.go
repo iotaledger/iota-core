@@ -1,15 +1,20 @@
 package tests
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -116,18 +121,52 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		fmt.Println("\n=========================\nMerged network partitions\n=========================")
 	}
 
-	// TODO: engine switching is currently not yet implemented
-	// wg := &sync.WaitGroup{}
-	//
-	// // Issue blocks after merging the networks
-	// {
-	// 	wg.Add(4)
-	//
-	// 	node1.IssueActivity(25*time.Second, wg)
-	// 	node2.IssueActivity(25*time.Second, wg)
-	// 	node3.IssueActivity(25*time.Second, wg)
-	// 	node4.IssueActivity(25*time.Second, wg)
-	// }
-	//
-	// wg.Wait()
+	wg := &sync.WaitGroup{}
+
+	detectFork := func(node *mock.Node, done func()) {
+		forkDetected := make(chan struct{}, 1)
+		node.Protocol.Events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
+			forkDetected <- struct{}{}
+		})
+
+		go func() {
+			require.Eventually(t, func() bool {
+				select {
+				case <-forkDetected:
+					done()
+					return true
+				default:
+					return false
+				}
+			}, 25*time.Second, 10*time.Millisecond)
+		}()
+	}
+	node1Ctx, node1Cancel := context.WithCancel(context.Background())
+	defer node1Cancel()
+
+	node2Ctx, node2Cancel := context.WithCancel(context.Background())
+	defer node2Cancel()
+
+	node3Ctx, node3Cancel := context.WithCancel(context.Background())
+	defer node3Cancel()
+
+	node4Ctx, node4Cancel := context.WithCancel(context.Background())
+	defer node4Cancel()
+
+	detectFork(node1, node1Cancel)
+	detectFork(node2, node2Cancel)
+	detectFork(node3, node3Cancel)
+	detectFork(node4, node4Cancel)
+
+	// Issue blocks after merging the networks
+	{
+		wg.Add(4)
+
+		node1.IssueActivity(node1Ctx, 25*time.Second, wg)
+		node2.IssueActivity(node2Ctx, 25*time.Second, wg)
+		node3.IssueActivity(node3Ctx, 25*time.Second, wg)
+		node4.IssueActivity(node4Ctx, 25*time.Second, wg)
+	}
+
+	wg.Wait()
 }

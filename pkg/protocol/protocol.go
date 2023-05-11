@@ -305,7 +305,7 @@ func (p *Protocol) API() iotago.API {
 }
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
-	panic(fmt.Sprintf("Fork detected: %s", fork))
+	fmt.Printf("================================================================\nFork detected: %s\n================================================================\n", fork)
 }
 
 func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
