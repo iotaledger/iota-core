@@ -339,14 +339,6 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) 
 		}
 	})
 
-	transaction.OnPending(func() {
-		if slotIndex := transaction.EarliestIncludedSlot(); slotIndex > 0 {
-			if stateDiff, exists := m.stateDiffs.Get(slotIndex); exists {
-				stateDiff.RollbackTransaction(transaction)
-			}
-		}
-	})
-
 	transaction.OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex) {
 		m.updateStateDiffs(transaction, prevIndex, newIndex)
 	})
