@@ -192,7 +192,7 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 		})
 
 		request.OnSuccess(func(input *StateMetadata) {
-			if transaction.publishInput(index, input) {
+			if transaction.publishInputAndCheckSolidity(index, input) {
 				m.executeTransaction(transaction)
 			}
 

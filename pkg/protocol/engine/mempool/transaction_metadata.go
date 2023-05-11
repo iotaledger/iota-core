@@ -14,10 +14,6 @@ type TransactionMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateMetadata]
 
-	AllInputsAccepted() bool
-
-	OnAllInputsAccepted(callback func())
-
 	Commit()
 
 	IsSolid() bool

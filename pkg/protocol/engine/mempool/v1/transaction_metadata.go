@@ -118,7 +118,7 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	return outputs
 }
 
-func (t *TransactionMetadata) publishInput(index int, input *StateMetadata) (allInputsSolid bool) {
+func (t *TransactionMetadata) publishInputAndCheckSolidity(index int, input *StateMetadata) (allInputsSolid bool) {
 	t.inputs[index] = input
 
 	input.setupSpender(t)
@@ -209,11 +209,12 @@ func (t *TransactionMetadata) OnConflictAccepted(callback func()) {
 	t.conflictAccepted.OnTrigger(callback)
 }
 
+// TODO: make private / review if we need method or can use underlying value
 func (t *TransactionMetadata) AllInputsAccepted() bool {
 	return t.allInputsAccepted.WasTriggered()
 }
 
-func (t *TransactionMetadata) OnAllInputsAccepted(callback func()) {
+func (t *TransactionMetadata) onAllInputsAccepted(callback func()) {
 	t.allInputsAccepted.OnTrigger(callback)
 }
 
