@@ -114,6 +114,13 @@ func (p *Protocol) Run() {
 	p.mainEngine.SetChainID(rootCommitment.ID())
 	p.chainManager.Initialize(rootCommitment)
 
+	// Fill the chain manager with all our known commitments so that the chain is solid
+	for i := rootCommitment.Index(); i <= p.mainEngine.Storage.Settings().LatestCommitment().Index(); i++ {
+		if cm, err := p.mainEngine.Storage.Commitments().Load(i); err == nil {
+			p.chainManager.ProcessCommitment(cm)
+		}
+	}
+
 	// p.linkTo(p.mainEngine) -> CC and TipManager
 	// TODO: why do we create a protocol only when running?
 	// TODO: fill up protocol params
@@ -169,15 +176,6 @@ func (p *Protocol) initNetworkEvents() {
 	}, event.WithWorkerPool(wpCommitments))
 
 	p.Events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
-		// Check if we have the requested commitment in our storage before asking our peers for it.
-		// This can happen after we restart the node because the chain manager builds up the chain again.
-		if cm, _ := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); cm != nil {
-			if cm.ID() == commitmentID {
-				p.chainManager.ProcessCommitment(cm)
-				return
-			}
-		}
-
 		p.networkProtocol.RequestCommitment(commitmentID)
 	}, event.WithWorkerPool(wpCommitments))
 }
