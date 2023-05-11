@@ -37,7 +37,7 @@ func New(baseDir *utils.Directory, dbConfig database.Config, opts ...options.Opt
 	return options.Apply(&Permanent{
 		settings: NewSettings(baseDir.Path("settings.bin")),
 	}, opts, func(p *Permanent) {
-		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.API())
+		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.API)
 		p.logger = logger.NewWrappedLogger(p.optsLogger)
 
 		var err error

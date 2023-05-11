@@ -44,7 +44,7 @@ type Protocol struct {
 	Events        *Events
 	TipManager    tipmanager.TipManager
 	engineManager *enginemanager.EngineManager
-	chainManager  *chainmanager.Manager
+	ChainManager  *chainmanager.Manager
 
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
@@ -52,9 +52,9 @@ type Protocol struct {
 
 	mainEngine *engine.Engine
 
-	optsBaseDirectory    string
-	optsSnapshotPath     string
-	optsPruningThreshold uint64
+	optsBaseDirectory string
+	optsSnapshotPath  string
+	optsPruningDelay  iotago.SlotIndex
 
 	optsEngineOptions       []options.Option[engine.Engine]
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
@@ -86,8 +86,8 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
 
-		optsBaseDirectory:    "",
-		optsPruningThreshold: 6 * 60, // 1 hour given that slot duration is 10 seconds
+		optsBaseDirectory: "",
+		optsPruningDelay:  360,
 	}, opts,
 		(*Protocol).initNetworkEvents,
 		(*Protocol).initEngineManager,
@@ -107,12 +107,19 @@ func (p *Protocol) Run() {
 
 	rootCommitment := p.mainEngine.EarliestRootCommitment()
 
-	// the rootCommitment is also the earliest point in the chain we can fork from. It is used to prevent
-	// solidifying and processing commitments that we won't be able to switch to.
-	if err := p.mainEngine.Storage.Settings().SetChainID(rootCommitment.ID()); err != nil {
-		panic(fmt.Sprintln("could not load set main engine's chain using", rootCommitment))
+	// The root commitment is the earliest commitment we will ever need to know to solidify commitment chains, we can
+	// then initialize the chain manager with it, and identify our engine to be on such chain.
+	// Upon engine restart, such chain will be loaded with the latest finalized slot, and the chain manager, not needing
+	// persistent storage, will be able to continue from there.
+	p.mainEngine.SetChainID(rootCommitment.ID())
+	p.ChainManager.Initialize(rootCommitment)
+
+	// Fill the chain manager with all our known commitments so that the chain is solid
+	for i := rootCommitment.Index(); i <= p.mainEngine.Storage.Settings().LatestCommitment().Index(); i++ {
+		if cm, err := p.mainEngine.Storage.Commitments().Load(i); err == nil {
+			p.ChainManager.ProcessCommitment(cm)
+		}
 	}
-	p.chainManager.Initialize(rootCommitment)
 
 	// p.linkTo(p.mainEngine) -> CC and TipManager
 	// TODO: why do we create a protocol only when running?
@@ -128,7 +135,7 @@ func (p *Protocol) Shutdown() {
 
 	p.Workers.Shutdown()
 	p.mainEngine.Shutdown()
-	p.chainManager.Shutdown()
+	p.ChainManager.Shutdown()
 	p.TipManager.Shutdown()
 }
 
@@ -165,19 +172,10 @@ func (p *Protocol) initNetworkEvents() {
 	}, event.WithWorkerPool(wpCommitments))
 
 	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source network.PeerID) {
-		p.chainManager.ProcessCommitmentFromSource(commitment, source)
+		p.ChainManager.ProcessCommitmentFromSource(commitment, source)
 	}, event.WithWorkerPool(wpCommitments))
 
 	p.Events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
-		// Check if we have the requested commitment in our storage before asking our peers for it.
-		// This can happen after we restart the node because the chain manager builds up the chain again.
-		if cm, _ := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); cm != nil {
-			if cm.ID() == commitmentID {
-				p.chainManager.ProcessCommitment(cm)
-				return
-			}
-		}
-
 		p.networkProtocol.RequestCommitment(commitmentID)
 	}, event.WithWorkerPool(wpCommitments))
 }
@@ -199,6 +197,14 @@ func (p *Protocol) initEngineManager() {
 		p.optsNotarizationProvider,
 	)
 
+	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		// TODO: fix pruning
+		if index < p.optsPruningDelay {
+			return
+		}
+		p.MainEngineInstance().Storage.PruneUntilSlot(index - p.optsPruningDelay)
+	}, event.WithWorkerPool(p.Workers.CreatePool("PruneEngine", 2)))
+
 	mainEngine, err := p.engineManager.LoadActiveEngine()
 	if err != nil {
 		panic(fmt.Sprintf("could not load active engine: %s", err))
@@ -207,13 +213,13 @@ func (p *Protocol) initEngineManager() {
 }
 
 func (p *Protocol) initChainManager() {
-	p.chainManager = chainmanager.NewManager(p.optsChainManagerOptions...)
-	p.Events.ChainManager.LinkTo(p.chainManager.Events)
+	p.ChainManager = chainmanager.NewManager(p.optsChainManagerOptions...)
+	p.Events.ChainManager.LinkTo(p.ChainManager.Events)
 
 	wp := p.Workers.CreatePool("ChainManager", 1) // Using just 1 worker to avoid contention
 
 	p.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		p.chainManager.ProcessCommitment(details.Commitment)
+		p.ChainManager.ProcessCommitment(details.Commitment)
 	}, event.WithWorkerPool(wp))
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
@@ -223,12 +229,12 @@ func (p *Protocol) initChainManager() {
 		// we first specify the chain's cut-off point, and only then evict the state. It is also important to
 		// note that no multiple goroutines should be allowed to perform this operation at once, hence the
 		// hooking worker pool should always have a single worker or these two calls should be protected by a lock.
-		p.chainManager.SetRootCommitment(rootCommitment)
+		p.ChainManager.SetRootCommitment(rootCommitment)
 
 		// We want to evict just below the height of our new root commitment (so that the slot of the root commitment
 		// stays in memory storage and with it the root commitment itself as well).
 		if rootCommitment.ID().Index() > 0 {
-			p.chainManager.EvictUntil(rootCommitment.ID().Index() - 1)
+			p.ChainManager.EvictUntil(rootCommitment.ID().Index() - 1)
 		}
 	}, event.WithWorkerPool(wp))
 
@@ -246,7 +252,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 		return errors.Errorf("protocol engine not yet initialized")
 	}
 
-	isSolid, chain := p.chainManager.ProcessCommitmentFromSource(block.SlotCommitment(), src)
+	isSolid, chain := p.ChainManager.ProcessCommitmentFromSource(block.SlotCommitment(), src)
 	if !isSolid {
 		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().ID() {
 			return nil
@@ -257,7 +263,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 
 	processed := false
 
-	if mainChain := mainEngine.Storage.Settings().ChainID(); chain.ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
+	if mainChain := mainEngine.ChainID(); chain.ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
 		mainEngine.ProcessBlockFromPeer(block, src)
 		processed = true
 	}
@@ -303,9 +309,9 @@ func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 	}
 }
 
-func WithPruningThreshold(pruningThreshold uint64) options.Option[Protocol] {
+func WithPruningDelay(pruningDelay iotago.SlotIndex) options.Option[Protocol] {
 	return func(n *Protocol) {
-		n.optsPruningThreshold = pruningThreshold
+		n.optsPruningDelay = pruningDelay
 	}
 }
 
