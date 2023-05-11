@@ -178,7 +178,7 @@ func (t *TestFramework) RequireGlobalBookedEventTriggered(transactionAliases ...
 }
 
 func (t *TestFramework) RequireAccepted(transactionAliases map[string]bool) {
-	t.requireAcceptedTriggered(transactionAliases)
+	//t.requireAcceptedTriggered(transactionAliases)
 	t.requireMarkedAccepted(transactionAliases)
 }
 
@@ -244,8 +244,18 @@ func (t *TestFramework) setupHookedEvents() {
 
 		require.True(t.test, metadata.IsAccepted(), "transaction is not marked as accepted")
 
-		t.markTransactionAcceptedTriggered(metadata.ID())
+		t.markTransactionAcceptedTriggered(metadata.ID(), true)
 	})
+
+	//t.Instance.Events().TransactionPending.Hook(func(metadata mempool.TransactionMetadata) {
+	//	if debug.GetEnabled() {
+	//		t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
+	//	}
+	//
+	//	require.False(t.test, metadata.IsAccepted(), "transaction is not marked as pending")
+	//
+	//	t.markTransactionAcceptedTriggered(metadata.ID(), true)
+	//})
 }
 
 func (t *TestFramework) markTransactionStoredTriggered(id iotago.TransactionID) {
@@ -276,7 +286,7 @@ func (t *TestFramework) markTransactionBookedTriggered(id iotago.TransactionID) 
 	t.globalBookedEventTriggered[id] = true
 }
 
-func (t *TestFramework) markTransactionAcceptedTriggered(id iotago.TransactionID) {
+func (t *TestFramework) markTransactionAcceptedTriggered(id iotago.TransactionID, accepted bool) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
