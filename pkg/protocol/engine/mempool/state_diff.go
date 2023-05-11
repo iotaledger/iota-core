@@ -7,19 +7,20 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// StateDiff is a collection of changes that happened in a certain slot and that can be applied to the ledger state.
 type StateDiff interface {
-	// Index returns a SlotIndex for which the StateDiff is constructed.
+	// Index returns the slot index of the state diff.
 	Index() iotago.SlotIndex
 
-	// SpentOutputs returns a collection of compacted spent outputs.
-	SpentOutputs() *shrinkingmap.ShrinkingMap[iotago.OutputID, StateWithMetadata]
+	// DestroyedStates returns a compacted list of all the states that were destroyed in the slot.
+	DestroyedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, StateMetadata]
 
-	// CreatedOutputs returns a collection of compacted created outputs.
-	CreatedOutputs() *shrinkingmap.ShrinkingMap[iotago.OutputID, StateWithMetadata]
+	// CreatedStates returns a compacted list of all the states that were created in the slot.
+	CreatedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, StateMetadata]
 
-	// ExecutedTransactions returns an ordered map of included transactions (from which we can retrieve un-compacted
-	// spent and created states).
-	ExecutedTransactions() *orderedmap.OrderedMap[iotago.TransactionID, TransactionWithMetadata]
+	// ExecutedTransactions returns an un-compacted list of all the transactions that were executed in the slot.
+	ExecutedTransactions() *orderedmap.OrderedMap[iotago.TransactionID, TransactionMetadata]
 
+	// Mutations returns an authenticated data structure that allows to commit to the applied mutations.
 	Mutations() *ads.Set[iotago.TransactionID, *iotago.TransactionID]
 }

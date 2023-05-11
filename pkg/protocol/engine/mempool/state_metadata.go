@@ -5,12 +5,26 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type StateWithMetadata interface {
+type StateMetadata interface {
 	ID() iotago.OutputID
 
 	State() ledger.State
 
 	IsSpent() bool
 
-	IsAccepted() bool
+	OnDoubleSpent(callback func())
+
+	OnSpendAccepted(callback func(spender TransactionMetadata))
+
+	OnSpendCommitted(callback func(spender TransactionMetadata))
+
+	AllSpendersRemoved() bool
+
+	OnAllSpendersRemoved(callback func()) (unsubscribe func())
+
+	SpenderCount() uint64
+
+	HasNoSpenders() bool
+
+	inclusionFlags
 }

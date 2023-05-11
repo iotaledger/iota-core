@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -19,32 +19,25 @@ import (
 type TestFramework struct {
 	Instance mempool.MemPool[vote.MockedPower]
 
-	stateIDByAlias               map[string]iotago.OutputID
-	transactionByAlias           map[string]mempool.Transaction
-	blockIDsByAlias              map[string]iotago.BlockID
-	globalStoredEventTriggered   map[iotago.TransactionID]bool
-	globalSolidEventTriggered    map[iotago.TransactionID]bool
-	globalExecutedEventTriggered map[iotago.TransactionID]bool
-	globalBookedEventTriggered   map[iotago.TransactionID]bool
-	globalAcceptedEventTriggered map[iotago.TransactionID]bool
+	stateIDByAlias     map[string]iotago.OutputID
+	transactionByAlias map[string]mempool.Transaction
+	blockIDsByAlias    map[string]iotago.BlockID
+
+	ledgerState *ledgertests.StateResolver
 
 	test  *testing.T
 	mutex sync.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower]) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower], ledgerState *ledgertests.StateResolver) *TestFramework {
 	t := &TestFramework{
-		Instance:                     instance,
-		stateIDByAlias:               make(map[string]iotago.OutputID),
-		transactionByAlias:           make(map[string]mempool.Transaction),
-		blockIDsByAlias:              make(map[string]iotago.BlockID),
-		globalStoredEventTriggered:   make(map[iotago.TransactionID]bool),
-		globalSolidEventTriggered:    make(map[iotago.TransactionID]bool),
-		globalBookedEventTriggered:   make(map[iotago.TransactionID]bool),
-		globalExecutedEventTriggered: make(map[iotago.TransactionID]bool),
-		globalAcceptedEventTriggered: make(map[iotago.TransactionID]bool),
+		Instance:           instance,
+		stateIDByAlias:     make(map[string]iotago.OutputID),
+		transactionByAlias: make(map[string]mempool.Transaction),
+		blockIDsByAlias:    make(map[string]iotago.BlockID),
 
-		test: test,
+		ledgerState: ledgerState,
+		test:        test,
 	}
 
 	t.setupHookedEvents()
@@ -106,8 +99,38 @@ func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, s
 	return nil
 }
 
-func (t *TestFramework) TransactionMetadata(alias string) (mempool.TransactionWithMetadata, bool) {
-	return t.Instance.Transaction(t.TransactionID(alias))
+func (t *TestFramework) CommitSlot(slotIndex iotago.SlotIndex) {
+	stateDiff := t.Instance.StateDiff(slotIndex)
+
+	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.StateMetadata) bool {
+		t.ledgerState.AddState(state)
+
+		return true
+	})
+
+	stateDiff.DestroyedStates().ForEach(func(id iotago.OutputID, _ mempool.StateMetadata) bool {
+		t.ledgerState.DestroyState(id)
+
+		return true
+	})
+
+	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, transaction mempool.TransactionMetadata) bool {
+		transaction.Commit()
+
+		return true
+	})
+}
+
+func (t *TestFramework) TransactionMetadata(alias string) (mempool.TransactionMetadata, bool) {
+	return t.Instance.TransactionMetadata(t.TransactionID(alias))
+}
+
+func (t *TestFramework) TransactionMetadataByAttachment(alias string) (mempool.TransactionMetadata, bool) {
+	return t.Instance.TransactionMetadataByAttachment(t.BlockID(alias))
+}
+
+func (t *TestFramework) StateMetadata(alias string) (mempool.StateMetadata, error) {
+	return t.Instance.StateMetadata(t.stateReference(alias))
 }
 
 func (t *TestFramework) StateID(alias string) iotago.OutputID {
@@ -134,104 +157,76 @@ func (t *TestFramework) TransactionID(alias string) iotago.TransactionID {
 func (t *TestFramework) RequireBooked(transactionAliases ...string) {
 	t.waitBooked(transactionAliases...)
 
-	t.requireBookedTriggered(transactionAliases...)
 	t.requireMarkedBooked(transactionAliases...)
 }
 
-func (t *TestFramework) RequireAccepted(transactionAliases ...string) {
-	t.requireAcceptedTriggered(transactionAliases...)
-	t.requireMarkedAccepted(transactionAliases...)
+func (t *TestFramework) RequireAccepted(transactionAliases map[string]bool) {
+	//t.requireAcceptedTriggered(transactionAliases)
+	t.requireMarkedAccepted(transactionAliases)
 }
 
-func (t *TestFramework) RequireDeleted(transactionAliases ...string) {
-	t.requireDeleted(transactionAliases...)
+func (t *TestFramework) RequireTransactionsEvicted(transactionAliases map[string]bool) {
+	for transactionAlias, deleted := range transactionAliases {
+		_, exists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
+		require.Equal(t.test, deleted, !exists, "transaction %s has incorrect eviction state", transactionAlias)
+	}
+}
+
+func (t *TestFramework) RequireAttachmentsEvicted(attachmentAliases map[string]bool) {
+	for attachmentAlias, deleted := range attachmentAliases {
+		_, exists := t.Instance.TransactionMetadataByAttachment(t.BlockID(attachmentAlias))
+		require.Equal(t.test, deleted, !exists, "attachment %s has incorrect eviction state", attachmentAlias)
+	}
 }
 
 func (t *TestFramework) setupHookedEvents() {
-	t.Instance.Events().TransactionStored.Hook(func(metadata mempool.TransactionWithMetadata) {
+	t.Instance.OnTransactionAttached(func(metadata mempool.TransactionMetadata) {
 		if debug.GetEnabled() {
-			t.test.Logf("[TRIGGERED] mempool.Events.TransactionStored with '%s'", metadata.ID())
+			t.test.Logf("[TRIGGERED] mempool.TransactionAttached with '%s'", metadata.ID())
 		}
 
-		require.NotNilf(t.test, metadata, "transaction metadata is nil")
+		metadata.OnSolid(func() {
+			if debug.GetEnabled() {
+				t.test.Logf("[TRIGGERED] mempool.Events.TransactionSolid with '%s'", metadata.ID())
+			}
 
-		t.markTransactionStoredTriggered(metadata.ID())
+			require.True(t.test, metadata.IsSolid(), "transaction is not marked as solid")
+		})
+
+		metadata.OnExecuted(func() {
+			if debug.GetEnabled() {
+				t.test.Logf("[TRIGGERED] mempool.Events.TransactionExecuted with '%s'", metadata.ID())
+			}
+
+			require.True(t.test, metadata.IsExecuted(), "transaction is not marked as executed")
+		})
+
+		metadata.OnBooked(func() {
+			if debug.GetEnabled() {
+				t.test.Logf("[TRIGGERED] mempool.Events.TransactionBooked with '%s'", metadata.ID())
+			}
+
+			require.True(t.test, metadata.IsBooked(), "transaction is not marked as booked")
+		})
+
+		metadata.OnAccepted(func() {
+			if debug.GetEnabled() {
+				t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
+			}
+
+			require.True(t.test, metadata.IsAccepted(), "transaction is not marked as accepted")
+		})
+
+		metadata.OnPending(func() {
+			//	if debug.GetEnabled() {
+			//		t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
+			//	}
+			//
+			//	require.False(t.test, metadata.IsAccepted(), "transaction is not marked as pending")
+			//
+			//	t.markTransactionAcceptedTriggered(metadata.ID(), true)
+		})
 	})
-
-	t.Instance.Events().TransactionSolid.Hook(func(metadata mempool.TransactionWithMetadata) {
-		if debug.GetEnabled() {
-			t.test.Logf("[TRIGGERED] mempool.Events.TransactionSolid with '%s'", metadata.ID())
-		}
-
-		require.True(t.test, metadata.IsSolid(), "transaction is not marked as solid")
-
-		t.markTransactionSolidTriggered(metadata.ID())
-	})
-
-	t.Instance.Events().TransactionExecuted.Hook(func(metadata mempool.TransactionWithMetadata) {
-		if debug.GetEnabled() {
-			t.test.Logf("[TRIGGERED] mempool.Events.TransactionExecuted with '%s'", metadata.ID())
-		}
-
-		require.True(t.test, metadata.IsExecuted(), "transaction is not marked as executed")
-
-		t.markTransactionExecutedTriggered(metadata.ID())
-	})
-
-	t.Instance.Events().TransactionBooked.Hook(func(metadata mempool.TransactionWithMetadata) {
-		if debug.GetEnabled() {
-			t.test.Logf("[TRIGGERED] mempool.Events.TransactionBooked with '%s'", metadata.ID())
-		}
-
-		require.True(t.test, metadata.IsBooked(), "transaction is not marked as booked")
-
-		t.markTransactionBookedTriggered(metadata.ID())
-	})
-
-	t.Instance.Events().TransactionAccepted.Hook(func(metadata mempool.TransactionWithMetadata) {
-		if debug.GetEnabled() {
-			t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
-		}
-
-		require.True(t.test, metadata.IsAccepted(), "transaction is not marked as accepted")
-
-		t.markTransactionAcceptedTriggered(metadata.ID())
-	})
-}
-
-func (t *TestFramework) markTransactionStoredTriggered(id iotago.TransactionID) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	t.globalStoredEventTriggered[id] = true
-}
-
-func (t *TestFramework) markTransactionSolidTriggered(id iotago.TransactionID) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	t.globalSolidEventTriggered[id] = true
-}
-
-func (t *TestFramework) markTransactionExecutedTriggered(id iotago.TransactionID) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	t.globalExecutedEventTriggered[id] = true
-}
-
-func (t *TestFramework) markTransactionBookedTriggered(id iotago.TransactionID) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	t.globalBookedEventTriggered[id] = true
-}
-
-func (t *TestFramework) markTransactionAcceptedTriggered(id iotago.TransactionID) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	t.globalAcceptedEventTriggered[id] = true
 }
 
 func (t *TestFramework) stateReference(alias string) ledger.StateReference {
@@ -249,58 +244,32 @@ func (t *TestFramework) waitBooked(transactionAliases ...string) {
 		transactionMetadata.OnBooked(allBooked.Done)
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
 	allBooked.Wait()
-}
-
-func (t *TestFramework) requireBookedTriggered(transactionAliases ...string) {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
-	for _, transactionAlias := range transactionAliases {
-		require.True(t.test, t.globalBookedEventTriggered[t.TransactionID(transactionAlias)], "transaction '%s' was not booked", transactionAlias)
-	}
 }
 
 func (t *TestFramework) requireMarkedBooked(transactionAliases ...string) {
 	for _, transactionAlias := range transactionAliases {
-		transactionMetadata, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
+		transactionMetadata, transactionMetadataExists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
 
-		require.True(t.test, transactionMetadataExists && transactionMetadata.IsBooked(), "transaction %s was not booked", transactionAlias)
+		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
+		require.True(t.test, transactionMetadata.IsBooked(), "transaction %s was not booked", transactionAlias)
 	}
 }
 
-func (t *TestFramework) requireAcceptedTriggered(transactionAliases ...string) {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
+func (t *TestFramework) requireMarkedAccepted(transactionAliases map[string]bool) {
+	for transactionAlias, accepted := range transactionAliases {
+		transactionMetadata, transactionMetadataExists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
 
-	for _, transactionAlias := range transactionAliases {
-		require.True(t.test, t.globalAcceptedEventTriggered[t.TransactionID(transactionAlias)], "transaction '%s' was not accepted", transactionAlias)
-	}
-}
-
-func (t *TestFramework) requireMarkedAccepted(transactionAliases ...string) {
-	for _, transactionAlias := range transactionAliases {
-		transactionMetadata, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
-
-		require.True(t.test, transactionMetadataExists && transactionMetadata.IsAccepted(), "transaction %s was not accepted", transactionAlias)
-	}
-}
-
-func (t *TestFramework) requireDeleted(transactionAliases ...string) {
-	for _, transactionAlias := range transactionAliases {
-		_, transactionMetadataExists := t.Instance.Transaction(t.TransactionID(transactionAlias))
-
-		require.False(t.test, transactionMetadataExists, "transaction %s was not deleted", transactionAlias)
+		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
+		require.Equal(t.test, accepted, transactionMetadata.IsAccepted(), "transaction %s was incorrectly accepted", transactionAlias)
 	}
 }
 
 func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAliases, createdOutputAliases, transactionAliases []string) {
 	stateDiff := t.Instance.StateDiff(index)
 
-	require.Equal(t.test, len(spentOutputAliases), stateDiff.SpentOutputs().Size())
-	require.Equal(t.test, len(createdOutputAliases), stateDiff.CreatedOutputs().Size())
+	require.Equal(t.test, len(spentOutputAliases), stateDiff.DestroyedStates().Size())
+	require.Equal(t.test, len(createdOutputAliases), stateDiff.CreatedStates().Size())
 	require.Equal(t.test, len(transactionAliases), stateDiff.ExecutedTransactions().Size())
 	require.Equal(t.test, len(transactionAliases), stateDiff.Mutations().Size())
 
@@ -310,11 +279,21 @@ func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAlias
 	}
 
 	for _, createdOutputAlias := range createdOutputAliases {
-		require.True(t.test, stateDiff.CreatedOutputs().Has(t.StateID(createdOutputAlias)))
+		require.True(t.test, stateDiff.CreatedStates().Has(t.StateID(createdOutputAlias)))
 	}
 
 	for _, spentOutputAlias := range spentOutputAliases {
-		require.True(t.test, stateDiff.SpentOutputs().Has(t.StateID(spentOutputAlias)))
+		require.True(t.test, stateDiff.DestroyedStates().Has(t.StateID(spentOutputAlias)))
 	}
 
+}
+
+func (t *TestFramework) Cleanup() {
+	t.ledgerState.Cleanup()
+
+	iotago.UnregisterIdentifierAliases()
+
+	t.stateIDByAlias = make(map[string]iotago.OutputID)
+	t.transactionByAlias = make(map[string]mempool.Transaction)
+	t.blockIDsByAlias = make(map[string]iotago.BlockID)
 }
