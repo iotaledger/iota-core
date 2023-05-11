@@ -110,7 +110,7 @@ func (p *Protocol) Run() {
 	// The root commitment is the earliest commitment we will ever need to know to solidify commitment chains, we can
 	// then initialize the chain manager with it, and identify our engine to be on such chain.
 	// Upon engine restart, such chain will be loaded with the latest finalized slot, and the chain manager, not needing
-	// persistant storage, will be able to continue from there.
+	// persistent storage, will be able to continue from there.
 	p.mainEngine.SetChainID(rootCommitment.ID())
 	p.ChainManager.Initialize(rootCommitment)
 
