@@ -16,6 +16,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	mockedconflictdag "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/mocked"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -24,6 +26,7 @@ import (
 type Ledger struct {
 	ledgerState  *ledgerstate.Manager
 	memPool      mempool.MemPool[vote.MockedPower]
+	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
 	errorHandler func(error)
 
 	module.Module
@@ -42,10 +45,11 @@ func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 func New(workers *workerpool.Group, store kvstore.KVStore, apiProviderFunc func() iotago.API, errorHandler func(error)) *Ledger {
 	l := &Ledger{
 		ledgerState:  ledgerstate.New(store, apiProviderFunc),
+		conflictDAG:  mockedconflictdag.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](),
 		errorHandler: errorHandler,
 	}
 
-	l.memPool = mempoolv1.New[vote.MockedPower](l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"))
+	l.memPool = mempoolv1.New[vote.MockedPower](l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG)
 
 	return l
 }
@@ -81,12 +85,12 @@ func (l *Ledger) resolveState(stateRef ledger.StateReference) *promise.Promise[l
 }
 
 func (l *Ledger) Output(id iotago.OutputID) (*ledgerstate.Output, error) {
-	stateWithMetadata, err := l.memPool.State(ledger.StoredStateReference(id))
+	stateWithMetadata, err := l.memPool.StateMetadata(ledger.StoredStateReference(id))
 	if err != nil {
 		return l.ledgerState.ReadOutputByOutputID(id)
 	}
 
-	txWithMetadata, exists := l.memPool.Transaction(id.TransactionID())
+	txWithMetadata, exists := l.memPool.TransactionMetadata(id.TransactionID())
 	if !exists {
 		return l.ledgerState.ReadOutputByOutputID(id)
 	}
@@ -113,7 +117,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	var outputs ledgerstate.Outputs
 	var spents ledgerstate.Spents
 
-	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionWithMetadata) bool {
+	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx := txWithMeta.Transaction().(*Transaction)
 		txCreationTime := tx.Transaction.Essence.CreationTime
 
@@ -135,7 +139,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			spents = append(spents, spent)
 		}
 
-		if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateWithMetadata) error {
+		if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateMetadata) error {
 			state := element.State().(*State)
 			output := ledgerstate.CreateOutput(l.ledgerState.API(), state.outputID, txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, state.output)
 			outputs = append(outputs, output)
@@ -158,8 +162,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	}
 
 	// Mark the transactions as committed so the mempool can evict it.
-	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, tx mempool.TransactionWithMetadata) bool {
-		tx.SetCommitted()
+	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, tx mempool.TransactionMetadata) bool {
+		tx.Commit()
 		return true
 	})
 

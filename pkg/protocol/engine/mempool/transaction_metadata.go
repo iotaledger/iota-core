@@ -10,8 +10,6 @@ type TransactionMetadata interface {
 
 	Transaction() Transaction
 
-	EarliestIncludedAttachment() iotago.BlockID
-
 	Inputs() *advancedset.AdvancedSet[StateMetadata]
 
 	Outputs() *advancedset.AdvancedSet[StateMetadata]
@@ -42,9 +40,9 @@ type TransactionMetadata interface {
 
 	OnConflicting(func())
 
-	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID)) (unsubscribe func())
+	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID))
 
-	EarliestIncludedSlot() iotago.SlotIndex
+	EarliestIncludedAttachment() iotago.BlockID
 
 	inclusionFlags
 }

@@ -37,9 +37,9 @@ type TransactionMetadata struct {
 	conflictAccepted      *promise.Event
 
 	// attachments
-	attachments           *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
-	earliestIncludedSlot  *promise.Value[iotago.SlotIndex]
-	allAttachmentsEvicted *promise.Event
+	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
+	earliestIncludedAttachment *promise.Value[iotago.BlockID]
+	allAttachmentsEvicted      *promise.Event
 
 	// mutex needed?
 	mutex sync.RWMutex
@@ -78,9 +78,9 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		conflicting:           promise.NewEvent(),
 		conflictAccepted:      promise.NewEvent(),
 
-		attachments:           shrinkingmap.New[iotago.BlockID, bool](),
-		earliestIncludedSlot:  promise.NewValue[iotago.SlotIndex](),
-		allAttachmentsEvicted: promise.NewEvent(),
+		attachments:                shrinkingmap.New[iotago.BlockID, bool](),
+		earliestIncludedAttachment: promise.NewValue[iotago.BlockID](),
+		allAttachmentsEvicted:      promise.NewEvent(),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(), nil
@@ -210,7 +210,7 @@ func (t *TransactionMetadata) OnConflictAccepted(callback func()) {
 }
 
 func (t *TransactionMetadata) IsIncluded() bool {
-	return t.earliestIncludedSlot.Get() != 0
+	return t.earliestIncludedAttachment.Get().Index() != 0
 }
 
 func (t *TransactionMetadata) AllInputsAccepted() bool {
@@ -267,8 +267,8 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		}
 	})
 
-	t.OnEarliestIncludedSlotUpdated(func(previousIndex, newIndex iotago.SlotIndex) {
-		if isIncluded, wasIncluded := newIndex != 0, previousIndex != 0; isIncluded != wasIncluded {
+	t.OnEarliestIncludedAttachmentUpdated(func(previousIndex, newIndex iotago.BlockID) {
+		if isIncluded, wasIncluded := newIndex.Index() != 0, previousIndex.Index() != 0; isIncluded != wasIncluded {
 			if !isIncluded {
 				t.setPending()
 			} else if t.AllInputsAccepted() && t.IsConflictAccepted() {
@@ -293,8 +293,8 @@ func (t *TransactionMetadata) MarkIncluded(blockID iotago.BlockID) (included boo
 
 	t.attachments.Set(blockID, true)
 
-	if lowestSlotIndex := t.earliestIncludedSlot.Get(); lowestSlotIndex == 0 || blockID.Index() < lowestSlotIndex {
-		t.earliestIncludedSlot.Set(blockID.Index())
+	if lowestSlotIndex := t.earliestIncludedAttachment.Get().Index(); lowestSlotIndex == 0 || blockID.Index() < lowestSlotIndex {
+		t.earliestIncludedAttachment.Set(blockID)
 	}
 
 	return true
@@ -311,19 +311,19 @@ func (t *TransactionMetadata) MarkOrphaned(blockID iotago.BlockID) (orphaned boo
 
 	t.evictAttachment(blockID)
 
-	if previousState && blockID.Index() == t.earliestIncludedSlot.Get() {
-		t.earliestIncludedSlot.Set(t.findLowestIncludedSlotIndex())
+	if previousState && blockID.Index() == t.earliestIncludedAttachment.Get().Index() {
+		t.earliestIncludedAttachment.Set(t.findLowestIncludedAttachment())
 	}
 
 	return true
 }
 
-func (t *TransactionMetadata) EarliestIncludedSlot() iotago.SlotIndex {
-	return t.earliestIncludedSlot.Get()
+func (t *TransactionMetadata) EarliestIncludedAttachment() iotago.BlockID {
+	return t.earliestIncludedAttachment.Get()
 }
 
-func (t *TransactionMetadata) OnEarliestIncludedSlotUpdated(callback func(prevIndex, newIndex iotago.SlotIndex)) {
-	t.earliestIncludedSlot.OnUpdate(callback)
+func (t *TransactionMetadata) OnEarliestIncludedAttachmentUpdated(callback func(prevBlock, newBlock iotago.BlockID)) {
+	t.earliestIncludedAttachment.OnUpdate(callback)
 }
 
 func (t *TransactionMetadata) OnAllAttachmentsEvicted(callback func()) {
@@ -343,16 +343,16 @@ func (t *TransactionMetadata) evictAttachment(id iotago.BlockID) {
 	}
 }
 
-func (t *TransactionMetadata) findLowestIncludedSlotIndex() iotago.SlotIndex {
-	var lowestIncludedSlotIndex iotago.SlotIndex
+func (t *TransactionMetadata) findLowestIncludedAttachment() iotago.BlockID {
+	var lowestIncludedBlock iotago.BlockID
 
 	t.attachments.ForEach(func(blockID iotago.BlockID, included bool) bool {
-		if included && (lowestIncludedSlotIndex == 0 || blockID.Index() < lowestIncludedSlotIndex) {
-			lowestIncludedSlotIndex = blockID.Index()
+		if included && (lowestIncludedBlock.Index() == 0 || blockID.Index() < lowestIncludedBlock.Index()) {
+			lowestIncludedBlock = blockID
 		}
 
 		return true
 	})
 
-	return lowestIncludedSlotIndex
+	return lowestIncludedBlock
 }

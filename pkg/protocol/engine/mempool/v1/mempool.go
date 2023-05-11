@@ -332,13 +332,13 @@ func (m *MemPool[VotePower]) setup() (self *MemPool[VotePower]) {
 
 func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
-		if slotIndex := transaction.EarliestIncludedSlot(); slotIndex > 0 {
-			lo.Return1(m.stateDiffs.GetOrCreate(slotIndex, func() *StateDiff { return NewStateDiff(slotIndex) })).AddTransaction(transaction)
+		if blockID := transaction.EarliestIncludedAttachment(); blockID.Index() > 0 {
+			lo.Return1(m.stateDiffs.GetOrCreate(blockID.Index(), func() *StateDiff { return NewStateDiff(blockID.Index()) })).AddTransaction(transaction)
 		}
 	})
 
-	transaction.OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex) {
-		m.updateStateDiffs(transaction, prevIndex, newIndex)
+	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
+		m.updateStateDiffs(transaction, prevBlock.Index(), newBlock.Index())
 	})
 
 	transaction.OnCommitted(func() {
