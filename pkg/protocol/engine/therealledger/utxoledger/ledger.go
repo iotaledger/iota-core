@@ -128,7 +128,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 		if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateWithMetadata) error {
 			state := element.State().(*State)
-			output := ledgerstate.CreateOutput(l.ledgerState.API(), state.outputID, iotago.EmptyBlockID(), index, txCreationTime, state.output)
+			output := ledgerstate.CreateOutput(l.ledgerState.API(), state.outputID, txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, state.output)
 			outputs = append(outputs, output)
 			return nil
 		}); createOutputErr != nil {
@@ -153,7 +153,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		tx.SetCommitted()
 		return true
 	})
-	
+
 	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), nil
 }
 
