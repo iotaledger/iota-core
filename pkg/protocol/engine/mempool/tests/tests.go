@@ -226,6 +226,7 @@ func TestSetNotAllAttachmentsOrphanedFutureCone(t *testing.T, tf *TestFramework)
 	tf.CreateTransaction("tx5", []string{"tx4:0"}, 1)
 
 	require.NoError(t, tf.AttachTransaction("tx5", "block5", 1))
+	require.NoError(t, tf.AttachTransaction("tx4", "block4.3", 1))
 	require.NoError(t, tf.AttachTransaction("tx4", "block4.2", 1))
 	require.NoError(t, tf.AttachTransaction("tx4", "block4.1", 1))
 	require.NoError(t, tf.AttachTransaction("tx3", "block3", 1))

@@ -305,6 +305,8 @@ func (m *MemPool[VotePower]) transactionByAttachment(blockID iotago.BlockID) (*T
 }
 
 func (m *MemPool[VotePower]) updateStateDiffs(transaction *TransactionMetadata, prevIndex iotago.SlotIndex, newIndex iotago.SlotIndex) {
+	// TODO: CHECK AGAINST last evicted slot
+
 	if prevIndex == newIndex {
 		return
 	}
@@ -334,6 +336,14 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) 
 	transaction.OnAccepted(func() {
 		if slotIndex := transaction.EarliestIncludedSlot(); slotIndex > 0 {
 			lo.Return1(m.stateDiffs.GetOrCreate(slotIndex, func() *StateDiff { return NewStateDiff(slotIndex) })).AddTransaction(transaction)
+		}
+	})
+
+	transaction.OnPending(func() {
+		if slotIndex := transaction.EarliestIncludedSlot(); slotIndex > 0 {
+			if stateDiff, exists := m.stateDiffs.Get(slotIndex); exists {
+				stateDiff.RollbackTransaction(transaction)
+			}
 		}
 	})
 

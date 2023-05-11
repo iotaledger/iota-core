@@ -70,6 +70,10 @@ func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) {
 	if _, exists := s.executedTransactions.Set(transaction.ID(), transaction); !exists {
 		s.mutations.Add(transaction.ID())
 		s.updateCompactedStateChanges(transaction, 1)
+
+		if transaction.IsPending() {
+			s.RollbackTransaction(transaction)
+		}
 	}
 }
 

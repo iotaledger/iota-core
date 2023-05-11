@@ -32,7 +32,7 @@ type TransactionMetadata struct {
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
-	allInputsAccepted     *promise.Event
+	allInputsAccepted     *promise.Value[bool]
 	conflicting           *promise.Event
 	conflictAccepted      *promise.Event
 
@@ -74,7 +74,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		invalid:            promise.NewEvent1[error](),
 
 		unacceptedInputsCount: uint64(len(inputReferences)),
-		allInputsAccepted:     promise.NewEvent(),
+		allInputsAccepted:     promise.NewValue[bool](),
 		conflicting:           promise.NewEvent(),
 		conflictAccepted:      promise.NewEvent(),
 
@@ -211,11 +211,23 @@ func (t *TransactionMetadata) OnConflictAccepted(callback func()) {
 
 // TODO: make private / review if we need method or can use underlying value
 func (t *TransactionMetadata) AllInputsAccepted() bool {
-	return t.allInputsAccepted.WasTriggered()
+	return t.allInputsAccepted.Get()
 }
 
 func (t *TransactionMetadata) onAllInputsAccepted(callback func()) {
-	t.allInputsAccepted.OnTrigger(callback)
+	t.allInputsAccepted.OnUpdate(func(_, allInputsAreAccepted bool) {
+		if allInputsAreAccepted {
+			callback()
+		}
+	})
+}
+
+func (t *TransactionMetadata) onNotAllInputsAccepted(callback func()) {
+	t.allInputsAccepted.OnUpdate(func(allInputsWereAccepted, allInputsAreAccepted bool) {
+		if !allInputsAreAccepted && allInputsWereAccepted {
+			callback()
+		}
+	})
 }
 
 func (t *TransactionMetadata) setConflicting() {
@@ -236,7 +248,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
-			if t.allInputsAccepted.Trigger() {
+			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
 				if t.IsConflictAccepted() && t.EarliestIncludedSlot() != 0 {
 					t.setAccepted()
 				}
@@ -244,8 +256,13 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 		}
 	})
 
+	input.OnPending(func() {
+		if atomic.AddUint64(&t.unacceptedInputsCount, 1) == 1 && t.allInputsAccepted.Set(false) {
+			t.setPending()
+		}
+	})
+
 	input.OnAcceptedSpenderUpdated(func(spender mempool.TransactionMetadata) {
-		// TODO: REORG REJECTED STUFF?
 		if spender != t {
 			t.setRejected()
 		}

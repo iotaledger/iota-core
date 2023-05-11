@@ -127,6 +127,10 @@ func (s *StateMetadata) setupSpender(spender *TransactionMetadata) {
 		s.spendAccepted.Set(spender)
 	})
 
+	spender.OnPending(func() {
+		s.spendAccepted.Set(nil)
+	})
+
 	spender.OnCommitted(func() {
 		s.spendCommitted.Set(spender)
 
