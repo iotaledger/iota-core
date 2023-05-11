@@ -244,11 +244,11 @@ func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
 		})
 	})
 
-	transaction.setBooked()
+	if transaction.setBooked() {
+		m.events.TransactionBooked.Trigger(transaction)
 
-	m.events.TransactionBooked.Trigger(transaction)
-
-	m.publishOutputs(transaction)
+		m.publishOutputs(transaction)
+	}
 }
 
 func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionMetadata) {

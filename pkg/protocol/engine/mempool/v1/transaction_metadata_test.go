@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	mempooltests "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -14,7 +15,8 @@ func TestAttachments(t *testing.T) {
 		"2": iotago.SlotIdentifierRepresentingData(2, []byte("block2")),
 	}
 
-	attachments := NewAttachments()
+	attachments, err := NewTransactionWithMetadata(mempooltests.NewTransaction(2))
+	require.NoError(t, err)
 	require.True(t, attachments.Add(blockIDs["1"]))
 	require.True(t, attachments.Add(blockIDs["2"]))
 
