@@ -19,15 +19,16 @@ import (
 
 func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 	for testName, testCase := range map[string]func(*testing.T, *TestFramework){
-		"TestProcessTransaction":                TestProcessTransaction,
-		"TestProcessTransactionsOutOfOrder":     TestProcessTransactionsOutOfOrder,
-		"TestSetInclusionSlot":                  TestSetInclusionSlot,
-		"TestSetTransactionOrphanage":           TestSetTransactionOrphanage,
-		"TestSetAllAttachmentsOrphaned":         TestSetAllAttachmentsOrphaned,
-		"TestSetNotAllAttachmentsOrphaned":      TestSetNotAllAttachmentsOrphaned,
-		"TestSetTxOrphanageMultipleAttachments": TestSetTxOrphanageMultipleAttachments,
-		"TestStateDiff":                         TestStateDiff,
-		"TestMemoryRelease":                     TestMemoryRelease,
+		"TestProcessTransaction":                     TestProcessTransaction,
+		"TestProcessTransactionsOutOfOrder":          TestProcessTransactionsOutOfOrder,
+		"TestSetInclusionSlot":                       TestSetInclusionSlot,
+		"TestSetTransactionOrphanage":                TestSetTransactionOrphanage,
+		"TestSetAllAttachmentsOrphaned":              TestSetAllAttachmentsOrphaned,
+		"TestSetNotAllAttachmentsOrphaned":           TestSetNotAllAttachmentsOrphaned,
+		"TestSetTxOrphanageMultipleAttachments":      TestSetTxOrphanageMultipleAttachments,
+		"TestSetNotAllAttachmentsOrphanedFutureCone": TestSetNotAllAttachmentsOrphanedFutureCone,
+		"TestStateDiff":                              TestStateDiff,
+		"TestMemoryRelease":                          TestMemoryRelease,
 	} {
 		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
 	}
@@ -215,6 +216,69 @@ func TestSetAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
 }
 
+func TestSetNotAllAttachmentsOrphanedFutureCone(t *testing.T, tf *TestFramework) {
+	debug.SetEnabled(true)
+	defer debug.SetEnabled(false)
+	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateTransaction("tx3", []string{"tx2:0"}, 1)
+	tf.CreateTransaction("tx4", []string{"tx3:0"}, 1)
+	tf.CreateTransaction("tx5", []string{"tx4:0"}, 1)
+
+	require.NoError(t, tf.AttachTransaction("tx5", "block5", 1))
+	require.NoError(t, tf.AttachTransaction("tx4", "block4.2", 1))
+	require.NoError(t, tf.AttachTransaction("tx4", "block4.1", 1))
+	require.NoError(t, tf.AttachTransaction("tx3", "block3", 1))
+	require.NoError(t, tf.AttachTransaction("tx2", "block2", 1))
+
+	require.NoError(t, tf.AttachTransaction("tx1", "block1.2", 1))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1.1", 1))
+
+	tf.RequireBooked("tx1", "tx2", "tx3", "tx4", "tx5")
+
+	require.True(t, tf.MarkAttachmentIncluded("block5"))
+	require.True(t, tf.MarkAttachmentIncluded("block3"))
+	require.True(t, tf.MarkAttachmentIncluded("block2"))
+
+	acceptanceState := map[string]bool{"tx1": false, "tx2": false, "tx3": false, "tx4": false, "tx5": false}
+	tf.RequireAccepted(acceptanceState)
+
+	require.True(t, tf.MarkAttachmentIncluded("block1.1"))
+
+	tf.RequireAccepted(lo.MergeMaps(acceptanceState, map[string]bool{"tx1": true, "tx2": true, "tx3": true}))
+	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx3:0"}, []string{"tx1", "tx2", "tx3"})
+
+	require.True(t, tf.MarkAttachmentIncluded("block4.1"))
+
+	tf.RequireAccepted(lo.MergeMaps(acceptanceState, map[string]bool{"tx4": true, "tx5": true}))
+	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx5:0"}, []string{"tx1", "tx2", "tx3", "tx4", "tx5"})
+
+	require.True(t, tf.MarkAttachmentOrphaned("block4.1"))
+
+	tf.RequireAccepted(lo.MergeMaps(acceptanceState, map[string]bool{"tx4": false, "tx5": false}))
+	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx3:0"}, []string{"tx1", "tx2", "tx3"})
+
+	require.True(t, tf.MarkAttachmentOrphaned("block1.1"))
+
+	tf.RequireAccepted(lo.MergeMaps(acceptanceState, map[string]bool{"tx1": false, "tx2": false, "tx3": false}))
+	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
+
+	require.True(t, tf.MarkAttachmentIncluded("block1.2"))
+
+	tf.RequireAccepted(lo.MergeMaps(acceptanceState, map[string]bool{"tx1": true, "tx2": true, "tx3": true}))
+	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx3:0"}, []string{"tx1", "tx2", "tx3"})
+
+	require.True(t, tf.MarkAttachmentIncluded("block4.2"))
+
+	tf.RequireAccepted(lo.MergeMaps(acceptanceState, map[string]bool{"tx4": true, "tx5": true}))
+	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx5:0"}, []string{"tx1", "tx2", "tx3", "tx4", "tx5"})
+
+	require.True(t, tf.MarkAttachmentOrphaned("block4.2"))
+
+	tf.RequireAccepted(lo.MergeMaps(acceptanceState, map[string]bool{"tx4": false, "tx5": false}))
+	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx3:0"}, []string{"tx1", "tx2", "tx3"})
+}
+
 func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
@@ -274,7 +338,6 @@ func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedSlot())
 	tf.AssertStateDiff(4, []string{}, []string{}, []string{})
 	tf.AssertStateDiff(5, []string{}, []string{}, []string{})
-
 }
 
 func TestSetTransactionOrphanage(t *testing.T, tf *TestFramework) {
