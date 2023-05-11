@@ -286,20 +286,22 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 		return fmt.Errorf("unable to seek to LS counter placeholders: %w", err)
 	}
 
+	var countersSize int64
+
 	// Outputs Count
 	// The amount of UTXOs contained within this snapshot.
-	if err := writeValueFunc(writer, "outputs count", outputCount); err != nil {
+	if err := writeValueFunc(writer, "outputs count", outputCount, &countersSize); err != nil {
 		return err
 	}
 
 	// Slot Diffs Count
 	// The amount of slot diffs contained within this snapshot.
-	if err := writeValueFunc(writer, "slot diffs count", slotDiffCount); err != nil {
+	if err := writeValueFunc(writer, "slot diffs count", slotDiffCount, &countersSize); err != nil {
 		return err
 	}
 
 	// seek back to the last write position
-	if _, err := writer.Seek(relativeCountersPosition, io.SeekCurrent); err != nil {
+	if _, err := writer.Seek(relativeCountersPosition-countersSize, io.SeekCurrent); err != nil {
 		return fmt.Errorf("unable to seek to LS last written position: %w", err)
 	}
 
