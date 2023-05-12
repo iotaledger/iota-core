@@ -74,15 +74,15 @@ const (
 	// GET returns the output IDs of all UTXO changes.
 	RouteCommitmentByIDUTXOChanges = "/commitments/:" + restapipkg.ParameterCommitmentID + "/utxo-changes"
 
-	// RouteSlotByIndex is the route for getting a commitment by its SlotIndex.
+	// RouteCommitmentByIndex is the route for getting a commitment by its SlotIndex.
 	// GET returns the commitment.
 	// MIMEApplicationJSON => json.
 	// MIMEVendorIOTASerializer => bytes.
-	RouteSlotByIndex = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex
+	RouteCommitmentByIndex = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex
 
-	// RouteSlotByIndexUTXOChanges is the route for getting all UTXO changes of a commitment by its SlotIndex.
+	// RouteCommitmentByIndexUTXOChanges is the route for getting all UTXO changes of a commitment by its SlotIndex.
 	// GET returns the output IDs of all UTXO changes.
-	RouteSlotByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
+	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
 	// RouteAccountsByAcciuntID is the route for getting an account by its accountID.
 	// GET returns the account details.
@@ -243,7 +243,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteSlotByIndex, func(c echo.Context) error {
+	routeGroup.GET(RouteCommitmentByIndex, func(c echo.Context) error {
 		indexUint64, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
@@ -257,7 +257,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteSlotByIndexUTXOChanges, func(c echo.Context) error {
+	routeGroup.GET(RouteCommitmentByIndexUTXOChanges, func(c echo.Context) error {
 		index, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
