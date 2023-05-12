@@ -149,7 +149,7 @@ func configure() error {
 	// Check for features
 	if restapi.ParamsRestAPI.PoW.Enabled {
 		AddFeature("pow")
-		// todo: add pow supports to block issuer
+		// TODO: add pow supports to block issuer
 	}
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
@@ -171,6 +171,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
+		// TODO: fill in blockReason, TxState, TxReason.
 		resp, err := blockMetadataResponseByID(c)
 		if err != nil {
 			return err
@@ -180,6 +181,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.POST(RouteBlocks, func(c echo.Context) error {
+		// TODO: implement sendBlock.
 		resp, err := sendBlock(c)
 		if err != nil {
 			return err
@@ -264,6 +266,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteOutputMetadata, func(c echo.Context) error {
+		// TODO: add CommitmentIDSpent, TransactionIDSpent, IncludedCommitmentID
 		resp, err := getOutputMetadata(c)
 		if err != nil {
 			return err
@@ -301,7 +304,6 @@ func AddFeature(feature string) {
 func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// todo update with sync status
 			if !deps.Protocol.SyncManager.IsNodeSynced() {
 				return errors.WithMessage(echo.ErrServiceUnavailable, "node is not synced")
 			}
