@@ -28,11 +28,16 @@ func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
 	}
 	outputID := output.OutputID()
 	slotCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	spent, err := deps.Protocol.MainEngineInstance().Ledger.IsOutputSpent(outputID)
+	if err != nil {
+		return nil, err
+	}
 
 	return &outputMetadataResponse{
 		BlockID:            output.BlockID().ToHex(),
 		TransactionID:      outputID.TransactionID().ToHex(),
 		OutputIndex:        outputID.Index(),
+		IsSpent:            spent,
 		LatestCommitmentID: slotCommitment.ID().ToHex(),
 	}, nil
 }
