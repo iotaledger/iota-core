@@ -264,6 +264,76 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, &slotUTXOResponse{})
 	}, checkNodeSynced())
 
+	routeGroup.GET(RouteOutput, func(c echo.Context) error {
+		mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
+		if err != nil && err != httpserver.ErrNotAcceptable {
+			return err
+		}
+
+		output, err := getOutput(c)
+		if err != nil {
+			return err
+		}
+
+		// default to echo.MIMEApplicationJSON
+		switch mimeType {
+		case httpserver.MIMEApplicationVendorIOTASerializerV1:
+			return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, output.Bytes())
+
+		default:
+			j, err := deps.Protocol.API().JSONEncode(output.Output())
+			if err != nil {
+				return err
+			}
+
+			return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, j)
+		}
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteOutputMetadata, func(c echo.Context) error {
+		resp, err := getOutputMetadata(c)
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteTransactionsIncludedBlock, func(c echo.Context) error {
+		mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
+		if err != nil && err != httpserver.ErrNotAcceptable {
+			return err
+		}
+
+		block, err := blockByTransactionID(c)
+		if err != nil {
+			return err
+		}
+
+		// default to echo.MIMEApplicationJSON
+		switch mimeType {
+		case httpserver.MIMEApplicationVendorIOTASerializerV1:
+			return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, block.Data())
+
+		default:
+			j, err := deps.Protocol.API().JSONEncode(block.Block())
+			if err != nil {
+				return err
+			}
+
+			return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, j)
+		}
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteTransactionsIncludedBlockMetadata, func(c echo.Context) error {
+		resp, err := blockMetadataFromTransactionID(c)
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
 	return nil
 }
 
