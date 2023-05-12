@@ -1,19 +1,20 @@
 package inmemorybooker
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -27,7 +28,8 @@ type Booker struct {
 
 	workers *workerpool.Group
 
-	blockCache *blocks.Blocks
+	blockCache  *blocks.Blocks
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
 
 	module.Module
 }
@@ -102,20 +104,35 @@ func (b *Booker) isPayloadSolid(_ *blocks.Block) (isPayloadSolid bool, err error
 }
 
 func (b *Booker) book(block *blocks.Block) error {
+	if err := b.trackWitnessWeight(block); err != nil {
+		return errors.Wrapf(err, "failed to track witness weight for block %s", block.ID())
+	}
+
+	conflictsToInherit, err := b.inheritConflicts(block)
+	if err != nil {
+		return errors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
+	}
+	block.SetConflictIDs(conflictsToInherit)
+
+	votePower := booker.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
+	if err := b.conflictDAG.CastVotes(vote.NewVote[booker.BlockVotePower](block.Block().IssuerID, votePower), conflictsToInherit); err != nil {
+		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
+		//  Do we track witness weight of invalid blocks?
+		return errors.Wrapf(err, "failed to cast votes for conflicts of block %s", block.ID())
+	}
+
 	block.SetBooked()
 	b.events.BlockBooked.Trigger(block)
-
-	b.trackWitnessWeight(block)
 
 	return nil
 }
 
-func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
+func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) error {
 	witness := votingBlock.Block().IssuerID
 
 	// Only track witness weight for issuers that are part of the committee.
 	if !b.sybilProtection.Committee().Has(witness) {
-		return
+		return nil
 	}
 
 	// Add the witness to the voting block itself as each block carries a vote for itself.
@@ -129,7 +146,7 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
 		blockID := walk.Next()
 		block, exists := b.blockCache.Block(blockID)
 		if !exists {
-			panic(fmt.Sprintf("parent %s does not exist", blockID))
+			return errors.Errorf("parent %s does not exist", blockID)
 		}
 
 		if block.IsRootBlock() {
@@ -165,12 +182,47 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) {
 		//  is reached for these lowest rank blocks and accordingly propagates acceptance to their children.
 		b.events.WitnessAdded.Trigger(block)
 	}
+
+	return nil
 }
 
 func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	if block.SetInvalid() {
 		b.events.BlockInvalid.Trigger(block, errors.Wrap(err, "block marked as invalid in Booker"))
 	}
+}
+
+func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset.AdvancedSet[iotago.TransactionID], err error) {
+	conflictIDsToInherit := advancedset.New[iotago.TransactionID]()
+
+	for _, parent := range block.ModelBlock().ParentsWithType() {
+		parentBlock, exists := b.blockCache.Block(parent.ID)
+		if !exists {
+			return nil, errors.Errorf("parent %s does not exist", parent.ID)
+		}
+
+		switch parent.Type {
+		case model.StrongParentType:
+			conflictIDsToInherit.AddAll(parentBlock.ConflictIDs())
+		case model.WeakParentType:
+			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
+		case model.ShallowLikeParentType:
+			// TODO: check whether it contains a TX, otherwise shallow like reference is invalid?
+
+			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
+			//  remove all conflicting conflicts from conflictIDsToInherit
+			for _, conflictID := range parentBlock.PayloadConflictIDs().Slice() {
+				if conflictingConflicts, exists := b.conflictDAG.ConflictingConflicts(conflictID); exists {
+					conflictIDsToInherit.DeleteAll(conflictingConflicts)
+				}
+			}
+		}
+	}
+
+	conflictIDsToInherit.AddAll(block.PayloadConflictIDs())
+
+	// Only inherit conflicts that are not yet accepted (aka merge to master).
+	return b.conflictDAG.UnacceptedConflicts(conflictIDsToInherit), nil
 }
 
 // isReferenceValid checks if the reference between the child and its parent is valid.

@@ -40,6 +40,9 @@ type Ledger struct {
 func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) therealledger.Ledger {
 		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.Events.Error.Trigger)
+		// TODO: do we always book a block even if its transaction is not solid?
+		//  This is problematic because we need the information of the transaction to actually book the block in the Tangle.
+		//  Also: we need to forward propagate once a TX is booked in case there were pending TX (and thus blocks) that were waiting for this TX to be booked.
 		e.Events.Booker.BlockBooked.Hook(l.attachTransaction)
 		e.Events.BlockGadget.BlockAccepted.Hook(l.blockAccepted)
 

@@ -25,8 +25,10 @@ type Block struct {
 	shallowLikeChildren []*Block
 
 	// Booker block
-	booked    bool
-	witnesses *advancedset.AdvancedSet[iotago.AccountID]
+	booked             bool
+	witnesses          *advancedset.AdvancedSet[iotago.AccountID]
+	conflictIDs        *advancedset.AdvancedSet[iotago.TransactionID]
+	payloadConflictIDs *advancedset.AdvancedSet[iotago.TransactionID]
 
 	// BlockGadget block
 	accepted         bool
@@ -58,9 +60,11 @@ func (r *rootBlock) String() string {
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
 	return &Block{
-		witnesses:  advancedset.New[iotago.AccountID](),
-		ratifiers:  advancedset.New[iotago.AccountID](),
-		modelBlock: data,
+		witnesses:          advancedset.New[iotago.AccountID](),
+		conflictIDs:        advancedset.New[iotago.TransactionID](),
+		payloadConflictIDs: advancedset.New[iotago.TransactionID](),
+		ratifiers:          advancedset.New[iotago.AccountID](),
+		modelBlock:         data,
 	}
 }
 
@@ -331,6 +335,22 @@ func (b *Block) Witnesses() []iotago.AccountID {
 	defer b.mutex.RUnlock()
 
 	return b.witnesses.Slice()
+}
+
+func (b *Block) ConflictIDs() *advancedset.AdvancedSet[iotago.TransactionID] {
+	return b.conflictIDs
+}
+
+func (b *Block) SetConflictIDs(conflictIDs *advancedset.AdvancedSet[iotago.TransactionID]) {
+	b.conflictIDs = conflictIDs
+}
+
+func (b *Block) PayloadConflictIDs() *advancedset.AdvancedSet[iotago.TransactionID] {
+	return b.payloadConflictIDs
+}
+
+func (b *Block) SetPayloadConflictIDs(payloadConflictIDs *advancedset.AdvancedSet[iotago.TransactionID]) {
+	b.payloadConflictIDs = payloadConflictIDs
 }
 
 // IsAccepted returns true if the Block was accepted.

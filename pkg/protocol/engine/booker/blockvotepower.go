@@ -12,8 +12,8 @@ type BlockVotePower struct {
 	time    time.Time
 }
 
-func NewBlockVotePower(id iotago.BlockID, time time.Time) *BlockVotePower {
-	return &BlockVotePower{
+func NewBlockVotePower(id iotago.BlockID, time time.Time) BlockVotePower {
+	return BlockVotePower{
 		blockID: id,
 		time:    time,
 	}
@@ -26,5 +26,19 @@ func (v BlockVotePower) Compare(other BlockVotePower) int {
 		return 1
 	} else {
 		return bytes.Compare(v.blockID[:], other.blockID[:])
+	}
+}
+
+func (v BlockVotePower) Increase() BlockVotePower {
+	return BlockVotePower{
+		blockID: v.blockID,
+		time:    v.time.Add(time.Nanosecond),
+	}
+}
+
+func (v BlockVotePower) Decrease() BlockVotePower {
+	return BlockVotePower{
+		blockID: v.blockID,
+		time:    v.time.Add(-time.Nanosecond),
 	}
 }

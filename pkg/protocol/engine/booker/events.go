@@ -9,6 +9,7 @@ type Events struct {
 	BlockBooked  *event.Event1[*blocks.Block]
 	WitnessAdded *event.Event1[*blocks.Block]
 	BlockInvalid *event.Event2[*blocks.Block, error]
+	// TODO: hook this up in engine
 
 	Error *event.Event1[error]
 
