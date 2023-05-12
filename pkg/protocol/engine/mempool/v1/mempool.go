@@ -218,6 +218,10 @@ func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata
 }
 
 func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
+	transaction.Inputs().Range(func(inputState mempool.StateMetadata) {
+		inputState.ConflictIDs()
+	})
+
 	lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 		input.OnDoubleSpent(func() {
 			m.forkTransaction(transaction, input)

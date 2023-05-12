@@ -14,6 +14,8 @@ type TransactionMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateMetadata]
 
+	ConflictIDs() *advancedset.AdvancedSet[iotago.TransactionID]
+
 	Commit()
 
 	IsSolid() bool

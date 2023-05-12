@@ -3,6 +3,7 @@ package mempoolv1
 import (
 	"sync/atomic"
 
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -11,8 +12,9 @@ import (
 )
 
 type StateMetadata struct {
-	id    iotago.OutputID
-	state ledger.State
+	id          iotago.OutputID
+	state       ledger.State
+	conflictIDs *advancedset.AdvancedSet[iotago.TransactionID]
 
 	// lifecycle
 	spenderCount       uint64
@@ -58,6 +60,10 @@ func (s *StateMetadata) ID() iotago.OutputID {
 
 func (s *StateMetadata) State() ledger.State {
 	return s.state
+}
+
+func (s *StateMetadata) ConflictIDs() *advancedset.AdvancedSet[iotago.TransactionID] {
+	return s.conflictIDs
 }
 
 func (s *StateMetadata) IsDoubleSpent() bool {

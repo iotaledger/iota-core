@@ -118,6 +118,10 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	return outputs
 }
 
+func (t *TransactionMetadata) ConflictIDs() *advancedset.AdvancedSet[iotago.TransactionID] {
+	return t.conflictIDs
+}
+
 func (t *TransactionMetadata) publishInputAndCheckSolidity(index int, input *StateMetadata) (allInputsSolid bool) {
 	t.inputs[index] = input
 

@@ -1,7 +1,6 @@
 package mockedconflictdag
 
 import (
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
@@ -71,7 +70,7 @@ func (c ConflictDAG[ConflictID, ResourceID, VotePower]) UnacceptedConflicts(conf
 	panic("implement me")
 }
 
-func (c ConflictDAG[ConflictID, ResourceID, VotePower]) AllConflictsSupported(issuerID identity.ID, conflictIDs *advancedset.AdvancedSet[ConflictID]) bool {
+func (c ConflictDAG[ConflictID, ResourceID, VotePower]) AllConflictsSupported(issuerID iotago.AccountID, conflictIDs *advancedset.AdvancedSet[ConflictID]) bool {
 	//TODO implement me
 	panic("implement me")
 }
@@ -106,7 +105,7 @@ func (c ConflictDAG[ConflictID, ResourceID, VotePower]) ConflictChildren(conflic
 	panic("implement me")
 }
 
-func (c ConflictDAG[ConflictID, ResourceID, VotePower]) ConflictVoters(conflictID ConflictID) (voters map[identity.ID]int64) {
+func (c ConflictDAG[ConflictID, ResourceID, VotePower]) ConflictVoters(conflictID ConflictID) (voters map[iotago.AccountID]int64) {
 	//TODO implement me
 	panic("implement me")
 }
