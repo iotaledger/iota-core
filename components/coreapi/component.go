@@ -162,29 +162,12 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteBlock, func(c echo.Context) error {
-		mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
-		if err != nil && err != httpserver.ErrNotAcceptable {
-			return err
-		}
-
 		block, err := blockByID(c)
 		if err != nil {
 			return err
 		}
 
-		// default to echo.MIMEApplicationJSON
-		switch mimeType {
-		case httpserver.MIMEApplicationVendorIOTASerializerV1:
-			return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, block.Data())
-
-		default:
-			j, err := deps.Protocol.API().JSONEncode(block.Block())
-			if err != nil {
-				return err
-			}
-
-			return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, j)
-		}
+		return responseByHeader(c, block.Block())
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
@@ -272,29 +255,12 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteOutput, func(c echo.Context) error {
-		mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
-		if err != nil && err != httpserver.ErrNotAcceptable {
-			return err
-		}
-
 		output, err := getOutput(c)
 		if err != nil {
 			return err
 		}
 
-		// default to echo.MIMEApplicationJSON
-		switch mimeType {
-		case httpserver.MIMEApplicationVendorIOTASerializerV1:
-			return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, output.Bytes())
-
-		default:
-			j, err := deps.Protocol.API().JSONEncode(output.Output())
-			if err != nil {
-				return err
-			}
-
-			return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, j)
-		}
+		return responseByHeader(c, output.Output())
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteOutputMetadata, func(c echo.Context) error {
@@ -307,29 +273,12 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteTransactionsIncludedBlock, func(c echo.Context) error {
-		mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
-		if err != nil && err != httpserver.ErrNotAcceptable {
-			return err
-		}
-
 		block, err := blockByTransactionID(c)
 		if err != nil {
 			return err
 		}
 
-		// default to echo.MIMEApplicationJSON
-		switch mimeType {
-		case httpserver.MIMEApplicationVendorIOTASerializerV1:
-			return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, block.Data())
-
-		default:
-			j, err := deps.Protocol.API().JSONEncode(block.Block())
-			if err != nil {
-				return err
-			}
-
-			return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, j)
-		}
+		return responseByHeader(c, block.Block())
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteTransactionsIncludedBlockMetadata, func(c echo.Context) error {
@@ -372,5 +321,30 @@ func checkUpcomingUnsupportedProtocolVersion() echo.MiddlewareFunc {
 
 			return next(c)
 		}
+	}
+}
+
+func responseByHeader(c echo.Context, obj any) error {
+	mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
+	if err != nil && err != httpserver.ErrNotAcceptable {
+		return err
+	}
+
+	// default to echo.MIMEApplicationJSON
+	switch mimeType {
+	case httpserver.MIMEApplicationVendorIOTASerializerV1:
+		b, err := deps.Protocol.API().Encode(obj)
+		if err != nil {
+			return err
+		}
+		return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, b)
+
+	default:
+		j, err := deps.Protocol.API().JSONEncode(obj)
+		if err != nil {
+			return err
+		}
+
+		return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, j)
 	}
 }
