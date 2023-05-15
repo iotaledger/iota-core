@@ -25,9 +25,7 @@ dist/
 .DS_Store
 
 # Data directories
-/data
-/peerdb
-/db
+/testnet
 
 # snapshot and settings file
 *.bin

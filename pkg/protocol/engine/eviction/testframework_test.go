@@ -85,10 +85,9 @@ func (t *TestFramework) RequireActiveRootBlocks(expected ...string) {
 	require.Equalf(t.Testing, expectedRootBlocks, gotActiveRootBlocks, "active root blocks do not match, expected: %v, got: %v", expectedRootBlocks, gotActiveRootBlocks)
 }
 
-func (t *TestFramework) RequireLastEvictedSlot(expectedSlot iotago.SlotIndex, expectedValid bool) {
-	slot, valid := t.Instance.LastEvictedSlot()
+func (t *TestFramework) RequireLastEvictedSlot(expectedSlot iotago.SlotIndex) {
+	slot := t.Instance.LastEvictedSlot()
 	require.Equal(t.Testing, expectedSlot, slot)
-	require.Equal(t.Testing, expectedValid, valid)
 }
 
 func (t *TestFramework) RequireStorageRootBlocks(expected ...string) {

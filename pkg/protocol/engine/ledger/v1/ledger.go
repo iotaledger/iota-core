@@ -33,7 +33,7 @@ func (m *Ledger) ResolveState(id iotago.OutputID) *promise.Promise[ledger.State]
 	return p
 }
 
-func (m *Ledger) loadOutput(id iotago.OutputID) (ledger.State, bool) {
+func (m *Ledger) loadOutput(_ iotago.OutputID) (ledger.State, bool) {
 	// TODO
 	return nil, false
 }

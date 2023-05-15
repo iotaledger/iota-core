@@ -28,7 +28,7 @@
     "seed": "",
     "overwriteStoredSeed": false,
     "externalAddress": "auto",
-    "peerDBDirectory": "peerdb"
+    "peerDBDirectory": "testnet/peerdb"
   },
   "profiling": {
     "enabled": false,
@@ -61,18 +61,15 @@
     }
   },
   "database": {
-    "directory": "db",
-    "inMemory": false,
+    "engine": "rocksdb",
+    "path": "testnet/database",
     "maxOpenDBs": 10,
     "pruningThreshold": 360,
-    "dbGranularity": 1,
-    "settings": {
-      "fileName": "settings.bin"
-    }
+    "dbGranularity": 1
   },
   "protocol": {
     "snapshot": {
-      "path": "./snapshot.bin",
+      "path": "testnet/snapshot.bin",
       "depth": 5
     },
     "notarization": {

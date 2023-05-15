@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -17,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -32,6 +34,8 @@ type Manager struct {
 	attestations  *Attestations
 
 	workers *workerpool.Group
+
+	ledger therealledger.Ledger
 
 	storage         *storage.Storage
 	commitmentMutex sync.RWMutex
@@ -70,24 +74,28 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 					m.storage = e.Storage
 					m.acceptedTimeFunc = e.Clock.Accepted().Time
 
+					m.ledger = e.Ledger
+
 					wpBlocks := m.workers.CreatePool("Blocks", 1)           // Using just 1 worker to avoid contention
 					wpCommitments := m.workers.CreatePool("Commitments", 1) // Using just 1 worker to avoid contention
 
-					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-						if err := m.notarizeAcceptedBlock(block); err != nil {
+					e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+						if err := m.notarizeRatifiedAcceptedBlock(block); err != nil {
 							e.Events.Error.Trigger(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 						}
 					}, event.WithWorkerPool(wpBlocks))
 
-					// Slots are committed whenever ATT advances, start committing only when bootstrapped.
-					e.Events.Clock.AcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
+					// Slots are committed whenever RatifiedATT advances, start committing only when bootstrapped.
+					e.Events.Clock.RatifiedAcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
 
-					m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index())
-
-					m.events.AcceptedBlockRemoved.LinkTo(m.slotMutations.AcceptedBlockRemoved)
 					e.Events.Notarization.LinkTo(m.events)
+					m.events.Error.Hook(e.Events.Error.Trigger)
 
 					m.TriggerInitialized()
+				})
+
+				e.Storage.Settings().HookInitialized(func() {
+					m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index())
 				})
 			},
 			(*Manager).TriggerConstructed)
@@ -121,12 +129,12 @@ func (m *Manager) IsBootstrapped() bool {
 	return m.storage.Settings().LatestCommitment().Index() >= m.slotTimeProviderFunc().IndexFromTime(m.acceptedTimeFunc())-m.optsMinCommittableSlotAge-1
 }
 
-func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
-	if err = m.slotMutations.AddAcceptedBlock(block); err != nil {
+func (m *Manager) notarizeRatifiedAcceptedBlock(block *blocks.Block) (err error) {
+	if err = m.slotMutations.AddRatifiedAcceptedBlock(block); err != nil {
 		return errors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
-	if _, err = m.attestations.Add(iotago.NewAttestation(block.Block(), m.slotTimeProviderFunc())); err != nil {
+	if _, err = m.attestations.Add(iotago.NewAttestation(block.Block())); err != nil {
 		return errors.Wrap(err, "failed to add block to attestations")
 	}
 
@@ -194,15 +202,35 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	acceptedBlocks, err := m.slotMutations.Evict(index)
-	if err != nil {
-		m.events.Error.Trigger(errors.Wrap(err, "failed to commit mutations"))
-		return false
+	// set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
+	ratifiedAcceptedBlocks := m.slotMutations.RatifiedAcceptedBlocks(index, true)
+
+	var err error
+	var attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation]
+	var attestationsWeight int64
+
+	if m.attestations.LastCommittedSlot() == index {
+		attestations, err = m.attestations.Get(index)
+		if err != nil {
+			m.events.Error.Trigger(errors.Wrap(err, "failed to get committed attestations"))
+			return false
+		}
+		attestationsWeight, err = m.attestations.Weight(index)
+		if err != nil {
+			m.events.Error.Trigger(errors.Wrap(err, "failed to get committed attestations weight"))
+			return false
+		}
+	} else {
+		attestations, attestationsWeight, err = m.attestations.Commit(index)
+		if err != nil {
+			m.events.Error.Trigger(errors.Wrap(err, "failed to commit attestations"))
+			return false
+		}
 	}
 
-	attestations, attestationsWeight, err := m.attestations.Commit(index)
+	stateRoot, mutationRoot, err := m.ledger.CommitSlot(index)
 	if err != nil {
-		m.events.Error.Trigger(errors.Wrap(err, "failed to commit attestations"))
+		m.events.Error.Trigger(errors.Wrap(err, "failed to commit ledger"))
 		return false
 	}
 
@@ -210,10 +238,10 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		index,
 		latestCommitment.ID(),
 		iotago.NewRoots(
-			iotago.Identifier(acceptedBlocks.Root()),
-			iotago.Identifier{},
+			iotago.Identifier(ratifiedAcceptedBlocks.Root()),
+			mutationRoot,
 			iotago.Identifier(attestations.Root()),
-			iotago.Identifier{},
+			stateRoot,
 			iotago.Identifier(m.slotMutations.weights.Root()),
 		).ID(),
 		m.storage.Settings().LatestCommitment().CumulativeWeight()+uint64(attestationsWeight),
@@ -235,10 +263,14 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	m.events.SlotCommitted.Trigger(&notarization.SlotCommittedDetails{
-		Commitment:            newModelCommitment,
-		AcceptedBlocks:        acceptedBlocks,
-		ActiveValidatorsCount: 0,
+		Commitment:             newModelCommitment,
+		RatifiedAcceptedBlocks: ratifiedAcceptedBlocks,
+		ActiveValidatorsCount:  0,
 	})
+
+	if err = m.slotMutations.Evict(index); err != nil {
+		m.events.Error.Trigger(errors.Wrapf(err, "failed to evict slotMutations at index: %d", index))
+	}
 
 	return true
 }

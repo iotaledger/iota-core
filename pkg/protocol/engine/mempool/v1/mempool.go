@@ -207,7 +207,7 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 
 func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
-		if outputStates, err := m.executeStateTransition(transaction.Transaction(), lo.Map(transaction.inputs, (*StateMetadata).State), context.Background()); err != nil {
+		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction(), lo.Map(transaction.inputs, (*StateMetadata).State)); err != nil {
 			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)
@@ -354,8 +354,8 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) 
 		}
 	})
 
-	transaction.OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex) {
-		m.updateStateDiffs(transaction, prevIndex, newIndex)
+	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
+		m.updateStateDiffs(transaction, prevBlock.Index(), newBlock.Index())
 	})
 
 	transaction.OnCommitted(func() {
