@@ -72,7 +72,7 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 
 				e.HookConstructed(func() {
 					m.storage = e.Storage
-					m.acceptedTimeFunc = e.Clock.Accepted().Time
+					m.acceptedTimeFunc = e.Clock.RatifiedAccepted().Time
 
 					m.ledger = e.Ledger
 
