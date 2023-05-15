@@ -4,7 +4,7 @@ package coreapi
 func info() (*infoResponse, error) {
 	cl := deps.Protocol.MainEngineInstance().Clock
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
-	metrics := deps.Protocol.MetricsTracker.NodeMetrics()
+	metrics := deps.MetricsTracker.NodeMetrics()
 	protoParams := deps.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters()
 
 	protoParamsBytes, err := deps.Protocol.API().JSONEncode(protoParams)

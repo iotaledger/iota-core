@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
+	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -49,10 +50,11 @@ var (
 type dependencies struct {
 	dig.In
 
-	Protocol   *protocol.Protocol
-	LocalPeer  *peer.Local
-	AppInfo    *app.Info
-	P2PManager *p2p.Manager
+	Protocol       *protocol.Protocol
+	LocalPeer      *peer.Local
+	AppInfo        *app.Info
+	P2PManager     *p2p.Manager
+	MetricsTracker *metricstracker.MetricsTracker
 }
 
 func configure() error {

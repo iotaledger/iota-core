@@ -10,6 +10,7 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
+	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -136,6 +137,7 @@ type dependencies struct {
 	AppInfo          *app.Info
 	RestRouteManager *restapi.RestRouteManager
 	BlockIssuer      *blockissuer.BlockIssuer
+	MetricsTracker   *metricstracker.MetricsTracker
 }
 
 func configure() error {

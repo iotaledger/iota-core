@@ -34,8 +34,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/metricstracker"
-	"github.com/iotaledger/iota-core/pkg/protocol/metricstracker/trivialmetricstracker"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
@@ -47,12 +45,11 @@ import (
 // region Protocol /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Protocol struct {
-	Events         *Events
-	TipManager     tipmanager.TipManager
-	SyncManager    syncmanager.SyncManager
-	MetricsTracker metricstracker.MetricsTracker
-	engineManager  *enginemanager.EngineManager
-	ChainManager   *chainmanager.Manager
+	Events        *Events
+	TipManager    tipmanager.TipManager
+	SyncManager   syncmanager.SyncManager
+	engineManager *enginemanager.EngineManager
+	ChainManager  *chainmanager.Manager
 
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
@@ -78,7 +75,6 @@ type Protocol struct {
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
-	optsMetricsTrackerProvider  module.Provider[*engine.Engine, metricstracker.MetricsTracker]
 	optsLedgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
 }
 
@@ -97,7 +93,6 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
-		optsMetricsTrackerProvider:  trivialmetricstracker.NewProvider(),
 		optsLedgerProvider:          utxoledger.NewProvider(),
 
 		optsBaseDirectory: "",
@@ -115,7 +110,6 @@ func (p *Protocol) Run() {
 	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
 	p.Events.TipManager.LinkTo(p.TipManager.Events())
 	p.SyncManager = p.optsSyncManagerProvider(p.mainEngine)
-	p.MetricsTracker = p.optsMetricsTrackerProvider(p.mainEngine)
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
 		panic(err)
@@ -154,7 +148,6 @@ func (p *Protocol) Shutdown() {
 	p.ChainManager.Shutdown()
 	p.TipManager.Shutdown()
 	p.SyncManager.Shutdown()
-	p.MetricsTracker.Shutdown()
 }
 
 func (p *Protocol) initNetworkEvents() {

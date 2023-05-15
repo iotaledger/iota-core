@@ -75,7 +75,7 @@ func runWebSocketStreams(component *app.Component) {
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
 		)
 		timeutil.NewTicker(func() {
-			bpsInfo := deps.Protocol.MetricsTracker.NodeMetrics()
+			bpsInfo := deps.MetricsTracker.NodeMetrics()
 			process(bpsInfo.BlocksPerSecond)
 		}, 2*time.Second, ctx)
 
