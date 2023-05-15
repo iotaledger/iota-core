@@ -15,7 +15,7 @@ func (m MockedPower) Compare(other MockedPower) int {
 	}
 }
 
-// Increase increases the MockedPower by one step
+// Increase increases the MockedPower by one step.
 func (m MockedPower) Increase() MockedPower {
 	return m + 1
 }

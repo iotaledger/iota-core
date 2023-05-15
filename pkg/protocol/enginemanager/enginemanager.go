@@ -22,6 +22,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -50,6 +51,7 @@ type EngineManager struct {
 	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	slotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
+	ledgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
 
 	activeInstance *engine.Engine
 }
@@ -68,6 +70,7 @@ func New(
 	blockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*engine.Engine, notarization.Notarization],
+	ledgerProvider module.Provider[*engine.Engine, therealledger.Ledger],
 ) *EngineManager {
 	return &EngineManager{
 		workers:                 workers,
@@ -83,6 +86,7 @@ func New(
 		blockGadgetProvider:     blockGadgetProvider,
 		slotGadgetProvider:      slotGadgetProvider,
 		notarizationProvider:    notarizationProvider,
+		ledgerProvider:          ledgerProvider,
 	}
 }
 
@@ -161,6 +165,7 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.blockGadgetProvider,
 		e.slotGadgetProvider,
 		e.notarizationProvider,
+		e.ledgerProvider,
 		e.engineOptions...,
 	)
 }

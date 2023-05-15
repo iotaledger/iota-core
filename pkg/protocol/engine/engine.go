@@ -28,6 +28,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -47,6 +48,7 @@ type Engine struct {
 	BlockGadget     blockgadget.Gadget
 	SlotGadget      slotgadget.Gadget
 	Notarization    notarization.Notarization
+	Ledger          therealledger.Ledger
 
 	Workers *workerpool.Group
 
@@ -54,6 +56,8 @@ type Engine struct {
 
 	isBootstrapped      bool
 	isBootstrappedMutex sync.Mutex
+
+	chainID iotago.CommitmentID
 
 	optsBootstrappedThreshold time.Duration
 	optsEntryPointsDepth      int
@@ -74,13 +78,14 @@ func New(
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
+	ledgerProvider module.Provider[*Engine, therealledger.Ledger],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
 		&Engine{
 			Events:        NewEvents(),
 			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance.RootBlocks, storageInstance.Settings().LatestCommitment().Index()),
+			EvictionState: eviction.NewState(storageInstance.RootBlocks),
 			Workers:       workers,
 
 			optsBootstrappedThreshold: 10 * time.Second,
@@ -98,11 +103,16 @@ func New(
 			e.BlockGadget = blockGadgetProvider(e)
 			e.SlotGadget = slotGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
+			e.Ledger = ledgerProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings().TriggerInitialized,
 				e.Storage.Commitments().TriggerInitialized,
 			))
+
+			e.Storage.Settings().HookInitialized(func() {
+				e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Index())
+			})
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
@@ -194,10 +204,15 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		if err = e.readSnapshot(snapshot[0]); err != nil {
 			return errors.Wrapf(err, "failed to read snapshot from file '%s'", snapshot)
 		}
+		if e.Storage.Settings().LatestFinalizedSlot() > 0 {
+			// Only mark any pruning indexes if we loaded a non-genesis snapshot
+			e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
+		}
 	} else {
 		e.Storage.Settings().UpdateAPI()
 		e.Storage.Settings().TriggerInitialized()
 		e.Storage.Commitments().TriggerInitialized()
+		e.Storage.Prunable.RestoreFromDisk()
 		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
 
 		// e.Notarization.attestations().SetLastCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
@@ -234,8 +249,8 @@ func (e *Engine) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to import settings")
 	} else if err = e.Storage.Commitments().Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import commitments")
-		// } else if err = e.Ledger.Import(reader); err != nil {
-		// 	return errors.Wrap(err, "failed to import ledger")
+	} else if err = e.Ledger.Import(reader); err != nil {
+		return errors.Wrap(err, "failed to import ledger")
 	} else if err = e.EvictionState.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import eviction state")
 		// } else if err = e.Notarization.Import(reader); err != nil {
@@ -250,8 +265,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export settings")
 	} else if err = e.Storage.Commitments().Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export commitments")
-		// } else if err = e.Ledger.Export(writer, targetSlot); err != nil {
-		// 	return errors.Wrap(err, "failed to export ledger")
+	} else if err = e.Ledger.Export(writer, targetSlot); err != nil {
+		return errors.Wrap(err, "failed to export ledger")
 	} else if err = e.EvictionState.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export eviction state")
 		// } else if err = e.Notarization.Export(writer, targetSlot); err != nil {
@@ -270,10 +285,18 @@ func (e *Engine) Name() string {
 	return filepath.Base(e.Storage.Directory())
 }
 
+func (e *Engine) ChainID() iotago.CommitmentID {
+	return e.chainID
+}
+
+func (e *Engine) SetChainID(chainID iotago.CommitmentID) {
+	e.chainID = chainID
+}
+
 func (e *Engine) setupBlockStorage() {
 	wp := e.Workers.CreatePool("BlockStorage", 1) // Using just 1 worker to avoid contention
 
-	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
 		store := e.Storage.Blocks(block.ID().Index())
 		if store == nil {
 			e.Events.Error.Trigger(errors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
@@ -290,7 +313,7 @@ func (e *Engine) setupEvictionState() {
 
 	wp := e.Workers.CreatePool("EvictionState", 1) // Using just 1 worker to avoid contention
 
-	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
 		block.ForEachParent(func(parent model.Parent) {
 			// TODO: ONLY ADD STRONG PARENTS AFTER NOT DOWNLOADING PAST WEAK ARROWS
 			// TODO: is this correct? could this lock acceptance in some extreme corner case? something like this happened, that confirmation is correctly advancing per block, but acceptance does not. I think it might have something to do with root blocks
@@ -305,10 +328,8 @@ func (e *Engine) setupEvictionState() {
 		})
 	}, event.WithWorkerPool(wp))
 
-	// In order to still have the root blocks when when ratifying a block, we need to evict a slot when the supermajority
-	// of the online committee have accepted a block committing to such slot.
-	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
-		e.EvictionState.EvictUntil(block.SlotCommitmentID().Index())
+	e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+		e.EvictionState.AdvanceActiveWindowToIndex(details.Commitment.Index())
 	}, event.WithWorkerPool(wp))
 
 	e.Events.EvictionState.SlotEvicted.Hook(e.BlockCache.EvictUntil)

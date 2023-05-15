@@ -7,11 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
@@ -21,8 +23,9 @@ import (
 )
 
 type TestSuite struct {
-	Testing *testing.T
-	Network *mock.Network
+	Testing     *testing.T
+	fakeTesting *testing.T
+	Network     *mock.Network
 
 	Directory *utils.Directory
 	nodes     map[string]*mock.Node
@@ -31,22 +34,26 @@ type TestSuite struct {
 	validators     map[iotago.AccountID]int64
 	validatorsOnce sync.Once
 	snapshotPath   string
-	blocks         *shrinkingmap.ShrinkingMap[string, *model.Block]
+	blocks         *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 
 	ProtocolParameters iotago.ProtocolParameters
 
 	optsSnapshotOptions []options.Option[snapshotcreator.Options]
+	optsWaitFor         time.Duration
+	optsTick            time.Duration
 
 	mutex sync.RWMutex
 }
 
-func NewTestSuite(testingT *testing.T, snapshotOptions ...options.Option[snapshotcreator.Options]) *TestSuite {
-	t := &TestSuite{
-		Testing:   testingT,
-		Network:   mock.NewNetwork(),
-		Directory: utils.NewDirectory(testingT.TempDir()),
-		nodes:     make(map[string]*mock.Node),
-		blocks:    shrinkingmap.New[string, *model.Block](),
+func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
+	return options.Apply(&TestSuite{
+		Testing:     testingT,
+		fakeTesting: &testing.T{},
+		Network:     mock.NewNetwork(),
+		Directory:   utils.NewDirectory(testingT.TempDir()),
+		nodes:       make(map[string]*mock.Node),
+		blocks:      shrinkingmap.New[string, *blocks.Block](),
+
 		ProtocolParameters: iotago.ProtocolParameters{
 			Version:     3,
 			NetworkName: testingT.Name(),
@@ -58,26 +65,31 @@ func NewTestSuite(testingT *testing.T, snapshotOptions ...options.Option[snapsho
 				VBFactorKey:  10,
 			},
 			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*10),
+			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*100),
 			SlotDurationInSeconds: 10,
 		},
-	}
+		optsWaitFor: 1 * time.Second,
+		optsTick:    10 * time.Millisecond,
+	}, opts, func(t *TestSuite) {
+		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
+		t.RegisterBlock("Genesis", genesisBlock)
 
-	t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
-	var defaultSnapshotOptions = []options.Option[snapshotcreator.Options]{
-		snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
-		snapshotcreator.WithFilePath(t.snapshotPath),
-		snapshotcreator.WithProtocolParameters(t.ProtocolParameters),
-		snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
-			iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
-		}),
-	}
-	t.optsSnapshotOptions = append(defaultSnapshotOptions, snapshotOptions...)
-
-	return t
+		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
+		defaultSnapshotOptions := []options.Option[snapshotcreator.Options]{
+			snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
+			snapshotcreator.WithFilePath(t.snapshotPath),
+			snapshotcreator.WithProtocolParameters(t.ProtocolParameters),
+			snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
+				iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
+			}),
+		}
+		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
+	})
 }
 
-func (t *TestSuite) Block(alias string) *model.Block {
+// Block returns the block with the given alias. Important to note that this blocks.Block is a placeholder and is
+// thus not the same as the blocks.Block that is created by a node.
+func (t *TestSuite) Block(alias string) *blocks.Block {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
@@ -99,41 +111,41 @@ func (t *TestSuite) BlockIDs(aliases ...string) []iotago.BlockID {
 	})
 }
 
-func (t *TestSuite) Blocks(aliases ...string) []*model.Block {
-	return lo.Map(aliases, func(alias string) *model.Block {
+func (t *TestSuite) Blocks(aliases ...string) []*blocks.Block {
+	return lo.Map(aliases, func(alias string) *blocks.Block {
 		return t.Block(alias)
 	})
 }
 
-func (t *TestSuite) BlocksWithPrefix(prefix string) []*model.Block {
+func (t *TestSuite) BlocksWithPrefix(prefix string) []*blocks.Block {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	blocks := make([]*model.Block, 0)
+	b := make([]*blocks.Block, 0)
 
-	t.blocks.ForEach(func(alias string, block *model.Block) bool {
+	t.blocks.ForEach(func(alias string, block *blocks.Block) bool {
 		if strings.HasPrefix(alias, prefix) {
-			blocks = append(blocks, block)
+			b = append(b, block)
 		}
 
 		return true
 	})
 
-	return blocks
+	return b
 }
 
-func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, node *mock.Node, parents ...iotago.BlockID) *model.Block {
+func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, node *mock.Node, parents ...iotago.BlockID) *blocks.Block {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := node.IssueBlockAtSlot(alias, slot, parents...)
+	block := node.IssueBlockAtSlot(alias, slot, slotCommitment, parents...)
 
 	t.blocks.Set(alias, block)
 
 	return block
 }
 
-func (t *TestSuite) RegisterBlock(alias string, block *model.Block) {
+func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -195,7 +207,7 @@ func (t *TestSuite) Shutdown() {
 	}
 }
 
-func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string, opts ...options.Option[protocol.Protocol]) *mock.Node {
+func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string) *mock.Node {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -203,21 +215,25 @@ func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, parti
 		panic(fmt.Sprintf("cannot add validator node %s to partition %s with weight %d: framework already running", name, partition, weight))
 	}
 
-	t.nodes[name] = mock.NewNode(t.Testing, t.Network, partition, name, weight, opts...)
+	t.nodes[name] = mock.NewNode(t.Testing, t.Network, partition, name, weight)
 
 	return t.nodes[name]
 }
 
-func (t *TestSuite) AddValidatorNode(name string, weight int64, opts ...options.Option[protocol.Protocol]) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition, opts...)
+func (t *TestSuite) AddValidatorNode(name string, weight int64) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition)
 }
 
-func (t *TestSuite) AddNodeToPartition(name string, partition string, opts ...options.Option[protocol.Protocol]) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, partition, opts...)
+func (t *TestSuite) AddNodeToPartition(name string, partition string) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, 0, partition)
 }
 
-func (t *TestSuite) AddNode(name string, opts ...options.Option[protocol.Protocol]) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition, opts...)
+func (t *TestSuite) AddNode(name string) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition)
+}
+
+func (t *TestSuite) RemoveNode(name string) {
+	delete(t.nodes, name)
 }
 
 func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
@@ -281,8 +297,57 @@ func (t *TestSuite) HookLogging() {
 	}
 }
 
+// Eventually asserts that given condition will be met in opts.waitFor time,
+// periodically checking target function each opts.tick.
+//
+//	assert.Eventually(t, func() bool { return true; }, time.Second, 10*time.Millisecond)
+func (t *TestSuite) Eventually(condition func() error) {
+	ch := make(chan error, 1)
+
+	timer := time.NewTimer(t.optsWaitFor)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(t.optsTick)
+	defer ticker.Stop()
+
+	var lastErr error
+	for tick := ticker.C; ; {
+		select {
+		case <-timer.C:
+			require.FailNow(t.Testing, "condition never satisfied", lastErr)
+		case <-tick:
+			tick = nil
+			go func() { ch <- condition() }()
+		case lastErr = <-ch:
+			// The condition is satisfied, we can exit.
+			if lastErr == nil {
+				return
+			}
+			tick = ticker.C
+		}
+	}
+}
+
 func mustNodes(nodes []*mock.Node) {
 	if len(nodes) == 0 {
 		panic("no nodes provided")
+	}
+}
+
+func WithWaitFor(waitFor time.Duration) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsWaitFor = waitFor
+	}
+}
+
+func WithTick(tick time.Duration) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsTick = tick
+	}
+}
+
+func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Options]) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsSnapshotOptions = snapshotOptions
 	}
 }

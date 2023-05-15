@@ -15,6 +15,7 @@ import (
 const (
 	sybilProtectionPrefix byte = iota
 	attestationsPrefix
+	ledgerPrefix
 )
 
 type Permanent struct {
@@ -27,6 +28,7 @@ type Permanent struct {
 
 	sybilProtection kvstore.KVStore
 	attestations    kvstore.KVStore
+	ledger          kvstore.KVStore
 
 	optsLogger *logger.Logger
 	logger     *logger.WrappedLogger
@@ -37,7 +39,7 @@ func New(baseDir *utils.Directory, dbConfig database.Config, opts ...options.Opt
 	return options.Apply(&Permanent{
 		settings: NewSettings(baseDir.Path("settings.bin")),
 	}, opts, func(p *Permanent) {
-		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.API())
+		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.API)
 		p.logger = logger.NewWrappedLogger(p.optsLogger)
 
 		var err error
@@ -56,6 +58,7 @@ func New(baseDir *utils.Directory, dbConfig database.Config, opts ...options.Opt
 
 		p.sybilProtection = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{sybilProtectionPrefix}))
 		p.attestations = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{attestationsPrefix}))
+		p.ledger = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{ledgerPrefix}))
 	})
 }
 
@@ -83,6 +86,15 @@ func (p *Permanent) Attestations(optRealm ...byte) kvstore.KVStore {
 	}
 
 	return lo.PanicOnErr(p.attestations.WithExtendedRealm(optRealm))
+}
+
+// Ledger returns the ledger storage (or a specialized sub-storage if a realm is provided).
+func (p *Permanent) Ledger(optRealm ...byte) kvstore.KVStore {
+	if len(optRealm) == 0 {
+		return p.ledger
+	}
+
+	return lo.PanicOnErr(p.ledger.WithExtendedRealm(optRealm))
 }
 
 // Size returns the size of the permanent storage.

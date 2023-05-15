@@ -207,7 +207,7 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 
 func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
-		if outputStates, err := m.executeStateTransition(transaction.Transaction(), lo.Map(transaction.inputs, (*StateMetadata).State), context.Background()); err != nil {
+		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction(), lo.Map(transaction.inputs, (*StateMetadata).State)); err != nil {
 			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)
@@ -321,7 +321,9 @@ func (m *MemPool[VotePower]) updateStateDiffs(transaction *TransactionMetadata, 
 	}
 
 	if transaction.IsAccepted() && newIndex != 0 {
-		lo.Return1(m.stateDiffs.GetOrCreate(newIndex, func() *StateDiff { return NewStateDiff(newIndex) })).AddTransaction(transaction)
+		if stateDiff, evicted := m.stateDiff(newIndex); !evicted {
+			stateDiff.AddTransaction(transaction)
+		}
 	}
 }
 
@@ -335,15 +337,28 @@ func (m *MemPool[VotePower]) setup() (self *MemPool[VotePower]) {
 	return m
 }
 
+func (m *MemPool[VotePower]) stateDiff(slotIndex iotago.SlotIndex) (stateDiff *StateDiff, evicted bool) {
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
+	if m.lastEvictedSlot >= slotIndex {
+		return nil, true
+	}
+
+	return lo.Return1(m.stateDiffs.GetOrCreate(slotIndex, func() *StateDiff { return NewStateDiff(slotIndex) })), false
+}
+
 func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
-		if slotIndex := transaction.EarliestIncludedSlot(); slotIndex > 0 {
-			lo.Return1(m.stateDiffs.GetOrCreate(slotIndex, func() *StateDiff { return NewStateDiff(slotIndex) })).AddTransaction(transaction)
+		if slotIndex := transaction.EarliestIncludedAttachment().Index(); slotIndex > 0 {
+			if stateDiff, evicted := m.stateDiff(slotIndex); !evicted {
+				stateDiff.AddTransaction(transaction)
+			}
 		}
 	})
 
-	transaction.OnEarliestIncludedSlotUpdated(func(prevIndex, newIndex iotago.SlotIndex) {
-		m.updateStateDiffs(transaction, prevIndex, newIndex)
+	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
+		m.updateStateDiffs(transaction, prevBlock.Index(), newBlock.Index())
 	})
 
 	transaction.OnCommitted(func() {

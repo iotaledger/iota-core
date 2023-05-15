@@ -9,6 +9,9 @@ type Clock interface {
 	// Accepted returns a notion of time that is anchored to the latest accepted block.
 	Accepted() RelativeTime
 
+	// RatifiedAccepted returns a notion of time that is anchored to the latest ratified accepted block.
+	RatifiedAccepted() RelativeTime
+
 	// Confirmed returns a notion of time that is anchored to the latest confirmed block.
 	Confirmed() RelativeTime
 
