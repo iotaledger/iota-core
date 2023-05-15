@@ -1,14 +1,13 @@
 package promise
 
-import "sync/atomic"
-
 // CallbackID is an identifier for a callback.
-type CallbackID = uint64
+type UniqueID uint64
 
-// NewCallbackID creates a new unique callback ID.
-func NewCallbackID() CallbackID {
-	return atomic.AddUint64(&uniqueCallbackIDCounter, 1)
+func (u *UniqueID) Next() UniqueID {
+	*u++
+
+	return *u
 }
 
 // uniqueCallbackIDCounter is used to generate unique callback IDs.
-var uniqueCallbackIDCounter CallbackID
+var uniqueCallbackIDCounter UniqueID

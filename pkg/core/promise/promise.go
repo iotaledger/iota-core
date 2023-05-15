@@ -9,13 +9,15 @@ import (
 // Promise is a promise that can be resolved or rejected.
 type Promise[T any] struct {
 	// successCallbacks are called when the promise is resolved successfully.
-	successCallbacks *orderedmap.OrderedMap[CallbackID, func(T)]
+	successCallbacks *orderedmap.OrderedMap[UniqueID, func(T)]
 
 	// errorCallbacks are called when the promise is rejected.
-	errorCallbacks *orderedmap.OrderedMap[CallbackID, func(error)]
+	errorCallbacks *orderedmap.OrderedMap[UniqueID, func(error)]
 
 	// completeCallbacks are called when the promise is resolved or rejected.
-	completeCallbacks *orderedmap.OrderedMap[CallbackID, func()]
+	completeCallbacks *orderedmap.OrderedMap[UniqueID, func()]
+
+	callbackIDs UniqueID
 
 	// result is the result of the promise.
 	result T
@@ -33,9 +35,9 @@ type Promise[T any] struct {
 // New creates a new promise.
 func New[T any](optResolver ...func(p *Promise[T])) *Promise[T] {
 	p := &Promise[T]{
-		successCallbacks:  orderedmap.New[CallbackID, func(T)](),
-		errorCallbacks:    orderedmap.New[CallbackID, func(error)](),
-		completeCallbacks: orderedmap.New[CallbackID, func()](),
+		successCallbacks:  orderedmap.New[UniqueID, func(T)](),
+		errorCallbacks:    orderedmap.New[UniqueID, func(error)](),
+		completeCallbacks: orderedmap.New[UniqueID, func()](),
 	}
 
 	if len(optResolver) > 0 {
@@ -54,12 +56,12 @@ func (p *Promise[T]) Resolve(result T) *Promise[T] {
 		return p
 	}
 
-	p.successCallbacks.ForEach(func(key CallbackID, callback func(T)) bool {
+	p.successCallbacks.ForEach(func(key UniqueID, callback func(T)) bool {
 		callback(result)
 		return true
 	})
 
-	p.completeCallbacks.ForEach(func(key CallbackID, callback func()) bool {
+	p.completeCallbacks.ForEach(func(key UniqueID, callback func()) bool {
 		callback()
 		return true
 	})
@@ -82,12 +84,12 @@ func (p *Promise[T]) Reject(err error) *Promise[T] {
 		return p
 	}
 
-	p.errorCallbacks.ForEach(func(key CallbackID, callback func(error)) bool {
+	p.errorCallbacks.ForEach(func(key UniqueID, callback func(error)) bool {
 		callback(err)
 		return true
 	})
 
-	p.completeCallbacks.ForEach(func(key CallbackID, callback func()) bool {
+	p.completeCallbacks.ForEach(func(key UniqueID, callback func()) bool {
 		callback()
 		return true
 	})
@@ -114,7 +116,7 @@ func (p *Promise[T]) OnSuccess(callback func(result T)) (cancel func()) {
 		return func() {}
 	}
 
-	callbackID := NewCallbackID()
+	callbackID := p.callbackIDs.Next()
 	p.successCallbacks.Set(callbackID, callback)
 
 	return func() {
@@ -140,7 +142,7 @@ func (p *Promise[T]) OnError(callback func(err error)) func() {
 		return func() {}
 	}
 
-	callbackID := NewCallbackID()
+	callbackID := p.callbackIDs.Next()
 	p.errorCallbacks.Set(callbackID, callback)
 
 	return func() {
@@ -173,7 +175,7 @@ func (p *Promise[T]) OnComplete(callback func()) func() {
 		return func() {}
 	}
 
-	callbackID := NewCallbackID()
+	callbackID := p.callbackIDs.Next()
 	p.completeCallbacks.Set(callbackID, callback)
 
 	return func() {
