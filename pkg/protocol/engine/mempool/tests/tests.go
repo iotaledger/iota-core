@@ -24,6 +24,7 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 		"TestSetInclusionSlot":                       TestSetInclusionSlot,
 		"TestSetTransactionOrphanage":                TestSetTransactionOrphanage,
 		"TestSetAllAttachmentsOrphaned":              TestSetAllAttachmentsOrphaned,
+		"TestConflictPropagation":                    TestConflictPropagation,
 		"TestSetNotAllAttachmentsOrphaned":           TestSetNotAllAttachmentsOrphaned,
 		"TestSetTxOrphanageMultipleAttachments":      TestSetTxOrphanageMultipleAttachments,
 		"TestSetNotAllAttachmentsOrphanedFutureCone": TestSetNotAllAttachmentsOrphanedFutureCone,
@@ -166,7 +167,6 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	require.False(t, tx3Metadata.IsOrphaned())
 
 	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block3": true}))
-
 }
 
 func TestSetAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
@@ -455,6 +455,39 @@ func TestStateDiff(t *testing.T, tf *TestFramework) {
 
 	tf.RequireAccepted(lo.MergeMaps(acceptanceState, map[string]bool{"tx3": true}))
 	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx3:0"}, []string{"tx1", "tx2", "tx3"})
+}
+
+func TestConflictPropagation(t *testing.T, tf *TestFramework) {
+	debug.SetEnabled(true)
+	defer debug.SetEnabled(false)
+	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateTransaction("tx1*", []string{"genesis"}, 1)
+
+	tf.CreateTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateTransaction("tx2*", []string{"tx1*:0"}, 1)
+	tf.CreateTransaction("tx3", []string{"tx2:0"}, 1)
+	tf.CreateTransaction("tx3*", []string{"tx2*:0"}, 1)
+	tf.CreateTransaction("tx4", []string{"tx1:0"}, 1)
+
+	require.NoError(t, tf.AttachTransaction("tx3", "block3", 3))
+	require.NoError(t, tf.AttachTransaction("tx2", "block2", 2))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1", 1))
+
+	tf.RequireBooked("tx1", "tx2", "tx3")
+	tf.RequireConflictIDs(map[string][]string{"tx1": {}, "tx2": {}, "tx3": {}})
+
+	require.NoError(t, tf.AttachTransaction("tx3*", "block3*", 3))
+	require.NoError(t, tf.AttachTransaction("tx2*", "block2*", 2))
+	require.NoError(t, tf.AttachTransaction("tx1*", "block1*", 1))
+
+	tf.RequireBooked("tx1*", "tx2*", "tx3*")
+	tf.RequireConflictIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx1"}, "tx3": {"tx1"}, "tx1*": {"tx1*"}, "tx2*": {"tx1*"}, "tx3*": {"tx1*"}})
+
+	require.NoError(t, tf.AttachTransaction("tx4", "block4", 2))
+
+	tf.RequireBooked("tx4")
+	tf.RequireConflictIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx2"}, "tx4": {"tx4"}, "tx1*": {"tx1*"}, "tx2*": {"tx1*"}, "tx3*": {"tx1*"}})
+
 }
 
 func TestMemoryRelease(t *testing.T, tf *TestFramework) {

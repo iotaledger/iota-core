@@ -9,13 +9,16 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mockedconflictdag "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/mocked"
 	mempooltests "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -95,5 +98,5 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedPower](mempooltests.VM, func(reference ledger.StateReference) *promise.Promise[ledger.State] {
 		return ledgerState.ResolveState(reference.StateID())
-	}, workerpool.NewGroup(t.Name()), mockedconflictdag.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower]()), ledgerState)
+	}, workerpool.NewGroup(t.Name()), conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())), ledgerState)
 }

@@ -172,6 +172,20 @@ func (t *TestFramework) RequireTransactionsEvicted(transactionAliases map[string
 	}
 }
 
+func (t *TestFramework) RequireConflictIDs(conflictMapping map[string][]string) {
+	for transactionAlias, conflictAliases := range conflictMapping {
+		transactionMetadata, exists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
+		require.True(t.test, exists, "transaction %s does not exist", transactionAlias)
+
+		conflictIDs := transactionMetadata.ConflictIDs()
+		require.Equal(t.test, len(conflictAliases), conflictIDs.Size())
+
+		for _, conflictAlias := range conflictAliases {
+			require.True(t.test, conflictIDs.Has(t.TransactionID(conflictAlias)), "transaction %s should have conflict %s, instead had %s", transactionAlias, conflictAlias, conflictIDs)
+		}
+	}
+}
+
 func (t *TestFramework) RequireAttachmentsEvicted(attachmentAliases map[string]bool) {
 	for attachmentAlias, deleted := range attachmentAliases {
 		_, exists := t.Instance.TransactionMetadataByAttachment(t.BlockID(attachmentAlias))

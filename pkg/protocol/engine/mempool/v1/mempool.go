@@ -218,10 +218,6 @@ func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata
 }
 
 func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
-	transaction.Inputs().Range(func(inputState mempool.StateMetadata) {
-		inputState.ConflictIDs()
-	})
-
 	lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 		input.OnDoubleSpent(func() {
 			m.forkTransaction(transaction, input)
@@ -279,7 +275,10 @@ func (m *MemPool[VotePower]) requestStateWithMetadata(stateReference ledger.Stat
 func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, input *StateMetadata) {
 	switch err := m.conflictDAG.CreateConflict(transaction.ID(), transaction.conflictIDs.Get(), advancedset.New(input.ID()), acceptance.Pending); {
 	case errors.Is(err, conflictdag.ErrConflictExists):
-		m.conflictDAG.JoinConflictSets(transaction.ID(), advancedset.New(input.ID()))
+		err = m.conflictDAG.JoinConflictSets(transaction.ID(), advancedset.New(input.ID()))
+		if err != nil {
+			panic(err)
+		}
 	case err != nil:
 		panic(err)
 	default:

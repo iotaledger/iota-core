@@ -12,9 +12,8 @@ import (
 )
 
 type StateMetadata struct {
-	id          iotago.OutputID
-	state       ledger.State
-	conflictIDs *advancedset.AdvancedSet[iotago.TransactionID]
+	id    iotago.OutputID
+	state ledger.State
 
 	// lifecycle
 	spenderCount       uint64
@@ -78,7 +77,7 @@ func (s *StateMetadata) State() ledger.State {
 }
 
 func (s *StateMetadata) ConflictIDs() *advancedset.AdvancedSet[iotago.TransactionID] {
-	return s.conflictIDs
+	return s.conflictIDs.Get()
 }
 
 func (s *StateMetadata) IsDoubleSpent() bool {
