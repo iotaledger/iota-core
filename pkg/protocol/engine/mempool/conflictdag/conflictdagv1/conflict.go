@@ -91,7 +91,7 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.V
 }
 
 // NewConflict creates a new Conflict.
-func NewConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.VotePowerType[VotePower]](id ConflictID, parents *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VotePower]], conflictSets *advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VotePower]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[ConflictID, ResourceID, VotePower] {
+func NewConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.VotePowerType[VotePower]](id ConflictID, conflictSets *advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VotePower]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[ConflictID, ResourceID, VotePower] {
 	c := &Conflict[ConflictID, ResourceID, VotePower]{
 		ID:                      id,
 		Parents:                 advancedset.New[*Conflict[ConflictID, ResourceID, VotePower]](),
@@ -111,12 +111,6 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictda
 	}
 
 	c.preferredInstead = c
-
-	parents.Range(func(parent *Conflict[ConflictID, ResourceID, VotePower]) {
-		if c.Parents.Add(parent) {
-			parent.registerChild(c)
-		}
-	})
 
 	c.unhookAcceptanceMonitoring = c.Weight.OnUpdate.Hook(func(value weight.Value) {
 		if threshold := c.acceptanceThreshold(); value.AcceptanceState().IsPending() && value.ValidatorsWeight() >= threshold {
@@ -178,7 +172,7 @@ func (c *Conflict[ConflictID, ResourceID, VotePower]) removeParent(parent *Confl
 }
 
 // UpdateParents updates the parents of the Conflict.
-func (c *Conflict[ConflictID, ResourceID, VotePower]) UpdateParents(addedParent *Conflict[ConflictID, ResourceID, VotePower], removedParents *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VotePower]]) (updated bool) {
+func (c *Conflict[ConflictID, ResourceID, VotePower]) UpdateParents(addedParents, removedParents *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VotePower]]) (updated bool) {
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
@@ -186,11 +180,13 @@ func (c *Conflict[ConflictID, ResourceID, VotePower]) UpdateParents(addedParent 
 		updated = c.removeParent(removedParent) || updated
 	})
 
-	if c.Parents.Add(addedParent) {
-		addedParent.registerChild(c)
+	addedParents.Range(func(addedParent *Conflict[ConflictID, ResourceID, VotePower]) {
+		if c.Parents.Add(addedParent) {
+			addedParent.registerChild(c)
 
-		updated = true
-	}
+			updated = true
+		}
+	})
 
 	return updated
 }

@@ -23,7 +23,14 @@ import (
 
 type TestConflict = *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
 
-var NewTestConflict = NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+//var NewTestConflict = NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+
+func NewTestConflict(id iotago.TransactionID, parentConflicts *advancedset.AdvancedSet[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower]], conflictSets *advancedset.AdvancedSet[*ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedPower]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower] {
+	conflict := NewConflict(id, conflictSets, initialWeight, pendingTasksCounter, acceptanceThresholdProvider)
+	conflict.UpdateParents(parentConflicts, advancedset.New[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower]]())
+
+	return conflict
+}
 
 func TestConflict_SetRejected(t *testing.T) {
 	weights := account.NewSelectedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))

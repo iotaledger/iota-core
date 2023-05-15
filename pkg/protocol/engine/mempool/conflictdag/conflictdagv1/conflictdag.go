@@ -68,15 +68,10 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) Events() *conflictdag.E
 }
 
 // CreateConflict creates a new Conflict that is conflicting over the given ResourceIDs and that has the given parents.
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateConflict(id ConflictID, parentIDs *advancedset.AdvancedSet[ConflictID], resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error {
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error {
 	err := func() error {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
-
-		parents, err := c.conflicts(parentIDs, !initialAcceptanceState.IsRejected())
-		if err != nil {
-			return xerrors.Errorf("failed to create conflict: %w", err)
-		}
 
 		conflictSets, err := c.conflictSets(resourceIDs, true /*!initialAcceptanceState.IsRejected()*/)
 		if err != nil {
@@ -87,7 +82,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateConflict(id Confl
 			initialWeight := weight.New(c.committeeSet)
 			initialWeight.SetAcceptanceState(initialAcceptanceState)
 
-			newConflict := NewConflict[ConflictID, ResourceID, VotePower](id, parents, conflictSets, initialWeight, c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
+			newConflict := NewConflict[ConflictID, ResourceID, VotePower](id, conflictSets, initialWeight, c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
 
 			// attach to the acceptance state updated event and propagate that event to the outside.
 			// also need to remember the unhook method to properly evict the conflict.
@@ -161,7 +156,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) JoinConflictSets(confli
 }
 
 // UpdateConflictParents updates the parents of the given Conflict and returns an error if the operation failed.
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UpdateConflictParents(conflictID ConflictID, addedParentID ConflictID, removedParentIDs *advancedset.AdvancedSet[ConflictID]) error {
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UpdateConflictParents(conflictID ConflictID, addedParentIDs, removedParentIDs *advancedset.AdvancedSet[ConflictID]) error {
 	newParents := advancedset.New[ConflictID]()
 
 	updated, err := func() (bool, error) {
@@ -172,16 +167,25 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UpdateConflictParents(c
 		if !currentConflictExists {
 			return false, xerrors.Errorf("tried to modify evicted conflict with %s: %w", conflictID, conflictdag.ErrEntityEvicted)
 		}
+		addedParents := advancedset.New[*Conflict[ConflictID, ResourceID, VotePower]]()
 
-		addedParent, addedParentExists := c.conflictsByID.Get(addedParentID)
-		if !addedParentExists {
-			if !currentConflict.IsRejected() {
-				// UpdateConflictParents is only called when a Conflict is forked, which means that the added parent
-				// must exist (unless it was forked on top of a rejected branch, just before eviction).
-				return false, xerrors.Errorf("tried to add non-existent parent with %s: %w", addedParentID, conflictdag.ErrFatal)
+		if err := addedParentIDs.ForEach(func(addedParentID ConflictID) error {
+			addedParent, addedParentExists := c.conflictsByID.Get(addedParentID)
+			if !addedParentExists {
+				if !currentConflict.IsRejected() {
+					// UpdateConflictParents is only called when a Conflict is forked, which means that the added parent
+					// must exist (unless it was forked on top of a rejected branch, just before eviction).
+					return xerrors.Errorf("tried to add non-existent parent with %s: %w", addedParentID, conflictdag.ErrFatal)
+				}
+
+				return xerrors.Errorf("tried to add evicted parent with %s to rejected conflict with %s: %w", addedParentID, conflictID, conflictdag.ErrEntityEvicted)
 			}
 
-			return false, xerrors.Errorf("tried to add evicted parent with %s to rejected conflict with %s: %w", addedParentID, conflictID, conflictdag.ErrEntityEvicted)
+			addedParents.Add(addedParent)
+
+			return nil
+		}); err != nil {
+			return false, err
 		}
 
 		removedParents, err := c.conflicts(removedParentIDs, !currentConflict.IsRejected())
@@ -189,7 +193,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UpdateConflictParents(c
 			return false, xerrors.Errorf("failed to update conflict parents: %w", err)
 		}
 
-		updated := currentConflict.UpdateParents(addedParent, removedParents)
+		updated := currentConflict.UpdateParents(addedParents, removedParents)
 		if updated {
 			_ = currentConflict.Parents.ForEach(func(parentConflict *Conflict[ConflictID, ResourceID, VotePower]) (err error) {
 				newParents.Add(parentConflict.ID)

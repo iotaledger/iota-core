@@ -23,7 +23,7 @@ func (c ConflictDAG[ConflictID, ResourceID, VotePower]) Events() *conflictdag.Ev
 	return c.events
 }
 
-func (c ConflictDAG[ConflictID, ResourceID, VotePower]) CreateConflict(id ConflictID, parentIDs *advancedset.AdvancedSet[ConflictID], resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error {
+func (c ConflictDAG[ConflictID, ResourceID, VotePower]) CreateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error {
 	//TODO implement me
 	panic("implement me")
 }
@@ -38,7 +38,7 @@ func (c ConflictDAG[ConflictID, ResourceID, VotePower]) JoinConflictSets(conflic
 	panic("implement me")
 }
 
-func (c ConflictDAG[ConflictID, ResourceID, VotePower]) UpdateConflictParents(conflictID ConflictID, addedParentID ConflictID, removedParentIDs *advancedset.AdvancedSet[ConflictID]) error {
+func (c ConflictDAG[ConflictID, ResourceID, VotePower]) UpdateConflictParents(conflictID ConflictID, addedParentIDs, removedParentIDs *advancedset.AdvancedSet[ConflictID]) error {
 	//TODO implement me
 	panic("implement me")
 }
