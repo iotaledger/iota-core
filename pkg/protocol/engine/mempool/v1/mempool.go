@@ -318,7 +318,9 @@ func (m *MemPool[VotePower]) updateStateDiffs(transaction *TransactionMetadata, 
 	}
 
 	if transaction.IsAccepted() && newIndex != 0 {
-		lo.Return1(m.stateDiffs.GetOrCreate(newIndex, func() *StateDiff { return NewStateDiff(newIndex) })).AddTransaction(transaction)
+		if stateDiff, evicted := m.stateDiff(newIndex); !evicted {
+			stateDiff.AddTransaction(transaction)
+		}
 	}
 }
 
@@ -332,10 +334,23 @@ func (m *MemPool[VotePower]) setup() (self *MemPool[VotePower]) {
 	return m
 }
 
+func (m *MemPool[VotePower]) stateDiff(slotIndex iotago.SlotIndex) (stateDiff *StateDiff, evicted bool) {
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
+	if m.lastEvictedSlot >= slotIndex {
+		return nil, true
+	}
+
+	return lo.Return1(m.stateDiffs.GetOrCreate(slotIndex, func() *StateDiff { return NewStateDiff(slotIndex) })), false
+}
+
 func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
 		if slotIndex := transaction.EarliestIncludedSlot(); slotIndex > 0 {
-			lo.Return1(m.stateDiffs.GetOrCreate(slotIndex, func() *StateDiff { return NewStateDiff(slotIndex) })).AddTransaction(transaction)
+			if stateDiff, evicted := m.stateDiff(slotIndex); !evicted {
+				stateDiff.AddTransaction(transaction)
+			}
 		}
 	})
 
