@@ -195,6 +195,7 @@ func (b *Booker) markInvalid(block *blocks.Block, err error) {
 func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset.AdvancedSet[iotago.TransactionID], err error) {
 	conflictIDsToInherit := advancedset.New[iotago.TransactionID]()
 
+	// Inherit conflictIDs from parents based on the parent type.
 	for _, parent := range block.ModelBlock().ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
@@ -219,6 +220,8 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset
 		}
 	}
 
+	// Add all conflicts from the block's payload itself.
+	// Forking on booking: we determine the block's PayloadConflictIDs by treating each TX as a conflict.
 	conflictIDsToInherit.AddAll(block.PayloadConflictIDs())
 
 	// Only inherit conflicts that are not yet accepted (aka merge to master).

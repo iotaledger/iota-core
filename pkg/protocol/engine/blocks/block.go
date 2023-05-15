@@ -25,9 +25,11 @@ type Block struct {
 	shallowLikeChildren []*Block
 
 	// Booker block
-	booked             bool
-	witnesses          *advancedset.AdvancedSet[iotago.AccountID]
-	conflictIDs        *advancedset.AdvancedSet[iotago.TransactionID]
+	booked    bool
+	witnesses *advancedset.AdvancedSet[iotago.AccountID]
+	// conflictIDs are the all conflictIDs of the block inherited from the parents + payloadConflictIDs.
+	conflictIDs *advancedset.AdvancedSet[iotago.TransactionID]
+	// payloadConflictIDs are the conflictIDs of the block's payload (in case it is a transaction, otherwise empty).
 	payloadConflictIDs *advancedset.AdvancedSet[iotago.TransactionID]
 
 	// BlockGadget block
