@@ -24,6 +24,8 @@ type StateMetadata struct {
 	spendCommitted     *promise.Value[*TransactionMetadata]
 	allSpendersRemoved *event.Event
 
+	conflictIDs *promise.Set[iotago.TransactionID]
+
 	*inclusionFlags
 }
 
@@ -38,18 +40,31 @@ func NewStateMetadata(state ledger.State, optSource ...*TransactionMetadata) *St
 		spendCommitted:     promise.NewValue[*TransactionMetadata](),
 		allSpendersRemoved: event.New(),
 
+		conflictIDs: promise.NewSet[iotago.TransactionID](),
+
 		inclusionFlags: newInclusionFlags(),
 	}).setup(optSource...)
 }
 
 func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata {
-	if len(optSource) > 0 {
-		optSource[0].OnPending(s.setPending)
-		optSource[0].OnAccepted(s.setAccepted)
-		optSource[0].OnRejected(s.setRejected)
-		optSource[0].OnCommitted(s.setCommitted)
-		optSource[0].OnOrphaned(s.setOrphaned)
+	if len(optSource) == 0 {
+		return s
 	}
+	source := optSource[0]
+
+	cancelConflictInheritance := s.conflictIDs.InheritFrom(source.conflictIDs)
+
+	source.OnConflicting(func() {
+		cancelConflictInheritance()
+
+		s.conflictIDs.Set(advancedset.New[iotago.TransactionID](source.id))
+	})
+
+	source.OnPending(s.setPending)
+	source.OnAccepted(s.setAccepted)
+	source.OnRejected(s.setRejected)
+	source.OnCommitted(s.setCommitted)
+	source.OnOrphaned(s.setOrphaned)
 
 	return s
 }

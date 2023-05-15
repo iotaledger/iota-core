@@ -20,7 +20,9 @@ type Value[T comparable] struct {
 	value T
 
 	// updateCallbacks are the registered callbacks that are triggered when the value changes.
-	updateCallbacks *shrinkingmap.ShrinkingMap[CallbackID, *valueCallback[T]]
+	updateCallbacks *shrinkingmap.ShrinkingMap[UniqueID, *valueCallback[T]]
+
+	callbackIDs UniqueID
 
 	// triggerIDCounter is the counter that is used to assign a unique triggerID to each update.
 	triggerIDCounter int
@@ -35,7 +37,7 @@ type Value[T comparable] struct {
 // NewValue creates a new Value instance.
 func NewValue[T comparable]() *Value[T] {
 	return &Value[T]{
-		updateCallbacks: shrinkingmap.New[CallbackID, *valueCallback[T]](),
+		updateCallbacks: shrinkingmap.New[UniqueID, *valueCallback[T]](),
 	}
 }
 
@@ -70,7 +72,7 @@ func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe f
 		currentUpdateIndex = v.triggerIDCounter
 	)
 
-	createdCallback := newValueCallback[T](callback, currentUpdateIndex)
+	createdCallback := newValueCallback[T](v.callbackIDs.Next(), callback, currentUpdateIndex)
 
 	v.updateCallbacks.Set(createdCallback.id, createdCallback)
 
@@ -113,7 +115,7 @@ func (v *Value[T]) prepareTrigger(newValue T) (previousValue T, triggerID int, c
 // ensure the correct execution order of callbacks in the Value.
 type valueCallback[T comparable] struct {
 	// id is the unique identifier of the callback.
-	id CallbackID
+	id UniqueID
 
 	// callback is the function that is executed when the callback is triggered.
 	callback func(prevValue, newValue T)
@@ -126,9 +128,9 @@ type valueCallback[T comparable] struct {
 }
 
 // newValueCallback creates a new valueCallback instance.
-func newValueCallback[T comparable](callbackFunc func(prevValue, newValue T), updateIndex int) *valueCallback[T] {
+func newValueCallback[T comparable](id UniqueID, callbackFunc func(prevValue, newValue T), updateIndex int) *valueCallback[T] {
 	return &valueCallback[T]{
-		id:            NewCallbackID(),
+		id:            id,
 		callback:      callbackFunc,
 		lastTriggerID: updateIndex,
 	}
