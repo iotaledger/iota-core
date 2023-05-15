@@ -46,20 +46,24 @@ func NewStateMetadata(state ledger.State, optSource ...*TransactionMetadata) *St
 }
 
 func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata {
-	if len(optSource) > 0 {
-		cancelInheritance := s.conflictIDs.InheritFrom(optSource[0].conflictIDs)
-		optSource[0].OnConflicting(func() {
-			cancelInheritance()
-
-			s.conflictIDs.Set(advancedset.New[iotago.TransactionID](optSource[0].id))
-		})
-
-		optSource[0].OnPending(s.setPending)
-		optSource[0].OnAccepted(s.setAccepted)
-		optSource[0].OnRejected(s.setRejected)
-		optSource[0].OnCommitted(s.setCommitted)
-		optSource[0].OnOrphaned(s.setOrphaned)
+	if len(optSource) == 0 {
+		return s
 	}
+	source := optSource[0]
+
+	cancelConflictInheritance := s.conflictIDs.InheritFrom(source.conflictIDs)
+
+	source.OnConflicting(func() {
+		cancelConflictInheritance()
+
+		s.conflictIDs.Set(advancedset.New[iotago.TransactionID](source.id))
+	})
+
+	source.OnPending(s.setPending)
+	source.OnAccepted(s.setAccepted)
+	source.OnRejected(s.setRejected)
+	source.OnCommitted(s.setCommitted)
+	source.OnOrphaned(s.setOrphaned)
 
 	return s
 }
