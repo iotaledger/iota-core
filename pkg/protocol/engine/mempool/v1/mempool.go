@@ -347,7 +347,7 @@ func (m *MemPool[VotePower]) stateDiff(slotIndex iotago.SlotIndex) (stateDiff *S
 
 func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
-		if slotIndex := transaction.EarliestIncludedSlot(); slotIndex > 0 {
+		if slotIndex := transaction.EarliestIncludedAttachment().Index(); slotIndex > 0 {
 			if stateDiff, evicted := m.stateDiff(slotIndex); !evicted {
 				stateDiff.AddTransaction(transaction)
 			}

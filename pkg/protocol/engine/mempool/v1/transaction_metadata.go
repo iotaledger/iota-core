@@ -209,10 +209,6 @@ func (t *TransactionMetadata) OnConflictAccepted(callback func()) {
 	t.conflictAccepted.OnTrigger(callback)
 }
 
-func (t *TransactionMetadata) IsIncluded() bool {
-	return t.earliestIncludedAttachment.Get().Index() != 0
-}
-
 func (t *TransactionMetadata) AllInputsAccepted() bool {
 	return t.allInputsAccepted.Get()
 }
@@ -239,7 +235,7 @@ func (t *TransactionMetadata) setConflicting() {
 
 func (t *TransactionMetadata) setConflictAccepted() {
 	if t.conflictAccepted.Trigger() {
-		if t.AllInputsAccepted() && t.EarliestIncludedSlot() != 0 {
+		if t.AllInputsAccepted() && t.EarliestIncludedAttachment().Index() != 0 {
 			t.setAccepted()
 		}
 	}
@@ -254,7 +250,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
-				if t.IsConflictAccepted() && t.EarliestIncludedSlot() != 0 {
+				if t.IsConflictAccepted() && t.EarliestIncludedAttachment().Index() != 0 {
 					t.setAccepted()
 				}
 			}
