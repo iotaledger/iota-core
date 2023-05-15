@@ -83,7 +83,7 @@ func (f *AccountsTestFramework) CreateID(alias string, optWeight ...int64) iotag
 	validatorID = iotago.IdentifierFromData(hashedAlias[:])
 	validatorID.RegisterAlias(alias)
 
-	f.Instance.Update(validatorID, lo.First(optWeight))
+	f.Instance.Set(validatorID, lo.First(optWeight))
 	f.Committee.Add(validatorID)
 
 	f.identitiesByAlias[alias] = validatorID

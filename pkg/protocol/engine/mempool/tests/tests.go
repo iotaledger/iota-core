@@ -17,19 +17,26 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 )
 
-func TestAll(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
+func TestAllWithoutForkingEverything(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 	for testName, testCase := range map[string]func(*testing.T, *TestFramework){
 		"TestProcessTransaction":                     TestProcessTransaction,
 		"TestProcessTransactionsOutOfOrder":          TestProcessTransactionsOutOfOrder,
 		"TestSetInclusionSlot":                       TestSetInclusionSlot,
 		"TestSetTransactionOrphanage":                TestSetTransactionOrphanage,
 		"TestSetAllAttachmentsOrphaned":              TestSetAllAttachmentsOrphaned,
-		"TestConflictPropagation":                    TestConflictPropagation,
 		"TestSetNotAllAttachmentsOrphaned":           TestSetNotAllAttachmentsOrphaned,
 		"TestSetTxOrphanageMultipleAttachments":      TestSetTxOrphanageMultipleAttachments,
 		"TestSetNotAllAttachmentsOrphanedFutureCone": TestSetNotAllAttachmentsOrphanedFutureCone,
 		"TestStateDiff":                              TestStateDiff,
 		"TestMemoryRelease":                          TestMemoryRelease,
+	} {
+		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
+	}
+}
+
+func TestAllWithForkingEverything(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
+	for testName, testCase := range map[string]func(*testing.T, *TestFramework){
+		"TestConflictPropagation": TestConflictPropagation,
 	} {
 		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
 	}
@@ -185,7 +192,6 @@ func TestSetAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedAttachment().Index())
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.2"))
-
 	require.True(t, tx1Metadata.IsAccepted())
 	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedAttachment().Index())
 	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
@@ -474,19 +480,19 @@ func TestConflictPropagation(t *testing.T, tf *TestFramework) {
 	require.NoError(t, tf.AttachTransaction("tx1", "block1", 1))
 
 	tf.RequireBooked("tx1", "tx2", "tx3")
-	tf.RequireConflictIDs(map[string][]string{"tx1": {}, "tx2": {}, "tx3": {}})
+	tf.RequireConflictIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx3"}})
 
 	require.NoError(t, tf.AttachTransaction("tx3*", "block3*", 3))
 	require.NoError(t, tf.AttachTransaction("tx2*", "block2*", 2))
 	require.NoError(t, tf.AttachTransaction("tx1*", "block1*", 1))
 
 	tf.RequireBooked("tx1*", "tx2*", "tx3*")
-	tf.RequireConflictIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx1"}, "tx3": {"tx1"}, "tx1*": {"tx1*"}, "tx2*": {"tx1*"}, "tx3*": {"tx1*"}})
+	tf.RequireConflictIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx3"}, "tx1*": {"tx1*"}, "tx2*": {"tx2*"}, "tx3*": {"tx3*"}})
 
 	require.NoError(t, tf.AttachTransaction("tx4", "block4", 2))
 
 	tf.RequireBooked("tx4")
-	tf.RequireConflictIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx2"}, "tx4": {"tx4"}, "tx1*": {"tx1*"}, "tx2*": {"tx1*"}, "tx3*": {"tx1*"}})
+	tf.RequireConflictIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx3"}, "tx4": {"tx4"}, "tx1*": {"tx1*"}, "tx2*": {"tx2*"}, "tx3*": {"tx3*"}})
 
 }
 

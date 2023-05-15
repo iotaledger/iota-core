@@ -13,11 +13,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type TestFramework struct {
-	Instance mempool.MemPool[vote.MockedPower]
+	Instance    mempool.MemPool[vote.MockedPower]
+	ConflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
 
 	stateIDByAlias     map[string]iotago.OutputID
 	transactionByAlias map[string]mempool.Transaction
@@ -29,9 +31,10 @@ type TestFramework struct {
 	mutex sync.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower], ledgerState *ledgertests.StateResolver) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower], conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower], ledgerState *ledgertests.StateResolver) *TestFramework {
 	t := &TestFramework{
 		Instance:           instance,
+		ConflictDAG:        conflictDAG,
 		stateIDByAlias:     make(map[string]iotago.OutputID),
 		transactionByAlias: make(map[string]mempool.Transaction),
 		blockIDsByAlias:    make(map[string]iotago.BlockID),
@@ -178,7 +181,7 @@ func (t *TestFramework) RequireConflictIDs(conflictMapping map[string][]string) 
 		require.True(t.test, exists, "transaction %s does not exist", transactionAlias)
 
 		conflictIDs := transactionMetadata.ConflictIDs()
-		require.Equal(t.test, len(conflictAliases), conflictIDs.Size())
+		require.Equal(t.test, len(conflictAliases), conflictIDs.Size(), "%s has wrong number of ConflictIDs", transactionAlias)
 
 		for _, conflictAlias := range conflictAliases {
 			require.True(t.test, conflictIDs.Has(t.TransactionID(conflictAlias)), "transaction %s should have conflict %s, instead had %s", transactionAlias, conflictAlias, conflictIDs)

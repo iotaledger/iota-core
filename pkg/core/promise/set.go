@@ -46,6 +46,11 @@ func (s *Set[T]) Get() *advancedset.AdvancedSet[T] {
 	return s.value
 }
 
+// Size returns the size of the set.
+func (s *Set[T]) Size() int {
+	return s.Get().Size()
+}
+
 // Set sets the given value as the new value of the set.
 func (s *Set[T]) Set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T]) {
 	s.applyMutex.Lock()
