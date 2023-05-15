@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -30,8 +31,8 @@ var (
 
 type Ledger struct {
 	ledgerState  *ledgerstate.Manager
-	memPool      mempool.MemPool[vote.MockedPower]
-	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+	memPool      mempool.MemPool[booker.BlockVotePower]
+	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
 	errorHandler func(error)
 
 	module.Module
@@ -43,7 +44,12 @@ func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 		// TODO: do we always book a block even if its transaction is not solid?
 		//  This is problematic because we need the information of the transaction to actually book the block in the Tangle.
 		//  Also: we need to forward propagate once a TX is booked in case there were pending TX (and thus blocks) that were waiting for this TX to be booked.
-		e.Events.Booker.BlockBooked.Hook(l.attachTransaction)
+		e.Events.Booker.BlockBooked.Hook(l.AttachTransaction)
+
+		// TODO: add all attachments of transaction to the booker's queue.
+		l.memPool.OnTransactionAttached()
+
+		// TODO: should this attach to RatifiedAccepted instead?
 		e.Events.BlockGadget.BlockAccepted.Hook(l.blockAccepted)
 
 		return l
@@ -53,7 +59,7 @@ func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 func New(workers *workerpool.Group, store kvstore.KVStore, apiProviderFunc func() iotago.API, errorHandler func(error)) *Ledger {
 	l := &Ledger{
 		ledgerState:  ledgerstate.New(store, apiProviderFunc),
-		conflictDAG:  mockedconflictdag.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](),
+		conflictDAG:  mockedconflictdag.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](),
 		errorHandler: errorHandler,
 	}
 
@@ -193,7 +199,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), nil
 }
 
-func (l *Ledger) attachTransaction(block *blocks.Block) {
+func (l *Ledger) AttachTransaction(block *blocks.Block) {
 	switch payload := block.Block().Payload.(type) {
 	case *iotago.Transaction:
 		tx := &Transaction{payload}

@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -30,6 +31,7 @@ type Booker struct {
 
 	blockCache  *blocks.Blocks
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	ledger      therealledger.Ledger
 
 	module.Module
 }
@@ -81,6 +83,7 @@ var _ booker.Booker = new(Booker)
 
 // Queue checks if payload is solid and then adds the block to a Booker's CausalOrder.
 func (b *Booker) Queue(block *blocks.Block) (wasQueued bool, err error) {
+	// TODO: handle block in ledger -> create attachment, book and only queue if solid.
 	if isSolid, err := b.isPayloadSolid(block); !isSolid {
 		return false, errors.Wrap(err, "payload is not solid")
 	}
