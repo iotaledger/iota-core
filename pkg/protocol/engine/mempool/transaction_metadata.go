@@ -14,10 +14,6 @@ type TransactionMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateMetadata]
 
-	AllInputsAccepted() bool
-
-	OnAllInputsAccepted(callback func())
-
 	Commit()
 
 	IsSolid() bool
@@ -40,9 +36,9 @@ type TransactionMetadata interface {
 
 	OnConflicting(func())
 
-	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID))
-
 	EarliestIncludedAttachment() iotago.BlockID
+
+	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID))
 
 	inclusionFlags
 }

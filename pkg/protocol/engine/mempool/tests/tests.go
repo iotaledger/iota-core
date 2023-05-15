@@ -47,7 +47,7 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 
 	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
-		require.True(t, state.IsSpent())
+		require.Equal(t, 1, state.PendingSpenderCount())
 
 		return nil
 	})
@@ -57,7 +57,7 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 
 	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
-		require.False(t, state.IsSpent())
+		require.Equal(t, 0, state.PendingSpenderCount())
 
 		return nil
 	})
@@ -79,7 +79,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 
 	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
-		require.True(t, state.IsSpent())
+		require.Equal(t, 1, state.PendingSpenderCount())
 
 		return nil
 	})
@@ -89,7 +89,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 
 	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
-		require.True(t, state.IsSpent())
+		require.Equal(t, 1, state.PendingSpenderCount())
 
 		return nil
 	})
@@ -99,7 +99,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 
 	_ = tx3Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
-		require.False(t, state.IsSpent())
+		require.Equal(t, 0, state.PendingSpenderCount())
 
 		return nil
 	})
@@ -226,6 +226,7 @@ func TestSetNotAllAttachmentsOrphanedFutureCone(t *testing.T, tf *TestFramework)
 	tf.CreateTransaction("tx5", []string{"tx4:0"}, 1)
 
 	require.NoError(t, tf.AttachTransaction("tx5", "block5", 1))
+	require.NoError(t, tf.AttachTransaction("tx4", "block4.3", 1))
 	require.NoError(t, tf.AttachTransaction("tx4", "block4.2", 1))
 	require.NoError(t, tf.AttachTransaction("tx4", "block4.1", 1))
 	require.NoError(t, tf.AttachTransaction("tx3", "block3", 1))
