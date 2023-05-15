@@ -21,7 +21,7 @@ type TransactionMetadata struct {
 	inputs          []*StateMetadata
 	outputs         []*StateMetadata
 	transaction     mempool.Transaction
-	conflictIDs     *advancedset.AdvancedSet[iotago.TransactionID]
+	conflictIDs     *promise.Set[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -65,7 +65,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		inputReferences: inputReferences,
 		inputs:          make([]*StateMetadata, len(inputReferences)),
 		transaction:     transaction,
-		conflictIDs:     advancedset.New[iotago.TransactionID](),
+		conflictIDs:     promise.NewSet[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
 		booked:             promise.NewEvent(),
@@ -243,6 +243,8 @@ func (t *TransactionMetadata) setConflictAccepted() {
 }
 
 func (t *TransactionMetadata) setupInput(input *StateMetadata) {
+	t.conflictIDs.InheritFrom(input.conflictIDs)
+
 	input.OnRejected(t.setRejected)
 	input.OnOrphaned(t.setOrphaned)
 

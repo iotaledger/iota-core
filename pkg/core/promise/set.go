@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/lo"
 )
 
 // Set is a wrapper for an AdvancedSet that is extended by the ability to register callbacks that are
@@ -35,6 +36,30 @@ func NewSet[T comparable]() *Set[T] {
 		value:           advancedset.New[T](),
 		updateCallbacks: shrinkingmap.New[UniqueID, *Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]](),
 	}
+}
+
+// Get returns the current value of the set.
+func (s *Set[T]) Get() *advancedset.AdvancedSet[T] {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	return s.value
+}
+
+// Set sets the given value as the new value of the set.
+func (s *Set[T]) Set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T]) {
+	s.applyMutex.Lock()
+	defer s.applyMutex.Unlock()
+
+	appliedMutations, updateID, callbacksToTrigger := s.set(value)
+	for _, callback := range callbacksToTrigger {
+		if callback.Lock(updateID) {
+			callback.Invoke(value, appliedMutations)
+			callback.Unlock()
+		}
+	}
+
+	return appliedMutations
 }
 
 // Apply applies the given SetMutations to the set.
@@ -97,14 +122,28 @@ func (s *Set[T]) Has(element T) bool {
 }
 
 // InheritFrom registers the given sets to inherit their mutations to the set.
-func (s *Set[T]) InheritFrom(sources ...*Set[T]) {
-	for _, source := range sources {
-		source.OnUpdate(func(_ *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T]) {
+func (s *Set[T]) InheritFrom(sources ...*Set[T]) (unsubscribe func()) {
+	unsubscribeCallbacks := make([]func(), len(sources))
+
+	for i, source := range sources {
+		unsubscribeCallbacks[i] = source.OnUpdate(func(_ *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T]) {
 			if !appliedMutations.IsEmpty() {
 				s.Apply(appliedMutations)
 			}
 		})
 	}
+
+	return lo.Batch(unsubscribeCallbacks...)
+}
+
+func (s *Set[T]) set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T], triggerID UniqueID, callbacksToTrigger []*Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	appliedMutations = NewSetMutations[T](WithRemovedElements(s.value), WithAddedElements(value))
+	s.value = value
+
+	return appliedMutations, s.uniqueUpdateID.Next(), s.updateCallbacks.Values()
 }
 
 // applyMutations applies the given mutations to the set.

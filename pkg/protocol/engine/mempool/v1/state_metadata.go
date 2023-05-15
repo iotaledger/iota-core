@@ -3,6 +3,7 @@ package mempoolv1
 import (
 	"sync/atomic"
 
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -22,6 +23,8 @@ type StateMetadata struct {
 	spendCommitted     *promise.Value[*TransactionMetadata]
 	allSpendersRemoved *event.Event
 
+	conflictIDs *promise.Set[iotago.TransactionID]
+
 	*inclusionFlags
 }
 
@@ -36,12 +39,21 @@ func NewStateMetadata(state ledger.State, optSource ...*TransactionMetadata) *St
 		spendCommitted:     promise.NewValue[*TransactionMetadata](),
 		allSpendersRemoved: event.New(),
 
+		conflictIDs: promise.NewSet[iotago.TransactionID](),
+
 		inclusionFlags: newInclusionFlags(),
 	}).setup(optSource...)
 }
 
 func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata {
 	if len(optSource) > 0 {
+		cancelInheritance := s.conflictIDs.InheritFrom(optSource[0].conflictIDs)
+		optSource[0].OnConflicting(func() {
+			cancelInheritance()
+
+			s.conflictIDs.Set(advancedset.New[iotago.TransactionID](optSource[0].id))
+		})
+
 		optSource[0].OnPending(s.setPending)
 		optSource[0].OnAccepted(s.setAccepted)
 		optSource[0].OnRejected(s.setRejected)

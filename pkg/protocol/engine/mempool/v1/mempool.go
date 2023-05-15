@@ -273,7 +273,7 @@ func (m *MemPool[VotePower]) requestStateWithMetadata(stateReference ledger.Stat
 }
 
 func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, input *StateMetadata) {
-	switch err := m.conflictDAG.CreateConflict(transaction.ID(), transaction.conflictIDs, advancedset.New(input.ID()), acceptance.Pending); {
+	switch err := m.conflictDAG.CreateConflict(transaction.ID(), transaction.conflictIDs.Get(), advancedset.New(input.ID()), acceptance.Pending); {
 	case errors.Is(err, conflictdag.ErrConflictExists):
 		m.conflictDAG.JoinConflictSets(transaction.ID(), advancedset.New(input.ID()))
 	case err != nil:
