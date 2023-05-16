@@ -38,7 +38,7 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection, e.BlockCache, opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection, e.BlockCache, e.Ledger, opts...)
 
 		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 			if err := b.Queue(block); err != nil {
@@ -57,11 +57,12 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, sybilProtection sybilprotection.SybilProtection, blockCache *blocks.Blocks, opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, sybilProtection sybilprotection.SybilProtection, blockCache *blocks.Blocks, ledger therealledger.Ledger, opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:          booker.NewEvents(),
 		sybilProtection: sybilProtection,
 		blockCache:      blockCache,
+		ledger:          ledger,
 
 		workers: workers,
 	}, opts, func(b *Booker) {
