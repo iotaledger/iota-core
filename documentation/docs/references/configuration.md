@@ -109,13 +109,13 @@ Example:
 
 ## <a id="p2p"></a> 3. P2p
 
-| Name                | Description                                                                                                                                          | Type    | Default value   |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | --------------- |
-| bindAddress         | The bind address for p2p connections                                                                                                                 | string  | "0.0.0.0:14666" |
-| seed                | Private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively | string  | ""              |
-| overwriteStoredSeed | Whether to overwrite the private key if an existing peerdb exists                                                                                    | boolean | false           |
-| externalAddress     | External IP address under which the node is reachable; or 'auto' to determine it automatically                                                       | string  | "auto"          |
-| peerDBDirectory     | Path to the peer database directory                                                                                                                  | string  | "peerdb"        |
+| Name                | Description                                                                                                                                          | Type    | Default value    |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------- |
+| bindAddress         | The bind address for p2p connections                                                                                                                 | string  | "0.0.0.0:14666"  |
+| seed                | Private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively | string  | ""               |
+| overwriteStoredSeed | Whether to overwrite the private key if an existing peerdb exists                                                                                    | boolean | false            |
+| externalAddress     | External IP address under which the node is reachable; or 'auto' to determine it automatically                                                       | string  | "auto"           |
+| peerDBDirectory     | Path to the peer database directory                                                                                                                  | string  | "testnet/peerdb" |
 
 Example:
 
@@ -126,7 +126,7 @@ Example:
       "seed": "",
       "overwriteStoredSeed": false,
       "externalAddress": "auto",
-      "peerDBDirectory": "peerdb"
+      "peerDBDirectory": "testnet/peerdb"
     }
   }
 ```
@@ -209,34 +209,24 @@ Example:
 
 ## <a id="database"></a> 6. Database
 
-| Name                           | Description                                                   | Type    | Default value |
-| ------------------------------ | ------------------------------------------------------------- | ------- | ------------- |
-| directory                      | Path to the database directory                                | string  | "db"          |
-| inMemory                       | Whether the database is only kept in memory and not persisted | boolean | false         |
-| maxOpenDBs                     | Maximum number of open database instances                     | int     | 10            |
-| pruningThreshold               | How many confirmed slots should be retained                   | uint    | 360           |
-| dbGranularity                  | How many slots should be contained in a single DB instance    | int     | 1             |
-| [settings](#database_settings) | Configuration for settings                                    | object  |               |
-
-### <a id="database_settings"></a> Settings
-
-| Name     | Description                                                            | Type   | Default value  |
-| -------- | ---------------------------------------------------------------------- | ------ | -------------- |
-| fileName | The file name of the settings file, relative to the database directory | string | "settings.bin" |
+| Name             | Description                                                | Type   | Default value      |
+| ---------------- | ---------------------------------------------------------- | ------ | ------------------ |
+| engine           | The used database engine (rocksdb/mapdb)                   | string | "rocksdb"          |
+| path             | The path to the database folder                            | string | "testnet/database" |
+| maxOpenDBs       | Maximum number of open database instances                  | int    | 10                 |
+| pruningThreshold | How many confirmed slots should be retained                | uint   | 360                |
+| dbGranularity    | How many slots should be contained in a single DB instance | int    | 1                  |
 
 Example:
 
 ```json
   {
     "database": {
-      "directory": "db",
-      "inMemory": false,
+      "engine": "rocksdb",
+      "path": "testnet/database",
       "maxOpenDBs": 10,
       "pruningThreshold": 360,
-      "dbGranularity": 1,
-      "settings": {
-        "fileName": "settings.bin"
-      }
+      "dbGranularity": 1
     }
   }
 ```
@@ -252,10 +242,10 @@ Example:
 
 ### <a id="protocol_snapshot"></a> Snapshot
 
-| Name  | Description                                                                                | Type   | Default value    |
-| ----- | ------------------------------------------------------------------------------------------ | ------ | ---------------- |
-| path  | The path of the snapshot file                                                              | string | "./snapshot.bin" |
-| depth | Defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate | int    | 5                |
+| Name  | Description                                                                                | Type   | Default value          |
+| ----- | ------------------------------------------------------------------------------------------ | ------ | ---------------------- |
+| path  | The path of the snapshot file                                                              | string | "testnet/snapshot.bin" |
+| depth | Defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate | int    | 5                      |
 
 ### <a id="protocol_notarization"></a> Notarization
 
@@ -288,7 +278,7 @@ Example:
   {
     "protocol": {
       "snapshot": {
-        "path": "./snapshot.bin",
+        "path": "testnet/snapshot.bin",
         "depth": 5
       },
       "notarization": {

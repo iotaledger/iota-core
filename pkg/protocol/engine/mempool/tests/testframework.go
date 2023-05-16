@@ -218,6 +218,14 @@ func (t *TestFramework) setupHookedEvents() {
 		})
 
 		metadata.OnPending(func() {
+			if debug.GetEnabled() {
+				t.test.Logf("[TRIGGERED] mempool.Events.TransactionPending with '%s'", metadata.ID())
+			}
+
+			require.True(t.test, metadata.IsPending(), "transaction is not marked as pending")
+		})
+
+		metadata.OnPending(func() {
 			//	if debug.GetEnabled() {
 			//		t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
 			//	}
