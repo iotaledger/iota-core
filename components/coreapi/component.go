@@ -183,7 +183,6 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.POST(RouteBlocks, func(c echo.Context) error {
-		// TODO: implement sendBlock.
 		resp, err := sendBlock(c)
 		if err != nil {
 			return err
