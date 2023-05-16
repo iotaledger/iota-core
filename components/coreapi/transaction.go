@@ -55,10 +55,6 @@ func blockMetadataFromTransactionID(c echo.Context) (*blockMetadataResponse, err
 		ShallowLikeParents: block.Block().ShallowLikeParents.ToHex(),
 		BlockState:         blockStatePending.String(),
 	}
-	_, exists := deps.Protocol.MainEngineInstance().Block(block.ID())
-	if !exists {
-		bmResponse.BlockStateReason = "block not found"
-	}
 
 	return bmResponse, nil
 }
