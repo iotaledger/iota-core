@@ -75,7 +75,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 
 		conflictSets, err := c.conflictSets(resourceIDs, true /*!initialAcceptanceState.IsRejected()*/)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to create ConflictSet: %w", err)
+			return advancedset.New[ResourceID](), xerrors.Errorf("failed to create ConflictSet: %w", err)
 		}
 
 		if conflict, isNew := c.conflictsByID.GetOrCreate(id, func() *Conflict[ConflictID, ResourceID, VotePower] {
@@ -100,16 +100,16 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 		}); !isNew {
 			joinedConflictSets, err := conflict.JoinConflictSets(conflictSets)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to join conflict sets: %w", err)
+				return advancedset.New[ResourceID](), xerrors.Errorf("failed to join conflict sets: %w", err)
 			}
 
 			return joinedConflictSets, nil
 		}
 
-		return nil, nil
+		return advancedset.New[ResourceID](), nil
 	}()
 
-	if err == nil && joinedConflictSets == nil {
+	if err == nil && joinedConflictSets.IsEmpty() {
 		c.events.ConflictCreated.Trigger(id)
 	} else if err == nil && !joinedConflictSets.IsEmpty() {
 		c.events.ConflictingResourcesAdded.Trigger(id, joinedConflictSets)
