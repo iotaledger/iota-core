@@ -46,6 +46,11 @@ func (s *Set[T]) Get() *advancedset.AdvancedSet[T] {
 	return s.value
 }
 
+// Size returns the size of the set.
+func (s *Set[T]) Size() int {
+	return s.Get().Size()
+}
+
 // Set sets the given value as the new value of the set.
 func (s *Set[T]) Set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T]) {
 	s.applyMutex.Lock()
@@ -154,20 +159,16 @@ func (s *Set[T]) applyMutations(mutations *SetMutations[T]) (updatedSet *advance
 	updatedSet = s.value.Clone()
 	appliedMutations = NewSetMutations[T]()
 
-	mutations.RemovedElements.ForEach(func(element T) error {
+	mutations.RemovedElements.Range(func(element T) {
 		if updatedSet.Delete(element) {
 			appliedMutations.RemovedElements.Add(element)
 		}
-
-		return nil
 	})
 
-	mutations.AddedElements.ForEach(func(element T) error {
+	mutations.AddedElements.Range(func(element T) {
 		if updatedSet.Add(element) && !appliedMutations.RemovedElements.Delete(element) {
 			appliedMutations.AddedElements.Add(element)
 		}
-
-		return nil
 	})
 
 	s.value = updatedSet

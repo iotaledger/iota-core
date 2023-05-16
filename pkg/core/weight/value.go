@@ -69,7 +69,7 @@ func (v Value) SetAcceptanceState(acceptanceState acceptance.State) Value {
 
 // Compare compares the Value to the given other Value and returns the result of the comparison.
 func (v Value) Compare(other Value) Comparison {
-	if result := v.compareConfirmationState(other); result != 0 {
+	if result := v.compareAcceptanceState(other); result != 0 {
 		return result
 	}
 
@@ -93,8 +93,8 @@ func (v Value) String() string {
 	)
 }
 
-// compareConfirmationState compares the confirmation state of the Value to the confirmation state of the other Value.
-func (v Value) compareConfirmationState(other Value) int {
+// compareAcceptanceState compares the confirmation state of the Value to the confirmation state of the other Value.
+func (v Value) compareAcceptanceState(other Value) int {
 	switch {
 	case v.acceptanceState.IsAccepted() && !other.acceptanceState.IsAccepted():
 		return Heavier

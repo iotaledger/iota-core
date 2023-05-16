@@ -3,7 +3,6 @@ package mempoolv1
 import (
 	"sync/atomic"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -51,13 +50,7 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	}
 	source := optSource[0]
 
-	cancelConflictInheritance := s.conflictIDs.InheritFrom(source.conflictIDs)
-
-	source.OnConflicting(func() {
-		cancelConflictInheritance()
-
-		s.conflictIDs.Set(advancedset.New[iotago.TransactionID](source.id))
-	})
+	s.conflictIDs.InheritFrom(source.conflictIDs)
 
 	source.OnPending(s.setPending)
 	source.OnAccepted(s.setAccepted)
@@ -74,6 +67,10 @@ func (s *StateMetadata) ID() iotago.OutputID {
 
 func (s *StateMetadata) State() ledger.State {
 	return s.state
+}
+
+func (s *StateMetadata) ConflictIDs() *promise.Set[iotago.TransactionID] {
+	return s.conflictIDs
 }
 
 func (s *StateMetadata) IsDoubleSpent() bool {

@@ -16,12 +16,13 @@ import (
 )
 
 type TransactionMetadata struct {
-	id              iotago.TransactionID
-	inputReferences []ledger.StateReference
-	inputs          []*StateMetadata
-	outputs         []*StateMetadata
-	transaction     mempool.Transaction
-	conflictIDs     *promise.Set[iotago.TransactionID]
+	id                iotago.TransactionID
+	inputReferences   []ledger.StateReference
+	inputs            []*StateMetadata
+	outputs           []*StateMetadata
+	transaction       mempool.Transaction
+	parentConflictIDs *promise.Set[iotago.TransactionID]
+	conflictIDs       *promise.Set[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -61,11 +62,12 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 	}
 
 	return (&TransactionMetadata{
-		id:              transactionID,
-		inputReferences: inputReferences,
-		inputs:          make([]*StateMetadata, len(inputReferences)),
-		transaction:     transaction,
-		conflictIDs:     promise.NewSet[iotago.TransactionID](),
+		id:                transactionID,
+		inputReferences:   inputReferences,
+		inputs:            make([]*StateMetadata, len(inputReferences)),
+		transaction:       transaction,
+		parentConflictIDs: promise.NewSet[iotago.TransactionID](),
+		conflictIDs:       promise.NewSet[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
 		booked:             promise.NewEvent(),
@@ -116,6 +118,10 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	}
 
 	return outputs
+}
+
+func (t *TransactionMetadata) ConflictIDs() *promise.Set[iotago.TransactionID] {
+	return t.conflictIDs
 }
 
 func (t *TransactionMetadata) publishInputAndCheckSolidity(index int, input *StateMetadata) (allInputsSolid bool) {
@@ -213,22 +219,6 @@ func (t *TransactionMetadata) AllInputsAccepted() bool {
 	return t.allInputsAccepted.Get()
 }
 
-func (t *TransactionMetadata) onAllInputsAccepted(callback func()) {
-	t.allInputsAccepted.OnUpdate(func(_, allInputsAreAccepted bool) {
-		if allInputsAreAccepted {
-			callback()
-		}
-	})
-}
-
-func (t *TransactionMetadata) onNotAllInputsAccepted(callback func()) {
-	t.allInputsAccepted.OnUpdate(func(allInputsWereAccepted, allInputsAreAccepted bool) {
-		if !allInputsAreAccepted && allInputsWereAccepted {
-			callback()
-		}
-	})
-}
-
 func (t *TransactionMetadata) setConflicting() {
 	t.conflicting.Trigger()
 }
@@ -242,7 +232,7 @@ func (t *TransactionMetadata) setConflictAccepted() {
 }
 
 func (t *TransactionMetadata) setupInput(input *StateMetadata) {
-	t.conflictIDs.InheritFrom(input.conflictIDs)
+	t.parentConflictIDs.InheritFrom(input.conflictIDs)
 
 	input.OnRejected(t.setRejected)
 	input.OnOrphaned(t.setOrphaned)
@@ -277,6 +267,14 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 }
 
 func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
+	cancelConflictInheritance := t.conflictIDs.InheritFrom(t.parentConflictIDs)
+
+	t.OnConflicting(func() {
+		cancelConflictInheritance()
+
+		t.conflictIDs.Set(advancedset.New[iotago.TransactionID](t.id))
+	})
+
 	t.allAttachmentsEvicted.OnTrigger(func() {
 		if !t.IsCommitted() {
 			t.setOrphaned()
