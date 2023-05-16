@@ -5,14 +5,17 @@ import (
 
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// TODO design apply diffs function for BIC and Holdings
-
 // BlockIssuanceCredits is the minimal interface for the Accounts component of the IOTA protocol.
 type BlockIssuanceCredits interface {
+	// CommitSlot commits the slot and returns the BI root.
+	CommitSlot(diff *ledgerstate.SlotDiff) (bicRoot iotago.Identifier, err error)
+
 	// BIC returns Block Issuer Credits of all registered accounts.
+	// TODO do we still need this if we have ComitSlot?
 	BIC() *account.Accounts[iotago.AccountID, *iotago.AccountID]
 
 	// AccountBIC returns Block Issuer Credits of a specific account.

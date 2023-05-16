@@ -205,13 +205,6 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	// TODO update the ledger with state diff
-	// TODO update the BIC vector
-	if err := m.bic.Update(index); err != nil {
-		m.events.Error.Trigger(errors.Wrap(err, "failed to update weights"))
-		return false
-	}
-
 	// set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
 	ratifiedAcceptedBlocks := m.slotMutations.RatifiedAcceptedBlocks(index, true)
 
@@ -238,9 +231,15 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		}
 	}
 
-	stateRoot, mutationRoot, err := m.ledger.CommitSlot(index)
+	stateRoot, mutationRoot, slotDiff, err := m.ledger.CommitSlot(index)
 	if err != nil {
 		m.errorHandler(errors.Wrap(err, "failed to commit ledger"))
+		return false
+	}
+
+	bicRoot, err := m.bic.CommitSlot(slotDiff)
+	if err != nil {
+		m.events.Error.Trigger(errors.Wrap(err, "failed to commit BIC"))
 		return false
 	}
 
@@ -252,7 +251,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 			mutationRoot,
 			iotago.Identifier(attestations.Root()),
 			stateRoot,
-			iotago.Identifier(m.slotMutations.weights.Root()),
+			bicRoot,
 		).ID(),
 		m.storage.Settings().LatestCommitment().CumulativeWeight()+uint64(attestationsWeight),
 	)

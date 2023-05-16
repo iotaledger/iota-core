@@ -145,22 +145,22 @@ func (m *Manager) ReadLedgerIndex() (iotago.SlotIndex, error) {
 	return m.ReadLedgerIndexWithoutLocking()
 }
 
-func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
+func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) (*SlotDiff, error) {
 	mutations, err := m.store.Batched()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, output := range newOutputs {
 		if err := storeOutput(output, mutations); err != nil {
 			mutations.Cancel()
 
-			return err
+			return nil, err
 		}
 		if err := markAsUnspent(output, mutations); err != nil {
 			mutations.Cancel()
 
-			return err
+			return nil, err
 		}
 	}
 
@@ -168,7 +168,7 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 		if err := storeSpentAndMarkOutputAsSpent(spent, mutations); err != nil {
 			mutations.Cancel()
 
-			return err
+			return nil, err
 		}
 	}
 
@@ -181,17 +181,17 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 	if err := storeDiff(msDiff, mutations); err != nil {
 		mutations.Cancel()
 
-		return err
+		return nil, err
 	}
 
 	if err := storeLedgerIndex(index, mutations); err != nil {
 		mutations.Cancel()
 
-		return err
+		return nil, err
 	}
 
 	if err := mutations.Commit(); err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, output := range newOutputs {
@@ -201,10 +201,10 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 		m.stateTree.Delete(spent.OutputID())
 	}
 
-	return nil
+	return msDiff, nil
 }
 
-func (m *Manager) ApplyDiff(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
+func (m *Manager) ApplyDiff(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) (*SlotDiff, error) {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
