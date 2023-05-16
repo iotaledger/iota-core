@@ -41,6 +41,7 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 
 		e.HookConstructed(func() {
 			f.events.BlockFiltered.Hook(func(filteredEvent *filter.BlockFilteredEvent) {
+				// TODO: not necessarily an error
 				e.Events.Error.Trigger(errors.Wrapf(filteredEvent.Reason, "block (%s) filtered", filteredEvent.Block.ID()))
 			}, event.WithWorkerPool(e.Workers.CreatePool("Filter", 2)))
 
