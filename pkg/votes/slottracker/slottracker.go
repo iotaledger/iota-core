@@ -4,14 +4,13 @@ import (
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/votes/latestvotes"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type SlotTracker struct {
 	Events *Events
 
-	votesPerIdentity *shrinkingmap.ShrinkingMap[iotago.AccountID, *latestvotes.LatestVotes[iotago.SlotIndex, SlotVotePower]]
+	votesPerIdentity *shrinkingmap.ShrinkingMap[iotago.AccountID, iotago.SlotIndex]
 	votersPerSlot    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.AccountID]]
 
 	cutoffIndexCallback func() iotago.SlotIndex
@@ -19,7 +18,7 @@ type SlotTracker struct {
 
 func NewSlotTracker(cutoffIndexCallback func() iotago.SlotIndex) *SlotTracker {
 	return &SlotTracker{
-		votesPerIdentity: shrinkingmap.New[iotago.AccountID, *latestvotes.LatestVotes[iotago.SlotIndex, SlotVotePower]](),
+		votesPerIdentity: shrinkingmap.New[iotago.AccountID, iotago.SlotIndex](),
 		votersPerSlot:    shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.AccountID]](),
 
 		cutoffIndexCallback: cutoffIndexCallback,
@@ -35,30 +34,39 @@ func (s *SlotTracker) slotVoters(slotIndex iotago.SlotIndex) *advancedset.Advanc
 	return slotVoters
 }
 
-func (s *SlotTracker) TrackVotes(slotIndex iotago.SlotIndex, voterID iotago.AccountID, power SlotVotePower) {
+func (s *SlotTracker) TrackVotes(slotIndex iotago.SlotIndex, voterID iotago.AccountID) {
 	slotVoters := s.slotVoters(slotIndex)
+	// We tracked a vote for this voter on this slot already.
 	if slotVoters.Has(voterID) {
 		// We already tracked the voter for this slot, so no need to update anything
 		return
 	}
 
-	votersVotes, _ := s.votesPerIdentity.GetOrCreate(voterID, func() *latestvotes.LatestVotes[iotago.SlotIndex, SlotVotePower] {
-		return latestvotes.NewLatestVotes[iotago.SlotIndex, SlotVotePower](voterID)
+	var previousIndex iotago.SlotIndex
+	var updated bool
+	updatedIndex := s.votesPerIdentity.Compute(voterID, func(currentValue iotago.SlotIndex, exists bool) iotago.SlotIndex {
+		previousIndex = currentValue
+		if slotIndex > previousIndex {
+			updated = true
+			return slotIndex
+		}
+
+		return previousIndex
 	})
 
-	updated, previousHighestIndex := votersVotes.Store(slotIndex, power)
-	if !updated || previousHighestIndex >= slotIndex {
+	// The new slotIndex is smaller or equal the previousIndex. There's no need to update votersPerSlot.
+	if !updated {
 		return
 	}
 
-	for i := lo.Max(s.cutoffIndexCallback(), previousHighestIndex) + 1; i <= slotIndex; i++ {
+	for i := lo.Max(s.cutoffIndexCallback(), previousIndex) + 1; i <= updatedIndex; i++ {
 		s.slotVoters(i).Add(voterID)
 	}
 
 	s.Events.VotersUpdated.Trigger(&VoterUpdatedEvent{
 		Voter:               voterID,
-		NewLatestSlotIndex:  slotIndex,
-		PrevLatestSlotIndex: previousHighestIndex,
+		NewLatestSlotIndex:  updatedIndex,
+		PrevLatestSlotIndex: previousIndex,
 	})
 }
 
@@ -86,15 +94,11 @@ func (s *SlotTracker) EvictSlot(indexToEvict iotago.SlotIndex) {
 
 	var identitiesToPrune []iotago.AccountID
 	_ = identities.ForEach(func(identity iotago.AccountID) error {
-		votesForIdentity, has := s.votesPerIdentity.Get(identity)
+		latestVoteIndex, has := s.votesPerIdentity.Get(identity)
 		if !has {
 			return nil
 		}
-		power, hasPower := votesForIdentity.Power(indexToEvict)
-		if !hasPower {
-			return nil
-		}
-		if power.Index <= indexToEvict {
+		if latestVoteIndex <= indexToEvict {
 			identitiesToPrune = append(identitiesToPrune, identity)
 		}
 
@@ -107,21 +111,3 @@ func (s *SlotTracker) EvictSlot(indexToEvict iotago.SlotIndex) {
 
 	s.votersPerSlot.Delete(indexToEvict)
 }
-
-// region SlotVotePower //////////////////////////////////////////////////////////////////////////////////////////////
-
-type SlotVotePower struct {
-	Index iotago.SlotIndex
-}
-
-func (p SlotVotePower) Compare(other SlotVotePower) int {
-	if other.Index > p.Index {
-		return -1
-	} else if other.Index < p.Index {
-		return 1
-	} else {
-		return 0
-	}
-}
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
