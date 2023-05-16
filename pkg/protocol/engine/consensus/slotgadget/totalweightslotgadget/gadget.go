@@ -63,7 +63,13 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				}, event.WithWorkerPool(g.workers.CreatePool("Refresh", 2)))
 
 				e.HookInitialized(func() {
-					g.lastFinalizedSlot = e.Storage.Permanent.Settings().LatestFinalizedSlot()
+					// Can't use setter here as it has a side effect.
+					func() {
+						g.mutex.Lock()
+						defer g.mutex.Unlock()
+						g.lastFinalizedSlot = e.Storage.Permanent.Settings().LatestFinalizedSlot()
+					}()
+
 					g.TriggerInitialized()
 				})
 			})

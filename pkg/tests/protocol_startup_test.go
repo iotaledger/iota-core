@@ -31,11 +31,17 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 			),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+			),
 		},
 		"node2": {
 			protocol.WithPruningDelay(1),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+			),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
 			),
 		},
 	})
@@ -125,7 +131,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			ts.AssertBlocksInCacheConfirmed(ts.Blocks("3.1"), true, ts.Nodes()...)
 		}
 
-		// Verify nodes' states: Slot 1 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 3.
+		// Verify nodes' states: Slot 1 should be committed as the MinCommittableSlotAge is 1, and we ratified accepted a block at slot 3.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -154,8 +160,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("6.2", "7.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("8.2"), false, ts.Nodes()...)
 
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheConfirmed(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("4.2", "5.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("4.2", "5.1"), true, ts.Nodes()...)
 		}
 
 		// Verify nodes' states:
@@ -195,8 +201,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("8.2", "9.1", "10.2", "11.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("12.2"), false, ts.Nodes()...)
 
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("6.2", "7.1", "8.2", "9.1"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheConfirmed(ts.Blocks("6.2", "7.1", "8.2", "9.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("8.2", "9.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("8.2", "9.1"), true, ts.Nodes()...)
 		}
 
 		// Verify nodes' states:
@@ -322,7 +328,6 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 		node21 := ts.AddNode("node2.1")
 		node21.CopyIdentityFromNode(node2)
-		fmt.Println("validators", ts.Validators())
 		node21.Initialize(
 			protocol.WithBaseDirectory(ts.Directory.Path(node2.Name)),
 			protocol.WithSybilProtectionProvider(

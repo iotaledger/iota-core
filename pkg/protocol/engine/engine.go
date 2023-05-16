@@ -58,6 +58,7 @@ type Engine struct {
 	isBootstrappedMutex sync.Mutex
 
 	chainID iotago.CommitmentID
+	mutex   sync.RWMutex
 
 	optsBootstrappedThreshold time.Duration
 	optsEntryPointsDepth      int
@@ -286,10 +287,16 @@ func (e *Engine) Name() string {
 }
 
 func (e *Engine) ChainID() iotago.CommitmentID {
+	e.mutex.RLock()
+	defer e.mutex.RUnlock()
+
 	return e.chainID
 }
 
 func (e *Engine) SetChainID(chainID iotago.CommitmentID) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
 	e.chainID = chainID
 }
 

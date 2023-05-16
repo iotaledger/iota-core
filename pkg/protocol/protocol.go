@@ -93,7 +93,6 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsBaseDirectory: "",
 		optsPruningDelay:  360,
 	}, opts,
-		(*Protocol).initNetworkEvents,
 		(*Protocol).initEngineManager,
 		(*Protocol).initChainManager,
 	)
@@ -126,10 +125,7 @@ func (p *Protocol) Run() {
 	}
 
 	// p.linkTo(p.mainEngine) -> CC and TipManager
-	// TODO: why do we create a protocol only when running?
-	// TODO: fill up protocol params
-	p.networkProtocol = core.NewProtocol(p.dispatcher, p.Workers.CreatePool("NetworkProtocol"), p.API()) // Use max amount of workers for networking
-	p.Events.Network.LinkTo(p.networkProtocol.Events)
+	p.runNetworkProtocol()
 }
 
 func (p *Protocol) Shutdown() {
@@ -143,7 +139,10 @@ func (p *Protocol) Shutdown() {
 	p.TipManager.Shutdown()
 }
 
-func (p *Protocol) initNetworkEvents() {
+func (p *Protocol) runNetworkProtocol() {
+	p.networkProtocol = core.NewProtocol(p.dispatcher, p.Workers.CreatePool("NetworkProtocol"), p.API()) // Use max amount of workers for networking
+	p.Events.Network.LinkTo(p.networkProtocol.Events)
+
 	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks
 
 	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {

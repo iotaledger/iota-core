@@ -1,7 +1,6 @@
 package eviction
 
 import (
-	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -111,7 +110,6 @@ func (s *State) ActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
 
 	activeRootBlocks := make(map[iotago.BlockID]iotago.CommitmentID)
 	start, end := s.activeIndexRange()
-	fmt.Println("ActiveRootBlocks: ", start, " ", end)
 	for index := start; index <= end; index++ {
 		storage := s.rootBlocks.Get(index)
 		if storage == nil {
@@ -135,10 +133,8 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 
 	// The rootblock is too old, ignore it.
 	if id.Index() < lo.Return1(s.activeIndexRange()) {
-		fmt.Println("ignore AddRootBlock: ", id.String(), id.Index(), lo.Return1(s.activeIndexRange()))
 		return
 	}
-	fmt.Println("AddRootBlock: ", id.String(), id.Index(), lo.Return1(s.activeIndexRange()))
 
 	if s.rootBlocks.Get(id.Index(), true).Set(id, commitmentID) {
 		if err := s.rootBlockStorageFunc(id.Index()).Store(id, commitmentID); err != nil {
@@ -180,8 +176,6 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	start, end := s.activeIndexRange()
-	fmt.Println("RootBlockCommitmentID: ", id.String(), id.Index(), start, end)
 	if !s.withinActiveIndexRange(id.Index()) {
 		return iotago.CommitmentID{}, false
 	}
@@ -213,7 +207,6 @@ func (s *State) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err 
 
 	return stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		for currentSlot := start; currentSlot <= targetSlot; currentSlot++ {
-			fmt.Println("Export: ", currentSlot)
 			if err = s.rootBlockStorageFunc(currentSlot).Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
 				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
 					return errors.Wrapf(err, "failed to write root block ID %s", rootBlockID)
@@ -248,7 +241,6 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 			return errors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
 		}
 
-		fmt.Println("importing root block", rootBlockID, commitmentID)
 		s.AddRootBlock(rootBlockID, commitmentID)
 
 		return nil
