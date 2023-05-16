@@ -1,12 +1,13 @@
 package coreapi
 
 import (
+	"github.com/labstack/echo/v4"
+	"github.com/pkg/errors"
+
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/labstack/echo/v4"
-	"github.com/pkg/errors"
 )
 
 func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
