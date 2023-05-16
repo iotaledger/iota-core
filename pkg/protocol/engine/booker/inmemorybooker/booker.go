@@ -3,6 +3,7 @@ package inmemorybooker
 import (
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/walker"
@@ -15,7 +16,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -23,7 +23,7 @@ import (
 type Booker struct {
 	events *booker.Events
 
-	sybilProtection sybilprotection.SybilProtection
+	committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
 
 	bookingOrder *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
@@ -38,7 +38,7 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection, e.BlockCache, e.Ledger, opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection.Committee(), e.BlockCache, e.Ledger, opts...)
 
 		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 			if err := b.Queue(block); err != nil {
@@ -57,12 +57,12 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, sybilProtection sybilprotection.SybilProtection, blockCache *blocks.Blocks, ledger therealledger.Ledger, opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], blockCache *blocks.Blocks, ledger therealledger.Ledger, opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
-		events:          booker.NewEvents(),
-		sybilProtection: sybilProtection,
-		blockCache:      blockCache,
-		ledger:          ledger,
+		events:     booker.NewEvents(),
+		committee:  committee,
+		blockCache: blockCache,
+		ledger:     ledger,
 
 		workers: workers,
 	}, opts, func(b *Booker) {
@@ -139,7 +139,7 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) error {
 	witness := votingBlock.Block().IssuerID
 
 	// Only track witness weight for issuers that are part of the committee.
-	if !b.sybilProtection.Committee().Has(witness) {
+	if !b.committee.Has(witness) {
 		return nil
 	}
 

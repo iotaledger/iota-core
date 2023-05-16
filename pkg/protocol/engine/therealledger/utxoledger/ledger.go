@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -20,7 +21,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -38,7 +38,7 @@ type Ledger struct {
 
 func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) therealledger.Ledger {
-		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.SybilProtection, e.Events.Error.Trigger)
+		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.SybilProtection.OnlineCommittee(), e.Events.Error.Trigger)
 
 		// TODO: should this attach to RatifiedAccepted instead?
 		e.Events.BlockGadget.BlockAccepted.Hook(l.blockAccepted)
@@ -47,10 +47,10 @@ func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 	})
 }
 
-func New(workers *workerpool.Group, store kvstore.KVStore, apiProviderFunc func() iotago.API, sybilProtection sybilprotection.SybilProtection, errorHandler func(error)) *Ledger {
+func New(workers *workerpool.Group, store kvstore.KVStore, apiProviderFunc func() iotago.API, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], errorHandler func(error)) *Ledger {
 	l := &Ledger{
 		ledgerState:  ledgerstate.New(store, apiProviderFunc),
-		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](sybilProtection.OnlineCommittee()),
+		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
 		errorHandler: errorHandler,
 	}
 
