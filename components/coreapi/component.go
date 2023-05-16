@@ -343,6 +343,7 @@ func responseByHeader(c echo.Context, obj any) error {
 		if err != nil {
 			return err
 		}
+
 		return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, b)
 
 	default:

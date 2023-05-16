@@ -1,10 +1,11 @@
 package coreapi
 
 import (
+	"github.com/labstack/echo/v4"
+
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/labstack/echo/v4"
 )
 
 func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {

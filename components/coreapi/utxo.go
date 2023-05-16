@@ -1,10 +1,11 @@
 package coreapi
 
 import (
+	"github.com/labstack/echo/v4"
+
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	"github.com/labstack/echo/v4"
 )
 
 func getOutput(c echo.Context) (*ledgerstate.Output, error) {
