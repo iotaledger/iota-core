@@ -159,20 +159,16 @@ func (s *Set[T]) applyMutations(mutations *SetMutations[T]) (updatedSet *advance
 	updatedSet = s.value.Clone()
 	appliedMutations = NewSetMutations[T]()
 
-	mutations.RemovedElements.ForEach(func(element T) error {
+	mutations.RemovedElements.Range(func(element T) {
 		if updatedSet.Delete(element) {
 			appliedMutations.RemovedElements.Add(element)
 		}
-
-		return nil
 	})
 
-	mutations.AddedElements.ForEach(func(element T) error {
+	mutations.AddedElements.Range(func(element T) {
 		if updatedSet.Add(element) && !appliedMutations.RemovedElements.Delete(element) {
 			appliedMutations.AddedElements.Add(element)
 		}
-
-		return nil
 	})
 
 	s.value = updatedSet
