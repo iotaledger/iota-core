@@ -34,6 +34,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -45,6 +47,7 @@ import (
 type Protocol struct {
 	Events        *Events
 	TipManager    tipmanager.TipManager
+	SyncManager   syncmanager.SyncManager
 	engineManager *enginemanager.EngineManager
 	ChainManager  *chainmanager.Manager
 
@@ -71,6 +74,7 @@ type Protocol struct {
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
+	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsLedgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
 }
 
@@ -88,6 +92,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
+		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          utxoledger.NewProvider(),
 
 		optsBaseDirectory: "",
@@ -103,6 +108,7 @@ func (p *Protocol) Run() {
 	p.Events.Engine.LinkTo(p.mainEngine.Events)
 	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
 	p.Events.TipManager.LinkTo(p.TipManager.Events())
+	p.SyncManager = p.optsSyncManagerProvider(p.mainEngine)
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
 		panic(err)
@@ -137,6 +143,7 @@ func (p *Protocol) Shutdown() {
 	p.mainEngine.Shutdown()
 	p.ChainManager.Shutdown()
 	p.TipManager.Shutdown()
+	p.SyncManager.Shutdown()
 }
 
 func (p *Protocol) runNetworkProtocol() {
@@ -301,6 +308,10 @@ func (p *Protocol) Network() *core.Protocol {
 
 func (p *Protocol) API() iotago.API {
 	return p.MainEngineInstance().API()
+}
+
+func (p *Protocol) SupportedVersions() Versions {
+	return SupportedVersions
 }
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
