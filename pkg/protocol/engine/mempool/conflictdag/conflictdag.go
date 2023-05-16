@@ -8,6 +8,7 @@ import (
 )
 
 type ConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePower]] interface {
+	Shutdown()
 	Events() *Events[ConflictID, ResourceID]
 
 	CreateOrUpdateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error

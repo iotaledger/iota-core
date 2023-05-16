@@ -128,7 +128,7 @@ func (e *Engine) Shutdown() {
 		e.BlockRequester.Shutdown()
 		e.Notarization.Shutdown()
 		e.Booker.Shutdown()
-		e.BlockDAG.Shutdown()
+		e.Ledger.Shutdown()
 		e.BlockDAG.Shutdown()
 		e.BlockGadget.Shutdown()
 		e.SlotGadget.Shutdown()

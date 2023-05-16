@@ -62,6 +62,18 @@ func New[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.VotePo
 
 var _ conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower] = &ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]{}
 
+// Shutdown shuts down the ConflictDAG.
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) Shutdown() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.conflictsByID.ForEach(func(conflictID ConflictID, conflict *Conflict[ConflictID, ResourceID, VotePower]) bool {
+		conflict.Shutdown()
+
+		return true
+	})
+}
+
 // Events returns the events of the ConflictDAG.
 func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) Events() *conflictdag.Events[ConflictID, ResourceID] {
 	return c.events
@@ -82,7 +94,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 			initialWeight := weight.New(c.committeeSet)
 			initialWeight.SetAcceptanceState(initialAcceptanceState)
 
-			newConflict := NewConflict[ConflictID, ResourceID, VotePower](id, conflictSets, initialWeight, c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
+			newConflict := NewConflict(id, conflictSets, initialWeight, c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
 
 			// attach to the acceptance state updated event and propagate that event to the outside.
 			// also need to remember the unhook method to properly evict the conflict.
