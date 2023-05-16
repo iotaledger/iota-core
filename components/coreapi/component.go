@@ -151,7 +151,10 @@ func configure() error {
 	// Check for features
 	if restapi.ParamsRestAPI.PoW.Enabled {
 		AddFeature("pow")
-		// TODO: add pow supports to block issuer
+	}
+
+	if restapi.ParamsRestAPI.AllowIncompleteBlock {
+		AddFeature("allowIncompleteBlock")
 	}
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {

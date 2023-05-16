@@ -20,9 +20,10 @@ import (
 )
 
 var (
-	ErrBlockAttacherInvalidBlock         = errors.New("invalid block")
-	ErrBlockAttacherAttachingNotPossible = errors.New("attaching not possible")
-	ErrBlockAttacherPoWNotAvailable      = errors.New("proof of work is not available on this node")
+	ErrBlockAttacherInvalidBlock              = errors.New("invalid block")
+	ErrBlockAttacherAttachingNotPossible      = errors.New("attaching not possible")
+	ErrBlockAttacherPoWNotAvailable           = errors.New("proof of work is not available on this node")
+	ErrBlockAttacherIncompleteBlockNotAllowed = errors.New("incomplete block is not allowed on this node")
 )
 
 // BlockIssuer contains logic to create and issue blocks signed by the given account.
@@ -36,6 +37,8 @@ type BlockIssuer struct {
 
 	optsTipSelectionTimeout       time.Duration
 	optsTipSelectionRetryInterval time.Duration
+	optsPoWEnabled                bool
+	optsIncompleteBlockAccepted   bool
 }
 
 func New(p *protocol.Protocol, account Account, opts ...options.Option[BlockIssuer]) *BlockIssuer {
@@ -151,6 +154,10 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) 
 			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "no parents were given but nonce was != 0")
 		}
 
+		if !i.optsPoWEnabled && targetScore != 0 {
+			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "no parents given and node PoW is disabled")
+		}
+
 		// only allow to update tips during proof of work if no parents were given
 		references, err := i.getReferences(ctx, iotaBlock.Payload, nil)
 		if err != nil {
@@ -177,26 +184,34 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) 
 	}
 
 	if iotaBlock.IssuerID.Empty() || resign {
-		iotaBlock.IssuerID = i.Account.ID()
+		if i.optsIncompleteBlockAccepted {
+			iotaBlock.IssuerID = i.Account.ID()
 
-		prvKey := i.Account.PrivateKey()
-		signature, err := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
-		if err != nil {
-			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, err.Error())
+			prvKey := i.Account.PrivateKey()
+			signature, err := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
+			if err != nil {
+				return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, err.Error())
+			}
+
+			edSig, isEdSig := signature.(*iotago.Ed25519Signature)
+			if !isEdSig {
+				return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "unsupported signature type")
+			}
+
+			iotaBlock.Signature = edSig
+		} else {
+			return iotago.EmptyBlockID(), errors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
 		}
-
-		edSig, isEdSig := signature.(*iotago.Ed25519Signature)
-		if !isEdSig {
-			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "unsupported signature type")
-		}
-
-		iotaBlock.Signature = edSig
 	}
 
 	if iotaBlock.Nonce == 0 && targetScore != 0 {
-		err := iotaBlock.DoPOW(ctx, float64(targetScore))
-		if err != nil {
-			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, err.Error())
+		if i.optsPoWEnabled {
+			err := iotaBlock.DoPOW(ctx, float64(targetScore))
+			if err != nil {
+				return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, err.Error())
+			}
+		} else {
+			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherPoWNotAvailable, "send a complete block")
 		}
 	}
 
@@ -289,5 +304,17 @@ func WithTipSelectionTimeout(timeout time.Duration) options.Option[BlockIssuer] 
 func WithTipSelectionRetryInterval(interval time.Duration) options.Option[BlockIssuer] {
 	return func(i *BlockIssuer) {
 		i.optsTipSelectionRetryInterval = interval
+	}
+}
+
+func WithPoWEnabled(enabled bool) options.Option[BlockIssuer] {
+	return func(i *BlockIssuer) {
+		i.optsPoWEnabled = enabled
+	}
+}
+
+func WithIncompleteBlockAccepted(accepted bool) options.Option[BlockIssuer] {
+	return func(i *BlockIssuer) {
+		i.optsIncompleteBlockAccepted = accepted
 	}
 }
