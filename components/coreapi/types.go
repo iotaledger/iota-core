@@ -176,12 +176,12 @@ type blockCreatedResponse struct {
 }
 
 type outputMetadataResponse struct {
-	BlockID              string `json:"blockId"`
-	TransactionID        string `json:"transactionId"`
-	OutputIndex          uint16 `json:"outputIndex"`
-	IsSpent              bool   `json:"isSpent"`
-	CommitmentIDSpent    string `json:"commitmentIdSpent"`
-	TransactionIDSpent   string `json:"transactionIdSpent"`
-	IncludedCommitmentID string `json:"includedCommitmentId"`
-	LatestCommitmentID   string `json:"latestCommitmentId"`
+	BlockID               string `json:"blockId"`
+	TransactionID         string `json:"transactionId"`
+	OutputIndex           uint16 `json:"outputIndex"`
+	IsSpent               bool   `json:"isSpent"`
+	CommitmentIDSpent     string `json:"commitmentIdSpent"`
+	TransactionIDSpent    string `json:"transactionIdSpent"`
+	CommitmentIDConfirmed string `json:"CommitmentIdConfirmed"`
+	LatestCommitmentID    string `json:"latestCommitmentId"`
 }

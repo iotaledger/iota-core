@@ -270,7 +270,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteOutputMetadata, func(c echo.Context) error {
-		// TODO: add CommitmentIDSpent, TransactionIDSpent, IncludedCommitmentID
+		// TODO: add CommitmentIDSpent, TransactionIDSpent, CommitmentIDConfirmed
 		resp, err := getOutputMetadata(c)
 		if err != nil {
 			return err

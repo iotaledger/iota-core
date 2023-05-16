@@ -33,6 +33,7 @@ func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
 		return nil, err
 	}
 
+	// TODO: CommitmentIDSpent,TransactionIDSpent, CommitmentIDConfirmed
 	return &outputMetadataResponse{
 		BlockID:            output.BlockID().ToHex(),
 		TransactionID:      outputID.TransactionID().ToHex(),

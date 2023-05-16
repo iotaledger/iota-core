@@ -1412,7 +1412,7 @@ components:
         transactionId: "0x1c52e8e630d1c6e45ab6f46c63d8d6cb02e6c2ed6e31b6c97d6f5c5f5a5d5c5b"
         outputIndex: 3
         isSpent: false
-        includedCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
+        confirmedCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
         latestCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
 
     get-output-metadata-by-id-response-spent-example:
@@ -1423,7 +1423,7 @@ components:
         isSpent: true
         commitmentIdSpent: "0x4b91c935926c77d0ac9b4a569c3eb3b0f0c9918f2d4f4d9bb1c7dfc19b41e4c2"
         transactionIdSpent: "0x1ee46e19f4219ee65afc10227d0ca22753f76ef32d1e922e5cbe3fbc9b5a5298"
-        includedCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
+        confirmedCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
         latestCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
 
     get-commitment-response-example:
@@ -2790,13 +2790,13 @@ components:
           description: Tells if the output is spent in a confirmed transaction or not.
         commitmentIdSpent:
           type: string
-          description: The commitment index of the slot at which this output was spent.
+          description: The commitment ID of the slot at which this output was spent.
         transactionIdSpent:
           type: string
           description: The transaction this output was spent with. Hex-encoded with 0x prefix.
-        includedCommitmentId:
+        confirmedCommitmentId:
           type: string
-          description: The commitment index at which the output was included into the ledger.
+          description: The commitment ID at which the output was included into the ledger.
         latestCommitmentId:
           type: string
           description: The current latest commitment id for which the request was made.
@@ -2805,7 +2805,7 @@ components:
         - transactionId
         - outputIndex
         - isSpent
-        - includedCommitmentId
+        - confirmedCommitmentId
         - latestCommitmentId
 
     UTXOChangesResponse:
