@@ -42,12 +42,6 @@ func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
 		ShallowLikeParents: block.Block().ShallowLikeParents.ToHex(),
 		BlockState:         blockStatePending.String(),
 	}
-	_, exists := deps.Protocol.MainEngineInstance().Block(block.ID())
-	if !exists {
-		bmResponse.BlockStateReason = "block not found"
-	}
-
-	// todo set states and error
 
 	return bmResponse, nil
 }
