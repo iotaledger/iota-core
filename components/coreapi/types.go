@@ -182,6 +182,6 @@ type outputMetadataResponse struct {
 	IsSpent              bool   `json:"isSpent"`
 	CommitmentIDSpent    string `json:"commitmentIdSpent"`
 	TransactionIDSpent   string `json:"transactionIdSpent"`
-	IncludedCommitmentId string `json:"includedCommitmentId"`
+	IncludedCommitmentID string `json:"includedCommitmentId"`
 	LatestCommitmentID   string `json:"latestCommitmentId"`
 }

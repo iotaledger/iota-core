@@ -46,7 +46,7 @@ func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
 		TransactionID:        outputID.TransactionID().ToHex(),
 		OutputIndex:          outputID.Index(),
 		IsSpent:              spent,
-		IncludedCommitmentId: commitment.ID().ToHex(),
+		IncludedCommitmentID: commitment.ID().ToHex(),
 		LatestCommitmentID:   slotCommitment.ID().ToHex(),
 	}, nil
 }
