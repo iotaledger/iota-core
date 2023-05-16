@@ -41,7 +41,7 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection, e.BlockCache, opts...)
 
 		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-			if _, err := b.Queue(block); err != nil {
+			if err := b.Queue(block); err != nil {
 				b.events.Error.Trigger(err)
 			}
 		})
@@ -82,15 +82,21 @@ func New(workers *workerpool.Group, sybilProtection sybilprotection.SybilProtect
 var _ booker.Booker = new(Booker)
 
 // Queue checks if payload is solid and then adds the block to a Booker's CausalOrder.
-func (b *Booker) Queue(block *blocks.Block) (wasQueued bool, err error) {
-	// TODO: handle block in ledger -> create attachment, book and only queue if solid.
-	if isSolid, err := b.isPayloadSolid(block); !isSolid {
-		return false, errors.Wrap(err, "payload is not solid")
+func (b *Booker) Queue(block *blocks.Block) error {
+	if transactionMetadata, containsTransaction := b.ledger.AttachTransaction(block); containsTransaction {
+		if transactionMetadata != nil {
+			transactionMetadata.OnBooked(func() {
+				b.bookingOrder.Queue(block)
+			})
+			return nil
+		}
+
+		return errors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
 	b.bookingOrder.Queue(block)
 
-	return true, nil
+	return nil
 }
 
 func (b *Booker) Shutdown() {
@@ -100,10 +106,6 @@ func (b *Booker) Shutdown() {
 
 func (b *Booker) evict(slotIndex iotago.SlotIndex) {
 	b.bookingOrder.EvictUntil(slotIndex)
-}
-
-func (b *Booker) isPayloadSolid(_ *blocks.Block) (isPayloadSolid bool, err error) {
-	return true, nil
 }
 
 func (b *Booker) book(block *blocks.Block) error {
@@ -118,7 +120,7 @@ func (b *Booker) book(block *blocks.Block) error {
 	block.SetConflictIDs(conflictsToInherit)
 
 	votePower := booker.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
-	if err := b.conflictDAG.CastVotes(vote.NewVote[booker.BlockVotePower](block.Block().IssuerID, votePower), conflictsToInherit); err != nil {
+	if err := b.conflictDAG.CastVotes(vote.NewVote(block.Block().IssuerID, votePower), conflictsToInherit); err != nil {
 		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
 		//  Do we track witness weight of invalid blocks?
 		return errors.Wrapf(err, "failed to cast votes for conflicts of block %s", block.ID())

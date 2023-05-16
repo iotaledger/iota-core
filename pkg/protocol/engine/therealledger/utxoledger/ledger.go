@@ -7,13 +7,10 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
-	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -23,13 +20,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-var (
-	ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
-)
+var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
 
 type Ledger struct {
 	ledgerState  *ledgerstate.Manager
@@ -42,14 +38,7 @@ type Ledger struct {
 
 func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) therealledger.Ledger {
-		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.Events.Error.Trigger)
-		// TODO: do we always book a block even if its transaction is not solid?
-		//  This is problematic because we need the information of the transaction to actually book the block in the Tangle.
-		//  Also: we need to forward propagate once a TX is booked in case there were pending TX (and thus blocks) that were waiting for this TX to be booked.
-		e.Events.Booker.BlockBooked.Hook(l.AttachTransaction)
-
-		// TODO: add all attachments of transaction to the booker's queue.
-		l.memPool.OnTransactionAttached()
+		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.SybilProtection, e.Events.Error.Trigger)
 
 		// TODO: should this attach to RatifiedAccepted instead?
 		e.Events.BlockGadget.BlockAccepted.Hook(l.blockAccepted)
@@ -58,22 +47,21 @@ func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 	})
 }
 
-func New(workers *workerpool.Group, store kvstore.KVStore, apiProviderFunc func() iotago.API, errorHandler func(error)) *Ledger {
+func New(workers *workerpool.Group, store kvstore.KVStore, apiProviderFunc func() iotago.API, sybilProtection sybilprotection.SybilProtection, errorHandler func(error)) *Ledger {
 	l := &Ledger{
 		ledgerState:  ledgerstate.New(store, apiProviderFunc),
-		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts()),
+		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](sybilProtection.OnlineCommittee()),
 		errorHandler: errorHandler,
 	}
 
-	l.memPool = mempoolv1.New[vote.MockedPower](l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG)
+	l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG)
 
 	return l
 }
 
 func (l *Ledger) Shutdown() {
 	l.TriggerStopped()
-	// TODO:
-	// l.memPool.Shutdown()
+	l.conflictDAG.Shutdown()
 }
 
 func (l *Ledger) Import(reader io.ReadSeeker) error {
@@ -101,6 +89,7 @@ func (l *Ledger) resolveState(stateRef ledger.StateReference) *promise.Promise[l
 }
 
 func (l *Ledger) Output(id iotago.OutputID) (*ledgerstate.Output, error) {
+	// TODO: remove loading from ledgerstate as the mempool does it for us.
 	stateWithMetadata, err := l.memPool.StateMetadata(ledger.StoredStateReference(id))
 	if err != nil {
 		return l.ledgerState.ReadOutputByOutputID(id)
@@ -201,16 +190,21 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), nil
 }
 
-func (l *Ledger) AttachTransaction(block *blocks.Block) {
+func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
 	switch payload := block.Block().Payload.(type) {
 	case *iotago.Transaction:
 		tx := &Transaction{payload}
-		if _, err := l.memPool.AttachTransaction(tx, block.ID()); err != nil {
+		transactioMetadata, err := l.memPool.AttachTransaction(tx, block.ID())
+		if err != nil {
 			l.errorHandler(err)
+
+			return nil, true
 		}
 
+		return transactioMetadata, true
 	default:
-		return
+
+		return nil, false
 	}
 }
 

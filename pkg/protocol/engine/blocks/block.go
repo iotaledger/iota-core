@@ -118,6 +118,11 @@ func (b *Block) IsRootBlock() bool {
 	return b.rootBlock != nil
 }
 
+func (b *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
+	tx, isTransaction = b.Block().Payload.(*iotago.Transaction)
+	return tx, isTransaction
+}
+
 func (b *Block) ID() iotago.BlockID {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
