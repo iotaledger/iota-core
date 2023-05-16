@@ -110,6 +110,10 @@ func (n *Node) HookLogging() {
 	events.Network.Error.Hook(func(err error, id identity.ID) {
 		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
 	})
+
+	events.Error.Hook(func(err error) {
+		fmt.Printf("%s > Protocol.Error: %s\n", n.Name, err.Error())
+	})
 }
 
 func (n *Node) attachEngineLogs(instance *engine.Engine) {

@@ -40,8 +40,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// region Protocol /////////////////////////////////////////////////////////////////////////////////////////////////////
-
 type Protocol struct {
 	Events        *Events
 	TipManager    tipmanager.TipManager
@@ -202,7 +200,6 @@ func (p *Protocol) initEngineManager() {
 	)
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		// TODO: fix pruning
 		if index < p.optsPruningDelay {
 			return
 		}
@@ -305,100 +302,4 @@ func (p *Protocol) API() iotago.API {
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	fmt.Printf("================================================================\nFork detected: %s\n================================================================\n", fork)
-}
-
-func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsBaseDirectory = baseDirectory
-	}
-}
-
-func WithPruningDelay(pruningDelay iotago.SlotIndex) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsPruningDelay = pruningDelay
-	}
-}
-
-func WithSnapshotPath(snapshot string) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsSnapshotPath = snapshot
-	}
-}
-
-func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, filter.Filter]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsFilterProvider = optsFilterProvider
-	}
-}
-
-func WithBlockDAGProvider(optsBlockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsBlockDAGProvider = optsBlockDAGProvider
-	}
-}
-
-func WithTipManagerProvider(optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsTipManagerProvider = optsTipManagerProvider
-	}
-}
-
-func WithBookerProvider(optsBookerProvider module.Provider[*engine.Engine, booker.Booker]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsBookerProvider = optsBookerProvider
-	}
-}
-
-func WithClockProvider(optsClockProvider module.Provider[*engine.Engine, clock.Clock]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsClockProvider = optsClockProvider
-	}
-}
-
-func WithSybilProtectionProvider(optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsSybilProtectionProvider = optsSybilProtectionProvider
-	}
-}
-
-func WithBlockGadgetProvider(optsBlockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsBlockGadgetProvider = optsBlockGadgetProvider
-	}
-}
-
-func WithSlotGadgetProvider(optsSlotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsSlotGadgetProvider = optsSlotGadgetProvider
-	}
-}
-
-func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.Engine, notarization.Notarization]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsNotarizationProvider = optsNotarizationProvider
-	}
-}
-
-func WithLedgerProvider(optsLedgerProvider module.Provider[*engine.Engine, therealledger.Ledger]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsLedgerProvider = optsLedgerProvider
-	}
-}
-
-func WithEngineOptions(opts ...options.Option[engine.Engine]) options.Option[Protocol] {
-	return func(p *Protocol) {
-		p.optsEngineOptions = append(p.optsEngineOptions, opts...)
-	}
-}
-
-func WithChainManagerOptions(opts ...options.Option[chainmanager.Manager]) options.Option[Protocol] {
-	return func(p *Protocol) {
-		p.optsChainManagerOptions = append(p.optsChainManagerOptions, opts...)
-	}
-}
-
-func WithStorageOptions(opts ...options.Option[storage.Storage]) options.Option[Protocol] {
-	return func(p *Protocol) {
-		p.optsStorageOptions = append(p.optsStorageOptions, opts...)
-	}
 }
