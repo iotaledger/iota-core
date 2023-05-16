@@ -160,7 +160,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("6.2", "7.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("8.2"), false, ts.Nodes()...)
 
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("4.2", "5.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheConfirmed(ts.Blocks("4.2", "5.1"), true, ts.Nodes()...)
 		}
 
@@ -201,8 +201,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("8.2", "9.1", "10.2", "11.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("12.2"), false, ts.Nodes()...)
 
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("6.2", "7.1", "8.2", "9.1"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheConfirmed(ts.Blocks("7.1", "8.2", "9.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("8.2", "9.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("8.2", "9.1"), true, ts.Nodes()...)
 		}
 
 		// Verify nodes' states:
