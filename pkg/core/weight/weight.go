@@ -15,33 +15,22 @@ type Weight struct {
 	// OnUpdate is an event that is triggered when the weight value is updated.
 	OnUpdate *event.Event1[Value]
 
-	// Validators is the set of validators that are contributing to the validators weight.
-	Validators *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
+	// Voters is the set of validators that are contributing to the validators weight.
+	Voters *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
 
 	// value is the current weight Value.
 	value Value
-
-	//// validatorsHook is the hook that is triggered when the validators weight is updated.
-	//validatorsHook *event.Hook[func(int64)]
 
 	// mutex is used to synchronize access to the weight value.
 	mutex sync.RWMutex
 }
 
 // New creates a new Weight instance.
-func New(weights *account.Accounts[iotago.AccountID, *iotago.AccountID]) *Weight {
+func New(weights *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]) *Weight {
 	w := &Weight{
-		Validators: weights.SelectAccounts(),
-		OnUpdate:   event.New1[Value](),
+		Voters:   weights.SelectAccounts(),
+		OnUpdate: event.New1[Value](),
 	}
-
-	// TODO: FIX THIS WITH A CORRECT IMPLEMENTATION
-	// w.validatorsHook = w.Validators.OnTotalWeightUpdated.Hook(func(totalWeight int64) {
-	//	w.mutex.Lock()
-	//	defer w.mutex.Unlock()
-	//
-	//	w.updateValidatorsWeight(totalWeight)
-	// })
 
 	return w
 }
@@ -91,6 +80,42 @@ func (w *Weight) RemoveCumulativeWeight(delta int64) *Weight {
 	}
 
 	return w
+}
+
+// AddVoter adds the given voter to the list of Voters, updates the weight and returns the Weight (for chaining).
+func (w *Weight) AddVoter(id iotago.AccountID) *Weight {
+	if w.Voters.Add(id) {
+		if newValue, valueUpdated := w.updateValidatorsWeight(); valueUpdated {
+			w.OnUpdate.Trigger(newValue)
+		}
+	}
+
+	return w
+}
+
+// DeleteVoter removes the given voter from the list of Voters, updates the weight and returns the Weight (for chaining).
+func (w *Weight) DeleteVoter(id iotago.AccountID) *Weight {
+	if w.Voters.Delete(id) {
+		if newValue, valueUpdated := w.updateValidatorsWeight(); valueUpdated {
+			w.OnUpdate.Trigger(newValue)
+		}
+	}
+
+	return w
+}
+
+func (w *Weight) updateValidatorsWeight() (Value, bool) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	newValidatorWeight := w.Voters.TotalWeight()
+	if w.value.ValidatorsWeight() != newValidatorWeight {
+		w.value = w.value.SetValidatorsWeight(newValidatorWeight)
+
+		return w.value, true
+	}
+
+	return w.value, false
 }
 
 // AcceptanceState returns the acceptance state of the weight.
@@ -146,18 +171,9 @@ func (w *Weight) String() string {
 
 	return stringify.Struct("Weight",
 		stringify.NewStructField("Value", w.value),
-		stringify.NewStructField("Validators", w.Validators),
+		stringify.NewStructField("Voters", w.Voters.Members()),
 	)
 }
-
-//// updateValidatorsWeight updates the validators weight of the Weight.
-//func (w *Weight) updateValidatorsWeight(weight int64) {
-//	if w.value.ValidatorsWeight() != weight {
-//		w.value = w.value.SetValidatorsWeight(weight)
-//
-//		w.OnUpdate.Trigger(w.value)
-//	}
-//}
 
 // setAcceptanceState sets the acceptance state of the weight and returns the previous acceptance state.
 func (w *Weight) setAcceptanceState(acceptanceState acceptance.State) (previousState acceptance.State) {

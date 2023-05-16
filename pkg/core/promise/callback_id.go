@@ -1,6 +1,6 @@
 package promise
 
-// CallbackID is an identifier for a callback.
+// UniqueID is an identifier for a resource.
 type UniqueID uint64
 
 func (u *UniqueID) Next() UniqueID {
@@ -8,6 +8,3 @@ func (u *UniqueID) Next() UniqueID {
 
 	return *u
 }
-
-// uniqueCallbackIDCounter is used to generate unique callback IDs.
-var uniqueCallbackIDCounter UniqueID
