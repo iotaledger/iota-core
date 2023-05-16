@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/lo"
 )
 
@@ -36,19 +37,6 @@ func NewSet[T comparable]() *Set[T] {
 		value:           advancedset.New[T](),
 		updateCallbacks: shrinkingmap.New[UniqueID, *Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]](),
 	}
-}
-
-// Get returns the current value of the set.
-func (s *Set[T]) Get() *advancedset.AdvancedSet[T] {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	return s.value
-}
-
-// Size returns the size of the set.
-func (s *Set[T]) Size() int {
-	return s.Get().Size()
 }
 
 // Set sets the given value as the new value of the set.
@@ -118,12 +106,12 @@ func (s *Set[T]) Remove(elements *advancedset.AdvancedSet[T]) (updatedSet *advan
 	return s.Apply(NewSetMutations(WithRemovedElements(elements)))
 }
 
-// Has returns true if the set contains the given element.
-func (s *Set[T]) Has(element T) bool {
+// Get returns the current value of the set.
+func (s *Set[T]) Get() *advancedset.AdvancedSet[T] {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return s.value.Has(element)
+	return s.value
 }
 
 // InheritFrom registers the given sets to inherit their mutations to the set.
@@ -141,6 +129,77 @@ func (s *Set[T]) InheritFrom(sources ...*Set[T]) (unsubscribe func()) {
 	return lo.Batch(unsubscribeCallbacks...)
 }
 
+// Size returns the size of the set.
+func (s *Set[T]) Size() int {
+	return s.Get().Size()
+}
+
+// IsEmpty returns true if the set is empty.
+func (s *Set[T]) IsEmpty() bool {
+	return s.Get().IsEmpty()
+}
+
+// Has returns true if the set contains the given element.
+func (s *Set[T]) Has(element T) bool {
+	return s.Get().Has(element)
+}
+
+// HasAll returns true if the set contains all elements of the other set.
+func (s *Set[T]) HasAll(other *Set[T]) bool {
+	return s.Get().HasAll(other.Get())
+}
+
+// ForEach calls the callback for each element of the set (the iteration can be stopped by returning an error).
+func (s *Set[T]) ForEach(callback func(element T) error) error {
+	return s.Get().ForEach(callback)
+}
+
+// Range calls the callback for each element of the set.
+func (s *Set[T]) Range(callback func(element T)) {
+	s.Get().Range(callback)
+}
+
+// Intersect returns a new set that contains the intersection of the set and the other set.
+func (s *Set[T]) Intersect(other *advancedset.AdvancedSet[T]) *advancedset.AdvancedSet[T] {
+	return s.Get().Intersect(other)
+}
+
+// Filter returns a new set that contains the elements of the set that satisfy the predicate.
+func (s *Set[T]) Filter(predicate func(element T) bool) *advancedset.AdvancedSet[T] {
+	return s.Get().Filter(predicate)
+}
+
+// Equal returns true if the set is equal to the other set.
+func (s *Set[T]) Equal(other *advancedset.AdvancedSet[T]) bool {
+	return s.Get().Equal(other)
+}
+
+// Is returns true if the set contains a single element that is equal to the given element.
+func (s *Set[T]) Is(element T) bool {
+	return s.Get().Is(element)
+}
+
+// Clone returns a shallow copy of the set.
+func (s *Set[T]) Clone() *advancedset.AdvancedSet[T] {
+	return s.Get().Clone()
+}
+
+// Slice returns a slice representation of the set.
+func (s *Set[T]) Slice() []T {
+	return s.Get().Slice()
+}
+
+// Iterator returns an iterator for the set.
+func (s *Set[T]) Iterator() *walker.Walker[T] {
+	return s.Get().Iterator()
+}
+
+// String returns a human-readable version of the set.
+func (s *Set[T]) String() string {
+	return s.Get().String()
+}
+
+// set sets the given value as the new value of the set.
 func (s *Set[T]) set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T], triggerID UniqueID, callbacksToTrigger []*Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
