@@ -1183,7 +1183,7 @@ components:
           type: string
           description: The transaction this output was spent with.
           example: '0xe526f8b1c856d4e844cc734bbe095429fb880ec4d93f3ccffe3b292a7de17be7'
-        commitmentIdConfirmed:
+        includedCommitmentId:
           type: string
           description: The commitment ID at which the output was included into the ledger.
           example: '0xe526f8b1c856d4e844cc734bbe095429fb880ec4d93f3ccffe3b292a7de17be7'       
@@ -1196,4 +1196,4 @@ components:
         - transactionId
         - outputIndex
         - isSpent
-        - commitmentIdConfirmed
+        - includedCommitmentId

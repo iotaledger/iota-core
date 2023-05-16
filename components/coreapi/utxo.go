@@ -34,12 +34,19 @@ func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
 		return nil, err
 	}
 
-	// TODO: CommitmentIDSpent,TransactionIDSpent, CommitmentIDConfirmed
+	includedIndex := output.BlockID().Index()
+	commitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: CommitmentIDSpent,TransactionIDSpent
 	return &outputMetadataResponse{
-		BlockID:            output.BlockID().ToHex(),
-		TransactionID:      outputID.TransactionID().ToHex(),
-		OutputIndex:        outputID.Index(),
-		IsSpent:            spent,
-		LatestCommitmentID: slotCommitment.ID().ToHex(),
+		BlockID:              output.BlockID().ToHex(),
+		TransactionID:        outputID.TransactionID().ToHex(),
+		OutputIndex:          outputID.Index(),
+		IsSpent:              spent,
+		IncludedCommitmentId: commitment.ID().ToHex(),
+		LatestCommitmentID:   slotCommitment.ID().ToHex(),
 	}, nil
 }
