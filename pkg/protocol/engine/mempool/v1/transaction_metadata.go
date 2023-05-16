@@ -272,7 +272,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	t.OnConflicting(func() {
 		cancelConflictInheritance()
 
-		t.conflictIDs.Set(advancedset.New[iotago.TransactionID](t.id))
+		t.conflictIDs.Set(advancedset.New(t.id))
 	})
 
 	t.allAttachmentsEvicted.OnTrigger(func() {

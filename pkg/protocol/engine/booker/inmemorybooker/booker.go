@@ -85,7 +85,9 @@ var _ booker.Booker = new(Booker)
 func (b *Booker) Queue(block *blocks.Block) error {
 	if transactionMetadata, containsTransaction := b.ledger.AttachTransaction(block); containsTransaction {
 		if transactionMetadata != nil {
+			// Based on the assumption that we always fork and the UTXO and Tangle paste cones are always fully known.
 			transactionMetadata.OnBooked(func() {
+				block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs().Get())
 				b.bookingOrder.Queue(block)
 			})
 			return nil

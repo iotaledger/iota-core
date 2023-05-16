@@ -260,7 +260,7 @@ func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionMetadata)
 }
 
 func (m *MemPool[VotePower]) requestStateWithMetadata(stateReference ledger.StateReference, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
-	return promise.New[*StateMetadata](func(p *promise.Promise[*StateMetadata]) {
+	return promise.New(func(p *promise.Promise[*StateMetadata]) {
 		request := m.requestInput(stateReference)
 
 		request.OnSuccess(func(state ledger.State) {
