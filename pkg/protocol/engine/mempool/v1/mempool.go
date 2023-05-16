@@ -280,24 +280,17 @@ func (m *MemPool[VotePower]) requestStateWithMetadata(stateReference ledger.Stat
 }
 
 func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, inputs *advancedset.AdvancedSet[iotago.OutputID]) {
-	switch err := m.conflictDAG.CreateConflict(transaction.ID(), inputs, acceptance.Pending); {
-	case errors.Is(err, conflictdag.ErrConflictExists):
-		err = m.conflictDAG.JoinConflictSets(transaction.ID(), inputs)
+	if err := m.conflictDAG.CreateOrUpdateConflict(transaction.ID(), inputs, acceptance.Pending); err != nil {
+		panic(err)
+	}
+	transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
+		err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements)
 		if err != nil {
 			panic(err)
 		}
-	case err != nil:
-		panic(err)
-	default:
-		transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
-			err = m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements)
-			if err != nil {
-				panic(err)
-			}
-		})
+	})
 
-		transaction.setConflicting()
-	}
+	transaction.setConflicting()
 }
 
 func (m *MemPool[VotePower]) updateAttachment(blockID iotago.BlockID, updateFunc func(transaction *TransactionMetadata, blockID iotago.BlockID) bool) bool {

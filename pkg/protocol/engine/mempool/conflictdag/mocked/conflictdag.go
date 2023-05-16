@@ -23,17 +23,12 @@ func (c ConflictDAG[ConflictID, ResourceID, VotePower]) Events() *conflictdag.Ev
 	return c.events
 }
 
-func (c ConflictDAG[ConflictID, ResourceID, VotePower]) CreateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error {
+func (c ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error {
 	//TODO implement me
 	panic("implement me")
 }
 
 func (c ConflictDAG[ConflictID, ResourceID, VotePower]) ReadConsistent(callback func(conflictDAG conflictdag.ReadLockedConflictDAG[ConflictID, ResourceID, VotePower]) error) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c ConflictDAG[ConflictID, ResourceID, VotePower]) JoinConflictSets(conflictID ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID]) error {
 	//TODO implement me
 	panic("implement me")
 }
