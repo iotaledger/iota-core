@@ -19,7 +19,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
-	mockedconflictdag "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/mocked"
 	mempooltests "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -34,7 +33,7 @@ func TestMemPoolV1_InterfaceWithForkingEverything(t *testing.T) {
 
 func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	ledgerState := ledgertests.New(ledgertests.NewState(iotago.TransactionID{}, 0))
-	conflictDAG := mockedconflictdag.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower]()
+	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
 	mempoolInstance := New[vote.MockedPower](mempooltests.VM, func(reference ledger.StateReference) *promise.Promise[ledger.State] {
 		return ledgerState.ResolveState(reference.StateID())
 	}, workerpool.NewGroup(t.Name()), conflictDAG)
