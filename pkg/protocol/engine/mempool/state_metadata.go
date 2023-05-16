@@ -1,6 +1,7 @@
 package mempool
 
 import (
+	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -10,21 +11,13 @@ type StateMetadata interface {
 
 	State() ledger.State
 
-	IsSpent() bool
+	ConflictIDs() *promise.Set[iotago.TransactionID]
 
-	OnDoubleSpent(callback func())
+	PendingSpenderCount() int
 
-	OnSpendAccepted(callback func(spender TransactionMetadata))
+	AcceptedSpender() (TransactionMetadata, bool)
 
-	OnSpendCommitted(callback func(spender TransactionMetadata))
-
-	AllSpendersRemoved() bool
-
-	OnAllSpendersRemoved(callback func()) (unsubscribe func())
-
-	SpenderCount() uint64
-
-	HasNoSpenders() bool
+	OnAcceptedSpenderUpdated(callback func(spender TransactionMetadata))
 
 	inclusionFlags
 }

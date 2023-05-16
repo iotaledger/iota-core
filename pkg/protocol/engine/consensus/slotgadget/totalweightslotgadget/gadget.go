@@ -94,7 +94,7 @@ func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {
 }
 
 func (g *Gadget) trackVotes(block *blocks.Block) {
-	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, block.Block().IssuerID, slottracker.SlotVotePower{Index: block.ID().Index()})
+	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, block.Block().IssuerID)
 }
 
 func (g *Gadget) refreshSlotFinalization(previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) {

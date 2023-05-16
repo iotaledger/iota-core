@@ -12,7 +12,8 @@ import (
 type StateDiff struct {
 	index iotago.SlotIndex
 
-	spentOutputs   *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateMetadata]
+	spentOutputs *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateMetadata]
+
 	createdOutputs *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.StateMetadata]
 
 	executedTransactions *orderedmap.OrderedMap[iotago.TransactionID, mempool.TransactionMetadata]
@@ -70,6 +71,10 @@ func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) {
 	if _, exists := s.executedTransactions.Set(transaction.ID(), transaction); !exists {
 		s.mutations.Add(transaction.ID())
 		s.updateCompactedStateChanges(transaction, 1)
+
+		transaction.OnPending(func() {
+			s.RollbackTransaction(transaction)
+		})
 	}
 }
 

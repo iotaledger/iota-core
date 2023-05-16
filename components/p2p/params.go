@@ -15,7 +15,7 @@ type ParametersP2P struct {
 	// ExternalAddress defines the config flag of the network external address.
 	ExternalAddress string `default:"auto" usage:"external IP address under which the node is reachable; or 'auto' to determine it automatically"`
 	// PeerDBDirectory defines the path to the peer database.
-	PeerDBDirectory string `default:"peerdb" usage:"path to the peer database directory"`
+	PeerDBDirectory string `default:"testnet/peerdb" usage:"path to the peer database directory"`
 }
 
 // ParametersPeers contains the definition of the parameters used by the manualPeering plugin.

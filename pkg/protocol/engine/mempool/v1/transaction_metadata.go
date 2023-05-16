@@ -16,12 +16,13 @@ import (
 )
 
 type TransactionMetadata struct {
-	id              iotago.TransactionID
-	inputReferences []ledger.StateReference
-	inputs          []*StateMetadata
-	outputs         []*StateMetadata
-	transaction     mempool.Transaction
-	conflictIDs     *advancedset.AdvancedSet[iotago.TransactionID]
+	id                iotago.TransactionID
+	inputReferences   []ledger.StateReference
+	inputs            []*StateMetadata
+	outputs           []*StateMetadata
+	transaction       mempool.Transaction
+	parentConflictIDs *promise.Set[iotago.TransactionID]
+	conflictIDs       *promise.Set[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -32,7 +33,7 @@ type TransactionMetadata struct {
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
-	allInputsAccepted     *promise.Event
+	allInputsAccepted     *promise.Value[bool]
 	conflicting           *promise.Event
 	conflictAccepted      *promise.Event
 
@@ -61,11 +62,12 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 	}
 
 	return (&TransactionMetadata{
-		id:              transactionID,
-		inputReferences: inputReferences,
-		inputs:          make([]*StateMetadata, len(inputReferences)),
-		transaction:     transaction,
-		conflictIDs:     advancedset.New[iotago.TransactionID](),
+		id:                transactionID,
+		inputReferences:   inputReferences,
+		inputs:            make([]*StateMetadata, len(inputReferences)),
+		transaction:       transaction,
+		parentConflictIDs: promise.NewSet[iotago.TransactionID](),
+		conflictIDs:       promise.NewSet[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
 		booked:             promise.NewEvent(),
@@ -74,7 +76,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		invalid:            promise.NewEvent1[error](),
 
 		unacceptedInputsCount: uint64(len(inputReferences)),
-		allInputsAccepted:     promise.NewEvent(),
+		allInputsAccepted:     promise.NewValue[bool](),
 		conflicting:           promise.NewEvent(),
 		conflictAccepted:      promise.NewEvent(),
 
@@ -118,7 +120,11 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	return outputs
 }
 
-func (t *TransactionMetadata) publishInput(index int, input *StateMetadata) (allInputsSolid bool) {
+func (t *TransactionMetadata) ConflictIDs() *promise.Set[iotago.TransactionID] {
+	return t.conflictIDs
+}
+
+func (t *TransactionMetadata) publishInputAndCheckSolidity(index int, input *StateMetadata) (allInputsSolid bool) {
 	t.inputs[index] = input
 
 	input.setupSpender(t)
@@ -209,16 +215,8 @@ func (t *TransactionMetadata) OnConflictAccepted(callback func()) {
 	t.conflictAccepted.OnTrigger(callback)
 }
 
-func (t *TransactionMetadata) IsIncluded() bool {
-	return t.earliestIncludedAttachment.Get().Index() != 0
-}
-
 func (t *TransactionMetadata) AllInputsAccepted() bool {
-	return t.allInputsAccepted.WasTriggered()
-}
-
-func (t *TransactionMetadata) OnAllInputsAccepted(callback func()) {
-	t.allInputsAccepted.OnTrigger(callback)
+	return t.allInputsAccepted.Get()
 }
 
 func (t *TransactionMetadata) setConflicting() {
@@ -227,27 +225,35 @@ func (t *TransactionMetadata) setConflicting() {
 
 func (t *TransactionMetadata) setConflictAccepted() {
 	if t.conflictAccepted.Trigger() {
-		if t.AllInputsAccepted() && t.IsIncluded() {
+		if t.AllInputsAccepted() && t.EarliestIncludedAttachment().Index() != 0 {
 			t.setAccepted()
 		}
 	}
 }
 
 func (t *TransactionMetadata) setupInput(input *StateMetadata) {
+	t.parentConflictIDs.InheritFrom(input.conflictIDs)
+
 	input.OnRejected(t.setRejected)
 	input.OnOrphaned(t.setOrphaned)
 
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
-			if t.allInputsAccepted.Trigger() {
-				if t.IsConflictAccepted() && t.IsIncluded() {
+			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
+				if t.IsConflictAccepted() && t.EarliestIncludedAttachment().Index() != 0 {
 					t.setAccepted()
 				}
 			}
 		}
 	})
 
-	input.OnSpendAccepted(func(spender mempool.TransactionMetadata) {
+	input.OnPending(func() {
+		if atomic.AddUint64(&t.unacceptedInputsCount, 1) == 1 && t.allInputsAccepted.Set(false) {
+			t.setPending()
+		}
+	})
+
+	input.OnAcceptedSpenderUpdated(func(spender mempool.TransactionMetadata) {
 		if spender != t {
 			t.setRejected()
 		}
@@ -261,7 +267,15 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 }
 
 func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
-	t.OnAllAttachmentsEvicted(func() {
+	cancelConflictInheritance := t.conflictIDs.InheritFrom(t.parentConflictIDs)
+
+	t.OnConflicting(func() {
+		cancelConflictInheritance()
+
+		t.conflictIDs.Set(advancedset.New[iotago.TransactionID](t.id))
+	})
+
+	t.allAttachmentsEvicted.OnTrigger(func() {
 		if !t.IsCommitted() {
 			t.setOrphaned()
 		}
@@ -280,14 +294,14 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	return t
 }
 
-func (t *TransactionMetadata) Add(blockID iotago.BlockID) (added bool) {
+func (t *TransactionMetadata) addAttachment(blockID iotago.BlockID) (added bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
 	return lo.Return2(t.attachments.GetOrCreate(blockID, func() bool { return false }))
 }
 
-func (t *TransactionMetadata) MarkIncluded(blockID iotago.BlockID) (included bool) {
+func (t *TransactionMetadata) markAttachmentIncluded(blockID iotago.BlockID) (included bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
@@ -300,7 +314,7 @@ func (t *TransactionMetadata) MarkIncluded(blockID iotago.BlockID) (included boo
 	return true
 }
 
-func (t *TransactionMetadata) MarkOrphaned(blockID iotago.BlockID) (orphaned bool) {
+func (t *TransactionMetadata) markAttachmentOrphaned(blockID iotago.BlockID) (orphaned bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
@@ -324,17 +338,6 @@ func (t *TransactionMetadata) EarliestIncludedAttachment() iotago.BlockID {
 
 func (t *TransactionMetadata) OnEarliestIncludedAttachmentUpdated(callback func(prevBlock, newBlock iotago.BlockID)) {
 	t.earliestIncludedAttachment.OnUpdate(callback)
-}
-
-func (t *TransactionMetadata) OnAllAttachmentsEvicted(callback func()) {
-	t.allAttachmentsEvicted.OnTrigger(callback)
-}
-
-func (t *TransactionMetadata) EvictAttachment(id iotago.BlockID) {
-	t.attachmentsMutex.Lock()
-	defer t.attachmentsMutex.Unlock()
-
-	t.evictAttachment(id)
 }
 
 func (t *TransactionMetadata) evictAttachment(id iotago.BlockID) {

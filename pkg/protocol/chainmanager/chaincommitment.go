@@ -149,6 +149,9 @@ func (c *ChainCommitment) replaceChain(chain *Chain) {
 }
 
 func (c *ChainCommitment) String() string {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
 	builder := stringify.NewStructBuilder("ChainCommitment",
 		stringify.NewStructField("ID", c.id),
 		stringify.NewStructField("Commitment", c.commitment.String()),

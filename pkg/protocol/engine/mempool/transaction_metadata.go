@@ -2,6 +2,7 @@ package mempool
 
 import (
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/iota-core/pkg/core/promise"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -14,9 +15,7 @@ type TransactionMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateMetadata]
 
-	AllInputsAccepted() bool
-
-	OnAllInputsAccepted(callback func())
+	ConflictIDs() *promise.Set[iotago.TransactionID]
 
 	Commit()
 
@@ -40,9 +39,9 @@ type TransactionMetadata interface {
 
 	OnConflicting(func())
 
-	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID))
-
 	EarliestIncludedAttachment() iotago.BlockID
+
+	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID))
 
 	inclusionFlags
 }

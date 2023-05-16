@@ -23,18 +23,20 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func init() {
 	Component = &app.Component{
-		Name:      "Protocol",
-		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
-		Params:    params,
-		Provide:   provide,
-		Configure: configure,
-		Run:       run,
+		Name:             "Protocol",
+		DepsFunc:         func(cDeps dependencies) { deps = cDeps },
+		Params:           params,
+		InitConfigParams: initConfigParams,
+		Provide:          provide,
+		Configure:        configure,
+		Run:              run,
 	}
 }
 
@@ -50,26 +52,52 @@ type dependencies struct {
 	Protocol *protocol.Protocol
 }
 
+func initConfigParams(c *dig.Container) error {
+
+	type cfgResult struct {
+		dig.Out
+		DatabaseEngine hivedb.Engine `name:"databaseEngine"`
+	}
+
+	if err := c.Provide(func() cfgResult {
+		dbEngine, err := hivedb.EngineFromStringAllowed(ParamsDatabase.Engine, database.AllowedEnginesDefault)
+		if err != nil {
+			Component.LogPanic(err)
+		}
+
+		return cfgResult{
+			DatabaseEngine: dbEngine,
+		}
+	}); err != nil {
+		Component.LogPanic(err)
+	}
+
+	return nil
+}
+
 func provide(c *dig.Container) error {
-	return c.Provide(func(p2pManager *p2p.Manager) *protocol.Protocol {
+
+	type protocolDeps struct {
+		dig.In
+
+		DatabaseEngine hivedb.Engine `name:"databaseEngine"`
+		P2PManager     *p2p.Manager
+	}
+
+	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
 		validators := make(map[iotago.AccountID]int64)
 		for _, validator := range ParamsProtocol.SybilProtection.Committee {
 			hex := lo.PanicOnErr(iotago.DecodeHex(validator.Identity))
 			validators[iotago.AccountID(hex[:])] = validator.Weight
 		}
 
-		dbEngine := hivedb.EngineRocksDB
-		if ParamsDatabase.InMemory {
-			dbEngine = hivedb.EngineMapDB
-		}
-
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
-			p2pManager,
-			protocol.WithBaseDirectory(ParamsDatabase.Directory),
+			deps.P2PManager,
+			protocol.WithBaseDirectory(ParamsDatabase.Path),
 			protocol.WithPruningDelay(iotago.SlotIndex(ParamsDatabase.PruningThreshold)),
 			protocol.WithStorageOptions(
-				storage.WithDBEngine(dbEngine),
+				storage.WithDBEngine(deps.DatabaseEngine),
 				storage.WithPrunableManagerOptions(
 					prunable.WithGranularity(ParamsDatabase.DBGranularity),
 					prunable.WithMaxOpenDBs(ParamsDatabase.MaxOpenDBs),
