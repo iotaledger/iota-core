@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
@@ -251,9 +250,6 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(t.Validators()),
-			),
-			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
 			),
 		}
 		if len(nodesOptions) == 1 {

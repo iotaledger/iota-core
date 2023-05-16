@@ -9,9 +9,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -30,43 +32,90 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
 			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID))),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+			),
+			protocol.WithChainManagerOptions(
+				chainmanager.WithCommitmentRequesterOptions(
+					eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](1*time.Second),
+					eventticker.RetryJitter[iotago.SlotIndex, iotago.CommitmentID](500*time.Millisecond),
+				),
+			),
 		},
 		"node2": {
 			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID))),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+			),
+			protocol.WithChainManagerOptions(
+				chainmanager.WithCommitmentRequesterOptions(
+					eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](1*time.Second),
+					eventticker.RetryJitter[iotago.SlotIndex, iotago.CommitmentID](500*time.Millisecond),
+				),
+			),
 		},
 		"node3": {
 			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID))),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+			),
+			protocol.WithChainManagerOptions(
+				chainmanager.WithCommitmentRequesterOptions(
+					eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](1*time.Second),
+					eventticker.RetryJitter[iotago.SlotIndex, iotago.CommitmentID](500*time.Millisecond),
+				),
+			),
 		},
 		"node4": {
 			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID))),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+			),
+			protocol.WithChainManagerOptions(
+				chainmanager.WithCommitmentRequesterOptions(
+					eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](1*time.Second),
+					eventticker.RetryJitter[iotago.SlotIndex, iotago.CommitmentID](500*time.Millisecond),
+				),
+			),
 		},
 	})
 	ts.HookLogging()
 
-	// Verify all nodes have the expected states.
-	ts.AssertSnapshotImported(true, ts.Nodes()...)
-	ts.AssertProtocolParameters(ts.ProtocolParameters, ts.Nodes()...)
-	ts.AssertLatestCommitment(iotago.NewEmptyCommitment(), ts.Nodes()...)
-	ts.AssertLatestStateMutationSlot(0, ts.Nodes()...)
-	ts.AssertLatestFinalizedSlot(0, ts.Nodes()...)
-	ts.AssertChainID(iotago.NewEmptyCommitment().MustID(), ts.Nodes()...)
-
-	ts.AssertStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}, ts.Nodes()...)
-
-	ts.AssertSybilProtectionCommittee(map[iotago.AccountID]int64{
+	expectedCommittee := map[iotago.AccountID]int64{
 		node1.AccountID: 75,
 		node2.AccountID: 75,
 		node3.AccountID: 25,
 		node4.AccountID: 25,
-	}, ts.Nodes()...)
-	ts.AssertSybilProtectionOnlineCommittee(map[iotago.AccountID]int64{
+	}
+	expectedP1Committee := map[iotago.AccountID]int64{
 		node1.AccountID: 75,
 		node2.AccountID: 75,
-	}, node1, node2)
-	ts.AssertSybilProtectionOnlineCommittee(map[iotago.AccountID]int64{
+	}
+	expectedP2Committee := map[iotago.AccountID]int64{
 		node3.AccountID: 25,
 		node4.AccountID: 25,
-	}, node3, node4)
+	}
+
+	// Verify that nodes have the expected states.
+	{
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithSnapshotImported(true),
+			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithLatestCommitment(iotago.NewEmptyCommitment()),
+			testsuite.WithLatestStateMutationSlot(0),
+			testsuite.WithLatestFinalizedSlot(0),
+			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
+
+			testsuite.WithSybilProtectionCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(0),
+			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
+		)
+
+		ts.AssertSybilProtectionOnlineCommittee(expectedP1Committee, node1, node2)
+		ts.AssertSybilProtectionOnlineCommittee(expectedP2Committee, node3, node4)
+	}
 
 	// Issue blocks on partition 1.
 	{
@@ -83,8 +132,21 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, node1, node2)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, node3, node4)
 
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.A", "P1.B", "P1.C", "P1.D", "P1.E", "P1.F", "P1.G", "P1.H"), true, node1, node2)
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.I"), false, node1, node2) // block not referenced yet
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.G", "P1.H"), true, node1, node2)
+		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P1.D", "P1.E", "P1.F"), true, node1, node2)
+		ts.AssertBlocksInCacheConfirmed(ts.Blocks("P1.E", "P1.F"), true, node1, node2)
+
+		// Verify that nodes have the expected states.
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithLatestCommitmentSlotIndex(8),
+			testsuite.WithLatestStateMutationSlot(0),
+			testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
+			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+
+			testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee),
+			testsuite.WithSybilProtectionCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(8),
+		)
 	}
 
 	// Issue blocks on partition 2.
@@ -102,8 +164,23 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, node3, node4)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
 
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.A", "P2.B", "P2.C", "P2.D", "P2.E", "P2.F", "P2.G", "P2.H"), true, node3, node4)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.G", "P2.H"), true, node3, node4)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.I"), false, node3, node4) // block not referenced yet
+		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P2.D", "P2.E", "P2.F"), true, node3, node4)
+
+		ts.AssertBlocksInCacheConfirmed(ts.Blocks("P2.E", "P2.F"), false, node3, node4)
+
+		// Verify that nodes have the expected states.
+		ts.AssertNodeState(ts.Nodes("node3", "node4"),
+			testsuite.WithLatestCommitmentSlotIndex(8),
+			testsuite.WithLatestStateMutationSlot(0),
+			testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
+			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+
+			testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
+			testsuite.WithSybilProtectionCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(8),
+		)
 	}
 
 	// Both partitions should have committed slot 8 and have different commitments

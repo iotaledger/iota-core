@@ -75,7 +75,7 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 		opts...,
 	)
 
-	n.Protocol.Run()
+	go n.Protocol.Run()
 }
 
 func (n *Node) HookLogging() {

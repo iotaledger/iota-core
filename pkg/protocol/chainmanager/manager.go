@@ -495,3 +495,9 @@ func WithForkDetectionMinimumDepth(depth int64) options.Option[Manager] {
 		m.optsMinimumForkDepth = depth
 	}
 }
+
+func WithCommitmentRequesterOptions(opts ...options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]) options.Option[Manager] {
+	return func(m *Manager) {
+		m.optsCommitmentRequester = append(m.optsCommitmentRequester, opts...)
+	}
+}
