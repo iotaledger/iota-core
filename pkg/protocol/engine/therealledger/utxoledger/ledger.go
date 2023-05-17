@@ -72,17 +72,21 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 	return l.ledgerState.Export(writer, targetIndex)
 }
 
-func (l *Ledger) resolveState(stateRef ledger.StateReference) *promise.Promise[ledger.State] {
+func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[ledger.State] {
 	p := promise.New[ledger.State]()
-
-	output, err := l.ledgerState.ReadOutputByOutputID(stateRef.StateID())
-	if err != nil {
-		p.Reject(xerrors.Errorf("output %s not found: %w", stateRef.StateID(), ledger.ErrStateNotFound))
-	} else {
-		p.Resolve(&State{
-			outputID: output.OutputID(),
-			output:   output.Output(),
-		})
+	switch specificStateRef := stateRef.(type) {
+	case iotago.IndexedUTXOReferencer:
+		output, err := l.ledgerState.ReadOutputByOutputID(specificStateRef.Ref())
+		if err != nil {
+			p.Reject(xerrors.Errorf("output %s not found: %w", specificStateRef.Ref(), ledger.ErrStateNotFound))
+		} else {
+			p.Resolve(&State{
+				outputID: output.OutputID(),
+				output:   output.Output(),
+			})
+		}
+	default:
+		panic(xerrors.Errorf("unsupported StateReference type %d", stateRef.Type()))
 	}
 
 	return p
@@ -146,7 +150,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			return false
 		}
 		for _, input := range inputs {
-			inputOutput, outputErr := l.Output(input.StateID())
+			inputOutput, outputErr := l.Output(input.Ref())
 			if outputErr != nil {
 				innerErr = outputErr
 				return false
@@ -192,9 +196,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
 	switch payload := block.Block().Payload.(type) {
-	case *iotago.Transaction:
-		tx := &Transaction{payload}
-		transactioMetadata, err := l.memPool.AttachTransaction(tx, block.ID())
+	case mempool.Transaction:
+		transactioMetadata, err := l.memPool.AttachTransaction(payload, block.ID())
 		if err != nil {
 			l.errorHandler(err)
 

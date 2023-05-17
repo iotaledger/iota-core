@@ -113,3 +113,16 @@ func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 		return ledgerState.ResolveState(reference.StateID())
 	}, workerpool.NewGroup(t.Name()), conflictDAG, WithForkAllTransactions[vote.MockedPower](true)), conflictDAG, ledgerState)
 }
+
+type InterfaceType interface {
+	ID() string
+}
+
+type BaseType struct {
+	id     string
+	inputs []string
+}
+
+func (t *BaseType) ID() string {
+	return t.id
+}

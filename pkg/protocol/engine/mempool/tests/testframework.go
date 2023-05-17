@@ -254,7 +254,7 @@ func (t *TestFramework) setupHookedEvents() {
 	})
 }
 
-func (t *TestFramework) stateReference(alias string) ledger.StateReference {
+func (t *TestFramework) stateReference(alias string) iotago.IndexedUTXOReferencer {
 	return ledger.StoredStateReference(t.StateID(alias))
 }
 

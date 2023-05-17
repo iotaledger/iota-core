@@ -116,7 +116,7 @@ func (m *MemPool[VotePower]) TransactionMetadata(id iotago.TransactionID) (trans
 
 // StateMetadata returns the metadata of the state with the given ID.
 func (m *MemPool[VotePower]) StateMetadata(stateReference ledger.StateReference) (state mempool.StateMetadata, err error) {
-	stateRequest, exists := m.cachedStateRequests.Get(stateReference.StateID())
+	stateRequest, exists := m.cachedStateRequests.Get(stateReference.Ref())
 	if !exists || !stateRequest.WasCompleted() {
 		stateRequest = m.requestStateWithMetadata(stateReference)
 	}
@@ -190,7 +190,7 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 	for i, inputReference := range transaction.inputReferences {
 		stateReference, index := inputReference, i
 
-		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[*StateMetadata] {
+		request, created := m.cachedStateRequests.GetOrCreate(stateReference.Ref(), func() *promise.Promise[*StateMetadata] {
 			return m.requestStateWithMetadata(stateReference, true)
 		})
 
