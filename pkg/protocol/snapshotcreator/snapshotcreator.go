@@ -1,7 +1,6 @@
 package snapshotcreator
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/pkg/errors"
@@ -39,7 +38,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	api := iotago.LatestAPI(&opt.ProtocolParameters)
 
 	errorHandler := func(err error) {
-		fmt.Println(err)
+		panic(err)
 	}
 
 	workers := workerpool.NewGroup("CreateSnapshot")
