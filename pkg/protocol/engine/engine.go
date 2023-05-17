@@ -50,7 +50,8 @@ type Engine struct {
 	Notarization    notarization.Notarization
 	Ledger          therealledger.Ledger
 
-	Workers *workerpool.Group
+	Workers      *workerpool.Group
+	errorHandler func(error)
 
 	BlockCache *blocks.Blocks
 
@@ -70,20 +71,7 @@ type Engine struct {
 
 func New(
 	workers *workerpool.Group,
-	opts ...options.Option[Engine],
-) (engine *Engine) {
-	return options.Apply(
-		&Engine{
-			Events: NewEvents(),
-
-			Workers: workers,
-
-			optsBootstrappedThreshold: 10 * time.Second,
-			optsSnapshotDepth:         5,
-		}, opts)
-}
-
-func (e *Engine) Initialize(
+	errorHandler func(error),
 	storageInstance *storage.Storage,
 	filterProvider module.Provider[*Engine, filter.Filter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
@@ -94,68 +82,47 @@ func (e *Engine) Initialize(
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	ledgerProvider module.Provider[*Engine, therealledger.Ledger],
-) {
-	e.BlockRequester = eventticker.New(e.optsBlockRequester...)
+	opts ...options.Option[Engine],
+) (engine *Engine) {
+	return options.Apply(
+		&Engine{
+			Events:        NewEvents(),
+			Storage:       storageInstance,
+			EvictionState: eviction.NewState(storageInstance.RootBlocks),
+			Workers:       workers,
+			errorHandler:  errorHandler,
 
-	e.Storage = storageInstance
-	e.EvictionState = eviction.NewState(storageInstance.RootBlocks)
-	e.BlockCache = blocks.New(e.EvictionState, func() *iotago.SlotTimeProvider { return e.API().SlotTimeProvider() })
+			optsBootstrappedThreshold: 10 * time.Second,
+			optsSnapshotDepth:         5,
+		}, opts, func(e *Engine) {
+			e.BlockCache = blocks.New(e.EvictionState, func() *iotago.SlotTimeProvider { return e.API().SlotTimeProvider() })
 
-	e.SybilProtection = sybilProtectionProvider(e)
-	e.BlockDAG = blockDAGProvider(e)
-	e.Filter = filterProvider(e)
-	e.Booker = bookerProvider(e)
-	e.Clock = clockProvider(e)
-	e.BlockGadget = blockGadgetProvider(e)
-	e.SlotGadget = slotGadgetProvider(e)
-	e.Notarization = notarizationProvider(e)
-	e.Ledger = ledgerProvider(e)
+			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 
-	e.HookInitialized(lo.Batch(
-		e.Storage.Settings().TriggerInitialized,
-		e.Storage.Commitments().TriggerInitialized,
-	))
+			e.SybilProtection = sybilProtectionProvider(e)
+			e.BlockDAG = blockDAGProvider(e)
+			e.Filter = filterProvider(e)
+			e.Booker = bookerProvider(e)
+			e.Clock = clockProvider(e)
+			e.BlockGadget = blockGadgetProvider(e)
+			e.SlotGadget = slotGadgetProvider(e)
+			e.Notarization = notarizationProvider(e)
+			e.Ledger = ledgerProvider(e)
 
-	e.Storage.Settings().HookInitialized(func() {
-		e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Index())
-	})
+			e.HookInitialized(lo.Batch(
+				e.Storage.Settings().TriggerInitialized,
+				e.Storage.Commitments().TriggerInitialized,
+			))
 
-	e.setupBlockStorage()
-	e.setupEvictionState()
-	e.setupBlockRequester()
-	e.TriggerConstructed()
-}
-
-func (e *Engine) Run(snapshot ...string) (err error) {
-	if !e.Storage.Settings().SnapshotImported() {
-		if len(snapshot) == 0 || snapshot[0] == "" {
-			panic("no snapshot path specified")
-		}
-		if err = e.readSnapshot(snapshot[0]); err != nil {
-			return errors.Wrapf(err, "failed to read snapshot from file '%s'", snapshot)
-		}
-		if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-			// Only mark any pruning indexes if we loaded a non-genesis snapshot
-			e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
-		}
-	} else {
-		e.Storage.Settings().UpdateAPI()
-		e.Storage.Settings().TriggerInitialized()
-		e.Storage.Commitments().TriggerInitialized()
-		e.Storage.Prunable.RestoreFromDisk()
-		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
-
-		// e.Notarization.attestations().SetLastCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
-		// e.Notarization.attestations().TriggerInitialized()
-		//
-		// e.Notarization.TriggerInitialized()
-	}
-
-	e.TriggerInitialized()
-
-	fmt.Println("Engine Settings", e.Storage.Settings().String())
-
-	return
+			e.Storage.Settings().HookInitialized(func() {
+				e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Index())
+			})
+		},
+		(*Engine).setupBlockStorage,
+		(*Engine).setupEvictionState,
+		(*Engine).setupBlockRequester,
+		(*Engine).TriggerConstructed,
+	)
 }
 
 func (e *Engine) Shutdown() {
@@ -231,6 +198,38 @@ func (e *Engine) IsSynced() (isBootstrapped bool) {
 
 func (e *Engine) API() iotago.API {
 	return e.Storage.Settings().API()
+}
+
+func (e *Engine) Initialize(snapshot ...string) (err error) {
+	if !e.Storage.Settings().SnapshotImported() {
+		if len(snapshot) == 0 || snapshot[0] == "" {
+			panic("no snapshot path specified")
+		}
+		if err = e.readSnapshot(snapshot[0]); err != nil {
+			return errors.Wrapf(err, "failed to read snapshot from file '%s'", snapshot)
+		}
+		if e.Storage.Settings().LatestFinalizedSlot() > 0 {
+			// Only mark any pruning indexes if we loaded a non-genesis snapshot
+			e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
+		}
+	} else {
+		e.Storage.Settings().UpdateAPI()
+		e.Storage.Settings().TriggerInitialized()
+		e.Storage.Commitments().TriggerInitialized()
+		e.Storage.Prunable.RestoreFromDisk()
+		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
+
+		// e.Notarization.attestations().SetLastCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
+		// e.Notarization.attestations().TriggerInitialized()
+		//
+		// e.Notarization.TriggerInitialized()
+	}
+
+	e.TriggerInitialized()
+
+	fmt.Println("Engine Settings", e.Storage.Settings().String())
+
+	return
 }
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
@@ -310,11 +309,11 @@ func (e *Engine) setupBlockStorage() {
 	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
 		store := e.Storage.Blocks(block.ID().Index())
 		if store == nil {
-			e.Events.Error.Trigger(errors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
+			e.errorHandler(errors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
 		}
 
 		if err := store.Store(block.ModelBlock()); err != nil {
-			e.Events.Error.Trigger(errors.Wrapf(err, "failed to store block with %s", block.ID()))
+			e.errorHandler(errors.Wrapf(err, "failed to store block with %s", block.ID()))
 		}
 	}, event.WithWorkerPool(wp))
 }
@@ -331,7 +330,7 @@ func (e *Engine) setupEvictionState() {
 			if parent.ID.Index() < block.ID().Index() && !e.EvictionState.IsRootBlock(parent.ID) {
 				parentBlock, exists := e.Block(parent.ID)
 				if !exists {
-					e.Events.Error.Trigger(errors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
+					e.errorHandler(errors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
 					return
 				}
 				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.Block().SlotCommitment.MustID())
@@ -397,7 +396,7 @@ func (e *Engine) EarliestRootCommitment() *model.Commitment {
 
 func (e *Engine) ErrorHandler(componentName string) func(error) {
 	return func(err error) {
-		e.Events.Error.Trigger(errors.Wrapf(err, componentName))
+		e.errorHandler(errors.Wrap(err, componentName))
 	}
 }
 

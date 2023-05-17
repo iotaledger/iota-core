@@ -1,6 +1,7 @@
 package snapshotcreator
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/pkg/errors"
@@ -37,13 +38,15 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 
 	api := iotago.LatestAPI(&opt.ProtocolParameters)
 
+	errorHandler := func(err error) {
+		fmt.Println(err)
+	}
+
 	workers := workerpool.NewGroup("CreateSnapshot")
 	defer workers.Shutdown()
-
-	engineInstance := engine.New(workers.CreateGroup("Engine"))
-
-	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, engineInstance.ErrorHandler("storage"))
+	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, errorHandler)
 	defer s.Shutdown()
+
 	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
 		return errors.Wrap(err, "failed to store empty commitment")
 	}
@@ -51,7 +54,8 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		return errors.Wrap(err, "failed to set the genesis time")
 	}
 
-	engineInstance.Initialize(
+	engineInstance := engine.New(workers.CreateGroup("Engine"),
+		errorHandler,
 		s,
 		blockfilter.NewProvider(),
 		inmemoryblockdag.NewProvider(),

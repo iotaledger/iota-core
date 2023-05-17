@@ -102,7 +102,7 @@ func (p *Protocol) Run() {
 	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
 	p.Events.TipManager.LinkTo(p.TipManager.Events())
 
-	if err := p.mainEngine.Run(p.optsSnapshotPath); err != nil {
+	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
 		panic(err)
 	}
 
@@ -122,7 +122,7 @@ func (p *Protocol) Run() {
 		}
 	}
 
-	// p.linkTo(p.mainEngine) -> CC and TipManager
+	// p.linkTo(p.mainrEngine) -> CC and TipManager
 	p.runNetworkProtocol()
 }
 
@@ -145,7 +145,7 @@ func (p *Protocol) runNetworkProtocol() {
 
 	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {
 		if err := p.ProcessBlock(block, id); err != nil {
-			p.Events.Error.Trigger(err)
+			p.ErrorHandler()(err)
 		}
 	}, event.WithWorkerPool(wpBlocks))
 
@@ -184,6 +184,7 @@ func (p *Protocol) runNetworkProtocol() {
 func (p *Protocol) initEngineManager() {
 	p.engineManager = enginemanager.New(
 		p.Workers.CreateGroup("EngineManager"),
+		p.ErrorHandler(),
 		p.optsBaseDirectory,
 		DatabaseVersion,
 		p.optsStorageOptions,
@@ -298,6 +299,12 @@ func (p *Protocol) Network() *core.Protocol {
 
 func (p *Protocol) API() iotago.API {
 	return p.MainEngineInstance().API()
+}
+
+func (p *Protocol) ErrorHandler() func(error) {
+	return func(err error) {
+		p.Events.Error.Trigger(err)
+	}
 }
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {

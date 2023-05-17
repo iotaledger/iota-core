@@ -169,10 +169,6 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Engine.BlockProcessed: %s\n", n.Name, engineName, blockID)
 	})
 
-	events.Error.Hook(func(err error) {
-		fmt.Printf("%s > [%s] Engine.Error: %s\n", n.Name, engineName, err.Error())
-	})
-
 	events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment)
 	})

@@ -41,6 +41,7 @@ type EngineManager struct {
 	dbVersion      byte
 	storageOptions []options.Option[storage.Storage]
 	workers        *workerpool.Group
+	errorHandler   func(error)
 
 	engineOptions           []options.Option[engine.Engine]
 	filterProvider          module.Provider[*engine.Engine, filter.Filter]
@@ -58,6 +59,7 @@ type EngineManager struct {
 
 func New(
 	workers *workerpool.Group,
+	errorHandler func(error),
 	dir string,
 	dbVersion byte,
 	storageOptions []options.Option[storage.Storage],
@@ -74,6 +76,7 @@ func New(
 ) *EngineManager {
 	return &EngineManager{
 		workers:                 workers,
+		errorHandler:            errorHandler,
 		directory:               utils.NewDirectory(dir),
 		dbVersion:               dbVersion,
 		storageOptions:          storageOptions,
@@ -155,9 +158,13 @@ func (e *EngineManager) SetActiveInstance(instance *engine.Engine) error {
 }
 
 func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
-	engineInstance := engine.New(e.workers.CreateGroup(dirName), e.engineOptions...)
-	engineInstance.Initialize(
-		storage.New(e.directory.Path(dirName), e.dbVersion, engineInstance.ErrorHandler("storage"), e.storageOptions...),
+	errorHandler := func(err error) {
+		e.errorHandler(errors.Wrapf(err, "engine (%s)", dirName[0:8]))
+	}
+
+	return engine.New(e.workers.CreateGroup(dirName),
+		errorHandler,
+		storage.New(e.directory.Path(dirName), e.dbVersion, errorHandler, e.storageOptions...),
 		e.filterProvider,
 		e.blockDAGProvider,
 		e.bookerProvider,
@@ -167,9 +174,8 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.slotGadgetProvider,
 		e.notarizationProvider,
 		e.ledgerProvider,
+		e.engineOptions...,
 	)
-
-	return engineInstance
 }
 
 func (e *EngineManager) newEngineInstance() *engine.Engine {
@@ -185,7 +191,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	}
 
 	instance := e.newEngineInstance()
-	if err := instance.Run(snapshotPath); err != nil {
+	if err := instance.Initialize(snapshotPath); err != nil {
 		instance.Shutdown()
 		_ = instance.RemoveFromFilesystem()
 		_ = os.Remove(snapshotPath)
