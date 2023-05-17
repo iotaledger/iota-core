@@ -39,9 +39,11 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 
 	workers := workerpool.NewGroup("CreateSnapshot")
 	defer workers.Shutdown()
-	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion)
-	defer s.Shutdown()
 
+	engineInstance := engine.New(workers.CreateGroup("Engine"))
+
+	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, engineInstance.ErrorHandler("storage"))
+	defer s.Shutdown()
 	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
 		return errors.Wrap(err, "failed to store empty commitment")
 	}
@@ -49,7 +51,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		return errors.Wrap(err, "failed to set the genesis time")
 	}
 
-	engineInstance := engine.New(workers.CreateGroup("Engine"),
+	engineInstance.Initialize(
 		s,
 		blockfilter.NewProvider(),
 		inmemoryblockdag.NewProvider(),

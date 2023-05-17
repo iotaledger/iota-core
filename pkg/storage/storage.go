@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
-	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
@@ -30,17 +29,18 @@ type Storage struct {
 	*prunable.Prunable
 
 	shutdownOnce sync.Once
+	errorHandler func(error)
 
 	optsDBEngine               hivedb.Engine
 	optsAllowedDBEngines       []hivedb.Engine
-	optsLogger                 *logger.Logger
 	optsPrunableManagerOptions []options.Option[prunable.Manager]
 }
 
 // New creates a new storage instance with the named database version in the given directory.
-func New(directory string, dbVersion byte, opts ...options.Option[Storage]) *Storage {
+func New(directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
 	return options.Apply(&Storage{
 		dir:          utils.NewDirectory(directory, true),
+		errorHandler: errorHandler,
 		optsDBEngine: hivedb.EngineRocksDB,
 	}, opts,
 		func(s *Storage) {
@@ -51,8 +51,8 @@ func New(directory string, dbVersion byte, opts ...options.Option[Storage]) *Sto
 				PrefixHealth: []byte{storePrefixHealth},
 			}
 
-			s.Permanent = permanent.New(s.dir, dbConfig)
-			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPrunableManagerOptions...)
+			s.Permanent = permanent.New(s.dir, dbConfig, errorHandler)
+			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), errorHandler, s.optsPrunableManagerOptions...)
 
 			s.Permanent.Settings().HookInitialized(func() {
 				s.Prunable.Initialize(s.Settings().API())

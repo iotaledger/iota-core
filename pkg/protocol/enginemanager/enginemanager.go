@@ -155,8 +155,9 @@ func (e *EngineManager) SetActiveInstance(instance *engine.Engine) error {
 }
 
 func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
-	return engine.New(e.workers.CreateGroup(dirName),
-		storage.New(e.directory.Path(dirName), e.dbVersion, e.storageOptions...),
+	engineInstance := engine.New(e.workers.CreateGroup(dirName), e.engineOptions...)
+	engineInstance.Initialize(
+		storage.New(e.directory.Path(dirName), e.dbVersion, engineInstance.ErrorHandler("storage"), e.storageOptions...),
 		e.filterProvider,
 		e.blockDAGProvider,
 		e.bookerProvider,
@@ -166,8 +167,9 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.slotGadgetProvider,
 		e.notarizationProvider,
 		e.ledgerProvider,
-		e.engineOptions...,
 	)
+
+	return engineInstance
 }
 
 func (e *EngineManager) newEngineInstance() *engine.Engine {
@@ -183,7 +185,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	}
 
 	instance := e.newEngineInstance()
-	if err := instance.Initialize(snapshotPath); err != nil {
+	if err := instance.Run(snapshotPath); err != nil {
 		instance.Shutdown()
 		_ = instance.RemoveFromFilesystem()
 		_ = os.Remove(snapshotPath)

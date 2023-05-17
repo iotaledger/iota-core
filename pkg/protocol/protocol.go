@@ -102,7 +102,7 @@ func (p *Protocol) Run() {
 	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
 	p.Events.TipManager.LinkTo(p.TipManager.Events())
 
-	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
+	if err := p.mainEngine.Run(p.optsSnapshotPath); err != nil {
 		panic(err)
 	}
 
