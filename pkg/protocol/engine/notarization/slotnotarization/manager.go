@@ -16,7 +16,6 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -75,7 +74,6 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 
 				e.HookConstructed(func() {
 					m.storage = e.Storage
-					m.bic = e.BIC
 					m.acceptedTimeFunc = e.Clock.RatifiedAccepted().Time
 
 					m.ledger = e.Ledger
@@ -231,15 +229,9 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		}
 	}
 
-	stateRoot, mutationRoot, slotDiff, err := m.ledger.CommitSlot(index)
+	stateRoot, mutationRoot, bicRoot, err := m.ledger.CommitSlot(index)
 	if err != nil {
 		m.errorHandler(errors.Wrap(err, "failed to commit ledger"))
-		return false
-	}
-
-	bicRoot, err := m.bic.CommitSlot(slotDiff)
-	if err != nil {
-		m.events.Error.Trigger(errors.Wrap(err, "failed to commit BIC"))
 		return false
 	}
 

@@ -145,30 +145,30 @@ func (m *Manager) ReadLedgerIndex() (iotago.SlotIndex, error) {
 	return m.ReadLedgerIndexWithoutLocking()
 }
 
-func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) (*SlotDiff, error) {
+func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
 	mutations, err := m.store.Batched()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	for _, output := range newOutputs {
-		if err := storeOutput(output, mutations); err != nil {
+		if err = storeOutput(output, mutations); err != nil {
 			mutations.Cancel()
 
-			return nil, err
+			return err
 		}
-		if err := markAsUnspent(output, mutations); err != nil {
+		if err = markAsUnspent(output, mutations); err != nil {
 			mutations.Cancel()
 
-			return nil, err
+			return err
 		}
 	}
 
 	for _, spent := range newSpents {
-		if err := storeSpentAndMarkOutputAsSpent(spent, mutations); err != nil {
+		if err = storeSpentAndMarkOutputAsSpent(spent, mutations); err != nil {
 			mutations.Cancel()
 
-			return nil, err
+			return err
 		}
 	}
 
@@ -178,20 +178,20 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 		Spents:  newSpents,
 	}
 
-	if err := storeDiff(msDiff, mutations); err != nil {
+	if err = storeDiff(msDiff, mutations); err != nil {
 		mutations.Cancel()
 
-		return nil, err
+		return err
 	}
 
-	if err := storeLedgerIndex(index, mutations); err != nil {
+	if err = storeLedgerIndex(index, mutations); err != nil {
 		mutations.Cancel()
 
-		return nil, err
+		return err
 	}
 
-	if err := mutations.Commit(); err != nil {
-		return nil, err
+	if err = mutations.Commit(); err != nil {
+		return err
 	}
 
 	for _, output := range newOutputs {
@@ -201,10 +201,10 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 		m.stateTree.Delete(spent.OutputID())
 	}
 
-	return msDiff, nil
+	return nil
 }
 
-func (m *Manager) ApplyDiff(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) (*SlotDiff, error) {
+func (m *Manager) ApplyDiff(index iotago.SlotIndex, newOutputs Outputs, newSpents Spents) error {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 

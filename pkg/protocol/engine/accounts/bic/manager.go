@@ -6,81 +6,58 @@ import (
 
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// BIC is a Block Issuer Credits module responsible for tracking account-based mana balances..
-type BIC struct {
+// BlockIssuanceCredits is a Block Issuer Credits module responsible for tracking account-based mana balances..
+type BlockIssuanceCredits struct {
 	workers *workerpool.Group
 	// balances represents the Block Issuer Credits of all registered accounts, isupdated on the slot commitment.
 	balances *account.Accounts[iotago.AccountID, *iotago.AccountID]
-
-	ledger ledger.Ledger
 
 	mutex sync.RWMutex
 
 	module.Module
 }
 
-func NewProvider(opts ...options.Option[BIC]) module.Provider[*engine.Engine, accounts.BlockIssuanceCredits] {
-	return module.Provide(func(e *engine.Engine) accounts.BlockIssuanceCredits {
-		return options.Apply(
-			&BIC{
-				workers:  e.Workers.CreateGroup("BIC"),
-				balances: account.NewAccounts[iotago.AccountID](e.Storage.Accounts(StoreKeyPrefixBIC)),
-			},
-			opts, func(b *BIC) {
-				e.HookConstructed(func() {
-					//	e.Events.TransactionAccepted.Attach(events.NewClosure(func(tx *ledgerstate.Transaction) {
-					//		b.workers.Submit(func() {
-					//			b.mutex.Lock()
-					//			defer b.mutex.Unlock()
-					//
-					//			// TODO update mana
-					//		})
-					//	}))
-				})
-			})
-	})
-}
-
-func (b *BIC) CommitSlot(slotDiff *ledgerstate.SlotDiff) (bicRoot iotago.Identifier, err error) {
+func (b *BlockIssuanceCredits) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotago.AccountID]uint64) (bicRoot iotago.Identifier, err error) {
 	// TODO do we need to store the index, if yes should it be in the engine store or should we create new kv store as in the ledger?
 	bicIndex, err := b.ReadBICIndex()
 	if err != nil {
 		return iotago.Identifier{}, err
 	}
-	if slotDiff.Index != bicIndex+1 {
-		panic(fmt.Errorf("there is a gap in the bicstate %d vs %d", bicIndex, slotDiff.Index))
+	if slotIndex != bicIndex+1 {
+		panic(fmt.Errorf("there is a gap in the bicstate %d vs %d", bicIndex, slotIndex))
 	}
 
-	b.ApplyDiff(slotDiff)
+	b.ApplyDiff(allotments)
 
 	return iotago.Identifier{}, nil
 }
 
-func (b *BIC) BIC() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
+func (b *BlockIssuanceCredits) BIC() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
 	return b.balances
 }
 
-func (b *BIC) AccountBIC(id iotago.AccountID) (account *accounts.Account, err error) {
+func (b *BlockIssuanceCredits) AccountBIC(id iotago.AccountID) (account *accounts.Account, err error) {
 	return nil, nil
 }
 
-func (b *BIC) Shutdown() {
+func (b *BlockIssuanceCredits) Shutdown() {
 }
 
-func (b *BIC) ReadBICIndex() (index iotago.SlotIndex, err error) {
+func (b *BlockIssuanceCredits) ReadBICIndex() (index iotago.SlotIndex, err error) {
 	return 0, nil
 }
 
-func (b *BIC) ApplyDiff(slotDiff *ledgerstate.SlotDiff) {
-	// todo handle locking
+func (b *BlockIssuanceCredits) ApplyDiff(allotments map[iotago.AccountID]uint64) {
+
+	for accountID, allotmentValue := range allotments {
+		current, _ := b.balances.Get(accountID)
+		// allotment is always positive, but balance don't need to be
+		b.balances.Set(accountID, current+int64(allotmentValue))
+	}
 
 }

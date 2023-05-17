@@ -15,7 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/bic"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
@@ -37,7 +37,7 @@ type Ledger struct {
 	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
 	errorHandler func(error)
 
-	bic accounts.BlockIssuanceCredits
+	accountLedger *bic.BlockIssuanceCredits
 
 	module.Module
 }
@@ -71,6 +71,7 @@ func (l *Ledger) Shutdown() {
 }
 
 func (l *Ledger) Import(reader io.ReadSeeker) error {
+	// l.accountLedger.import()
 	return l.ledgerState.Import(reader)
 }
 
@@ -121,10 +122,10 @@ func (l *Ledger) Output(id iotago.OutputID) (*ledgerstate.Output, error) {
 	return ledgerstate.CreateOutput(l.ledgerState.API(), state.outputID, earliestAttachment, earliestAttachment.Index(), txCreationTime, state.output), nil
 }
 
-func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, diff *ledgerstate.SlotDiff, err error) {
+func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot, mutationRoot, bicRoot iotago.Identifier, err error) {
 	ledgerIndex, err := l.ledgerState.ReadLedgerIndex()
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, diff, err
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
 	if index != ledgerIndex+1 {
@@ -136,6 +137,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	var innerErr error
 	var outputs ledgerstate.Outputs
 	var spents ledgerstate.Spents
+	var allotments map[iotago.AccountID]uint64
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*Transaction)
@@ -175,26 +177,32 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			return false
 		}
 
+		for _, allotment := range tx.Transaction.Essence.Allotments {
+			allotments[allotment.AccountID] += allotment.Amount
+		}
+
 		return true
 	})
 
 	if innerErr != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, diff, innerErr
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, innerErr
 	}
 
-	var slotDiff *ledgerstate.SlotDiff
-	if slotDiff, err = l.ledgerState.ApplyDiff(index, outputs, spents); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, diff, err
+	if err = l.ledgerState.ApplyDiff(index, outputs, spents); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
-	// todo check when tx is evicted, is it after committment?
+	if bicRoot, err = l.accountLedger.CommitSlot(index, allotments); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
+	}
+
 	// Mark the transactions as committed so the mempool can evict it.
 	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, tx mempool.TransactionMetadata) bool {
 		tx.Commit()
 		return true
 	})
 
-	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), slotDiff, nil
+	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), bicRoot, nil
 }
 
 func (l *Ledger) IsOutputSpent(outputID iotago.OutputID) (bool, error) {
