@@ -454,7 +454,7 @@ export class ExplorerStore {
             case PayloadType.Transaction:
                 this.payload = blk.payload as TransactionPayload
                 break;
-            case PayloadType.Data:
+            case PayloadType.TaggedData:
                 this.payload = blk.payload as BasicPayload
                 break;
             case PayloadType.Faucet:

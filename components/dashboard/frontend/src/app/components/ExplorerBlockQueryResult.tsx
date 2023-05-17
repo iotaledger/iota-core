@@ -58,7 +58,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                     return <TransactionPayload />
                 }
                 return <BasicPayload />
-            case PayloadType.Data:
+            case PayloadType.TaggedData:
                 return <BasicPayload />
             case PayloadType.Faucet:
                 return <FaucetPayload />

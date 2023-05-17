@@ -1,6 +1,6 @@
 export enum PayloadType {
-    Data = 0,
-    Transaction = 1,
+    TaggedData = 5,
+    Transaction = 6,
     Faucet = 3,
 }
 
@@ -119,8 +119,8 @@ export class Opinion {
 
 export function getPayloadType(p: number){
     switch (p) {
-        case PayloadType.Data:
-            return "Data"
+        case PayloadType.TaggedData:
+            return "TaggedData"
         case PayloadType.Transaction:
             return "Transaction"
         case PayloadType.Faucet:
