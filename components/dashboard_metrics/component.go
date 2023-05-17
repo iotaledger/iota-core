@@ -63,7 +63,7 @@ type dependencies struct {
 func configure() error {
 	// check if RestAPI plugin is disabled
 	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanic("RestAPI plugin needs to be enabled to use the CoreAPIV3 plugin")
+		Component.LogPanic("RestAPI plugin needs to be enabled to use the DashboardMetrics plugin")
 	}
 	configureComponentCountersEvents()
 
