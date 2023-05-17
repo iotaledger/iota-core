@@ -2,6 +2,7 @@ package blockissuer
 
 import (
 	"context"
+	"crypto/ed25519"
 	"time"
 
 	"github.com/pkg/errors"
@@ -18,6 +19,13 @@ import (
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
+var (
+	ErrBlockAttacherInvalidBlock              = errors.New("invalid block")
+	ErrBlockAttacherAttachingNotPossible      = errors.New("attaching not possible")
+	ErrBlockAttacherPoWNotAvailable           = errors.New("proof of work is not available on this node")
+	ErrBlockAttacherIncompleteBlockNotAllowed = errors.New("incomplete block is not allowed on this node")
+)
+
 // BlockIssuer contains logic to create and issue blocks signed by the given account.
 type BlockIssuer struct {
 	events *Events
@@ -29,6 +37,8 @@ type BlockIssuer struct {
 
 	optsTipSelectionTimeout       time.Duration
 	optsTipSelectionRetryInterval time.Duration
+	optsPoWEnabled                bool
+	optsIncompleteBlockAccepted   bool
 }
 
 func New(p *protocol.Protocol, account Account, opts ...options.Option[BlockIssuer]) *BlockIssuer {
@@ -86,35 +96,14 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, p iotago.Payload, parents
 
 // CreateBlockWithReferences creates a new block with the given payload and parent references.
 func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Payload, references model.ParentReferences, strongParentsCountOpt ...int) (*model.Block, error) {
-	strongParentsCount := iotago.BlockMaxParents
-	if len(strongParentsCountOpt) > 0 {
-		strongParentsCount = strongParentsCountOpt[0]
-	}
-
 	var err error
-	if references == nil {
-		references, err = i.getReferencesWithRetry(ctx, p, strongParentsCount)
-		if err != nil {
-			return nil, errors.Wrap(err, "error while trying to get references")
-		}
+	references, err = i.getReferences(ctx, p, references, strongParentsCountOpt...)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "tipselection failed, error: %s", err.Error())
 	}
 
 	slotCommitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 	lastFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
-
-	parentsMaxTime := time.Time{}
-	parents := lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds }))
-	for _, parent := range parents {
-		if b, exists := i.protocol.MainEngineInstance().BlockFromCache(parent); exists {
-			if b.IssuingTime().After(parentsMaxTime) {
-				parentsMaxTime = b.IssuingTime()
-			}
-		}
-	}
-
-	if parentsMaxTime.After(time.Now()) {
-		return nil, errors.Errorf("cannot issue block if the parents issuingTime is ahead of our local clock: %s vs %s", parentsMaxTime, time.Now())
-	}
 
 	block, err := builder.NewBlockBuilder().
 		StrongParents(references[model.StrongParentType]).
@@ -138,6 +127,137 @@ func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Pa
 	i.events.BlockConstructed.Trigger(modelBlock)
 
 	return modelBlock, nil
+}
+
+func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
+	// if anything changes, need to make a new signature
+	var resign bool
+	protoParams := i.protocol.MainEngineInstance().Storage.Settings().ProtocolParameters()
+	targetScore := protoParams.MinPoWScore
+
+	if iotaBlock.ProtocolVersion != protoParams.Version {
+		return iotago.EmptyBlockID(), errors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
+	}
+
+	if iotaBlock.NetworkID == 0 {
+		iotaBlock.NetworkID = protoParams.NetworkID()
+		resign = true
+	}
+
+	if iotaBlock.IssuingTime.IsZero() {
+		iotaBlock.IssuingTime = time.Now()
+		resign = true
+	}
+
+	if len(iotaBlock.StrongParents) == 0 {
+		if iotaBlock.Nonce != 0 {
+			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "no parents were given but nonce was != 0")
+		}
+
+		if !i.optsPoWEnabled && targetScore != 0 {
+			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "no parents given and node PoW is disabled")
+		}
+
+		// only allow to update tips during proof of work if no parents were given
+		references, err := i.getReferences(ctx, iotaBlock.Payload, nil)
+		if err != nil {
+			return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %s", err.Error())
+		}
+
+		iotaBlock.StrongParents = references[model.StrongParentType]
+		iotaBlock.WeakParents = references[model.WeakParentType]
+		iotaBlock.ShallowLikeParents = references[model.ShallowLikeParentType]
+		resign = true
+	}
+
+	if iotaBlock.SlotCommitment == nil {
+		iotaBlock.SlotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		iotaBlock.LatestFinalizedSlot = i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
+		resign = true
+	}
+
+	switch payload := iotaBlock.Payload.(type) {
+	case *iotago.Transaction:
+		if payload.Essence.NetworkID != protoParams.NetworkID() {
+			return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Essence.NetworkID)
+		}
+	}
+
+	if iotaBlock.IssuerID.Empty() || resign {
+		if i.optsIncompleteBlockAccepted {
+			iotaBlock.IssuerID = i.Account.ID()
+
+			prvKey := i.Account.PrivateKey()
+			signature, err := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
+			if err != nil {
+				return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, err.Error())
+			}
+
+			edSig, isEdSig := signature.(*iotago.Ed25519Signature)
+			if !isEdSig {
+				return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "unsupported signature type")
+			}
+
+			iotaBlock.Signature = edSig
+		} else {
+			return iotago.EmptyBlockID(), errors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
+		}
+	}
+
+	if iotaBlock.Nonce == 0 && targetScore != 0 {
+		if i.optsPoWEnabled {
+			err := iotaBlock.DoPOW(ctx, float64(targetScore))
+			if err != nil {
+				return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, err.Error())
+			}
+		} else {
+			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherPoWNotAvailable, "send a complete block")
+		}
+	}
+
+	modelBlock, err := model.BlockFromBlock(iotaBlock, i.protocol.API())
+	if err != nil {
+		return iotago.EmptyBlockID(), errors.Wrap(err, "error serializing block to model block")
+	}
+
+	i.events.BlockConstructed.Trigger(modelBlock)
+
+	if err := i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
+		return iotago.EmptyBlockID(), errors.Wrap(err, "error issuing model block")
+	}
+
+	return modelBlock.ID(), nil
+}
+
+func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, references model.ParentReferences, strongParentsCountOpt ...int) (model.ParentReferences, error) {
+	strongParentsCount := iotago.BlockMaxParents
+	if len(strongParentsCountOpt) > 0 {
+		strongParentsCount = strongParentsCountOpt[0]
+	}
+
+	var err error
+	if references == nil {
+		references, err = i.getReferencesWithRetry(ctx, p, strongParentsCount)
+		if err != nil {
+			return nil, errors.Wrap(err, "error while trying to get references")
+		}
+	}
+
+	parentsMaxTime := time.Time{}
+	parents := lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds }))
+	for _, parent := range parents {
+		if b, exists := i.protocol.MainEngineInstance().BlockFromCache(parent); exists {
+			if b.IssuingTime().After(parentsMaxTime) {
+				parentsMaxTime = b.IssuingTime()
+			}
+		}
+	}
+
+	if parentsMaxTime.After(time.Now()) {
+		return nil, errors.Errorf("cannot issue block if the parents issuingTime is ahead of our local clock: %s vs %s", parentsMaxTime, time.Now())
+	}
+
+	return references, nil
 }
 
 func (i *BlockIssuer) issueBlock(block *model.Block) error {
@@ -184,5 +304,17 @@ func WithTipSelectionTimeout(timeout time.Duration) options.Option[BlockIssuer] 
 func WithTipSelectionRetryInterval(interval time.Duration) options.Option[BlockIssuer] {
 	return func(i *BlockIssuer) {
 		i.optsTipSelectionRetryInterval = interval
+	}
+}
+
+func WithPoWEnabled(enabled bool) options.Option[BlockIssuer] {
+	return func(i *BlockIssuer) {
+		i.optsPoWEnabled = enabled
+	}
+}
+
+func WithIncompleteBlockAccepted(accepted bool) options.Option[BlockIssuer] {
+	return func(i *BlockIssuer) {
+		i.optsIncompleteBlockAccepted = accepted
 	}
 }

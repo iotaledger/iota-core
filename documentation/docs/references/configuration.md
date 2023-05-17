@@ -158,7 +158,9 @@ Example:
 | publicRoutes                | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes<br/>/api/core/v3/info<br/>/api/core/v3/blocks\*<br/>/api/core/v3/transactions\*<br/>/api/core/v3/commitments\*<br/>/api/core/v3/outputs\*<br/>/api/debug/v1/\*<br/>/api/indexer/v1/\* |
 | protectedRoutes             | The HTTP REST routes which need to be called with authorization. Wildcards using \* are allowed | array   | /api/\*                                                                                                                                                                                                  |
 | debugRequestLoggerEnabled   | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                   |
+| allowIncompleteBlock        | Whether the node allows to fill in incomplete block and issue it for user                      | boolean | false                                                                                                                                                                                                   |
 | [jwtAuth](#restapi_jwtauth) | Configuration for jwtAuth                                                                      | object  |                                                                                                                                                                                                         |
+| [pow](#restapi_pow)         | Configuration for pow                                                                          | object  |                                                                                                                                                                                                         |
 | [limits](#restapi_limits)   | Configuration for limits                                                                       | object  |                                                                                                                                                                                                         |
 
 ### <a id="restapi_jwtauth"></a> JwtAuth
@@ -166,6 +168,13 @@ Example:
 | Name | Description                                                                                                                             | Type   | Default value |
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------- |
 | salt | Salt used inside the JWT tokens for the REST API. Change this to a different value to invalidate JWT tokens not matching this new value | string | "IOTA"        |
+
+### <a id="restapi_pow"></a> Pow
+
+| Name        | Description                                                                | Type    | Default value |
+| ----------- | -------------------------------------------------------------------------- | ------- | ------------- |
+| enabled     | Whether the node does PoW if blocks are received via API                   | boolean | false         |
+| workerCount | The amount of workers used for calculating PoW when issuing blocks via API | int     | 1             |
 
 ### <a id="restapi_limits"></a> Limits
 
@@ -196,8 +205,13 @@ Example:
         "/api/*"
       ],
       "debugRequestLoggerEnabled": false,
+      "allowIncompleteBlock": false,
       "jwtAuth": {
         "salt": "IOTA"
+      },
+      "pow": {
+        "enabled": false,
+        "workerCount": 1
       },
       "limits": {
         "maxBodyLength": "1M",
@@ -207,7 +221,23 @@ Example:
   }
 ```
 
-## <a id="database"></a> 6. Database
+## <a id="metricstracker"></a> 6. Metricstracker
+
+| Name    | Description                                   | Type    | Default value |
+| ------- | --------------------------------------------- | ------- | ------------- |
+| enabled | Whether the Metrics Tracker plugin is enabled | boolean | true          |
+
+Example:
+
+```json
+  {
+    "metricstracker": {
+      "enabled": true
+    }
+  }
+```
+
+## <a id="database"></a> 7. Database
 
 | Name             | Description                                                | Type   | Default value      |
 | ---------------- | ---------------------------------------------------------- | ------ | ------------------ |
@@ -231,7 +261,7 @@ Example:
   }
 ```
 
-## <a id="protocol"></a> 7. Protocol
+## <a id="protocol"></a> 8. Protocol
 
 | Name                                         | Description                       | Type   | Default value |
 | -------------------------------------------- | --------------------------------- | ------ | ------------- |
@@ -294,7 +324,7 @@ Example:
   }
 ```
 
-## <a id="blockissuer"></a> 8. BlockIssuer
+## <a id="blockissuer"></a> 9. BlockIssuer
 
 | Name                      | Description                                               | Type    | Default value |
 | ------------------------- | --------------------------------------------------------- | ------- | ------------- |
@@ -318,7 +348,7 @@ Example:
   }
 ```
 
-## <a id="activity"></a> 9. Activity
+## <a id="activity"></a> 10. Activity
 
 | Name               | Description                                                                                                | Type    | Default value |
 | ------------------ | ---------------------------------------------------------------------------------------------------------- | ------- | ------------- |
@@ -340,7 +370,7 @@ Example:
   }
 ```
 
-## <a id="dashboard"></a> 10. Dashboard
+## <a id="dashboard"></a> 11. Dashboard
 
 | Name                              | Description                             | Type    | Default value  |
 | --------------------------------- | --------------------------------------- | ------- | -------------- |
