@@ -15,6 +15,7 @@ import { TransactionPayload } from './TransactionPayload'
 import { getPayloadType, PayloadType } from '../misc/Payload'
 import { resolveBase58ConflictID } from "../utils/conflict";
 import { FaucetPayload } from './FaucetPayload';
+import { TaggedDataPayload } from './TaggedDataPayload';
 
 interface Props {
     nodeStore?: NodeStore;
@@ -59,7 +60,7 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                 }
                 return <BasicPayload />
             case PayloadType.TaggedData:
-                return <BasicPayload />
+                return <TaggedDataPayload />
             case PayloadType.Faucet:
                 return <FaucetPayload />
             default:

@@ -107,6 +107,11 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 		return nil
 	}
 
+	payloadJSON, err := deps.Protocol.API().JSONEncode(iotaBlk.Payload)
+	if err != nil {
+		return nil
+	}
+
 	t := &ExplorerBlock{
 		ID:                  block.ID().ToHex(),
 		ProtocolVersion:     iotaBlk.ProtocolVersion,
@@ -124,7 +129,7 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 			}
 			return iotago.PayloadType(0)
 		}(),
-		// Payload:              ProcessPayload(block.Payload()),
+		Payload:      payloadJSON,
 		CommitmentID: commitmentID.ToHex(),
 		Commitment: CommitmentResponse{
 			Index:            uint64(iotaBlk.SlotCommitment.Index),

@@ -8,7 +8,8 @@ import {
     SigLockedSingleOutput,
     TransactionPayload,
     FaucetPayload,
-    Transaction
+    Transaction,
+    TaggedDataPayload
 } from "../misc/Payload";
 import * as React from "react";
 import { Link } from 'react-router-dom';
@@ -455,7 +456,7 @@ export class ExplorerStore {
                 this.payload = blk.payload as TransactionPayload
                 break;
             case PayloadType.TaggedData:
-                this.payload = blk.payload as BasicPayload
+                this.payload = blk.payload as TaggedDataPayload
                 break;
             case PayloadType.Faucet:
                 this.payload = blk.payload as FaucetPayload

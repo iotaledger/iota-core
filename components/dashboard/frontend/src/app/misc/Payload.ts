@@ -10,6 +10,11 @@ export class BasicPayload {
     content: string;
 }
 
+export class TaggedDataPayload {
+    tag: string;
+    data: string;
+}
+
 // Transaction payload
 export class TransactionPayload {
     txID: string;
