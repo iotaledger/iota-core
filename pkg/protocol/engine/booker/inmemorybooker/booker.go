@@ -15,8 +15,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -31,14 +31,14 @@ type Booker struct {
 
 	blockCache  *blocks.Blocks
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
-	ledger      therealledger.Ledger
+	ledger      ledger.Ledger
 
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection.Committee(), e.BlockCache, e.Ledger, opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection.Committee(), e.BlockCache, opts...)
 
 		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 			if err := b.Queue(block); err != nil {
@@ -47,6 +47,9 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 		})
 
 		e.HookConstructed(func() {
+			b.ledger = e.Ledger
+			b.conflictDAG = b.ledger.ConflictDAG()
+
 			b.events.Error.Hook(e.Events.Error.Trigger)
 			e.Events.Booker.LinkTo(b.events)
 
@@ -57,12 +60,11 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], blockCache *blocks.Blocks, ledger therealledger.Ledger, opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], blockCache *blocks.Blocks, opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:     booker.NewEvents(),
 		committee:  committee,
 		blockCache: blockCache,
-		ledger:     ledger,
 
 		workers: workers,
 	}, opts, func(b *Booker) {
@@ -91,6 +93,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 				block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs().Get())
 				b.bookingOrder.Queue(block)
 			})
+
 			return nil
 		}
 

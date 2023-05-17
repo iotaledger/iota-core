@@ -1,4 +1,4 @@
-package ledger
+package mempool
 
 import "golang.org/x/xerrors"
 

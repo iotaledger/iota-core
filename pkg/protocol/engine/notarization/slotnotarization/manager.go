@@ -17,8 +17,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -35,7 +35,7 @@ type Manager struct {
 
 	workers *workerpool.Group
 
-	ledger therealledger.Ledger
+	ledger ledger.Ledger
 
 	storage         *storage.Storage
 	commitmentMutex sync.RWMutex

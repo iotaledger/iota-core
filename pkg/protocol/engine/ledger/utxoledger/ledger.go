@@ -21,7 +21,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -36,8 +35,8 @@ type Ledger struct {
 	module.Module
 }
 
-func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
-	return module.Provide(func(e *engine.Engine) therealledger.Ledger {
+func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
+	return module.Provide(func(e *engine.Engine) ledger.Ledger {
 		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.SybilProtection.OnlineCommittee(), e.Events.Error.Trigger)
 
 		// TODO: should this attach to RatifiedAccepted instead?
@@ -59,6 +58,10 @@ func New(workers *workerpool.Group, store kvstore.KVStore, apiProviderFunc func(
 	return l
 }
 
+func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower] {
+	return l.conflictDAG
+}
+
 func (l *Ledger) Shutdown() {
 	l.TriggerStopped()
 	l.conflictDAG.Shutdown()
@@ -72,52 +75,46 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 	return l.ledgerState.Export(writer, targetIndex)
 }
 
-func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[ledger.State] {
-	p := promise.New[ledger.State]()
-	switch specificStateRef := stateRef.(type) {
-	case iotago.IndexedUTXOReferencer:
-		output, err := l.ledgerState.ReadOutputByOutputID(specificStateRef.Ref())
-		if err != nil {
-			p.Reject(xerrors.Errorf("output %s not found: %w", specificStateRef.Ref(), ledger.ErrStateNotFound))
-		} else {
-			p.Resolve(&State{
-				outputID: output.OutputID(),
-				output:   output.Output(),
-			})
-		}
-	default:
-		panic(xerrors.Errorf("unsupported StateReference type %d", stateRef.Type()))
+func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
+	p := promise.New[mempool.State]()
+
+	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
+	output, err := l.ledgerState.ReadOutputByOutputID(stateRef.Ref())
+	if err != nil {
+		p.Reject(xerrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+	} else {
+		p.Resolve(output)
 	}
 
 	return p
 }
 
-func (l *Ledger) Output(id iotago.OutputID) (*ledgerstate.Output, error) {
-	// TODO: remove loading from ledgerstate as the mempool does it for us.
-	stateWithMetadata, err := l.memPool.StateMetadata(ledger.StoredStateReference(id))
+func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*ledgerstate.Output, error) {
+	stateWithMetadata, err := l.memPool.StateMetadata(stateRef)
 	if err != nil {
-		return l.ledgerState.ReadOutputByOutputID(id)
+		return nil, err
 	}
 
-	txWithMetadata, exists := l.memPool.TransactionMetadata(id.TransactionID())
-	if !exists {
-		return l.ledgerState.ReadOutputByOutputID(id)
+	switch castState := stateWithMetadata.State().(type) {
+	case *ledgerstate.Output:
+		return castState, nil
+	case *ExecutionOutput:
+		txWithMetadata, exists := l.memPool.TransactionMetadata(stateRef.Ref().TransactionID())
+		if !exists {
+			return nil, err
+		}
+
+		earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
+
+		tx, ok := txWithMetadata.Transaction().(*iotago.Transaction)
+		if !ok {
+			return nil, ErrUnexpectedUnderlyingType
+		}
+
+		return ledgerstate.CreateOutput(l.ledgerState.API(), stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
+	default:
+		panic("unexpected State type")
 	}
-
-	earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
-	state, ok := stateWithMetadata.State().(*State)
-	if !ok {
-		return nil, ErrUnexpectedUnderlyingType
-	}
-
-	tx, ok := txWithMetadata.Transaction().(*Transaction)
-	if !ok {
-		return nil, ErrUnexpectedUnderlyingType
-	}
-
-	txCreationTime := tx.Transaction.Essence.CreationTime
-
-	return ledgerstate.CreateOutput(l.ledgerState.API(), state.outputID, earliestAttachment, earliestAttachment.Index(), txCreationTime, state.output), nil
 }
 
 func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, err error) {
@@ -137,35 +134,32 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	var spents ledgerstate.Spents
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
-		tx, ok := txWithMeta.Transaction().(*Transaction)
+		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
 		if !ok {
 			innerErr = ErrUnexpectedUnderlyingType
 			return false
 		}
-		txCreationTime := tx.Transaction.Essence.CreationTime
+		txCreationTime := tx.Essence.CreationTime
 
-		inputs, errInput := tx.Inputs()
+		inputRefs, errInput := tx.Inputs()
 		if errInput != nil {
 			innerErr = errInput
 			return false
 		}
-		for _, input := range inputs {
-			inputOutput, outputErr := l.Output(input.Ref())
+
+		for _, inputRef := range inputRefs {
+			inputState, outputErr := l.Output(inputRef)
 			if outputErr != nil {
 				innerErr = outputErr
 				return false
 			}
 
-			spent := ledgerstate.NewSpent(inputOutput, txWithMeta.ID(), txCreationTime, index)
+			spent := ledgerstate.NewSpent(inputState, txWithMeta.ID(), txCreationTime, index)
 			spents = append(spents, spent)
 		}
 
 		if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateMetadata) error {
-			state, ok := element.State().(*State)
-			if !ok {
-				return ErrUnexpectedUnderlyingType
-			}
-			output := ledgerstate.CreateOutput(l.ledgerState.API(), state.outputID, txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, state.output)
+			output := ledgerstate.CreateOutput(l.ledgerState.API(), element.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, element.State().Output())
 			outputs = append(outputs, output)
 
 			return nil

@@ -26,9 +26,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -48,7 +48,7 @@ type Engine struct {
 	BlockGadget     blockgadget.Gadget
 	SlotGadget      slotgadget.Gadget
 	Notarization    notarization.Notarization
-	Ledger          therealledger.Ledger
+	Ledger          ledger.Ledger
 
 	Workers *workerpool.Group
 
@@ -78,7 +78,7 @@ func New(
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
-	ledgerProvider module.Provider[*Engine, therealledger.Ledger],
+	ledgerProvider module.Provider[*Engine, ledger.Ledger],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(

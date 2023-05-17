@@ -10,8 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -25,13 +24,13 @@ type TestFramework struct {
 	transactionByAlias map[string]mempool.Transaction
 	blockIDsByAlias    map[string]iotago.BlockID
 
-	ledgerState *ledgertests.StateResolver
+	ledgerState *ledgertests.MockStateResolver
 
 	test  *testing.T
 	mutex sync.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower], conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower], ledgerState *ledgertests.StateResolver) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower], conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower], ledgerState *ledgertests.MockStateResolver) *TestFramework {
 	t := &TestFramework{
 		Instance:           instance,
 		ConflictDAG:        conflictDAG,
@@ -106,7 +105,7 @@ func (t *TestFramework) CommitSlot(slotIndex iotago.SlotIndex) {
 	stateDiff := t.Instance.StateDiff(slotIndex)
 
 	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.StateMetadata) bool {
-		t.ledgerState.AddState(state)
+		t.ledgerState.AddState(state.State())
 
 		return true
 	})
@@ -255,7 +254,7 @@ func (t *TestFramework) setupHookedEvents() {
 }
 
 func (t *TestFramework) stateReference(alias string) iotago.IndexedUTXOReferencer {
-	return ledger.StoredStateReference(t.StateID(alias))
+	return ledgertests.StoredStateReference(t.StateID(alias))
 }
 
 func (t *TestFramework) waitBooked(transactionAliases ...string) {

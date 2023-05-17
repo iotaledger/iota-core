@@ -3,29 +3,23 @@ package utxoledger
 import (
 	"context"
 
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 	iotagovm "github.com/iotaledger/iota.go/v4/vm"
 	"github.com/iotaledger/iota.go/v4/vm/stardust"
 )
 
-func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputs []ledger.State) (outputs []ledger.State, err error) {
-	tx, ok := stateTransition.(*Transaction)
+func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.State) (outputStates []mempool.State, err error) {
+	tx, ok := stateTransition.(*iotago.Transaction)
 	if !ok {
 		return nil, ErrUnexpectedUnderlyingType
 	}
 
-	txCreationTime := tx.Transaction.Essence.CreationTime
+	txCreationTime := tx.Essence.CreationTime
 
 	inputSet := iotago.OutputSet{}
-	for _, input := range inputs {
-		s, ok := input.(*State)
-		if !ok {
-			return nil, ErrUnexpectedUnderlyingType
-		}
-
-		inputSet[s.outputID] = s.output
+	for _, inputState := range inputStates {
+		inputSet[inputState.OutputID()] = inputState.Output()
 	}
 
 	params := &iotagovm.Params{
@@ -35,18 +29,18 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		},
 	}
 
-	if err := stardust.NewVirtualMachine().Execute(tx.Transaction, params, inputSet); err != nil {
+	if err := stardust.NewVirtualMachine().Execute(tx, params, inputSet); err != nil {
 		return nil, err
 	}
 
-	outputSet, err := tx.Transaction.OutputsSet()
+	outputSet, err := tx.OutputsSet()
 	if err != nil {
 		return nil, err
 	}
 
-	created := make([]ledger.State, len(outputSet))
+	created := make([]mempool.State, len(outputSet))
 	for outputID, output := range outputSet {
-		created = append(created, &State{
+		created = append(created, &ExecutionOutput{
 			outputID: outputID,
 			output:   output,
 		})
