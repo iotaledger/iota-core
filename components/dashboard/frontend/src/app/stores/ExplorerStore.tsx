@@ -5,15 +5,16 @@ import {
     getPayloadType,
     Output,
     PayloadType,
-    SigLockedSingleOutput,
     TransactionPayload,
     FaucetPayload,
     Transaction,
-    TaggedDataPayload
+    TaggedDataPayload,
+    BasicOutput
 } from "../misc/Payload";
 import * as React from "react";
 import { Link } from 'react-router-dom';
 import { RouterStore } from "mobx-react-router";
+import { OutputType } from 'app/utils/output';
 
 export const GenesisBlockID = "1111111111111111111111111111111111111111111111111111111111111111";
 export const GenesisTransactionID = "11111111111111111111111111111111";
@@ -300,10 +301,9 @@ export class ExplorerStore {
                 let referencedOutputRes = await fetch(`/api/output/${inputID}`)
                 if (referencedOutputRes.status === 404) {
                     let genOutput = new Output();
-                    genOutput.output = new SigLockedSingleOutput();
-                    genOutput.output.balance = 0;
-                    genOutput.output.address = "LOADED FROM SNAPSHOT";
-                    genOutput.type = "SigLockedSingleOutputType";
+                    genOutput.output = new BasicOutput();
+                    genOutput.output.amount = 0;
+                    genOutput.type = OutputType.Basic;
                     genOutput.outputID = tx.inputs[i].referencedOutputID;
                     tx.inputs[i].output = genOutput;
                 }

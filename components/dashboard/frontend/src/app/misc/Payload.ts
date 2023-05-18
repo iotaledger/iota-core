@@ -46,8 +46,12 @@ export class Input {
 
 export class Output {
     outputID: OutputID;
-    type: string;
-    output: any;
+    type: number;
+    output: 
+        BasicOutput|
+        AliasOutput|
+        FoundryOutput|
+        NFTOutput;
 }
 
 export class OutputID {
@@ -69,45 +73,42 @@ export class SignatureEd25519 {
     signature: string;
 }
 
-export class SigLockedSingleOutput {
-    balance: number;
-    address: string;
-}
-
 export class BasicOutput {
     amount: number
-    // fill in other fields
-}
-
-export class SigLockedColoredOutput {
-    balances: Map<string,number>;
-    address: string;
+    nativeTokens?: Array<NativeToken>;
+    unlockConditions?: Array<Condition>;
+    features?: Array<Feature>;
 }
 
 export class AliasOutput {
-    balances: Map<string,number>;
-    aliasAddress: string;
-    stateAddress: string;
+    amount: number;
+    nativeTokens?: Array<NativeToken>;
+    aliasId: string;
     stateIndex: number;
-    isGovernanceUpdate: boolean;
-    isOrigin: boolean;
-    isDelegated: boolean;
-    delegationTimelock: number;
-    governingAddress: string;
-
-    stateData: any;
-    governanceMetadata: any;
-    immutableData: any;
+    stateMetadata?: string;
+    foundryCounter: number;
+    unlockConditions?: Array<Condition>;
+    features?: Array<Feature>;
+    immutableFeatures?: Array<Feature>;
 }
 
-export class ExtendedLockedOutput {
-    balances: Map<string,number>;
-    address: string
-    fallbackAddress?: string;
-    fallbackDeadline?: number;
-    timelock?: number;
-    payload: any;
+export class FoundryOutput {
+    amount: number;
+    nativeTokens?: Array<NativeToken>;
+    serialNumber: number;
+    tokenScheme: number;    
+    unlockConditions?: Array<Condition>;
+    features?: Array<Feature>;
+    immutableFeatures?: Array<Feature>;
+}
 
+export class NFTOutput {
+    amount: number;
+    nativeTokens?: Array<NativeToken>;
+    nftId: string;  
+    unlockConditions?: Array<Condition>;
+    features?: Array<Feature>;
+    immutableFeatures?: Array<Feature>;
 }
 
 export class Balance {
@@ -129,6 +130,60 @@ export class Timestamp {
 export class Opinion {
     value: string;
     round: number;
+}
+
+export class NativeToken {
+    id: string;
+    amount: number;
+}
+
+export class Condition {
+    type: number;
+    condition: 
+        AddressUnlockCondition |
+        StorageDepositReturnUnlockCondition |
+        TimelockUnlockCondition |
+        ExpirationUnlockCondition;
+}
+
+// address, stateController, Governor share the same struct
+export class AddressUnlockCondition {
+    address: string;
+}
+
+export class StorageDepositReturnUnlockCondition {
+    returnAddress: string;
+    amount: number;
+}
+
+export class TimelockUnlockCondition {
+    unixTime?: number;
+}
+
+export class ExpirationUnlockCondition {
+    returnAddress: string;
+    unixTime: number;
+}
+
+export class Feature {
+    type: number;
+    feature:
+        IssuerFeature |
+        MetadataFeature |
+        TagFeature;
+}
+
+// Issuer and sender share a struct
+export class IssuerFeature {
+    address: string
+}
+
+export class MetadataFeature {
+    data: string;
+}
+
+export class TagFeature {
+    tag: string;
 }
 
 export function getPayloadType(p: number){
