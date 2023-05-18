@@ -37,9 +37,13 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 
 	api := iotago.LatestAPI(&opt.ProtocolParameters)
 
+	errorHandler := func(err error) {
+		panic(err)
+	}
+
 	workers := workerpool.NewGroup("CreateSnapshot")
 	defer workers.Shutdown()
-	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion)
+	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, errorHandler)
 	defer s.Shutdown()
 
 	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
@@ -50,6 +54,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	}
 
 	engineInstance := engine.New(workers.CreateGroup("Engine"),
+		errorHandler,
 		s,
 		blockfilter.NewProvider(),
 		inmemoryblockdag.NewProvider(),

@@ -30,19 +30,23 @@ type Booker struct {
 	workers *workerpool.Group
 
 	blockCache  *blocks.Blocks
+
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+
 	ledger      ledger.Ledger
+
+	errorHandler    func(error)
 
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection.Committee(), e.BlockCache, opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection.Committee(), e.BlockCache, e.ErrorHandler("booker"), opts...)
 
 		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 			if err := b.Queue(block); err != nil {
-				b.events.Error.Trigger(err)
+				b.errorHandler(err)
 			}
 		})
 
@@ -50,7 +54,6 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 			b.ledger = e.Ledger
 			b.conflictDAG = b.ledger.ConflictDAG()
 
-			b.events.Error.Hook(e.Events.Error.Trigger)
 			e.Events.Booker.LinkTo(b.events)
 
 			b.TriggerInitialized()
@@ -60,13 +63,13 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], blockCache *blocks.Blocks, opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:     booker.NewEvents(),
 		committee:  committee,
 		blockCache: blockCache,
-
-		workers: workers,
+		workers:         workers,
+		errorHandler:    errorHandler,
 	}, opts, func(b *Booker) {
 		b.bookingOrder = causalorder.New(
 			workers.CreatePool("BookingOrder", 2),

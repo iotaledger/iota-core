@@ -63,6 +63,10 @@ func (t *TestSuite) assertBlocksInCacheWithFunc(expectedBlocks []*blocks.Block, 
 					return errors.Errorf("assertBlocksInCacheWithFunc: %s: block %s does not exist", node.Name, block.ID())
 				}
 
+				if blockFromCache.IsRootBlock() {
+					return errors.Errorf("assertBlocksInCacheWithFunc: %s: block %s is root block", node.Name, blockFromCache.ID())
+				}
+
 				if expectedPropertyState != propertyFunc(blockFromCache) {
 					return errors.Errorf("assertBlocksInCacheWithFunc: %s: block %s: expected %v, got %v", node.Name, blockFromCache.ID(), expectedPropertyState, propertyFunc(blockFromCache))
 				}

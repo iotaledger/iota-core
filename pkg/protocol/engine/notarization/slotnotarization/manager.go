@@ -33,17 +33,16 @@ type Manager struct {
 	slotMutations *SlotMutations
 	attestations  *Attestations
 
-	workers *workerpool.Group
+	workers      *workerpool.Group
+	errorHandler func(error)
 
 	ledger ledger.Ledger
 
 	storage         *storage.Storage
 	commitmentMutex sync.RWMutex
 
-	acceptedTimeFunc func() time.Time
-
-	slotTimeProviderFunc func() *iotago.SlotTimeProvider
-
+	acceptedTimeFunc          func() time.Time
+	slotTimeProviderFunc      func() *iotago.SlotTimeProvider
 	optsMinCommittableSlotAge iotago.SlotIndex
 
 	module.Module
@@ -54,6 +53,7 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 		return options.Apply(&Manager{
 			events:                    notarization.NewEvents(),
 			workers:                   e.Workers.CreateGroup("NotarizationManager"),
+			errorHandler:              e.ErrorHandler("notarization"),
 			optsMinCommittableSlotAge: defaultMinSlotCommittableAge,
 		}, opts,
 			func(m *Manager) {
@@ -81,7 +81,7 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 
 					e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
 						if err := m.notarizeRatifiedAcceptedBlock(block); err != nil {
-							e.Events.Error.Trigger(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
+							m.errorHandler(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 						}
 					}, event.WithWorkerPool(wpBlocks))
 
@@ -89,7 +89,6 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 					e.Events.Clock.RatifiedAcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
 
 					e.Events.Notarization.LinkTo(m.events)
-					m.events.Error.Hook(e.Events.Error.Trigger)
 
 					m.TriggerInitialized()
 				})
@@ -197,7 +196,7 @@ func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool
 func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	latestCommitment := m.storage.Settings().LatestCommitment()
 	if index != latestCommitment.Index()+1 {
-		m.events.Error.Trigger(errors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
+		m.errorHandler(errors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
 
 		return false
 	}
@@ -212,25 +211,25 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	if m.attestations.LastCommittedSlot() == index {
 		attestations, err = m.attestations.Get(index)
 		if err != nil {
-			m.events.Error.Trigger(errors.Wrap(err, "failed to get committed attestations"))
+			m.errorHandler(errors.Wrap(err, "failed to get committed attestations"))
 			return false
 		}
 		attestationsWeight, err = m.attestations.Weight(index)
 		if err != nil {
-			m.events.Error.Trigger(errors.Wrap(err, "failed to get committed attestations weight"))
+			m.errorHandler(errors.Wrap(err, "failed to get committed attestations weight"))
 			return false
 		}
 	} else {
 		attestations, attestationsWeight, err = m.attestations.Commit(index)
 		if err != nil {
-			m.events.Error.Trigger(errors.Wrap(err, "failed to commit attestations"))
+			m.errorHandler(errors.Wrap(err, "failed to commit attestations"))
 			return false
 		}
 	}
 
 	stateRoot, mutationRoot, err := m.ledger.CommitSlot(index)
 	if err != nil {
-		m.events.Error.Trigger(errors.Wrap(err, "failed to commit ledger"))
+		m.errorHandler(errors.Wrap(err, "failed to commit ledger"))
 		return false
 	}
 
@@ -253,12 +252,12 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	if err = m.storage.Settings().SetLatestCommitment(newModelCommitment); err != nil {
-		m.events.Error.Trigger(errors.Wrap(err, "failed to set latest commitment"))
+		m.errorHandler(errors.Wrap(err, "failed to set latest commitment"))
 		return false
 	}
 
 	if err = m.storage.Commitments().Store(newModelCommitment); err != nil {
-		m.events.Error.Trigger(errors.Wrap(err, "failed to store latest commitment"))
+		m.errorHandler(errors.Wrap(err, "failed to store latest commitment"))
 		return false
 	}
 
@@ -269,7 +268,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	})
 
 	if err = m.slotMutations.Evict(index); err != nil {
-		m.events.Error.Trigger(errors.Wrapf(err, "failed to evict slotMutations at index: %d", index))
+		m.errorHandler(errors.Wrapf(err, "failed to evict slotMutations at index: %d", index))
 	}
 
 	return true

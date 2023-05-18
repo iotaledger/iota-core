@@ -10,7 +10,6 @@ import (
 // Events is a container that acts as a dictionary for the events of the notarization manager.
 type Events struct {
 	SlotCommitted *event.Event1[*SlotCommittedDetails]
-	Error         *event.Event1[error]
 
 	event.Group[Events, *Events]
 }
@@ -19,7 +18,6 @@ type Events struct {
 var NewEvents = event.CreateGroupConstructor(func() (self *Events) {
 	return &Events{
 		SlotCommitted: event.New1[*SlotCommittedDetails](),
-		Error:         event.New1[error](),
 	}
 })
 

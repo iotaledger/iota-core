@@ -11,10 +11,13 @@ import (
 )
 
 func TestState_RootBlocks(t *testing.T) {
+	errorHandler := func(err error) {
+		t.Error(err)
+	}
 	prunableStorage := prunable.New(database.Config{
 		Engine:    hivedb.EngineMapDB,
 		Directory: t.TempDir(),
-	})
+	}, errorHandler)
 
 	ts := NewTestFramework(t, prunableStorage, eviction.NewState(prunableStorage.RootBlocks, eviction.WithRootBlocksEvictionDelay(3)))
 	ts.CreateAndAddRootBlock("Genesis", 0, iotago.NewEmptyCommitment().MustID())

@@ -125,8 +125,13 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 			return iotago.PayloadType(0)
 		}(),
 		// Payload:              ProcessPayload(block.Payload()),
-		CommitmentID:        commitmentID.ToHex(),
-		Commitment:          iotaBlk.SlotCommitment,
+		CommitmentID: commitmentID.ToHex(),
+		Commitment: CommitmentResponse{
+			Index:            uint64(iotaBlk.SlotCommitment.Index),
+			PrevID:           iotaBlk.SlotCommitment.PrevID.ToHex(),
+			RootsID:          iotaBlk.SlotCommitment.RootsID.ToHex(),
+			CumulativeWeight: iotaBlk.SlotCommitment.CumulativeWeight,
+		},
 		LatestConfirmedSlot: uint64(iotaBlk.LatestFinalizedSlot),
 	}
 

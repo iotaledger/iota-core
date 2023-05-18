@@ -75,7 +75,7 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 		opts...,
 	)
 
-	n.Protocol.Run()
+	go n.Protocol.Run()
 }
 
 func (n *Node) HookLogging() {
@@ -109,6 +109,10 @@ func (n *Node) HookLogging() {
 
 	events.Network.Error.Hook(func(err error, id identity.ID) {
 		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
+	})
+
+	events.Error.Hook(func(err error) {
+		fmt.Printf("%s > Protocol.Error: %s\n", n.Name, err.Error())
 	})
 }
 
@@ -163,10 +167,6 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.BlockProcessed.Hook(func(blockID iotago.BlockID) {
 		fmt.Printf("%s > [%s] Engine.BlockProcessed: %s\n", n.Name, engineName, blockID)
-	})
-
-	events.Error.Hook(func(err error) {
-		fmt.Printf("%s > [%s] Engine.Error: %s\n", n.Name, engineName, err.Error())
 	})
 
 	events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {

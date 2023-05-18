@@ -37,7 +37,7 @@ type Ledger struct {
 
 func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) ledger.Ledger {
-		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.SybilProtection.OnlineCommittee(), e.Events.Error.Trigger)
+		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.SybilProtection.OnlineCommittee(), e.ErrorHandler("ledger"))
 
 		// TODO: should this attach to RatifiedAccepted instead?
 		e.Events.BlockGadget.BlockAccepted.Hook(l.blockAccepted)
@@ -186,6 +186,14 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	})
 
 	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), nil
+}
+
+func (l *Ledger) IsOutputSpent(outputID iotago.OutputID) (bool, error) {
+	return l.ledgerState.IsOutputIDUnspentWithoutLocking(outputID)
+}
+
+func (l *Ledger) StateDiffs(index iotago.SlotIndex) (*ledgerstate.SlotDiff, error) {
+	return l.ledgerState.SlotDiffWithoutLocking(index)
 }
 
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {

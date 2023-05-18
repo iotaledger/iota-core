@@ -1177,7 +1177,7 @@ components:
           example: true
         commitmentIdSpent:
           type: string
-          description: The commitment index of the slot at which this output was spent.
+          description: The commitment ID of the slot at which this output was spent.
           example: '0xe526f8b1c856d4e844cc734bbe095429fb880ec4d93f3ccffe3b292a7de17be7'
         transactionIdSpent:
           type: string
@@ -1185,7 +1185,7 @@ components:
           example: '0xe526f8b1c856d4e844cc734bbe095429fb880ec4d93f3ccffe3b292a7de17be7'
         includedCommitmentId:
           type: string
-          description: The commitment index at which the output was included into the ledger.
+          description: The commitment ID at which the output was included into the ledger.
           example: '0xe526f8b1c856d4e844cc734bbe095429fb880ec4d93f3ccffe3b292a7de17be7'       
         latestCommitmentId:
           type: string

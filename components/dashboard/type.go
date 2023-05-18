@@ -175,7 +175,7 @@ type ExplorerBlock struct {
 
 	// Slot commitment
 	CommitmentID        string             `json:"commitmentID"`
-	Commitment          *iotago.Commitment `json:"commitment"`
+	Commitment          CommitmentResponse `json:"commitment"`
 	LatestConfirmedSlot uint64             `json:"latestConfirmedSlot"`
 }
 
@@ -192,4 +192,12 @@ type ExplorerOutput struct {
 	// Metadata          *jsonmodels.OutputMetadata `json:"metadata"`
 	TxTimestamp int `json:"txTimestamp"`
 	// ConfirmationState coreapi.txState `json:"confirmationState"`
+}
+
+type CommitmentResponse struct {
+	Index            uint64 `json:"index"`
+	PrevID           string `json:"prevID"`
+	RootsID          string `json:"rootsID"`
+	CumulativeWeight uint64 `json:"cumulativeWeight"`
+	// TODO: might add roots of different trees here
 }

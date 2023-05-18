@@ -17,7 +17,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
-	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
+	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -50,10 +50,11 @@ var (
 type dependencies struct {
 	dig.In
 
-	Protocol   *protocol.Protocol
-	LocalPeer  *peer.Local
-	AppInfo    *app.Info
-	P2PManager *p2p.Manager
+	Protocol       *protocol.Protocol
+	LocalPeer      *peer.Local
+	AppInfo        *app.Info
+	P2PManager     *p2p.Manager
+	MetricsTracker *metricstracker.MetricsTracker
 }
 
 func configure() error {
@@ -150,13 +151,15 @@ func currentNodeStatus() *nodestatus {
 	}
 	//get TangleTime
 	cl := deps.Protocol.MainEngineInstance().Clock
+	syncStatus := deps.Protocol.SyncManager.SyncStatus()
+
 	status.TangleTime = tangleTime{
-		Synced:           deps.Protocol.MainEngineInstance().IsSynced(),
+		Synced:           syncStatus.NodeSynced,
 		Bootstrapped:     deps.Protocol.MainEngineInstance().IsBootstrapped(),
-		AcceptedBlockID:  dashboardmetrics.GetLastAcceptedBlockID().ToHex(),
-		ConfirmedBlockID: dashboardmetrics.GetLastConfirmedBlockID().ToHex(),
-		CommittedSlot:    int64(deps.Protocol.MainEngineInstance().Notarization.Attestations().LastCommittedSlot()),
-		ConfirmedSlot:    0,
+		AcceptedBlockID:  syncStatus.LastAcceptedBlockID.ToHex(),
+		ConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
+		CommittedSlot:    int64(syncStatus.LatestCommittedSlot),
+		ConfirmedSlot:    int64(syncStatus.FinalizedSlot),
 		ATT:              cl.Accepted().Time().UnixNano(),
 		RATT:             cl.Accepted().RelativeTime().UnixNano(),
 		CTT:              cl.Confirmed().Time().UnixNano(),
