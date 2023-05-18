@@ -10,8 +10,6 @@ type Events struct {
 	WitnessAdded *event.Event1[*blocks.Block]
 	BlockInvalid *event.Event2[*blocks.Block, error]
 
-	Error *event.Event1[error]
-
 	event.Group[Events, *Events]
 }
 
@@ -21,6 +19,5 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		BlockBooked:  event.New1[*blocks.Block](),
 		WitnessAdded: event.New1[*blocks.Block](),
 		BlockInvalid: event.New2[*blocks.Block, error](),
-		Error:        event.New1[error](),
 	}
 })

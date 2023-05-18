@@ -41,7 +41,7 @@ type Ledger struct {
 
 func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) therealledger.Ledger {
-		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.Events.Error.Trigger)
+		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.ErrorHandler("ledger"))
 		e.Events.Booker.BlockBooked.Hook(l.attachTransaction)
 		e.Events.BlockGadget.BlockAccepted.Hook(l.blockAccepted)
 

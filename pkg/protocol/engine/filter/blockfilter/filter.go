@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -40,10 +39,6 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 		f := New(e.Storage.Settings().ProtocolParameters, opts...)
 
 		e.HookConstructed(func() {
-			f.events.BlockFiltered.Hook(func(filteredEvent *filter.BlockFilteredEvent) {
-				e.Events.Error.Trigger(errors.Wrapf(filteredEvent.Reason, "block (%s) filtered", filteredEvent.Block.ID()))
-			}, event.WithWorkerPool(e.Workers.CreatePool("Filter", 2)))
-
 			e.Events.Filter.LinkTo(f.events)
 		})
 

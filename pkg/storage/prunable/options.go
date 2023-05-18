@@ -1,7 +1,6 @@
 package prunable
 
 import (
-	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 )
 
@@ -17,11 +16,5 @@ func WithGranularity(granularity int64) options.Option[Manager] {
 func WithMaxOpenDBs(optsMaxOpenDBs int) options.Option[Manager] {
 	return func(m *Manager) {
 		m.optsMaxOpenDBs = optsMaxOpenDBs
-	}
-}
-
-func WithLogger(log *logger.Logger) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsLogger = log
 	}
 }

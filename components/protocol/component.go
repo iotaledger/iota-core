@@ -128,11 +128,6 @@ func configure() error {
 		Component.LogErrorf("Error in Protocol: %s", err)
 	})
 
-	// TODO: forward engine errors to protocol?
-	deps.Protocol.Events.Engine.Error.Hook(func(err error) {
-		Component.LogErrorf("Error in Engine: %s", err)
-	})
-
 	deps.Protocol.Events.Network.Error.Hook(func(err error, id network.PeerID) {
 		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})

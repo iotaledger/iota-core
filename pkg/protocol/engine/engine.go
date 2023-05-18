@@ -50,7 +50,8 @@ type Engine struct {
 	Notarization    notarization.Notarization
 	Ledger          therealledger.Ledger
 
-	Workers *workerpool.Group
+	Workers      *workerpool.Group
+	errorHandler func(error)
 
 	BlockCache *blocks.Blocks
 
@@ -70,6 +71,7 @@ type Engine struct {
 
 func New(
 	workers *workerpool.Group,
+	errorHandler func(error),
 	storageInstance *storage.Storage,
 	filterProvider module.Provider[*Engine, filter.Filter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
@@ -88,6 +90,7 @@ func New(
 			Storage:       storageInstance,
 			EvictionState: eviction.NewState(storageInstance.RootBlocks),
 			Workers:       workers,
+			errorHandler:  errorHandler,
 
 			optsBootstrappedThreshold: 10 * time.Second,
 			optsSnapshotDepth:         5,
@@ -306,11 +309,11 @@ func (e *Engine) setupBlockStorage() {
 	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
 		store := e.Storage.Blocks(block.ID().Index())
 		if store == nil {
-			e.Events.Error.Trigger(errors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
+			e.errorHandler(errors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
 		}
 
 		if err := store.Store(block.ModelBlock()); err != nil {
-			e.Events.Error.Trigger(errors.Wrapf(err, "failed to store block with %s", block.ID()))
+			e.errorHandler(errors.Wrapf(err, "failed to store block with %s", block.ID()))
 		}
 	}, event.WithWorkerPool(wp))
 }
@@ -327,7 +330,7 @@ func (e *Engine) setupEvictionState() {
 			if parent.ID.Index() < block.ID().Index() && !e.EvictionState.IsRootBlock(parent.ID) {
 				parentBlock, exists := e.Block(parent.ID)
 				if !exists {
-					e.Events.Error.Trigger(errors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
+					e.errorHandler(errors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
 					return
 				}
 				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.Block().SlotCommitment.MustID())
@@ -389,6 +392,12 @@ func (e *Engine) EarliestRootCommitment() *model.Commitment {
 	}
 
 	return rootCommitment
+}
+
+func (e *Engine) ErrorHandler(componentName string) func(error) {
+	return func(err error) {
+		e.errorHandler(errors.Wrap(err, componentName))
+	}
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

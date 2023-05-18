@@ -55,17 +55,19 @@ type BlockDAG struct {
 	workers    *workerpool.Group
 	workerPool *workerpool.WorkerPool
 
+	errorHandler func(error)
+
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.Storage.Commitments().Load, opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.Storage.Commitments().Load, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
 			e.Events.Filter.BlockAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
-					e.Events.Error.Trigger(errors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.Block().IssuerID))
+					b.errorHandler(errors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.Block().IssuerID))
 				}
 			}, event.WithWorkerPool(b.workers.CreatePool("BlockDAG.Attach", 2)))
 
@@ -79,7 +81,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, latestCommitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, latestCommitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
 		events:         blockdag.NewEvents(),
 		evictionState:  evictionState,
@@ -88,6 +90,7 @@ func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *b
 		futureBlocks:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*blocks.Block]](),
 		workers:        workers,
 		workerPool:     workers.CreatePool("Solidifier", 2),
+		errorHandler:   errorHandler,
 	}, opts,
 		func(b *BlockDAG) {
 			b.solidifier = causalorder.New(

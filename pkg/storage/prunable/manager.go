@@ -4,11 +4,11 @@ import (
 	"os"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/zyedidia/generic/cache"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -22,35 +22,32 @@ type Manager struct {
 	lastPrunedSlot *model.EvictionIndex
 	pruningMutex   sync.RWMutex
 
-	dbConfig database.Config
+	dbConfig     database.Config
+	errorHandler func(error)
 
 	dbSizes *shrinkingmap.ShrinkingMap[iotago.SlotIndex, int64]
-
-	optsLogger *logger.Logger
-	logger     *logger.WrappedLogger
 
 	// The granularity of the DB instances (i.e. how many buckets/slots are stored in one DB).
 	optsGranularity int64
 	optsMaxOpenDBs  int
 }
 
-func NewManager(dbConfig database.Config, opts ...options.Option[Manager]) *Manager {
+func NewManager(dbConfig database.Config, errorHandler func(error), opts ...options.Option[Manager]) *Manager {
 	return options.Apply(&Manager{
 		optsGranularity: 10,
 		optsMaxOpenDBs:  10,
 		dbConfig:        dbConfig,
+		errorHandler:    errorHandler,
 		dbSizes:         shrinkingmap.New[iotago.SlotIndex, int64](),
 		lastPrunedSlot:  model.NewEvictionIndex(),
 	}, opts, func(m *Manager) {
-		m.logger = logger.NewWrappedLogger(m.optsLogger)
-
 		m.openDBs = cache.New[iotago.SlotIndex, *dbInstance](m.optsMaxOpenDBs)
 		m.openDBs.SetEvictCallback(func(baseIndex iotago.SlotIndex, db *dbInstance) {
 			db.Close()
 
 			size, err := dbPrunableDirectorySize(dbConfig.Directory, baseIndex)
 			if err != nil {
-				m.logger.LogError("failed to get size of prunable directory for base index %d: %w", baseIndex, err)
+				errorHandler(errors.Wrapf(err, "failed to get size of prunable directory for base index %d", baseIndex))
 			}
 
 			m.dbSizes.Set(baseIndex, size)
@@ -133,7 +130,7 @@ func (m *Manager) PrunableStorageSize() int64 {
 	m.openDBs.Each(func(key iotago.SlotIndex, val *dbInstance) {
 		size, err := dbPrunableDirectorySize(m.dbConfig.Directory, key)
 		if err != nil {
-			m.logger.LogError("dbPrunableDirectorySize failed for %s%s: %w", m.dbConfig.Directory, key, err)
+			m.errorHandler(errors.Wrapf(err, "dbPrunableDirectorySize failed for %s%s", m.dbConfig.Directory, key))
 			return
 		}
 		sum += size

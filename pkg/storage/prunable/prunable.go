@@ -14,13 +14,15 @@ const (
 )
 
 type Prunable struct {
-	api     iotago.API
-	manager *Manager
+	api          iotago.API
+	manager      *Manager
+	errorHandler func(error)
 }
 
-func New(dbConfig database.Config, opts ...options.Option[Manager]) *Prunable {
+func New(dbConfig database.Config, errorHandler func(error), opts ...options.Option[Manager]) *Prunable {
 	return &Prunable{
-		manager: NewManager(dbConfig, opts...),
+		errorHandler: errorHandler,
+		manager:      NewManager(dbConfig, errorHandler, opts...),
 	}
 }
 
