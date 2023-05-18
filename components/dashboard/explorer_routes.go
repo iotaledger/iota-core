@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 
+	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -37,10 +38,10 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 		return c.JSON(http.StatusOK, t)
 	})
 
-	// routeGroup.GET("/transaction/:transactionID", ledgerstateAPI.GetTransaction)
+	routeGroup.GET("/transaction/:"+restapipkg.ParameterTransactionID, getTransaction)
 	// routeGroup.GET("/transaction/:transactionID/metadata", ledgerstateAPI.GetTransactionMetadata)
 	// routeGroup.GET("/transaction/:transactionID/attachments", ledgerstateAPI.GetTransactionAttachments)
-	// routeGroup.GET("/output/:outputID", ledgerstateAPI.GetOutput)
+	routeGroup.GET("/output/:"+restapipkg.ParameterOutputID, getOutput)
 	// routeGroup.GET("/output/:outputID/metadata", ledgerstateAPI.GetOutputMetadata)
 	// routeGroup.GET("/output/:outputID/consumers", ledgerstateAPI.GetOutputConsumers)
 	// routeGroup.GET("/conflict/:conflictID", ledgerstateAPI.GetConflict)
@@ -48,9 +49,9 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 	// routeGroup.GET("/conflict/:conflictID/conflicts", ledgerstateAPI.GetConflictConflicts)
 	// routeGroup.GET("/conflict/:conflictID/voters", ledgerstateAPI.GetConflictVoters)
 	// routeGroup.GET("/slot/:index/blocks", slotAPI.GetBlocks)
-	// routeGroup.GET("/slot/commitment/:commitment", slotAPI.GetCommittedSlotByCommitment)
+	routeGroup.GET("/slot/commitment/:"+restapipkg.ParameterCommitmentID, getCommitmentByID)
 	// routeGroup.GET("/slot/:index/transactions", slotAPI.GetTransactions)
-	// routeGroup.GET("/slot/:index/utxos", slotAPI.GetUTXOs)
+	routeGroup.GET("/slot/:"+restapipkg.ParameterSlotIndex+"/utxos", getUTXOs)
 
 	routeGroup.GET("/search/:search", func(c echo.Context) error {
 		search := c.Param("search")
@@ -141,4 +142,100 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 	}
 
 	return t
+}
+
+func getTransaction(c echo.Context) error {
+	txID, err := httpserver.ParseTransactionIDParam(c, restapipkg.ParameterTransactionID)
+	if err != nil {
+		return err
+	}
+
+	// Get the first output of that transaction (using index 0)
+	outputID := iotago.OutputID{}
+	copy(outputID[:], txID[:])
+
+	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	if err != nil {
+		return err
+	}
+
+	block, exists := deps.Protocol.MainEngineInstance().Block(output.BlockID())
+	if !exists {
+		return errors.Errorf("block not found: %s", output.BlockID().ToHex())
+	}
+
+	iotaTX, isTX := block.Block().Payload.(*iotago.Transaction)
+	if !isTX {
+		return errors.Errorf("payload is not a transaction: %s", output.BlockID().ToHex())
+	}
+
+	return httpserver.JSONResponse(c, http.StatusOK, NewTransaction(iotaTX))
+}
+
+func getOutput(c echo.Context) error {
+	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
+	if err != nil {
+		return err
+	}
+
+	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	if err != nil {
+		return err
+	}
+
+	return httpserver.JSONResponse(c, http.StatusOK, NewOutputFromLedgerstateOutput(output))
+}
+
+func getCommitmentByID(c echo.Context) error {
+	commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
+	if err != nil {
+		return err
+	}
+
+	commitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(commitmentID.Index())
+	if err != nil {
+		return err
+	}
+
+	commitmentJSON, err := deps.Protocol.API().JSONEncode(commitment)
+	if err != nil {
+		return err
+	}
+
+	return httpserver.JSONResponse(c, http.StatusOK, commitmentJSON)
+}
+
+func getUTXOs(c echo.Context) error {
+	indexUint64, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
+	if err != nil {
+		return err
+	}
+
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.StateDiffs(iotago.SlotIndex(indexUint64))
+	if err != nil {
+		return err
+	}
+
+	createdOutputs := make([]string, len(diffs.Outputs))
+	consumedOutputs := make([]string, len(diffs.Spents))
+
+	for i, output := range diffs.Outputs {
+		createdOutputs[i] = output.OutputID().ToHex()
+	}
+
+	for i, output := range diffs.Spents {
+		consumedOutputs[i] = output.OutputID().ToHex()
+	}
+
+	type utxosResponse struct {
+		Index           iotago.SlotIndex `json:"index"`
+		CreatedOutputs  []string         `json:"createdOutputs"`
+		ConsumedOutputs []string         `json:"consumedOutputs"`
+	}
+
+	return httpserver.JSONResponse(c, http.StatusOK, &utxosResponse{
+		Index:           iotago.SlotIndex(indexUint64),
+		CreatedOutputs:  createdOutputs,
+		ConsumedOutputs: consumedOutputs,
+	})
 }

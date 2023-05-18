@@ -13,7 +13,7 @@ export class AliasOutputComponent extends React.Component<Props, any> {
     render() {
         let balances = Object.keys(this.props.output.balances).map((key) => {return {color:key, value:this.props.output.balances[key]}})
         return (
-            <div className={"mb-2"} key={this.props.id.base58}>
+            <div className={"mb-2"} key={this.props.id.hex}>
                 <ListGroup style={{wordBreak: "break-word"}}>
                     <ListGroup.Item>Type: AliasOutput</ListGroup.Item>
                     <ListGroup.Item>
@@ -22,7 +22,7 @@ export class AliasOutputComponent extends React.Component<Props, any> {
                             {balances.map((entry, i) => (<div key={i}><Badge variant="success">{new Intl.NumberFormat().format(entry.value)} {resolveColor(entry.color)}</Badge></div>))}
                         </div>
                     </ListGroup.Item>
-                    <ListGroup.Item>OutputID: <a href={`/explorer/output/${this.props.id.base58}`}>{this.props.id.base58}</a></ListGroup.Item>
+                    <ListGroup.Item>OutputID: <a href={`/explorer/output/${this.props.id.hex}`}>{this.props.id.hex}</a></ListGroup.Item>
                     <ListGroup.Item>AliasAddress: <a href={`/explorer/address/${this.props.output.aliasAddress}`}> {this.props.output.aliasAddress}</a></ListGroup.Item>
                     <ListGroup.Item>StateAddress: <a href={`/explorer/address/${this.props.output.stateAddress}`}> {this.props.output.stateAddress}</a></ListGroup.Item>
                     <ListGroup.Item>Governing Address:  {this.props.output.governingAddress?  <a href={`/explorer/address/${this.props.output.governingAddress}`}> {this.props.output.governingAddress}</a> : "Self-governed"} </ListGroup.Item>

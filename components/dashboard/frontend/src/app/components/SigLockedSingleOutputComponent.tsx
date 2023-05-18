@@ -13,7 +13,7 @@ export class SigLockedSingleOutputComponent extends React.Component<Props, any> 
         let o = this.props.output;
         let id = this.props.id;
         return (
-            <div className={"mb-2"} key={this.props.id.base58}>
+            <div className={"mb-2"} key={this.props.id.hex}>
                 <ListGroup>
                     <ListGroup.Item>Type: SigLockedSingleOutput</ListGroup.Item>
                     <ListGroup.Item>
@@ -22,7 +22,7 @@ export class SigLockedSingleOutputComponent extends React.Component<Props, any> 
                             <div><Badge variant="success">{new Intl.NumberFormat().format(o.balance)} IOTA</Badge></div>
                         </div>
                     </ListGroup.Item>
-                    <ListGroup.Item>OutputID: <a href={`/explorer/output/${id.base58}`}>{id.base58}</a></ListGroup.Item>
+                    <ListGroup.Item>OutputID: <a href={`/explorer/output/${id.hex}`}>{id.hex}</a></ListGroup.Item>
                     <ListGroup.Item>Address: <a href={`/explorer/address/${o.address}`}> {o.address}</a></ListGroup.Item>
                 <ListGroup.Item>Transaction: <a href={`/explorer/transaction/${id.transactionID}`}> {id.transactionID}</a></ListGroup.Item>
                 <ListGroup.Item>Output Index: {id.outputIndex}</ListGroup.Item>

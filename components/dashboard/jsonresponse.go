@@ -1,0 +1,251 @@
+package dashboard
+
+import (
+	"encoding/json"
+
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
+	iotago "github.com/iotaledger/iota.go/v4"
+)
+
+// region Address //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Address represents the JSON model of a ledgerstate.Address.
+// type Address struct {
+// 	Type   string `json:"type"`
+// 	Base58 string `json:"base58"`
+// }
+
+// // NewAddress returns an Address from the given ledgerstate.Address.
+// func NewAddress(address devnetvm.Address) *Address {
+// 	return &Address{
+// 		Type:   address.Type().String(),
+// 		Base58: address.Base58(),
+// 	}
+// }
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region Output ///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Output represents the JSON model of a ledgerstate.Output.
+type Output struct {
+	OutputID *OutputID       `json:"outputID,omitempty"`
+	Type     string          `json:"type"`
+	Output   json.RawMessage `json:"output"`
+}
+
+// NewOutput returns an Output from the given ledgerstate.Output.
+func NewOutput(output iotago.Output) (result *Output) {
+	outputJSON, err := deps.Protocol.API().JSONEncode(output)
+	if err != nil {
+		return nil
+	}
+
+	return &Output{
+		Type:   output.Type().String(),
+		Output: outputJSON,
+	}
+}
+
+// NewOutput returns an Output from the given ledgerstate.Output.
+func NewOutputFromLedgerstateOutput(output *ledgerstate.Output) (result *Output) {
+	outputJSON, err := deps.Protocol.API().JSONEncode(output)
+	if err != nil {
+		return nil
+	}
+
+	return &Output{
+		OutputID: NewOutputID(output.OutputID()),
+		Type:     output.OutputType().String(),
+		Output:   outputJSON,
+	}
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region OutputID /////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// OutputID represents the JSON model of a ledgerstate.OutputID.
+type OutputID struct {
+	Hex           string `json:"hex"`
+	TransactionID string `json:"transactionID"`
+	OutputIndex   uint16 `json:"outputIndex"`
+}
+
+// NewOutputID returns an OutputID from the given ledgerstate.OutputID.
+func NewOutputID(outputID iotago.OutputID) *OutputID {
+	return &OutputID{
+		Hex:           outputID.ToHex(),
+		TransactionID: outputID.TransactionID().ToHex(),
+		OutputIndex:   outputID.Index(),
+	}
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region OutputMetadata ///////////////////////////////////////////////////////////////////////////////////////////////
+
+// OutputMetadata represents the JSON model of the mempool.OutputMetadata.
+// type OutputMetadata struct {
+// 	OutputID              *OutputID          `json:"outputID"`
+// 	ConflictIDs           []string           `json:"conflictIDs"`
+// 	FirstConsumer         string             `json:"firstCount"`
+// 	ConfirmedConsumer     string             `json:"confirmedConsumer,omitempty"`
+// 	ConfirmationState     confirmation.State `json:"confirmationState"`
+// 	ConfirmationStateTime int64              `json:"confirmationStateTime"`
+// }
+
+// // NewOutputMetadata returns the OutputMetadata from the given mempool.OutputMetadata.
+// func NewOutputMetadata(outputMetadata *mempool.OutputMetadata, confirmedConsumerID utxo.TransactionID) *OutputMetadata {
+// 	return &OutputMetadata{
+// 		OutputID: NewOutputID(outputMetadata.ID()),
+// 		ConflictIDs: lo.Map(lo.Map(outputMetadata.ConflictIDs().Slice(), func(t utxo.TransactionID) []byte {
+// 			return lo.PanicOnErr(t.Bytes())
+// 		}), base58.Encode),
+// 		FirstConsumer:         outputMetadata.FirstConsumer().Base58(),
+// 		ConfirmedConsumer:     confirmedConsumerID.Base58(),
+// 		ConfirmationState:     outputMetadata.ConfirmationState(),
+// 		ConfirmationStateTime: outputMetadata.ConfirmationStateTime().Unix(),
+// 	}
+// }
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region Transaction //////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Transaction represents the JSON model of a ledgerstate.Transaction.
+type Transaction struct {
+	NetworkID        iotago.NetworkID        `json:"networkId"`
+	CreationTime     int64                   `json:"creationTime"`
+	Inputs           []*Input                `json:"inputs"`
+	InputsCommitment iotago.InputsCommitment `json:"inputsCommitment"`
+	Outputs          []*Output               `json:"outputs"`
+	Unlocks          []*UnlockBlock          `json:"unlocks"`
+	Payload          []byte                  `json:"payload"`
+}
+
+// NewTransaction returns a Transaction from the given ledgerstate.Transaction.
+func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
+	txID, err := iotaTx.ID()
+	if err != nil {
+		return nil
+	}
+
+	inputs := make([]*Input, len(iotaTx.Essence.Inputs))
+	for i, input := range iotaTx.Essence.Inputs {
+		inputs[i] = NewInput(input)
+	}
+
+	outputs := make([]*Output, len(iotaTx.Essence.Outputs))
+	for i, output := range iotaTx.Essence.Outputs {
+		outputs[i] = NewOutput(output)
+		outputs[i].OutputID = &OutputID{
+			Hex: iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(i)).ToHex(),
+		}
+	}
+
+	unlockBlocks := make([]*UnlockBlock, len(iotaTx.Unlocks))
+	for i, unlockBlock := range iotaTx.Unlocks {
+		unlockBlocks[i] = NewUnlockBlock(unlockBlock)
+	}
+
+	dataPayload := make([]byte, 0)
+	if iotaTx.Essence.Payload != nil {
+		dataPayload, _ = deps.Protocol.API().Encode(iotaTx.Essence.Payload)
+	}
+
+	return &Transaction{
+		NetworkID:    iotaTx.Essence.NetworkID,
+		CreationTime: iotaTx.Essence.CreationTime.Unix(),
+		Inputs:       inputs,
+		Outputs:      outputs,
+		Unlocks:      unlockBlocks,
+		Payload:      dataPayload,
+	}
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region Input ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Input represents the JSON model of a ledgerstate.Input.
+type Input struct {
+	Type               string    `json:"type"`
+	ReferencedOutputID *OutputID `json:"referencedOutputID,omitempty"`
+	// the referenced output object, omit if not specified
+	Output *Output `json:"output,omitempty"`
+}
+
+// NewInput returns an Input from the given ledgerstate.Input.
+func NewInput(input iotago.Input) *Input {
+	utxoInput, isUtxoInput := input.(*iotago.UTXOInput)
+	if !isUtxoInput {
+		return nil
+	}
+
+	return &Input{
+		Type:               input.Type().String(),
+		ReferencedOutputID: NewOutputID(utxoInput.Ref()),
+	}
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region UnlockBlock //////////////////////////////////////////////////////////////////////////////////////////////////
+
+// UnlockBlock represents the JSON model of a ledgerstate.UnlockBlock.
+type UnlockBlock struct {
+	Type            string               `json:"type"`
+	ReferencedIndex uint16               `json:"referencedIndex,omitempty"`
+	SignatureType   iotago.SignatureType `json:"signatureType,omitempty"`
+	Signature       json.RawMessage      `json:"signature,omitempty"`
+}
+
+// NewUnlockBlock returns an UnlockBlock from the given ledgerstate.UnlockBlock.
+func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
+	result := &UnlockBlock{
+		Type: unlockBlock.Type().String(),
+	}
+
+	switch unlock := unlockBlock.(type) {
+	case *iotago.SignatureUnlock:
+		switch signature := unlock.Signature.(type) {
+		case *iotago.Ed25519Signature:
+			sigJSON, err := deps.Protocol.API().JSONEncode(signature)
+			if err != nil {
+				return nil
+			}
+			result.Signature = sigJSON
+		}
+	}
+
+	return result
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region TransactionMetadata ///////////////////////////////////////////////////////////////////////////////////////////
+
+// TransactionMetadata represents the JSON model of the mempool.TransactionMetadata.
+// type TransactionMetadata struct {
+// 	TransactionID         string             `json:"transactionID"`
+// 	ConflictIDs           []string           `json:"conflictIDs"`
+// 	Booked                bool               `json:"booked"`
+// 	BookedTime            int64              `json:"bookedTime"`
+// 	ConfirmationState     confirmation.State `json:"confirmationState"`
+// 	ConfirmationStateTime int64              `json:"confirmationStateTime"`
+// }
+
+// // NewTransactionMetadata returns the TransactionMetadata from the given mempool.TransactionMetadata.
+// func NewTransactionMetadata(transactionMetadata *mempool.TransactionMetadata) *TransactionMetadata {
+// 	return &TransactionMetadata{
+// 		TransactionID:         transactionMetadata.ID().Base58(),
+// 		ConflictIDs:           lo.Map(lo.Map(transactionMetadata.ConflictIDs().Slice(), func(t utxo.TransactionID) []byte { return lo.PanicOnErr(t.Bytes()) }), base58.Encode),
+// 		Booked:                transactionMetadata.IsBooked(),
+// 		BookedTime:            transactionMetadata.BookingTime().Unix(),
+// 		ConfirmationState:     transactionMetadata.ConfirmationState(),
+// 		ConfirmationStateTime: transactionMetadata.ConfirmationStateTime().Unix(),
+// 	}
+// }
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

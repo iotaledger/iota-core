@@ -2,22 +2,20 @@ import {
     AliasOutput,
     ExtendedLockedOutput,
     Output,
-    OutputID,
     SigLockedColoredOutput,
     SigLockedSingleOutput
 } from "../misc/Payload";
 import { SigLockedSingleOutputComponent} from "../components/SigLockedSingleOutputComponent";
 import * as React from "react";
 import {SigLockedColoredOutputComponent} from "../components/SigLockedColoredOutputComponent";
-import {AliasOutputComponent} from "../components/AliasOutputComponent.tsx.tsx";
+import {AliasOutputComponent} from "../components/AliasOutputComponent.tsx";
 import {ExtendedLockedOutputComponent} from "../components/ExtendedLockedOutput";
 import {ExplorerOutput} from "../stores/ExplorerStore";
 import {Base58EncodedColorIOTA, resolveColor} from "./color";
 import {ConfirmationState} from "./confirmation_state";
-import { Base58, ReadStream } from '@iota/util.js';
 
 export function outputToComponent(output: Output) {
-    const id = outputIDFromBase58(output.outputID.base58);
+    let id = output.outputID
     switch (output.type) {
         case "SigLockedSingleOutputType":
             return <SigLockedSingleOutputComponent output={output.output as SigLockedSingleOutput} id={id}/>;
@@ -96,15 +94,4 @@ let extractBalanceInfo = (o: ExplorerOutput, result: Map<string, number>) => {
         }
         result.set(resolvedColor, balance + prevBalance);
     }
-}
-
-export function outputIDFromBase58(outputIDStr: string): OutputID {
-    const outputIDBytes = Base58.decode(outputIDStr);
-
-    const readStream = new ReadStream(outputIDBytes);
-    return {
-        base58: outputIDStr,
-        transactionID: Base58.encode(readStream.readBytes('TransactionID', 32)),
-        outputIndex: Number(readStream.readUInt16('Index')),
-    };
 }

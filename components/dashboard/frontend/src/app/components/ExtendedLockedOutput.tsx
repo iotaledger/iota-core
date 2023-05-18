@@ -13,7 +13,7 @@ export class ExtendedLockedOutputComponent extends React.Component<Props, any> {
     render() {
         let balances = Object.keys(this.props.output.balances).map((key) => {return {color:key, value:this.props.output.balances[key]}})
         return (
-            <div className={"mb-2"} key={this.props.id.base58}>
+            <div className={"mb-2"} key={this.props.id.hex}>
                 <ListGroup>
                     <ListGroup.Item>Type: ExtendedLockedOutput</ListGroup.Item>
                     <ListGroup.Item>
@@ -22,7 +22,7 @@ export class ExtendedLockedOutputComponent extends React.Component<Props, any> {
                             {balances.map((entry, i) => (<div key={i}><Badge variant="success">{new Intl.NumberFormat().format(entry.value)} {resolveColor(entry.color)}</Badge></div>))}
                         </div>
                     </ListGroup.Item>
-                    <ListGroup.Item>OutputID: <a href={`/explorer/output/${this.props.id.base58}`}>{this.props.id.base58}</a></ListGroup.Item>
+                    <ListGroup.Item>OutputID: <a href={`/explorer/output/${this.props.id.hex}`}>{this.props.id.hex}</a></ListGroup.Item>
                     <ListGroup.Item>Address: <a href={`/explorer/address/${this.props.output.address}`}> {this.props.output.address}</a></ListGroup.Item>
                     {
                         this.props.output.fallbackAddress &&

@@ -293,9 +293,9 @@ export class ExplorerStore {
     @action
     getTransaction = async (id: string) => {
         const tx = await this.fetchJson<never, Transaction>("get", `/api/transaction/${id}`)
-
+        
         for (let i = 0; i < tx.inputs.length; i++) {
-            let inputID = tx.inputs[i] ? tx.inputs[i].referencedOutputID.base58 : GenesisBlockID
+            let inputID = tx.inputs[i] ? tx.inputs[i].referencedOutputID.hex : GenesisBlockID
             try {
                 let referencedOutputRes = await fetch(`/api/output/${inputID}`)
                 if (referencedOutputRes.status === 404) {

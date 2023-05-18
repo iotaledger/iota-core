@@ -29,14 +29,13 @@ export class FaucetPayload {
 }
 
 export class Transaction {
-    version: number;
-    timestamp: number;
-    accessPledgeID: string;
-    consensusPledgeID: string;
+    networkId: number;
+    creationTime: number;
     inputs: Array<Input>;
+    inputsCommitment: string;
     outputs: Array<Output>;
-    unlockBlocks: Array<UnlockBlock>;
-    dataPayload: any;
+    payload: any;
+    unlocks: Array<UnlockBlock>;
 }
 
 export class Input {
@@ -52,7 +51,7 @@ export class Output {
 }
 
 export class OutputID {
-    base58: string;
+    hex: string;
     transactionID: string;
     outputIndex: number;
 }
@@ -61,6 +60,11 @@ export class UnlockBlock {
     type: string;
     referencedIndex: number;
     signatureType: number;
+    // TODO: make it any and add struct for other types of signature.
+    signature: SignatureEd25519;
+}
+
+export class SignatureEd25519 {
     publicKey: string;
     signature: string;
 }
@@ -68,6 +72,11 @@ export class UnlockBlock {
 export class SigLockedSingleOutput {
     balance: number;
     address: string;
+}
+
+export class BasicOutput {
+    amount: number
+    // fill in other fields
 }
 
 export class SigLockedColoredOutput {
