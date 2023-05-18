@@ -37,23 +37,23 @@ type Ledger struct {
 
 func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) ledger.Ledger {
-		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.SybilProtection.OnlineCommittee(), e.ErrorHandler("ledger"))
+		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), executeStardustVM, e.API, e.SybilProtection.OnlineCommittee(), e.ErrorHandler("ledger"))
 
 		// TODO: should this attach to RatifiedAccepted instead?
-		e.Events.BlockGadget.BlockAccepted.Hook(l.blockAccepted)
+		e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
 
 		return l
 	})
 }
 
-func New(workers *workerpool.Group, store kvstore.KVStore, apiProviderFunc func() iotago.API, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], errorHandler func(error)) *Ledger {
+func New(workers *workerpool.Group, store kvstore.KVStore, vm mempool.VM, apiProviderFunc func() iotago.API, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], errorHandler func(error)) *Ledger {
 	l := &Ledger{
 		ledgerState:  ledgerstate.New(store, apiProviderFunc),
 		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
 		errorHandler: errorHandler,
 	}
 
-	l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG)
+	l.memPool = mempoolv1.New(vm, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG)
 
 	return l
 }
@@ -213,7 +213,7 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 	}
 }
 
-func (l *Ledger) blockAccepted(block *blocks.Block) {
+func (l *Ledger) BlockAccepted(block *blocks.Block) {
 	switch block.Block().Payload.(type) {
 	case *iotago.Transaction:
 		l.memPool.MarkAttachmentIncluded(block.ID())

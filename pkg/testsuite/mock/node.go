@@ -208,17 +208,25 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 
 // TODO: the block Issuance should be improved once the protocol has a better way to issue blocks.
 
-func (n *Node) IssueBlock() iotago.BlockID {
+func (n *Node) IssueBlock(optPayload ...iotago.Payload) iotago.BlockID {
 	references := n.Protocol.TipManager.Tips(iotago.BlockMaxParents)
+	var payload iotago.Payload
+
+	if len(optPayload) > 0 {
+		payload = optPayload[0]
+	} else {
+		payload = &iotago.TaggedData{
+			Tag: []byte("ACTIVITY"),
+		}
+	}
+
 	block, err := builder.NewBlockBuilder().
 		StrongParents(references[model.StrongParentType]).
 		WeakParents(references[model.WeakParentType]).
 		ShallowLikeParents(references[model.ShallowLikeParentType]).
 		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()).
 		LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
-		Payload(&iotago.TaggedData{
-			Tag: []byte("ACTIVITY"),
-		}).
+		Payload(payload).
 		Sign(n.AccountID, n.privateKey).
 		Build()
 

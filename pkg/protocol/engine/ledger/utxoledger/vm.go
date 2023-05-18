@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/vm/stardust"
 )
 
-func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.State) (outputStates []mempool.State, err error) {
+func executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.State) (outputStates []mempool.State, err error) {
 	tx, ok := stateTransition.(*iotago.Transaction)
 	if !ok {
 		return nil, ErrUnexpectedUnderlyingType
