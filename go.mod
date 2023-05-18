@@ -21,7 +21,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230509142214-c542bb85ed3c
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230509142214-c542bb85ed3c
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230509142214-c542bb85ed3c
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230414063201-6891da12467e
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230505140033-037b26225f31
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230517140417-5a7e3d76d50a
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/labstack/gommon v0.4.0
@@ -58,7 +58,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.2 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
 	github.com/flynn/noise v1.0.0 // indirect

@@ -17,6 +17,8 @@ type Ledger interface {
 	Output(id iotago.IndexedUTXOReferencer) (*ledgerstate.Output, error)
 	CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, err error)
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	IsOutputSpent(outputID iotago.OutputID) (bool, error)
+	StateDiffs(index iotago.SlotIndex) (*ledgerstate.SlotDiff, error)
 
 	Import(reader io.ReadSeeker) error
 	Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error
