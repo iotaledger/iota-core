@@ -3,6 +3,7 @@ package v1
 import (
 	"github.com/iotaledger/hive.go/ds/randommap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -29,9 +30,69 @@ func NewTipManager(retrieveBlock func(blockID iotago.BlockID) (block *blocks.Blo
 
 func (t *TipManager) AddBlock(block *blocks.Block) {
 	if tipBlock := NewBlock(block); t.trackedBlocks.Set(block.ID(), tipBlock) {
-		t.increaseParentApprovalCount(tipBlock)
+		t.setupBlock(tipBlock)
+	}
+}
 
-		t.blockAdded.Trigger(tipBlock)
+func (t *TipManager) setupBlock(block *Block) {
+	t.blockAdded.Trigger(block)
+
+	block.OnTipPoolChanged(func(prevType, newType TipPoolType) {
+		if newType == StrongTipPool {
+			t.joinStrongTipPool(block)
+		}
+	})
+
+	block.setTipPool(t.chooseTipPool(block))
+}
+
+func (t *TipManager) joinStrongTipPool(block *Block) {
+	var unsubscribeEvents func()
+
+	leaveStrongTipPool := func() {
+		unsubscribeEvents()
+
+		t.tips.Delete(block.ID())
+
+		// TODO: decrease parent approval count
+		t.decreaseParentApprovalCount(block)
+	}
+
+	t.increaseParentApprovalCount(block)
+
+	unsubscribeEvents = lo.Batch(
+		block.OnStrongApprovalCountUpdated(func(prevValue, newValue int) {
+			if prevValue == 0 && newValue == 1 {
+				t.tips.Delete(block.ID())
+			} else if newValue == 0 {
+				t.tips.Set(block.ID(), block) // TODO: reclassify before adding back in
+			}
+		}),
+
+		block.OnTipPoolChanged(func(prevType, newType TipPoolType) {
+			if newType != StrongTipPool {
+				leaveStrongTipPool()
+			}
+		}),
+	)
+}
+
+func (t *TipManager) chooseTipPool(block *Block, optMinType ...TipPoolType) TipPoolType {
+	blockIsVotingForNonRejectedBranches := func(block *Block) bool {
+		return true
+	}
+
+	payloadIsNotRejected := func(block *Block) bool {
+		return true
+	}
+
+	switch {
+	case lo.First(optMinType) <= StrongTipPool && blockIsVotingForNonRejectedBranches(block):
+		return StrongTipPool
+	case lo.First(optMinType) <= WeakTipPool && payloadIsNotRejected(block):
+		return WeakTipPool
+	default:
+		return DroppedTipPool
 	}
 }
 
@@ -43,6 +104,10 @@ func (t *TipManager) RemoveBlock(blockID iotago.BlockID) {
 
 func (t *TipManager) OnBlockAdded(handler func(block *Block)) (unsubscribe func()) {
 	return t.blockAdded.Hook(handler).Unhook
+}
+
+func (t *TipManager) decreaseParentApprovalCount(block *Block) {
+
 }
 
 func (t *TipManager) increaseParentApprovalCount(block *Block) {
@@ -57,9 +122,7 @@ func (t *TipManager) increaseParentApprovalCount(block *Block) {
 			parentBlock.IncreaseApprovalCount()
 
 			if created {
-				if parent.Type == model.StrongParentType {
-					t.increaseParentApprovalCount(parentBlock)
-				}
+				t.setupBlock(parentBlock)
 
 				t.blockAdded.Trigger(parentBlock)
 			}

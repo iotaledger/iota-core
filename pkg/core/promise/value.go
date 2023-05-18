@@ -51,10 +51,15 @@ func (v *Value[T]) Get() T {
 
 // Set sets the new value and triggers the registered callbacks if the value has changed.
 func (v *Value[T]) Set(newValue T) (previousValue T) {
+	return v.Compute(func(T) T { return newValue })
+}
+
+// Compute computes the new value based on the current value and triggers the registered callbacks if the value changed.
+func (v *Value[T]) Compute(computeFunc func(currentValue T) T) (previousValue T) {
 	v.setOrderMutex.Lock()
 	defer v.setOrderMutex.Unlock()
 
-	previousValue, triggerID, callbacksToTrigger := v.prepareTrigger(newValue)
+	newValue, previousValue, triggerID, callbacksToTrigger := v.prepareDynamicTrigger(computeFunc)
 	for _, callback := range callbacksToTrigger {
 		callback.trigger(triggerID, previousValue, newValue)
 	}
@@ -91,20 +96,20 @@ func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe f
 	}
 }
 
-// prepareTrigger atomically prepares the trigger by setting the new value and returning the previous value, the
+// prepareDynamicTrigger atomically prepares the trigger by setting the new value and returning the previous value, the
 // triggerID and the callbacks to trigger.
-func (v *Value[T]) prepareTrigger(newValue T) (previousValue T, triggerID int, callbacksToTrigger []*valueCallback[T]) {
+func (v *Value[T]) prepareDynamicTrigger(newValueGenerator func(T) T) (newValue, previousValue T, triggerID int, callbacksToTrigger []*valueCallback[T]) {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 
-	if previousValue = v.value; newValue == previousValue {
-		return previousValue, 0, nil
+	if previousValue, newValue = v.value, newValueGenerator(previousValue); newValue == previousValue {
+		return newValue, previousValue, 0, nil
 	}
 
 	v.triggerIDCounter++
 	v.value = newValue
 
-	return previousValue, v.triggerIDCounter, v.updateCallbacks.Values()
+	return newValue, previousValue, v.triggerIDCounter, v.updateCallbacks.Values()
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
