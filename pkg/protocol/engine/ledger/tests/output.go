@@ -9,7 +9,7 @@ func (m *MockedOutput) Size() int {
 	panic("implement me")
 }
 
-func (m *MockedOutput) VBytes(rentStruct *iotago.RentStructure, override iotago.VBytesFunc) uint64 {
+func (m *MockedOutput) VBytes(_ *iotago.RentStructure, _ iotago.VBytesFunc) uint64 {
 	//TODO implement me
 	panic("implement me")
 }

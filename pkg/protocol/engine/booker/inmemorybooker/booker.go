@@ -29,13 +29,13 @@ type Booker struct {
 
 	workers *workerpool.Group
 
-	blockCache  *blocks.Blocks
+	blockCache *blocks.Blocks
 
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
 
-	ledger      ledger.Ledger
+	ledger ledger.Ledger
 
-	errorHandler    func(error)
+	errorHandler func(error)
 
 	module.Module
 }
@@ -65,11 +65,11 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 
 func New(workers *workerpool.Group, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
-		events:     booker.NewEvents(),
-		committee:  committee,
-		blockCache: blockCache,
-		workers:         workers,
-		errorHandler:    errorHandler,
+		events:       booker.NewEvents(),
+		committee:    committee,
+		blockCache:   blockCache,
+		workers:      workers,
+		errorHandler: errorHandler,
 	}, opts, func(b *Booker) {
 		b.bookingOrder = causalorder.New(
 			workers.CreatePool("BookingOrder", 2),
