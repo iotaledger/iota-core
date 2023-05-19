@@ -210,8 +210,6 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.AccountID.RegisterAlias(n.Name)
 }
 
-// TODO: the block Issuance should be improved once the protocol has a better way to issue blocks.
-
 func (n *Node) IssueBlock(alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
 	block, err := n.blockIssuer.CreateBlockWithOptions(context.Background(), opts...)
 	require.NoError(n.Testing, err)
