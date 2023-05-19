@@ -196,6 +196,10 @@ func (l *Ledger) StateDiffs(index iotago.SlotIndex) (*ledgerstate.SlotDiff, erro
 	return l.ledgerState.SlotDiffWithoutLocking(index)
 }
 
+func (l *Ledger) AddUnspentOutput(unspentOutput *ledgerstate.Output) error {
+	return l.ledgerState.AddUnspentOutput(unspentOutput)
+}
+
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
 	switch payload := block.Block().Payload.(type) {
 	case mempool.Transaction:

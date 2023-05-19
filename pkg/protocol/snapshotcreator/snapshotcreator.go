@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -16,7 +17,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -64,7 +64,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
 		slotnotarization.NewProvider(),
-		utxoledger.NewProvider(),
+		opt.LedgerProvider(),
 	)
 	defer engineInstance.Shutdown()
 
@@ -72,5 +72,48 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
 	}
 
+	createGenesisOutput(100, []byte{}, engineInstance)
+
 	return engineInstance.WriteSnapshot(opt.FilePath)
+}
+
+func createGenesisOutput(genesisTokenAmount uint64, genesisSeed []byte, engineInstance *engine.Engine) error {
+	if genesisTokenAmount > 0 {
+		output, outputMetadata, err := createOutput(engineInstance.Ledger, seed.NewSeed(m.GenesisSeed).KeyPair(0).PublicKey, m.GenesisTokenAmount, identity.ID{}, 0)
+		if err != nil {
+			return err
+		}
+
+		if err = engineInstance.Ledger.AddUnspentOutput(mempool.NewOutputWithMetadata(0, output.ID(), output, outputMetadata.ConsensusManaPledgeID(), outputMetadata.AccessManaPledgeID())); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func createOutput(ledgerVM vm.VM, publicKey ed25519.PublicKey, tokenAmount uint64, pledgeID identity.ID, includedInSlot slot.Index) (output utxo.Output, outputMetadata *mempool.OutputMetadata, err error) {
+	switch ledgerVM.(type) {
+	case *mockedvm.MockedVM:
+		output = mempooltests.
+		(utxo.EmptyTransactionID, outputCounter, tokenAmount)
+
+	case *devnetvm.VM:
+		output = devnetvm.NewSigLockedColoredOutput(devnetvm.NewColoredBalances(map[devnetvm.Color]uint64{
+			devnetvm.ColorIOTA: tokenAmount,
+		}), devnetvm.NewED25519Address(publicKey))
+		output.SetID(utxo.NewOutputID(utxo.EmptyTransactionID, outputCounter))
+
+	default:
+		return nil, nil, errors.Errorf("cannot create snapshot output for VM of type '%v'", ledgerVM)
+	}
+
+	outputCounter++
+
+	outputMetadata = mempool.NewOutputMetadata(output.ID())
+	outputMetadata.SetConfirmationState(confirmation.Confirmed)
+	outputMetadata.SetAccessManaPledgeID(pledgeID)
+	outputMetadata.SetConsensusManaPledgeID(pledgeID)
+	outputMetadata.SetInclusionSlot(includedInSlot)
+
+	return output, outputMetadata, nil
 }

@@ -19,7 +19,7 @@ type Ledger interface {
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
 	IsOutputSpent(outputID iotago.OutputID) (bool, error)
 	StateDiffs(index iotago.SlotIndex) (*ledgerstate.SlotDiff, error)
-
+	AddUnspentOutput(unspentOutput *ledgerstate.Output) error
 	Import(reader io.ReadSeeker) error
 	Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error
 
