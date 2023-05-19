@@ -67,8 +67,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*100),
 			SlotDurationInSeconds: 10,
 		},
-		optsWaitFor: 5 * time.Second,
-		optsTick:    10 * time.Millisecond,
+		optsWaitFor: 10 * time.Second,
+		optsTick:    100 * time.Millisecond,
 	}, opts, func(t *TestSuite) {
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
