@@ -52,23 +52,14 @@ func NewFramework[CID, RID conflictdag.IDType, V conflictdag.VotePowerType[V]](
 	return f
 }
 
-// CreateConflict creates a new conflict with the given alias and parents.
-func (f *Framework[ConflictID, ResourceID, VotePower]) CreateConflict(alias string, parentIDs []string, resourceAliases []string, initialAcceptanceState ...acceptance.State) error {
-	if err := f.Instance.CreateConflict(f.ConflictID(alias), f.ConflictSetIDs(resourceAliases...), lo.First(initialAcceptanceState)); err != nil {
-		return err
-	}
-
-	return f.Instance.UpdateConflictParents(f.ConflictID(alias), f.ConflictIDs(parentIDs...), f.ConflictIDs())
+// CreateOrUpdateConflict creates a new conflict or adds it to the given ConflictSets.
+func (f *Framework[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(alias string, resourceAliases []string, initialAcceptanceState ...acceptance.State) error {
+	return f.Instance.CreateOrUpdateConflict(f.ConflictID(alias), f.ConflictSetIDs(resourceAliases...), lo.First(initialAcceptanceState))
 }
 
 // UpdateConflictParents updates the parents of the conflict with the given alias.
-func (f *Framework[ConflictID, ResourceID, VotePower]) UpdateConflictParents(conflictAlias string, addedParentID string, removedParentIDs ...string) error {
-	return f.Instance.UpdateConflictParents(f.ConflictID(conflictAlias), f.ConflictIDs(addedParentID), f.ConflictIDs(removedParentIDs...))
-}
-
-// JoinConflictSets joins the given conflict sets into a single conflict set.
-func (f *Framework[ConflictID, ResourceID, VotePower]) JoinConflictSets(conflictAlias string, resourceAliases ...string) error {
-	return f.Instance.JoinConflictSets(f.ConflictID(conflictAlias), f.ConflictSetIDs(resourceAliases...))
+func (f *Framework[ConflictID, ResourceID, VotePower]) UpdateConflictParents(conflictAlias string, addedParentIDs, removedParentIDs []string) error {
+	return f.Instance.UpdateConflictParents(f.ConflictID(conflictAlias), f.ConflictIDs(addedParentIDs...), f.ConflictIDs(removedParentIDs...))
 }
 
 // LikedInstead returns the set of conflicts that are liked instead of the given conflicts.

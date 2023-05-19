@@ -52,13 +52,21 @@
       "/api/*"
     ],
     "debugRequestLoggerEnabled": false,
+    "allowIncompleteBlock": false,
     "jwtAuth": {
       "salt": "IOTA"
+    },
+    "pow": {
+      "enabled": false,
+      "workerCount": 1
     },
     "limits": {
       "maxBodyLength": "1M",
       "maxResults": 1000
     }
+  },
+  "metricstracker": {
+    "enabled": true
   },
   "database": {
     "engine": "rocksdb",

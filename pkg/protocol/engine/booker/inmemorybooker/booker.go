@@ -22,28 +22,25 @@ type Booker struct {
 	events *booker.Events
 
 	sybilProtection sybilprotection.SybilProtection
-
-	bookingOrder *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
-
-	workers *workerpool.Group
-
-	blockCache *blocks.Blocks
+	bookingOrder    *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
+	workers         *workerpool.Group
+	blockCache      *blocks.Blocks
+	errorHandler    func(error)
 
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection, e.BlockCache, opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection, e.BlockCache, e.ErrorHandler("booker"), opts...)
 
 		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 			if _, err := b.Queue(block); err != nil {
-				b.events.Error.Trigger(err)
+				b.errorHandler(err)
 			}
 		})
 
 		e.HookConstructed(func() {
-			b.events.Error.Hook(e.Events.Error.Trigger)
 			e.Events.Booker.LinkTo(b.events)
 
 			b.TriggerInitialized()
@@ -53,13 +50,13 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, sybilProtection sybilprotection.SybilProtection, blockCache *blocks.Blocks, opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, sybilProtection sybilprotection.SybilProtection, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:          booker.NewEvents(),
 		sybilProtection: sybilProtection,
 		blockCache:      blockCache,
-
-		workers: workers,
+		workers:         workers,
+		errorHandler:    errorHandler,
 	}, opts, func(b *Booker) {
 		b.bookingOrder = causalorder.New(
 			workers.CreatePool("BookingOrder", 2),

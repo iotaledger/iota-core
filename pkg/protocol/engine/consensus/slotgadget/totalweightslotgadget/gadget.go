@@ -29,7 +29,8 @@ type Gadget struct {
 	lastFinalizedSlot          iotago.SlotIndex
 	storeLastFinalizedSlotFunc func(index iotago.SlotIndex)
 
-	mutex sync.RWMutex
+	mutex        sync.RWMutex
+	errorHandler func(error)
 
 	optsSlotFinalizationThreshold float64
 
@@ -41,6 +42,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 		return options.Apply(&Gadget{
 			events:                        slotgadget.NewEvents(),
 			optsSlotFinalizationThreshold: 0.67,
+			errorHandler:                  e.ErrorHandler("slotgadget"),
 		}, opts, func(g *Gadget) {
 			g.sybilProtection = e.SybilProtection
 			g.slotTracker = slottracker.NewSlotTracker(g.LatestFinalizedSlot)
@@ -51,7 +53,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 
 			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
 				if err := e.Storage.Settings().SetLatestFinalizedSlot(index); err != nil {
-					e.Events.Error.Trigger(errors.Wrap(err, "failed to set latest finalized slot"))
+					g.errorHandler(errors.Wrap(err, "failed to set latest finalized slot"))
 				}
 			}
 
@@ -63,7 +65,13 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				}, event.WithWorkerPool(g.workers.CreatePool("Refresh", 2)))
 
 				e.HookInitialized(func() {
-					g.lastFinalizedSlot = e.Storage.Permanent.Settings().LatestFinalizedSlot()
+					// Can't use setter here as it has a side effect.
+					func() {
+						g.mutex.Lock()
+						defer g.mutex.Unlock()
+						g.lastFinalizedSlot = e.Storage.Permanent.Settings().LatestFinalizedSlot()
+					}()
+
 					g.TriggerInitialized()
 				})
 			})
@@ -94,7 +102,7 @@ func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {
 }
 
 func (g *Gadget) trackVotes(block *blocks.Block) {
-	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, block.Block().IssuerID, slottracker.SlotVotePower{Index: block.ID().Index()})
+	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, block.Block().IssuerID)
 }
 
 func (g *Gadget) refreshSlotFinalization(previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) {

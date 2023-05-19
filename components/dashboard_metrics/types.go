@@ -26,6 +26,24 @@ const (
 	Booked
 )
 
+// NodeInfoExtended represents extended information about the node.
+type NodeInfoExtended struct {
+	Version       string `json:"version"`
+	LatestVersion string `json:"latestVersion"`
+	Uptime        int64  `json:"uptime"`
+	NodeID        string `json:"nodeId"`
+	NodeAlias     string `json:"nodeAlias"`
+	MemoryUsage   int64  `json:"memUsage"`
+}
+
+// DatabaseSizesMetric represents database size metrics.
+type DatabaseSizesMetric struct {
+	Prunable  int64 `json:"prunable"`
+	Permanent int64 `json:"permanent"`
+	Total     int64 `json:"total"`
+	Time      int64 `json:"ts"`
+}
+
 // String returns the stringified component type.
 func (c ComponentType) String() string {
 	switch c {

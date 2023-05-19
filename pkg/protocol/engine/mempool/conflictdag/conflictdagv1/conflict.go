@@ -124,7 +124,9 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictda
 	}
 
 	c.ConflictingConflicts = NewSortedConflicts[ConflictID, ResourceID, VotePower](c, pendingTasksCounter)
-	c.JoinConflictSets(conflictSets)
+
+	// error can only occur when conflict is evicted, which is impossible because it was just created
+	_, _ = c.JoinConflictSets(conflictSets)
 
 	return c
 }

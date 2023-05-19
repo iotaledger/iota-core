@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -22,6 +21,7 @@ type Permanent struct {
 	dbConfig      database.Config
 	store         kvstore.KVStore
 	healthTracker *kvstore.StoreHealthTracker
+	errorHandler  func(error)
 
 	settings    *Settings
 	commitments *Commitments
@@ -29,18 +29,15 @@ type Permanent struct {
 	sybilProtection kvstore.KVStore
 	attestations    kvstore.KVStore
 	ledger          kvstore.KVStore
-
-	optsLogger *logger.Logger
-	logger     *logger.WrappedLogger
 }
 
 // New returns a new permanent storage instance.
-func New(baseDir *utils.Directory, dbConfig database.Config, opts ...options.Option[Permanent]) *Permanent {
+func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) *Permanent {
 	return options.Apply(&Permanent{
-		settings: NewSettings(baseDir.Path("settings.bin")),
+		errorHandler: errorHandler,
+		settings:     NewSettings(baseDir.Path("settings.bin")),
 	}, opts, func(p *Permanent) {
 		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.API)
-		p.logger = logger.NewWrappedLogger(p.optsLogger)
 
 		var err error
 		p.store, err = database.StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
@@ -101,7 +98,7 @@ func (p *Permanent) Ledger(optRealm ...byte) kvstore.KVStore {
 func (p *Permanent) Size() int64 {
 	dbSize, err := ioutils.FolderSize(p.dbConfig.Directory)
 	if err != nil {
-		p.logger.LogError("dbDirectorySize failed for %s: %w", p.dbConfig.Directory, err)
+		p.errorHandler(errors.Wrapf(err, "dbDirectorySize failed for %s", p.dbConfig.Directory))
 		return 0
 	}
 

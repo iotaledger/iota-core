@@ -219,22 +219,6 @@ func (t *TransactionMetadata) AllInputsAccepted() bool {
 	return t.allInputsAccepted.Get()
 }
 
-func (t *TransactionMetadata) onAllInputsAccepted(callback func()) {
-	t.allInputsAccepted.OnUpdate(func(_, allInputsAreAccepted bool) {
-		if allInputsAreAccepted {
-			callback()
-		}
-	})
-}
-
-func (t *TransactionMetadata) onNotAllInputsAccepted(callback func()) {
-	t.allInputsAccepted.OnUpdate(func(allInputsWereAccepted, allInputsAreAccepted bool) {
-		if !allInputsAreAccepted && allInputsWereAccepted {
-			callback()
-		}
-	})
-}
-
 func (t *TransactionMetadata) setConflicting() {
 	t.conflicting.Trigger()
 }

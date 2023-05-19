@@ -96,14 +96,19 @@ func (s *Settings) SetProtocolParameters(params iotago.ProtocolParameters) (err 
 
 func (s *Settings) LatestCommitment() *model.Commitment {
 	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
 	if s.latestCommitment == nil {
+		s.mutex.RUnlock()
+		s.mutex.Lock()
+		defer s.mutex.Unlock()
+
 		if s.api.SlotTimeProvider().Duration() == 0 {
 			panic("accessing the LatestCommitment before the settings are initialized")
 		}
 		s.latestCommitment = lo.PanicOnErr(model.CommitmentFromCommitment(s.settingsModel.LatestCommitment, s.api))
+
+		return s.latestCommitment
 	}
+	defer s.mutex.RUnlock()
 
 	return s.latestCommitment
 }

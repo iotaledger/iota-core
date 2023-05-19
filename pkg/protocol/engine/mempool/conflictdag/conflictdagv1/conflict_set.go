@@ -48,9 +48,10 @@ func (c *ConflictSet[ConflictID, ResourceID, VotePower]) Remove(removedConflict 
 	defer c.mutex.Unlock()
 
 	if removed = !c.members.Delete(removedConflict); removed && c.members.IsEmpty() {
-		if wasShutdown := c.allMembersEvicted.Swap(true); !wasShutdown {
-			// TODO: trigger conflict set removal
-		}
+		c.allMembersEvicted.Swap(true)
+		//if wasShutdown := c.allMembersEvicted.Swap(true); !wasShutdown {
+		// trigger conflict set removal
+		//}
 	}
 
 	return removed

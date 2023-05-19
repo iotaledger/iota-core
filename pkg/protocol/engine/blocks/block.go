@@ -440,5 +440,8 @@ func (b *Block) String() string {
 }
 
 func (b *Block) ModelBlock() *model.Block {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
 	return b.modelBlock
 }

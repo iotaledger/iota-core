@@ -7,7 +7,9 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
@@ -18,7 +20,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
-	mockedconflictdag "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/mocked"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -39,7 +41,7 @@ type Ledger struct {
 
 func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) therealledger.Ledger {
-		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.Events.Error.Trigger)
+		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), e.API, e.ErrorHandler("ledger"))
 		e.Events.Booker.BlockBooked.Hook(l.attachTransaction)
 		e.Events.BlockGadget.BlockAccepted.Hook(l.blockAccepted)
 
@@ -50,7 +52,7 @@ func NewProvider() module.Provider[*engine.Engine, therealledger.Ledger] {
 func New(workers *workerpool.Group, store kvstore.KVStore, apiProviderFunc func() iotago.API, errorHandler func(error)) *Ledger {
 	l := &Ledger{
 		ledgerState:  ledgerstate.New(store, apiProviderFunc),
-		conflictDAG:  mockedconflictdag.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](),
+		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts()),
 		errorHandler: errorHandler,
 	}
 
@@ -188,6 +190,14 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	})
 
 	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), nil
+}
+
+func (l *Ledger) IsOutputSpent(outputID iotago.OutputID) (bool, error) {
+	return l.ledgerState.IsOutputIDUnspentWithoutLocking(outputID)
+}
+
+func (l *Ledger) StateDiffs(index iotago.SlotIndex) (*ledgerstate.SlotDiff, error) {
+	return l.ledgerState.SlotDiffWithoutLocking(index)
 }
 
 func (l *Ledger) attachTransaction(block *blocks.Block) {

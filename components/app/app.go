@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/iota-core/components/coreapi"
 	"github.com/iotaledger/iota-core/components/dashboard"
 	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
+	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/p2p"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
@@ -32,6 +33,7 @@ func App() *app.App {
 			profiling.Component,
 			restapi.Component,
 			coreapi.Component,
+			metricstracker.Component,
 			protocol.Component,
 			blockissuer.Component,
 			activity.Component,
