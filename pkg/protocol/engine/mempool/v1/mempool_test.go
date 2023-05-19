@@ -5,7 +5,6 @@ import (
 	"runtime"
 	memleakdebug "runtime/debug"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -32,13 +31,15 @@ func TestMemPoolV1_InterfaceWithForkingEverything(t *testing.T) {
 }
 
 func TestMempoolV1_ResourceCleanup(t *testing.T) {
+	workers := workerpool.NewGroup(t.Name())
+
 	ledgerState := ledgertests.New(ledgertests.NewState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
 	mempoolInstance := New[vote.MockedPower](mempooltests.VM, func(reference ledger.StateReference) *promise.Promise[ledger.State] {
 		return ledgerState.ResolveState(reference.StateID())
-	}, workerpool.NewGroup(t.Name()), conflictDAG)
+	}, workers, conflictDAG)
 
-	tf := mempooltests.NewTestFramework(t, mempoolInstance, conflictDAG, ledgerState)
+	tf := mempooltests.NewTestFramework(t, mempoolInstance, conflictDAG, ledgerState, workers)
 
 	issueTransactions := func(startIndex, transactionCount int, prevStateAlias string) (int, string) {
 		index := startIndex
@@ -67,14 +68,14 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	fmt.Println(memanalyzer.MemoryReport(tf))
 
 	txIndex, prevStateAlias := issueTransactions(1, 10, "genesis")
+	tf.WaitChildren()
 
 	require.Equal(t, 0, mempoolInstance.cachedTransactions.Size())
 	require.Equal(t, 0, mempoolInstance.stateDiffs.Size())
 	require.Equal(t, 0, mempoolInstance.cachedStateRequests.Size())
 
-	time.Sleep(1 * time.Second)
-
 	txIndex, prevStateAlias = issueTransactions(txIndex, 10, prevStateAlias)
+	tf.WaitChildren()
 
 	require.Equal(t, 0, mempoolInstance.cachedTransactions.Size())
 	require.Equal(t, 0, mempoolInstance.stateDiffs.Size())
@@ -97,19 +98,23 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 }
 
 func newTestFramework(t *testing.T) *mempooltests.TestFramework {
+	workers := workerpool.NewGroup(t.Name())
+
 	ledgerState := ledgertests.New(ledgertests.NewState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedPower](mempooltests.VM, func(reference ledger.StateReference) *promise.Promise[ledger.State] {
 		return ledgerState.ResolveState(reference.StateID())
-	}, workerpool.NewGroup(t.Name()), conflictDAG), conflictDAG, ledgerState)
+	}, workers, conflictDAG), conflictDAG, ledgerState, workers)
 }
 
 func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
+	workers := workerpool.NewGroup(t.Name())
+
 	ledgerState := ledgertests.New(ledgertests.NewState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedPower](mempooltests.VM, func(reference ledger.StateReference) *promise.Promise[ledger.State] {
 		return ledgerState.ResolveState(reference.StateID())
-	}, workerpool.NewGroup(t.Name()), conflictDAG, WithForkAllTransactions[vote.MockedPower](true)), conflictDAG, ledgerState)
+	}, workers, conflictDAG, WithForkAllTransactions[vote.MockedPower](true)), conflictDAG, ledgerState, workers)
 }

@@ -5,7 +5,6 @@ import (
 	"runtime"
 	memleakdebug "runtime/debug"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -524,12 +523,9 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 	memStatsStart := memStats()
 
 	txIndex, prevStateAlias := issueTransactions(1, 10000, "genesis")
-
-	time.Sleep(1 * time.Second)
+	tf.WaitChildren()
 
 	issueTransactions(txIndex, 10000, prevStateAlias)
-
-	time.Sleep(1 * time.Second)
 
 	tf.Cleanup()
 
