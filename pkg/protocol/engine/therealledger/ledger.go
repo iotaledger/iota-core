@@ -10,7 +10,8 @@ import (
 
 type Ledger interface {
 	Output(id iotago.OutputID) (*ledgerstate.Output, error)
-	IsOutputSpent(outputID iotago.OutputID) (bool, error)
+	IsOutputUnspent(outputID iotago.OutputID) (bool, error)
+	Spent(outputID iotago.OutputID) (*ledgerstate.Spent, error)
 	CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, err error)
 	StateDiffs(index iotago.SlotIndex) (*ledgerstate.SlotDiff, error)
 

@@ -192,8 +192,12 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), nil
 }
 
-func (l *Ledger) IsOutputSpent(outputID iotago.OutputID) (bool, error) {
+func (l *Ledger) IsOutputUnspent(outputID iotago.OutputID) (bool, error) {
 	return l.ledgerState.IsOutputIDUnspentWithoutLocking(outputID)
+}
+
+func (l *Ledger) Spent(outputID iotago.OutputID) (*ledgerstate.Spent, error) {
+	return l.ledgerState.ReadSpentForOutputIDWithoutLocking(outputID)
 }
 
 func (l *Ledger) StateDiffs(index iotago.SlotIndex) (*ledgerstate.SlotDiff, error) {
