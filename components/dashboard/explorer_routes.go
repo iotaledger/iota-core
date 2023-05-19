@@ -48,10 +48,7 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 	// routeGroup.GET("/conflict/:conflictID/children", ledgerstateAPI.GetConflictChildren)
 	// routeGroup.GET("/conflict/:conflictID/conflicts", ledgerstateAPI.GetConflictConflicts)
 	// routeGroup.GET("/conflict/:conflictID/voters", ledgerstateAPI.GetConflictVoters)
-	// routeGroup.GET("/slot/:index/blocks", slotAPI.GetBlocks)
-	routeGroup.GET("/slot/commitment/:"+restapipkg.ParameterCommitmentID, getCommitmentByID)
-	// routeGroup.GET("/slot/:index/transactions", slotAPI.GetTransactions)
-	routeGroup.GET("/slot/:"+restapipkg.ParameterSlotIndex+"/utxos", getUTXOs)
+	routeGroup.GET("/slot/commitment/:"+restapipkg.ParameterCommitmentID, getSlotDetailsByID)
 
 	routeGroup.GET("/search/:search", func(c echo.Context) error {
 		search := c.Param("search")
@@ -186,7 +183,7 @@ func getOutput(c echo.Context) error {
 	return httpserver.JSONResponse(c, http.StatusOK, NewOutputFromLedgerstateOutput(output))
 }
 
-func getCommitmentByID(c echo.Context) error {
+func getSlotDetailsByID(c echo.Context) error {
 	commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
 	if err != nil {
 		return err
@@ -197,45 +194,10 @@ func getCommitmentByID(c echo.Context) error {
 		return err
 	}
 
-	commitmentJSON, err := deps.Protocol.API().JSONEncode(commitment)
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.StateDiffs(commitmentID.Index())
 	if err != nil {
 		return err
 	}
 
-	return httpserver.JSONResponse(c, http.StatusOK, commitmentJSON)
-}
-
-func getUTXOs(c echo.Context) error {
-	indexUint64, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
-	if err != nil {
-		return err
-	}
-
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.StateDiffs(iotago.SlotIndex(indexUint64))
-	if err != nil {
-		return err
-	}
-
-	createdOutputs := make([]string, len(diffs.Outputs))
-	consumedOutputs := make([]string, len(diffs.Spents))
-
-	for i, output := range diffs.Outputs {
-		createdOutputs[i] = output.OutputID().ToHex()
-	}
-
-	for i, output := range diffs.Spents {
-		consumedOutputs[i] = output.OutputID().ToHex()
-	}
-
-	type utxosResponse struct {
-		Index           iotago.SlotIndex `json:"index"`
-		CreatedOutputs  []string         `json:"createdOutputs"`
-		ConsumedOutputs []string         `json:"consumedOutputs"`
-	}
-
-	return httpserver.JSONResponse(c, http.StatusOK, &utxosResponse{
-		Index:           iotago.SlotIndex(indexUint64),
-		CreatedOutputs:  createdOutputs,
-		ConsumedOutputs: consumedOutputs,
-	})
+	return httpserver.JSONResponse(c, http.StatusOK, NewSlotDetails(commitment, diffs))
 }

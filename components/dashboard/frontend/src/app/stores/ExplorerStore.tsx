@@ -159,20 +159,12 @@ class SlotInfo {
     rootsID: string;
     prevID: string;
     cumulativeWeight: number;
-}
-
-class SlotBlocks {
     blocks: Array<string>;
-}
-
-class SlotTransactions {
     transactions: Array<string>;
-}
-
-class SlotUTXOs {
     createdOutputs: Array<string>;
     spentOutputs: Array<string>;
 }
+
 class SearchResult {
     block: BlockRef;
     address: AddressResult;
@@ -214,9 +206,6 @@ export class ExplorerStore {
     @observable conflictVoters: ConflictVoters = null;
     @observable tips: Tips = null;
     @observable slotInfo: SlotInfo = new SlotInfo;
-    @observable slotBlocks: SlotBlocks = new SlotBlocks;
-    @observable slotTransactions: SlotTransactions = new SlotTransactions;
-    @observable slotUtxos: SlotUTXOs = new SlotUTXOs;
 
     // loading
     @observable query_loading: boolean = false;
@@ -290,6 +279,10 @@ export class ExplorerStore {
         const res = await this.fetchJson<never, AddressResult>("get", `/api/address/${id}`)
         this.updateAddress(res);
     };
+
+    getSlotDetails = async (id: string) => {
+        await this.getSlotInfo(id);
+    }
 
     @action
     getTransaction = async (id: string) => {
@@ -378,27 +371,9 @@ export class ExplorerStore {
     }
 
     @action
-    getSlotDetails = async (id: string) => {
+    getSlotInfo = async (id: string) => {
         const res = await this.fetchJson<never, SlotInfo>("get", `/api/slot/commitment/${id}`)
         this.slotInfo = res;
-    }
-
-    @action
-    getSlotBlocks = async (index: number) => {
-        const res = await this.fetchJson<never, SlotBlocks>("get", `/api/slot/${index}/blocks`)
-        this.slotBlocks = res;
-    }
-
-    @action
-    getSlotTransactions = async (index: number) => {
-        const res = await this.fetchJson<never, SlotTransactions>("get", `/api/slot/${index}/transactions`)
-        this.slotTransactions = res;
-    }
-
-    @action
-    getSlotUTXOs = async (index: number) => {
-        const res = await this.fetchJson<never, SlotUTXOs>("get", `/api/slot/${index}/utxos`)
-        this.slotUtxos = res;
     }
 
     @action
@@ -423,10 +398,7 @@ export class ExplorerStore {
         this.conflictChildren = null;
         this.conflictConflicts = null;
         this.tips = null;
-        this.slotBlocks = new SlotBlocks;
         this.slotInfo = new SlotInfo;
-        this.slotTransactions = new SlotTransactions;
-        this.slotUtxos = new SlotUTXOs;
     };
 
     @action

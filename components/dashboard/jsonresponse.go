@@ -3,6 +3,7 @@ package dashboard
 import (
 	"encoding/json"
 
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -249,3 +250,35 @@ func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
 // }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+type SlotDetailsResponse struct {
+	Index            uint64   `json:"index"`
+	PrevID           string   `json:"prevID"`
+	RootsID          string   `json:"rootsID"`
+	CumulativeWeight uint64   `json:"cumulativeWeight"`
+	CreatedOutputs   []string `json:"createdOutputs"`
+	SpentOutputs     []string `json:"spentOutputs"`
+	// TODO: might add roots of different trees here
+}
+
+func NewSlotDetails(commitment *model.Commitment, diffs *ledgerstate.SlotDiff) *SlotDetailsResponse {
+	createdOutputs := make([]string, len(diffs.Outputs))
+	consumedOutputs := make([]string, len(diffs.Spents))
+
+	for i, output := range diffs.Outputs {
+		createdOutputs[i] = output.OutputID().ToHex()
+	}
+
+	for i, output := range diffs.Spents {
+		consumedOutputs[i] = output.OutputID().ToHex()
+	}
+
+	return &SlotDetailsResponse{
+		Index:            uint64(commitment.Index()),
+		PrevID:           commitment.PrevID().ToHex(),
+		RootsID:          commitment.RootsID().ToHex(),
+		CumulativeWeight: commitment.CumulativeWeight(),
+		CreatedOutputs:   createdOutputs,
+		SpentOutputs:     consumedOutputs,
+	}
+}
