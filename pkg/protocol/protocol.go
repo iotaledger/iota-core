@@ -14,6 +14,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -72,6 +74,7 @@ type Protocol struct {
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
+	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestation]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsLedgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
 }
@@ -90,6 +93,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
+		optsAttestationProvider:     slotattestation.NewProvider(),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          utxoledger.NewProvider(),
 
@@ -204,6 +208,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsBlockGadgetProvider,
 		p.optsSlotGadgetProvider,
 		p.optsNotarizationProvider,
+		p.optsAttestationProvider,
 		p.optsLedgerProvider,
 	)
 

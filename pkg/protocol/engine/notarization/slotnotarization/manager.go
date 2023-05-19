@@ -1,14 +1,11 @@
 package slotnotarization
 
 import (
-	"io"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -16,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
@@ -31,12 +29,12 @@ const (
 type Manager struct {
 	events        *notarization.Events
 	slotMutations *SlotMutations
-	attestations  *Attestations
 
 	workers      *workerpool.Group
 	errorHandler func(error)
 
-	ledger therealledger.Ledger
+	attestation attestation.Attestation
+	ledger      therealledger.Ledger
 
 	storage         *storage.Storage
 	commitmentMutex sync.RWMutex
@@ -61,20 +59,12 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 					return e.API().SlotTimeProvider()
 				}
 
-				m.attestations = NewAttestations(e.Storage.Permanent.Attestations,
-					e.Storage.Prunable.Attestations,
-					func() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
-						// Using a func here because at this point SybilProtection is not guaranteed to exist since the engine has not been constructed, but other modules already might want to use `Attestations()`
-						return e.SybilProtection.Accounts()
-					}, m.slotTimeProviderFunc)
-
-				m.HookInitialized(m.attestations.TriggerInitialized)
-
 				e.HookConstructed(func() {
 					m.storage = e.Storage
 					m.acceptedTimeFunc = e.Clock.RatifiedAccepted().Time
 
 					m.ledger = e.Ledger
+					m.attestation = e.Attestation
 
 					wpBlocks := m.workers.CreatePool("Blocks", 1)           // Using just 1 worker to avoid contention
 					wpCommitments := m.workers.CreatePool("Commitments", 1) // Using just 1 worker to avoid contention
@@ -97,12 +87,10 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 					m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index())
 				})
 			},
-			(*Manager).TriggerConstructed)
+			(*Manager).TriggerConstructed,
+			(*Manager).TriggerInitialized,
+		)
 	})
-}
-
-func (m *Manager) Attestations() notarization.Attestations {
-	return m.attestations
 }
 
 func (m *Manager) Shutdown() {
@@ -133,33 +121,7 @@ func (m *Manager) notarizeRatifiedAcceptedBlock(block *blocks.Block) (err error)
 		return errors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
-	if _, err = m.attestations.Add(iotago.NewAttestation(block.Block())); err != nil {
-		return errors.Wrap(err, "failed to add block to attestations")
-	}
-
-	return
-}
-
-func (m *Manager) Import(reader io.ReadSeeker) (err error) {
-	m.commitmentMutex.Lock()
-	defer m.commitmentMutex.Unlock()
-
-	if err = m.attestations.Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import attestations")
-	}
-
-	m.TriggerInitialized()
-
-	return
-}
-
-func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
-	m.commitmentMutex.RLock()
-	defer m.commitmentMutex.RUnlock()
-
-	if err = m.attestations.Export(writer, targetSlot); err != nil {
-		return errors.Wrap(err, "failed to export attestations")
-	}
+	m.attestation.AddAttestationFromBlock(block)
 
 	return
 }
@@ -197,34 +159,16 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	latestCommitment := m.storage.Settings().LatestCommitment()
 	if index != latestCommitment.Index()+1 {
 		m.errorHandler(errors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
-
 		return false
 	}
 
 	// set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
 	ratifiedAcceptedBlocks := m.slotMutations.RatifiedAcceptedBlocks(index, true)
 
-	var err error
-	var attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation]
-	var attestationsWeight int64
-
-	if m.attestations.LastCommittedSlot() == index {
-		attestations, err = m.attestations.Get(index)
-		if err != nil {
-			m.errorHandler(errors.Wrap(err, "failed to get committed attestations"))
-			return false
-		}
-		attestationsWeight, err = m.attestations.Weight(index)
-		if err != nil {
-			m.errorHandler(errors.Wrap(err, "failed to get committed attestations weight"))
-			return false
-		}
-	} else {
-		attestations, attestationsWeight, err = m.attestations.Commit(index)
-		if err != nil {
-			m.errorHandler(errors.Wrap(err, "failed to commit attestations"))
-			return false
-		}
+	cumulativeWeight, attestations, err := m.attestation.Commit(index)
+	if err != nil {
+		m.errorHandler(errors.Wrap(err, "failed to commit attestations"))
+		return false
 	}
 
 	stateRoot, mutationRoot, err := m.ledger.CommitSlot(index)
@@ -243,7 +187,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 			stateRoot,
 			iotago.Identifier(m.slotMutations.weights.Root()),
 		).ID(),
-		m.storage.Settings().LatestCommitment().CumulativeWeight()+uint64(attestationsWeight),
+		cumulativeWeight,
 	)
 
 	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, m.storage.Settings().API(), serix.WithValidation())

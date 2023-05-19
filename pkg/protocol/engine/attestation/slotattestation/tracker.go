@@ -1,4 +1,4 @@
-package attestation
+package slotattestation
 
 import (
 	"github.com/iotaledger/hive.go/core/memstorage"

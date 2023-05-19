@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
@@ -52,6 +53,7 @@ type EngineManager struct {
 	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	slotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
+	attestationProvider     module.Provider[*engine.Engine, attestation.Attestation]
 	ledgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
 
 	activeInstance *engine.Engine
@@ -72,6 +74,7 @@ func New(
 	blockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*engine.Engine, notarization.Notarization],
+	attestationProvider module.Provider[*engine.Engine, attestation.Attestation],
 	ledgerProvider module.Provider[*engine.Engine, therealledger.Ledger],
 ) *EngineManager {
 	return &EngineManager{
@@ -89,6 +92,7 @@ func New(
 		blockGadgetProvider:     blockGadgetProvider,
 		slotGadgetProvider:      slotGadgetProvider,
 		notarizationProvider:    notarizationProvider,
+		attestationProvider:     attestationProvider,
 		ledgerProvider:          ledgerProvider,
 	}
 }
@@ -173,6 +177,7 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.blockGadgetProvider,
 		e.slotGadgetProvider,
 		e.notarizationProvider,
+		e.attestationProvider,
 		e.ledgerProvider,
 		e.engineOptions...,
 	)

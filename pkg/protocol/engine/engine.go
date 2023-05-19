@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -48,6 +49,7 @@ type Engine struct {
 	BlockGadget     blockgadget.Gadget
 	SlotGadget      slotgadget.Gadget
 	Notarization    notarization.Notarization
+	Attestation     attestation.Attestation
 	Ledger          therealledger.Ledger
 
 	Workers      *workerpool.Group
@@ -81,6 +83,7 @@ func New(
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
+	attestationProvider module.Provider[*Engine, attestation.Attestation],
 	ledgerProvider module.Provider[*Engine, therealledger.Ledger],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
@@ -107,6 +110,7 @@ func New(
 			e.BlockGadget = blockGadgetProvider(e)
 			e.SlotGadget = slotGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
+			e.Attestation = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
 
 			e.HookInitialized(lo.Batch(

@@ -5,6 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
@@ -88,6 +89,12 @@ func WithSlotGadgetProvider(optsSlotGadgetProvider module.Provider[*engine.Engin
 func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.Engine, notarization.Notarization]) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsNotarizationProvider = optsNotarizationProvider
+	}
+}
+
+func WithAttestationProvider(optsAttestationProvider module.Provider[*engine.Engine, attestation.Attestation]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsAttestationProvider = optsAttestationProvider
 	}
 }
 
