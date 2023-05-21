@@ -12,8 +12,10 @@ type Block struct {
 	tipPool                   *promise.Value[TipPoolType]
 	stronglyConnectedChildren *promise.Int
 	weaklyConnectedChildren   *promise.Int
-	stronglyReachableFromTips *promise.Value[bool]
-	weaklyReachableFromTips   *promise.Value[bool]
+	stronglyConnectedToTips   *promise.Value[bool]
+	weaklyConnectedToTips     *promise.Value[bool]
+	stronglyReferencedByTips  *promise.Value[bool]
+	referencedByTips          *promise.Value[bool]
 
 	blockEvicted *promise.Event
 }
@@ -23,48 +25,45 @@ func NewBlock(block *blocks.Block) *Block {
 		Block:                     block,
 		blockEvicted:              promise.NewEvent(),
 		tipPool:                   promise.NewValue[TipPoolType](),
+		stronglyConnectedToTips:   promise.NewValue[bool](),
+		weaklyConnectedToTips:     promise.NewValue[bool](),
 		stronglyConnectedChildren: promise.NewInt(),
 		weaklyConnectedChildren:   promise.NewInt(),
-		stronglyReachableFromTips: promise.NewValue[bool](),
-		weaklyReachableFromTips:   promise.NewValue[bool](),
+		stronglyReferencedByTips:  promise.NewValue[bool](),
+		referencedByTips:          promise.NewValue[bool](),
 	}
 
 	b.tipPool.OnUpdate(func(_, tipPool TipPoolType) {
-		b.stronglyReachableFromTips.Set(tipPool == StrongTipPool || b.stronglyConnectedChildren.Get() > 0)
-		b.weaklyReachableFromTips.Set(tipPool == WeakTipPool || b.weaklyConnectedChildren.Get() > 0)
+		b.stronglyConnectedToTips.Set(tipPool == StrongTipPool || b.stronglyConnectedChildren.Get() > 0)
+		b.weaklyConnectedToTips.Set(tipPool == WeakTipPool || b.weaklyConnectedChildren.Get() > 0)
 	})
-	b.OnStronglyConnectedChildrenUpdated(func(_, newCount int) {
-		b.stronglyReachableFromTips.Set(newCount > 0 || b.tipPool.Get() == StrongTipPool)
+	b.stronglyConnectedChildren.OnUpdate(func(_, strongChildren int) {
+		b.stronglyConnectedToTips.Set(strongChildren > 0 || b.tipPool.Get() == StrongTipPool)
+		b.referencedByTips.Set(strongChildren > 0 || b.weaklyConnectedChildren.Get() > 0)
+		b.stronglyReferencedByTips.Set(strongChildren > 0)
 	})
-	b.OnWeaklyConnectedChildrenUpdated(func(_, newCount int) {
-		b.weaklyReachableFromTips.Set(newCount > 0 || b.tipPool.Get() == WeakTipPool)
+	b.weaklyConnectedChildren.OnUpdate(func(_, newCount int) {
+		b.weaklyConnectedToTips.Set(newCount > 0 || b.tipPool.Get() == WeakTipPool)
+		b.referencedByTips.Set(newCount > 0 || b.stronglyConnectedChildren.Get() > 0)
 	})
 
 	return b
 }
 
-func (b *Block) OnWeaklyConnectedChildrenUpdated(handler func(prevValue, newValue int)) (unsubscribe func()) {
-	return b.weaklyConnectedChildren.OnUpdate(handler)
+func (b *Block) increaseStronglyConnectedChildren() {
+	b.stronglyConnectedChildren.Increase()
 }
 
-func (b *Block) OnConnectionToStrongTips(callback func()) (unsubscribe func()) {
-	return b.stronglyReachableFromTips.OnUpdate(func(_, newValue bool) {
-		if newValue {
-			callback()
-		}
-	})
+func (b *Block) decreaseStronglyConnectedChildren() {
+	b.stronglyConnectedChildren.Decrease()
 }
 
-func (b *Block) OnConnectionToStrongTipsLost(callback func()) (unsubscribe func()) {
-	return b.stronglyReachableFromTips.OnUpdate(func(_, newValue bool) {
-		if !newValue {
-			callback()
-		}
-	})
+func (b *Block) increaseWeaklyConnectedChildren() {
+	b.weaklyConnectedChildren.Increase()
 }
 
-func (b *Block) OnStronglyConnectedChildrenUpdated(handler func(prevValue, newValue int)) (unsubscribe func()) {
-	return b.stronglyConnectedChildren.OnUpdate(handler)
+func (b *Block) decreaseWeaklyConnectedChildren() {
+	b.weaklyConnectedChildren.Decrease()
 }
 
 func (b *Block) setTipPool(newType TipPoolType) (updated bool) {
