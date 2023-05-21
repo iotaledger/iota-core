@@ -11,8 +11,9 @@ import (
 )
 
 type TipManager struct {
-	trackedBlocks *shrinkingmap.ShrinkingMap[iotago.BlockID, *Block]
-	tips          *randommap.RandomMap[iotago.BlockID, *Block]
+	blocks     *shrinkingmap.ShrinkingMap[iotago.BlockID, *Block]
+	strongTips *randommap.RandomMap[iotago.BlockID, *Block]
+	weakTips   *randommap.RandomMap[iotago.BlockID, *Block]
 
 	blockAdded *event.Event1[*Block]
 
@@ -21,63 +22,88 @@ type TipManager struct {
 
 func NewTipManager(retrieveBlock func(blockID iotago.BlockID) (block *blocks.Block, exists bool)) *TipManager {
 	return &TipManager{
-		trackedBlocks: shrinkingmap.New[iotago.BlockID, *Block](),
-		tips:          randommap.New[iotago.BlockID, *Block](),
+		blocks:        shrinkingmap.New[iotago.BlockID, *Block](),
+		strongTips:    randommap.New[iotago.BlockID, *Block](),
 		blockAdded:    event.New1[*Block](),
 		retrieveBlock: retrieveBlock,
 	}
 }
 
 func (t *TipManager) AddBlock(block *blocks.Block) {
-	if tipBlock := NewBlock(block); t.trackedBlocks.Set(block.ID(), tipBlock) {
+	if tipBlock := NewBlock(block); t.blocks.Set(block.ID(), tipBlock) {
 		t.setupBlock(tipBlock)
 	}
 }
 
-func (t *TipManager) setupBlock(block *Block) {
-	t.blockAdded.Trigger(block)
+func (t *TipManager) RemoveBlock(blockID iotago.BlockID) {
+	if tipBlock, removed := t.blocks.DeleteAndReturn(blockID); removed {
+		tipBlock.blockEvicted.Trigger()
+	}
+}
 
-	block.OnTipPoolChanged(func(prevType, newType TipPoolType) {
-		if newType == StrongTipPool {
-			t.joinStrongTipPool(block)
+func (t *TipManager) OnBlockAdded(handler func(block *Block)) (unsubscribe func()) {
+	return t.blockAdded.Hook(handler).Unhook
+}
+
+func (t *TipManager) setupBlock(block *Block) {
+	block.stronglyReachableFromTips.OnUpdate(func(_, reachable bool) {
+		if reachable {
+			t.updateParents(block, model.StrongParentType, func(parentBlock *Block) { parentBlock.stronglyConnectedChildren.Increase() })
+			t.updateParents(block, model.WeakParentType, func(parentBlock *Block) { parentBlock.weaklyConnectedChildren.Increase() })
+		} else {
+			t.updateParents(block, model.StrongParentType, func(parentBlock *Block) { parentBlock.stronglyConnectedChildren.Decrease() })
+			t.updateParents(block, model.WeakParentType, func(parentBlock *Block) { parentBlock.weaklyConnectedChildren.Decrease() })
 		}
 	})
 
-	block.setTipPool(t.chooseTipPool(block))
-}
+	block.weaklyReachableFromTips.OnUpdate(func(_, reachable bool) {
+		if reachable {
+			t.updateParents(block, model.WeakParentType, func(parentBlock *Block) { parentBlock.weaklyConnectedChildren.Increase() })
+		} else {
+			t.updateParents(block, model.WeakParentType, func(parentBlock *Block) { parentBlock.weaklyConnectedChildren.Decrease() })
+		}
+	})
 
-func (t *TipManager) joinStrongTipPool(block *Block) {
-	var unsubscribeEvents func()
-
-	leaveStrongTipPool := func() {
-		unsubscribeEvents()
-
-		t.tips.Delete(block.ID())
-
-		// TODO: decrease parent approval count
-		t.decreaseParentApprovalCount(block)
+	setupTipPoolEvents := func(tipPool *randommap.RandomMap[iotago.BlockID, *Block], onConnectedChildrenUpdated func(func(int, int)) func()) func() {
+		return onConnectedChildrenUpdated(func(from, to int) {
+			if from == 0 && to == 1 {
+				tipPool.Delete(block.ID())
+			} else if to == 0 {
+				tipPool.Set(block.ID(), block)
+			}
+		})
 	}
 
-	t.increaseParentApprovalCount(block)
+	var unhookTipPoolEvents func()
 
-	unsubscribeEvents = lo.Batch(
-		block.OnStrongApprovalCountUpdated(func(prevValue, newValue int) {
-			if prevValue == 0 && newValue == 1 {
-				t.tips.Delete(block.ID())
-			} else if newValue == 0 {
-				t.tips.Set(block.ID(), block) // TODO: reclassify before adding back in
-			}
-		}),
+	block.tipPool.OnUpdate(func(prevType, newType TipPoolType) {
+		if unhookTipPoolEvents != nil {
+			unhookTipPoolEvents()
 
-		block.OnTipPoolChanged(func(prevType, newType TipPoolType) {
-			if newType != StrongTipPool {
-				leaveStrongTipPool()
+			switch prevType {
+			case StrongTipPool:
+				t.strongTips.Delete(block.ID())
+			case WeakTipPool:
+				t.weakTips.Delete(block.ID())
 			}
-		}),
-	)
+		}
+
+		switch newType {
+		case StrongTipPool:
+			unhookTipPoolEvents = setupTipPoolEvents(t.strongTips, block.OnStronglyConnectedChildrenUpdated)
+		case WeakTipPool:
+			unhookTipPoolEvents = setupTipPoolEvents(t.weakTips, block.OnWeaklyConnectedChildrenUpdated)
+		default:
+			unhookTipPoolEvents = nil
+		}
+	})
+
+	block.setTipPool(t.determineTipPool(block))
+
+	t.blockAdded.Trigger(block)
 }
 
-func (t *TipManager) chooseTipPool(block *Block, optMinType ...TipPoolType) TipPoolType {
+func (t *TipManager) determineTipPool(block *Block, optMinType ...TipPoolType) TipPoolType {
 	blockIsVotingForNonRejectedBranches := func(block *Block) bool {
 		return true
 	}
@@ -96,35 +122,20 @@ func (t *TipManager) chooseTipPool(block *Block, optMinType ...TipPoolType) TipP
 	}
 }
 
-func (t *TipManager) RemoveBlock(blockID iotago.BlockID) {
-	if tipBlock, removed := t.trackedBlocks.DeleteAndReturn(blockID); removed {
-		tipBlock.blockEvicted.Trigger()
-	}
-}
-
-func (t *TipManager) OnBlockAdded(handler func(block *Block)) (unsubscribe func()) {
-	return t.blockAdded.Hook(handler).Unhook
-}
-
-func (t *TipManager) decreaseParentApprovalCount(block *Block) {
-
-}
-
-func (t *TipManager) increaseParentApprovalCount(block *Block) {
+func (t *TipManager) updateParents(block *Block, parentType model.ParentsType, updateFunc func(*Block)) {
 	block.ForEachParent(func(parent model.Parent) {
-		if parentBlock, created := t.trackedBlocks.GetOrCreate(parent.ID, func() *Block {
-			if parentBlock, parentBlockExists := t.retrieveBlock(parent.ID); parentBlockExists {
-				return NewBlock(parentBlock)
+		if parentBlock, created := t.blocks.GetOrCreate(parent.ID, func() *Block {
+			parentBlock, parentBlockExists := t.retrieveBlock(parent.ID)
+			if !parentBlockExists {
+				return nil
 			}
 
-			return nil
-		}); parentBlock != nil {
-			parentBlock.IncreaseApprovalCount()
+			return NewBlock(parentBlock)
+		}); parentBlock != nil && parent.Type == parentType {
+			updateFunc(parentBlock)
 
 			if created {
 				t.setupBlock(parentBlock)
-
-				t.blockAdded.Trigger(parentBlock)
 			}
 		}
 	})
