@@ -17,6 +17,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -104,8 +106,11 @@ func (m *MemPool[VotePower]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool
 }
 
 // MarkAttachmentIncluded marks the attachment of the given block as included.
-func (m *MemPool[VotePower]) MarkAttachmentIncluded(blockID iotago.BlockID) bool {
-	return m.updateAttachment(blockID, (*TransactionMetadata).markAttachmentIncluded)
+func (m *MemPool[VotePower]) MarkAttachmentIncluded(block *blocks.Block) bool {
+	if stateDiff, evicted := m.stateDiff(block.ID().Index()); !evicted {
+		stateDiff.AddBlock(block.Block())
+	}
+	return m.updateAttachment(block.ID(), (*TransactionMetadata).markAttachmentIncluded)
 }
 
 // TransactionMetadata returns the metadata of the transaction with the given ID.

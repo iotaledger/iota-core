@@ -21,6 +21,8 @@ type StateDiff struct {
 	stateUsageCounters *shrinkingmap.ShrinkingMap[iotago.OutputID, int]
 
 	mutations *ads.Set[iotago.TransactionID, *iotago.TransactionID]
+
+	burnedMana *shrinkingmap.ShrinkingMap[*iotago.Block, uint64]
 }
 
 func NewStateDiff(index iotago.SlotIndex) *StateDiff {
@@ -53,6 +55,10 @@ func (s *StateDiff) Mutations() *ads.Set[iotago.TransactionID, *iotago.Transacti
 	return s.mutations
 }
 
+func (s *StateDiff) BurnedMana() *shrinkingmap.ShrinkingMap[*iotago.Block, uint64] {
+	return s.burnedMana
+}
+
 func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata, direction int) {
 	transaction.Inputs().Range(func(input mempool.StateMetadata) {
 		s.compactStateChanges(input, s.stateUsageCounters.Compute(input.ID(), func(currentValue int, _ bool) int {
@@ -76,6 +82,10 @@ func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) {
 			s.RollbackTransaction(transaction)
 		})
 	}
+}
+
+func (s *StateDiff) AddBlock(block *iotago.Block) {
+	s.burnedMana.Set(block, block.BurnedMana)
 }
 
 func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) {

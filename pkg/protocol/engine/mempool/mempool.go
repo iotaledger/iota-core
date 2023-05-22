@@ -2,6 +2,7 @@ package mempool
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -13,7 +14,7 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 
 	MarkAttachmentOrphaned(blockID iotago.BlockID) bool
 
-	MarkAttachmentIncluded(blockID iotago.BlockID) bool
+	MarkAttachmentIncluded(block *blocks.Block) bool
 
 	StateMetadata(reference iotago.IndexedUTXOReferencer) (state StateMetadata, err error)
 
