@@ -19,12 +19,13 @@ type TipManager struct {
 	blockAdded    *event.Event1[*Block]
 }
 
-func NewTipManager(retrieveBlock func(blockID iotago.BlockID) (block *blocks.Block, exists bool)) *TipManager {
+func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool)) *TipManager {
 	return &TipManager{
+		retrieveBlock: blockRetriever,
 		blocks:        shrinkingmap.New[iotago.BlockID, *Block](),
 		strongTips:    randommap.New[iotago.BlockID, *Block](),
+		weakTips:      randommap.New[iotago.BlockID, *Block](),
 		blockAdded:    event.New1[*Block](),
-		retrieveBlock: retrieveBlock,
 	}
 }
 
@@ -46,21 +47,11 @@ func (t *TipManager) OnBlockAdded(handler func(block *Block)) (unsubscribe func(
 
 func (t *TipManager) setupBlock(block *Block) {
 	block.stronglyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-		if isConnected {
-			t.updateParents(block, model.StrongParentType, (*Block).increaseStronglyConnectedChildren)
-			t.updateParents(block, model.WeakParentType, (*Block).increaseWeaklyConnectedChildren)
-		} else {
-			t.updateParents(block, model.StrongParentType, (*Block).decreaseStronglyConnectedChildren)
-			t.updateParents(block, model.WeakParentType, (*Block).decreaseWeaklyConnectedChildren)
-		}
+		t.updateParents(block, propagateConnectedChildren(isConnected, true))
 	})
 
 	block.weaklyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-		if isConnected {
-			t.updateParents(block, model.WeakParentType, (*Block).increaseWeaklyConnectedChildren)
-		} else {
-			t.updateParents(block, model.WeakParentType, (*Block).decreaseWeaklyConnectedChildren)
-		}
+		t.updateParents(block, propagateConnectedChildren(isConnected, false))
 	})
 
 	joinTipPool := func(tipSet *randommap.RandomMap[iotago.BlockID, *Block], blockReferencedByTips *promise.Value[bool]) (leaveTipPool func()) {
@@ -80,7 +71,8 @@ func (t *TipManager) setupBlock(block *Block) {
 	}
 
 	var leaveTipPool func()
-	block.tipPool.OnUpdate(func(prevTipPool, newTipPool TipPoolType) {
+
+	block.tipPool.OnUpdate(func(prevTipPool, newTipPool TipPool) {
 		if leaveTipPool != nil {
 			leaveTipPool()
 		}
@@ -99,12 +91,14 @@ func (t *TipManager) setupBlock(block *Block) {
 	t.blockAdded.Trigger(block)
 }
 
-func (t *TipManager) determineInitialTipPool(block *Block, optMinType ...TipPoolType) TipPoolType {
+func (t *TipManager) determineInitialTipPool(block *Block, optMinType ...TipPool) TipPool {
 	blockIsVotingForNonRejectedBranches := func(block *Block) bool {
+		// TODO: implement check of conflict dag
 		return true
 	}
 
 	payloadIsLiked := func(block *Block) bool {
+		// TODO: implement check of conflict dag
 		return true
 	}
 
@@ -119,18 +113,19 @@ func (t *TipManager) determineInitialTipPool(block *Block, optMinType ...TipPool
 	return DroppedTipPool
 }
 
-func (t *TipManager) updateParents(block *Block, parentType model.ParentsType, updateFunc func(*Block)) {
+func (t *TipManager) updateParents(block *Block, parentTypeSpecificUpdates map[model.ParentsType]func(*Block)) {
 	block.ForEachParent(func(parent model.Parent) {
 		// TODO: MAKE GetOrCreate ignore nil return values
 		if parentBlock, created := t.blocks.GetOrCreate(parent.ID, func() *Block {
-			parentBlock, parentBlockExists := t.retrieveBlock(parent.ID)
-			if !parentBlockExists {
-				return nil
+			if parentBlock, parentBlockExists := t.retrieveBlock(parent.ID); parentBlockExists {
+				return NewBlock(parentBlock)
 			}
 
-			return NewBlock(parentBlock)
-		}); parentBlock != nil && parent.Type == parentType {
-			updateFunc(parentBlock)
+			return nil
+		}); parentBlock != nil {
+			if parentTypeSpecificUpdate, exists := parentTypeSpecificUpdates[parent.Type]; exists {
+				parentTypeSpecificUpdate(parentBlock)
+			}
 
 			if created {
 				t.setupBlock(parentBlock)
