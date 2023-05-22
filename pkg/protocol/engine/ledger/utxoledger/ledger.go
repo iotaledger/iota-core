@@ -53,7 +53,7 @@ func New(workers *workerpool.Group, store kvstore.KVStore, vm mempool.VM, apiPro
 		errorHandler: errorHandler,
 	}
 
-	l.memPool = mempoolv1.New(vm, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG)
+	l.memPool = mempoolv1.New(vm, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[booker.BlockVotePower](true))
 
 	return l
 }

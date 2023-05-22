@@ -224,7 +224,10 @@ func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
 		m.forkTransaction(transaction, advancedset.New(lo.Map(transaction.inputs, (*StateMetadata).ID)...))
 	} else {
 		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
-			m.forkTransaction(transaction, advancedset.New(input.ID()))
+			input.OnDoubleSpent(func() {
+				m.forkTransaction(transaction, advancedset.New(input.ID()))
+			})
+
 		})
 	}
 	if transaction.setBooked() {

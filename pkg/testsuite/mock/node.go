@@ -77,7 +77,7 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 		n.Endpoint,
 		opts...,
 	)
-	n.blockIssuer = blockissuer.New(n.Protocol, blockissuer.NewEd25519Account(n.AccountID, n.privateKey))
+	n.blockIssuer = blockissuer.New(n.Protocol, blockissuer.NewEd25519Account(n.AccountID, n.privateKey), blockissuer.WithTipSelectionTimeout(3*time.Second), blockissuer.WithTipSelectionRetryInterval(time.Millisecond*100))
 
 	go n.Protocol.Run()
 }
