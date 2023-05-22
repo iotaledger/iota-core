@@ -1,13 +1,18 @@
 package coreapi
 
 import (
+	"errors"
+
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
+
+var ErrOutputNotCommitted = errors.New("the included slot index of an output is not commitment yet")
 
 func getOutput(c echo.Context) (*ledgerstate.Output, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
@@ -24,16 +29,12 @@ func getOutput(c echo.Context) (*ledgerstate.Output, error) {
 }
 
 func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
-	output, err := getOutput(c)
+	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, err
 	}
-	outputID := output.OutputID()
+
 	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
-	includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(output.BlockID().Index())
-	if err != nil {
-		return nil, err
-	}
 
 	unspent, err := deps.Protocol.MainEngineInstance().Ledger.IsOutputUnspent(outputID)
 	if err != nil {
@@ -41,24 +42,27 @@ func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
 	}
 
 	if unspent {
-		return newOutputMetadataResponse(output, latestCommitment, includedCommitment), nil
+		return newOutputMetadataResponse(outputID, latestCommitment)
 	}
-
-	ledgerOutput, err := deps.Protocol.MainEngineInstance().Ledger.Spent(outputID)
-	if err != nil {
-		return nil, err
-	}
-
-	spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(ledgerOutput.SlotIndexSpent())
-	if err != nil {
-		return nil, err
-	}
-
-	return newSpentMetadataResponse(ledgerOutput, latestCommitment, includedCommitment, spentCommitment), nil
+	return newSpentMetadataResponse(outputID, latestCommitment)
 }
 
-func newOutputMetadataResponse(output *ledgerstate.Output, latestCommitment, includedCommitment *model.Commitment) *outputMetadataResponse {
-	outputID := output.OutputID()
+func newOutputMetadataResponse(outputID iotago.OutputID, latestCommitment *model.Commitment) (*outputMetadataResponse, error) {
+	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	if err != nil {
+		return nil, err
+	}
+
+	includedSlotIndex := output.SlotIndexBooked()
+	if includedSlotIndex > latestCommitment.Index() {
+		return nil, ErrOutputNotCommitted
+	}
+
+	includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedSlotIndex)
+	if err != nil {
+		return nil, err
+	}
+
 	return &outputMetadataResponse{
 		BlockID:              output.BlockID().ToHex(),
 		TransactionID:        outputID.TransactionID().ToHex(),
@@ -66,19 +70,40 @@ func newOutputMetadataResponse(output *ledgerstate.Output, latestCommitment, inc
 		IsSpent:              false,
 		IncludedCommitmentID: includedCommitment.ID().ToHex(),
 		LatestCommitmentID:   latestCommitment.ID().ToHex(),
-	}
+	}, nil
 }
 
-func newSpentMetadataResponse(output *ledgerstate.Spent, latestCommitment, includedCommitment, spentCommitment *model.Commitment) *outputMetadataResponse {
-	outputID := output.OutputID()
+func newSpentMetadataResponse(outputID iotago.OutputID, latestCommitment *model.Commitment) (*outputMetadataResponse, error) {
+	ledgerOutput, err := deps.Protocol.MainEngineInstance().Ledger.Spent(outputID)
+	if err != nil {
+		return nil, err
+	}
+
+	includedSlotIndex := ledgerOutput.Output().SlotIndexBooked()
+	spentSlotIndex := ledgerOutput.SlotIndexSpent()
+
+	if includedSlotIndex > latestCommitment.Index() || spentSlotIndex > latestCommitment.Index() {
+		return nil, ErrOutputNotCommitted
+	}
+
+	includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedSlotIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(spentSlotIndex)
+	if err != nil {
+		return nil, err
+	}
+
 	return &outputMetadataResponse{
-		BlockID:              output.BlockID().ToHex(),
+		BlockID:              ledgerOutput.BlockID().ToHex(),
 		TransactionID:        outputID.TransactionID().ToHex(),
 		OutputIndex:          outputID.Index(),
 		IsSpent:              true,
-		TransactionIDSpent:   output.TransactionIDSpent().ToHex(),
+		TransactionIDSpent:   ledgerOutput.TransactionIDSpent().ToHex(),
 		CommitmentIDSpent:    spentCommitment.ID().ToHex(),
 		IncludedCommitmentID: includedCommitment.ID().ToHex(),
 		LatestCommitmentID:   latestCommitment.ID().ToHex(),
-	}
+	}, nil
 }
