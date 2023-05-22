@@ -4,8 +4,12 @@ import (
 	"crypto/ed25519"
 	"fmt"
 
+	"github.com/wollac/iota-crypto-demo/pkg/bip32path"
+	"github.com/wollac/iota-crypto-demo/pkg/slip10"
+	"github.com/wollac/iota-crypto-demo/pkg/slip10/eddsa"
+
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
-	iotago "github.com/iotaledger/iota.go/v3"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
@@ -90,7 +94,7 @@ func (hd *HDWallet) AddressSigner() iotago.AddressSigner {
 	privKey, pubKey := hd.KeyPair()
 	address := iotago.Ed25519AddressFromPubKey(pubKey)
 
-	return iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(&address, privKey))
+	return iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(address, privKey))
 }
 
 func (hd *HDWallet) Outputs() []*ledgerstate.Output {
@@ -102,7 +106,7 @@ func (hd *HDWallet) Address() *iotago.Ed25519Address {
 	_, pubKey := hd.KeyPair()
 	addr := iotago.Ed25519AddressFromPubKey(pubKey)
 
-	return &addr
+	return addr
 }
 
 func (hd *HDWallet) PrintStatus() {

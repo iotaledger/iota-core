@@ -20,6 +20,9 @@ type Options struct {
 	// RootBlocks define the initial blocks to which new blocks can attach to.
 	RootBlocks map[iotago.BlockID]iotago.CommitmentID
 
+	// GenesisSeed defines the seed used to generate keypair that can spend Genesis outputs.
+	GenesisSeed []byte
+
 	DataBaseVersion byte
 	LedgerProvider  func() module.Provider[*engine.Engine, ledger.Ledger]
 }
@@ -62,5 +65,12 @@ func WithProtocolParameters(params iotago.ProtocolParameters) options.Option[Opt
 func WithRootBlocks(rootBlocks map[iotago.BlockID]iotago.CommitmentID) options.Option[Options] {
 	return func(m *Options) {
 		m.RootBlocks = rootBlocks
+	}
+}
+
+// WithGenesisSeed defines the seed used to generate keypair that can spend Genesis outputs.
+func WithGenesisSeed(genesisSeed []byte) options.Option[Options] {
+	return func(m *Options) {
+		m.GenesisSeed = genesisSeed
 	}
 }
