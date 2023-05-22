@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
@@ -52,7 +53,7 @@ func TestBooker(t *testing.T) {
 		Build(node1.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(), iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(walletFrom.Address(), lo.Return1(walletFrom.KeyPair()))))
 	require.NoError(t, err)
 
-	node1.IssueBlock(transaction)
+	node1.IssueBlock("block1", blockissuer.WithPayload(transaction))
 
 	ts.Wait(node1)
 
