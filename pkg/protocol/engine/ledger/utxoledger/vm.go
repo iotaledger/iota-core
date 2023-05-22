@@ -38,7 +38,7 @@ func executeStardustVM(_ context.Context, stateTransition mempool.Transaction, i
 		return nil, err
 	}
 
-	created := make([]mempool.State, len(outputSet))
+	created := make([]mempool.State, 0, len(outputSet))
 	for outputID, output := range outputSet {
 		created = append(created, &ExecutionOutput{
 			outputID: outputID,
