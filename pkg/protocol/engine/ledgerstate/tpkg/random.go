@@ -134,9 +134,9 @@ func RandNFTID() iotago.NFTID {
 	return nft
 }
 
-func RandAliasID() iotago.AliasID {
-	alias := iotago.AliasID{}
-	copy(alias[:], RandBytes(iotago.AliasIDLength))
+func RandAccountID() iotago.AccountID {
+	alias := iotago.AccountID{}
+	copy(alias[:], RandBytes(iotago.AccountIDLength))
 
 	return alias
 }
@@ -165,8 +165,8 @@ func RandAddress(addressType iotago.AddressType) iotago.Address {
 	case iotago.AddressNFT:
 		return RandNFTID().ToAddress()
 
-	case iotago.AddressAlias:
-		return RandAliasID().ToAddress()
+	case iotago.AddressAccount:
+		return RandAccountID().ToAddress()
 
 	default:
 		panic("unknown address type")
@@ -180,7 +180,7 @@ func RandOutputType() iotago.OutputType {
 func RandOutput(outputType iotago.OutputType) iotago.Output {
 	var addr iotago.Address
 	if outputType == iotago.OutputFoundry {
-		addr = RandAddress(iotago.AddressAlias)
+		addr = RandAddress(iotago.AddressAccount)
 	} else {
 		addr = RandAddress(iotago.AddressEd25519)
 	}
@@ -206,12 +206,12 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 				},
 			},
 		}
-	case iotago.OutputAlias:
+	case iotago.OutputAccount:
 		//nolint:forcetypeassert // we already checked the type
-		iotaOutput = &iotago.AliasOutput{
-			Amount:  amount,
-			AliasID: RandAliasID(),
-			Conditions: iotago.AliasOutputUnlockConditions{
+		iotaOutput = &iotago.AccountOutput{
+			Amount:    amount,
+			AccountID: RandAccountID(),
+			Conditions: iotago.AccountOutputUnlockConditions{
 				&iotago.StateControllerAddressUnlockCondition{
 					Address: address,
 				},
@@ -221,7 +221,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 			},
 		}
 	case iotago.OutputFoundry:
-		if address.Type() != iotago.AddressAlias {
+		if address.Type() != iotago.AddressAccount {
 			panic("not an alias address")
 		}
 		supply := new(big.Int).SetUint64(RandAmount())
@@ -236,8 +236,8 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 				MaximumSupply: supply,
 			},
 			Conditions: iotago.FoundryOutputUnlockConditions{
-				&iotago.ImmutableAliasUnlockCondition{
-					Address: address.(*iotago.AliasAddress),
+				&iotago.ImmutableAccountUnlockCondition{
+					Address: address.(*iotago.AccountAddress),
 				},
 			},
 		}

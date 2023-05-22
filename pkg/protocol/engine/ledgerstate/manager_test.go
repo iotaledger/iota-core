@@ -20,7 +20,7 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputNFT),   // spent
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic), // spent
-		tpkg.RandLedgerStateOutputWithType(iotago.OutputAlias),
+		tpkg.RandLedgerStateOutputWithType(iotago.OutputAccount),
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputNFT),
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputFoundry),
 	}
@@ -111,7 +111,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputFoundry),
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic), // spent
-		tpkg.RandLedgerStateOutputWithType(iotago.OutputAlias),
+		tpkg.RandLedgerStateOutputWithType(iotago.OutputAccount),
 	}
 
 	index := iotago.SlotIndex(49)

@@ -254,33 +254,33 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 	AssertOutputUnspentAndSpentTransitions(t, output, spent)
 }
 
-func TestAliasOutputSerialization(t *testing.T) {
+func TestAccountOutputSerialization(t *testing.T) {
 	api := tpkg.API()
 	outputID := tpkg.RandOutputID()
 	blockID := tpkg.RandBlockID()
-	aliasID := tpkg.RandAliasID()
-	stateController := tpkg.RandAliasID()
+	aliasID := tpkg.RandAccountID()
+	stateController := tpkg.RandAccountID()
 	governor := tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	issuer := tpkg.RandNFTID()
-	sender := tpkg.RandAliasID()
+	sender := tpkg.RandAccountID()
 	amount := tpkg.RandAmount()
 	index := tpkg.RandSlotIndex()
 	timestampCreated := tpkg.RandTimestamp()
 
-	iotaOutput := &iotago.AliasOutput{
-		Amount:  amount,
-		AliasID: aliasID,
-		Features: iotago.AliasOutputFeatures{
+	iotaOutput := &iotago.AccountOutput{
+		Amount:    amount,
+		AccountID: aliasID,
+		Features: iotago.AccountOutputFeatures{
 			&iotago.SenderFeature{
 				Address: sender.ToAddress(),
 			},
 		},
-		ImmutableFeatures: iotago.AliasOutputImmFeatures{
+		ImmutableFeatures: iotago.AccountOutputImmFeatures{
 			&iotago.IssuerFeature{
 				Address: issuer.ToAddress(),
 			},
 		},
-		Conditions: iotago.AliasOutputUnlockConditions{
+		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{
 				Address: stateController.ToAddress(),
 			},
@@ -301,7 +301,7 @@ func TestFoundryOutputSerialization(t *testing.T) {
 	api := tpkg.API()
 	outputID := tpkg.RandOutputID()
 	blockID := tpkg.RandBlockID()
-	aliasID := tpkg.RandAliasID()
+	aliasID := tpkg.RandAccountID()
 	amount := tpkg.RandAmount()
 	index := tpkg.RandSlotIndex()
 	timestampCreated := tpkg.RandTimestamp()
@@ -316,8 +316,8 @@ func TestFoundryOutputSerialization(t *testing.T) {
 			MaximumSupply: supply,
 		},
 		Conditions: iotago.FoundryOutputUnlockConditions{
-			&iotago.ImmutableAliasUnlockCondition{
-				Address: aliasID.ToAddress().(*iotago.AliasAddress),
+			&iotago.ImmutableAccountUnlockCondition{
+				Address: aliasID.ToAddress().(*iotago.AccountAddress),
 			},
 		},
 	}
