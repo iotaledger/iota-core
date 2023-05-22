@@ -211,13 +211,9 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 }
 
 func (n *Node) IssueBlock(alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
-	block, err := n.blockIssuer.CreateBlockWithOptions(context.Background(), opts...)
+	modelBlock, err := n.blockIssuer.CreateBlock(context.Background(), opts...)
 	require.NoError(n.Testing, err)
 
-	modelBlock, err := model.BlockFromBlock(block, n.Protocol.API())
-	if err != nil {
-		panic(err)
-	}
 	modelBlock.ID().RegisterAlias(alias)
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(modelBlock))

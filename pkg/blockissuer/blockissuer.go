@@ -56,8 +56,8 @@ func (i *BlockIssuer) Shutdown() {
 	i.workerPool.ShutdownComplete.Wait()
 }
 
-// CreateBlockWithOptions creates a new block with the options.
-func (i *BlockIssuer) CreateBlockWithOptions(ctx context.Context, opts ...options.Option[BlockParams]) (*iotago.Block, error) {
+// CreateBlock creates a new block with the options.
+func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BlockParams{}, opts)
 
 	if blockParams.slotCommitment == nil {
@@ -67,12 +67,6 @@ func (i *BlockIssuer) CreateBlockWithOptions(ctx context.Context, opts ...option
 	if blockParams.latestFinalizedSlot == nil {
 		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		blockParams.latestFinalizedSlot = &latestFinalizedSlot
-	}
-
-	if blockParams.payload == nil {
-		blockParams.payload = &iotago.TaggedData{
-			Tag: []byte("ACTIVITY"),
-		}
 	}
 
 	if blockParams.issuingTime == nil {
@@ -138,7 +132,14 @@ func (i *BlockIssuer) CreateBlockWithOptions(ctx context.Context, opts ...option
 		return nil, errors.Wrap(err, "error building block")
 	}
 
-	return block, nil
+	modelBlock, err := model.BlockFromBlock(block, i.protocol.API())
+	if err != nil {
+		return nil, errors.Wrap(err, "error serializing block to model block")
+	}
+
+	i.events.BlockConstructed.Trigger(modelBlock)
+
+	return modelBlock, nil
 }
 
 // IssueBlock submits a block to be processed.
@@ -172,34 +173,6 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	case <-triggered:
 		return nil
 	}
-}
-
-// CreateBlock creates a new block with the given payload and an optionally defined amount of strong parents.
-func (i *BlockIssuer) CreateBlock(ctx context.Context, p iotago.Payload, parentsCount ...int) (*model.Block, error) {
-	return i.CreateBlockWithReferences(ctx, p, nil, parentsCount...)
-}
-
-// CreateBlockWithReferences creates a new block with the given payload and parent references.
-func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Payload, references model.ParentReferences, strongParentsCountOpt ...int) (modelBlock *model.Block, err error) {
-	var block *iotago.Block
-
-	if len(strongParentsCountOpt) > 0 {
-		block, err = i.CreateBlockWithOptions(ctx, WithPayload(p), WithReferences(references), WithParentsCount(strongParentsCountOpt[0]))
-	} else {
-		block, err = i.CreateBlockWithOptions(ctx, WithPayload(p), WithReferences(references))
-	}
-	if err != nil {
-		return nil, errors.Wrap(err, "error building block")
-	}
-
-	modelBlock, err = model.BlockFromBlock(block, i.protocol.API())
-	if err != nil {
-		return nil, errors.Wrap(err, "error serializing block to model block")
-	}
-
-	i.events.BlockConstructed.Trigger(modelBlock)
-
-	return modelBlock, nil
 }
 
 func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
