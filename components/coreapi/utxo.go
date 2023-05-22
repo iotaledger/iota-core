@@ -44,6 +44,7 @@ func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
 	if unspent {
 		return newOutputMetadataResponse(outputID, latestCommitment)
 	}
+
 	return newSpentMetadataResponse(outputID, latestCommitment)
 }
 
