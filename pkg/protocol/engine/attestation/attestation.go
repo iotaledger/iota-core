@@ -8,12 +8,13 @@ import (
 )
 
 type Attestation interface {
-	// Get(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error)
+	Get(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error)
 	AddAttestationFromBlock(block *blocks.Block)
 	Commit(index iotago.SlotIndex) (newCW uint64, attestationsMap *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error)
 
-	// Import(reader io.ReadSeeker) (err error)
-	// Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error)
+	// TODO: integrate into snapshot
+	//  Import(reader io.ReadSeeker) (err error)
+	//  Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error)
 
 	module.Interface
 }

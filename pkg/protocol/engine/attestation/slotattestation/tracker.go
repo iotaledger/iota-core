@@ -25,7 +25,7 @@ func NewTracker(cutoffIndexCallback func() iotago.SlotIndex) *Tracker {
 
 func (s *Tracker) TrackAttestation(attestation *iotago.Attestation) {
 	var previousAttestationIndex iotago.SlotIndex
-	var updated bool
+	updated := true
 
 	updatedAttestation := s.latestAttestations.Compute(attestation.IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
 		if !exists {
@@ -36,9 +36,10 @@ func (s *Tracker) TrackAttestation(attestation *iotago.Attestation) {
 
 		// Replace the stored attestation only if the new one is greater.
 		if attestation.Compare(currentValue) == 1 {
-			updated = true
 			return attestation
 		}
+
+		updated = false
 
 		return currentValue
 	})
@@ -48,7 +49,7 @@ func (s *Tracker) TrackAttestation(attestation *iotago.Attestation) {
 		return
 	}
 
-	for i := lo.Max(s.cutoffIndexCallback(), previousAttestationIndex) + 1; i <= updatedAttestation.SlotCommitmentID.Index(); i++ {
+	for i := lo.Max(s.cutoffIndexCallback(), previousAttestationIndex); i <= updatedAttestation.SlotCommitmentID.Index(); i++ {
 		s.attestationsPerSlot.Get(i, true).Set(attestation.IssuerID, updatedAttestation)
 	}
 }

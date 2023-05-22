@@ -16,10 +16,13 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-const (
-	PrefixAttestations byte = iota
-)
-
+// Manager is the manager of slot attestations. It works in two phases:
+//  1. It stores "pending" attestations temporarily until the corresponding slot becomes committable.
+//  2. When a slot is committed:
+//     a. Apply the pending attestations of the committed slot.
+//     b. It computes the cumulative weight of the committed slot.
+//     c. Get all attestations for attestation slot = committed slot - attestationCommitmentOffset and store in bucketed storage.
+//     d. Compute the cumulative weight of the attestation slot.
 type Manager struct {
 	weightsProviderFunc func() *account.Accounts[iotago.AccountID, *iotago.AccountID]
 
@@ -38,7 +41,7 @@ type Manager struct {
 
 func NewProvider() module.Provider[*engine.Engine, attestation.Attestation] {
 	return module.Provide(func(e *engine.Engine) attestation.Attestation {
-		m := NewManager(2, e.Storage.Prunable.Attestations, e.SybilProtection.Accounts)
+		m := NewManager(4, e.Storage.Prunable.Attestations, e.SybilProtection.Accounts)
 
 		e.HookInitialized(func() {
 			cw := e.Storage.Settings().LatestCommitment().Commitment().CumulativeWeight
@@ -80,8 +83,16 @@ func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
 	m.commitmentMutex.RLock()
 	defer m.commitmentMutex.RUnlock()
 
-	// TODO: check if blockIDIndex is above lastCommittedSlotIndex, otherwise ignore.
-	//  check if commitment index > blockID index - drift, otherwise ignore.
+	// We only care about attestations that are newer than the last committed slot.
+	if block.ID().Index() <= m.lastCommittedSlot {
+		return
+	}
+
+	// Attestations that are older than m.lastCommittedSlot - m.attestationCommitmentOffset don't have any effect, so we ignore them.
+	if block.SlotCommitmentID().Index() <= m.computeAttestationCommitmentOffset() {
+		return
+	}
+
 	newAttestation := iotago.NewAttestation(block.Block())
 
 	storage := m.pendingAttestations.Get(block.ID().Index(), true)
@@ -117,12 +128,11 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsMap 
 	attestations := m.tracker.Attestations(attestationSlotIndex)
 	m.tracker.EvictSlot(attestationSlotIndex)
 
-	// Store all attestations of attestationSlotIndex in bucketed storage.
-	attestationsStorage, err := m.bucketedStorage(attestationSlotIndex).WithExtendedRealm(kvstore.Realm{PrefixAttestations})
+	// Store all attestations of attestationSlotIndex in bucketed storage via ads.Map / sparse merkle tree.
+	tree, err := m.attestationStorage(index)
 	if err != nil {
-		return 0, nil, errors.Wrapf(err, "failed to access storage for attestors of slot %d", index)
+		return 0, nil, errors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
 	}
-	tree := ads.NewMap[iotago.AccountID, iotago.Attestation](attestationsStorage)
 
 	// Add all attestations to the tree and calculate the new cumulative weight.
 	for _, a := range attestations {
@@ -134,10 +144,20 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsMap 
 		}
 	}
 
-	// TODO: set this at the end or beginning?
 	m.lastCommittedSlot = index
 
 	return m.lastCumulativeWeight, tree, nil
+}
+
+func (m *Manager) Get(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
+	m.commitmentMutex.RLock()
+	defer m.commitmentMutex.RUnlock()
+
+	if index > m.lastCommittedSlot {
+		return nil, errors.Errorf("slot %d is newer than last committed slot %d", index, m.lastCommittedSlot)
+	}
+
+	return m.attestationStorage(index)
 }
 
 func (m *Manager) computeAttestationCommitmentOffset() iotago.SlotIndex {
@@ -146,4 +166,13 @@ func (m *Manager) computeAttestationCommitmentOffset() iotago.SlotIndex {
 	}
 
 	return m.lastCommittedSlot - m.attestationCommitmentOffset
+}
+
+func (m *Manager) attestationStorage(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
+	attestationsStorage := m.bucketedStorage(index)
+	if attestationsStorage == nil {
+		return nil, errors.Errorf("failed to access storage for attestors of slot %d", index)
+	}
+
+	return ads.NewMap[iotago.AccountID, iotago.Attestation](attestationsStorage), nil
 }

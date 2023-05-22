@@ -64,6 +64,20 @@ func (t *TestSuite) AssertLatestCommitmentSlotIndex(slot iotago.SlotIndex, nodes
 	}
 }
 
+func (t *TestSuite) AssertLatestCommitmentCumulativeWeight(cw uint64, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			if cw != node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
+				return errors.Errorf("AssertLatestCommitmentCumulativeWeight: %s: expected %v, got %v", node.Name, cw, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight())
+			}
+
+			return nil
+		})
+	}
+}
+
 func (t *TestSuite) AssertLatestStateMutationSlot(slot iotago.SlotIndex, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
