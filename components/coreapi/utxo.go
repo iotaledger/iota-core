@@ -12,7 +12,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-var ErrOutputNotCommitted = errors.New("the included slot index of an output is not commitment yet")
+var ErrOutputNotCommitted = errors.New("the included slot index of the requested output is not committed yet")
 
 func getOutput(c echo.Context) (*ledgerstate.Output, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
