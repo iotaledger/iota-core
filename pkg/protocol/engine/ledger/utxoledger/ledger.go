@@ -40,6 +40,8 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) ledger.Ledger {
 		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), executeStardustVM, e.API, e.SybilProtection.OnlineCommittee(), e.ErrorHandler("ledger"))
 
+		e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
+
 		// TODO: should this attach to RatifiedAccepted instead?
 		e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
 

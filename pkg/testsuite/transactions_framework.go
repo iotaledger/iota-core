@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TransactionFramework struct {
@@ -105,6 +106,8 @@ func (t *TransactionFramework) CreateTransactionWithInputsAndOutputs(consumedInp
 	for _, output := range outputs {
 		txBuilder.AddOutput(output)
 	}
+	randomPayload := tpkg.Rand12ByteArray()
+	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
 
 	return txBuilder.Build(t.protoParams, iotago.NewInMemoryAddressSigner(walletKeys...))
 }
