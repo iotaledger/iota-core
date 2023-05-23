@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -137,26 +138,26 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, api iotago.API) (*SlotDi
 func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *SlotDiff) (written int64, err error) {
 	var totalBytesWritten int64
 
-	if err := writeValueFunc(writer, "slot diff index", uint64(diff.Index), &totalBytesWritten); err != nil {
+	if err := utils.WriteValueFunc(writer, "slot diff index", uint64(diff.Index), &totalBytesWritten); err != nil {
 		return 0, err
 	}
 
-	if err := writeValueFunc(writer, "slot diff created count", uint64(len(diff.Outputs)), &totalBytesWritten); err != nil {
+	if err := utils.WriteValueFunc(writer, "slot diff created count", uint64(len(diff.Outputs)), &totalBytesWritten); err != nil {
 		return 0, err
 	}
 
 	for _, output := range diff.sortedOutputs() {
-		if err := writeBytesFunc(writer, "slot diff created output", output.SnapshotBytes(), &totalBytesWritten); err != nil {
+		if err := utils.WriteBytesFunc(writer, "slot diff created output", output.SnapshotBytes(), &totalBytesWritten); err != nil {
 			return 0, err
 		}
 	}
 
-	if err := writeValueFunc(writer, "slot diff consumed count", uint64(len(diff.Spents)), &totalBytesWritten); err != nil {
+	if err := utils.WriteValueFunc(writer, "slot diff consumed count", uint64(len(diff.Spents)), &totalBytesWritten); err != nil {
 		return 0, err
 	}
 
 	for _, spent := range diff.sortedSpents() {
-		if err := writeBytesFunc(writer, "slot diff created output", spent.SnapshotBytes(), &totalBytesWritten); err != nil {
+		if err := utils.WriteBytesFunc(writer, "slot diff created output", spent.SnapshotBytes(), &totalBytesWritten); err != nil {
 			return 0, err
 		}
 	}
@@ -226,7 +227,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	if err != nil {
 		return err
 	}
-	if err := writeValueFunc(writer, "ledgerIndex", ledgerIndex); err != nil {
+	if err := utils.WriteValueFunc(writer, "ledgerIndex", ledgerIndex); err != nil {
 		return err
 	}
 
@@ -237,13 +238,13 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 
 	// Outputs Count
 	// The amount of UTXOs contained within this snapshot.
-	if err := writeValueFunc(writer, "outputs count", outputCount, &relativeCountersPosition); err != nil {
+	if err := utils.WriteValueFunc(writer, "outputs count", outputCount, &relativeCountersPosition); err != nil {
 		return err
 	}
 
 	// Slot Diffs Count
 	// The amount of slot diffs contained within this snapshot.
-	if err := writeValueFunc(writer, "slot diffs count", slotDiffCount, &relativeCountersPosition); err != nil {
+	if err := utils.WriteValueFunc(writer, "slot diffs count", slotDiffCount, &relativeCountersPosition); err != nil {
 		return err
 	}
 
@@ -259,7 +260,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 			return err
 		}
 
-		if err := writeBytesFunc(writer, "outputID", output.SnapshotBytes(), &relativeCountersPosition); err != nil {
+		if err := utils.WriteBytesFunc(writer, "outputID", output.SnapshotBytes(), &relativeCountersPosition); err != nil {
 			return err
 		}
 
@@ -290,13 +291,13 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 
 	// Outputs Count
 	// The amount of UTXOs contained within this snapshot.
-	if err := writeValueFunc(writer, "outputs count", outputCount, &countersSize); err != nil {
+	if err := utils.WriteValueFunc(writer, "outputs count", outputCount, &countersSize); err != nil {
 		return err
 	}
 
 	// Slot Diffs Count
 	// The amount of slot diffs contained within this snapshot.
-	if err := writeValueFunc(writer, "slot diffs count", slotDiffCount, &countersSize); err != nil {
+	if err := utils.WriteValueFunc(writer, "slot diffs count", slotDiffCount, &countersSize); err != nil {
 		return err
 	}
 
@@ -304,38 +305,6 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	if _, err := writer.Seek(relativeCountersPosition-countersSize, io.SeekCurrent); err != nil {
 		return fmt.Errorf("unable to seek to LS last written position: %w", err)
 	}
-
-	return nil
-}
-
-func increaseOffsets(amount int64, offsets ...*int64) {
-	for _, offset := range offsets {
-		*offset += amount
-	}
-}
-
-func writeValueFunc(writeSeeker io.WriteSeeker, variableName string, value any, offsetsToIncrease ...*int64) error {
-	length := binary.Size(value)
-	if length == -1 {
-		return fmt.Errorf("unable to determine length of %s", variableName)
-	}
-
-	if err := binary.Write(writeSeeker, binary.LittleEndian, value); err != nil {
-		return fmt.Errorf("unable to write LS %s: %w", variableName, err)
-	}
-
-	increaseOffsets(int64(length), offsetsToIncrease...)
-
-	return nil
-}
-
-func writeBytesFunc(writeSeeker io.WriteSeeker, variableName string, bytes []byte, offsetsToIncrease ...*int64) error {
-	length, err := writeSeeker.Write(bytes)
-	if err != nil {
-		return fmt.Errorf("unable to write LS %s: %w", variableName, err)
-	}
-
-	increaseOffsets(int64(length), offsetsToIncrease...)
 
 	return nil
 }
