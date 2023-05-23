@@ -89,21 +89,22 @@ var _ booker.Booker = new(Booker)
 
 // Queue checks if payload is solid and then adds the block to a Booker's CausalOrder.
 func (b *Booker) Queue(block *blocks.Block) error {
-	if transactionMetadata, containsTransaction := b.ledger.AttachTransaction(block); containsTransaction {
-		if transactionMetadata != nil {
-			// Based on the assumption that we always fork and the UTXO and Tangle paste cones are always fully known.
-			transactionMetadata.OnBooked(func() {
-				block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs().Get())
-				b.bookingOrder.Queue(block)
-			})
+	transactionMetadata, containsTransaction := b.ledger.AttachTransaction(block)
 
-			return nil
-		}
+	if !containsTransaction {
+		b.bookingOrder.Queue(block)
+		return nil
+	}
 
+	if transactionMetadata == nil {
 		return errors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
-	b.bookingOrder.Queue(block)
+	// Based on the assumption that we always fork and the UTXO and Tangle paste cones are always fully known.
+	transactionMetadata.OnBooked(func() {
+		block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs().Get())
+		b.bookingOrder.Queue(block)
+	})
 
 	return nil
 }
