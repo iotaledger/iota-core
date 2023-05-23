@@ -1,4 +1,4 @@
-package v1
+package tipmanagerv1
 
 import (
 	"github.com/iotaledger/hive.go/lo"
@@ -38,8 +38,8 @@ type Block struct {
 	// at least one weakly connected child.
 	weaklyConnectedToTips *promise.Value[bool]
 
-	// blockEvicted is triggered when the block is removed from the TipManager.
-	blockEvicted *promise.Event
+	// evicted is triggered when the block is removed from the TipManager.
+	evicted *promise.Event
 }
 
 // NewBlock creates a new Block.
@@ -49,12 +49,27 @@ func NewBlock(block *blocks.Block) *Block {
 		tipPool:                   promise.NewValue[TipPool](),
 		stronglyConnectedChildren: promise.NewInt(),
 		weaklyConnectedChildren:   promise.NewInt(),
-		stronglyReferencedByTips:  promise.NewValue[bool](),
-		referencedByTips:          promise.NewValue[bool](),
+		stronglyReferencedByTips:  promise.NewValue[bool]().WithTriggerWithInitialEmptyValue(true),
+		referencedByTips:          promise.NewValue[bool]().WithTriggerWithInitialEmptyValue(true),
 		stronglyConnectedToTips:   promise.NewValue[bool](),
 		weaklyConnectedToTips:     promise.NewValue[bool](),
-		blockEvicted:              promise.NewEvent(),
+		evicted:                   promise.NewEvent(),
 	}).setup()
+}
+
+// TipPool returns the TipPool the Block is currently in.
+func (b *Block) TipPool() TipPool {
+	return b.tipPool.Get()
+}
+
+// IsEvicted returns true if the Block was removed from the TipManager.
+func (b *Block) IsEvicted() bool {
+	return b.evicted.WasTriggered()
+}
+
+// OnEvicted registers a callback that is triggered when the Block is removed from the TipManager.
+func (b *Block) OnEvicted(handler func()) {
+	b.evicted.OnTrigger(handler)
 }
 
 // setup sets up the behavior of the derived properties of the Block.

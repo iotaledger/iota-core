@@ -32,6 +32,10 @@ type Value[T comparable] struct {
 
 	// setOrderMutex is an additional mutex that is used to ensure that the order of updates is ensured.
 	setOrderMutex sync.Mutex
+
+	// optTriggerWithInitialEmptyValue is an option that can be set to true to trigger the callbacks even when the
+	// initial value is empty on subscription.
+	optTriggerWithInitialEmptyValue bool
 }
 
 // NewValue creates a new Value instance.
@@ -67,6 +71,12 @@ func (v *Value[T]) Compute(computeFunc func(currentValue T) T) (previousValue T)
 	return previousValue
 }
 
+func (v *Value[T]) WithTriggerWithInitialEmptyValue(trigger bool) *Value[T] {
+	v.optTriggerWithInitialEmptyValue = trigger
+
+	return v
+}
+
 // OnUpdate registers a callback that is triggered when the value changes.
 func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe func()) {
 	v.mutex.Lock()
@@ -87,7 +97,7 @@ func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe f
 	defer createdCallback.triggerMutex.Unlock()
 	v.mutex.Unlock()
 
-	if previousValue != currentValue {
+	if v.optTriggerWithInitialEmptyValue || previousValue != currentValue {
 		createdCallback.callback(previousValue, currentValue)
 	}
 
