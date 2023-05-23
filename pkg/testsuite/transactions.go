@@ -1,112 +1,103 @@
 package testsuite
 
 import (
-	"fmt"
-	"time"
+	"github.com/pkg/errors"
 
-	"golang.org/x/xerrors"
-
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/builder"
 )
 
-type TransactionFramework struct {
-	api         iotago.API
-	protoParams *iotago.ProtocolParameters
+func (t *TestSuite) AssertTransactionsExist(transactionAliases []string, expectedExist bool, nodes ...*mock.Node) {
+	mustNodes(nodes)
 
-	wallet *mock.HDWallet
-	states map[string]*ledgerstate.Output
-}
+	for _, node := range nodes {
+		for _, transactionAlias := range transactionAliases {
+			t.Eventually(func() error {
+				actuallyExists := lo.Return2(node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(t.TransactionFramework.TransactionID(transactionAlias)))
+				if actuallyExists && !expectedExist {
+					return errors.Errorf("AssertTransactionsExist: %s: transaction %s exists but should not", node.Name, transactionAlias)
+				}
+				if !actuallyExists && expectedExist {
+					return errors.Errorf("AssertTransactionsExist: %s: transaction %s does not exists but should", node.Name, transactionAlias)
+				}
 
-func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte) *TransactionFramework {
-	genesisOutput, err := protocol.MainEngineInstance().Ledger.Output(iotago.OutputID{}.UTXOInput())
-	if err != nil {
-		panic(err)
-	}
-
-	return &TransactionFramework{
-		api:         protocol.API(),
-		protoParams: protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(),
-		states:      map[string]*ledgerstate.Output{"Genesis": genesisOutput},
-		wallet:      mock.NewHDWallet("genesis", genesisSeed, 0),
-	}
-}
-
-func (t *TransactionFramework) CreateTransaction(alias string, outputCount int, inputAliases ...string) (*iotago.Transaction, error) {
-	inputStates := make([]*ledgerstate.Output, 0, len(inputAliases))
-	totalInputDeposits := uint64(0)
-	for _, inputAlias := range inputAliases {
-		output := t.resolveOutputAlias(inputAlias)
-		inputStates = append(inputStates, output)
-		totalInputDeposits += output.Deposit()
-	}
-
-	tokenAmount := totalInputDeposits / uint64(outputCount)
-	remainderFunds := totalInputDeposits
-
-	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
-	for i := 0; i < outputCount; i++ {
-		if i+1 == outputCount {
-			tokenAmount = remainderFunds
-		}
-		remainderFunds -= tokenAmount
-
-		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount: tokenAmount,
-			Conditions: iotago.BasicOutputUnlockConditions{
-				&iotago.AddressUnlockCondition{Address: t.wallet.Address()},
-			},
-		})
-	}
-
-	transaction, err := t.CreateTransactionWithInputsAndOutputs(inputStates, outputStates, []*mock.HDWallet{t.wallet})
-	if err != nil {
-		panic(err)
-	}
-	for idx, output := range outputStates {
-		t.states[fmt.Sprintf("%s:%d", alias, idx)] = ledgerstate.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), uint16(idx)), iotago.EmptyBlockID(), 0, time.Now(), output)
-	}
-
-	return transaction, err
-}
-
-func (t *TransactionFramework) CreateTransactionWithInputsAndOutputs(consumedInputs ledgerstate.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) (*iotago.Transaction, error) {
-	walletKeys := make([]iotago.AddressKeys, len(signingWallets))
-	for i, wallet := range signingWallets {
-		inputPrivateKey, _ := wallet.KeyPair()
-		walletKeys[i] = iotago.AddressKeys{Address: wallet.Address(), Keys: inputPrivateKey}
-	}
-
-	txBuilder := builder.NewTransactionBuilder(t.protoParams.NetworkID())
-	for _, input := range consumedInputs {
-		switch input.OutputType() {
-		case iotago.OutputFoundry:
-			// For foundries we need to unlock the alias
-			txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Output().UnlockConditionSet().ImmutableAlias().Address, InputID: input.OutputID(), Input: input.Output()})
-		case iotago.OutputAlias:
-			// For alias we need to unlock the state controller
-			txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Output().UnlockConditionSet().StateControllerAddress().Address, InputID: input.OutputID(), Input: input.Output()})
-		default:
-			txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Output().UnlockConditionSet().Address().Address, InputID: input.OutputID(), Input: input.Output()})
+				return nil
+			})
 		}
 	}
-
-	for _, output := range outputs {
-		txBuilder.AddOutput(output)
-	}
-
-	return txBuilder.Build(t.protoParams, iotago.NewInMemoryAddressSigner(walletKeys...))
 }
 
-func (t *TransactionFramework) resolveOutputAlias(alias string) *ledgerstate.Output {
-	output, exists := t.states[alias]
-	if !exists {
-		panic(xerrors.Errorf("given alias does not exist %s", alias))
-	}
+func (t *TestSuite) assertTransactionsInCacheWithFunc(expectedTransactions []iotago.TransactionID, expectedPropertyState bool, propertyFunc func(mempool.TransactionMetadata) bool, nodes ...*mock.Node) {
+	mustNodes(nodes)
 
-	return output
+	for _, node := range nodes {
+		for _, transactionID := range expectedTransactions {
+			t.Eventually(func() error {
+				blockFromCache, exists := node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
+				if !exists {
+					return errors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s does not exist", node.Name, transactionID)
+				}
+
+				if expectedPropertyState != propertyFunc(blockFromCache) {
+					return errors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s: expected %v, got %v", node.Name, blockFromCache.ID(), expectedPropertyState, propertyFunc(blockFromCache))
+				}
+
+				return nil
+			})
+		}
+	}
+}
+
+func (t *TestSuite) AssertTransactionsInCacheAccepted(expectedTransactions []string, expectedFlag bool, nodes ...*mock.Node) {
+	t.assertTransactionsInCacheWithFunc(lo.Map(expectedTransactions, t.TransactionFramework.TransactionID), expectedFlag, mempool.TransactionMetadata.IsAccepted, nodes...)
+}
+
+func (t *TestSuite) AssertTransactionsInCacheRejected(expectedTransactions []string, expectedFlag bool, nodes ...*mock.Node) {
+	t.assertTransactionsInCacheWithFunc(lo.Map(expectedTransactions, t.TransactionFramework.TransactionID), expectedFlag, mempool.TransactionMetadata.IsRejected, nodes...)
+}
+
+func (t *TestSuite) AssertTransactionsInCacheBooked(expectedTransactions []string, expectedFlag bool, nodes ...*mock.Node) {
+	t.assertTransactionsInCacheWithFunc(lo.Map(expectedTransactions, t.TransactionFramework.TransactionID), expectedFlag, mempool.TransactionMetadata.IsBooked, nodes...)
+}
+
+func (t *TestSuite) AssertTransactionsInCacheConflicting(expectedTransactions []string, expectedFlag bool, nodes ...*mock.Node) {
+	t.assertTransactionsInCacheWithFunc(lo.Map(expectedTransactions, t.TransactionFramework.TransactionID), expectedFlag, mempool.TransactionMetadata.IsConflicting, nodes...)
+}
+
+func (t *TestSuite) AssertTransactionsInCacheInvalid(expectedTransactions []string, expectedFlag bool, nodes ...*mock.Node) {
+	t.assertTransactionsInCacheWithFunc(lo.Map(expectedTransactions, t.TransactionFramework.TransactionID), expectedFlag, mempool.TransactionMetadata.IsInvalid, nodes...)
+}
+
+func (t *TestSuite) AssertTransactionsInCachePending(expectedTransactions []string, expectedFlag bool, nodes ...*mock.Node) {
+	t.assertTransactionsInCacheWithFunc(lo.Map(expectedTransactions, t.TransactionFramework.TransactionID), expectedFlag, mempool.TransactionMetadata.IsPending, nodes...)
+}
+
+func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[string][]string, nodes ...*mock.Node) {
+	for _, node := range nodes {
+		for transactionAlias, conflictAliases := range transactionConflicts {
+			t.Eventually(func() error {
+				transactionFromCache, exists := node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(t.TransactionFramework.TransactionID(transactionAlias))
+				if !exists {
+					return errors.Errorf("AssertTransactionInCacheConflicts: %s: block %s does not exist", node.Name, transactionAlias)
+				}
+
+				expectedConflictIDs := advancedset.New(lo.Map(conflictAliases, t.TransactionFramework.TransactionID)...)
+				actualConflictIDs := transactionFromCache.ConflictIDs().Get()
+
+				if expectedConflictIDs.Size() != actualConflictIDs.Size() {
+					return errors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s conflict count incorrect: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedConflictIDs, actualConflictIDs)
+				}
+
+				if !actualConflictIDs.HasAll(expectedConflictIDs) {
+					return errors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedConflictIDs, actualConflictIDs)
+				}
+
+				return nil
+			})
+
+		}
+	}
 }

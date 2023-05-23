@@ -9,6 +9,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
@@ -215,6 +216,17 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 
 		return nil, false
 	}
+}
+
+func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
+	l.memPool.OnTransactionAttached(handler, opts...)
+}
+
+func (l *Ledger) TransactionMetadata(transactionID iotago.TransactionID) (mempool.TransactionMetadata, bool) {
+	return l.memPool.TransactionMetadata(transactionID)
+}
+func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempool.TransactionMetadata, bool) {
+	return l.memPool.TransactionMetadataByAttachment(blockID)
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {

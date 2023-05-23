@@ -4,6 +4,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -93,4 +94,35 @@ func (t *TestSuite) AssertBlocksInCacheConfirmed(expectedBlocks []*blocks.Block,
 
 func (t *TestSuite) AssertBlocksInCacheRootBlock(expectedBlocks []*blocks.Block, expectedRootBlock bool, nodes ...*mock.Node) {
 	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedRootBlock, (*blocks.Block).IsRootBlock, nodes...)
+}
+
+func (t *TestSuite) AssertBlocksInCacheConflicts(blockConflicts map[string][]string, nodes ...*mock.Node) {
+	for _, node := range nodes {
+		for blockAlias, conflictAliases := range blockConflicts {
+			t.Eventually(func() error {
+				blockFromCache, exists := node.Protocol.MainEngineInstance().BlockFromCache(t.BlockID(blockAlias))
+				if !exists {
+					return errors.Errorf("AssertBlocksInCacheConflicts: %s: block %s does not exist", node.Name, blockAlias)
+				}
+
+				if blockFromCache.IsRootBlock() {
+					return errors.Errorf("AssertBlocksInCacheConflicts: %s: block %s is root block", node.Name, blockFromCache.ID())
+				}
+
+				expectedConflictIDs := advancedset.New(lo.Map(conflictAliases, t.TransactionFramework.TransactionID)...)
+				actualConflictIDs := blockFromCache.ConflictIDs()
+
+				if expectedConflictIDs.Size() != actualConflictIDs.Size() {
+					return errors.Errorf("AssertBlocksInCacheConflicts: %s: block %s conflict count incorrect: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedConflictIDs, actualConflictIDs)
+				}
+
+				if !actualConflictIDs.HasAll(expectedConflictIDs) {
+					return errors.Errorf("AssertBlocksInCacheConflicts: %s: block %s: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedConflictIDs, actualConflictIDs)
+				}
+
+				return nil
+			})
+
+		}
+	}
 }

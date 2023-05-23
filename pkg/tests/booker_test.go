@@ -11,16 +11,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
-	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func TestBooker(t *testing.T) {
-	genesisSeed := tpkg.RandEd25519Seed()
-	ts := testsuite.NewTestSuite(t, testsuite.WithSnapshotOptions(
-		snapshotcreator.WithGenesisSeed(genesisSeed[:]),
-	))
+	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1", 1)
@@ -31,26 +26,42 @@ func TestBooker(t *testing.T) {
 			),
 		},
 	})
+
+	node1.HookLogging()
+
 	time.Sleep(time.Second)
 
-	transactionFramework := testsuite.NewTransactionFramework(node1.Protocol, genesisSeed[:])
-	tx1, err := transactionFramework.CreateTransaction("Tx1", 1, "Genesis")
-	require.NoError(t, err)
+	tx1 := ts.CreateTransaction("Tx1", 1, "Genesis")
 
-	tx2, err := transactionFramework.CreateTransaction("Tx2", 1, "Tx1:0")
+	tx2 := ts.CreateTransaction("Tx2", 1, "Tx1:0")
 
 	blocksBooked := 0
 	node1.Protocol.MainEngineInstance().Events.Booker.BlockBooked.Hook(func(_ *blocks.Block) {
 		blocksBooked++
 	})
 
-	node1.IssueBlock("block1", blockissuer.WithPayload(tx2))
+	ts.RegisterBlock("block1", node1.IssueBlock("block1", blockissuer.WithPayload(tx2)))
 	ts.Wait(node1)
 
+	ts.AssertTransactionsExist([]string{"Tx2"}, true, node1)
+	ts.AssertTransactionsExist([]string{"Tx1"}, false, node1)
+
+	ts.AssertTransactionsInCacheBooked([]string{"Tx2"}, false, node1)
 	require.Equal(t, 0, blocksBooked)
 
-	node1.IssueBlock("block2", blockissuer.WithPayload(tx1))
+	ts.RegisterBlock("block2", node1.IssueBlock("block2", blockissuer.WithPayload(tx1)))
 	ts.Wait(node1)
 
+	ts.AssertTransactionsExist([]string{"Tx1", "Tx2"}, true, node1)
+	ts.AssertTransactionsInCacheBooked([]string{"Tx1", "Tx2"}, true, node1)
 	require.Equal(t, 2, blocksBooked)
+	ts.AssertBlocksInCacheConflicts(map[string][]string{
+		"block1": {"Tx2"},
+		"block2": {"Tx1"},
+	}, node1)
+
+	ts.AssertTransactionInCacheConflicts(map[string][]string{
+		"Tx2": {"Tx2"},
+		"Tx1": {"Tx1"},
+	}, node1)
 }

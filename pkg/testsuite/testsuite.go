@@ -14,11 +14,13 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TestSuite struct {
@@ -41,7 +43,8 @@ type TestSuite struct {
 	optsWaitFor         time.Duration
 	optsTick            time.Duration
 
-	mutex sync.RWMutex
+	mutex                sync.RWMutex
+	TransactionFramework *TransactionFramework
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
@@ -152,6 +155,22 @@ func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {
 	block.ID().RegisterAlias(alias)
 }
 
+func (t *TestSuite) CreateTransactionWithInputsAndOutputs(consumedInputs ledgerstate.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) *iotago.Transaction {
+	if t.TransactionFramework == nil {
+		panic("cannot create a transaction without running the network first")
+	}
+
+	return lo.PanicOnErr(t.TransactionFramework.CreateTransactionWithInputsAndOutputs(consumedInputs, outputs, signingWallets))
+}
+
+func (t *TestSuite) CreateTransaction(alias string, outputCount int, inputAliases ...string) *iotago.Transaction {
+	if t.TransactionFramework == nil {
+		panic("cannot create a transaction without running the network first")
+	}
+
+	return lo.PanicOnErr(t.TransactionFramework.CreateTransaction(alias, outputCount, inputAliases...))
+}
+
 func (t *TestSuite) Node(name string) *mock.Node {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
@@ -238,8 +257,9 @@ func (t *TestSuite) RemoveNode(name string) {
 func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
+	genesisSeed := tpkg.RandEd25519Seed()
 
-	err := snapshotcreator.CreateSnapshot(t.optsSnapshotOptions...)
+	err := snapshotcreator.CreateSnapshot(append([]options.Option[snapshotcreator.Options]{snapshotcreator.WithGenesisSeed(genesisSeed[:])}, t.optsSnapshotOptions...)...)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
@@ -259,6 +279,10 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		}
 
 		node.Initialize(baseOpts...)
+
+		if t.TransactionFramework == nil {
+			t.TransactionFramework = NewTransactionFramework(node.Protocol, genesisSeed[:])
+		}
 	}
 
 	t.running = true
