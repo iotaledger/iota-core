@@ -20,7 +20,7 @@ func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
 	outputID := iotago.OutputID{}
 	copy(outputID[:], txID[:])
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID.UTXOInput())
 	if err != nil {
 		return iotago.EmptyBlockID(), err
 	}

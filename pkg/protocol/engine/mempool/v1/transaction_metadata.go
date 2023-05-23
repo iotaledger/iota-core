@@ -10,14 +10,13 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type TransactionMetadata struct {
 	id                iotago.TransactionID
-	inputReferences   []ledger.StateReference
+	inputReferences   []iotago.IndexedUTXOReferencer
 	inputs            []*StateMetadata
 	outputs           []*StateMetadata
 	transaction       mempool.Transaction
@@ -133,7 +132,7 @@ func (t *TransactionMetadata) publishInputAndCheckSolidity(index int, input *Sta
 	return t.markInputSolid()
 }
 
-func (t *TransactionMetadata) setExecuted(outputStates []ledger.State) {
+func (t *TransactionMetadata) setExecuted(outputStates []mempool.State) {
 	t.mutex.Lock()
 	for _, outputState := range outputStates {
 		t.outputs = append(t.outputs, NewStateMetadata(outputState, t))
@@ -272,7 +271,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	t.OnConflicting(func() {
 		cancelConflictInheritance()
 
-		t.conflictIDs.Set(advancedset.New[iotago.TransactionID](t.id))
+		t.conflictIDs.Set(advancedset.New(t.id))
 	})
 
 	t.allAttachmentsEvicted.OnTrigger(func() {
