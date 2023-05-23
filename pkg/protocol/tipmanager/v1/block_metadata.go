@@ -7,8 +7,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 
-// Block represents a block in the TipManager.
-type Block struct {
+// BlockMetadata represents the metadata for a block in the TipManager.
+type BlockMetadata struct {
 	// Block holds the actual block.
 	*blocks.Block
 
@@ -42,9 +42,9 @@ type Block struct {
 	evicted *promise.Event
 }
 
-// NewBlock creates a new Block.
-func NewBlock(block *blocks.Block) *Block {
-	return (&Block{
+// NewBlockMetadata creates a new BlockMetadata instance.
+func NewBlockMetadata(block *blocks.Block) *BlockMetadata {
+	return (&BlockMetadata{
 		Block:                     block,
 		tipPool:                   promise.NewValue[TipPool](),
 		stronglyConnectedChildren: promise.NewValue[int](),
@@ -58,22 +58,22 @@ func NewBlock(block *blocks.Block) *Block {
 }
 
 // TipPool returns the TipPool the Block is currently in.
-func (b *Block) TipPool() TipPool {
+func (b *BlockMetadata) TipPool() TipPool {
 	return b.tipPool.Get()
 }
 
 // IsEvicted returns true if the Block was removed from the TipManager.
-func (b *Block) IsEvicted() bool {
+func (b *BlockMetadata) IsEvicted() bool {
 	return b.evicted.WasTriggered()
 }
 
 // OnEvicted registers a callback that is triggered when the Block is removed from the TipManager.
-func (b *Block) OnEvicted(handler func()) {
+func (b *BlockMetadata) OnEvicted(handler func()) {
 	b.evicted.OnTrigger(handler)
 }
 
 // setup sets up the behavior of the derived properties of the Block.
-func (b *Block) setup() (self *Block) {
+func (b *BlockMetadata) setup() (self *BlockMetadata) {
 	b.tipPool.OnUpdate(func(_, tipPool TipPool) {
 		b.stronglyConnectedToTips.Set(tipPool == StrongTipPool || b.stronglyConnectedChildren.Get() > 0)
 		b.weaklyConnectedToTips.Set(tipPool == WeakTipPool || b.weaklyConnectedChildren.Get() > 0)
@@ -94,7 +94,7 @@ func (b *Block) setup() (self *Block) {
 }
 
 // setTipPool sets the TipPool of the Block.
-func (b *Block) setTipPool(newType TipPool) (updated bool) {
+func (b *BlockMetadata) setTipPool(newType TipPool) (updated bool) {
 	b.tipPool.Compute(func(prevType TipPool) TipPool {
 		updated = newType > prevType
 
@@ -105,20 +105,20 @@ func (b *Block) setTipPool(newType TipPool) (updated bool) {
 }
 
 // propagateConnectedChildren returns the rules for the propagation of the internal connected children counters.
-func propagateConnectedChildren(isConnected bool, stronglyConnected bool) (propagationRules map[model.ParentsType]func(*Block)) {
-	valueDiff := lo.Cond(isConnected, 1, -1)
+func propagateConnectedChildren(isConnected bool, stronglyConnected bool) (propagationRules map[model.ParentsType]func(*BlockMetadata)) {
+	diffToApply := lo.Cond(isConnected, 1, -1)
 	updateValue := func(value int) int {
-		return value + valueDiff
+		return value + diffToApply
 	}
 
-	propagationRules = map[model.ParentsType]func(*Block){
-		model.WeakParentType: func(parent *Block) {
+	propagationRules = map[model.ParentsType]func(*BlockMetadata){
+		model.WeakParentType: func(parent *BlockMetadata) {
 			parent.weaklyConnectedChildren.Compute(updateValue)
 		},
 	}
 
 	if stronglyConnected {
-		propagationRules[model.StrongParentType] = func(parent *Block) {
+		propagationRules[model.StrongParentType] = func(parent *BlockMetadata) {
 			parent.stronglyConnectedChildren.Compute(updateValue)
 		}
 	}

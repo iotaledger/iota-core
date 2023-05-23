@@ -18,17 +18,17 @@ type TipManager struct {
 	// retrieveBlock is a function that retrieves a Block from the Tangle.
 	retrieveBlock func(blockID iotago.BlockID) (block *blocks.Block, exists bool)
 
-	// blocks contains the blocks that are managed by the TipManager.
-	blocks *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *Block]]
+	// blockMetadataStorage contains the BlockMetadata of all Blocks that are managed by the TipManager.
+	blockMetadataStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *BlockMetadata]]
 
-	// strongTips contains the strong tips that are available for tip selection.
-	strongTips *randommap.RandomMap[iotago.BlockID, *Block]
+	// strongTipSet contains the blocks of the strong tip pool that have no referencing children.
+	strongTipSet *randommap.RandomMap[iotago.BlockID, *BlockMetadata]
 
-	// weakTips contains the weak tips that are available for tip selection.
-	weakTips *randommap.RandomMap[iotago.BlockID, *Block]
+	// weakTipSet contains the blocks of the weak tip pool that have no referencing children.
+	weakTipSet *randommap.RandomMap[iotago.BlockID, *BlockMetadata]
 
 	// blockAdded is triggered when a new Block was added to the TipManager.
-	blockAdded *event.Event1[*Block]
+	blockAdded *event.Event1[*BlockMetadata]
 
 	// lastEvictedSlot is the last slot index that was evicted from the MemPool.
 	lastEvictedSlot iotago.SlotIndex
@@ -40,34 +40,56 @@ type TipManager struct {
 // NewTipManager creates a new TipManager.
 func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool)) *TipManager {
 	return &TipManager{
-		retrieveBlock: blockRetriever,
-		blocks:        shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *Block]](),
-		strongTips:    randommap.New[iotago.BlockID, *Block](),
-		weakTips:      randommap.New[iotago.BlockID, *Block](),
-		blockAdded:    event.New1[*Block](),
+		retrieveBlock:        blockRetriever,
+		blockMetadataStorage: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *BlockMetadata]](),
+		strongTipSet:         randommap.New[iotago.BlockID, *BlockMetadata](),
+		weakTipSet:           randommap.New[iotago.BlockID, *BlockMetadata](),
+		blockAdded:           event.New1[*BlockMetadata](),
 	}
 }
 
 // AddBlock adds a Block to the TipManager.
 func (t *TipManager) AddBlock(block *blocks.Block) {
-	newBlock := NewBlock(block)
+	newBlockMetadata := NewBlockMetadata(block)
 
-	if blocks := t.blocksBySlotIndex(block.ID().Index()); blocks != nil && blocks.Set(block.ID(), newBlock) {
-		t.setupBlock(newBlock)
+	if storage := t.metadataStorage(block.ID().Index()); storage != nil && storage.Set(block.ID(), newBlockMetadata) {
+		t.setupBlockMetadata(newBlockMetadata)
 	}
 }
 
+// StrongTipSet returns the strong tip set of the TipManager.
+func (t *TipManager) StrongTipSet() (tipSet []*blocks.Block) {
+	t.strongTipSet.ForEach(func(_ iotago.BlockID, blockMetadata *BlockMetadata) bool {
+		tipSet = append(tipSet, blockMetadata.Block)
+
+		return true
+	})
+
+	return tipSet
+}
+
+// WeakTipSet returns the weak tip set of the TipManager.
+func (t *TipManager) WeakTipSet() (tipSet []*blocks.Block) {
+	t.weakTipSet.ForEach(func(_ iotago.BlockID, blockMetadata *BlockMetadata) bool {
+		tipSet = append(tipSet, blockMetadata.Block)
+
+		return true
+	})
+
+	return tipSet
+}
+
 // OnBlockAdded registers a callback that is triggered when a new Block was added to the TipManager.
-func (t *TipManager) OnBlockAdded(handler func(block *Block)) (unsubscribe func()) {
+func (t *TipManager) OnBlockAdded(handler func(blockMetadata *BlockMetadata)) (unsubscribe func()) {
 	return t.blockAdded.Hook(handler).Unhook
 }
 
 // Evict evicts a slot from the TipManager.
 func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
-	if t.evict(slotIndex) {
-		if evictedBlocks, deleted := t.blocks.DeleteAndReturn(slotIndex); deleted {
-			evictedBlocks.ForEach(func(_ iotago.BlockID, block *Block) bool {
-				block.evicted.Trigger()
+	if t.markSlotAsEvicted(slotIndex) {
+		if evictedObjects, deleted := t.blockMetadataStorage.DeleteAndReturn(slotIndex); deleted {
+			evictedObjects.ForEach(func(_ iotago.BlockID, blockMetadata *BlockMetadata) bool {
+				blockMetadata.evicted.Trigger()
 
 				return true
 			})
@@ -75,70 +97,70 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 	}
 }
 
-// setupBlock sets up the behavior of the given Block.
-func (t *TipManager) setupBlock(block *Block) {
-	block.stronglyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-		t.updateParents(block, propagateConnectedChildren(isConnected, true))
+// setupBlockMetadata sets up the behavior of the given Block.
+func (t *TipManager) setupBlockMetadata(blockMetadata *BlockMetadata) {
+	blockMetadata.stronglyConnectedToTips.OnUpdate(func(_, isConnected bool) {
+		t.updateParents(blockMetadata, propagateConnectedChildren(isConnected, true))
 	})
 
-	block.weaklyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-		t.updateParents(block, propagateConnectedChildren(isConnected, false))
+	blockMetadata.weaklyConnectedToTips.OnUpdate(func(_, isConnected bool) {
+		t.updateParents(blockMetadata, propagateConnectedChildren(isConnected, false))
 	})
 
-	joinTipPool := func(tipSet *randommap.RandomMap[iotago.BlockID, *Block], blockReferencedByTips *promise.Value[bool]) (leaveTipPool func()) {
+	joinTipPool := func(tipSet *randommap.RandomMap[iotago.BlockID, *BlockMetadata], blockReferencedByTips *promise.Value[bool]) (leaveTipPool func()) {
 		unsubscribe := blockReferencedByTips.OnUpdate(func(_, isReferenced bool) {
 			if isReferenced {
-				tipSet.Delete(block.ID())
+				tipSet.Delete(blockMetadata.ID())
 			} else {
-				tipSet.Set(block.ID(), block)
+				tipSet.Set(blockMetadata.ID(), blockMetadata)
 			}
 		})
 
 		return func() {
 			unsubscribe()
 
-			tipSet.Delete(block.ID())
+			tipSet.Delete(blockMetadata.ID())
 		}
 	}
 
 	var leaveTipPool func()
 
-	block.tipPool.OnUpdate(func(prevTipPool, newTipPool TipPool) {
+	blockMetadata.tipPool.OnUpdate(func(prevTipPool, newTipPool TipPool) {
 		if leaveTipPool != nil {
 			leaveTipPool()
 		}
 
 		if newTipPool == StrongTipPool {
-			leaveTipPool = joinTipPool(t.strongTips, block.stronglyReferencedByTips)
+			leaveTipPool = joinTipPool(t.strongTipSet, blockMetadata.stronglyReferencedByTips)
 		} else if newTipPool == WeakTipPool {
-			leaveTipPool = joinTipPool(t.weakTips, block.referencedByTips)
+			leaveTipPool = joinTipPool(t.weakTipSet, blockMetadata.referencedByTips)
 		} else {
 			leaveTipPool = nil
 		}
 	})
 
-	block.setTipPool(t.determineInitialTipPool(block))
+	blockMetadata.setTipPool(t.determineTipPool(blockMetadata))
 
-	t.blockAdded.Trigger(block)
+	t.blockAdded.Trigger(blockMetadata)
 }
 
-// determineInitialTipPool determines the initial TipPool of the given Block.
-func (t *TipManager) determineInitialTipPool(block *Block, optMinType ...TipPool) TipPool {
-	blockIsVotingForNonRejectedBranches := func(block *Block) bool {
+// determineTipPool determines the initial TipPool of the given Block.
+func (t *TipManager) determineTipPool(blockMetadata *BlockMetadata, minPool ...TipPool) TipPool {
+	blockIsVotingForNonRejectedBranches := func(blockMetadata *BlockMetadata) bool {
 		// TODO: implement check of conflict dag
 		return true
 	}
 
-	payloadIsLiked := func(block *Block) bool {
+	payloadIsLiked := func(blockMetadata *BlockMetadata) bool {
 		// TODO: implement check of conflict dag
 		return true
 	}
 
-	if lo.First(optMinType) <= StrongTipPool && blockIsVotingForNonRejectedBranches(block) {
+	if lo.First(minPool) <= StrongTipPool && blockIsVotingForNonRejectedBranches(blockMetadata) {
 		return StrongTipPool
 	}
 
-	if lo.First(optMinType) <= WeakTipPool && payloadIsLiked(block) {
+	if lo.First(minPool) <= WeakTipPool && payloadIsLiked(blockMetadata) {
 		return WeakTipPool
 	}
 
@@ -146,31 +168,28 @@ func (t *TipManager) determineInitialTipPool(block *Block, optMinType ...TipPool
 }
 
 // updateParents updates the parents of the given Block.
-func (t *TipManager) updateParents(block *Block, parentTypeSpecificUpdates map[model.ParentsType]func(*Block)) {
-	block.ForEachParent(func(parent model.Parent) {
-		if blocks := t.blocksBySlotIndex(parent.ID.Index()); blocks != nil {
-			// TODO: MAKE GetOrCreate ignore nil return values
-			if parentBlock, created := blocks.GetOrCreate(parent.ID, func() *Block {
-				if parentBlock, parentBlockExists := t.retrieveBlock(parent.ID); parentBlockExists {
-					return NewBlock(parentBlock)
-				}
+func (t *TipManager) updateParents(blockMetadata *BlockMetadata, updates map[model.ParentsType]func(*BlockMetadata)) {
+	blockMetadata.ForEachParent(func(parent model.Parent) {
+		storage := t.metadataStorage(parent.ID.Index())
+		if storage == nil {
+			return
+		}
 
-				return nil
-			}); parentBlock != nil {
-				if parentTypeSpecificUpdate, exists := parentTypeSpecificUpdates[parent.Type]; exists {
-					parentTypeSpecificUpdate(parentBlock)
-				}
+		parentMetadata, created := storage.GetOrCreate(parent.ID, func() *BlockMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) })
+		if parentMetadata.Block == nil {
+			return
+		} else if created {
+			t.setupBlockMetadata(parentMetadata)
+		}
 
-				if created {
-					t.setupBlock(parentBlock)
-				}
-			}
+		if update, exists := updates[parent.Type]; exists {
+			update(parentMetadata)
 		}
 	})
 }
 
-// blocksBySlotIndex returns the Blocks of the given SlotIndex.
-func (t *TipManager) blocksBySlotIndex(slotIndex iotago.SlotIndex) (blocks *shrinkingmap.ShrinkingMap[iotago.BlockID, *Block]) {
+// metadataStorage returns the BlockMetadata storage for the given slotIndex.
+func (t *TipManager) metadataStorage(slotIndex iotago.SlotIndex) (storage *shrinkingmap.ShrinkingMap[iotago.BlockID, *BlockMetadata]) {
 	t.evictionMutex.RLock()
 	defer t.evictionMutex.RUnlock()
 
@@ -178,17 +197,17 @@ func (t *TipManager) blocksBySlotIndex(slotIndex iotago.SlotIndex) (blocks *shri
 		return nil
 	}
 
-	return lo.Return1(t.blocks.GetOrCreate(slotIndex, lo.NoVariadic(shrinkingmap.New[iotago.BlockID, *Block])))
+	return lo.Return1(t.blockMetadataStorage.GetOrCreate(slotIndex, lo.NoVariadic(shrinkingmap.New[iotago.BlockID, *BlockMetadata])))
 }
 
-// evict updates the last evicted slot of the TipManager.
-func (t *TipManager) evict(slotIndex iotago.SlotIndex) (evicted bool) {
+// markSlotAsEvicted marks the given slotIndex as evicted.
+func (t *TipManager) markSlotAsEvicted(slotIndex iotago.SlotIndex) (success bool) {
 	t.evictionMutex.Lock()
 	defer t.evictionMutex.Unlock()
 
-	if evicted = t.lastEvictedSlot < slotIndex; evicted {
+	if success = t.lastEvictedSlot < slotIndex; success {
 		t.lastEvictedSlot = slotIndex
 	}
 
-	return evicted
+	return success
 }

@@ -87,10 +87,10 @@ func (t *TestFramework) BlockID(alias string) iotago.BlockID {
 
 func (t *TestFramework) AssertStrongTips(aliases ...string) {
 	for _, alias := range aliases {
-		require.True(t.test, t.Instance.strongTips.Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
+		require.True(t.test, t.Instance.strongTipSet.Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
 	}
 
-	require.Equal(t.test, len(aliases), t.Instance.strongTips.Size(), "strongTips size does not match")
+	require.Equal(t.test, len(aliases), t.Instance.strongTipSet.Size(), "strongTips size does not match")
 }
 
 var protoParams = iotago.ProtocolParameters{
