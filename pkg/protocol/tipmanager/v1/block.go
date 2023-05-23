@@ -17,10 +17,10 @@ type Block struct {
 
 	// stronglyConnectedChildren holds the number of strong children that can be reached from the tips using only strong
 	// references.
-	stronglyConnectedChildren *promise.Int
+	stronglyConnectedChildren *promise.Value[int]
 
 	// weaklyConnectedChildren holds the number of weak children that can be reached from the tips.
-	weaklyConnectedChildren *promise.Int
+	weaklyConnectedChildren *promise.Value[int]
 
 	// stronglyReferencedByTips is a derived property that is true if the block has at least one strongly connected
 	// child.
@@ -47,8 +47,8 @@ func NewBlock(block *blocks.Block) *Block {
 	return (&Block{
 		Block:                     block,
 		tipPool:                   promise.NewValue[TipPool](),
-		stronglyConnectedChildren: promise.NewInt(),
-		weaklyConnectedChildren:   promise.NewInt(),
+		stronglyConnectedChildren: promise.NewValue[int](),
+		weaklyConnectedChildren:   promise.NewValue[int](),
 		stronglyReferencedByTips:  promise.NewValue[bool]().WithTriggerWithInitialEmptyValue(true),
 		referencedByTips:          promise.NewValue[bool]().WithTriggerWithInitialEmptyValue(true),
 		stronglyConnectedToTips:   promise.NewValue[bool](),
@@ -104,39 +104,22 @@ func (b *Block) setTipPool(newType TipPool) (updated bool) {
 	return updated
 }
 
-// increaseStronglyConnectedChildren increases the number of strongly connected children.
-func (b *Block) increaseStronglyConnectedChildren() {
-	b.stronglyConnectedChildren.Increase()
-}
-
-// decreaseStronglyConnectedChildren decreases the number of strongly connected children.
-func (b *Block) decreaseStronglyConnectedChildren() {
-	b.stronglyConnectedChildren.Decrease()
-}
-
-// increaseWeaklyConnectedChildren increases the number of weakly connected children.
-func (b *Block) increaseWeaklyConnectedChildren() {
-	b.weaklyConnectedChildren.Increase()
-}
-
-// decreaseWeaklyConnectedChildren decreases the number of weakly connected children.
-func (b *Block) decreaseWeaklyConnectedChildren() {
-	b.weaklyConnectedChildren.Decrease()
-}
-
 // propagateConnectedChildren returns the rules for the propagation of the internal connected children counters.
 func propagateConnectedChildren(isConnected bool, stronglyConnected bool) (propagationRules map[model.ParentsType]func(*Block)) {
-	if isConnected {
-		if propagationRules = map[model.ParentsType]func(*Block){
-			model.WeakParentType: (*Block).increaseWeaklyConnectedChildren,
-		}; stronglyConnected {
-			propagationRules[model.StrongParentType] = (*Block).increaseStronglyConnectedChildren
-		}
-	} else {
-		if propagationRules = map[model.ParentsType]func(*Block){
-			model.WeakParentType: (*Block).decreaseWeaklyConnectedChildren,
-		}; stronglyConnected {
-			propagationRules[model.StrongParentType] = (*Block).decreaseStronglyConnectedChildren
+	valueDiff := lo.Cond(isConnected, 1, -1)
+	updateValue := func(value int) int {
+		return value + valueDiff
+	}
+
+	propagationRules = map[model.ParentsType]func(*Block){
+		model.WeakParentType: func(parent *Block) {
+			parent.weaklyConnectedChildren.Compute(updateValue)
+		},
+	}
+
+	if stronglyConnected {
+		propagationRules[model.StrongParentType] = func(parent *Block) {
+			parent.stronglyConnectedChildren.Compute(updateValue)
 		}
 	}
 

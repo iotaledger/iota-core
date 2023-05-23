@@ -33,8 +33,8 @@ type Value[T comparable] struct {
 	// setOrderMutex is an additional mutex that is used to ensure that the order of updates is ensured.
 	setOrderMutex sync.Mutex
 
-	// optTriggerWithInitialEmptyValue is an option that can be set to true to trigger the callbacks even when the
-	// initial value is empty on subscription.
+	// optTriggerWithInitialEmptyValue is an option that can be set to make the OnUpdate callbacks trigger immediately
+	// on subscription even if the current value is empty.
 	optTriggerWithInitialEmptyValue bool
 }
 
@@ -71,12 +71,6 @@ func (v *Value[T]) Compute(computeFunc func(currentValue T) T) (previousValue T)
 	return previousValue
 }
 
-func (v *Value[T]) WithTriggerWithInitialEmptyValue(trigger bool) *Value[T] {
-	v.optTriggerWithInitialEmptyValue = trigger
-
-	return v
-}
-
 // OnUpdate registers a callback that is triggered when the value changes.
 func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe func()) {
 	v.mutex.Lock()
@@ -104,6 +98,14 @@ func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe f
 	return func() {
 		v.updateCallbacks.Delete(createdCallback.id)
 	}
+}
+
+// WithTriggerWithInitialEmptyValue is an option that can be set to make the OnUpdate callbacks trigger immediately on
+// subscription even if the current value is empty.
+func (v *Value[T]) WithTriggerWithInitialEmptyValue(trigger bool) *Value[T] {
+	v.optTriggerWithInitialEmptyValue = trigger
+
+	return v
 }
 
 // prepareDynamicTrigger atomically prepares the trigger by setting the new value and returning the previous value, the
