@@ -56,6 +56,92 @@ func (i *BlockIssuer) Shutdown() {
 	i.workerPool.ShutdownComplete.Wait()
 }
 
+// CreateBlock creates a new block with the options.
+func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
+	blockParams := options.Apply(&BlockParams{}, opts)
+
+	if blockParams.slotCommitment == nil {
+		blockParams.slotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+	}
+
+	if blockParams.latestFinalizedSlot == nil {
+		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
+		blockParams.latestFinalizedSlot = &latestFinalizedSlot
+	}
+
+	if blockParams.issuingTime == nil {
+		issuingTime := time.Now()
+		blockParams.issuingTime = &issuingTime
+	}
+
+	if blockParams.references == nil {
+		references, err := i.getReferences(ctx, blockParams.payload, blockParams.parentsCount)
+		if err != nil {
+			return nil, errors.Wrap(err, "error building block")
+		}
+		blockParams.references = references
+	}
+
+	if blockParams.issuer == nil {
+		blockParams.issuer = NewEd25519Account(i.Account.ID(), i.Account.PrivateKey())
+	}
+
+	if blockParams.proofOfWorkDifficulty == nil {
+		powDifficulty := float64(i.protocol.MainEngineInstance().Storage.Settings().ProtocolParameters().MinPoWScore)
+		blockParams.proofOfWorkDifficulty = &powDifficulty
+	}
+
+	if err := i.validateReferences(*blockParams.issuingTime, blockParams.slotCommitment.Index, blockParams.references); err != nil {
+		return nil, errors.Wrap(err, "block references invalid")
+	}
+
+	blockBuilder := builder.NewBlockBuilder()
+
+	if blockParams.protocolVersion != nil {
+		blockBuilder.ProtocolVersion(*blockParams.protocolVersion)
+	}
+
+	blockBuilder.Payload(blockParams.payload)
+
+	blockBuilder.SlotCommitment(blockParams.slotCommitment)
+
+	blockBuilder.LatestFinalizedSlot(*blockParams.latestFinalizedSlot)
+
+	blockBuilder.IssuingTime(*blockParams.issuingTime)
+
+	if strongParents, exists := blockParams.references[model.StrongParentType]; exists && len(strongParents) > 0 {
+		blockBuilder.StrongParents(strongParents)
+	} else {
+		return nil, errors.New("cannot create a block without strong parents")
+	}
+
+	if weakParents, exists := blockParams.references[model.WeakParentType]; exists {
+		blockBuilder.WeakParents(weakParents)
+	}
+
+	if shallowLikeParents, exists := blockParams.references[model.ShallowLikeParentType]; exists {
+		blockBuilder.ShallowLikeParents(shallowLikeParents)
+	}
+
+	blockBuilder.Sign(i.Account.ID(), i.Account.PrivateKey())
+
+	blockBuilder.ProofOfWork(ctx, *blockParams.proofOfWorkDifficulty)
+
+	block, err := blockBuilder.Build()
+	if err != nil {
+		return nil, errors.Wrap(err, "error building block")
+	}
+
+	modelBlock, err := model.BlockFromBlock(block, i.protocol.API())
+	if err != nil {
+		return nil, errors.Wrap(err, "error serializing block to model block")
+	}
+
+	i.events.BlockConstructed.Trigger(modelBlock)
+
+	return modelBlock, nil
+}
+
 // IssueBlock submits a block to be processed.
 func (i *BlockIssuer) IssueBlock(block *model.Block) error {
 	return i.issueBlock(block)
@@ -89,46 +175,6 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	}
 }
 
-// CreateBlock creates a new block with the given payload and an optionally defined amount of strong parents.
-func (i *BlockIssuer) CreateBlock(ctx context.Context, p iotago.Payload, parentsCount ...int) (*model.Block, error) {
-	return i.CreateBlockWithReferences(ctx, p, nil, parentsCount...)
-}
-
-// CreateBlockWithReferences creates a new block with the given payload and parent references.
-func (i *BlockIssuer) CreateBlockWithReferences(ctx context.Context, p iotago.Payload, references model.ParentReferences, strongParentsCountOpt ...int) (*model.Block, error) {
-	var err error
-	references, err = i.getReferences(ctx, p, references, strongParentsCountOpt...)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "tipselection failed, error: %s", err.Error())
-	}
-
-	slotCommitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
-	lastFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
-
-	block, err := builder.NewBlockBuilder().
-		StrongParents(references[model.StrongParentType]).
-		WeakParents(references[model.WeakParentType]).
-		ShallowLikeParents(references[model.ShallowLikeParentType]).
-		SlotCommitment(slotCommitment.Commitment()).
-		LatestFinalizedSlot(lastFinalizedSlot).
-		Payload(p).
-		Sign(i.Account.ID(), i.Account.PrivateKey()).
-		ProofOfWork(ctx, float64(i.protocol.MainEngineInstance().Storage.Settings().ProtocolParameters().MinPoWScore)).
-		Build()
-	if err != nil {
-		return nil, errors.Wrap(err, "error building block")
-	}
-
-	modelBlock, err := model.BlockFromBlock(block, i.protocol.API())
-	if err != nil {
-		return nil, errors.Wrap(err, "error serializing block to model block")
-	}
-
-	i.events.BlockConstructed.Trigger(modelBlock)
-
-	return modelBlock, nil
-}
-
 func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
 	// if anything changes, need to make a new signature
 	var resign bool
@@ -149,27 +195,6 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) 
 		resign = true
 	}
 
-	if len(iotaBlock.StrongParents) == 0 {
-		if iotaBlock.Nonce != 0 {
-			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "no parents were given but nonce was != 0")
-		}
-
-		if !i.optsPoWEnabled && targetScore != 0 {
-			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "no parents given and node PoW is disabled")
-		}
-
-		// only allow to update tips during proof of work if no parents were given
-		references, err := i.getReferences(ctx, iotaBlock.Payload, nil)
-		if err != nil {
-			return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %s", err.Error())
-		}
-
-		iotaBlock.StrongParents = references[model.StrongParentType]
-		iotaBlock.WeakParents = references[model.WeakParentType]
-		iotaBlock.ShallowLikeParents = references[model.ShallowLikeParentType]
-		resign = true
-	}
-
 	if iotaBlock.SlotCommitment == nil {
 		iotaBlock.SlotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 		iotaBlock.LatestFinalizedSlot = i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
@@ -181,6 +206,38 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) 
 		if payload.Essence.NetworkID != protoParams.NetworkID() {
 			return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Essence.NetworkID)
 		}
+	}
+
+	var references model.ParentReferences
+	if len(iotaBlock.StrongParents) == 0 {
+		if iotaBlock.Nonce != 0 {
+			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "no parents were given but nonce was != 0")
+		}
+
+		if !i.optsPoWEnabled && targetScore != 0 {
+			return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "no parents given and node PoW is disabled")
+		}
+
+		// only allow to update tips during proof of work if no parents were given
+		var err error
+		references, err = i.getReferences(ctx, iotaBlock.Payload)
+		if err != nil {
+			return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %s", err.Error())
+		}
+
+		iotaBlock.StrongParents = references[model.StrongParentType]
+		iotaBlock.WeakParents = references[model.WeakParentType]
+		iotaBlock.ShallowLikeParents = references[model.ShallowLikeParentType]
+		resign = true
+	} else {
+		references = make(model.ParentReferences)
+		references[model.StrongParentType] = iotaBlock.StrongParents
+		references[model.WeakParentType] = iotaBlock.WeakParents
+		references[model.ShallowLikeParentType] = iotaBlock.ShallowLikeParents
+	}
+
+	if err := i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitment.Index, references); err != nil {
+		return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %s", err.Error())
 	}
 
 	if iotaBlock.IssuerID.Empty() || resign {
@@ -229,35 +286,30 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) 
 	return modelBlock.ID(), nil
 }
 
-func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, references model.ParentReferences, strongParentsCountOpt ...int) (model.ParentReferences, error) {
+func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, strongParentsCountOpt ...int) (model.ParentReferences, error) {
 	strongParentsCount := iotago.BlockMaxParents
 	if len(strongParentsCountOpt) > 0 {
 		strongParentsCount = strongParentsCountOpt[0]
 	}
 
-	var err error
-	if references == nil {
-		references, err = i.getReferencesWithRetry(ctx, p, strongParentsCount)
-		if err != nil {
-			return nil, errors.Wrap(err, "error while trying to get references")
-		}
-	}
+	return i.getReferencesWithRetry(ctx, p, strongParentsCount)
+}
 
-	parentsMaxTime := time.Time{}
-	parents := lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds }))
-	for _, parent := range parents {
+func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIndex iotago.SlotIndex, references model.ParentReferences) error {
+	for _, parent := range lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds })) {
 		if b, exists := i.protocol.MainEngineInstance().BlockFromCache(parent); exists {
-			if b.IssuingTime().After(parentsMaxTime) {
-				parentsMaxTime = b.IssuingTime()
+			if b.IssuingTime().After(issuingTime) {
+				return errors.Errorf("cannot issue block if the parents issuingTime is ahead block's issuingTime: %s vs %s", b.IssuingTime(), issuingTime)
 			}
+			if b.SlotCommitmentID().Index() > slotCommitmentIndex {
+				return errors.Errorf("cannot issue block if the commitment is ahead of its parents' commitment: %s vs %s", b.SlotCommitmentID().Index(), slotCommitmentIndex)
+
+			}
+
 		}
 	}
 
-	if parentsMaxTime.After(time.Now()) {
-		return nil, errors.Errorf("cannot issue block if the parents issuingTime is ahead of our local clock: %s vs %s", parentsMaxTime, time.Now())
-	}
-
-	return references, nil
+	return nil
 }
 
 func (i *BlockIssuer) issueBlock(block *model.Block) error {
