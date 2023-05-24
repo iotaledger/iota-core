@@ -14,7 +14,7 @@ func getOutput(c echo.Context) (*ledgerstate.Output, error) {
 		return nil, err
 	}
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID.UTXOInput())
 	if err != nil {
 		return nil, err
 	}

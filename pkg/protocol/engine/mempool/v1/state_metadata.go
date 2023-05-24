@@ -5,14 +5,13 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type StateMetadata struct {
 	id    iotago.OutputID
-	state ledger.State
+	state mempool.State
 
 	// lifecycle
 	spenderCount       uint64
@@ -27,9 +26,9 @@ type StateMetadata struct {
 	*inclusionFlags
 }
 
-func NewStateMetadata(state ledger.State, optSource ...*TransactionMetadata) *StateMetadata {
+func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *StateMetadata {
 	return (&StateMetadata{
-		id:    state.ID(),
+		id:    state.OutputID(),
 		state: state,
 
 		spent:              promise.NewEvent(),
@@ -65,7 +64,7 @@ func (s *StateMetadata) ID() iotago.OutputID {
 	return s.id
 }
 
-func (s *StateMetadata) State() ledger.State {
+func (s *StateMetadata) State() mempool.State {
 	return s.state
 }
 

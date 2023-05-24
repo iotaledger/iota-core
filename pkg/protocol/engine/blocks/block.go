@@ -27,6 +27,10 @@ type Block struct {
 	// Booker block
 	booked    bool
 	witnesses *advancedset.AdvancedSet[iotago.AccountID]
+	// conflictIDs are the all conflictIDs of the block inherited from the parents + payloadConflictIDs.
+	conflictIDs *advancedset.AdvancedSet[iotago.TransactionID]
+	// payloadConflictIDs are the conflictIDs of the block's payload (in case it is a transaction, otherwise empty).
+	payloadConflictIDs *advancedset.AdvancedSet[iotago.TransactionID]
 
 	// BlockGadget block
 	accepted         bool
@@ -58,9 +62,11 @@ func (r *rootBlock) String() string {
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
 	return &Block{
-		witnesses:  advancedset.New[iotago.AccountID](),
-		ratifiers:  advancedset.New[iotago.AccountID](),
-		modelBlock: data,
+		witnesses:          advancedset.New[iotago.AccountID](),
+		conflictIDs:        advancedset.New[iotago.TransactionID](),
+		payloadConflictIDs: advancedset.New[iotago.TransactionID](),
+		ratifiers:          advancedset.New[iotago.AccountID](),
+		modelBlock:         data,
 	}
 }
 
@@ -110,6 +116,11 @@ func (b *Block) ForEachParent(consumer func(parent model.Parent)) {
 
 func (b *Block) IsRootBlock() bool {
 	return b.rootBlock != nil
+}
+
+func (b *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
+	tx, isTransaction = b.Block().Payload.(*iotago.Transaction)
+	return tx, isTransaction
 }
 
 func (b *Block) ID() iotago.BlockID {
@@ -331,6 +342,22 @@ func (b *Block) Witnesses() []iotago.AccountID {
 	defer b.mutex.RUnlock()
 
 	return b.witnesses.Slice()
+}
+
+func (b *Block) ConflictIDs() *advancedset.AdvancedSet[iotago.TransactionID] {
+	return b.conflictIDs
+}
+
+func (b *Block) SetConflictIDs(conflictIDs *advancedset.AdvancedSet[iotago.TransactionID]) {
+	b.conflictIDs = conflictIDs
+}
+
+func (b *Block) PayloadConflictIDs() *advancedset.AdvancedSet[iotago.TransactionID] {
+	return b.payloadConflictIDs
+}
+
+func (b *Block) SetPayloadConflictIDs(payloadConflictIDs *advancedset.AdvancedSet[iotago.TransactionID]) {
+	b.payloadConflictIDs = payloadConflictIDs
 }
 
 // IsAccepted returns true if the Block was accepted.

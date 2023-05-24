@@ -114,8 +114,6 @@ github.com/eknkc/amber v0.0.0-20171010120322-cdade1c07385/go.mod h1:0vRUJqYpeSZi
 github.com/elastic/gosigar v0.12.0/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
 github.com/elastic/gosigar v0.14.2 h1:Dg80n8cr90OZ7x+bAax/QjoW/XqTI11RmA79ZwIm9/4=
 github.com/elastic/gosigar v0.14.2/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
-github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=
-github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
@@ -345,11 +343,10 @@ github.com/iotaledger/hive.go/stringify v0.0.0-20230509142214-c542bb85ed3c h1:KA
 github.com/iotaledger/hive.go/stringify v0.0.0-20230509142214-c542bb85ed3c/go.mod h1:l/F3cA/+67QdNj+sohv2v4HhmsdOcWScoA+sVYoAE4c=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230505140033-037b26225f31 h1:TO5xuOLPwl5S7jngbF3K6UzzchnWLvM1+jVGA+KLICU=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230505140033-037b26225f31/go.mod h1:aXVaVk+VGpGWz9aT/V/+9bA2jkhWxt6LhjUH8FGVXC4=
-github.com/iotaledger/inx/go v1.0.0-rc.2 h1:SjHGHQ1pEe7/B0bnVIHCa1zQBvcC0QRwcYPzUGarrJU=
 github.com/iotaledger/iota.go v1.0.0 h1:tqm1FxJ/zOdzbrAaQ5BQpVF8dUy2eeGlSeWlNG8GoXY=
 github.com/iotaledger/iota.go v1.0.0/go.mod h1:RiKYwDyY7aCD1L0YRzHSjOsJ5mUR9yvQpvhZncNcGQI=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230510103734-f95a132d437d h1:a65aNItDzZ43nAALXZl2CHCVj0kJkynmCfUhyMOvreE=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230510103734-f95a132d437d/go.mod h1:wubeI88qUUevg49VrOMjAbsw/IM3WMI2b98EQpzPTKM=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230517140417-5a7e3d76d50a h1:SmyHEh6rDVcY2R5xBHWCuzPgmc9sJgZmWUI6m3dd790=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230517140417-5a7e3d76d50a/go.mod h1:wubeI88qUUevg49VrOMjAbsw/IM3WMI2b98EQpzPTKM=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
 github.com/ipfs/go-cid v0.4.1/go.mod h1:uQHwDeX4c6CtyrFwdqyhpNcxVewur1M7l7fNU7LKwZk=
 github.com/ipfs/go-detect-race v0.0.1 h1:qX/xay2W3E4Q1U7d9lNs1sU9nvguX0a7319XbyQ6cOk=
@@ -740,6 +737,8 @@ github.com/valyala/fasttemplate v1.2.2/go.mod h1:KHLXt3tVN2HBp8eijSv/kGJopbvo7S+
 github.com/valyala/tcplisten v0.0.0-20161114210144-ceec8f93295a/go.mod h1:v3UYOV9WzVtRmSR+PDvWpU/qWl4Wa5LApYYX4ZtKbio=
 github.com/viant/assertly v0.4.8/go.mod h1:aGifi++jvCrUaklKEKT0BU95igDNaqkvz+49uaYMPRU=
 github.com/viant/toolbox v0.24.0/go.mod h1:OxMCG57V0PXuIP2HNQrtJf2CjqdmbrOx5EkMILuUhzM=
+github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98 h1:i7k63xHOX2ntuHrhHewfKro67c834jug2DIk599fqAA=
+github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98/go.mod h1:Knu2XMRWe8SkwTlHc/+ghP+O9DEaZRQQEyTjvLJ5Cck=
 github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c/go.mod h1:lB8K/P019DLNhemzwFU4jHLhdvlE6uDZjXFejJXr49I=
 github.com/xdg/stringprep v1.0.0/go.mod h1:Jhud4/sHMO4oL310DaZAKk9ZaJ08SJfe+sJh0HrGL1Y=
 github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=

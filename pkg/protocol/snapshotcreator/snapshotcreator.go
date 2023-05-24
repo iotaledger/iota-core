@@ -17,10 +17,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -66,7 +67,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		totalweightslotgadget.NewProvider(),
 		slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
-		utxoledger.NewProvider(),
+		opt.LedgerProvider(),
 	)
 	defer engineInstance.Shutdown()
 
@@ -74,5 +75,38 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
 	}
 
+	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply, opt.GenesisSeed, engineInstance); err != nil {
+		return errors.Wrap(err, "failed to create genesis outputs")
+	}
+
 	return engineInstance.WriteSnapshot(opt.FilePath)
+}
+
+func createGenesisOutput(genesisTokenAmount uint64, genesisSeed []byte, engineInstance *engine.Engine) error {
+	if genesisTokenAmount > 0 {
+		genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
+		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
+
+		if err := engineInstance.Ledger.AddUnspentOutput(ledgerstate.CreateOutput(engineInstance.API(), iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0), iotago.EmptyBlockID(), 0, engineInstance.API().SlotTimeProvider().GenesisTime(), output)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func createOutput(address iotago.Address, tokenAmount uint64) (output iotago.Output) {
+	//switch ledgerVM.(type) {
+	//case *mockedvm.MockedVM:
+	//case *devnetvm.VM:
+	//default:
+	//	return nil, nil, errors.Errorf("cannot create snapshot output for VM of type '%v'", ledgerVM)
+	//}
+
+	return &iotago.BasicOutput{
+		Amount: tokenAmount,
+		Conditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: address},
+		},
+	}
 }

@@ -29,12 +29,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
@@ -76,7 +76,7 @@ type Protocol struct {
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
-	optsLedgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
+	optsLedgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {

@@ -27,9 +27,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -50,7 +50,7 @@ type Engine struct {
 	SlotGadget      slotgadget.Gadget
 	Notarization    notarization.Notarization
 	Attestation     attestation.Attestations
-	Ledger          therealledger.Ledger
+	Ledger          ledger.Ledger
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -84,7 +84,7 @@ func New(
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
-	ledgerProvider module.Provider[*Engine, therealledger.Ledger],
+	ledgerProvider module.Provider[*Engine, ledger.Ledger],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -136,7 +136,7 @@ func (e *Engine) Shutdown() {
 		e.BlockRequester.Shutdown()
 		e.Notarization.Shutdown()
 		e.Booker.Shutdown()
-		e.BlockDAG.Shutdown()
+		e.Ledger.Shutdown()
 		e.BlockDAG.Shutdown()
 		e.BlockGadget.Shutdown()
 		e.SlotGadget.Shutdown()

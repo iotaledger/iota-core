@@ -22,7 +22,7 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230509142214-c542bb85ed3c
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230509142214-c542bb85ed3c
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230505140033-037b26225f31
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230510103734-f95a132d437d
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230517140417-5a7e3d76d50a
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.27.3
@@ -31,6 +31,7 @@ require (
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.2
+	github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98
 	github.com/zyedidia/generic v1.2.1
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.0
@@ -58,7 +59,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.2 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
 	github.com/flynn/noise v1.0.0 // indirect

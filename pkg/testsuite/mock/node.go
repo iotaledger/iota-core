@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -30,6 +31,8 @@ type Node struct {
 
 	Name   string
 	Weight int64
+
+	blockIssuer *blockissuer.BlockIssuer
 
 	privateKey ed25519.PrivateKey
 	pubKey     ed25519.PublicKey
@@ -74,6 +77,7 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 		n.Endpoint,
 		opts...,
 	)
+	n.blockIssuer = blockissuer.New(n.Protocol, blockissuer.NewEd25519Account(n.AccountID, n.privateKey), blockissuer.WithTipSelectionTimeout(3*time.Second), blockissuer.WithTipSelectionRetryInterval(time.Millisecond*100))
 
 	go n.Protocol.Run()
 }
@@ -206,39 +210,17 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.AccountID.RegisterAlias(n.Name)
 }
 
-// TODO: the block Issuance should be improved once the protocol has a better way to issue blocks.
+func (n *Node) IssueBlock(alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+	modelBlock, err := n.blockIssuer.CreateBlock(context.Background(), opts...)
+	require.NoError(n.Testing, err)
 
-func (n *Node) IssueBlock() iotago.BlockID {
-	references := n.Protocol.TipManager.Tips(iotago.BlockMaxParents)
-	block, err := builder.NewBlockBuilder().
-		StrongParents(references[model.StrongParentType]).
-		WeakParents(references[model.WeakParentType]).
-		ShallowLikeParents(references[model.ShallowLikeParentType]).
-		SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()).
-		LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
-		Payload(&iotago.TaggedData{
-			Tag: []byte("ACTIVITY"),
-		}).
-		Sign(n.AccountID, n.privateKey).
-		Build()
+	modelBlock.ID().RegisterAlias(alias)
 
-	if err != nil {
-		panic(err)
-	}
-
-	modelBlock, err := model.BlockFromBlock(block, n.Protocol.API())
-	if err != nil {
-		panic(err)
-	}
-
-	err = n.Protocol.ProcessBlock(modelBlock, n.PeerID)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(n.Testing, n.blockIssuer.IssueBlock(modelBlock))
 
 	fmt.Printf("Issued block: %s - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
 
-	return modelBlock.ID()
+	return blocks.NewBlock(modelBlock)
 }
 
 func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, parents ...iotago.BlockID) *blocks.Block {
@@ -246,72 +228,10 @@ func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitm
 	issuingTime := slotTimeProvider.StartTime(slot)
 	require.Truef(n.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", n.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
 
-	n.checkParentsCommitmentMonotonicity(slotCommitment, parents)
-	n.checkParentsTimeMonotonicity(issuingTime, parents)
+	parentReferences := make(model.ParentReferences)
+	parentReferences[model.StrongParentType] = parents
 
-	block, err := builder.NewBlockBuilder().
-		StrongParents(parents).
-		IssuingTime(issuingTime).
-		SlotCommitment(slotCommitment).
-		LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
-		Payload(&iotago.TaggedData{
-			Tag: []byte("ACTIVITY"),
-		}).
-		Sign(n.AccountID, n.privateKey).
-		Build()
-
-	if err != nil {
-		panic(err)
-	}
-
-	modelBlock, err := model.BlockFromBlock(block, n.Protocol.API())
-	if err != nil {
-		panic(err)
-	}
-
-	modelBlock.ID().RegisterAlias(alias)
-
-	err = n.Protocol.ProcessBlock(modelBlock, n.PeerID)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Issued block: %s - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
-
-	return blocks.NewBlock(modelBlock)
-}
-
-// TODO: this should be part of the blockIssuer and the blockissuer being reused here:
-//  make it possible to issue blocks with a specific issuing time and slot commitment. maybe using options?
-
-func (n *Node) checkParentsTimeMonotonicity(issuingTime time.Time, parents iotago.BlockIDs) {
-	parentsMaxTime := time.Time{}
-	for _, parentBlockID := range parents {
-		if b, exists := n.Protocol.MainEngineInstance().BlockFromCache(parentBlockID); exists {
-			if b.IssuingTime().After(parentsMaxTime) {
-				parentsMaxTime = b.IssuingTime()
-			}
-		}
-	}
-
-	if parentsMaxTime.After(issuingTime) {
-		panic(fmt.Sprintf("cannot issue block if parent's time is not monotonic: %s vs %s", issuingTime, parentsMaxTime))
-	}
-}
-
-func (n *Node) checkParentsCommitmentMonotonicity(commitment *iotago.Commitment, parents iotago.BlockIDs) {
-	parentsMaxCommitmentIndex := iotago.SlotIndex(0)
-	for _, parentBlockID := range parents {
-		if b, exists := n.Protocol.MainEngineInstance().BlockFromCache(parentBlockID); exists {
-			if b.SlotCommitmentID().Index() > parentsMaxCommitmentIndex {
-				parentsMaxCommitmentIndex = b.SlotCommitmentID().Index()
-			}
-		}
-	}
-
-	if parentsMaxCommitmentIndex > commitment.Index {
-		panic(fmt.Sprintf("cannot issue block if parent's commitment is not monotonic: %d vs %d", commitment.Index, parentsMaxCommitmentIndex))
-	}
+	return n.IssueBlock(alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithReferences(parentReferences))
 }
 
 func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sync.WaitGroup) {

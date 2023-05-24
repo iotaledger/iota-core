@@ -16,7 +16,7 @@ type RootBlocks struct {
 func NewRootBlocks(slot iotago.SlotIndex, store kvstore.KVStore) *RootBlocks {
 	return &RootBlocks{
 		slot:  slot,
-		store: kvstore.NewTypedStore[iotago.BlockID, iotago.CommitmentID, *iotago.BlockID, *iotago.CommitmentID](store),
+		store: kvstore.NewTypedStore[iotago.BlockID, iotago.CommitmentID](store),
 	}
 }
 
