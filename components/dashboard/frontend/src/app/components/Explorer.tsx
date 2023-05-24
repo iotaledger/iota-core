@@ -46,8 +46,6 @@ export class Explorer extends React.Component<Props, any> {
                 </Row>
                 <ExplorerLiveFeed/>
                 <small>
-                    This explorer implementation is heavily inspired by <a
-                    href={"https://thetangle.org"}>thetangle.org</a>.
                 </small>
             </Container>
         );
