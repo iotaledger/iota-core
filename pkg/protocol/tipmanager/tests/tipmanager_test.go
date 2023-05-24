@@ -1,4 +1,4 @@
-package tipmanagerv1
+package tests
 
 import (
 	"testing"
