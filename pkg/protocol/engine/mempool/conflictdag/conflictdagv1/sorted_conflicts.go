@@ -90,7 +90,7 @@ func (s *SortedConflicts[ConflictID, ResourceID, VotePower]) Add(conflict *Confl
 	}
 
 	newMember, isNew := s.members.GetOrCreate(conflict.ID, func() *sortedConflict[ConflictID, ResourceID, VotePower] {
-		return newSortedConflict[ConflictID, ResourceID, VotePower](s, conflict)
+		return newSortedConflict(s, conflict)
 	})
 	if !isNew {
 		return false

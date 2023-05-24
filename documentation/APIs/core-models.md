@@ -209,8 +209,10 @@ Block ID denotes an identifier of a block, with type `ArrayBytes[40]`. It is cal
 
 Calculation:
 1. `content_hash` = hash(`content`)
-2. `id` = hash(Concat(`content_hash`, signatureBytes))
+2. `id` = hash(Concat(`content_hash`, signatureBytes, `nonce`))
 3. And finally, `BlockID` = Concat(`id`, `slot_index`) 
+
+The way of constructing Block ID allows ones to derive it without knowing the entire Block but from `content_hash`, signature, and `nonce` only. This is essential for attetstation verification (to check if other sees a valid Block with correct Block ID) in the protocol.
 
 The string format of Block ID is hexadecimal encoding of Block ID with `0x` prefix.
 

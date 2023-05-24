@@ -62,27 +62,39 @@ func New[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.VotePo
 
 var _ conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower] = &ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]{}
 
+// Shutdown shuts down the ConflictDAG.
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) Shutdown() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.conflictsByID.ForEach(func(conflictID ConflictID, conflict *Conflict[ConflictID, ResourceID, VotePower]) bool {
+		conflict.Shutdown()
+
+		return true
+	})
+}
+
 // Events returns the events of the ConflictDAG.
 func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) Events() *conflictdag.Events[ConflictID, ResourceID] {
 	return c.events
 }
 
-// CreateConflict creates a new Conflict that is conflicting over the given ResourceIDs and that has the given parents.
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error {
-	err := func() error {
+// CreateOrUpdateConflict creates a new Conflict that is conflicting over the given ResourceIDs. If the conflict already exists, it adds it any new passed ConflictSets.
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error {
+	joinedConflictSets, err := func() (*advancedset.AdvancedSet[ResourceID], error) {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
 		conflictSets, err := c.conflictSets(resourceIDs, true /*!initialAcceptanceState.IsRejected()*/)
 		if err != nil {
-			return xerrors.Errorf("failed to create ConflictSet: %w", err)
+			return advancedset.New[ResourceID](), xerrors.Errorf("failed to create ConflictSet: %w", err)
 		}
 
-		if _, isNew := c.conflictsByID.GetOrCreate(id, func() *Conflict[ConflictID, ResourceID, VotePower] {
+		if conflict, isNew := c.conflictsByID.GetOrCreate(id, func() *Conflict[ConflictID, ResourceID, VotePower] {
 			initialWeight := weight.New(c.committeeSet)
 			initialWeight.SetAcceptanceState(initialAcceptanceState)
 
-			newConflict := NewConflict[ConflictID, ResourceID, VotePower](id, conflictSets, initialWeight, c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
+			newConflict := NewConflict(id, conflictSets, initialWeight, c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
 
 			// attach to the acceptance state updated event and propagate that event to the outside.
 			// also need to remember the unhook method to properly evict the conflict.
@@ -98,14 +110,21 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateConflict(id Confl
 
 			return newConflict
 		}); !isNew {
-			return xerrors.Errorf("tried to create conflict with %s twice: %w", id, conflictdag.ErrConflictExists)
+			joinedConflictSets, err := conflict.JoinConflictSets(conflictSets)
+			if err != nil {
+				return advancedset.New[ResourceID](), xerrors.Errorf("failed to join conflict sets: %w", err)
+			}
+
+			return joinedConflictSets, nil
 		}
 
-		return nil
+		return advancedset.New[ResourceID](), nil
 	}()
 
-	if err == nil {
+	if err == nil && joinedConflictSets.IsEmpty() {
 		c.events.ConflictCreated.Trigger(id)
+	} else if err == nil && !joinedConflictSets.IsEmpty() {
+		c.events.ConflictingResourcesAdded.Trigger(id, joinedConflictSets)
 	}
 
 	return err
@@ -119,40 +138,6 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) ReadConsistent(callback
 	c.pendingTasks.WaitIsZero()
 
 	return callback(c)
-}
-
-// JoinConflictSets adds the Conflict to the given ConflictSets and returns true if the conflict membership was modified during this operation.
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) JoinConflictSets(conflictID ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID]) error {
-	joinedConflictSets, err := func() (*advancedset.AdvancedSet[ResourceID], error) {
-		c.mutex.RLock()
-		defer c.mutex.RUnlock()
-
-		currentConflict, exists := c.conflictsByID.Get(conflictID)
-		if !exists {
-			return nil, xerrors.Errorf("tried to modify evicted conflict with %s: %w", conflictID, conflictdag.ErrEntityEvicted)
-		}
-
-		conflictSets, err := c.conflictSets(resourceIDs, true /*!currentConflict.IsRejected()*/)
-		if err != nil {
-			return nil, xerrors.Errorf("failed to join conflict sets: %w", err)
-		}
-
-		joinedConflictSets, err := currentConflict.JoinConflictSets(conflictSets)
-		if err != nil {
-			return nil, xerrors.Errorf("failed to join conflict sets: %w", err)
-		}
-
-		return joinedConflictSets, nil
-	}()
-	if err != nil {
-		return err
-	}
-
-	if !joinedConflictSets.IsEmpty() {
-		c.events.ConflictingResourcesAdded.Trigger(conflictID, joinedConflictSets)
-	}
-
-	return nil
 }
 
 // UpdateConflictParents updates the parents of the given Conflict and returns an error if the operation failed.

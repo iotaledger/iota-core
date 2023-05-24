@@ -17,7 +17,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -31,7 +30,7 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] struct {
 	executeStateTransition mempool.VM
 
 	// requestInput is the function that is used to request state from the ledger.
-	requestInput ledger.StateReferenceResolver
+	requestInput mempool.StateReferenceResolver
 
 	// attachments is the storage that is used to keep track of the attachments of transactions.
 	attachments *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata]
@@ -61,7 +60,7 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] struct {
 }
 
 // New is the constructor of the MemPool.
-func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputResolver ledger.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower], opts ...options.Option[MemPool[VotePower]]) *MemPool[VotePower] {
+func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VotePower], opts ...options.Option[MemPool[VotePower]]) *MemPool[VotePower] {
 	return options.Apply(&MemPool[VotePower]{
 		transactionAttached:    event.New1[mempool.TransactionMetadata](),
 		executeStateTransition: vm,
@@ -115,8 +114,8 @@ func (m *MemPool[VotePower]) TransactionMetadata(id iotago.TransactionID) (trans
 }
 
 // StateMetadata returns the metadata of the state with the given ID.
-func (m *MemPool[VotePower]) StateMetadata(stateReference ledger.StateReference) (state mempool.StateMetadata, err error) {
-	stateRequest, exists := m.cachedStateRequests.Get(stateReference.StateID())
+func (m *MemPool[VotePower]) StateMetadata(stateReference iotago.IndexedUTXOReferencer) (state mempool.StateMetadata, err error) {
+	stateRequest, exists := m.cachedStateRequests.Get(stateReference.Ref())
 	if !exists || !stateRequest.WasCompleted() {
 		stateRequest = m.requestStateWithMetadata(stateReference)
 	}
@@ -190,7 +189,7 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 	for i, inputReference := range transaction.inputReferences {
 		stateReference, index := inputReference, i
 
-		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[*StateMetadata] {
+		request, created := m.cachedStateRequests.GetOrCreate(stateReference.Ref(), func() *promise.Promise[*StateMetadata] {
 			return m.requestStateWithMetadata(stateReference, true)
 		})
 
@@ -221,16 +220,16 @@ func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata
 }
 
 func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
-	lo.ForEach(transaction.inputs, func(input *StateMetadata) {
-		if m.optForkAllTransactions {
-			m.forkTransaction(transaction, input)
-		} else {
+	if m.optForkAllTransactions {
+		m.forkTransaction(transaction, advancedset.New(lo.Map(transaction.inputs, (*StateMetadata).ID)...))
+	} else {
+		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 			input.OnDoubleSpent(func() {
-				m.forkTransaction(transaction, input)
+				m.forkTransaction(transaction, advancedset.New(input.ID()))
 			})
-		}
-	})
 
+		})
+	}
 	if transaction.setBooked() {
 		m.publishOutputs(transaction)
 	}
@@ -259,11 +258,11 @@ func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionMetadata)
 	m.cachedTransactions.Delete(transaction.ID())
 }
 
-func (m *MemPool[VotePower]) requestStateWithMetadata(stateReference ledger.StateReference, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
-	return promise.New[*StateMetadata](func(p *promise.Promise[*StateMetadata]) {
-		request := m.requestInput(stateReference)
+func (m *MemPool[VotePower]) requestStateWithMetadata(stateRef iotago.IndexedUTXOReferencer, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
+	return promise.New(func(p *promise.Promise[*StateMetadata]) {
+		request := m.requestInput(stateRef)
 
-		request.OnSuccess(func(state ledger.State) {
+		request.OnSuccess(func(state mempool.State) {
 			stateWithMetadata := NewStateMetadata(state)
 			stateWithMetadata.setAccepted()
 			stateWithMetadata.setCommitted()
@@ -272,32 +271,25 @@ func (m *MemPool[VotePower]) requestStateWithMetadata(stateReference ledger.Stat
 		})
 
 		request.OnError(func(err error) {
-			if !lo.First(waitIfMissing) || !errors.Is(err, ledger.ErrStateNotFound) {
+			if !lo.First(waitIfMissing) || !errors.Is(err, mempool.ErrStateNotFound) {
 				p.Reject(err)
 			}
 		})
 	})
 }
 
-func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, input *StateMetadata) {
-	switch err := m.conflictDAG.CreateConflict(transaction.ID(), advancedset.New(input.ID()), acceptance.Pending); {
-	case errors.Is(err, conflictdag.ErrConflictExists):
-		err = m.conflictDAG.JoinConflictSets(transaction.ID(), advancedset.New(input.ID()))
+func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, inputs *advancedset.AdvancedSet[iotago.OutputID]) {
+	if err := m.conflictDAG.CreateOrUpdateConflict(transaction.ID(), inputs, acceptance.Pending); err != nil {
+		panic(err)
+	}
+	transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
+		err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements)
 		if err != nil {
 			panic(err)
 		}
-	case err != nil:
-		panic(err)
-	default:
-		transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
-			err = m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements)
-			if err != nil {
-				panic(err)
-			}
-		})
+	})
 
-		transaction.setConflicting()
-	}
+	transaction.setConflicting()
 }
 
 func (m *MemPool[VotePower]) updateAttachment(blockID iotago.BlockID, updateFunc func(transaction *TransactionMetadata, blockID iotago.BlockID) bool) bool {

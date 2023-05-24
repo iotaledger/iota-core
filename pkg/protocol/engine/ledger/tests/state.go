@@ -2,18 +2,26 @@ package ledgertests
 
 import iotago "github.com/iotaledger/iota.go/v4"
 
-type State struct {
-	id iotago.OutputID
+type MockedState struct {
+	id     iotago.OutputID
+	output *MockedOutput
 }
 
-func NewState(transactionID iotago.TransactionID, index uint16) *State {
-	return &State{id: iotago.OutputIDFromTransactionIDAndIndex(transactionID, index)}
+func NewMockedState(transactionID iotago.TransactionID, index uint16) *MockedState {
+	return &MockedState{
+		id:     iotago.OutputIDFromTransactionIDAndIndex(transactionID, index),
+		output: &MockedOutput{},
+	}
 }
 
-func (m *State) ID() iotago.OutputID {
+func (m *MockedState) OutputID() iotago.OutputID {
 	return m.id
 }
 
-func (m *State) String() string {
+func (m *MockedState) Output() iotago.Output {
+	return m.output
+}
+
+func (m *MockedState) String() string {
 	return "MockedOutput(" + m.id.ToHex() + ")"
 }

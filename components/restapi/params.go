@@ -16,11 +16,20 @@ type ParametersRestAPI struct {
 	ProtectedRoutes []string `usage:"the HTTP REST routes which need to be called with authorization. Wildcards using * are allowed"`
 	// whether the debug logging for requests should be enabled
 	DebugRequestLoggerEnabled bool `default:"false" usage:"whether the debug logging for requests should be enabled"`
+	// AllowIncompleteBlock defines whether the node allows to fill in incomplete block and issue it for user.
+	AllowIncompleteBlock bool `default:"false" usage:"whether the node allows to fill in incomplete block and issue it for user"`
 
 	JWTAuth struct {
 		// salt used inside the JWT tokens for the REST API. Change this to a different value to invalidate JWT tokens not matching this new value
 		Salt string `default:"IOTA" usage:"salt used inside the JWT tokens for the REST API. Change this to a different value to invalidate JWT tokens not matching this new value"`
 	} `name:"jwtAuth"`
+
+	PoW struct {
+		// whether the node does PoW if blocks are received via API
+		Enabled bool `default:"false" usage:"whether the node does PoW if blocks are received via API"`
+		// the amount of workers used for calculating PoW when issuing blocks via API
+		WorkerCount int `default:"1" usage:"the amount of workers used for calculating PoW when issuing blocks via API"`
+	} `name:"pow"`
 
 	Limits struct {
 		// the maximum number of characters that the body of an API call may contain

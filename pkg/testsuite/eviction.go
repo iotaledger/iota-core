@@ -1,8 +1,6 @@
 package testsuite
 
 import (
-	"fmt"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 
@@ -24,7 +22,6 @@ func (t *TestSuite) AssertActiveRootBlocks(expectedBlocks []*blocks.Block, nodes
 		t.Eventually(func() error {
 			activeRootBlocks := node.Protocol.MainEngineInstance().EvictionState.ActiveRootBlocks()
 
-			fmt.Println("activeRootBlocks: ", activeRootBlocks)
 			if len(expectedBlocks) != len(activeRootBlocks) {
 				return errors.Errorf("AssertActiveRootBlocks: %s: expected %d active root blocks, got %d", node.Name, len(expectedBlocks), len(activeRootBlocks))
 			}

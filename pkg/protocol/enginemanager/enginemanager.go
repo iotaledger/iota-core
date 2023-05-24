@@ -20,9 +20,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/therealledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -41,6 +41,7 @@ type EngineManager struct {
 	dbVersion      byte
 	storageOptions []options.Option[storage.Storage]
 	workers        *workerpool.Group
+	errorHandler   func(error)
 
 	engineOptions           []options.Option[engine.Engine]
 	filterProvider          module.Provider[*engine.Engine, filter.Filter]
@@ -51,13 +52,14 @@ type EngineManager struct {
 	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	slotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
-	ledgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
+	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
 
 	activeInstance *engine.Engine
 }
 
 func New(
 	workers *workerpool.Group,
+	errorHandler func(error),
 	dir string,
 	dbVersion byte,
 	storageOptions []options.Option[storage.Storage],
@@ -70,10 +72,11 @@ func New(
 	blockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*engine.Engine, notarization.Notarization],
-	ledgerProvider module.Provider[*engine.Engine, therealledger.Ledger],
+	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
 ) *EngineManager {
 	return &EngineManager{
 		workers:                 workers,
+		errorHandler:            errorHandler,
 		directory:               utils.NewDirectory(dir),
 		dbVersion:               dbVersion,
 		storageOptions:          storageOptions,
@@ -155,8 +158,13 @@ func (e *EngineManager) SetActiveInstance(instance *engine.Engine) error {
 }
 
 func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
+	errorHandler := func(err error) {
+		e.errorHandler(errors.Wrapf(err, "engine (%s)", dirName[0:8]))
+	}
+
 	return engine.New(e.workers.CreateGroup(dirName),
-		storage.New(e.directory.Path(dirName), e.dbVersion, e.storageOptions...),
+		errorHandler,
+		storage.New(e.directory.Path(dirName), e.dbVersion, errorHandler, e.storageOptions...),
 		e.filterProvider,
 		e.blockDAGProvider,
 		e.bookerProvider,

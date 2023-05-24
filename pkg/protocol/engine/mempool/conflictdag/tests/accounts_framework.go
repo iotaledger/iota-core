@@ -74,13 +74,13 @@ func (f *AccountsTestFramework) TotalWeight() int64 {
 }
 
 func (f *AccountsTestFramework) CreateID(alias string, optWeight ...int64) iotago.AccountID {
-	validatorID, exists := f.identitiesByAlias[alias]
+	_, exists := f.identitiesByAlias[alias]
 	if exists {
 		f.test.Fatal(xerrors.Errorf("identity with alias '%s' already exists", alias))
 	}
 
 	hashedAlias := blake2b.Sum256([]byte(alias))
-	validatorID = iotago.IdentifierFromData(hashedAlias[:])
+	validatorID := iotago.IdentifierFromData(hashedAlias[:])
 	validatorID.RegisterAlias(alias)
 
 	f.Instance.Set(validatorID, lo.First(optWeight))

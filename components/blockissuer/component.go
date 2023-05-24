@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/crypto"
+	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -62,6 +63,8 @@ func provide(c *dig.Container) error {
 		return blockissuer.New(deps.Protocol, accountFromParam(ParamsBlockIssuer.IssuerAccount, ParamsBlockIssuer.PrivateKey),
 			blockissuer.WithTipSelectionTimeout(ParamsBlockIssuer.TipSelectionTimeout),
 			blockissuer.WithTipSelectionRetryInterval(ParamsBlockIssuer.TipSelectionRetryInterval),
+			blockissuer.WithPoWEnabled(restapi.ParamsRestAPI.PoW.Enabled),
+			blockissuer.WithIncompleteBlockAccepted(restapi.ParamsRestAPI.AllowIncompleteBlock),
 		)
 	})
 }

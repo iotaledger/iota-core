@@ -21,6 +21,7 @@ type Events struct {
 
 	// BlockInvalid is triggered when a Block is found to be invalid.
 	BlockInvalid *event.Event2[*blocks.Block, error]
+	// TODO: hook this up in engine
 
 	event.Group[Events, *Events]
 }
