@@ -20,10 +20,4 @@ type IDType interface {
 type VotePowerType[T any] interface {
 	// Comparable imports the constraints.Comparable[T] interface to ensure that the type can be compared.
 	constraints.Comparable[T]
-
-	// Increase returns the next higher value of the current value.
-	Increase() T
-
-	// Decrease returns the next lower value of the current value.
-	Decrease() T
 }

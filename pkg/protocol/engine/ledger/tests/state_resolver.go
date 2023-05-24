@@ -5,42 +5,42 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type StateResolver struct {
-	statesByID *shrinkingmap.ShrinkingMap[iotago.OutputID, ledger.State]
+type MockStateResolver struct {
+	statesByID *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.State]
 }
 
-func New(initialStates ...ledger.State) *StateResolver {
-	stateResolver := &StateResolver{
-		statesByID: shrinkingmap.New[iotago.OutputID, ledger.State](),
+func New(initialStates ...mempool.State) *MockStateResolver {
+	stateResolver := &MockStateResolver{
+		statesByID: shrinkingmap.New[iotago.OutputID, mempool.State](),
 	}
 	for _, initialState := range initialStates {
-		stateResolver.statesByID.Set(initialState.ID(), initialState)
+		stateResolver.statesByID.Set(initialState.OutputID(), initialState)
 	}
 
 	return stateResolver
 }
 
-func (s *StateResolver) AddState(state ledger.State) {
-	s.statesByID.Set(state.ID(), state)
+func (s *MockStateResolver) AddState(state mempool.State) {
+	s.statesByID.Set(state.OutputID(), state)
 }
 
-func (s *StateResolver) DestroyState(stateID iotago.OutputID) {
+func (s *MockStateResolver) DestroyState(stateID iotago.OutputID) {
 	s.statesByID.Delete(stateID)
 }
 
-func (s *StateResolver) ResolveState(id iotago.OutputID) *promise.Promise[ledger.State] {
+func (s *MockStateResolver) ResolveState(id iotago.OutputID) *promise.Promise[mempool.State] {
 	output, exists := s.statesByID.Get(id)
 	if !exists {
-		return promise.New[ledger.State]().Reject(xerrors.Errorf("output %s not found: %w", id.ToHex(), ledger.ErrStateNotFound))
+		return promise.New[mempool.State]().Reject(xerrors.Errorf("output %s not found: %w", id.ToHex(), mempool.ErrStateNotFound))
 	}
 
-	return promise.New[ledger.State]().Resolve(output)
+	return promise.New[mempool.State]().Resolve(output)
 }
 
-func (s *StateResolver) Cleanup() {
+func (s *MockStateResolver) Cleanup() {
 	s.statesByID.Clear()
 }

@@ -23,7 +23,7 @@ type SortedConflictSet = *SortedConflicts[iotago.TransactionID, iotago.OutputID,
 var NewSortedConflictSet = NewSortedConflicts[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
 
 func TestSortedConflict(t *testing.T) {
-	weights := account.NewSelectedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSelectedAccounts(account.NewAccounts[iotago.AccountID](mapdb.NewMapDB()))
 	pendingTasks := syncutils.NewCounter()
 
 	conflict1 := NewTestConflict(transactionID("conflict1"), nil, nil, weight.New(weights).AddCumulativeWeight(12), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
@@ -173,7 +173,6 @@ func generateRandomWeightPermutation() func(conflict TestConflict) {
 	default:
 		// return generateRandomConfirmationStatePermutation()
 		return func(conflict TestConflict) {
-
 		}
 	}
 }

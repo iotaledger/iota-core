@@ -2,7 +2,6 @@ package mempool
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -16,7 +15,7 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 
 	MarkAttachmentIncluded(blockID iotago.BlockID) bool
 
-	StateMetadata(reference ledger.StateReference) (state StateMetadata, err error)
+	StateMetadata(reference iotago.IndexedUTXOReferencer) (state StateMetadata, err error)
 
 	TransactionMetadata(id iotago.TransactionID) (transaction TransactionMetadata, exists bool)
 

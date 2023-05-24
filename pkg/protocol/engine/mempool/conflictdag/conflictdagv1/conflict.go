@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
@@ -85,9 +84,6 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.V
 
 	// unhookAcceptanceMonitoring
 	unhookAcceptanceMonitoring func()
-
-	// Module embeds the required methods of the module.Interface.
-	module.Module
 }
 
 // NewConflict creates a new Conflict.
@@ -123,7 +119,7 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictda
 		c.setAcceptanceState(acceptance.Accepted)
 	}
 
-	c.ConflictingConflicts = NewSortedConflicts[ConflictID, ResourceID, VotePower](c, pendingTasksCounter)
+	c.ConflictingConflicts = NewSortedConflicts(c, pendingTasksCounter)
 
 	// error can only occur when conflict is evicted, which is impossible because it was just created
 	_, _ = c.JoinConflictSets(conflictSets)
@@ -265,6 +261,11 @@ func (c *Conflict[ConflictID, ResourceID, VotePower]) LikedInstead() *advancedse
 	defer c.likedInsteadMutex.RUnlock()
 
 	return c.likedInstead.Clone()
+}
+
+// Shutdown shuts down the Conflict.
+func (c *Conflict[ConflictID, ResourceID, VotePower]) Shutdown() {
+	c.ConflictingConflicts.Shutdown()
 }
 
 // Evict cleans up the sortedConflict.

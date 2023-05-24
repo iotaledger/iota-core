@@ -19,10 +19,10 @@ func TestConflictDAG(t *testing.T) {
 }
 
 // newTestFramework creates a new instance of the TestFramework for internal unit tests.
-func newTestFramework(t *testing.T) *tests.Framework[iotago.TransactionID, iotago.OutputID, vote.MockedPower] {
-	accountsTestFramework := tests.NewAccountsTestFramework(t, account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+func newTestFramework(t *testing.T) *tests.Framework {
+	accountsTestFramework := tests.NewAccountsTestFramework(t, account.NewAccounts[iotago.AccountID](mapdb.NewMapDB()))
 
-	return tests.NewFramework[iotago.TransactionID, iotago.OutputID, vote.MockedPower](
+	return tests.NewFramework(
 		t,
 		New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](accountsTestFramework.Committee),
 		accountsTestFramework,
