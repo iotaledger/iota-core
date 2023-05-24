@@ -92,7 +92,7 @@ func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.E
 	}
 }
 
-func WithAttestationProvider(optsAttestationProvider module.Provider[*engine.Engine, attestation.Attestation]) options.Option[Protocol] {
+func WithAttestationProvider(optsAttestationProvider module.Provider[*engine.Engine, attestation.Attestations]) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsAttestationProvider = optsAttestationProvider
 	}

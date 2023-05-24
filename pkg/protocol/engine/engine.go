@@ -49,7 +49,7 @@ type Engine struct {
 	BlockGadget     blockgadget.Gadget
 	SlotGadget      slotgadget.Gadget
 	Notarization    notarization.Notarization
-	Attestation     attestation.Attestation
+	Attestation     attestation.Attestations
 	Ledger          therealledger.Ledger
 
 	Workers      *workerpool.Group
@@ -83,7 +83,7 @@ func New(
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
-	attestationProvider module.Provider[*Engine, attestation.Attestation],
+	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, therealledger.Ledger],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
@@ -223,10 +223,7 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		e.Storage.Prunable.RestoreFromDisk()
 		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
 
-		// e.Notarization.attestations().SetLastCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
-		// e.Notarization.attestations().TriggerInitialized()
-		//
-		// e.Notarization.TriggerInitialized()
+		// TODO: restore attestation tracker from disk?
 	}
 
 	e.TriggerInitialized()
@@ -261,6 +258,7 @@ func (e *Engine) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to import ledger")
 	} else if err = e.EvictionState.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import eviction state")
+		// TODO: call import on attestations?
 		// } else if err = e.Notarization.Import(reader); err != nil {
 		// 	return errors.Wrap(err, "failed to import notarization state")
 	}
@@ -277,6 +275,7 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export ledger")
 	} else if err = e.EvictionState.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export eviction state")
+		// TODO: call export on attestations?
 		// } else if err = e.Notarization.Export(writer, targetSlot); err != nil {
 		// 	return errors.Wrap(err, "failed to export notarization state")
 	}

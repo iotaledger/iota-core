@@ -64,8 +64,8 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		poa.NewProvider(map[iotago.AccountID]int64{}),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
-		slotnotarization.NewProvider(),
-		slotattestation.NewProvider(),
+		slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
+		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		utxoledger.NewProvider(),
 	)
 	defer engineInstance.Shutdown()

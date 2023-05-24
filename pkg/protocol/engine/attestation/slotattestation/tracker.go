@@ -23,11 +23,11 @@ func NewTracker(cutoffIndexCallback func() iotago.SlotIndex) *Tracker {
 	}
 }
 
-func (s *Tracker) TrackAttestation(attestation *iotago.Attestation) {
+func (t *Tracker) TrackAttestation(attestation *iotago.Attestation) {
 	var previousAttestationIndex iotago.SlotIndex
 	updated := true
 
-	updatedAttestation := s.latestAttestations.Compute(attestation.IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
+	updatedAttestation := t.latestAttestations.Compute(attestation.IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
 		if !exists {
 			return attestation
 		}
@@ -49,13 +49,13 @@ func (s *Tracker) TrackAttestation(attestation *iotago.Attestation) {
 		return
 	}
 
-	for i := lo.Max(s.cutoffIndexCallback(), previousAttestationIndex); i <= updatedAttestation.SlotCommitmentID.Index(); i++ {
-		s.attestationsPerSlot.Get(i, true).Set(attestation.IssuerID, updatedAttestation)
+	for i := lo.Max(t.cutoffIndexCallback(), previousAttestationIndex); i <= updatedAttestation.SlotCommitmentID.Index(); i++ {
+		t.attestationsPerSlot.Get(i, true).Set(attestation.IssuerID, updatedAttestation)
 	}
 }
 
-func (s *Tracker) Attestations(slotIndex iotago.SlotIndex) []*iotago.Attestation {
-	slotAttestors := s.attestationsPerSlot.Get(slotIndex, false)
+func (t *Tracker) Attestations(slotIndex iotago.SlotIndex) []*iotago.Attestation {
+	slotAttestors := t.attestationsPerSlot.Get(slotIndex, false)
 	if slotAttestors == nil {
 		return nil
 	}
@@ -63,15 +63,15 @@ func (s *Tracker) Attestations(slotIndex iotago.SlotIndex) []*iotago.Attestation
 	return slotAttestors.Values()
 }
 
-func (s *Tracker) EvictSlot(indexToEvict iotago.SlotIndex) {
-	slotAttestors := s.attestationsPerSlot.Evict(indexToEvict)
+func (t *Tracker) EvictSlot(indexToEvict iotago.SlotIndex) []*iotago.Attestation {
+	slotAttestors := t.attestationsPerSlot.Evict(indexToEvict)
 	if slotAttestors == nil {
-		return
+		return nil
 	}
 
 	var attestorsToEvict []iotago.AccountID
 	slotAttestors.ForEach(func(accountID iotago.AccountID, _ *iotago.Attestation) bool {
-		latestAttestation, has := s.latestAttestations.Get(accountID)
+		latestAttestation, has := t.latestAttestations.Get(accountID)
 		if !has {
 			return true
 		}
@@ -83,6 +83,8 @@ func (s *Tracker) EvictSlot(indexToEvict iotago.SlotIndex) {
 	})
 
 	for _, id := range attestorsToEvict {
-		s.latestAttestations.Delete(id)
+		t.latestAttestations.Delete(id)
 	}
+
+	return slotAttestors.Values()
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
@@ -108,9 +109,10 @@ func provide(c *dig.Container) error {
 				poa.NewProvider(validators),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(
-					slotnotarization.WithMinCommittableSlotAge(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),
-				),
+				slotnotarization.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),
+			),
+			protocol.WithAttestationProvider(
+				slotattestation.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)+slotattestation.DefaultOffsetMinCommittableAge),
 			),
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(

@@ -7,7 +7,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type Attestation interface {
+type Attestations interface {
 	Get(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error)
 	AddAttestationFromBlock(block *blocks.Block)
 	Commit(index iotago.SlotIndex) (newCW uint64, attestationsMap *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error)

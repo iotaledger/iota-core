@@ -53,7 +53,7 @@ type EngineManager struct {
 	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	slotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
-	attestationProvider     module.Provider[*engine.Engine, attestation.Attestation]
+	attestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	ledgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
 
 	activeInstance *engine.Engine
@@ -74,7 +74,7 @@ func New(
 	blockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*engine.Engine, notarization.Notarization],
-	attestationProvider module.Provider[*engine.Engine, attestation.Attestation],
+	attestationProvider module.Provider[*engine.Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*engine.Engine, therealledger.Ledger],
 ) *EngineManager {
 	return &EngineManager{

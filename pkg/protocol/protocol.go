@@ -74,7 +74,7 @@ type Protocol struct {
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
-	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestation]
+	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsLedgerProvider          module.Provider[*engine.Engine, therealledger.Ledger]
 }
@@ -92,8 +92,8 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
-		optsNotarizationProvider:    slotnotarization.NewProvider(),
-		optsAttestationProvider:     slotattestation.NewProvider(),
+		optsNotarizationProvider:    slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
+		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          utxoledger.NewProvider(),
 

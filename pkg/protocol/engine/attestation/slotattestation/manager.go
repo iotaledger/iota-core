@@ -13,7 +13,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	iotago "github.com/iotaledger/iota.go/v4"
+)
+
+const (
+	DefaultOffsetMinCommittableAge     = 4
+	DefaultAttestationCommitmentOffset = slotnotarization.DefaultMinSlotCommittableAge + DefaultOffsetMinCommittableAge
 )
 
 // Manager is the manager of slot attestations. It works in two phases:
@@ -24,7 +30,7 @@ import (
 //     c. Get all attestations for attestation slot = committed slot - attestationCommitmentOffset and store in bucketed storage.
 //     d. Compute the cumulative weight of the attestation slot.
 type Manager struct {
-	weightsProviderFunc func() *account.Accounts[iotago.AccountID, *iotago.AccountID]
+	committeeFunc func() *account.Accounts[iotago.AccountID, *iotago.AccountID]
 
 	bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore
 
@@ -39,9 +45,9 @@ type Manager struct {
 	module.Module
 }
 
-func NewProvider() module.Provider[*engine.Engine, attestation.Attestation] {
-	return module.Provide(func(e *engine.Engine) attestation.Attestation {
-		m := NewManager(4, e.Storage.Prunable.Attestations, e.SybilProtection.Accounts)
+func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*engine.Engine, attestation.Attestations] {
+	return module.Provide(func(e *engine.Engine) attestation.Attestations {
+		m := NewManager(attestationCommitmentOffset, e.Storage.Prunable.Attestations, e.SybilProtection.Accounts)
 
 		e.HookInitialized(func() {
 			cw := e.Storage.Settings().LatestCommitment().Commitment().CumulativeWeight
@@ -53,10 +59,10 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestation] {
 	})
 }
 
-func NewManager(attestationCommitmentOffset iotago.SlotIndex, bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore, weightsProviderFunc func() *account.Accounts[iotago.AccountID, *iotago.AccountID]) *Manager {
+func NewManager(attestationCommitmentOffset iotago.SlotIndex, bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore, committeeFunc func() *account.Accounts[iotago.AccountID, *iotago.AccountID]) *Manager {
 	m := &Manager{
 		attestationCommitmentOffset: attestationCommitmentOffset,
-		weightsProviderFunc:         weightsProviderFunc,
+		committeeFunc:               committeeFunc,
 		bucketedStorage:             bucketedStorage,
 		pendingAttestations:         memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
 	}
@@ -80,6 +86,11 @@ func (m *Manager) Shutdown() {
 }
 
 func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
+	// Only track attestations of active committee members.
+	if _, exists := m.committeeFunc().Get(block.Block().IssuerID); !exists {
+		return
+	}
+
 	m.commitmentMutex.RLock()
 	defer m.commitmentMutex.RUnlock()
 
@@ -125,8 +136,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsMap 
 
 	// Get all attestations for the valid time window of attestationSlotIndex up to index (as we just applied the pending attestations).
 	attestationSlotIndex := m.computeAttestationCommitmentOffset()
-	attestations := m.tracker.Attestations(attestationSlotIndex)
-	m.tracker.EvictSlot(attestationSlotIndex)
+	attestations := m.tracker.EvictSlot(attestationSlotIndex)
 
 	// Store all attestations of attestationSlotIndex in bucketed storage via ads.Map / sparse merkle tree.
 	tree, err := m.attestationStorage(index)
@@ -137,7 +147,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsMap 
 	// Add all attestations to the tree and calculate the new cumulative weight.
 	for _, a := range attestations {
 		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
-		if attestorWeight, exists := m.weightsProviderFunc().Get(a.IssuerID); exists {
+		if attestorWeight, exists := m.committeeFunc().Get(a.IssuerID); exists {
 			tree.Set(a.IssuerID, a)
 
 			m.lastCumulativeWeight += uint64(attestorWeight)

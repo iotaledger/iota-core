@@ -33,7 +33,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		"node1": {
 			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID))),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
 			),
 			protocol.WithChainManagerOptions(
 				chainmanager.WithCommitmentRequesterOptions(
@@ -45,7 +45,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		"node2": {
 			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID))),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
 			),
 			protocol.WithChainManagerOptions(
 				chainmanager.WithCommitmentRequesterOptions(
@@ -57,7 +57,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		"node3": {
 			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID))),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
 			),
 			protocol.WithChainManagerOptions(
 				chainmanager.WithCommitmentRequesterOptions(
@@ -69,7 +69,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		"node4": {
 			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID))),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
 			),
 			protocol.WithChainManagerOptions(
 				chainmanager.WithCommitmentRequesterOptions(

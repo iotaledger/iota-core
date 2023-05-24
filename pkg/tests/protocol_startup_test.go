@@ -32,7 +32,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
 			),
 		},
 		"node2": {
@@ -41,7 +41,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
 			),
 		},
 	})
@@ -334,7 +334,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				poa.NewProvider(ts.Validators()),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
 			),
 			protocol.WithPruningDelay(1),
 			protocol.WithStorageOptions(
@@ -376,7 +376,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				poa.NewProvider(ts.Validators()),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
 			),
 			protocol.WithPruningDelay(2),
 			protocol.WithStorageOptions(
