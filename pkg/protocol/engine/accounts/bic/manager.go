@@ -72,8 +72,7 @@ func (b *BlockIssuanceCredits) BIC(id iotago.AccountID, slotIndex iotago.SlotInd
 		return accounts.NewAccount(id, accounts.NewWeight(0, slotIndex), []ed25519.PublicKey{})
 	})
 
-	// TODO: add a clone method
-	newAccount := account
+	newAccount := account.Clone()
 
 	for slotDiffIndex := b.balancesIndex + 1; slotDiffIndex <= b.balancesIndex+slotsToApply; slotDiffIndex++ {
 		slotDiff, exists := b.slotDiffs.Get(slotDiffIndex)

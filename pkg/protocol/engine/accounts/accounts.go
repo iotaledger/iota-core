@@ -3,7 +3,6 @@ package accounts
 import (
 	"crypto"
 	"crypto/ed25519"
-
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -29,6 +28,9 @@ type Account interface {
 	ID() iotago.AccountID
 	Credits() *Credits
 	IsPublicKeyAllowed(ed25519.PublicKey) bool
+	AddPublicKey(ed25519.PublicKey)
+	RemovePublicKey(ed25519.PublicKey)
+	Clone() Account
 }
 
 type AccountImpl struct {
@@ -68,4 +70,21 @@ func (a *AccountImpl) RemovePublicKey(pubKey ed25519.PublicKey) {
 
 func (a *AccountImpl) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
 	return a.pubKeysMap.Has(pubKey)
+}
+
+func (a *AccountImpl) Clone() Account {
+	keyMapCopy := shrinkingmap.New[crypto.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
+	a.pubKeysMap.ForEachKey(func(key crypto.PublicKey) bool {
+		keyMapCopy.Set(key, types.Void)
+		return true
+	})
+
+	return &AccountImpl{
+		id: a.ID(),
+		credits: &Credits{
+			Value:      a.Credits().Value,
+			UpdateTime: a.Credits().UpdateTime,
+		},
+		pubKeysMap: keyMapCopy,
+	}
 }
