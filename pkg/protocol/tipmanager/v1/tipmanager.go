@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -107,36 +106,25 @@ func (t *TipManager) setupBlockMetadata(blockMetadata *BlockMetadata) {
 		t.updateParents(blockMetadata, propagateConnectedChildren(isConnected, false))
 	})
 
-	joinTipPool := func(tipSet *randommap.RandomMap[iotago.BlockID, *BlockMetadata], blockReferencedByTips *promise.Value[bool]) (leaveTipPool func()) {
-		unsubscribe := blockReferencedByTips.OnUpdate(func(_, isReferenced bool) {
-			if isReferenced {
-				tipSet.Delete(blockMetadata.ID())
-			} else {
-				tipSet.Set(blockMetadata.ID(), blockMetadata)
-			}
-		})
-
-		return func() {
-			unsubscribe()
-
-			tipSet.Delete(blockMetadata.ID())
-		}
-	}
-
-	var leaveTipPool func()
-
-	blockMetadata.tipPool.OnUpdate(func(prevTipPool, newTipPool TipPool) {
-		if leaveTipPool != nil {
-			leaveTipPool()
-		}
-
-		if newTipPool == StrongTipPool {
-			leaveTipPool = joinTipPool(t.strongTipSet, blockMetadata.stronglyReferencedByTips)
-		} else if newTipPool == WeakTipPool {
-			leaveTipPool = joinTipPool(t.weakTipSet, blockMetadata.referencedByTips)
+	blockMetadata.isStrongTip.OnUpdate(func(_, isStrongTip bool) {
+		if isStrongTip {
+			t.strongTipSet.Set(blockMetadata.ID(), blockMetadata)
 		} else {
-			leaveTipPool = nil
+			t.strongTipSet.Delete(blockMetadata.ID())
 		}
+	})
+
+	blockMetadata.isWeakTip.OnUpdate(func(_, isWeakTip bool) {
+		if isWeakTip {
+			t.weakTipSet.Set(blockMetadata.ID(), blockMetadata)
+		} else {
+			t.weakTipSet.Delete(blockMetadata.ID())
+		}
+	})
+
+	blockMetadata.OnEvicted(func() {
+		t.strongTipSet.Delete(blockMetadata.ID())
+		t.weakTipSet.Delete(blockMetadata.ID())
 	})
 
 	blockMetadata.setTipPool(t.determineTipPool(blockMetadata))
