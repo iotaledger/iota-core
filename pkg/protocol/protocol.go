@@ -188,7 +188,7 @@ func (p *Protocol) runNetworkProtocol() {
 	}, event.WithWorkerPool(wpCommitments))
 
 	p.Events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
-		p.networkProtocol.RequestCommitment(commitmentID)
+		p.networkProtocol.RequestSlotCommitment(commitmentID)
 	}, event.WithWorkerPool(wpCommitments))
 }
 

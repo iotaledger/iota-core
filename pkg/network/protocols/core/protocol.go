@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/bytesfilter"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
@@ -61,7 +62,7 @@ func (p *Protocol) RequestBlock(id iotago.BlockID, to ...network.PeerID) {
 	p.requestedBlockHashesMutex.Unlock()
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_BlockRequest{BlockRequest: &nwmodels.BlockRequest{
-		Id: id[:],
+		BlockId: id[:],
 	}}}, protocolID, to...)
 }
 
@@ -71,24 +72,22 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...network.PeerID
 	}}}, protocolID, to...)
 }
 
-// func (p *Protocol) SendAttestations(cm *commitment.Commitment, blockIDs models.BlockIDs, attestations *orderedmap.OrderedMap[iotago.SlotIndex, *advancedset.AdvancedSet[*notarization.Attestation]], to ...network.PeerID) {
-//	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
-//		Commitment:   lo.PanicOnErr(cm.Bytes()),
-//		BlocksIds:    lo.PanicOnErr(blockIDs.Bytes()),
-//		Attestations: lo.PanicOnErr(attestations.Encode()),
-//	}}}, protocolID, to...)
-// }
-
-func (p *Protocol) RequestCommitment(id iotago.CommitmentID, to ...network.PeerID) {
-	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitmentRequest{SlotCommitmentRequest: &nwmodels.SlotCommitmentRequest{
-		Id: id[:],
+func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, to ...network.PeerID) {
+	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
+		Commitment:   cm.Data(),
+		Attestations: lo.PanicOnErr(p.api.Encode(attestations)),
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) RequestAttestations(cm *model.Commitment, endIndex iotago.SlotIndex, to ...network.PeerID) {
+func (p *Protocol) RequestSlotCommitment(id iotago.CommitmentID, to ...network.PeerID) {
+	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitmentRequest{SlotCommitmentRequest: &nwmodels.SlotCommitmentRequest{
+		CommitmentId: id[:],
+	}}}, protocolID, to...)
+}
+
+func (p *Protocol) RequestAttestations(id iotago.CommitmentID, to ...network.PeerID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_AttestationsRequest{AttestationsRequest: &nwmodels.AttestationsRequest{
-		Commitment: cm.Data(),
-		EndIndex:   endIndex.Bytes(),
+		CommitmentId: lo.PanicOnErr(id.Bytes()),
 	}}}, protocolID, to...)
 }
 
@@ -104,18 +103,18 @@ func (p *Protocol) handlePacket(nbr network.PeerID, packet proto.Message) (err e
 	case *nwmodels.Packet_Block:
 		p.workerPool.Submit(func() { p.onBlock(packetBody.Block.GetBytes(), nbr) })
 	case *nwmodels.Packet_BlockRequest:
-		p.workerPool.Submit(func() { p.onBlockRequest(packetBody.BlockRequest.GetId(), nbr) })
+		p.workerPool.Submit(func() { p.onBlockRequest(packetBody.BlockRequest.GetBlockId(), nbr) })
 	case *nwmodels.Packet_SlotCommitment:
 		p.workerPool.Submit(func() { p.onSlotCommitment(packetBody.SlotCommitment.GetBytes(), nbr) })
 	case *nwmodels.Packet_SlotCommitmentRequest:
-		p.workerPool.Submit(func() { p.onSlotCommitmentRequest(packetBody.SlotCommitmentRequest.GetId(), nbr) })
+		p.workerPool.Submit(func() { p.onSlotCommitmentRequest(packetBody.SlotCommitmentRequest.GetCommitmentId(), nbr) })
 	case *nwmodels.Packet_Attestations:
-		// p.workerPool.Submit(func() {
-		//	p.onAttestations(packetBody.Attestations.GetCommitment(), packetBody.Attestations.GetBlocksIds(), packetBody.Attestations.GetAttestations(), nbr)
-		// })
+		p.workerPool.Submit(func() {
+			p.onAttestations(packetBody.Attestations.GetCommitment(), packetBody.Attestations.GetAttestations(), nbr)
+		})
 	case *nwmodels.Packet_AttestationsRequest:
 		p.workerPool.Submit(func() {
-			p.onAttestationsRequest(packetBody.AttestationsRequest.GetCommitment(), packetBody.AttestationsRequest.GetEndIndex(), nbr)
+			p.onAttestationsRequest(packetBody.AttestationsRequest.GetCommitmentId(), nbr)
 		})
 	default:
 		return errors.Errorf("unsupported packet; packet=%+v, packetBody=%T-%+v", packet, packetBody, packetBody)
@@ -179,65 +178,32 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id network.PeerID) {
 	p.Events.SlotCommitmentRequestReceived.Trigger(iotago.CommitmentID(idBytes), id)
 }
 
-// func (p *Protocol) onAttestations(commitmentBytes []byte, blockIDBytes []byte, attestationsBytes []byte, id network.PeerID) {
-//	cm := &commitment.Commitment{}
-//	if _, err := cm.FromBytes(commitmentBytes); err != nil {
-//		p.Events.Error.Trigger(&ErrorEvent{
-//			Error:  errors.Wrap(err, "failed to deserialize commitment"),
-//			Source: id,
-//		})
-//
-//		return
-//	}
-//
-//	blockIDs := models.NewBlockIDs()
-//	if _, err := blockIDs.FromBytes(blockIDBytes); err != nil {
-//		p.Events.Error.Trigger(&ErrorEvent{
-//			Error:  errors.Wrap(err, "failed to deserialize blockIDs"),
-//			Source: id,
-//		})
-//
-//		return
-//	}
-//
-//	attestations := orderedmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[*notarization.Attestation]]()
-//	if _, err := attestations.Decode(attestationsBytes); err != nil {
-//		p.Events.Error.Trigger(&ErrorEvent{
-//			Error:  errors.Wrap(err, "failed to deserialize attestations"),
-//			Source: id,
-//		})
-//
-//		return
-//	}
-//
-//	p.Events.AttestationsReceived.Trigger(&AttestationsReceivedEvent{
-//		Commitment:   cm,
-//		BlockIDs:     blockIDs,
-//		Attestations: attestations,
-//		Source:       id,
-//	})
-// }
-
-func (p *Protocol) onAttestationsRequest(commitmentBytes []byte, slotIndexBytes []byte, id network.PeerID) {
-	cm := new(iotago.Commitment)
-	if _, err := p.api.Decode(commitmentBytes, cm, serix.WithValidation()); err != nil {
+func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []byte, id network.PeerID) {
+	cm, err := model.CommitmentFromBytes(commitmentBytes, p.api, serix.WithValidation())
+	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize commitment"), id)
 
 		return
 	}
 
-	endSlotIndex, err := iotago.SlotIndexFromBytes(slotIndexBytes)
-	if err != nil {
-		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize end iotago.SlotIndex"), id)
+	var attestations []*iotago.Attestation
+	if _, err := p.api.Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
+		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize attestations"), id)
 
 		return
 	}
 
-	p.Events.AttestationsRequestReceived.Trigger(&AttestationsRequestReceivedEvent{
-		Commitment: cm,
-		EndIndex:   endSlotIndex,
-		Source:     id,
-	})
+	p.Events.AttestationsReceived.Trigger(cm, attestations, id)
+}
+
+func (p *Protocol) onAttestationsRequest(commitmentIDBytes []byte, id network.PeerID) {
+	if len(commitmentIDBytes) != iotago.CommitmentIDLength {
+		p.Events.Error.Trigger(errors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize commitmentID in attestations request"), id)
+
+		return
+	}
+
+	p.Events.AttestationsRequestReceived.Trigger(iotago.CommitmentID(commitmentIDBytes), id)
 }
 
 func newPacket() proto.Message {
