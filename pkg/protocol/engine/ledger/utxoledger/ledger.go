@@ -44,6 +44,8 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 		// TODO: should this attach to RatifiedAccepted instead?
 		e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
+		e.EvictionState.Events.SlotEvicted.Hook(l.memPool.EvictUntil)
+		// TODO: when should ledgerState be pruned?
 
 		return l
 	})

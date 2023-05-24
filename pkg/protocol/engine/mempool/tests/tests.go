@@ -148,7 +148,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	attachmentDeletionState := map[string]bool{"block1": true, "block2": false, "block3": false}
 	tf.RequireAttachmentsEvicted(attachmentDeletionState)
 
-	tf.Instance.Evict(1)
+	tf.Instance.EvictUntil(1)
 
 	tf.RequireAccepted(map[string]bool{"tx2": true, "tx3": false})
 	tf.RequireBooked("tx3")
@@ -158,7 +158,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx2": true}))
 	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block2": true}))
 
-	tf.Instance.Evict(2)
+	tf.Instance.EvictUntil(2)
 	tf.RequireBooked("tx3")
 
 	require.True(t, tf.MarkAttachmentIncluded("block3"))
@@ -306,7 +306,7 @@ func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.2"))
 
-	tf.Instance.Evict(1)
+	tf.Instance.EvictUntil(1)
 
 	require.True(t, tx1Metadata.IsAccepted())
 	require.False(t, tx1Metadata.IsOrphaned())
@@ -327,15 +327,15 @@ func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedAttachment().Index())
 	tf.AssertStateDiff(4, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
-	tf.Instance.Evict(2)
-	tf.Instance.Evict(3)
+	tf.Instance.EvictUntil(2)
+	tf.Instance.EvictUntil(3)
 
 	require.True(t, tx1Metadata.IsAccepted())
 	require.False(t, tx1Metadata.IsOrphaned())
 	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedAttachment().Index())
 	tf.AssertStateDiff(4, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
-	tf.Instance.Evict(4)
+	tf.Instance.EvictUntil(4)
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.5"))
 
@@ -373,7 +373,7 @@ func TestSetTransactionOrphanage(t *testing.T, tf *TestFramework) {
 	require.False(t, tx2Metadata.IsAccepted())
 	require.False(t, tx3Metadata.IsAccepted())
 
-	tf.Instance.Evict(1)
+	tf.Instance.EvictUntil(1)
 
 	tf.RequireTransactionsEvicted(map[string]bool{"tx1": true, "tx2": true, "tx3": true})
 
@@ -414,13 +414,13 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 	require.False(t, tx2Metadata.IsAccepted())
 	require.False(t, tx3Metadata.IsAccepted())
 
-	tf.Instance.Evict(1)
+	tf.Instance.EvictUntil(1)
 
 	require.False(t, tx1Metadata.IsOrphaned())
 	require.False(t, tx2Metadata.IsOrphaned())
 	require.False(t, tx3Metadata.IsOrphaned())
 
-	tf.Instance.Evict(2)
+	tf.Instance.EvictUntil(2)
 
 	require.True(t, tx1Metadata.IsOrphaned())
 	require.True(t, tx2Metadata.IsOrphaned())
@@ -511,7 +511,7 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 			prevStateAlias = fmt.Sprintf("tx%d:0", index)
 
 			tf.CommitSlot(iotago.SlotIndex(index))
-			tf.Instance.Evict(iotago.SlotIndex(index))
+			tf.Instance.EvictUntil(iotago.SlotIndex(index))
 
 		}
 

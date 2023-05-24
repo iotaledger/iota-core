@@ -141,23 +141,25 @@ func (m *MemPool[VotePower]) StateDiff(index iotago.SlotIndex) mempool.StateDiff
 	return NewStateDiff(index)
 }
 
-// Evict evicts the slot with the given index from the MemPool.
-func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
-	if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *TransactionMetadata] {
-		m.evictionMutex.Lock()
-		defer m.evictionMutex.Unlock()
+// EvictUntil evicts all slots with the given index and smaller from the MemPool.
+func (m *MemPool[VotePower]) EvictUntil(slotIndex iotago.SlotIndex) {
+	for m.lastEvictedSlot < slotIndex {
+		if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *TransactionMetadata] {
+			m.evictionMutex.Lock()
+			defer m.evictionMutex.Unlock()
 
-		m.lastEvictedSlot = slotIndex
+			m.lastEvictedSlot++
 
-		m.stateDiffs.Delete(slotIndex)
+			m.stateDiffs.Delete(m.lastEvictedSlot)
 
-		return m.attachments.Evict(slotIndex)
-	}(); evictedAttachments != nil {
-		evictedAttachments.ForEach(func(blockID iotago.BlockID, transaction *TransactionMetadata) bool {
-			transaction.evictAttachment(blockID)
+			return m.attachments.Evict(m.lastEvictedSlot)
+		}(); evictedAttachments != nil {
+			evictedAttachments.ForEach(func(blockID iotago.BlockID, transaction *TransactionMetadata) bool {
+				transaction.evictAttachment(blockID)
 
-			return true
-		})
+				return true
+			})
+		}
 	}
 }
 

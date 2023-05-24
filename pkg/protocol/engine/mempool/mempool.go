@@ -23,5 +23,5 @@ type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
 
 	StateDiff(index iotago.SlotIndex) StateDiff
 
-	Evict(slotIndex iotago.SlotIndex)
+	EvictUntil(slotIndex iotago.SlotIndex)
 }
