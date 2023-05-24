@@ -2,7 +2,7 @@ version: "3.9"
 # Create a custom build that can be re-used within Docker network
 x-build-iota-core: &iota-core_build
   context: ../../../
-  dockerfile: ./iota-core/Dockerfile
+  dockerfile: ./iota-core/Dockerfile.workdir
 services:
   peer_master:
     build: *iota-core_build
@@ -54,7 +54,6 @@ services:
       --blockIssuer.issuerAccount=0xe20f6f0982a184f07fed9e069e218d51f9678c8b49fd1311033e822e1b5901ed
       --blockIssuer.privateKey=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
       --activity.ignoreBootstrapped=true
-#       --faucet.seed=7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
