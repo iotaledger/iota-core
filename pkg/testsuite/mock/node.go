@@ -288,10 +288,7 @@ func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitm
 	issuingTime := slotTimeProvider.StartTime(slot)
 	require.Truef(n.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", n.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
 
-	parentReferences := make(model.ParentReferences)
-	parentReferences[model.StrongParentType] = parents
-
-	return n.IssueBlock(alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithReferences(parentReferences))
+	return n.IssueBlock(alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithStrongParents(parents...))
 }
 
 func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sync.WaitGroup) {

@@ -96,13 +96,13 @@ func (t *TestSuite) AssertBlocksInCacheRootBlock(expectedBlocks []*blocks.Block,
 	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedRootBlock, (*blocks.Block).IsRootBlock, nodes...)
 }
 
-func (t *TestSuite) AssertBlocksInCacheConflicts(blockConflicts map[string][]string, nodes ...*mock.Node) {
+func (t *TestSuite) AssertBlocksInCacheConflicts(blockConflicts map[*blocks.Block][]string, nodes ...*mock.Node) {
 	for _, node := range nodes {
-		for blockAlias, conflictAliases := range blockConflicts {
+		for block, conflictAliases := range blockConflicts {
 			t.Eventually(func() error {
-				blockFromCache, exists := node.Protocol.MainEngineInstance().BlockFromCache(t.BlockID(blockAlias))
+				blockFromCache, exists := node.Protocol.MainEngineInstance().BlockFromCache(block.ID())
 				if !exists {
-					return errors.Errorf("AssertBlocksInCacheConflicts: %s: block %s does not exist", node.Name, blockAlias)
+					return errors.Errorf("AssertBlocksInCacheConflicts: %s: block %s does not exist", node.Name, block.ID())
 				}
 
 				if blockFromCache.IsRootBlock() {

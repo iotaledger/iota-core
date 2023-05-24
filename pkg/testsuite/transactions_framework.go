@@ -132,6 +132,15 @@ func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
 
 	return transaction
 }
+
 func (t *TransactionFramework) TransactionID(alias string) iotago.TransactionID {
 	return lo.PanicOnErr(t.Transaction(alias).ID())
+}
+
+func (t *TransactionFramework) Transactions(aliases ...string) []*iotago.Transaction {
+	return lo.Map(aliases, t.Transaction)
+}
+
+func (t *TransactionFramework) TransactionIDs(aliases ...string) []iotago.TransactionID {
+	return lo.Map(aliases, t.TransactionID)
 }

@@ -2,14 +2,14 @@ package tests
 
 import (
 	"testing"
-	"time"
 
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
@@ -21,33 +21,30 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 
 	node1.HookLogging()
 
-	time.Sleep(time.Second)
-
 	tx1 := ts.CreateTransaction("Tx1", 1, "Genesis")
 
 	tx2 := ts.CreateTransaction("Tx2", 1, "Tx1:0")
 
-	ts.RegisterBlock("block1", node1.IssueBlock("block1", blockissuer.WithPayload(tx2)))
-	ts.Wait(node1)
+	ts.IssueBlock("block1", node1, blockissuer.WithPayload(tx2))
 
-	ts.AssertTransactionsExist([]string{"Tx2"}, true, node1)
-	ts.AssertTransactionsExist([]string{"Tx1"}, false, node1)
+	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("Tx2"), true, node1)
+	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("Tx1"), false, node1)
 
-	ts.AssertTransactionsInCacheBooked([]string{"Tx2"}, false, node1)
+	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("Tx2"), false, node1)
+	// make sure that the block is not booked
 
-	ts.RegisterBlock("block2", node1.IssueBlock("block2", blockissuer.WithPayload(tx1)))
-	ts.Wait(node1)
+	ts.IssueBlock("block2", node1, blockissuer.WithPayload(tx1))
 
-	ts.AssertTransactionsExist([]string{"Tx1", "Tx2"}, true, node1)
-	ts.AssertTransactionsInCacheBooked([]string{"Tx1", "Tx2"}, true, node1)
-	ts.AssertBlocksInCacheConflicts(map[string][]string{
-		"block1": {"Tx2"},
-		"block2": {"Tx1"},
+	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1)
+	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1)
+	ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+		ts.Block("block1"): {"Tx2"},
+		ts.Block("block2"): {"Tx1"},
 	}, node1)
 
-	ts.AssertTransactionInCacheConflicts(map[string][]string{
-		"Tx2": {"Tx2"},
-		"Tx1": {"Tx1"},
+	ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+		ts.TransactionFramework.Transaction("Tx2"): {"Tx2"},
+		ts.TransactionFramework.Transaction("Tx1"): {"Tx1"},
 	}, node1)
 }
 
@@ -62,72 +59,56 @@ func Test_DoubleSpend(t *testing.T) {
 
 	node1.HookLogging()
 
-	time.Sleep(time.Second)
-	//Create and issue double spends
+	// Create and issue double spends
 	{
 		tx1 := ts.CreateTransaction("Tx1", 1, "Genesis")
 		tx2 := ts.CreateTransaction("Tx2", 1, "Genesis")
 
-		ts.RegisterBlock("block1", node1.IssueBlock("block1", blockissuer.WithPayload(tx1)))
-		ts.RegisterBlock("block2", node1.IssueBlock("block2", blockissuer.WithPayload(tx2)))
-		ts.Wait(node1, node2)
+		ts.IssueBlock("block1", node1, blockissuer.WithPayload(tx1))
+		ts.IssueBlock("block2", node1, blockissuer.WithPayload(tx2))
 
-		ts.AssertTransactionsExist([]string{"Tx1", "Tx2"}, true, node1, node2)
-		ts.AssertTransactionsInCacheBooked([]string{"Tx1", "Tx2"}, true, node1, node2)
-		ts.AssertTransactionsInCachePending([]string{"Tx1", "Tx2"}, true, node1, node2)
-		ts.AssertBlocksInCacheConflicts(map[string][]string{
-			"block1": {"Tx1"},
-			"block2": {"Tx2"},
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block1"): {"Tx1"},
+			ts.Block("block2"): {"Tx2"},
 		}, node1, node2)
 
-		ts.AssertTransactionInCacheConflicts(map[string][]string{
-			"Tx2": {"Tx2"},
-			"Tx1": {"Tx1"},
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			ts.TransactionFramework.Transaction("Tx2"): {"Tx2"},
+			ts.TransactionFramework.Transaction("Tx1"): {"Tx1"},
 		}, node1, node2)
 	}
 
 	// Issue some more blocks and assert that conflicts are propagated to blocks.
 	{
-		references := make(model.ParentReferences)
-		references[model.StrongParentType] = ts.BlockIDs("block1")
-		ts.RegisterBlock("block3", node1.IssueBlock("block3", blockissuer.WithReferences(references)))
+		ts.IssueBlock("block3", node1, blockissuer.WithStrongParents(ts.BlockID("block1")))
+		ts.IssueBlock("block4", node1, blockissuer.WithStrongParents(ts.BlockID("block2")))
 
-		references = make(model.ParentReferences)
-		references[model.StrongParentType] = ts.BlockIDs("block2")
-		ts.RegisterBlock("block4", node1.IssueBlock("block4", blockissuer.WithReferences(references)))
-		ts.Wait(node1, node2)
-
-		ts.AssertBlocksInCacheConflicts(map[string][]string{
-			"block3": {"Tx1"},
-			"block4": {"Tx2"},
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block3"): {"Tx1"},
+			ts.Block("block4"): {"Tx2"},
 		}, node1, node2)
-		ts.AssertTransactionsInCachePending([]string{"Tx1", "Tx2"}, true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
 	}
 
 	// Issue an invalid block and assert that its vote is not cast.
 	{
-		references := make(model.ParentReferences)
-		references[model.StrongParentType] = ts.BlockIDs("block3", "block4")
-		ts.RegisterBlock("block5", node2.IssueBlock("block5", blockissuer.WithReferences(references)))
-		ts.Wait(node1, node2)
+		ts.IssueBlock("block5", node2, blockissuer.WithStrongParents(ts.BlockIDs("block3", "block4")...))
 
-		ts.AssertTransactionsInCachePending([]string{"Tx1", "Tx2"}, true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
 	}
 
 	// Issue a valid block that resolves the conflict.
 	{
-		references := make(model.ParentReferences)
-		references[model.StrongParentType] = ts.BlockIDs("block3", "block4")
-		references[model.ShallowLikeParentType] = ts.BlockIDs("block2")
+		ts.IssueBlock("block6", node2, blockissuer.WithStrongParents(ts.BlockIDs("block3", "block4")...), blockissuer.WithShallowLikeParents(ts.BlockID("block2")))
 
-		ts.RegisterBlock("block6", node2.IssueBlock("block6", blockissuer.WithReferences(references)))
-		ts.Wait(node1, node2)
-
-		ts.AssertBlocksInCacheConflicts(map[string][]string{
-			"block6": {"Tx2"},
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block6"): {"Tx2"},
 		}, node1, node2)
-		ts.AssertTransactionsInCacheAccepted([]string{"Tx2"}, true, node1, node2)
-		ts.AssertTransactionsInCacheRejected([]string{"Tx1"}, true, node1, node2)
+		ts.AssertTransactionsInCacheAccepted(ts.TransactionFramework.Transactions("Tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("Tx1"), true, node1, node2)
 
 	}
 }
@@ -143,26 +124,22 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	node1.HookLogging()
 
-	time.Sleep(time.Second)
 	//Create a transaction and issue it from both nodes, so that the conflict is accepted, but none attachment is not included yet.
 	{
 		tx1 := ts.CreateTransaction("Tx1", 2, "Genesis")
 
-		references := make(model.ParentReferences)
-		references[model.StrongParentType] = ts.BlockIDs("Genesis")
-		ts.RegisterBlock("block1", node1.IssueBlock("block1", blockissuer.WithPayload(tx1), blockissuer.WithReferences(references)))
-		ts.RegisterBlock("block2", node2.IssueBlock("block2", blockissuer.WithPayload(tx1), blockissuer.WithReferences(references)))
-		ts.Wait(node1, node2)
+		ts.IssueBlock("block1", node1, blockissuer.WithPayload(tx1), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBlock("block2", node2, blockissuer.WithPayload(tx1), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
 
-		ts.AssertTransactionsExist([]string{"Tx1"}, true, node1, node2)
-		ts.AssertTransactionsInCacheBooked([]string{"Tx1"}, true, node1, node2)
-		ts.AssertTransactionsInCachePending([]string{"Tx1"}, true, node1, node2)
-		ts.AssertBlocksInCacheConflicts(map[string][]string{
-			"block1": {"Tx1"},
-			"block2": {"Tx1"},
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("Tx1"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("Tx1"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("Tx1"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block1"): {"Tx1"},
+			ts.Block("block2"): {"Tx1"},
 		}, node1, node2)
-		ts.AssertTransactionInCacheConflicts(map[string][]string{
-			"Tx1": {"Tx1"},
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			ts.TransactionFramework.Transaction("Tx1"): {"Tx1"},
 		}, node1, node2)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"Tx1"}, acceptance.Accepted, node1, node2)
 	}
@@ -171,52 +148,42 @@ func Test_MultipleAttachments(t *testing.T) {
 	{
 		tx2 := ts.CreateTransaction("Tx2", 1, "Tx1:1")
 
-		references := make(model.ParentReferences)
-		references[model.StrongParentType] = ts.BlockIDs("Genesis")
-		ts.RegisterBlock("block3", node1.IssueBlock("block3", blockissuer.WithPayload(tx2), blockissuer.WithReferences(references)))
+		ts.IssueBlock("block3", node1, blockissuer.WithPayload(tx2), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBlock("block4", node2, blockissuer.WithStrongParents(ts.BlockID("block3")))
 
-		references = make(model.ParentReferences)
-		references[model.StrongParentType] = ts.BlockIDs("block3")
-		ts.RegisterBlock("block4", node2.IssueBlock("block4", blockissuer.WithReferences(references)))
-		ts.Wait(node1, node2)
-
-		ts.AssertTransactionsExist([]string{"Tx1", "Tx2"}, true, node1, node2)
-		ts.AssertTransactionsInCacheBooked([]string{"Tx1", "Tx2"}, true, node1, node2)
-		ts.AssertTransactionsInCachePending([]string{"Tx1", "Tx2"}, true, node1, node2)
-		ts.AssertBlocksInCacheConflicts(map[string][]string{
-			"block1": {"Tx1"},
-			"block2": {"Tx1"},
-			"block3": {"Tx2"},
-			"block4": {"Tx2"},
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block1"): {"Tx1"},
+			ts.Block("block2"): {"Tx1"},
+			ts.Block("block3"): {"Tx2"},
+			ts.Block("block4"): {"Tx2"},
 		}, node1, node2)
-		ts.AssertTransactionInCacheConflicts(map[string][]string{
-			"Tx1": {"Tx1"},
-			"Tx2": {"Tx2"},
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			ts.TransactionFramework.Transaction("Tx1"): {"Tx1"},
+			ts.TransactionFramework.Transaction("Tx2"): {"Tx2"},
 		}, node1, node2)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"Tx1", "Tx2"}, acceptance.Accepted, node1, node2)
 	}
 
 	//Issue a block that includes Tx1, and make sure that Tx2 is accepted as well as a consequence.
 	{
-		references := make(model.ParentReferences)
-		references[model.StrongParentType] = ts.BlockIDs("block1")
-		ts.RegisterBlock("block5", node2.IssueBlock("block5", blockissuer.WithReferences(references)))
+		ts.IssueBlock("block5", node2, blockissuer.WithStrongParents(ts.BlockID("block1")))
 
-		ts.Wait(node1, node2)
-
-		ts.AssertTransactionsExist([]string{"Tx1", "Tx2"}, true, node1, node2)
-		ts.AssertTransactionsInCacheBooked([]string{"Tx1", "Tx2"}, true, node1, node2)
-		ts.AssertTransactionsInCacheAccepted([]string{"Tx1", "Tx2"}, true, node1, node2)
-		ts.AssertBlocksInCacheConflicts(map[string][]string{
-			"block1": {"Tx1"},
-			"block2": {"Tx1"},
-			"block3": {"Tx2"},
-			"block4": {"Tx2"},
-			"block5": {},
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheAccepted(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block1"): {"Tx1"},
+			ts.Block("block2"): {"Tx1"},
+			ts.Block("block3"): {"Tx2"},
+			ts.Block("block4"): {"Tx2"},
+			ts.Block("block5"): {},
 		}, node1, node2)
-		ts.AssertTransactionInCacheConflicts(map[string][]string{
-			"Tx1": {"Tx1"},
-			"Tx2": {"Tx2"},
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			ts.TransactionFramework.Transaction("Tx1"): {"Tx1"},
+			ts.TransactionFramework.Transaction("Tx2"): {"Tx2"},
 		}, node1, node2)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"Tx1", "Tx2"}, acceptance.Accepted, node1, node2)
 	}

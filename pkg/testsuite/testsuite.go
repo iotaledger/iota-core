@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
@@ -143,6 +144,19 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	block := node.IssueBlockAtSlot(alias, slot, slotCommitment, parents...)
 
 	t.blocks.Set(alias, block)
+	block.ID().RegisterAlias(alias)
+
+	return block
+}
+
+func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	block := node.IssueBlock(alias, blockOpts...)
+
+	t.blocks.Set(alias, block)
+	block.ID().RegisterAlias(alias)
 
 	return block
 }
