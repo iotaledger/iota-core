@@ -58,7 +58,7 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 			m.acceptedTimeFunc = e.Clock.RatifiedAccepted().Time
 
 			m.ledger = e.Ledger
-			m.attestation = e.Attestation
+			m.attestation = e.Attestations
 
 			wpBlocks := m.workers.CreatePool("Blocks", 1)           // Using just 1 worker to avoid contention
 			wpCommitments := m.workers.CreatePool("Commitments", 1) // Using just 1 worker to avoid contention

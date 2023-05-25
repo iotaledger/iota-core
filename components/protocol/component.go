@@ -112,7 +112,7 @@ func provide(c *dig.Container) error {
 				slotnotarization.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)+slotattestation.DefaultOffsetMinCommittableAge),
+				slotattestation.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)+slotattestation.DefaultAttestationCommitmentOffset),
 			),
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(

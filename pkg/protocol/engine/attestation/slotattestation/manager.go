@@ -1,6 +1,8 @@
 package slotattestation
 
 import (
+	"fmt"
+	"io"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -9,17 +11,20 @@ import (
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
-	DefaultOffsetMinCommittableAge     = 4
-	DefaultAttestationCommitmentOffset = slotnotarization.DefaultMinSlotCommittableAge + DefaultOffsetMinCommittableAge
+	DefaultAttestationCommitmentOffset = 4
+
+	prefixAttestationsADSMap byte = iota
+	prefixAttestationsTracker
 )
 
 // Manager is the manager of slot attestations. It works in two phases:
@@ -49,10 +54,11 @@ func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*
 	return module.Provide(func(e *engine.Engine) attestation.Attestations {
 		m := NewManager(attestationCommitmentOffset, e.Storage.Prunable.Attestations, e.SybilProtection.Accounts)
 
-		e.HookInitialized(func() {
-			cw := e.Storage.Settings().LatestCommitment().Commitment().CumulativeWeight
-			index := e.Storage.Settings().LatestCommitment().ID().Index()
-			m.Initialize(index, cw)
+		e.Storage.Settings().HookInitialized(func() {
+			m.commitmentMutex.Lock()
+			m.lastCommittedSlot = e.Storage.Settings().LatestCommitment().ID().Index()
+			m.lastCumulativeWeight = e.Storage.Settings().LatestCommitment().Commitment().CumulativeWeight
+			m.commitmentMutex.Unlock()
 		})
 
 		return m
@@ -72,16 +78,10 @@ func NewManager(attestationCommitmentOffset iotago.SlotIndex, bucketedStorage fu
 	return m
 }
 
-func (m *Manager) Initialize(lastCommitmentIndex iotago.SlotIndex, lastCumulativeWeight uint64) {
-	m.commitmentMutex.Lock()
-	m.lastCommittedSlot = lastCommitmentIndex
-	m.lastCumulativeWeight = lastCumulativeWeight
-	m.commitmentMutex.Unlock()
-
-	m.TriggerInitialized()
-}
-
 func (m *Manager) Shutdown() {
+	if err := m.writeToDisk(); err != nil {
+		panic(err)
+	}
 	m.TriggerStopped()
 }
 
@@ -139,7 +139,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsMap 
 	attestations := m.tracker.EvictSlot(attestationSlotIndex)
 
 	// Store all attestations of attestationSlotIndex in bucketed storage via ads.Map / sparse merkle tree.
-	tree, err := m.attestationStorage(index)
+	tree, err := m.adsMapStorage(attestationSlotIndex)
 	if err != nil {
 		return 0, nil, errors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
 	}
@@ -167,7 +167,7 @@ func (m *Manager) Get(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago
 		return nil, errors.Errorf("slot %d is newer than last committed slot %d", index, m.lastCommittedSlot)
 	}
 
-	return m.attestationStorage(index)
+	return m.adsMapStorage(index)
 }
 
 func (m *Manager) computeAttestationCommitmentOffset() iotago.SlotIndex {
@@ -178,11 +178,191 @@ func (m *Manager) computeAttestationCommitmentOffset() iotago.SlotIndex {
 	return m.lastCommittedSlot - m.attestationCommitmentOffset
 }
 
-func (m *Manager) attestationStorage(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
+func (m *Manager) adsMapStorage(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
 	attestationsStorage := m.bucketedStorage(index)
 	if attestationsStorage == nil {
 		return nil, errors.Errorf("failed to access storage for attestors of slot %d", index)
 	}
+	attestationsStorage, err := attestationsStorage.WithExtendedRealm(kvstore.Realm{prefixAttestationsADSMap})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get extended realm for attestations of slot %d", index)
+	}
 
 	return ads.NewMap[iotago.AccountID, iotago.Attestation](attestationsStorage), nil
+}
+
+func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
+	trackerStorage := m.bucketedStorage(index)
+	if trackerStorage == nil {
+		return nil, errors.Errorf("failed to access storage for tracker of slot %d", index)
+	}
+	trackerStorage, err := trackerStorage.WithExtendedRealm(kvstore.Realm{prefixAttestationsTracker})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get extended realm for tracker of slot %d", index)
+	}
+
+	return kvstore.NewTypedStore[iotago.AccountID, iotago.Attestation](trackerStorage), nil
+}
+
+func (m *Manager) Import(reader io.ReadSeeker) error {
+	m.commitmentMutex.Lock()
+	defer m.commitmentMutex.Unlock()
+
+	// Read slot count.
+	count, err := stream.Read[iotago.SlotIndex](reader)
+	if err != nil {
+		return errors.Wrap(err, "failed to read slot")
+	}
+
+	for i := 0; i < int(count); i++ {
+		// Read slot index.
+		slotIndex, err := stream.Read[iotago.SlotIndex](reader)
+		if err != nil {
+			return errors.Wrap(err, "failed to read slot")
+		}
+
+		// Read attestations.
+		var attestations []*iotago.Attestation
+		if err = stream.ReadCollection(reader, func(i int) error {
+			importedAttestation := new(iotago.Attestation)
+			if err = stream.ReadSerializable(reader, importedAttestation); err != nil {
+				return errors.Wrapf(err, "failed to read attestation %d", i)
+			}
+
+			attestations = append(attestations, importedAttestation)
+
+			return nil
+		}); err != nil {
+			return errors.Wrapf(err, "failed to import attestations for slot %d", slotIndex)
+		}
+
+		if slotIndex > m.computeAttestationCommitmentOffset() {
+			for _, a := range attestations {
+				m.tracker.TrackAttestation(a)
+			}
+		} else {
+			// We should never be able to import attestations for a slot that is older than the attestation commitment offset.
+			panic("commitment not aligned with attestation")
+		}
+	}
+
+	m.TriggerInitialized()
+
+	return nil
+}
+
+func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error {
+	m.commitmentMutex.RLock()
+	defer m.commitmentMutex.RUnlock()
+
+	if targetSlot > m.lastCommittedSlot {
+		return errors.Errorf("slot %d is newer than last committed slot %d", targetSlot, m.lastCommittedSlot)
+	}
+
+	attestationSlotIndex := m.computeAttestationCommitmentOffset()
+
+	// Write slot count.
+	start := lo.Min(targetSlot-m.attestationCommitmentOffset, 0) + 1
+	if err := stream.Write(writer, uint64(start-targetSlot)); err != nil {
+		return errors.Wrap(err, "failed to write slot count")
+	}
+
+	for i := start; i <= targetSlot; i++ {
+		var attestations []*iotago.Attestation
+		if i < attestationSlotIndex {
+			// Need to get attestations from storage.
+			attestationsStorage, err := m.adsMapStorage(i)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get attestations of slot %d", i)
+			}
+			err = attestationsStorage.Stream(func(key iotago.AccountID, value *iotago.Attestation) bool {
+				attestations = append(attestations, value)
+				return true
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to stream attestations of slot %d", i)
+			}
+		} else {
+			// Need to get attestations from tracker.
+			attestations = m.tracker.Attestations(i)
+		}
+
+		// Write slot index.
+		if err := stream.Write(writer, uint64(i)); err != nil {
+			return errors.Wrapf(err, "failed to write slot %d", i)
+		}
+
+		// Write attestations.
+		if err := stream.WriteCollection(writer, func() (uint64, error) {
+			for _, a := range attestations {
+				if writeErr := stream.WriteSerializable(writer, a); writeErr != nil {
+					return 0, errors.Wrapf(writeErr, "failed to write attestation %v", a)
+				}
+			}
+
+			return uint64(len(attestations)), nil
+		}); err != nil {
+			return errors.Wrapf(err, "failed to write attestations of slot %d", i)
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) RestoreFromDisk() error {
+	m.commitmentMutex.Lock()
+	defer m.commitmentMutex.Unlock()
+
+	for i := m.computeAttestationCommitmentOffset(); i <= m.lastCommittedSlot; i++ {
+		storage, err := m.trackerStorage(i)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get storage for slot %d", i)
+		}
+
+		err = storage.Iterate(kvstore.EmptyPrefix, func(key iotago.AccountID, value iotago.Attestation) bool {
+			m.tracker.TrackAttestation(&value)
+			return true
+		})
+		if err != nil {
+			return errors.Wrapf(err, "failed to iterate over attestations of slot %d", i)
+		}
+		if err := storage.Clear(); err != nil {
+			return errors.Wrapf(err, "failed to clear tracker attestations of slot %d", i)
+		}
+
+		// TODO: make sure it's actually deleted
+		fmt.Println("RestoreFromDisk: clearing", i)
+		err = storage.Iterate(kvstore.EmptyPrefix, func(key iotago.AccountID, value iotago.Attestation) bool {
+			fmt.Println("attestation", value)
+			return true
+		})
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	m.TriggerInitialized()
+
+	return nil
+}
+
+func (m *Manager) writeToDisk() error {
+	m.commitmentMutex.RLock()
+	defer m.commitmentMutex.RUnlock()
+
+	for i := m.computeAttestationCommitmentOffset(); i <= m.lastCommittedSlot; i++ {
+		storage, err := m.trackerStorage(i)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get storage for slot %d", i)
+		}
+
+		attestations := m.tracker.Attestations(i)
+		for _, a := range attestations {
+			if err := storage.Set(a.IssuerID, *a); err != nil {
+				return errors.Wrapf(err, "failed to set attestation %v", a)
+			}
+		}
+	}
+
+	return nil
 }

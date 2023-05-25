@@ -19,7 +19,7 @@ func (t *TestSuite) AssertAttestationsForSlot(slotIndex iotago.SlotIndex, blocks
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			attestationTree, err := node.Protocol.MainEngineInstance().Attestation.Get(slotIndex)
+			attestationTree, err := node.Protocol.MainEngineInstance().Attestations.Get(slotIndex)
 			if err != nil {
 				return errors.Wrapf(err, "AssertStorageAttestationsForSlot: %s: error loading attestation tree for slot %d", node.Name, slotIndex)
 			}
