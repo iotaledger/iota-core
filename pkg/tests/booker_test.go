@@ -33,7 +33,7 @@ func TestBooker(t *testing.T) {
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
 			),
 		},
 	})
