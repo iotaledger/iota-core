@@ -32,7 +32,9 @@ func (c *Credits) FromBytes(bytes []byte) (int, error) {
 }
 
 // Update updates the Credits increasing Value and updateTime.
-func (c *Credits) Update(add int64, updateTime iotago.SlotIndex) {
+func (c *Credits) Update(add int64, updateTime ...iotago.SlotIndex) {
 	c.Value += add
-	c.UpdateTime = updateTime
+	if len(updateTime) > 0 {
+		c.UpdateTime = updateTime[0]
+	}
 }

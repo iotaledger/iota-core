@@ -33,7 +33,7 @@ var (
 
 type Ledger struct {
 	utxoLedger     *ledgerstate.Manager
-	accountsLedger *bic.BlockIssuanceCredits
+	accountsLedger *bic.BICManager
 
 	memPool      mempool.MemPool[vote.MockedPower]
 	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
