@@ -59,7 +59,7 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 	return nil
 }
 
-func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *BICDiff, api iotago.API) (written int64, err error) {
+func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *Diff, api iotago.API) (written int64, err error) {
 	var totalBytesWritten int64
 
 	if err := utils.WriteValueFunc(writer, "slot diff index", uint64(diff.index), &totalBytesWritten); err != nil {
@@ -67,14 +67,10 @@ func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *BICDiff, api iot
 	}
 
 	// TODO maybe its better to sort the map by outputID and then write the bytes one by one, in case diff is large
-	allottmentBytes, err := api.Encode(diff.allotments)
+	allottmentBytes, err := api.Encode(diff.bicChanges)
 	if err = utils.WriteBytesFunc(writer, "slot diff allottments", allottmentBytes, &totalBytesWritten); err != nil {
 		return 0, err
 	}
 
-	burnBytes, err := api.Encode(diff.burns)
-	if err = utils.WriteBytesFunc(writer, "slot diff burns", burnBytes, &totalBytesWritten); err != nil {
-		return 0, err
-	}
 	return totalBytesWritten, nil
 }

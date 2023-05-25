@@ -16,43 +16,64 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type BICDiff struct {
-	index      iotago.SlotIndex            `serix:"0"`
-	allotments map[iotago.AccountID]uint64 `serix:"1,lengthPrefixType=uint32,omitempty"`
-	burns      map[iotago.AccountID]uint64 `serix:"2,lengthPrefixType=uint32,omitempty"`
+// Diff stores a changes in bic balances for a given slot.
+type Diff struct {
+	index      iotago.SlotIndex           `serix:"0"`
+	bicChanges map[iotago.AccountID]int64 `serix:"1,lengthPrefixType=uint32,omitempty"`
 }
 
-// BICManager is a module responsible for tracking block issuance credit balances.
+// newBICDiff creates a new BIC diff from the given allotments and burns.
+func newBICDiff(index iotago.SlotIndex, allotments map[iotago.AccountID]uint64, burns map[iotago.AccountID]uint64) *Diff {
+	bicChanges := make(map[iotago.AccountID]int64)
+	for id, allotment := range allotments {
+		bicChanges[id] += int64(allotment)
+	}
+	for id, burn := range burns {
+		bicChanges[id] -= int64(burn)
+	}
+
+	return &Diff{
+		index:      index,
+		bicChanges: bicChanges,
+	}
+}
+
+// BICManager is a Block Issuer Credits module responsible for tracking block issuance credit balances.
 type BICManager struct {
-	mutex sync.RWMutex
 
-	// TODO need to store BIC vector at least, only diffs can be recreated based on the ledgerstate
-	store kvstore.KVStore
-
+	// TODO no shrinking map needed, use bicTree as a base vector and apply the difs in a reverted order
 	// the slot index of the bic vector ("LatestCommitedSlot - MCA")
+	// TODO: store the index
 	bicIndex iotago.SlotIndex
 	// bic represents the Block Issuer Credits of all registered accounts, it is updated on the slot commitment.
 	bic *shrinkingmap.ShrinkingMap[iotago.AccountID, accounts.Account]
 
+	// TODO: include tx allottments inside the metadata of spent outputs, then pass the sllottments diff to the accountsLedger on the startup
+	// TODO: or store allotment diffs in the account ledger directly
+
 	// the slot index of the latest slot diff in the map
 	latestSlotDiffsIndex iotago.SlotIndex
 	// slot diffs for the BIC between [LatestCommitedSlot - MCA, LatestCommitedSlot]
-	slotDiffs *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *BICDiff]
+	slotDiffs *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Diff]
 
+	store kvstore.KVStore
 	// the slot index of the latest bic tree in the map
 	bicTreeIndex iotago.SlotIndex
 	// TODO on reading from the snapshot: create the BIC tree from the bic vector and the slot diffs
 	bicTree *ads.Map[iotago.AccountID, accounts.Credits, *iotago.AccountID, *accounts.Credits]
 
 	apiProviderFunc func() iotago.API
+	mutex           sync.RWMutex
 
 	module.Module
 }
 
+// TODO initialise this componen in the ledger manager, keep it behind the interface
+
 func New(store kvstore.KVStore, apiProviderFunc func() iotago.API) *BICManager {
 	return &BICManager{
 		bic:       shrinkingmap.New[iotago.AccountID, accounts.Account](),
-		slotDiffs: shrinkingmap.New[iotago.SlotIndex, *BICDiff](),
+		slotDiffs: shrinkingmap.New[iotago.SlotIndex, *Diff](),
 		bicTree:   ads.NewMap[iotago.AccountID, accounts.Credits](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixBICTree}))),
 	}
 }
@@ -69,12 +90,7 @@ func (b *BICManager) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotag
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	// TODO: should we combine allotments and burns in one value?
-	diff := &BICDiff{
-		index:      slotIndex,
-		allotments: allotments,
-		burns:      burns,
-	}
+	diff := newBICDiff(slotIndex, allotments, burns)
 
 	if err = b.applyDiff(diff); err != nil {
 		return iotago.Identifier{}, err
@@ -87,6 +103,7 @@ func (b *BICManager) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotag
 	return bicRoot, nil
 }
 
+// TODO update it for the no shrinking map version
 func (b *BICManager) BIC(id iotago.AccountID, slotIndex iotago.SlotIndex) (accounts.Account, error) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
@@ -115,13 +132,10 @@ func (b *BICManager) BIC(id iotago.AccountID, slotIndex iotago.SlotIndex) (accou
 		}
 
 		var accountSlotDiff int64
-		if alloted, exists := slotDiff.allotments[id]; exists {
-			accountSlotDiff += int64(alloted)
+		if change, exists := slotDiff.bicChanges[id]; exists {
+			accountSlotDiff += change
 		}
 
-		if burned, exists := slotDiff.burns[id]; exists {
-			accountSlotDiff -= int64(burned)
-		}
 		updatedTime := slotDiff.index
 		newAccount.Credits().Update(accountSlotDiff, updatedTime)
 	}
@@ -130,15 +144,14 @@ func (b *BICManager) BIC(id iotago.AccountID, slotIndex iotago.SlotIndex) (accou
 }
 
 func (b *BICManager) Shutdown() {
+	// TODO implement shutdown
 }
 
 func (b *BICManager) LatestCommittedIndex() (iotago.SlotIndex, error) {
 	return b.latestSlotDiffsIndex, nil
 }
 
-func (b *BICManager) applyDiff(newDiff *BICDiff) error {
-	// TODO (daria): do we need to store the index, if yes should it be in the engine store or should we create new kv store as in the ledger?
-
+func (b *BICManager) applyDiff(newDiff *Diff) error {
 	// check if the expected next slot diff is applied
 	if newDiff.index != b.latestSlotDiffsIndex+1 {
 		return errors.Errorf("could not apply diff, expected slot index %d, got %d", b.latestSlotDiffsIndex+1, newDiff.index)
@@ -164,22 +177,13 @@ func (b *BICManager) applyDiff(newDiff *BICDiff) error {
 		return fmt.Errorf("slot index does not exist: %d", newDiff.index-iotago.MaxCommitableSlotAge)
 	}
 
-	for accountID, allotmentValue := range oldDiff.allotments {
+	for accountID, allotmentValue := range oldDiff.bicChanges {
 		// check if there is an account, if not we need to create it
 		account, _ := b.bic.GetOrCreate(accountID, func() accounts.Account {
 			return accounts.NewAccount(accountID, accounts.NewCredits(0, newBalancesIndex), []ed25519.PublicKey{})
 		})
 
 		account.Credits().Value += int64(allotmentValue)
-	}
-
-	for accountID, burnValue := range oldDiff.burns {
-		// check if there is an account, if not we need to create it
-		account, _ := b.bic.GetOrCreate(accountID, func() accounts.Account {
-			return accounts.NewAccount(accountID, accounts.NewCredits(0, newBalancesIndex), []ed25519.PublicKey{})
-		})
-
-		account.Credits().Value -= int64(burnValue)
 	}
 
 	// set the new balances index
@@ -191,22 +195,14 @@ func (b *BICManager) applyDiff(newDiff *BICDiff) error {
 	return nil
 }
 
-func (b *BICManager) commitBICTree(diff *BICDiff) (bicRoot iotago.Identifier, err error) {
+func (b *BICManager) commitBICTree(diff *Diff) (bicRoot iotago.Identifier, err error) {
 	// previous bic tree should be at index -1
 	if b.bicTreeIndex != diff.index+1 {
 		return iotago.Identifier{}, errors.Errorf("the difference between already committed bic: %d and the target commit: %d is different than 1", b.bicTreeIndex, diff.index)
 	}
 
-	// TODO change diff to have target balance only
-	updates := make(map[iotago.AccountID]int64)
-	for accountID, allotmentValue := range diff.allotments {
-		updates[accountID] = int64(allotmentValue)
-	}
-	for accountID, burnValue := range diff.burns {
-		updates[accountID] -= int64(burnValue)
-	}
 	// update the bic tree to latestCommitted slot index
-	for accountID, valueChange := range updates {
+	for accountID, valueChange := range diff.bicChanges {
 		account, _ := b.bic.GetOrCreate(accountID, func() accounts.Account {
 			return accounts.NewAccount(accountID, accounts.NewCredits(0, diff.index), []ed25519.PublicKey{})
 		})
