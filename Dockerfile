@@ -48,6 +48,8 @@ RUN go build -o /app/iota-core -a -tags="$BUILD_TAGS" -ldflags='-w -s'
 COPY ./iota-core/config_defaults.json /app/config.json
 COPY ./iota-core/peering.json /app/peering.json
 
+RUN mkdir -p /app/data/peerdb
+
 ############################
 # Runtime Image
 ############################

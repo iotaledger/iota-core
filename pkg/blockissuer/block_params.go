@@ -25,9 +25,32 @@ func WithParentsCount(parentsCount int) func(builder *BlockParams) {
 	}
 }
 
-func WithReferences(references model.ParentReferences) func(builder *BlockParams) {
+func WithStrongParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.references = references
+		if builder.references == nil {
+			builder.references = make(model.ParentReferences)
+		}
+
+		builder.references[model.StrongParentType] = blockIDs
+	}
+}
+func WithWeakParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
+	return func(builder *BlockParams) {
+		if builder.references == nil {
+			builder.references = make(model.ParentReferences)
+		}
+
+		builder.references[model.WeakParentType] = blockIDs
+	}
+}
+
+func WithShallowLikeParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
+	return func(builder *BlockParams) {
+		if builder.references == nil {
+			builder.references = make(model.ParentReferences)
+		}
+
+		builder.references[model.ShallowLikeParentType] = blockIDs
 	}
 }
 

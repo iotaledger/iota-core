@@ -109,7 +109,7 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictda
 	c.preferredInstead = c
 
 	c.unhookAcceptanceMonitoring = c.Weight.OnUpdate.Hook(func(value weight.Value) {
-		if threshold := c.acceptanceThreshold(); value.AcceptanceState().IsPending() && value.ValidatorsWeight() >= threshold {
+		if value.AcceptanceState().IsPending() && value.ValidatorsWeight() >= c.acceptanceThreshold() {
 			c.setAcceptanceState(acceptance.Accepted)
 		}
 	}).Unhook

@@ -1,6 +1,8 @@
 package dashboard
 
 import (
+	"encoding/json"
+
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -165,7 +167,7 @@ type ExplorerBlock struct {
 	// PayloadType defines the type of the payload.
 	PayloadType iotago.PayloadType `json:"payloadType"`
 	// Payload is the content of the payload.
-	Payload interface{} `json:"payload"`
+	Payload json.RawMessage `json:"payload"`
 
 	// Structure details
 	Rank          uint64 `json:"rank"`
