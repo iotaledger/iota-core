@@ -190,6 +190,10 @@ func (p *Protocol) runNetworkProtocol() {
 	p.Events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
 		p.networkProtocol.RequestSlotCommitment(commitmentID)
 	}, event.WithWorkerPool(wpCommitments))
+
+	wpAttestations := p.Workers.CreatePool("NetworkEvents.Attestations", 1) // Using just 1 worker to avoid contention
+
+	p.Events.Network.AttestationsRequestReceived.Hook(p.ProcessAttestationsRequest, event.WithWorkerPool(wpAttestations))
 }
 
 func (p *Protocol) initEngineManager() {
@@ -299,6 +303,39 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	return nil
+}
+
+func (p *Protocol) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
+	mainEngine := p.MainEngineInstance()
+
+	if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
+		return
+	}
+
+	commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Index())
+	if err != nil {
+		return
+	}
+
+	if commitment.ID() != commitmentID {
+		return
+	}
+
+	store, err := mainEngine.Attestation.Get(commitmentID.Index())
+	if err != nil {
+		return
+	}
+
+	attestations := make([]*iotago.Attestation, 0)
+	if err := store.Stream(func(_ iotago.AccountID, attestation *iotago.Attestation) bool {
+		attestations = append(attestations, attestation)
+
+		return true
+	}); err != nil {
+		return
+	}
+
+	p.networkProtocol.SendAttestations(commitment, attestations, src)
 }
 
 func (p *Protocol) MainEngineInstance() *engine.Engine {
