@@ -3,6 +3,8 @@ package tipmanagerv1
 import (
 	"sync"
 
+	"golang.org/x/xerrors"
+
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/randommap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -89,28 +91,77 @@ func (t *TipManager) uniqueTipSelector() func(amount int) (strongTips []*BlockMe
 	}
 }
 
-func (t *TipManager) SelectTips(amount int) (references map[model.ParentsType]*advancedset.AdvancedSet[iotago.BlockID]) {
-	references = make(map[model.ParentsType]*advancedset.AdvancedSet[iotago.BlockID])
+// SelectTips selects the references that should be used for block issuance.
+func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) {
+	references = make(model.ParentReferences)
 
-	selectTips := t.uniqueTipSelector()
-	t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]) error {
-		for strongTipCandidates := selectTips(amount - references[model.StrongParentType].Size()); len(strongTipCandidates) != 0; strongTipCandidates = selectTips(amount - references[model.StrongParentType].Size()) {
-			for _, strongTip := range strongTipCandidates {
-				likedInsteadReferences := conflictDAG.LikedInstead(strongTip.ConflictIDs())
-				likedInsteadReferences.Range(func(element iotago.TransactionID) {
-					transactionMetadata, exists := t.memPool.TransactionMetadata(element)
-					transactionMetadata.
-					// get attachment
-				})
-
-				references[model.ShallowLikeParentType].Has(strongTip.Block.ID())
+	seenStrongTips := advancedset.New[iotago.BlockID]()
+	selectStrongTips := func(amount int) (strongTips []*BlockMetadata) {
+		if amount > 0 {
+			for _, strongTip := range t.strongTipSet.RandomUniqueEntries(amount + seenStrongTips.Size()) {
+				if seenStrongTips.Add(strongTip.Block.ID()) {
+					if strongTips = append(strongTips, strongTip); len(strongTips) == amount {
+						return strongTips
+					}
+				}
 			}
 		}
+
+		return strongTips
+	}
+
+	t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]) error {
+		likedConflicts := advancedset.New[iotago.TransactionID]()
+
+		likedInsteadReferences := func(blockMetadata *BlockMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {
+			necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
+			if err = conflictDAG.LikedInstead(blockMetadata.ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
+				if transactionMetadata, exists := t.memPool.TransactionMetadata(likedConflictID); !exists {
+					return xerrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedConflictID)
+				} else {
+					necessaryReferences[likedConflictID] = lo.First(transactionMetadata.Attachments())
+				}
+
+				return nil
+			}); err != nil {
+				return nil, nil, err
+			}
+
+			references, updatedLikedConflicts = make([]iotago.BlockID, 0), likedConflicts.Clone()
+			for conflictID, attachmentID := range necessaryReferences {
+				if updatedLikedConflicts.Add(conflictID) {
+					references = append(references, attachmentID)
+				}
+			}
+
+			if len(references) > maxLikedInsteadReferencesPerParent {
+				return nil, nil, xerrors.Errorf("too many liked instead references (%d) for block %s", len(references), blockMetadata.Block.ID())
+			}
+
+			return references, updatedLikedConflicts, nil
+		}
+
+		for strongTipCandidates := selectStrongTips(amount - len(references[model.StrongParentType])); len(strongTipCandidates) != 0; strongTipCandidates = selectStrongTips(amount - len(references[model.StrongParentType])) {
+			for _, strongTip := range strongTipCandidates {
+				if addedLikedInsteadReferences, updatedLikedConflicts, err := likedInsteadReferences(strongTip); err != nil {
+					// TODO: LOG REASON FOR DOWNGRADE?
+
+					strongTip.setTipPool(t.determineTipPool(strongTip, WeakTipPool))
+				} else if len(addedLikedInsteadReferences) <= maxLikedInsteadReferences-len(references[model.ShallowLikeParentType]) {
+					references[model.StrongParentType] = append(references[model.StrongParentType], strongTip.ID())
+					references[model.ShallowLikeParentType] = append(references[model.ShallowLikeParentType], addedLikedInsteadReferences...)
+
+					likedConflicts = updatedLikedConflicts
+				}
+			}
+		}
+
+		references[model.WeakParentType] = lo.Map(t.weakTipSet.RandomUniqueEntries(maxWeakReferences), (*BlockMetadata).ID)
 
 		return nil
 	})
 
-	return nil
+	return references
 }
 
 // StrongTipSet returns the strong tip set of the TipManager.
