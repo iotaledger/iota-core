@@ -3,11 +3,9 @@ package ledgerstate_test
 
 import (
 	"encoding/binary"
+	"github.com/stretchr/testify/require"
 	"sort"
 	"testing"
-	"time"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
@@ -18,7 +16,7 @@ import (
 
 func TestSimpleSlotDiffSerialization(t *testing.T) {
 	indexBooked := iotago.SlotIndex(255975)
-	timestampCreated := tpkg.RandTimestamp()
+	slotCreated := tpkg.RandSlotIndex()
 
 	api := tpkg.API()
 	outputID := tpkg.RandOutputID()
@@ -33,13 +31,13 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 			},
 		},
 	}
-	output := ledgerstate.CreateOutput(api, outputID, blockID, indexBooked, timestampCreated, iotaOutput)
+	output := ledgerstate.CreateOutput(api, outputID, blockID, indexBooked, slotCreated, iotaOutput)
 
 	transactionIDSpent := tpkg.RandTransactionID()
 
 	indexSpent := indexBooked + 1
 
-	spent := ledgerstate.NewSpent(output, transactionIDSpent, timestampCreated.Add(3*time.Second), indexSpent)
+	spent := ledgerstate.NewSpent(output, transactionIDSpent, indexSpent)
 
 	diff := &ledgerstate.SlotDiff{
 		Index:   indexSpent,

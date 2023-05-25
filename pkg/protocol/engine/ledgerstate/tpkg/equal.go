@@ -16,7 +16,7 @@ func EqualOutput(t *testing.T, expected *ledgerstate.Output, actual *ledgerstate
 	require.Equal(t, expected.OutputID(), actual.OutputID())
 	require.Equal(t, expected.BlockID(), actual.BlockID())
 	require.Equal(t, expected.SlotIndexBooked(), actual.SlotIndexBooked())
-	require.Equal(t, expected.TimestampCreated(), actual.TimestampCreated())
+	require.Equal(t, expected.SlotCreated(), actual.SlotCreated())
 	require.Equal(t, expected.OutputType(), actual.OutputType())
 
 	var expectedIdent iotago.Address
@@ -50,7 +50,6 @@ func EqualSpent(t *testing.T, expected *ledgerstate.Spent, actual *ledgerstate.S
 	require.Equal(t, expected.OutputID(), actual.OutputID())
 	require.Equal(t, expected.TransactionIDSpent(), actual.TransactionIDSpent())
 	require.Equal(t, expected.SlotIndexSpent(), actual.SlotIndexSpent())
-	require.Equal(t, expected.TimestampSpent(), actual.TimestampSpent())
 	EqualOutput(t, expected.Output(), actual.Output())
 }
 

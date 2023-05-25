@@ -3,13 +3,11 @@ package ledgerstate
 import (
 	"encoding/binary"
 	"fmt"
-	"io"
-	"time"
-
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"io"
 )
 
 // Helpers to serialize/deserialize into/from snapshots
@@ -19,7 +17,7 @@ func (o *Output) SnapshotBytes() []byte {
 	m.WriteBytes(o.outputID[:])
 	m.WriteBytes(o.blockID[:])
 	m.WriteUint64(uint64(o.slotIndexBooked))
-	m.WriteTime(o.timestampCreated)
+	m.WriteUint64(uint64(o.slotCreated))
 	m.WriteUint32(uint32(len(o.encodedOutput)))
 	m.WriteBytes(o.encodedOutput)
 
@@ -42,9 +40,9 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, api iotago.API) (*Output, er
 		return nil, fmt.Errorf("unable to read LS output milestone index booked: %w", err)
 	}
 
-	var timestampCreated int64
-	if err := binary.Read(reader, binary.LittleEndian, &timestampCreated); err != nil {
-		return nil, fmt.Errorf("unable to read LS output milestone timestamp booked: %w", err)
+	var indexCreated iotago.SlotIndex
+	if err := binary.Read(reader, binary.LittleEndian, &indexCreated); err != nil {
+		return nil, fmt.Errorf("unable to read LS output index created: %w", err)
 	}
 
 	var outputLength uint32
@@ -62,14 +60,14 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, api iotago.API) (*Output, er
 		return nil, fmt.Errorf("invalid LS output address: %w", err)
 	}
 
-	return CreateOutput(api, outputID, blockID, indexBooked, time.Unix(0, timestampCreated), output, outputBytes), nil
+	return CreateOutput(api, outputID, blockID, indexBooked, indexCreated, output, outputBytes), nil
 }
 
 func (s *Spent) SnapshotBytes() []byte {
 	m := marshalutil.New()
 	m.WriteBytes(s.Output().SnapshotBytes())
 	m.WriteBytes(s.transactionIDSpent[:])
-	m.WriteTime(s.timestampSpent)
+	m.WriteBytes(s.slotIndexSpent.Bytes())
 	// we don't need to write indexSpent because this info is available in the milestoneDiff that consumes the output
 	return m.Bytes()
 }
@@ -90,7 +88,7 @@ func SpentFromSnapshotReader(reader io.ReadSeeker, api iotago.API, indexSpent io
 		return nil, fmt.Errorf("unable to read LS output milestone timestamp booked: %w", err)
 	}
 
-	return NewSpent(output, transactionIDSpent, time.Unix(0, timestampSpent), indexSpent), nil
+	return NewSpent(output, transactionIDSpent, indexSpent), nil
 }
 
 func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, api iotago.API) (*SlotDiff, error) {

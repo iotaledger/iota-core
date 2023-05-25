@@ -175,7 +175,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot, mutationRoot, bi
 				return false
 			}
 
-			spent := ledgerstate.NewSpent(inputOutput, txWithMeta.ID(), txCreationTime, index)
+			spent := ledgerstate.NewSpent(inputOutput, txWithMeta.ID(), index)
 			spents = append(spents, spent)
 		}
 

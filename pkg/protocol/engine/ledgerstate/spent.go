@@ -2,8 +2,6 @@ package ledgerstate
 
 import (
 	"bytes"
-	"time"
-
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -33,8 +31,6 @@ type Spent struct {
 	outputID iotago.OutputID
 	// the ID of the transaction that spent the output
 	transactionIDSpent iotago.TransactionID
-	// the timestamp when the output was spent
-	timestampSpent time.Time
 	// the index of the slot that spent the output
 	slotIndexSpent iotago.SlotIndex
 
@@ -75,19 +71,13 @@ func (s *Spent) SlotIndexSpent() iotago.SlotIndex {
 	return s.slotIndexSpent
 }
 
-// TimestampSpent returns the timestamp when the output was spent.
-func (s *Spent) TimestampSpent() time.Time {
-	return s.timestampSpent
-}
-
 type Spents []*Spent
 
-func NewSpent(output *Output, transactionIDSpent iotago.TransactionID, timestampSpent time.Time, slotIndexSpent iotago.SlotIndex) *Spent {
+func NewSpent(output *Output, transactionIDSpent iotago.TransactionID, slotIndexSpent iotago.SlotIndex) *Spent {
 	return &Spent{
 		outputID:           output.outputID,
 		output:             output,
 		transactionIDSpent: transactionIDSpent,
-		timestampSpent:     timestampSpent,
 		slotIndexSpent:     slotIndexSpent,
 	}
 }
@@ -107,7 +97,6 @@ func (s *Spent) KVStorableKey() (key []byte) {
 func (s *Spent) KVStorableValue() (value []byte) {
 	ms := marshalutil.New(48)
 	ms.WriteBytes(s.transactionIDSpent[:])  // 32 bytes
-	ms.WriteTime(s.timestampSpent)          // 8 bytes
 	ms.WriteBytes(s.slotIndexSpent.Bytes()) // 8 bytes
 
 	return ms.Bytes()
@@ -133,11 +122,6 @@ func (s *Spent) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
 
 	// Read transaction ID
 	if s.transactionIDSpent, err = parseTransactionID(valueUtil); err != nil {
-		return err
-	}
-
-	// Read milestone timestamp
-	if s.timestampSpent, err = valueUtil.ReadTime(); err != nil {
 		return err
 	}
 

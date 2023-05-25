@@ -264,21 +264,21 @@ func RandLedgerStateOutput() *ledgerstate.Output {
 }
 
 func RandLedgerStateOutputWithType(outputType iotago.OutputType) *ledgerstate.Output {
-	return ledgerstate.CreateOutput(api, RandOutputID(), RandBlockID(), RandSlotIndex(), RandTimestamp(), RandOutput(outputType))
+	return ledgerstate.CreateOutput(api, RandOutputID(), RandBlockID(), RandSlotIndex(), RandSlotIndex(), RandOutput(outputType))
 }
 
 func RandLedgerStateOutputOnAddress(outputType iotago.OutputType, address iotago.Address) *ledgerstate.Output {
-	return ledgerstate.CreateOutput(api, RandOutputID(), RandBlockID(), RandSlotIndex(), RandTimestamp(), RandOutputOnAddress(outputType, address))
+	return ledgerstate.CreateOutput(api, RandOutputID(), RandBlockID(), RandSlotIndex(), RandSlotIndex(), RandOutputOnAddress(outputType, address))
 }
 
 func RandLedgerStateOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.Address, amount uint64) *ledgerstate.Output {
-	return ledgerstate.CreateOutput(api, RandOutputID(), RandBlockID(), RandSlotIndex(), RandTimestamp(), RandOutputOnAddressWithAmount(outputType, address, amount))
+	return ledgerstate.CreateOutput(api, RandOutputID(), RandBlockID(), RandSlotIndex(), RandSlotIndex(), RandOutputOnAddressWithAmount(outputType, address, amount))
 }
 
 func RandLedgerStateSpent(indexSpent iotago.SlotIndex, timestampSpent time.Time) *ledgerstate.Spent {
-	return ledgerstate.NewSpent(RandLedgerStateOutput(), RandTransactionID(), timestampSpent, indexSpent)
+	return ledgerstate.NewSpent(RandLedgerStateOutput(), RandTransactionID(), indexSpent)
 }
 
 func RandLedgerStateSpentWithOutput(output *ledgerstate.Output, indexSpent iotago.SlotIndex, timestampSpent time.Time) *ledgerstate.Spent {
-	return ledgerstate.NewSpent(output, RandTransactionID(), timestampSpent, indexSpent)
+	return ledgerstate.NewSpent(output, RandTransactionID(), indexSpent)
 }

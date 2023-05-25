@@ -20,19 +20,19 @@ func TestOutput_SnapshotBytes(t *testing.T) {
 	outputID := tpkg.RandOutputID(2)
 	blockID := tpkg.RandBlockID()
 	indexBooked := tpkg.RandSlotIndex()
-	tsCreated := tpkg.RandTimestamp()
+	slotCreated := tpkg.RandSlotIndex()
 	iotaOutput := tpkg.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := tpkg.API().Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := ledgerstate.CreateOutput(tpkg.API(), outputID, blockID, indexBooked, tsCreated, iotaOutput, iotaOutputBytes)
+	output := ledgerstate.CreateOutput(tpkg.API(), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
 
 	snapshotBytes := output.SnapshotBytes()
 
 	require.Equal(t, outputID[:], snapshotBytes[:iotago.OutputIDLength], "outputID not equal")
 	require.Equal(t, blockID[:], snapshotBytes[iotago.OutputIDLength:iotago.OutputIDLength+iotago.BlockIDLength], "blockID not equal")
 	require.Equal(t, uint64(indexBooked), binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength:iotago.OutputIDLength+iotago.BlockIDLength+8]), "slotIndexBooked not equal")
-	require.Equal(t, tsCreated.UnixNano(), int64(binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8:iotago.OutputIDLength+iotago.BlockIDLength+8+8])), "slotIndexBooked not equal")
+	require.Equal(t, uint64(slotCreated), int64(binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8:iotago.OutputIDLength+iotago.BlockIDLength+8+8])), "slotIndexBooked not equal")
 	require.Equal(t, uint32(len(iotaOutputBytes)), binary.LittleEndian.Uint32(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8+8:iotago.OutputIDLength+iotago.BlockIDLength+8+8+4]), "output bytes length")
 	require.Equal(t, iotaOutputBytes, snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8+8+4:], "output bytes not equal")
 }
@@ -41,12 +41,12 @@ func TestOutputFromSnapshotReader(t *testing.T) {
 	outputID := tpkg.RandOutputID(2)
 	blockID := tpkg.RandBlockID()
 	indexBooked := tpkg.RandSlotIndex()
-	tsCreated := tpkg.RandTimestamp()
+	slotCreated := tpkg.RandSlotIndex()
 	iotaOutput := tpkg.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := tpkg.API().Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := ledgerstate.CreateOutput(tpkg.API(), outputID, blockID, indexBooked, tsCreated, iotaOutput, iotaOutputBytes)
+	output := ledgerstate.CreateOutput(tpkg.API(), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
 	snapshotBytes := output.SnapshotBytes()
 
 	buf := bytes.NewReader(snapshotBytes)
@@ -60,18 +60,18 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 	outputID := tpkg.RandOutputID(2)
 	blockID := tpkg.RandBlockID()
 	indexBooked := tpkg.RandSlotIndex()
-	tsCreated := tpkg.RandTimestamp()
+	slotCreated := tpkg.RandSlotIndex()
 	iotaOutput := tpkg.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := tpkg.API().Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := ledgerstate.CreateOutput(tpkg.API(), outputID, blockID, indexBooked, tsCreated, iotaOutput, iotaOutputBytes)
+	output := ledgerstate.CreateOutput(tpkg.API(), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
 	outputSnapshotBytes := output.SnapshotBytes()
 
 	transactionID := tpkg.RandTransactionID()
 	tsSpent := tpkg.RandTimestamp()
 	indexSpent := tpkg.RandSlotIndex()
-	spent := ledgerstate.NewSpent(output, transactionID, tsSpent, indexSpent)
+	spent := ledgerstate.NewSpent(output, transactionID, indexSpent)
 
 	snapshotBytes := spent.SnapshotBytes()
 
@@ -84,17 +84,16 @@ func TestSpentFromSnapshotReader(t *testing.T) {
 	outputID := tpkg.RandOutputID(2)
 	blockID := tpkg.RandBlockID()
 	indexBooked := tpkg.RandSlotIndex()
-	tsCreated := tpkg.RandTimestamp()
+	slotCreated := tpkg.RandSlotIndex()
 	iotaOutput := tpkg.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := tpkg.API().Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := ledgerstate.CreateOutput(tpkg.API(), outputID, blockID, indexBooked, tsCreated, iotaOutput, iotaOutputBytes)
+	output := ledgerstate.CreateOutput(tpkg.API(), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
 
 	transactionID := tpkg.RandTransactionID()
-	tsSpent := tpkg.RandTimestamp()
 	indexSpent := tpkg.RandSlotIndex()
-	spent := ledgerstate.NewSpent(output, transactionID, tsSpent, indexSpent)
+	spent := ledgerstate.NewSpent(output, transactionID, indexSpent)
 
 	snapshotBytes := spent.SnapshotBytes()
 

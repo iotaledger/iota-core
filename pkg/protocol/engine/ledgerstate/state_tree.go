@@ -2,8 +2,6 @@ package ledgerstate
 
 import (
 	"bytes"
-	"time"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
@@ -11,30 +9,28 @@ import (
 )
 
 type stateTreeMetadata struct {
-	Time time.Time
+	Time iotago.SlotIndex
 }
 
 func newStateMetadata(output *Output) *stateTreeMetadata {
 	return &stateTreeMetadata{
-		Time: output.TimestampCreated(),
+		Time: output.SlotCreated(),
 	}
 }
 
 func (s *stateTreeMetadata) FromBytes(b []byte) (int, error) {
-	ms := marshalutil.New(b)
-	ts, err := ms.ReadInt64()
+	var err error
+	s.Time, err = iotago.SlotIndexFromBytes(b)
 	if err != nil {
 		return 0, err
 	}
-
-	s.Time = time.Unix(0, ts)
 
 	return 8, nil
 }
 
 func (s stateTreeMetadata) Bytes() ([]byte, error) {
 	ms := marshalutil.New(8)
-	ms.WriteInt64(s.Time.UnixNano())
+	ms.WriteBytes(s.Time.Bytes())
 
 	return ms.Bytes(), nil
 }

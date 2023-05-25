@@ -3,7 +3,6 @@ package ledgerstate
 import (
 	"bytes"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -31,10 +30,10 @@ func (l LexicalOrderedOutputs) Swap(i, j int) {
 type Output struct {
 	api iotago.API
 
-	outputID         iotago.OutputID
-	blockID          iotago.BlockID
-	slotIndexBooked  iotago.SlotIndex
-	timestampCreated time.Time
+	outputID        iotago.OutputID
+	blockID         iotago.BlockID
+	slotIndexBooked iotago.SlotIndex
+	slotCreated     iotago.SlotIndex
 
 	encodedOutput []byte
 	outputOnce    sync.Once
@@ -57,8 +56,8 @@ func (o *Output) SlotIndexBooked() iotago.SlotIndex {
 	return o.slotIndexBooked
 }
 
-func (o *Output) TimestampCreated() time.Time {
-	return o.timestampCreated
+func (o *Output) SlotCreated() iotago.SlotIndex {
+	return o.slotCreated
 }
 
 func (o *Output) OutputType() iotago.OutputType {
@@ -98,7 +97,7 @@ func (o Outputs) ToOutputSet() iotago.OutputSet {
 	return outputSet
 }
 
-func CreateOutput(api iotago.API, outputID iotago.OutputID, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, timestampCreated time.Time, output iotago.Output, outputBytes ...[]byte) *Output {
+func CreateOutput(api iotago.API, outputID iotago.OutputID, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, output iotago.Output, outputBytes ...[]byte) *Output {
 	var encodedOutput []byte
 	if len(outputBytes) == 0 {
 		var err error
@@ -111,12 +110,12 @@ func CreateOutput(api iotago.API, outputID iotago.OutputID, blockID iotago.Block
 	}
 
 	o := &Output{
-		api:              api,
-		outputID:         outputID,
-		blockID:          blockID,
-		slotIndexBooked:  slotIndexBooked,
-		timestampCreated: timestampCreated,
-		encodedOutput:    encodedOutput,
+		api:             api,
+		outputID:        outputID,
+		blockID:         blockID,
+		slotIndexBooked: slotIndexBooked,
+		slotCreated:     slotCreated,
+		encodedOutput:   encodedOutput,
 	}
 
 	o.outputOnce.Do(func() {
@@ -126,7 +125,7 @@ func CreateOutput(api iotago.API, outputID iotago.OutputID, blockID iotago.Block
 	return o
 }
 
-func NewOutput(api iotago.API, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, timestampCreated time.Time, transaction *iotago.Transaction, index uint16) (*Output, error) {
+func NewOutput(api iotago.API, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
 	txID, err := transaction.ID()
 	if err != nil {
 		return nil, err
@@ -139,7 +138,7 @@ func NewOutput(api iotago.API, blockID iotago.BlockID, slotIndexBooked iotago.Sl
 	output = transaction.Essence.Outputs[int(index)]
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(txID, index)
 
-	return CreateOutput(api, outputID, blockID, slotIndexBooked, timestampCreated, output), nil
+	return CreateOutput(api, outputID, blockID, slotIndexBooked, slotCreated, output), nil
 }
 
 // - kvStorable
@@ -160,7 +159,7 @@ func (o *Output) KVStorableValue() (value []byte) {
 	ms := marshalutil.New(48)
 	ms.WriteBytes(o.blockID[:])              // 32 bytes
 	ms.WriteBytes(o.slotIndexBooked.Bytes()) // 8 bytes
-	ms.WriteTime(o.timestampCreated)         // 8 bytes
+	ms.WriteBytes(o.slotCreated.Bytes())     // 8 bytes
 	ms.WriteBytes(o.encodedOutput)
 
 	return ms.Bytes()
@@ -195,7 +194,7 @@ func (o *Output) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
 		return err
 	}
 
-	if o.timestampCreated, err = valueUtil.ReadTime(); err != nil {
+	if o.slotCreated, err = parseSlotIndex(valueUtil); err != nil {
 		return err
 	}
 
