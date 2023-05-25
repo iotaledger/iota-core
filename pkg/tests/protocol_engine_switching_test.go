@@ -177,7 +177,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithEvictedSlot(9),
 			)
 
-			ts.AssertAttestationsForSlot(9, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
+			// Upon committing 7, we are includingn attestations for slot 4.
+			ts.AssertAttestationsForSlot(4, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 		}
 
@@ -205,8 +206,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithEvictedSlot(10),
 			)
 
-			ts.AssertAttestationsForSlot(9, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
-			ts.AssertAttestationsForSlot(10, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
+			ts.AssertAttestationsForSlot(4, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
+			ts.AssertAttestationsForSlot(5, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
+			// TODO: we should assert 6 and 7 as we are including committment to 9 in the blocks above.
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 		}
 
