@@ -37,7 +37,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
+	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -83,7 +83,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		dispatcher:                  dispatcher,
 		optsFilterProvider:          blockfilter.NewProvider(),
 		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
-		optsTipManagerProvider:      trivialtipmanager.NewProvider(),
+		optsTipManagerProvider:      tipmanagerv1.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
 		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),

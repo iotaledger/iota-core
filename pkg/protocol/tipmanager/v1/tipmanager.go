@@ -10,11 +10,15 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -26,6 +30,7 @@ type TipManager struct {
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
 
+	// memPool holds information about pending transactions.
 	memPool mempool.MemPool[booker.BlockVotePower]
 
 	// blockMetadataStorage contains the BlockMetadata of all Blocks that are managed by the TipManager.
@@ -45,6 +50,23 @@ type TipManager struct {
 
 	// evictionMutex is used to synchronize the eviction of slots.
 	evictionMutex sync.RWMutex
+
+	module.Module
+}
+
+// NewProvider creates a new TipManager provider.
+func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
+	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
+		t := NewTipManager(e.Ledger.ConflictDAG(), e.BlockCache.Block)
+
+		e.Events.Booker.BlockBooked.Hook(t.AddBlock, event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
+		e.BlockCache.Evict.Hook(t.Evict)
+		e.HookStopped(t.Shutdown)
+
+		t.TriggerInitialized()
+
+		return t
+	})
 }
 
 // NewTipManager creates a new TipManager.
@@ -69,26 +91,10 @@ func (t *TipManager) AddBlock(block *blocks.Block) {
 }
 
 // OnBlockAdded registers a callback that is triggered when a new Block was added to the TipManager.
-func (t *TipManager) OnBlockAdded(handler func(blockMetadata *BlockMetadata)) (unsubscribe func()) {
-	return t.blockAdded.Hook(handler).Unhook
-}
-
-func (t *TipManager) uniqueTipSelector() func(amount int) (strongTips []*BlockMetadata) {
-	seenStrongTips := advancedset.New[iotago.BlockID]()
-
-	return func(amount int) (strongTips []*BlockMetadata) {
-		if amount > 0 {
-			for _, uniqueTip := range t.strongTipSet.RandomUniqueEntries(amount + seenStrongTips.Size()) {
-				if seenStrongTips.Add(uniqueTip.Block.ID()) {
-					if strongTips = append(strongTips, uniqueTip); len(strongTips) == amount {
-						return strongTips
-					}
-				}
-			}
-		}
-
-		return strongTips
-	}
+func (t *TipManager) OnBlockAdded(handler func(blockMetadata tipmanager.TipMetadata)) (unsubscribe func()) {
+	return t.blockAdded.Hook(func(metadata *BlockMetadata) {
+		handler(metadata)
+	}).Unhook
 }
 
 // SelectTips selects the references that should be used for block issuance.
@@ -165,7 +171,8 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 }
 
 // StrongTipSet returns the strong tip set of the TipManager.
-func (t *TipManager) StrongTipSet() (tipSet []*blocks.Block) {
+func (t *TipManager) StrongTipSet() []*blocks.Block {
+	var tipSet []*blocks.Block
 	t.strongTipSet.ForEach(func(_ iotago.BlockID, blockMetadata *BlockMetadata) bool {
 		tipSet = append(tipSet, blockMetadata.Block)
 
@@ -196,6 +203,11 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 			})
 		}
 	}
+}
+
+// Shutdown marks the TipManager as shutdown.
+func (t *TipManager) Shutdown() {
+	t.TriggerStopped()
 }
 
 // setupBlockMetadata sets up the behavior of the given Block.

@@ -8,25 +8,33 @@ import (
 )
 
 type TipManager interface {
-	Events() *Events
+	//Events() *Events
 
 	// AddTip adds a Block to the tip pool.
-	AddTip(block *blocks.Block) (added bool)
+	AddBlock(block *blocks.Block)
+
+	OnBlockAdded(handler func(blockMetadata TipMetadata)) (unsubscribe func())
 
 	// RemoveTip removes a Block from the tip pool.
-	RemoveTip(blockID iotago.BlockID) (removed bool)
+	//RemoveTip(blockID iotago.BlockID) (removed bool)
 
 	// Tips returns up to 'count' number of tips.
-	Tips(count int) (references model.ParentReferences)
+	SelectTips(count int) (references model.ParentReferences)
+
+	StrongTipSet() []*blocks.Block
+
+	WeakTipSet() []*blocks.Block
+
+	Evict(slotIndex iotago.SlotIndex)
 
 	// AllTips returns all tips contained in the tip pool.
-	AllTips() (allTips []*blocks.Block)
+	//AllTips() (allTips []*blocks.Block)
 
 	// TipCount returns the total number of tips in the tip pool.
-	TipCount() (count int)
+	//TipCount() (count int)
 
 	// Shutdown shuts down the TipManager.
-	Shutdown()
+	//Shutdown()
 
 	module.Interface
 }
