@@ -2,7 +2,7 @@ version: "3.9"
 # Create a custom build that can be re-used within Docker network
 x-build-iota-core: &iota-core_build
   context: ../../../
-  dockerfile: ./iota-core/Dockerfile.workdir
+  dockerfile: ./iota-core/Dockerfile
 services:
   peer_master:
     build: *iota-core_build
