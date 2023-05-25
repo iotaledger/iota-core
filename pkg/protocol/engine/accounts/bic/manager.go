@@ -3,11 +3,12 @@ package bic
 import (
 	"crypto/ed25519"
 	"fmt"
+	"sync"
+
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/pkg/errors"
-	"sync"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -21,8 +22,8 @@ type BICDiff struct {
 	burns      map[iotago.AccountID]uint64 `serix:"2,lengthPrefixType=uint32,omitempty"`
 }
 
-// BlockIssuanceCredits is a Block Issuer Credits module responsible for tracking account-based mana balances.
-type BlockIssuanceCredits struct {
+// BICManager is a module responsible for tracking block issuance credit balances.
+type BICManager struct {
 	mutex sync.RWMutex
 
 	// TODO need to store BIC vector at least, only diffs can be recreated based on the ledgerstate
@@ -48,23 +49,23 @@ type BlockIssuanceCredits struct {
 	module.Module
 }
 
-func New(store kvstore.KVStore, apiProviderFunc func() iotago.API) *BlockIssuanceCredits {
-	return &BlockIssuanceCredits{
+func New(store kvstore.KVStore, apiProviderFunc func() iotago.API) *BICManager {
+	return &BICManager{
 		bic:       shrinkingmap.New[iotago.AccountID, accounts.Account](),
 		slotDiffs: shrinkingmap.New[iotago.SlotIndex, *BICDiff](),
 		bicTree:   ads.NewMap[iotago.AccountID, accounts.Credits](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixBICTree}))),
 	}
 }
 
-func (b *BlockIssuanceCredits) API() iotago.API {
+func (b *BICManager) API() iotago.API {
 	return b.apiProviderFunc()
 }
 
-func (b *BlockIssuanceCredits) BICTreeRoot() iotago.Identifier {
+func (b *BICManager) BICTreeRoot() iotago.Identifier {
 	return iotago.Identifier(b.bicTree.Root())
 }
 
-func (b *BlockIssuanceCredits) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotago.AccountID]uint64, burns map[iotago.AccountID]uint64) (bicRoot iotago.Identifier, err error) {
+func (b *BICManager) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotago.AccountID]uint64, burns map[iotago.AccountID]uint64) (bicRoot iotago.Identifier, err error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -86,7 +87,7 @@ func (b *BlockIssuanceCredits) CommitSlot(slotIndex iotago.SlotIndex, allotments
 	return bicRoot, nil
 }
 
-func (b *BlockIssuanceCredits) BIC(id iotago.AccountID, slotIndex iotago.SlotIndex) (accounts.Account, error) {
+func (b *BICManager) BIC(id iotago.AccountID, slotIndex iotago.SlotIndex) (accounts.Account, error) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
@@ -128,14 +129,14 @@ func (b *BlockIssuanceCredits) BIC(id iotago.AccountID, slotIndex iotago.SlotInd
 	return newAccount, nil
 }
 
-func (b *BlockIssuanceCredits) Shutdown() {
+func (b *BICManager) Shutdown() {
 }
 
-func (b *BlockIssuanceCredits) LatestCommittedIndex() (iotago.SlotIndex, error) {
+func (b *BICManager) LatestCommittedIndex() (iotago.SlotIndex, error) {
 	return b.latestSlotDiffsIndex, nil
 }
 
-func (b *BlockIssuanceCredits) applyDiff(newDiff *BICDiff) error {
+func (b *BICManager) applyDiff(newDiff *BICDiff) error {
 	// TODO (daria): do we need to store the index, if yes should it be in the engine store or should we create new kv store as in the ledger?
 
 	// check if the expected next slot diff is applied
@@ -190,7 +191,7 @@ func (b *BlockIssuanceCredits) applyDiff(newDiff *BICDiff) error {
 	return nil
 }
 
-func (b *BlockIssuanceCredits) commitBICTree(diff *BICDiff) (bicRoot iotago.Identifier, err error) {
+func (b *BICManager) commitBICTree(diff *BICDiff) (bicRoot iotago.Identifier, err error) {
 	// previous bic tree should be at index -1
 	if b.bicTreeIndex != diff.index+1 {
 		return iotago.Identifier{}, errors.Errorf("the difference between already committed bic: %d and the target commit: %d is different than 1", b.bicTreeIndex, diff.index)
