@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/pkg/errors"
 
@@ -55,7 +56,9 @@ type Protocol struct {
 	dispatcher      network.Endpoint
 	networkProtocol *core.Protocol
 
-	mainEngine *engine.Engine
+	activeEngineMutex sync.RWMutex
+	mainEngine        *engine.Engine
+	candidateEngine   *engine.Engine
 
 	optsBaseDirectory string
 	optsSnapshotPath  string
@@ -107,10 +110,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 
 // Run runs the protocol.
 func (p *Protocol) Run() {
-	p.Events.Engine.LinkTo(p.mainEngine.Events)
-	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
-	p.Events.TipManager.LinkTo(p.TipManager.Events())
-	p.SyncManager = p.optsSyncManagerProvider(p.mainEngine)
+	p.linkToEngine(p.mainEngine)
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
 		panic(err)
@@ -132,8 +132,26 @@ func (p *Protocol) Run() {
 		}
 	}
 
-	// p.linkTo(p.mainrEngine) -> CC and TipManager
 	p.runNetworkProtocol()
+}
+
+func (p *Protocol) linkToEngine(engineInstance *engine.Engine) {
+	if p.TipManager != nil {
+		p.TipManager.Shutdown()
+		p.TipManager = nil
+	}
+
+	if p.SyncManager != nil {
+		p.SyncManager.Shutdown()
+		p.SyncManager = nil
+	}
+
+	p.Events.Engine.LinkTo(engineInstance.Events)
+
+	p.TipManager = p.optsTipManagerProvider(engineInstance)
+	p.Events.TipManager.LinkTo(p.TipManager.Events())
+
+	p.SyncManager = p.optsSyncManagerProvider(engineInstance)
 }
 
 func (p *Protocol) Shutdown() {
@@ -142,7 +160,14 @@ func (p *Protocol) Shutdown() {
 	}
 
 	p.Workers.Shutdown()
+
+	p.activeEngineMutex.RLock()
 	p.mainEngine.Shutdown()
+	if p.candidateEngine != nil {
+		p.candidateEngine.Shutdown()
+	}
+	p.activeEngineMutex.RUnlock()
+
 	p.ChainManager.Shutdown()
 	p.TipManager.Shutdown()
 	p.SyncManager.Shutdown()
@@ -286,17 +311,17 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 		processed = true
 	}
 
-	// if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
-	//	if candidateChain := candidateEngine.Storage.Settings.ChainID(); chain.ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
-	//		candidateEngine.ProcessBlockFromPeer(block, src)
-	//		if candidateEngine.IsBootstrapped() &&
-	//			candidateEngine.Storage.Settings.LatestCommitment().Index() >= mainEngine.Storage.Settings.LatestCommitment().Index() &&
-	//			candidateEngine.Storage.Settings.LatestCommitment().CumulativeWeight() > mainEngine.Storage.Settings.LatestCommitment().CumulativeWeight() {
-	//			p.switchEngines()
-	//		}
-	//		processed = true
-	//	}
-	// }
+	if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
+		if candidateChain := candidateEngine.ChainID(); chain.ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
+			candidateEngine.ProcessBlockFromPeer(block, src)
+			if candidateEngine.IsBootstrapped() &&
+				candidateEngine.Storage.Settings().LatestCommitment().Index() >= mainEngine.Storage.Settings().LatestCommitment().Index() &&
+				candidateEngine.Storage.Settings().LatestCommitment().CumulativeWeight() > mainEngine.Storage.Settings().LatestCommitment().CumulativeWeight() {
+				p.switchEngines()
+			}
+			processed = true
+		}
+	}
 
 	if !processed {
 		return errors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.Block().SlotCommitment.MustID())
@@ -339,7 +364,17 @@ func (p *Protocol) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, 
 }
 
 func (p *Protocol) MainEngineInstance() *engine.Engine {
+	p.activeEngineMutex.RLock()
+	defer p.activeEngineMutex.RUnlock()
+
 	return p.mainEngine
+}
+
+func (p *Protocol) CandidateEngineInstance() *engine.Engine {
+	p.activeEngineMutex.RLock()
+	defer p.activeEngineMutex.RUnlock()
+
+	return p.candidateEngine
 }
 
 func (p *Protocol) Network() *core.Protocol {
@@ -377,4 +412,49 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	}
 
 	p.networkProtocol.RequestAttestations(fork.ForkingPoint.ID(), fork.Source)
+}
+
+func (p *Protocol) switchEngines() {
+	p.activeEngineMutex.Lock()
+
+	if p.candidateEngine == nil {
+		p.activeEngineMutex.Unlock()
+		return
+	}
+
+	// Try to re-org the chain manager
+	if err := p.ChainManager.SwitchMainChain(p.candidateEngine.Storage.Settings().LatestCommitment().ID()); err != nil {
+		p.activeEngineMutex.Unlock()
+		p.Events.Error.Trigger(errors.Wrap(err, "switching main chain failed"))
+		return
+	}
+
+	if err := p.engineManager.SetActiveInstance(p.candidateEngine); err != nil {
+		p.activeEngineMutex.Unlock()
+		p.Events.Error.Trigger(errors.Wrap(err, "error switching engines"))
+		return
+	}
+
+	//// Stop current Scheduler
+	//p.CongestionControl.Shutdown()
+
+	p.linkToEngine(p.candidateEngine)
+
+	// Save a reference to the current main engine and storage so that we can shut it down and prune it after switching
+	oldEngine := p.mainEngine
+	oldEngine.Shutdown()
+
+	p.mainEngine = p.candidateEngine
+	p.candidateEngine = nil
+
+	p.activeEngineMutex.Unlock()
+
+	p.Events.MainEngineSwitched.Trigger(p.MainEngineInstance())
+
+	// TODO: copy over old slots from the old engine to the new one
+
+	// Cleanup filesystem
+	if err := oldEngine.RemoveFromFilesystem(); err != nil {
+		p.Events.Error.Trigger(errors.Wrap(err, "error removing storage directory after switching engines"))
+	}
 }
