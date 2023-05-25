@@ -1,13 +1,14 @@
 package bic
 
 import (
+	"io"
+
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/pkg/errors"
-	"io"
 )
 
-func (b *BlockIssuanceCredits) Import(reader io.ReadSeeker) error {
+func (b *BICManager) Import(reader io.ReadSeeker) error {
 	// todo do we need storage for bic, what happens on the node startup?
 
 	// TODO:
@@ -18,7 +19,7 @@ func (b *BlockIssuanceCredits) Import(reader io.ReadSeeker) error {
 	return nil
 }
 
-func (b *BlockIssuanceCredits) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error {
+func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 

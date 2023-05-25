@@ -3,6 +3,7 @@ package accounts
 import (
 	"crypto"
 	"crypto/ed25519"
+
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -19,14 +20,11 @@ type BlockIssuanceCredits interface {
 	module.Interface
 }
 
-type Holdings interface {
-	// Mana is the stored and potential value of an account collected on the UTXO layer - used by the Scheduler.
-	Mana(id iotago.AccountID) (mana *Mana, err error)
-}
-
 type Account interface {
 	ID() iotago.AccountID
 	Credits() *Credits
+	// ManaHoldings returns the updated stored and potential value of an account collected on the UTXO layer - used by the Scheduler.
+	ManaHoldings() *ManaHoldings
 	IsPublicKeyAllowed(ed25519.PublicKey) bool
 	AddPublicKey(ed25519.PublicKey)
 	RemovePublicKey(ed25519.PublicKey)
@@ -34,9 +32,10 @@ type Account interface {
 }
 
 type AccountImpl struct {
-	id         iotago.AccountID
-	credits    *Credits
-	pubKeysMap *shrinkingmap.ShrinkingMap[crypto.PublicKey, types.Empty]
+	id           iotago.AccountID
+	credits      *Credits
+	manaHoldings *ManaHoldings
+	pubKeysMap   *shrinkingmap.ShrinkingMap[crypto.PublicKey, types.Empty]
 }
 
 func NewAccount(id iotago.AccountID, credits *Credits, pubKeys []ed25519.PublicKey) *AccountImpl {
@@ -58,6 +57,10 @@ func (a *AccountImpl) ID() iotago.AccountID {
 
 func (a *AccountImpl) Credits() *Credits {
 	return a.credits
+}
+
+func (a *AccountImpl) ManaHoldings() *ManaHoldings {
+	return a.manaHoldings
 }
 
 func (a *AccountImpl) AddPublicKey(pubKey ed25519.PublicKey) {
