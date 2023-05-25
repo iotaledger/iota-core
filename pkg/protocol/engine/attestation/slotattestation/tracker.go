@@ -11,10 +11,10 @@ type Tracker struct {
 	latestAttestations  *shrinkingmap.ShrinkingMap[iotago.AccountID, *iotago.Attestation]
 	attestationsPerSlot *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
 
-	cutoffIndexCallback func() iotago.SlotIndex
+	cutoffIndexCallback func() (iotago.SlotIndex, bool)
 }
 
-func NewTracker(cutoffIndexCallback func() iotago.SlotIndex) *Tracker {
+func NewTracker(cutoffIndexCallback func() (iotago.SlotIndex, bool)) *Tracker {
 	return &Tracker{
 		latestAttestations:  shrinkingmap.New[iotago.AccountID, *iotago.Attestation](),
 		attestationsPerSlot: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
@@ -49,7 +49,12 @@ func (t *Tracker) TrackAttestation(attestation *iotago.Attestation) {
 		return
 	}
 
-	for i := lo.Max(t.cutoffIndexCallback(), previousAttestationIndex); i <= updatedAttestation.SlotCommitmentID.Index(); i++ {
+	cutoffIndex, isValid := t.cutoffIndexCallback()
+	if !isValid {
+		return
+	}
+
+	for i := lo.Max(cutoffIndex, previousAttestationIndex); i <= updatedAttestation.SlotCommitmentID.Index(); i++ {
 		t.attestationsPerSlot.Get(i, true).Set(attestation.IssuerID, updatedAttestation)
 	}
 }

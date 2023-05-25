@@ -27,7 +27,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
-			protocol.WithPruningDelay(2),
+			protocol.WithPruningDelay(3),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 			),
@@ -36,7 +36,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			),
 		},
 		"node2": {
-			protocol.WithPruningDelay(1),
+			protocol.WithPruningDelay(4),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 			),
@@ -231,7 +231,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 		ts.AssertNodeState(ts.Nodes("node2"),
 			testsuite.WithStorageRootBlocks(ts.Blocks("1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2")),
-			testsuite.WithPrunedSlot(0, true),
+			testsuite.WithPrunedSlot(0, false),
 		)
 
 		// Slot 13
@@ -269,12 +269,12 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 		ts.AssertNodeState(ts.Nodes("node1"),
 			testsuite.WithStorageRootBlocks(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(1, true),
+			testsuite.WithPrunedSlot(0, true),
 		)
 
 		ts.AssertNodeState(ts.Nodes("node2"),
 			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(2, true),
+			testsuite.WithPrunedSlot(0, false),
 		)
 
 		// Slot 14
@@ -312,12 +312,12 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 		ts.AssertNodeState(ts.Nodes("node1"),
 			testsuite.WithStorageRootBlocks(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(1, true),
+			testsuite.WithPrunedSlot(0, true),
 		)
 
 		ts.AssertNodeState(ts.Nodes("node2"),
 			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(2, true),
+			testsuite.WithPrunedSlot(0, false),
 		)
 	}
 
@@ -336,7 +336,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
-			protocol.WithPruningDelay(1),
+			protocol.WithPruningDelay(3),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 			),
@@ -356,7 +356,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithEvictedSlot(9),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
-			testsuite.WithPrunedSlot(2, true),
+			testsuite.WithPrunedSlot(0, true),
 			testsuite.WithChainManagerIsSolid(),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
