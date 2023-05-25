@@ -6,6 +6,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -219,6 +221,7 @@ func (p *Protocol) runNetworkProtocol() {
 	wpAttestations := p.Workers.CreatePool("NetworkEvents.Attestations", 1) // Using just 1 worker to avoid contention
 
 	p.Events.Network.AttestationsRequestReceived.Hook(p.ProcessAttestationsRequest, event.WithWorkerPool(wpAttestations))
+	p.Events.Network.AttestationsReceived.Hook(p.ProcessAttestations, event.WithWorkerPool(wpAttestations))
 }
 
 func (p *Protocol) initEngineManager() {
@@ -361,6 +364,127 @@ func (p *Protocol) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, 
 	}
 
 	p.networkProtocol.SendAttestations(commitment, attestations, src)
+}
+
+func (p *Protocol) ProcessAttestations(commitment *model.Commitment, attestations []*iotago.Attestation, src network.PeerID) {
+	if len(attestations) == 0 {
+		p.Events.Error.Trigger(errors.Errorf("received attestations from peer %s are empty", src.String()))
+		return
+	}
+
+	fork, exists := p.ChainManager.ForkByForkingPoint(commitment.ID())
+	if !exists {
+		p.Events.Error.Trigger(errors.Errorf("failed to get forking point for commitment %s", commitment.ID()))
+		return
+	}
+
+	mainEngine := p.MainEngineInstance()
+
+	snapshotTargetIndex := fork.ForkingPoint.Index() - 1
+
+	snapshotTargetCommitment, err := mainEngine.Storage.Commitments().Load(snapshotTargetIndex)
+	if err != nil {
+		p.Events.Error.Trigger(errors.Wrapf(err, "failed to get commitment at snapshotTargetIndex %s", snapshotTargetIndex))
+		return
+	}
+
+	calculatedCumulativeWeight := snapshotTargetCommitment.CumulativeWeight()
+
+	visitedIdentities := make(map[iotago.AccountID]types.Empty)
+	var blockIDs iotago.BlockIDs
+	for _, att := range attestations {
+		if valid, err := att.VerifySignature(); !valid {
+			if err != nil {
+				p.Events.Error.Trigger(errors.Wrapf(err, "error validating attestation signature provided by %s", src))
+				return
+			}
+
+			p.Events.Error.Trigger(errors.Errorf("invalid attestation signature provided by %s", src))
+			return
+		}
+
+		if _, alreadyVisited := visitedIdentities[att.IssuerID]; alreadyVisited {
+			p.Events.Error.Trigger(errors.Errorf("invalid attestation from source %s, issuerID %s contains multiple attestations", src, att.IssuerID))
+			// TODO: ban source!
+			return
+		}
+
+		// TODO: this might differ if we have a Accounts with changing weights depending on the SlotIndex
+		if weight, weightExists := mainEngine.SybilProtection.Accounts().Get(att.IssuerID); weightExists {
+			calculatedCumulativeWeight += uint64(weight)
+		}
+
+		visitedIdentities[att.IssuerID] = types.Void
+
+		blockID, err := att.BlockID(mainEngine.API().SlotTimeProvider())
+		if err != nil {
+			p.Events.Error.Trigger(errors.Wrapf(err, "error calculating blockID from attestation"))
+			return
+		}
+
+		blockIDs = append(blockIDs, blockID)
+	}
+
+	// Compare the calculated cumulative weight with ours to verify it is really higher
+	weightAtForkedEventEnd := lo.PanicOnErr(mainEngine.Storage.Commitments().Load(fork.Commitment.Index())).CumulativeWeight()
+	if calculatedCumulativeWeight <= weightAtForkedEventEnd {
+		forkedEventClaimedWeight := fork.Commitment.CumulativeWeight()
+		forkedEventMainWeight := lo.PanicOnErr(mainEngine.Storage.Commitments().Load(fork.Commitment.Index())).CumulativeWeight()
+		p.Events.Error.Trigger(errors.Errorf("fork at point %d does not accumulate enough weight at slot %d calculated %d CW <= main chain %d CW. fork event detected at %d was %d CW > %d CW",
+			fork.ForkingPoint.Index(),
+			fork.Commitment.Index(),
+			calculatedCumulativeWeight,
+			weightAtForkedEventEnd,
+			fork.Commitment.Index(),
+			forkedEventClaimedWeight,
+			forkedEventMainWeight))
+		// TODO: ban source?
+		return
+	}
+
+	candidateEngine, err := p.engineManager.ForkEngineAtSlot(snapshotTargetIndex)
+	if err != nil {
+		p.Events.Error.Trigger(errors.Wrap(err, "error creating new candidate engine"))
+		return
+	}
+
+	// Set the chain to the correct forking point
+	candidateEngine.SetChainID(fork.ForkingPoint.ID())
+
+	// Attach the engine block requests to the protocol and detach as soon as we switch to that engine
+	wp := candidateEngine.Workers.CreatePool("CandidateBlockRequester", 2)
+	detachRequestBlocks := candidateEngine.Events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
+		p.networkProtocol.RequestBlock(blockID)
+	}, event.WithWorkerPool(wp)).Unhook
+
+	// Attach slot commitments to the chain manager and detach as soon as we switch to that engine
+	detachProcessCommitment := candidateEngine.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+		p.ChainManager.ProcessCandidateCommitment(details.Commitment)
+	}, event.WithWorkerPool(candidateEngine.Workers.CreatePool("ProcessCandidateCommitment", 2))).Unhook
+
+	p.Events.MainEngineSwitched.Hook(func(_ *engine.Engine) {
+		detachRequestBlocks()
+		detachProcessCommitment()
+	}, event.WithMaxTriggerCount(1))
+
+	// Add all the blocks from the forking point attestations to the requester since those will not be passed to the engine by the protocol
+	candidateEngine.BlockRequester.StartTickers(blockIDs)
+
+	// Set the engine as the new candidate
+	p.activeEngineMutex.Lock()
+	oldCandidateEngine := p.candidateEngine
+	p.candidateEngine = candidateEngine
+	p.activeEngineMutex.Unlock()
+
+	p.Events.CandidateEngineActivated.Trigger(candidateEngine)
+
+	if oldCandidateEngine != nil {
+		oldCandidateEngine.Shutdown()
+		if err := oldCandidateEngine.RemoveFromFilesystem(); err != nil {
+			p.Events.Error.Trigger(errors.Wrap(err, "error cleaning up replaced candidate engine from file system"))
+		}
+	}
+
 }
 
 func (p *Protocol) MainEngineInstance() *engine.Engine {
