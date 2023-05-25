@@ -22,7 +22,7 @@ func (b *BlockIssuanceCredits) Export(writer io.WriteSeeker, targetIndex iotago.
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if err := utils.WriteValueFunc(writer, "balancesIndex", b.balancesIndex); err != nil {
+	if err := utils.WriteValueFunc(writer, "bicIndex", b.bicIndex); err != nil {
 		return err
 	}
 	if err := utils.WriteValueFunc(writer, "latestSlotDiffsIndex", b.latestSlotDiffsIndex); err != nil {
@@ -41,7 +41,7 @@ func (b *BlockIssuanceCredits) Export(writer io.WriteSeeker, targetIndex iotago.
 		return err
 	}
 
-	for diffIndex := b.balancesIndex + 1; diffIndex > b.latestSlotDiffsIndex; diffIndex-- {
+	for diffIndex := b.bicIndex + 1; diffIndex > b.latestSlotDiffsIndex; diffIndex-- {
 		slotDiff, exists := b.slotDiffs.Get(diffIndex)
 		if !exists {
 			return errors.Errorf("could not export BIC diffs, slot diff for index %d not found", diffIndex)
