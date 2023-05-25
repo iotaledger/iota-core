@@ -361,5 +361,20 @@ func (p *Protocol) ErrorHandler() func(error) {
 }
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
-	fmt.Printf("================================================================\nFork detected: %s\n================================================================\n", fork)
+	claimedWeight := fork.Commitment.CumulativeWeight()
+	mainChainCommitment, err := p.MainEngineInstance().Storage.Commitments().Load(fork.Commitment.Index())
+	if err != nil {
+		p.Events.Error.Trigger(errors.Errorf("failed to load commitment for main chain tip at index %d", fork.Commitment.Index()))
+		return
+	}
+
+	mainChainWeight := mainChainCommitment.CumulativeWeight()
+
+	if claimedWeight <= mainChainWeight {
+		// TODO: ban source?
+		p.Events.Error.Trigger(errors.Errorf("dot not process fork with %d CW <= than main chain %d CW received from %s", claimedWeight, mainChainWeight, fork.Source))
+		return
+	}
+
+	p.networkProtocol.RequestAttestations(fork.ForkingPoint.ID(), fork.Source)
 }
