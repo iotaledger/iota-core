@@ -13,8 +13,8 @@ type Credits struct {
 	UpdateTime iotago.SlotIndex `serix:"1"`
 }
 
-// NewWeight creates a new Credits instance.
-func NewWeight(value int64, updateTime iotago.SlotIndex) (newWeight *Credits) {
+// NewCredits creates a new Credits instance.
+func NewCredits(value int64, updateTime iotago.SlotIndex) (newCredits *Credits) {
 	return &Credits{
 		Value:      value,
 		UpdateTime: updateTime,
@@ -22,11 +22,17 @@ func NewWeight(value int64, updateTime iotago.SlotIndex) (newWeight *Credits) {
 }
 
 // Bytes returns a serialized version of the Credits.
-func (w Credits) Bytes() ([]byte, error) {
-	return serix.DefaultAPI.Encode(context.Background(), w)
+func (c Credits) Bytes() ([]byte, error) {
+	return serix.DefaultAPI.Encode(context.Background(), c)
 }
 
 // FromBytes parses a serialized version of the Credits.
-func (w *Credits) FromBytes(bytes []byte) (int, error) {
-	return serix.DefaultAPI.Decode(context.Background(), bytes, w)
+func (c *Credits) FromBytes(bytes []byte) (int, error) {
+	return serix.DefaultAPI.Decode(context.Background(), bytes, c)
+}
+
+// Update updates the Credits increasing Value and updateTime.
+func (c *Credits) Update(add int64, updateTime iotago.SlotIndex) {
+	c.Value += add
+	c.UpdateTime = updateTime
 }
