@@ -125,7 +125,6 @@ func (t *TransactionMetadata) ConflictIDs() *promise.Set[iotago.TransactionID] {
 
 func (t *TransactionMetadata) publishInputAndCheckSolidity(index int, input *StateMetadata) (allInputsSolid bool) {
 	t.inputs[index] = input
-
 	input.setupSpender(t)
 	t.setupInput(input)
 

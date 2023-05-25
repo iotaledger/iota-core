@@ -222,16 +222,20 @@ func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata
 }
 
 func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
 	if m.optForkAllTransactions {
-		m.forkTransaction(transaction, advancedset.New(lo.Map(transaction.inputs, (*StateMetadata).ID)...))
+		m.forkTransaction(transaction, transaction.inputs...)
 	} else {
 		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 			input.OnDoubleSpent(func() {
-				m.forkTransaction(transaction, advancedset.New(input.ID()))
+				m.forkTransaction(transaction, input)
 			})
 
 		})
 	}
+
 	if transaction.setBooked() {
 		m.publishOutputs(transaction)
 	}
@@ -258,6 +262,11 @@ func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionMetadata)
 	})
 
 	m.cachedTransactions.Delete(transaction.ID())
+	if transaction.IsConflicting() {
+		if err := m.conflictDAG.EvictConflict(transaction.ID()); err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (m *MemPool[VotePower]) requestStateWithMetadata(stateRef iotago.IndexedUTXOReferencer, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
@@ -280,8 +289,19 @@ func (m *MemPool[VotePower]) requestStateWithMetadata(stateRef iotago.IndexedUTX
 	})
 }
 
-func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, inputs *advancedset.AdvancedSet[iotago.OutputID]) {
-	if err := m.conflictDAG.CreateOrUpdateConflict(transaction.ID(), inputs, acceptance.Pending); err != nil {
+func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, inputs ...*StateMetadata) {
+	initialConflictState := acceptance.Pending
+
+	inputIDs := advancedset.New[iotago.OutputID]()
+	for _, input := range inputs {
+		if _, spenderAccepted := input.AcceptedSpender(); spenderAccepted {
+			initialConflictState = acceptance.Rejected
+		}
+
+		inputIDs.Add(input.ID())
+	}
+
+	if err := m.conflictDAG.CreateOrUpdateConflict(transaction.ID(), inputIDs, initialConflictState); err != nil {
 		panic(err)
 	}
 	transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {

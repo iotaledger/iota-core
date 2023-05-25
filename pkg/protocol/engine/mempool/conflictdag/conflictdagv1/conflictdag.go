@@ -85,10 +85,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
-		conflictSets, err := c.conflictSets(resourceIDs, true /*!initialAcceptanceState.IsRejected()*/)
-		if err != nil {
-			return advancedset.New[ResourceID](), xerrors.Errorf("failed to create ConflictSet: %w", err)
-		}
+		conflictSets := c.conflictSets(resourceIDs)
 
 		if conflict, isNew := c.conflictsByID.GetOrCreate(id, func() *Conflict[ConflictID, ResourceID, VotePower] {
 			initialWeight := weight.New(c.committeeSet)
@@ -96,17 +93,20 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 
 			newConflict := NewConflict(id, conflictSets, initialWeight, c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
 
-			// attach to the acceptance state updated event and propagate that event to the outside.
-			// also need to remember the unhook method to properly evict the conflict.
-			c.conflictUnhooks.Set(id, newConflict.AcceptanceStateUpdated.Hook(func(oldState, newState acceptance.State) {
-				if newState.IsAccepted() {
-					c.events.ConflictAccepted.Trigger(newConflict.ID)
-					return
-				}
-				if newState.IsRejected() {
-					c.events.ConflictRejected.Trigger(newConflict.ID)
-				}
-			}).Unhook)
+			// Only listen to AcceptanceStateUpdated event if initial state is pending, the ConflictAccepted/Rejected event will be triggered immediately.
+			if initialAcceptanceState.IsPending() {
+				// attach to the acceptance state updated event and propagate that event to the outside.
+				// also need to remember the unhook method to properly evict the conflict.
+				c.conflictUnhooks.Set(id, newConflict.AcceptanceStateUpdated.Hook(func(oldState, newState acceptance.State) {
+					if newState.IsAccepted() {
+						c.events.ConflictAccepted.Trigger(newConflict.ID)
+						return
+					}
+					if newState.IsRejected() {
+						c.events.ConflictRejected.Trigger(newConflict.ID)
+					}
+				}).Unhook)
+			}
 
 			return newConflict
 		}); !isNew {
@@ -123,6 +123,12 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 
 	if err == nil && joinedConflictSets.IsEmpty() {
 		c.events.ConflictCreated.Trigger(id)
+
+		if initialAcceptanceState.IsAccepted() {
+			c.events.ConflictAccepted.Trigger(id)
+		} else if initialAcceptanceState.IsRejected() {
+			c.events.ConflictRejected.Trigger(id)
+		}
 	} else if err == nil && !joinedConflictSets.IsEmpty() {
 		c.events.ConflictingResourcesAdded.Trigger(id, joinedConflictSets)
 	}
@@ -334,6 +340,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CastVotes(vote *vote.Vo
 	defer c.mutex.RUnlock()
 	c.votingMutex.Lock(vote.Voter)
 	defer c.votingMutex.Unlock(vote.Voter)
+
 	supportedConflicts, revokedConflicts, err := c.determineVotes(conflictIDs)
 	if err != nil {
 		return xerrors.Errorf("failed to determine votes: %w", err)
@@ -399,8 +406,8 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UnacceptedConflicts(con
 // EvictConflict removes conflict with given ConflictID from ConflictDAG.
 func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) EvictConflict(conflictID ConflictID) error {
 	evictedConflictIDs, err := func() ([]ConflictID, error) {
-		c.mutex.RLock()
-		defer c.mutex.RUnlock()
+		c.mutex.Lock()
+		defer c.mutex.Unlock()
 
 		// evicting an already evicted conflict is fine
 		conflict, exists := c.conflictsByID.Get(conflictID)
@@ -451,30 +458,20 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) conflicts(ids *advanced
 			conflicts.Add(existingConflict)
 		}
 
-		return lo.Cond(exists || ignoreMissing, nil, xerrors.Errorf("tried to retrieve an evicted conflict with %s: %w", id, conflictdag.ErrEntityEvicted))
+		return lo.Cond(exists || ignoreMissing, nil, xerrors.Errorf("tried to retrieve a non-existing conflict with %s: %w", id, conflictdag.ErrEntityEvicted))
 	})
 }
 
 // conflictSets returns the ConflictSets that are associated with the given ResourceIDs. If createMissing is set to
 // true, it will create an empty ConflictSet for each missing ResourceID.
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) conflictSets(resourceIDs *advancedset.AdvancedSet[ResourceID], createMissing bool) (*advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VotePower]], error) {
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) conflictSets(resourceIDs *advancedset.AdvancedSet[ResourceID]) *advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VotePower]] {
 	conflictSets := advancedset.New[*ConflictSet[ConflictID, ResourceID, VotePower]]()
 
-	return conflictSets, resourceIDs.ForEach(func(resourceID ResourceID) (err error) {
-		if createMissing {
-			conflictSets.Add(lo.Return1(c.conflictSetsByID.GetOrCreate(resourceID, c.conflictSetFactory(resourceID))))
-
-			return nil
-		}
-
-		if conflictSet, exists := c.conflictSetsByID.Get(resourceID); exists {
-			conflictSets.Add(conflictSet)
-
-			return nil
-		}
-
-		return xerrors.Errorf("tried to create a Conflict with evicted Resource: %w", conflictdag.ErrEntityEvicted)
+	resourceIDs.Range(func(resourceID ResourceID) {
+		conflictSets.Add(lo.Return1(c.conflictSetsByID.GetOrCreate(resourceID, c.conflictSetFactory(resourceID))))
 	})
+
+	return conflictSets
 }
 
 // determineVotes determines the Conflicts that are supported and revoked by the given ConflictIDs.
@@ -525,8 +522,13 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) determineVotes(conflict
 
 func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) conflictSetFactory(resourceID ResourceID) func() *ConflictSet[ConflictID, ResourceID, VotePower] {
 	return func() *ConflictSet[ConflictID, ResourceID, VotePower] {
-		// TODO: listen to ConflictEvicted events and remove the Conflict from the ConflictSet
+		conflictSet := NewConflictSet[ConflictID, ResourceID, VotePower](resourceID)
+		conflictSet.OnAllMembersEvicted(func(prevValue, newValue bool) {
+			if newValue && !prevValue {
+				c.conflictSetsByID.Delete(conflictSet.ID, conflictSet.allMembersEvicted.Get)
+			}
+		})
 
-		return NewConflictSet[ConflictID, ResourceID, VotePower](resourceID)
+		return conflictSet
 	}
 }
