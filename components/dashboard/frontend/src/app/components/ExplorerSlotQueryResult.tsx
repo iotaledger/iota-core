@@ -21,11 +21,6 @@ export class ExplorerSlotQueryResult extends React.Component<Props, any> {
     componentDidMount() {
         const id = this.props.match.params.commitment;
         this.props.explorerStore.getSlotDetails(id);
-
-        const index = Number(id.split(':')[1]);
-        this.props.explorerStore.getSlotBlocks(index);
-        this.props.explorerStore.getSlotTransactions(index);
-        this.props.explorerStore.getSlotUTXOs(index);
     }
 
     componentWillUnmount() {
@@ -34,7 +29,7 @@ export class ExplorerSlotQueryResult extends React.Component<Props, any> {
 
     render() {
         let {commitment} = this.props.match.params;
-        let { query_err, slotInfo,  slotBlocks, slotTransactions, slotUtxos } = this.props.explorerStore;
+        let { query_err, slotInfo } = this.props.explorerStore;
 
         if (query_err) {
             return (
@@ -54,13 +49,13 @@ export class ExplorerSlotQueryResult extends React.Component<Props, any> {
                     <ListGroup.Item>PrevEC: {slotInfo.prevID}</ListGroup.Item>
                     <ListGroup.Item>Cumulative Weight: {slotInfo.cumulativeWeight}</ListGroup.Item>
                      <ListGroup.Item>Blocks:
-                        {slotBlocks.blocks && <Card>
+                        {slotInfo.blocks && <Card>
                         <Card.Body>
                             <Row className={"mb-3"}>
                                 <Col xs={12} style={{'max-height':'300px', 'overflow':'auto'}}>
                                     <Table>
                                         <tbody>
-                                        {slotBlocks.blocks.map((b,i) => <ListGroup.Item key={i}><a href={`/explorer/block/${b}`}>{b}</a></ListGroup.Item>)}
+                                        {slotInfo.blocks.map((b,i) => <ListGroup.Item key={i}><a href={`/explorer/block/${b}`}>{b}</a></ListGroup.Item>)}
                                         </tbody>
                                     </Table>
                                 </Col>
@@ -69,13 +64,13 @@ export class ExplorerSlotQueryResult extends React.Component<Props, any> {
                         </Card>}
                     </ListGroup.Item>
                     <ListGroup.Item>Transactions:
-                        {slotTransactions.transactions && <Card>
+                        {slotInfo.transactions && <Card>
                         <Card.Body>
                             <Row className={"mb-3"}>
                                 <Col xs={12} style={{'max-height':'300px', 'overflow':'auto'}}>
                                     <Table>
                                         <tbody>
-                                        {slotTransactions.transactions.map((t,i) => <ListGroup.Item key={i}><a href={`/explorer/transaction/${t}`}>{t}</a></ListGroup.Item>)}
+                                        {slotInfo.transactions.map((t,i) => <ListGroup.Item key={i}><a href={`/explorer/transaction/${t}`}>{t}</a></ListGroup.Item>)}
                                         </tbody>
                                     </Table>
                                 </Col>
@@ -84,13 +79,13 @@ export class ExplorerSlotQueryResult extends React.Component<Props, any> {
                         </Card>}
                     </ListGroup.Item>
                     <ListGroup.Item> Created outputs:
-                        {slotUtxos.createdOutputs && <Card>
+                        {slotInfo.createdOutputs && <Card>
                         <Card.Body>
                             <Row className={"mb-3"}>
                                 <Col xs={12} style={{'max-height':'300px', 'overflow':'auto'}}>
                                     <Table>
                                         <tbody>
-                                        {slotUtxos.createdOutputs.map((c,i) => <ListGroup.Item key={i}><a href={`/explorer/output/${c}`}>{c}</a></ListGroup.Item>)}
+                                        {slotInfo.createdOutputs.map((c,i) => <ListGroup.Item key={i}><a href={`/explorer/output/${c}`}>{c}</a></ListGroup.Item>)}
                                         </tbody>
                                     </Table>
                                 </Col>
@@ -99,13 +94,13 @@ export class ExplorerSlotQueryResult extends React.Component<Props, any> {
                         </Card>}
                     </ListGroup.Item>
                     <ListGroup.Item> Spent outputs:
-                        {slotUtxos.spentOutputs && <Card>
+                        {slotInfo.spentOutputs && <Card>
                         <Card.Body>
                             <Row className={"mb-3"}>
                                 <Col xs={12} style={{'max-height':'300px', 'overflow':'auto'}}>
                                     <Table>
                                         <tbody>
-                                        {slotUtxos.spentOutputs.map((s,i) => <ListGroup.Item key={i}><a href={`/explorer/output/${s}`}>{s}</a></ListGroup.Item>)}
+                                        {slotInfo.spentOutputs.map((s,i) => <ListGroup.Item key={i}><a href={`/explorer/output/${s}`}>{s}</a></ListGroup.Item>)}
                                         </tbody>
                                     </Table>
                                 </Col>
