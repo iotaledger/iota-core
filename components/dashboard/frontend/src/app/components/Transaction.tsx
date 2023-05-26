@@ -39,10 +39,8 @@ export class Transaction extends React.Component<Props, any> {
                             borderBottom: "2px solid #eee"}}><h5>Transaction Essence</h5></div>
                         <ListGroup>
                             <ListGroup.Item>ID: <a href={`/explorer/transaction/${txID}`}> {txID}</a></ListGroup.Item>
-                            <ListGroup.Item>Version: {tx.version}</ListGroup.Item>
-                            <ListGroup.Item>Timestamp: {new Date(tx.timestamp * 1000).toLocaleString()}</ListGroup.Item>
-                            <ListGroup.Item>Access pledge ID: {tx.accessPledgeID}</ListGroup.Item>
-                            <ListGroup.Item>Consensus pledge ID: {tx.consensusPledgeID}</ListGroup.Item>
+                            <ListGroup.Item>Network ID: {tx.networkId}</ListGroup.Item>
+                            <ListGroup.Item>Creation Time: {new Date(tx.creationTime * 1000).toLocaleString()}</ListGroup.Item>
                             <ListGroup.Item>
                                 <div className="d-flex justify-content-between align-items-center">
                                     <div className="align-self-start input-output-list" style={style}>
@@ -76,7 +74,7 @@ export class Transaction extends React.Component<Props, any> {
                                     </div>
                                 </div>
                             </ListGroup.Item>
-                            { tx.dataPayload && <ListGroup.Item>Data payload: {tx.dataPayload}</ListGroup.Item>}
+                            { tx.payload && <ListGroup.Item>Data payload: {tx.payload}</ListGroup.Item>}
                         </ListGroup>
                     </Col>
                 </Row>
@@ -88,7 +86,7 @@ export class Transaction extends React.Component<Props, any> {
                             borderBottom: "2px solid #eee"}}><h5>Unlock Blocks</h5></div>
                         <React.Fragment>
                             {
-                                tx.unlockBlocks.map((block,index) => (
+                                tx.unlocks.map((block,index) => (
                                     <UnlockBlock
                                         block={block}
                                         index={index}
