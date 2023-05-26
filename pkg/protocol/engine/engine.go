@@ -213,9 +213,11 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		if err = e.readSnapshot(snapshot[0]); err != nil {
 			return errors.Wrapf(err, "failed to read snapshot from file '%s'", snapshot)
 		}
+
+		// Only mark any pruning indexes if we loaded a non-genesis snapshot
 		if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-			// Only mark any pruning indexes if we loaded a non-genesis snapshot
-			e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
+			// TODO: hand in pruning delay?
+			e.Storage.Prunable.PruneUntilSlot(lo.Min(e.Storage.Settings().LatestFinalizedSlot(), e.Storage.Settings().LatestCommitment().Index()-4))
 		}
 	} else {
 		e.Storage.Settings().UpdateAPI()

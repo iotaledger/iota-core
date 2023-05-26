@@ -138,9 +138,12 @@ func (e *Endpoint) Send(packet proto.Message, protocolID string, to ...network.P
 			continue
 		}
 
-		if err := protocolHandler(e.id, packet); err != nil {
-			fmt.Println(e.id, "ERROR: ", err)
-		}
+		go func() {
+			if err := protocolHandler(e.id, packet); err != nil {
+				fmt.Println(e.id, "ERROR: ", err)
+			}
+		}()
+
 	}
 
 }
