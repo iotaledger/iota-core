@@ -36,7 +36,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
-			// TODO: add this to the whole network
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(2),
 			),
@@ -52,6 +51,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
+			protocol.WithAttestationProvider(
+				slotattestation.NewProvider(2),
+			),
 			protocol.WithChainManagerOptions(
 				chainmanager.WithCommitmentRequesterOptions(
 					eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](1*time.Second),
@@ -64,6 +66,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
+			protocol.WithAttestationProvider(
+				slotattestation.NewProvider(2),
+			),
 			protocol.WithChainManagerOptions(
 				chainmanager.WithCommitmentRequesterOptions(
 					eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](1*time.Second),
@@ -75,6 +80,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID))),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
+			),
+			protocol.WithAttestationProvider(
+				slotattestation.NewProvider(2),
 			),
 			protocol.WithChainManagerOptions(
 				chainmanager.WithCommitmentRequesterOptions(
@@ -182,8 +190,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithEvictedSlot(9),
 			)
 
-			// Upon committing 7, we are includingn attestations for slot 4.
-			ts.AssertAttestationsForSlot(4, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
+			// Upon committing 9, we included attestations up to slot 9 that committed at least to slot 7.
+			ts.AssertAttestationsForSlot(9, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
+
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 		}
 
@@ -200,7 +209,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node1", "node2"),
-				testsuite.WithLatestCommitmentCumulativeWeight(300),
+				// We have the same CW of Slot 9, because we didn't observe any attestation on top of 8 that we could include.
+				testsuite.WithLatestCommitmentCumulativeWeight(150),
 				testsuite.WithLatestCommitmentSlotIndex(10),
 				testsuite.WithLatestStateMutationSlot(0),
 				testsuite.WithLatestFinalizedSlot(7),
@@ -211,52 +221,151 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithEvictedSlot(10),
 			)
 
-			ts.AssertAttestationsForSlot(4, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
-			ts.AssertAttestationsForSlot(5, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
-			// TODO: we should assert 6 and 7 as we are including committment to 9 in the blocks above.
+			// Upon committing 10, we included attestations up to slot 10 that committed at least to slot 8, but we haven't seen any.
+			ts.AssertAttestationsForSlot(10, ts.Blocks(), node1, node2)
+			// Upon committing 9, we included attestations up to slot 9 that committed at least to slot 7.
+			ts.AssertAttestationsForSlot(9, ts.Blocks("P1.E5", "P1.E6"), node1, node2)
+			// Upon committing 8, we included attestations up to slot 6 that committed at least to slot 6: we didn't have any.
+			ts.AssertAttestationsForSlot(8, ts.Blocks(), node1, node2)
+
+			ts.AssertAttestationsForSlot(7, ts.Blocks(), node1, node2)
+			ts.AssertAttestationsForSlot(6, ts.Blocks(), node1, node2)
+			ts.AssertAttestationsForSlot(5, ts.Blocks(), node1, node2)
+			ts.AssertAttestationsForSlot(4, ts.Blocks(), node1, node2)
+
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 		}
 
+		{
+			slot10Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+			ts.IssueBlockAtSlot("P1.L1", 13, slot10Commitment, node1, ts.Block("P1.I3").ID())
+			ts.IssueBlockAtSlot("P1.L2", 13, slot10Commitment, node2, ts.Block("P1.L1").ID())
+			ts.IssueBlockAtSlot("P1.M", 13, slot10Commitment, node1, ts.Block("P1.L2").ID())
+			ts.IssueBlockAtSlot("P1.N", 13, slot10Commitment, node2, ts.Block("P1.M").ID())
+			ts.IssueBlockAtSlot("P1.O", 13, slot10Commitment, node1, ts.Block("P1.N").ID())
+			ts.IssueBlockAtSlot("P1.P", 13, slot10Commitment, node2, ts.Block("P1.O").ID())
+
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.L1", "P1.L1", "P1.L2", "P1.M", "P1.N", "P1.O"), true, node1, node2)
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P1.L1", "P1.L2", "P1.M"), true, node1, node2)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P1.L1", "P1.L2", "P1.M"), true, node1, node2)
+
+			// Verify that nodes have the expected states.
+			ts.AssertNodeState(ts.Nodes("node1", "node2"),
+				// We have the same CW of Slot 9, because we didn't observe any attestation on top of 8 that we could include.
+				testsuite.WithLatestCommitmentCumulativeWeight(150),
+				testsuite.WithLatestCommitmentSlotIndex(11),
+				testsuite.WithLatestStateMutationSlot(0),
+				testsuite.WithLatestFinalizedSlot(10),
+				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee),
+				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithEvictedSlot(11),
+			)
+
+			// Upon committing 11, we included attestations up to slot 11 that committed at least to slot 9: we don't have any.
+			ts.AssertAttestationsForSlot(11, ts.Blocks(), node1, node2)
+
+			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+		}
+	}
+
+	{
 		// Make sure that no blocks of partition 1 are known on partition 2.
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, node1, node2)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, node3, node4)
-
-		// TODO: add more checks on cumulative weight and attestations.
 	}
 
 	// TODO: extend P2 with more blocks and checks on cumulative weight.
 	// Issue blocks on partition 2.
 	{
-		ts.IssueBlockAtSlot("P2.A", 5, iotago.NewEmptyCommitment(), node3, iotago.EmptyBlockID())
-		ts.IssueBlockAtSlot("P2.B", 6, iotago.NewEmptyCommitment(), node4, ts.Block("P2.A").ID())
-		ts.IssueBlockAtSlot("P2.C", 7, iotago.NewEmptyCommitment(), node3, ts.Block("P2.B").ID())
-		ts.IssueBlockAtSlot("P2.D", 8, iotago.NewEmptyCommitment(), node4, ts.Block("P2.C").ID())
-		ts.IssueBlockAtSlot("P2.E", 9, iotago.NewEmptyCommitment(), node3, ts.Block("P2.D").ID())
-		ts.IssueBlockAtSlot("P2.F", 10, iotago.NewEmptyCommitment(), node4, ts.Block("P2.E").ID())
-		ts.IssueBlockAtSlot("P2.G", 11, iotago.NewEmptyCommitment(), node3, ts.Block("P2.F").ID())
-		ts.IssueBlockAtSlot("P2.H", 12, iotago.NewEmptyCommitment(), node4, ts.Block("P2.G").ID())
-		ts.IssueBlockAtSlot("P2.I", 13, iotago.NewEmptyCommitment(), node3, ts.Block("P2.H").ID())
+		{
+			ts.IssueBlockAtSlot("P2.A", 5, iotago.NewEmptyCommitment(), node3, iotago.EmptyBlockID())
+			ts.IssueBlockAtSlot("P2.B", 6, iotago.NewEmptyCommitment(), node4, ts.Block("P2.A").ID())
+			ts.IssueBlockAtSlot("P2.C", 7, iotago.NewEmptyCommitment(), node3, ts.Block("P2.B").ID())
+			ts.IssueBlockAtSlot("P2.D", 8, iotago.NewEmptyCommitment(), node4, ts.Block("P2.C").ID())
+			ts.IssueBlockAtSlot("P2.E", 9, iotago.NewEmptyCommitment(), node3, ts.Block("P2.D").ID())
+			ts.IssueBlockAtSlot("P2.F", 10, iotago.NewEmptyCommitment(), node4, ts.Block("P2.E").ID())
+			ts.IssueBlockAtSlot("P2.G", 11, iotago.NewEmptyCommitment(), node3, ts.Block("P2.F").ID())
+			ts.IssueBlockAtSlot("P2.H", 12, iotago.NewEmptyCommitment(), node4, ts.Block("P2.G").ID())
+			ts.IssueBlockAtSlot("P2.I", 13, iotago.NewEmptyCommitment(), node3, ts.Block("P2.H").ID())
 
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, node3, node4)
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
+			ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, node3, node4)
+			ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
 
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.G", "P2.H"), true, node3, node4)
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.I"), false, node3, node4) // block not referenced yet
-		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P2.E", "P2.F"), true, node3, node4)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.G", "P2.H"), true, node3, node4)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.I"), false, node3, node4) // block not referenced yet
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P2.E", "P2.F"), true, node3, node4)
 
-		ts.AssertBlocksInCacheConfirmed(ts.Blocks("P2.E", "P2.F"), false, node3, node4)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P2.E", "P2.F"), false, node3, node4)
 
-		// Verify that nodes have the expected states.
-		ts.AssertNodeState(ts.Nodes("node3", "node4"),
-			testsuite.WithLatestCommitmentSlotIndex(8),
-			testsuite.WithLatestStateMutationSlot(0),
-			testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
-			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			// Verify that nodes have the expected states.
+			ts.AssertNodeState(ts.Nodes("node3", "node4"),
+				testsuite.WithLatestCommitmentSlotIndex(8),
+				testsuite.WithLatestStateMutationSlot(0),
+				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
+				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
-			testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithEvictedSlot(8),
-		)
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
+				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithEvictedSlot(8),
+			)
+		}
+
+		{
+			slot8Commitment := node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+			ts.IssueBlockAtSlot("P2.L1", 13, slot8Commitment, node4, ts.Block("P2.I").ID())
+			ts.IssueBlockAtSlot("P2.L2", 13, slot8Commitment, node3, ts.Block("P2.L1").ID())
+			ts.IssueBlockAtSlot("P2.L3", 13, slot8Commitment, node4, ts.Block("P2.L2").ID())
+			ts.IssueBlockAtSlot("P2.L4", 13, slot8Commitment, node3, ts.Block("P2.L3").ID())
+			ts.IssueBlockAtSlot("P2.L5", 13, slot8Commitment, node4, ts.Block("P2.L4").ID())
+
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.L1", "P2.L2", "P2.L3", "P2.L4"), true, node3, node4)
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P2.L1", "P2.L2"), true, node3, node4)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P2.L1", "P2.L2"), false, node3, node4) // No supermajority
+
+			// Verify that nodes have the expected states.
+			ts.AssertNodeState(ts.Nodes("node3", "node4"),
+				testsuite.WithLatestCommitmentSlotIndex(11),
+				testsuite.WithLatestCommitmentCumulativeWeight(0), // We haven't collected any attestation yet.
+				testsuite.WithLatestStateMutationSlot(0),
+				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
+				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
+				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithEvictedSlot(11),
+			)
+
+			slot11Commitment := node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+			ts.IssueBlockAtSlot("P2.M1", 13, slot8Commitment, node3, ts.Block("P2.L5").ID())
+			ts.IssueBlockAtSlot("P2.M2", 13, slot8Commitment, node4, ts.Block("P2.M1").ID())
+			ts.IssueBlockAtSlot("P2.M3", 13, slot11Commitment, node3, ts.Block("P2.M2").ID())
+			ts.IssueBlockAtSlot("P2.M4", 13, slot11Commitment, node4, ts.Block("P2.M3").ID())
+
+			// We are going to commit 13
+			ts.IssueBlockAtSlot("P2.M5", 14, slot11Commitment, node3, ts.Block("P2.M4").ID())
+			ts.IssueBlockAtSlot("P2.M6", 15, slot11Commitment, node4, ts.Block("P2.M5").ID())
+			ts.IssueBlockAtSlot("P2.M7", 16, slot11Commitment, node3, ts.Block("P2.M6").ID())
+			ts.IssueBlockAtSlot("P2.M8", 17, slot11Commitment, node4, ts.Block("P2.M7").ID())
+			ts.IssueBlockAtSlot("P2.M9", 18, slot11Commitment, node3, ts.Block("P2.M8").ID())
+
+			// Verify that nodes have the expected states.
+			ts.AssertNodeState(ts.Nodes("node3", "node4"),
+				testsuite.WithLatestCommitmentSlotIndex(13),
+				testsuite.WithLatestCommitmentCumulativeWeight(50), // We haven't collected any attestation yet.
+				testsuite.WithLatestStateMutationSlot(0),
+				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
+				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
+				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithEvictedSlot(13),
+			)
+
+			// Upon committing 13, we included attestations up to slot 13 that committed at least to slot 11.
+			ts.AssertAttestationsForSlot(13, ts.Blocks("P2.M3", "P2.M4"), node3, node4)
+		}
 	}
 
 	// Both partitions should have committed slot 8 and have different commitments
