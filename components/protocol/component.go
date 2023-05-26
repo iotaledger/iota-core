@@ -96,9 +96,9 @@ func provide(c *dig.Container) error {
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
-			protocol.WithPruningDelay(iotago.SlotIndex(ParamsDatabase.PruningThreshold)),
 			protocol.WithStorageOptions(
 				storage.WithDBEngine(deps.DatabaseEngine),
+				storage.WithPruningDelay(iotago.SlotIndex(ParamsDatabase.PruningThreshold)),
 				storage.WithPrunableManagerOptions(
 					prunable.WithGranularity(ParamsDatabase.DBGranularity),
 					prunable.WithMaxOpenDBs(ParamsDatabase.MaxOpenDBs),

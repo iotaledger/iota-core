@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -34,6 +35,10 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID))),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
+			),
+			// TODO: add this to the whole network
+			protocol.WithAttestationProvider(
+				slotattestation.NewProvider(2),
 			),
 			protocol.WithChainManagerOptions(
 				chainmanager.WithCommitmentRequesterOptions(

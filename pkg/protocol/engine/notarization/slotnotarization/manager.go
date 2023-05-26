@@ -169,7 +169,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	// set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
 	ratifiedAcceptedBlocks := m.slotMutations.RatifiedAcceptedBlocks(index, true)
 
-	cumulativeWeight, attestations, err := m.attestation.Commit(index)
+	cumulativeWeight, attestationsRoot, err := m.attestation.Commit(index)
 	if err != nil {
 		m.errorHandler(errors.Wrap(err, "failed to commit attestations"))
 		return false
@@ -187,7 +187,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		iotago.NewRoots(
 			iotago.Identifier(ratifiedAcceptedBlocks.Root()),
 			mutationRoot,
-			iotago.Identifier(attestations.Root()),
+			iotago.Identifier(attestationsRoot),
 			stateRoot,
 			iotago.Identifier(m.slotMutations.weights.Root()),
 		).ID(),

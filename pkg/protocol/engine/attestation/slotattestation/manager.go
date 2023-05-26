@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/core/memstorage"
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -28,19 +29,26 @@ const (
 )
 
 // Manager is the manager of slot attestations. It works in two phases:
+//
 //  1. It stores "pending" attestations temporarily until the corresponding slot becomes committable.
+//
 //  2. When a slot is committed:
 //     a. Apply the pending attestations of the committed slot.
 //     b. It computes the cumulative weight of the committed slot.
 //     c. Get all attestations for attestation slot = committed slot - attestationCommitmentOffset and store in bucketed storage.
 //     d. Compute the cumulative weight of the attestation slot.
+//
+//     future attestations:    everything above lastCommittedSlot
+//     pending attestations:   sliding window of size attestationCommitmentOffset, add to Tracker (ratified accepted) blocks of slot that we are committing
+//     obtain and evict from it attestations that *commit to* lastCommittedSlot+1-attestationCommitmentOffset
+//     committed attestations: lastCommittedSlot-attestationCommitmentOffset
 type Manager struct {
 	committeeFunc func() *account.Accounts[iotago.AccountID, *iotago.AccountID]
 
 	bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore
 
-	pendingAttestations *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
-	tracker             *Tracker
+	futureAttestations *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
+	tracker            *Tracker
 
 	lastCommittedSlot           iotago.SlotIndex
 	lastCumulativeWeight        uint64
@@ -70,9 +78,9 @@ func NewManager(attestationCommitmentOffset iotago.SlotIndex, bucketedStorage fu
 		attestationCommitmentOffset: attestationCommitmentOffset,
 		committeeFunc:               committeeFunc,
 		bucketedStorage:             bucketedStorage,
-		pendingAttestations:         memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
+		futureAttestations:          memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
 	}
-	m.tracker = NewTracker(m.computeCurrentAttestationCommitmentOffset)
+	m.tracker = NewTracker()
 	m.TriggerConstructed()
 
 	return m
@@ -115,7 +123,7 @@ func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
 	newAttestation := iotago.NewAttestation(block.Block())
 
 	fmt.Println("AddAttestationFromBlock", block.ID())
-	storage := m.pendingAttestations.Get(block.ID().Index(), true)
+	storage := m.futureAttestations.Get(block.ID().Index(), true)
 	storage.Compute(block.Block().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
 		if !exists {
 			return newAttestation
@@ -130,29 +138,33 @@ func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
 	})
 }
 
-func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsMap *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error) {
+func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot types.Identifier, err error) {
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 
+	cutoffIndex, valid := m.computeAttestationCommitmentOffset(index)
+	if !valid {
+		return 0, types.Identifier{}, nil
+	}
+
 	// Remove all pending attestations of slot and apply to tracker.
-	pendingAttestations := m.pendingAttestations.Evict(index)
+	pendingAttestations := m.futureAttestations.Evict(index)
 	if pendingAttestations != nil {
 		pendingAttestations.ForEach(func(key iotago.AccountID, value *iotago.Attestation) bool {
 			fmt.Println("applying pending attestation", key, value.IssuingTime, value.SlotCommitmentID.Index())
-			m.tracker.TrackAttestation(value)
+			m.tracker.TrackAttestation(value, cutoffIndex)
+
 			return true
 		})
 	}
 
-	attestationSlotIndex, _ := m.computeCurrentAttestationCommitmentOffset()
+	// Get all attestations for the valid time window of cutoffIndex up to index (as we just applied the pending attestations).
+	attestations := m.tracker.EvictSlot(cutoffIndex)
 
-	// Get all attestations for the valid time window of attestationSlotIndex up to index (as we just applied the pending attestations).
-	attestations := m.tracker.EvictSlot(attestationSlotIndex)
-
-	// Store all attestations of attestationSlotIndex in bucketed storage via ads.Map / sparse merkle tree.
-	tree, err := m.adsMapStorage(attestationSlotIndex)
+	// Store all attestations of cutoffIndex in bucketed storage via ads.Map / sparse merkle tree.
+	tree, err := m.adsMapStorage(cutoffIndex)
 	if err != nil {
-		return 0, nil, errors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
+		return 0, types.Identifier{}, errors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
 	}
 
 	// Add all attestations to the tree and calculate the new cumulative weight.
@@ -167,9 +179,9 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsMap 
 	}
 
 	m.lastCommittedSlot = index
-	fmt.Println("commit", index, attestationSlotIndex, m.lastCumulativeWeight)
+	fmt.Println("commit", index, cutoffIndex, m.lastCumulativeWeight)
 
-	return m.lastCumulativeWeight, tree, nil
+	return m.lastCumulativeWeight, tree.Root(), nil
 }
 
 func (m *Manager) Get(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
@@ -179,16 +191,12 @@ func (m *Manager) Get(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago
 	if index > m.lastCommittedSlot {
 		return nil, errors.Errorf("slot %d is newer than last committed slot %d", index, m.lastCommittedSlot)
 	}
-	cutoffIndex, isValid := m.computeAttestationCommitmentOffset(index - 1)
+	cutoffIndex, isValid := m.computeAttestationCommitmentOffset(index)
 	if !isValid {
 		return nil, errors.Errorf("slot %d is smaller than attestation cutoffIndex %d thus we don't have attestations", index, cutoffIndex)
 	}
 
 	return m.adsMapStorage(cutoffIndex)
-}
-
-func (m *Manager) computeCurrentAttestationCommitmentOffset() (cutoffIndex iotago.SlotIndex, isValid bool) {
-	return m.computeAttestationCommitmentOffset(m.lastCommittedSlot)
 }
 
 func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cutoffIndex iotago.SlotIndex, isValid bool) {
@@ -262,7 +270,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 
 		fmt.Println("import", slotIndex, len(attestations))
 
-		cutoffIndex, isValid := m.computeCurrentAttestationCommitmentOffset()
+		cutoffIndex, isValid := m.computeAttestationCommitmentOffset(m.lastCommittedSlot)
 		if !isValid {
 			return nil
 		}
@@ -270,7 +278,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		fmt.Println("import", slotIndex, cutoffIndex)
 		if slotIndex >= cutoffIndex {
 			for _, a := range attestations {
-				m.tracker.TrackAttestation(a)
+				m.tracker.TrackAttestation(a, cutoffIndex)
 			}
 		} else {
 			// We should never be able to import attestations for a slot that is older than the attestation commitment offset.
@@ -293,7 +301,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 		return errors.Errorf("slot %d is newer than last committed slot %d", targetSlot, m.lastCommittedSlot)
 	}
 
-	attestationSlotIndex, isValid := m.computeCurrentAttestationCommitmentOffset()
+	attestationSlotIndex, isValid := m.computeAttestationCommitmentOffset(m.lastCommittedSlot)
 	if !isValid {
 		if err := stream.Write(writer, uint64(0)); err != nil {
 			return errors.Wrap(err, "failed to write slot count")
@@ -356,7 +364,7 @@ func (m *Manager) RestoreFromDisk() error {
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 
-	cutoffIndex, isValid := m.computeCurrentAttestationCommitmentOffset()
+	cutoffIndex, isValid := m.computeAttestationCommitmentOffset(m.lastCommittedSlot)
 
 	for i := cutoffIndex; isValid && i <= m.lastCommittedSlot; i++ {
 		storage, err := m.trackerStorage(i)
@@ -365,7 +373,7 @@ func (m *Manager) RestoreFromDisk() error {
 		}
 
 		err = storage.Iterate(kvstore.EmptyPrefix, func(key iotago.AccountID, value iotago.Attestation) bool {
-			m.tracker.TrackAttestation(&value)
+			m.tracker.TrackAttestation(&value, cutoffIndex)
 			return true
 		})
 		if err != nil {
@@ -395,7 +403,7 @@ func (m *Manager) writeToDisk() error {
 	m.commitmentMutex.RLock()
 	defer m.commitmentMutex.RUnlock()
 
-	cutoffIndex, isValid := m.computeCurrentAttestationCommitmentOffset()
+	cutoffIndex, isValid := m.computeAttestationCommitmentOffset(m.lastCommittedSlot)
 	if !isValid {
 		return nil
 	}

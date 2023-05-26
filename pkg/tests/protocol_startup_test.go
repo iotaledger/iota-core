@@ -28,27 +28,27 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
-			protocol.WithPruningDelay(3),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+				storage.WithPruningDelay(3),
 			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(2),
+				slotattestation.NewProvider(3),
 			),
 		},
 		"node2": {
-			protocol.WithPruningDelay(4),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+				storage.WithPruningDelay(4),
 			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(2),
+				slotattestation.NewProvider(3),
 			),
 		},
 	})
@@ -190,8 +190,6 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
-
-		// TODO: issue more blocks to get the committed index higher and so that we can reference the commitment of slot 8.
 
 		// Make slot 7 committed.
 		{
@@ -381,15 +379,15 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(ts.Validators()),
 			),
-			protocol.WithPruningDelay(4),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+				storage.WithPruningDelay(4),
 			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(2),
+				slotattestation.NewProvider(3),
 			),
 		)
 		ts.Wait()
@@ -430,15 +428,15 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(ts.Validators()),
 			),
-			protocol.WithPruningDelay(4),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+				storage.WithPruningDelay(4),
 			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(2),
+				slotattestation.NewProvider(3),
 			),
 		)
 		ts.Wait()
@@ -463,10 +461,10 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithEvictedSlot(9),
 			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.2")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("7.1", "8.2", "9.2")),
-			testsuite.WithPrunedSlot(5, true), // Min(latestFinalizedSlot, latestCommitmentSlot - PruningDelay)
+			testsuite.WithPrunedSlot(3, true), // latestFinalizedSlot - PruningDelay
 			testsuite.WithChainManagerIsSolid(),
 		)
-		require.Nil(t, node3.Protocol.MainEngineInstance().Storage.RootBlocks(4))
+		require.Nil(t, node3.Protocol.MainEngineInstance().Storage.RootBlocks(3))
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// Verify attestations state.
@@ -500,15 +498,15 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				testsuite.WithSybilProtectionCommittee(expectedCommittee),
 				testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 				testsuite.WithEvictedSlot(11),
-				// testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.2")),
-				// testsuite.WithStorageRootBlocks(ts.Blocks("4.2", "5.1", "6.2", "7.1", "8.2", "9.2")),
-				// testsuite.WithPrunedSlot(3, true),
+				testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.1")),
 				testsuite.WithChainManagerIsSolid(),
 			)
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
-			// TODO: assert attestations, especially node21 and node3 after restart/loading from snapshot.
+			ts.AssertLatestCommitmentCumulativeWeight(200, ts.Nodes()...)
+			ts.AssertAttestationsForSlot(10, ts.Blocks("9.1", "10.2"), ts.Nodes()...)
+			ts.AssertAttestationsForSlot(11, ts.Blocks(), ts.Nodes()...)
 		}
 	}
 }

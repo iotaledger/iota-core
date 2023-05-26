@@ -59,7 +59,6 @@ type Protocol struct {
 
 	optsBaseDirectory string
 	optsSnapshotPath  string
-	optsPruningDelay  iotago.SlotIndex
 
 	optsEngineOptions       []options.Option[engine.Engine]
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
@@ -98,7 +97,6 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsLedgerProvider:          utxoledger.NewProvider(),
 
 		optsBaseDirectory: "",
-		optsPruningDelay:  360,
 	}, opts,
 		(*Protocol).initEngineManager,
 		(*Protocol).initChainManager,
@@ -211,13 +209,6 @@ func (p *Protocol) initEngineManager() {
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,
 	)
-
-	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		if index < p.optsPruningDelay {
-			return
-		}
-		p.MainEngineInstance().Storage.PruneUntilSlot(index - p.optsPruningDelay)
-	}, event.WithWorkerPool(p.Workers.CreatePool("PruneEngine", 2)))
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
 	if err != nil {

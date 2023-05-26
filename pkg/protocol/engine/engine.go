@@ -125,6 +125,7 @@ func New(
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
 		(*Engine).setupBlockRequester,
+		(*Engine).setupPruning,
 		(*Engine).TriggerConstructed,
 	)
 }
@@ -216,8 +217,7 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 
 		// Only mark any pruning indexes if we loaded a non-genesis snapshot
 		if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-			// TODO: hand in pruning delay?
-			e.Storage.Prunable.PruneUntilSlot(lo.Min(e.Storage.Settings().LatestFinalizedSlot(), e.Storage.Settings().LatestCommitment().Index()-4))
+			e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
 		}
 	} else {
 		e.Storage.Settings().UpdateAPI()
@@ -364,6 +364,12 @@ func (e *Engine) setupBlockRequester() {
 	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
 		e.BlockRequester.StopTicker(block.ID())
 	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", 1))) // Using just 1 worker to avoid contention
+}
+
+func (e *Engine) setupPruning() {
+	e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		e.Storage.PruneUntilSlot(index)
+	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))
 }
 
 func (e *Engine) readSnapshot(filePath string) (err error) {
