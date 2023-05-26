@@ -80,7 +80,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) Events() *conflictdag.E
 }
 
 // CreateOrUpdateConflict creates a new Conflict that is conflicting over the given ResourceIDs. If the conflict already exists, it adds it any new passed ConflictSets.
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error {
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID]) error {
 	joinedConflictSets, err := func() (*advancedset.AdvancedSet[ResourceID], error) {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
@@ -89,24 +89,20 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 
 		if conflict, isNew := c.conflictsByID.GetOrCreate(id, func() *Conflict[ConflictID, ResourceID, VotePower] {
 			initialWeight := weight.New(c.committeeSet)
-			initialWeight.SetAcceptanceState(initialAcceptanceState)
 
 			newConflict := NewConflict(id, conflictSets, initialWeight, c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
 
-			// Only listen to AcceptanceStateUpdated event if initial state is pending, the ConflictAccepted/Rejected event will be triggered immediately.
-			if initialAcceptanceState.IsPending() {
-				// attach to the acceptance state updated event and propagate that event to the outside.
-				// also need to remember the unhook method to properly evict the conflict.
-				c.conflictUnhooks.Set(id, newConflict.AcceptanceStateUpdated.Hook(func(oldState, newState acceptance.State) {
-					if newState.IsAccepted() {
-						c.events.ConflictAccepted.Trigger(newConflict.ID)
-						return
-					}
-					if newState.IsRejected() {
-						c.events.ConflictRejected.Trigger(newConflict.ID)
-					}
-				}).Unhook)
-			}
+			// attach to the acceptance state updated event and propagate that event to the outside.
+			// also need to remember the unhook method to properly evict the conflict.
+			c.conflictUnhooks.Set(id, newConflict.AcceptanceStateUpdated.Hook(func(oldState, newState acceptance.State) {
+				if newState.IsAccepted() {
+					c.events.ConflictAccepted.Trigger(newConflict.ID)
+					return
+				}
+				if newState.IsRejected() {
+					c.events.ConflictRejected.Trigger(newConflict.ID)
+				}
+			}).Unhook)
 
 			return newConflict
 		}); !isNew {
@@ -123,12 +119,6 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 
 	if err == nil && joinedConflictSets.IsEmpty() {
 		c.events.ConflictCreated.Trigger(id)
-
-		if initialAcceptanceState.IsAccepted() {
-			c.events.ConflictAccepted.Trigger(id)
-		} else if initialAcceptanceState.IsRejected() {
-			c.events.ConflictRejected.Trigger(id)
-		}
 	} else if err == nil && !joinedConflictSets.IsEmpty() {
 		c.events.ConflictingResourcesAdded.Trigger(id, joinedConflictSets)
 	}

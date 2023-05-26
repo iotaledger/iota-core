@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -225,15 +224,26 @@ func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
+	var forkingErr error
 	if m.optForkAllTransactions {
-		m.forkTransaction(transaction, transaction.inputs...)
+		forkingErr = m.forkTransaction(transaction, transaction.inputs...)
 	} else {
 		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 			input.OnDoubleSpent(func() {
-				m.forkTransaction(transaction, input)
+				forkingErr = m.forkTransaction(transaction, input)
 			})
 
 		})
+	}
+
+	if forkingErr != nil {
+		for _, output := range transaction.outputs {
+			outputRequest, requestExists := m.cachedStateRequests.Get(output.id)
+
+			if requestExists {
+				outputRequest.Reject(xerrors.Errorf("state incorrect: %w", forkingErr))
+			}
+		}
 	}
 
 	if transaction.setBooked() {
@@ -289,21 +299,20 @@ func (m *MemPool[VotePower]) requestStateWithMetadata(stateRef iotago.IndexedUTX
 	})
 }
 
-func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, inputs ...*StateMetadata) {
-	initialConflictState := acceptance.Pending
-
+func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, inputs ...*StateMetadata) error {
 	inputIDs := advancedset.New[iotago.OutputID]()
 	for _, input := range inputs {
-		if _, spenderAccepted := input.AcceptedSpender(); spenderAccepted {
-			initialConflictState = acceptance.Rejected
+		if committedSpender, isSpenderCommitted := input.CommittedSpender(); isSpenderCommitted {
+			return xerrors.Errorf("failed to fork transaction because spend %s of %s is already committed", committedSpender.ID(), input.ID())
 		}
 
 		inputIDs.Add(input.ID())
 	}
 
-	if err := m.conflictDAG.CreateOrUpdateConflict(transaction.ID(), inputIDs, initialConflictState); err != nil {
-		panic(err)
+	if err := m.conflictDAG.CreateOrUpdateConflict(transaction.ID(), inputIDs); err != nil {
+		return err
 	}
+
 	transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
 		err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements)
 		if err != nil {
@@ -312,6 +321,8 @@ func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, i
 	})
 
 	transaction.setConflicting()
+
+	return nil
 }
 
 func (m *MemPool[VotePower]) updateAttachment(blockID iotago.BlockID, updateFunc func(transaction *TransactionMetadata, blockID iotago.BlockID) bool) bool {
@@ -336,10 +347,12 @@ func (m *MemPool[VotePower]) transactionByAttachment(blockID iotago.BlockID) (*T
 }
 
 func (m *MemPool[VotePower]) updateStateDiffs(transaction *TransactionMetadata, prevIndex iotago.SlotIndex, newIndex iotago.SlotIndex) {
-	// TODO: CHECK AGAINST last evicted slot
-
 	if prevIndex == newIndex {
 		return
+	}
+
+	if m.lastEvictedSlot >= newIndex {
+		panic("tried to include a transaction in an already evicted slot")
 	}
 
 	if prevIndex != 0 {
