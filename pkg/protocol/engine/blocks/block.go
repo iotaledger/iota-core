@@ -345,18 +345,30 @@ func (b *Block) Witnesses() []iotago.AccountID {
 }
 
 func (b *Block) ConflictIDs() *advancedset.AdvancedSet[iotago.TransactionID] {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
 	return b.conflictIDs
 }
 
 func (b *Block) SetConflictIDs(conflictIDs *advancedset.AdvancedSet[iotago.TransactionID]) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	b.conflictIDs = conflictIDs
 }
 
 func (b *Block) PayloadConflictIDs() *advancedset.AdvancedSet[iotago.TransactionID] {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
 	return b.payloadConflictIDs
 }
 
 func (b *Block) SetPayloadConflictIDs(payloadConflictIDs *advancedset.AdvancedSet[iotago.TransactionID]) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	b.payloadConflictIDs = payloadConflictIDs
 }
 

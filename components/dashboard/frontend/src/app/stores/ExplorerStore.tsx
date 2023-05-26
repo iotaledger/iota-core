@@ -5,14 +5,16 @@ import {
     getPayloadType,
     Output,
     PayloadType,
-    SigLockedSingleOutput,
     TransactionPayload,
     FaucetPayload,
-    Transaction
+    Transaction,
+    TaggedDataPayload,
+    BasicOutput
 } from "../misc/Payload";
 import * as React from "react";
 import { Link } from 'react-router-dom';
 import { RouterStore } from "mobx-react-router";
+import { OutputType } from 'app/utils/output';
 
 export const GenesisBlockID = "1111111111111111111111111111111111111111111111111111111111111111";
 export const GenesisTransactionID = "11111111111111111111111111111111";
@@ -157,20 +159,12 @@ class SlotInfo {
     rootsID: string;
     prevID: string;
     cumulativeWeight: number;
-}
-
-class SlotBlocks {
     blocks: Array<string>;
-}
-
-class SlotTransactions {
     transactions: Array<string>;
-}
-
-class SlotUTXOs {
     createdOutputs: Array<string>;
     spentOutputs: Array<string>;
 }
+
 class SearchResult {
     block: BlockRef;
     address: AddressResult;
@@ -212,9 +206,6 @@ export class ExplorerStore {
     @observable conflictVoters: ConflictVoters = null;
     @observable tips: Tips = null;
     @observable slotInfo: SlotInfo = new SlotInfo;
-    @observable slotBlocks: SlotBlocks = new SlotBlocks;
-    @observable slotTransactions: SlotTransactions = new SlotTransactions;
-    @observable slotUtxos: SlotUTXOs = new SlotUTXOs;
 
     // loading
     @observable query_loading: boolean = false;
@@ -289,20 +280,23 @@ export class ExplorerStore {
         this.updateAddress(res);
     };
 
+    getSlotDetails = async (id: string) => {
+        await this.getSlotInfo(id);
+    }
+
     @action
     getTransaction = async (id: string) => {
         const tx = await this.fetchJson<never, Transaction>("get", `/api/transaction/${id}`)
-
+        
         for (let i = 0; i < tx.inputs.length; i++) {
-            let inputID = tx.inputs[i] ? tx.inputs[i].referencedOutputID.base58 : GenesisBlockID
+            let inputID = tx.inputs[i] ? tx.inputs[i].referencedOutputID.hex : GenesisBlockID
             try {
                 let referencedOutputRes = await fetch(`/api/output/${inputID}`)
                 if (referencedOutputRes.status === 404) {
                     let genOutput = new Output();
-                    genOutput.output = new SigLockedSingleOutput();
-                    genOutput.output.balance = 0;
-                    genOutput.output.address = "LOADED FROM SNAPSHOT";
-                    genOutput.type = "SigLockedSingleOutputType";
+                    genOutput.output = new BasicOutput();
+                    genOutput.output.amount = 0;
+                    genOutput.type = OutputType.Basic;
                     genOutput.outputID = tx.inputs[i].referencedOutputID;
                     tx.inputs[i].output = genOutput;
                 }
@@ -377,27 +371,9 @@ export class ExplorerStore {
     }
 
     @action
-    getSlotDetails = async (id: string) => {
+    getSlotInfo = async (id: string) => {
         const res = await this.fetchJson<never, SlotInfo>("get", `/api/slot/commitment/${id}`)
         this.slotInfo = res;
-    }
-
-    @action
-    getSlotBlocks = async (index: number) => {
-        const res = await this.fetchJson<never, SlotBlocks>("get", `/api/slot/${index}/blocks`)
-        this.slotBlocks = res;
-    }
-
-    @action
-    getSlotTransactions = async (index: number) => {
-        const res = await this.fetchJson<never, SlotTransactions>("get", `/api/slot/${index}/transactions`)
-        this.slotTransactions = res;
-    }
-
-    @action
-    getSlotUTXOs = async (index: number) => {
-        const res = await this.fetchJson<never, SlotUTXOs>("get", `/api/slot/${index}/utxos`)
-        this.slotUtxos = res;
     }
 
     @action
@@ -422,10 +398,7 @@ export class ExplorerStore {
         this.conflictChildren = null;
         this.conflictConflicts = null;
         this.tips = null;
-        this.slotBlocks = new SlotBlocks;
         this.slotInfo = new SlotInfo;
-        this.slotTransactions = new SlotTransactions;
-        this.slotUtxos = new SlotUTXOs;
     };
 
     @action
@@ -454,8 +427,8 @@ export class ExplorerStore {
             case PayloadType.Transaction:
                 this.payload = blk.payload as TransactionPayload
                 break;
-            case PayloadType.Data:
-                this.payload = blk.payload as BasicPayload
+            case PayloadType.TaggedData:
+                this.payload = blk.payload as TaggedDataPayload
                 break;
             case PayloadType.Faucet:
                 this.payload = blk.payload as FaucetPayload

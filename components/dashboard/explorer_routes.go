@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 
+	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -37,20 +38,17 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 		return c.JSON(http.StatusOK, t)
 	})
 
-	// routeGroup.GET("/transaction/:transactionID", ledgerstateAPI.GetTransaction)
+	routeGroup.GET("/transaction/:"+restapipkg.ParameterTransactionID, getTransaction)
 	// routeGroup.GET("/transaction/:transactionID/metadata", ledgerstateAPI.GetTransactionMetadata)
 	// routeGroup.GET("/transaction/:transactionID/attachments", ledgerstateAPI.GetTransactionAttachments)
-	// routeGroup.GET("/output/:outputID", ledgerstateAPI.GetOutput)
+	routeGroup.GET("/output/:"+restapipkg.ParameterOutputID, getOutput)
 	// routeGroup.GET("/output/:outputID/metadata", ledgerstateAPI.GetOutputMetadata)
 	// routeGroup.GET("/output/:outputID/consumers", ledgerstateAPI.GetOutputConsumers)
 	// routeGroup.GET("/conflict/:conflictID", ledgerstateAPI.GetConflict)
 	// routeGroup.GET("/conflict/:conflictID/children", ledgerstateAPI.GetConflictChildren)
 	// routeGroup.GET("/conflict/:conflictID/conflicts", ledgerstateAPI.GetConflictConflicts)
 	// routeGroup.GET("/conflict/:conflictID/voters", ledgerstateAPI.GetConflictVoters)
-	// routeGroup.GET("/slot/:index/blocks", slotAPI.GetBlocks)
-	// routeGroup.GET("/slot/commitment/:commitment", slotAPI.GetCommittedSlotByCommitment)
-	// routeGroup.GET("/slot/:index/transactions", slotAPI.GetTransactions)
-	// routeGroup.GET("/slot/:index/utxos", slotAPI.GetUTXOs)
+	routeGroup.GET("/slot/commitment/:"+restapipkg.ParameterCommitmentID, getSlotDetailsByID)
 
 	routeGroup.GET("/search/:search", func(c echo.Context) error {
 		search := c.Param("search")
@@ -107,6 +105,11 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 		return nil
 	}
 
+	payloadJSON, err := deps.Protocol.API().JSONEncode(iotaBlk.Payload)
+	if err != nil {
+		return nil
+	}
+
 	t := &ExplorerBlock{
 		ID:                  block.ID().ToHex(),
 		ProtocolVersion:     iotaBlk.ProtocolVersion,
@@ -124,7 +127,7 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 			}
 			return iotago.PayloadType(0)
 		}(),
-		// Payload:              ProcessPayload(block.Payload()),
+		Payload:      payloadJSON,
 		CommitmentID: commitmentID.ToHex(),
 		Commitment: CommitmentResponse{
 			Index:            uint64(iotaBlk.SlotCommitment.Index),
@@ -136,4 +139,65 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 	}
 
 	return t
+}
+
+func getTransaction(c echo.Context) error {
+	txID, err := httpserver.ParseTransactionIDParam(c, restapipkg.ParameterTransactionID)
+	if err != nil {
+		return err
+	}
+
+	// Get the first output of that transaction (using index 0)
+	outputID := iotago.OutputID{}
+	copy(outputID[:], txID[:])
+
+	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID.UTXOInput())
+	if err != nil {
+		return err
+	}
+
+	block, exists := deps.Protocol.MainEngineInstance().Block(output.BlockID())
+	if !exists {
+		return errors.Errorf("block not found: %s", output.BlockID().ToHex())
+	}
+
+	iotaTX, isTX := block.Block().Payload.(*iotago.Transaction)
+	if !isTX {
+		return errors.Errorf("payload is not a transaction: %s", output.BlockID().ToHex())
+	}
+
+	return httpserver.JSONResponse(c, http.StatusOK, NewTransaction(iotaTX))
+}
+
+func getOutput(c echo.Context) error {
+	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
+	if err != nil {
+		return err
+	}
+
+	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID.UTXOInput())
+	if err != nil {
+		return err
+	}
+
+	return httpserver.JSONResponse(c, http.StatusOK, NewOutputFromLedgerstateOutput(output))
+}
+
+func getSlotDetailsByID(c echo.Context) error {
+	commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
+	if err != nil {
+		return err
+	}
+
+	commitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(commitmentID.Index())
+	if err != nil {
+		return err
+	}
+
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.StateDiffs(commitmentID.Index())
+	if err != nil {
+		return err
+	}
+
+	return httpserver.JSONResponse(c, http.StatusOK, NewSlotDetails(commitment, diffs))
 }
