@@ -7,34 +7,26 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// TipManager is a component that manages the tips of the Tangle.
 type TipManager interface {
-	//Events() *Events
-
-	// AddTip adds a Block to the tip pool.
+	// AddBlock adds a block to the TipManager.
 	AddBlock(block *blocks.Block)
 
+	// OnBlockAdded registers a callback that is triggered when a block is added to the TipManager.
 	OnBlockAdded(handler func(blockMetadata TipMetadata)) (unsubscribe func())
 
-	// RemoveTip removes a Block from the tip pool.
-	//RemoveTip(blockID iotago.BlockID) (removed bool)
-
-	// Tips returns up to 'count' number of tips.
+	// SelectTips selects the tips that should be used for the next block.
 	SelectTips(count int) (references model.ParentReferences)
 
+	// StrongTipSet returns the strong tip set of the TipManager.
 	StrongTipSet() []*blocks.Block
 
+	// WeakTipSet returns the weak tip set of the TipManager.
 	WeakTipSet() []*blocks.Block
 
+	// Evict evicts a block from the TipManager.
 	Evict(slotIndex iotago.SlotIndex)
 
-	// AllTips returns all tips contained in the tip pool.
-	//AllTips() (allTips []*blocks.Block)
-
-	// TipCount returns the total number of tips in the tip pool.
-	//TipCount() (count int)
-
-	// Shutdown shuts down the TipManager.
-	//Shutdown()
-
+	// Interface embeds the required methods of the module.Interface.
 	module.Interface
 }
