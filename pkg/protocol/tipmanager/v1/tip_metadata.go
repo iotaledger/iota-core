@@ -73,9 +73,7 @@ func (t *TipMetadata) TipPool() tipmanager.TipPool {
 
 // OnTipPoolUpdated registers a callback that is triggered when the TipPool the Block is currently in is updated.
 func (t *TipMetadata) OnTipPoolUpdated(handler func(tipPool tipmanager.TipPool)) (unsubscribe func()) {
-	return t.tipPool.OnUpdate(func(_, tipPool tipmanager.TipPool) {
-		handler(tipPool)
-	})
+	return t.tipPool.OnUpdate(func(_, tipPool tipmanager.TipPool) { handler(tipPool) })
 }
 
 // IsStrongTip returns true if the Block is part of the strong tip set.

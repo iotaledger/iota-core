@@ -333,3 +333,6 @@ func WithMaxWeakReferences(maxWeakReferences int) options.Option[TipManager] {
 		tipManager.optMaxWeakReferences = maxWeakReferences
 	}
 }
+
+// code contract (make sure the type implements all required methods).
+var _ tipmanager.TipManager = new(TipManager)
