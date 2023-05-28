@@ -277,25 +277,27 @@ func (t *TipManager) determineTipPool(tipMetadata *TipMetadata, minPool ...tipma
 
 // updateParents updates the parents of the given Block.
 func (t *TipManager) updateParents(tipMetadata *TipMetadata, updates map[model.ParentsType]func(*TipMetadata)) {
-	tipMetadata.Block().ForEachParent(func(parent model.Parent) {
-		metadataStorage := t.metadataStorage(parent.ID.Index())
-		if metadataStorage == nil {
-			return
-		}
+	if parentBlock := tipMetadata.Block(); parentBlock != nil {
+		parentBlock.ForEachParent(func(parent model.Parent) {
+			metadataStorage := t.metadataStorage(parent.ID.Index())
+			if metadataStorage == nil {
+				return
+			}
 
-		parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) })
-		if parentMetadata.Block() == nil {
-			return
-		}
+			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) })
+			if parentMetadata.Block() == nil {
+				return
+			}
 
-		if created {
-			t.setupBlockMetadata(parentMetadata)
-		}
+			if created {
+				t.setupBlockMetadata(parentMetadata)
+			}
 
-		if update, exists := updates[parent.Type]; exists {
-			update(parentMetadata)
-		}
-	})
+			if update, exists := updates[parent.Type]; exists {
+				update(parentMetadata)
+			}
+		})
+	}
 }
 
 // metadataStorage returns the TipMetadata storage for the given slotIndex.
