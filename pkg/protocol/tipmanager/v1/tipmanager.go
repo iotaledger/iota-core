@@ -174,6 +174,11 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 			return sourceType.Block().ID()
 		})
 
+		if len(references[model.StrongParentType]) == 0 {
+			// TODO: REPLACE WITH ROOT BLOCKS
+			references[model.StrongParentType] = append(references[model.StrongParentType], iotago.EmptyBlockID())
+		}
+
 		return nil
 	})
 
