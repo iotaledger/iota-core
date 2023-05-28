@@ -304,7 +304,7 @@ func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sy
 				return
 			}
 
-			if references := n.Protocol.TipManager.Tips(iotago.BlockMaxParents); len(references[model.StrongParentType]) > 0 {
+			if references := n.Protocol.TipManager.SelectTips(iotago.BlockMaxParents); len(references[model.StrongParentType]) > 0 {
 				if !n.issueActivityBlock(fmt.Sprintf("activity %s.%d", n.Name, counter), references[model.StrongParentType]...) {
 					fmt.Println(n.Name, "> Stopped activity due to block not being issued")
 					return
