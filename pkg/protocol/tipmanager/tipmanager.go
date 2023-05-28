@@ -12,9 +12,6 @@ type TipManager interface {
 	// AddBlock adds a block to the TipManager.
 	AddBlock(block *blocks.Block)
 
-	// OnBlockAdded registers a callback that is triggered when a block is added to the TipManager.
-	OnBlockAdded(handler func(blockMetadata TipMetadata)) (unsubscribe func())
-
 	// SelectTips selects the tips that should be used for the next block.
 	SelectTips(count int) (references model.ParentReferences)
 
@@ -26,6 +23,9 @@ type TipManager interface {
 
 	// Evict evicts a block from the TipManager.
 	Evict(slotIndex iotago.SlotIndex)
+
+	// Events returns the events of the TipManager.
+	Events() *Events
 
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface

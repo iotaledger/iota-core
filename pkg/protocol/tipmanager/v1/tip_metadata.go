@@ -11,7 +11,7 @@ import (
 // TipMetadata represents the metadata for a block in the TipManager.
 type TipMetadata struct {
 	// Block holds the actual block.
-	*blocks.Block
+	block *blocks.Block
 
 	// tipPool holds the TipPool the block is currently in.
 	tipPool *promise.Value[tipmanager.TipPool]
@@ -52,7 +52,7 @@ type TipMetadata struct {
 // NewBlockMetadata creates a new TipMetadata instance.
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	return (&TipMetadata{
-		Block:                     block,
+		block:                     block,
 		tipPool:                   promise.NewValue[tipmanager.TipPool](),
 		stronglyConnectedChildren: promise.NewValue[int](),
 		weaklyConnectedChildren:   promise.NewValue[int](),
@@ -64,6 +64,11 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		weakTip:                   promise.NewValue[bool](),
 		evicted:                   promise.NewEvent(),
 	}).setup()
+}
+
+// Block returns the Block the TipMetadata belongs to.
+func (t *TipMetadata) Block() *blocks.Block {
+	return t.block
 }
 
 // TipPool returns the TipPool the Block is currently in.

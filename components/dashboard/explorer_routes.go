@@ -151,7 +151,7 @@ func getTransaction(c echo.Context) error {
 	outputID := iotago.OutputID{}
 	copy(outputID[:], txID[:])
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(goutputID)
 	if err != nil {
 		return err
 	}

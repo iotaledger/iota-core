@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -21,6 +22,7 @@ type Events struct {
 	EvictionState  *eviction.Events
 	Filter         *filter.Events
 	BlockRequester *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
+	TipManager     *tipmanager.Events
 	BlockDAG       *blockdag.Events
 	Booker         *booker.Events
 	Clock          *clock.Events
@@ -39,6 +41,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		EvictionState:  eviction.NewEvents(),
 		Filter:         filter.NewEvents(),
 		BlockRequester: eventticker.NewEvents[iotago.SlotIndex, iotago.BlockID](),
+		TipManager:     tipmanager.NewEvents(),
 		BlockDAG:       blockdag.NewEvents(),
 		Booker:         booker.NewEvents(),
 		Clock:          clock.NewEvents(),

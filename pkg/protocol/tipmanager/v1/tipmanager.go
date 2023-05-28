@@ -42,8 +42,8 @@ type TipManager struct {
 	// weakTipSet contains the blocks of the weak tip pool that have no referencing children.
 	weakTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
 
-	// blockAdded is triggered when a new Block was added to the TipManager.
-	blockAdded *event.Event1[*TipMetadata]
+	// events contains all the events that are triggered by the TipManager.
+	events *tipmanager.Events
 
 	// lastEvictedSlot is the last slot index that was evicted from the MemPool.
 	lastEvictedSlot iotago.SlotIndex
@@ -72,6 +72,7 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 		e.Events.Booker.BlockBooked.Hook(t.AddBlock, event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
 		e.BlockCache.Evict.Hook(t.Evict)
 		e.HookStopped(t.Shutdown)
+		e.Events.TipManager.LinkTo(t.events)
 
 		t.TriggerInitialized()
 
@@ -87,7 +88,7 @@ func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iot
 		tipMetadataStorage:           shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
 		strongTipSet:                 randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:                   randommap.New[iotago.BlockID, *TipMetadata](),
-		blockAdded:                   event.New1[*TipMetadata](),
+		events:                       tipmanager.NewEvents(),
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,
 	}, opts, func(t *TipManager) {
@@ -104,11 +105,6 @@ func (t *TipManager) AddBlock(block *blocks.Block) {
 	}
 }
 
-// OnBlockAdded registers a callback that is triggered when a new Block was added to the TipManager.
-func (t *TipManager) OnBlockAdded(handler func(tipMetadata tipmanager.TipMetadata)) (unsubscribe func()) {
-	return t.blockAdded.Hook(func(metadata *TipMetadata) { handler(metadata) }).Unhook
-}
-
 // SelectTips selects the references that should be used for block issuance.
 func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
@@ -117,7 +113,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 	selectStrongTips := func(amount int) (strongTips []*TipMetadata) {
 		if amount > 0 {
 			for _, strongTip := range t.strongTipSet.RandomUniqueEntries(amount + seenStrongTips.Size()) {
-				if seenStrongTips.Add(strongTip.Block.ID()) {
+				if seenStrongTips.Add(strongTip.Block().ID()) {
 					if strongTips = append(strongTips, strongTip); len(strongTips) == amount {
 						return strongTips
 					}
@@ -133,7 +129,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 
 		likedInsteadReferences := func(tipMetadata *TipMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {
 			necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
-			if err = conflictDAG.LikedInstead(tipMetadata.ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
+			if err = conflictDAG.LikedInstead(tipMetadata.Block().ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
 				if transactionMetadata, exists := t.memPool.TransactionMetadata(likedConflictID); !exists {
 					return xerrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedConflictID)
 				} else {
@@ -153,7 +149,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 			}
 
 			if len(references) > t.optMaxLikedInsteadReferencesPerParent {
-				return nil, nil, xerrors.Errorf("too many liked instead references (%d) for block %s", len(references), tipMetadata.Block.ID())
+				return nil, nil, xerrors.Errorf("too many liked instead references (%d) for block %s", len(references), tipMetadata.Block().ID())
 			}
 
 			return references, updatedLikedConflicts, nil
@@ -166,7 +162,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 
 					strongTip.setTipPool(t.determineTipPool(strongTip, tipmanager.WeakTipPool))
 				} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[model.ShallowLikeParentType]) {
-					references[model.StrongParentType] = append(references[model.StrongParentType], strongTip.ID())
+					references[model.StrongParentType] = append(references[model.StrongParentType], strongTip.Block().ID())
 					references[model.ShallowLikeParentType] = append(references[model.ShallowLikeParentType], addedLikedInsteadReferences...)
 
 					likedConflicts = updatedLikedConflicts
@@ -174,7 +170,9 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 			}
 		}
 
-		references[model.WeakParentType] = lo.Map(t.weakTipSet.RandomUniqueEntries(t.optMaxWeakReferences), (*TipMetadata).ID)
+		references[model.WeakParentType] = lo.Map(t.weakTipSet.RandomUniqueEntries(t.optMaxWeakReferences), func(sourceType *TipMetadata) iotago.BlockID {
+			return sourceType.Block().ID()
+		})
 
 		return nil
 	})
@@ -186,7 +184,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 func (t *TipManager) StrongTipSet() []*blocks.Block {
 	var tipSet []*blocks.Block
 	t.strongTipSet.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
-		tipSet = append(tipSet, tipMetadata.Block)
+		tipSet = append(tipSet, tipMetadata.Block())
 
 		return true
 	})
@@ -197,7 +195,7 @@ func (t *TipManager) StrongTipSet() []*blocks.Block {
 // WeakTipSet returns the weak tip set of the TipManager.
 func (t *TipManager) WeakTipSet() (tipSet []*blocks.Block) {
 	t.weakTipSet.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
-		tipSet = append(tipSet, tipMetadata.Block)
+		tipSet = append(tipSet, tipMetadata.Block())
 
 		return true
 	})
@@ -218,6 +216,11 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 	}
 }
 
+// Events returns the events of the TipManager.
+func (t *TipManager) Events() *tipmanager.Events {
+	return t.events
+}
+
 // Shutdown marks the TipManager as shutdown.
 func (t *TipManager) Shutdown() {
 	t.TriggerStopped()
@@ -235,37 +238,37 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 
 	tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
 		if isStrongTip {
-			t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
+			t.strongTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
 		} else {
-			t.strongTipSet.Delete(tipMetadata.ID())
+			t.strongTipSet.Delete(tipMetadata.Block().ID())
 		}
 	})
 
 	tipMetadata.OnIsWeakTipUpdated(func(isWeakTip bool) {
 		if isWeakTip {
-			t.weakTipSet.Set(tipMetadata.ID(), tipMetadata)
+			t.weakTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
 		} else {
-			t.weakTipSet.Delete(tipMetadata.ID())
+			t.weakTipSet.Delete(tipMetadata.Block().ID())
 		}
 	})
 
 	tipMetadata.OnEvicted(func() {
-		t.strongTipSet.Delete(tipMetadata.ID())
-		t.weakTipSet.Delete(tipMetadata.ID())
+		t.strongTipSet.Delete(tipMetadata.Block().ID())
+		t.weakTipSet.Delete(tipMetadata.Block().ID())
 	})
 
 	tipMetadata.setTipPool(t.determineTipPool(tipMetadata))
 
-	t.blockAdded.Trigger(tipMetadata)
+	t.events.BlockAdded.Trigger(tipMetadata)
 }
 
 // determineTipPool determines the initial TipPool of the given Block.
 func (t *TipManager) determineTipPool(tipMetadata *TipMetadata, minPool ...tipmanager.TipPool) tipmanager.TipPool {
-	if lo.First(minPool) <= tipmanager.StrongTipPool && !t.conflictDAG.AcceptanceState(tipMetadata.ConflictIDs()).IsRejected() {
+	if lo.First(minPool) <= tipmanager.StrongTipPool && !t.conflictDAG.AcceptanceState(tipMetadata.Block().ConflictIDs()).IsRejected() {
 		return tipmanager.StrongTipPool
 	}
 
-	if lo.First(minPool) <= tipmanager.WeakTipPool && t.conflictDAG.LikedInstead(tipMetadata.PayloadConflictIDs()).Size() == 0 {
+	if lo.First(minPool) <= tipmanager.WeakTipPool && t.conflictDAG.LikedInstead(tipMetadata.Block().PayloadConflictIDs()).Size() == 0 {
 		return tipmanager.WeakTipPool
 	}
 
@@ -274,14 +277,14 @@ func (t *TipManager) determineTipPool(tipMetadata *TipMetadata, minPool ...tipma
 
 // updateParents updates the parents of the given Block.
 func (t *TipManager) updateParents(tipMetadata *TipMetadata, updates map[model.ParentsType]func(*TipMetadata)) {
-	tipMetadata.ForEachParent(func(parent model.Parent) {
+	tipMetadata.Block().ForEachParent(func(parent model.Parent) {
 		metadataStorage := t.metadataStorage(parent.ID.Index())
 		if metadataStorage == nil {
 			return
 		}
 
 		parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) })
-		if parentMetadata.Block == nil {
+		if parentMetadata.Block() == nil {
 			return
 		}
 

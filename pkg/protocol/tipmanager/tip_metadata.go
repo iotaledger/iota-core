@@ -1,7 +1,12 @@
 package tipmanager
 
+import "github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+
 // TipMetadata allows to access the tip related metadata and events of a block in the TipManager.
 type TipMetadata interface {
+	// Block returns the Block that the TipMetadata belongs to.
+	Block() *blocks.Block
+
 	// TipPool returns the TipPool the block is currently in.
 	TipPool() TipPool
 

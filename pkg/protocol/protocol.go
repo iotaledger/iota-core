@@ -105,7 +105,6 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 func (p *Protocol) Run() {
 	p.Events.Engine.LinkTo(p.mainEngine.Events)
 	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
-	p.Events.TipManager.LinkTo(p.TipManager.Events())
 	p.SyncManager = p.optsSyncManagerProvider(p.mainEngine)
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
