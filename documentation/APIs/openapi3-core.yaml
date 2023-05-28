@@ -2805,7 +2805,6 @@ components:
         - transactionId
         - outputIndex
         - isSpent
-        - includedCommitmentId
         - latestCommitmentId
 
     UTXOChangesResponse:
