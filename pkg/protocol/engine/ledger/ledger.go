@@ -21,7 +21,7 @@ type Ledger interface {
 	Spent(outputID iotago.OutputID) (*ledgerstate.Spent, error)
 	TransactionMetadata(id iotago.TransactionID) (transactionMetadata mempool.TransactionMetadata, exists bool)
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transactionMetadata mempool.TransactionMetadata, exists bool)
-	CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, err error)
+	CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot, bicRoot iotago.Identifier, err error)
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
 	StateDiffs(index iotago.SlotIndex) (*ledgerstate.SlotDiff, error)
 	AddUnspentOutput(unspentOutput *ledgerstate.Output) error

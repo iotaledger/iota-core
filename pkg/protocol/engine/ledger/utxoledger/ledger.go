@@ -2,6 +2,7 @@ package utxoledger
 
 import (
 	"fmt"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/bic"
 	"io"
 
 	"github.com/pkg/errors"
@@ -28,7 +29,9 @@ import (
 var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
 
 type Ledger struct {
-	ledgerState  *ledgerstate.Manager
+	utxoLedger     *ledgerstate.Manager
+	accountsLedger *bic.BICManager
+
 	memPool      mempool.MemPool[booker.BlockVotePower]
 	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
 	errorHandler func(error)
@@ -51,7 +54,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 func New(workers *workerpool.Group, store kvstore.KVStore, vm mempool.VM, apiProviderFunc func() iotago.API, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], errorHandler func(error)) *Ledger {
 	l := &Ledger{
-		ledgerState:  ledgerstate.New(store, apiProviderFunc),
+		utxoLedger:   ledgerstate.New(store, apiProviderFunc),
 		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
 		errorHandler: errorHandler,
 	}
@@ -71,18 +74,34 @@ func (l *Ledger) Shutdown() {
 }
 
 func (l *Ledger) Import(reader io.ReadSeeker) error {
-	return l.ledgerState.Import(reader)
+	if err := l.utxoLedger.Import(reader); err != nil {
+		return err
+	}
+
+	if err := l.accountsLedger.Import(reader); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error {
-	return l.ledgerState.Export(writer, targetIndex)
+	if err := l.utxoLedger.Export(writer, targetIndex); err != nil {
+		return err
+	}
+
+	if err := l.accountsLedger.Export(writer, targetIndex); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
 	p := promise.New[mempool.State]()
 
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
-	output, err := l.ledgerState.ReadOutputByOutputID(stateRef.Ref())
+	output, err := l.utxoLedger.ReadOutputByOutputID(stateRef.Ref())
 	if err != nil {
 		p.Reject(xerrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	} else {
@@ -114,16 +133,16 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*ledgerstate.Out
 			return nil, ErrUnexpectedUnderlyingType
 		}
 
-		return ledgerstate.CreateOutput(l.ledgerState.API(), stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
+		return ledgerstate.CreateOutput(l.utxoLedger.API(), stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
 	default:
 		panic("unexpected State type")
 	}
 }
 
-func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, err error) {
-	ledgerIndex, err := l.ledgerState.ReadLedgerIndex()
+func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, bicRoot iotago.Identifier, err error) {
+	ledgerIndex, err := l.utxoLedger.ReadLedgerIndex()
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, err
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
 	if index != ledgerIndex+1 {
@@ -135,6 +154,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	var innerErr error
 	var outputs ledgerstate.Outputs
 	var spents ledgerstate.Spents
+	var allotments map[iotago.AccountID]uint64
+	var burns map[iotago.AccountID]uint64
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
@@ -157,12 +178,12 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 				return false
 			}
 
-			spent := ledgerstate.NewSpent(inputState, txWithMeta.ID(), txCreationTime, index)
+			spent := ledgerstate.NewSpent(inputState, txWithMeta.ID(), index)
 			spents = append(spents, spent)
 		}
 
 		if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateMetadata) error {
-			output := ledgerstate.CreateOutput(l.ledgerState.API(), element.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, element.State().Output())
+			output := ledgerstate.CreateOutput(l.utxoLedger.API(), element.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, element.State().Output())
 			outputs = append(outputs, output)
 
 			return nil
@@ -171,15 +192,27 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			return false
 		}
 
+		for _, allotment := range tx.Essence.Allotments {
+			allotments[allotment.AccountID] += allotment.Amount
+		}
+
 		return true
 	})
 
+	stateDiff.BurnedMana().ForEach(func(b *iotago.Block, burn uint64) bool {
+		burns[b.IssuerID] += burn
+		return true
+	})
 	if innerErr != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, innerErr
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
 	}
 
-	if err := l.ledgerState.ApplyDiff(index, outputs, spents); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, err
+	if err := l.utxoLedger.ApplyDiff(index, outputs, spents); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+	}
+
+	if bicRoot, err = l.accountsLedger.CommitSlot(index, allotments, burns); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
 	// Mark the transactions as committed so the mempool can evict it.
@@ -188,23 +221,23 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return true
 	})
 
-	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), nil
+	return l.utxoLedger.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), bicRoot, nil
 }
 
 func (l *Ledger) IsOutputUnspent(outputID iotago.OutputID) (bool, error) {
-	return l.ledgerState.IsOutputIDUnspentWithoutLocking(outputID)
+	return l.utxoLedger.IsOutputIDUnspentWithoutLocking(outputID)
 }
 
 func (l *Ledger) Spent(outputID iotago.OutputID) (*ledgerstate.Spent, error) {
-	return l.ledgerState.ReadSpentForOutputIDWithoutLocking(outputID)
+	return l.utxoLedger.ReadSpentForOutputIDWithoutLocking(outputID)
 }
 
 func (l *Ledger) StateDiffs(index iotago.SlotIndex) (*ledgerstate.SlotDiff, error) {
-	return l.ledgerState.SlotDiffWithoutLocking(index)
+	return l.utxoLedger.SlotDiffWithoutLocking(index)
 }
 
 func (l *Ledger) AddUnspentOutput(unspentOutput *ledgerstate.Output) error {
-	return l.ledgerState.AddUnspentOutput(unspentOutput)
+	return l.utxoLedger.AddUnspentOutput(unspentOutput)
 }
 
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
@@ -238,7 +271,7 @@ func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempoo
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
 	switch block.Block().Payload.(type) {
 	case *iotago.Transaction:
-		l.memPool.MarkAttachmentIncluded(block.ID())
+		l.memPool.MarkAttachmentIncluded(block)
 
 	default:
 		return

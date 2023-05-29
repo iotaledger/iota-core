@@ -1,6 +1,7 @@
 package slotnotarization
 
 import (
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"io"
 	"sync"
 	"time"
