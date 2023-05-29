@@ -297,7 +297,7 @@ func (t *TipManager) determineTipPool(tipMetadata *TipMetadata, minPool ...tipma
 
 // updateParents updates the parents of the given Block.
 func (t *TipManager) updateParents(tipMetadata *TipMetadata, updates map[model.ParentsType]func(*TipMetadata)) {
-	if parentBlock := tipMetadata.Block(); parentBlock != nil {
+	if parentBlock := tipMetadata.Block(); parentBlock != nil && parentBlock.Block() != nil {
 		parentBlock.ForEachParent(func(parent model.Parent) {
 			metadataStorage := t.metadataStorage(parent.ID.Index())
 			if metadataStorage == nil {

@@ -123,9 +123,6 @@ func (blk *Block) ForEachParent(consumer func(parent Parent)) {
 	// TODO: is this even correct to ignore parents?
 	seenBlockIDs := make(map[iotago.BlockID]types.Empty)
 	block := blk.Block()
-	if block == nil {
-		return
-	}
 
 	for _, parentBlockID := range block.StrongParents {
 		if _, exists := seenBlockIDs[parentBlockID]; !exists {
