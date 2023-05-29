@@ -10,7 +10,7 @@ import ListGroup from "react-bootstrap/ListGroup";
 import Alert from "react-bootstrap/Alert";
 import {Link} from 'react-router-dom';
 import {displayManaUnit} from "../utils";
-import {outputToComponent, totalBalanceFromExplorerOutputs} from "../utils/output";
+import {OutputType, outputToComponent, outputTypeToName} from "../utils/output";
 import {Button, ListGroupItem} from "react-bootstrap";
 import {resolveBase58ConflictID} from "../utils/conflict";
 
@@ -87,22 +87,6 @@ export class ExplorerAddressQueryResult extends React.Component<Props, any> {
             // sort outputs
             unspent.sort(timestampCompareFn)
             spent.sort(timestampCompareFn)
-
-            // derive the available funds
-            totalBalanceFromExplorerOutputs(unspent, addr.address).forEach((balance: number, color: string) => {
-                available_balances.push(
-                    <ListGroup.Item key={color} style={{textAlign: 'center'}}>
-                        <Row>
-                            <Col xs={9}>
-                                {color}
-                            </Col>
-                            <Col>
-                                {new Intl.NumberFormat().format(balance)}
-                            </Col>
-                        </Row>
-                    </ListGroup.Item>
-                )
-            });
         }
         return (
             <Container>
@@ -200,7 +184,7 @@ class OutputButton extends React.Component<oProps, any> {
                 >
                  <Row>
                      <Col xs={6} style={{textAlign: "left"}}>{this.props.output.id.base58} </Col>
-                     <Col style={{textAlign: "left"}}>{this.props.output.output.type.replace("Type", "")} </Col>
+                     <Col style={{textAlign: "left"}}>{outputTypeToName(this.props.output.output.type)} </Col>
                      <Col style={{textAlign: "left"}}>{new Date(this.props.output.txTimestamp * 1000).toLocaleString()}</Col>
                  </Row>
                 </Button>
@@ -261,15 +245,15 @@ class OutputMeta extends React.Component<omProps, any> {
     }
 }
 
-let getVariant = (outputType) => {
+let getVariant = (outputType: number) => {
     switch (outputType) {
-        case "SigLockedSingleOutputType":
+        case OutputType.Basic:
             return "light";
-        case "SigLockedColoredOutputType":
+        case OutputType.Alias:
             return "light";
-        case "AliasOutputType":
+        case OutputType.Foundry:
             return "success";
-        case "ExtendedLockedOutputType":
+        case OutputType.NFT:
             return "info";
         default:
             return "danger";

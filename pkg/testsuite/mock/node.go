@@ -21,6 +21,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -79,7 +80,7 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 	)
 	n.blockIssuer = blockissuer.New(n.Protocol, blockissuer.NewEd25519Account(n.AccountID, n.privateKey), blockissuer.WithTipSelectionTimeout(3*time.Second), blockissuer.WithTipSelectionRetryInterval(time.Millisecond*100))
 
-	go n.Protocol.Run()
+	n.Protocol.Run()
 }
 
 func (n *Node) HookLogging() {
@@ -192,6 +193,65 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
 		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotConfirmed: %s\n", n.Name, engineName, slotIndex)
 	})
+
+	instance.Events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] ConflictDAG.ConflictCreated: %s\n", n.Name, engineName, conflictID)
+	})
+
+	instance.Events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] ConflictDAG.ConflictEvicted: %s\n", n.Name, engineName, conflictID)
+	})
+	instance.Events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] ConflictDAG.ConflictRejected: %s\n", n.Name, engineName, conflictID)
+	})
+
+	instance.Events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
+	})
+
+	instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
+		fmt.Printf("%s > [%s] Ledger.TransactionAttached: %s\n", n.Name, engineName, transactionMetadata.ID())
+
+		transactionMetadata.OnSolid(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionSolid: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+
+		transactionMetadata.OnExecuted(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionExecuted: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+
+		transactionMetadata.OnBooked(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionBooked: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+
+		transactionMetadata.OnConflicting(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionConflicting: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+
+		transactionMetadata.OnAccepted(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionAccepted: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+
+		transactionMetadata.OnRejected(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionRejected: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+
+		transactionMetadata.OnInvalid(func(err error) {
+			fmt.Printf("%s > [%s] MemPool.TransactionInvalid(%s): %s\n", n.Name, engineName, err, transactionMetadata.ID())
+		})
+
+		transactionMetadata.OnOrphaned(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionOrphaned: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+
+		transactionMetadata.OnCommitted(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionCommitted: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+
+		transactionMetadata.OnPending(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionPending: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+	})
 }
 
 func (n *Node) Wait() {
@@ -228,10 +288,7 @@ func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitm
 	issuingTime := slotTimeProvider.StartTime(slot)
 	require.Truef(n.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", n.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
 
-	parentReferences := make(model.ParentReferences)
-	parentReferences[model.StrongParentType] = parents
-
-	return n.IssueBlock(alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithReferences(parentReferences))
+	return n.IssueBlock(alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithStrongParents(parents...))
 }
 
 func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sync.WaitGroup) {
