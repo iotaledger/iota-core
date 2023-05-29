@@ -18,13 +18,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 type Node struct {
@@ -94,6 +94,34 @@ func (n *Node) HookLogging() {
 
 	events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source identity.ID) {
 		fmt.Printf("%s > Network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
+	})
+
+	events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source identity.ID) {
+		fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
+	})
+
+	events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
+		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
+	})
+
+	events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
+		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
+	})
+
+	events.ChainManager.CommitmentMissing.Hook(func(commitmentID iotago.CommitmentID) {
+		fmt.Printf("%s > ChainManager.CommitmentMissing: %s\n", n.Name, commitmentID)
+	})
+
+	events.ChainManager.MissingCommitmentReceived.Hook(func(commitmentID iotago.CommitmentID) {
+		fmt.Printf("%s > ChainManager.MissingCommitmentReceived: %s\n", n.Name, commitmentID)
+	})
+
+	events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
+		fmt.Printf("%s > ChainManager.CommitmentBelowRoot: %s\n", n.Name, commitmentID)
+	})
+
+	events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
+		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
 	})
 
 	// events.Network.AttestationsReceived.Hook(func(event *network.AttestationsReceivedEvent) {
@@ -270,15 +298,15 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.AccountID.RegisterAlias(n.Name)
 }
 
-func (n *Node) IssueBlock(alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
-	modelBlock, err := n.blockIssuer.CreateBlock(context.Background(), opts...)
+func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+	modelBlock, err := n.blockIssuer.CreateBlock(ctx, opts...)
 	require.NoError(n.Testing, err)
 
 	modelBlock.ID().RegisterAlias(alias)
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(modelBlock))
 
-	fmt.Printf("Issued block: %s - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
+	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.ID().Index(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
 
 	return blocks.NewBlock(modelBlock)
 }
@@ -288,7 +316,7 @@ func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitm
 	issuingTime := slotTimeProvider.StartTime(slot)
 	require.Truef(n.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", n.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
 
-	return n.IssueBlock(alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithStrongParents(parents...))
+	return n.IssueBlock(context.Background(), alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithStrongParents(parents...))
 }
 
 func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sync.WaitGroup) {
@@ -304,55 +332,17 @@ func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sy
 				return
 			}
 
-			if references := n.Protocol.TipManager.Tips(iotago.BlockMaxParents); len(references[model.StrongParentType]) > 0 {
-				if !n.issueActivityBlock(fmt.Sprintf("activity %s.%d", n.Name, counter), references[model.StrongParentType]...) {
-					fmt.Println(n.Name, "> Stopped activity due to block not being issued")
-					return
-				}
-				counter++
-				time.Sleep(1 * time.Second)
-				if duration > 0 && time.Since(start) > duration {
-					fmt.Println(n.Name, "> Stopped activity after", time.Since(start))
-					return
-				}
-			} else {
-				fmt.Println(n.Name, "> Skipped activity due lack of strong parents")
+			n.IssueBlock(ctx, fmt.Sprintf("activity %s.%d", n.Name, counter), blockissuer.WithPayload(&iotago.TaggedData{
+				Tag: []byte(fmt.Sprintf("activity %s.%d", n.Name, counter)),
+			}))
+
+			counter++
+			time.Sleep(1 * time.Second)
+			if duration > 0 && time.Since(start) > duration {
+				fmt.Println(n.Name, "> Stopped activity after", time.Since(start))
+				return
 			}
 		}
+
 	}()
-}
-
-func (n *Node) issueActivityBlock(alias string, parents ...iotago.BlockID) bool {
-	if !n.Protocol.MainEngineInstance().WasStopped() {
-
-		block, err := builder.NewBlockBuilder().
-			StrongParents(parents).
-			SlotCommitment(n.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()).
-			LatestFinalizedSlot(n.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()).
-			Payload(&iotago.TaggedData{
-				Tag: []byte("ACTIVITY"),
-			}).
-			Sign(n.AccountID, n.privateKey).
-			Build()
-
-		if err != nil {
-			panic(err)
-		}
-
-		modelBlock, err := model.BlockFromBlock(block, n.Protocol.API())
-		if err != nil {
-			panic(err)
-		}
-
-		err = n.Protocol.ProcessBlock(modelBlock, n.PeerID)
-		if err != nil {
-			panic(err)
-		}
-
-		modelBlock.ID().RegisterAlias(alias)
-
-		return true
-	}
-
-	return false
 }

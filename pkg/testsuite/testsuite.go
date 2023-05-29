@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -71,8 +72,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*100),
 			SlotDurationInSeconds: 10,
 		},
-		optsWaitFor: 2 * time.Second,
-		optsTick:    5 * time.Millisecond,
+		optsWaitFor: 10 * time.Second,
+		optsTick:    10 * time.Millisecond,
 	}, opts, func(t *TestSuite) {
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
@@ -153,7 +154,7 @@ func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...optio
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := node.IssueBlock(alias, blockOpts...)
+	block := node.IssueBlock(context.Background(), alias, blockOpts...)
 
 	t.blocks.Set(alias, block)
 	block.ID().RegisterAlias(alias)

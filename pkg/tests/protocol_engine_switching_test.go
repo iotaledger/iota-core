@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
-	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -353,7 +353,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node3", "node4"),
 				testsuite.WithLatestCommitmentSlotIndex(13),
-				testsuite.WithLatestCommitmentCumulativeWeight(50), // We haven't collected any attestation yet.
+				testsuite.WithLatestCommitmentCumulativeWeight(50),
 				testsuite.WithLatestStateMutationSlot(0),
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
@@ -383,52 +383,42 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		fmt.Println("\n=========================\nMerged network partitions\n=========================")
 	}
 
+	var forksDetected atomic.Uint32
+	var commitmentsBelowRootDetected atomic.Uint32
+	node1.Protocol.Events.ChainManager.CommitmentBelowRoot.Hook(func(commitment iotago.CommitmentID) {
+		commitmentsBelowRootDetected.Add(1)
+	})
+	node2.Protocol.Events.ChainManager.CommitmentBelowRoot.Hook(func(commitment iotago.CommitmentID) {
+		commitmentsBelowRootDetected.Add(1)
+	})
+	node3.Protocol.Events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
+		forksDetected.Add(1)
+	})
+	node4.Protocol.Events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
+		forksDetected.Add(1)
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	forkDetectionTimeout := 20 * time.Second
 	wg := &sync.WaitGroup{}
-
-	detectFork := func(node *mock.Node, done func()) {
-		forkDetected := make(chan struct{}, 1)
-		node.Protocol.Events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
-			forkDetected <- struct{}{}
-		})
-
-		go func() {
-			require.Eventually(t, func() bool {
-				select {
-				case <-forkDetected:
-					done()
-					return true
-				default:
-					return false
-				}
-			}, 25*time.Second, 10*time.Millisecond)
-		}()
-	}
-	node1Ctx, node1Cancel := context.WithCancel(context.Background())
-	defer node1Cancel()
-
-	node2Ctx, node2Cancel := context.WithCancel(context.Background())
-	defer node2Cancel()
-
-	node3Ctx, node3Cancel := context.WithCancel(context.Background())
-	defer node3Cancel()
-
-	node4Ctx, node4Cancel := context.WithCancel(context.Background())
-	defer node4Cancel()
-
-	detectFork(node1, node1Cancel)
-	detectFork(node2, node2Cancel)
-	detectFork(node3, node3Cancel)
-	detectFork(node4, node4Cancel)
-
 	// Issue blocks after merging the networks
 	{
 		wg.Add(4)
 
-		node1.IssueActivity(node1Ctx, 40*time.Second, wg)
-		node2.IssueActivity(node2Ctx, 40*time.Second, wg)
-		node3.IssueActivity(node3Ctx, 40*time.Second, wg)
-		node4.IssueActivity(node4Ctx, 40*time.Second, wg)
+		node1.IssueActivity(ctx, forkDetectionTimeout, wg)
+		node2.IssueActivity(ctx, forkDetectionTimeout, wg)
+		node3.IssueActivity(ctx, forkDetectionTimeout, wg)
+		node4.IssueActivity(ctx, forkDetectionTimeout, wg)
 	}
 
+	expectedForksDetected := uint32(2)
+	// node1 and node2 detect CommitmentBelowRoot for requested commitments: both nodes 3 and 4 will send it. Thus, in total 4.
+	expectedCommitmentsBelowRootDetected := uint32(4)
+	require.Eventually(t, func() bool {
+		return expectedForksDetected == forksDetected.Load() && expectedCommitmentsBelowRootDetected == commitmentsBelowRootDetected.Load()
+	}, forkDetectionTimeout, 100*time.Millisecond)
+
+	// After we detected all forks we can stop issuing activity blocks.
+	cancel()
 	wg.Wait()
 }
