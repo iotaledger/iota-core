@@ -9,7 +9,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// TODO do we still need this separate interface, together with ledger
 // BlockIssuanceCredits is the minimal interface for the Accounts component of the IOTA protocol.
 type BlockIssuanceCredits interface {
 	// BIC returns Block Issuer Credits of a specific account for a specific slot index.
@@ -19,16 +18,18 @@ type BlockIssuanceCredits interface {
 	module.Interface
 }
 
+type ManaHoldings interface {
+	// Mana is the stored and potential value of an account collected on the UTXO layer - used by the Scheduler.
+	Mana(id iotago.AccountID) (mana *ManaHoldings, err error)
+}
+
 type AccountPublicKeys interface {
 	IsPublicKeyAllowed(iotago.AccountID, iotago.SlotIndex, ed25519.PublicKey) bool
 }
 
-// TODO if pubkeys are not stored within BICManager, then we can remove this interface and use Credits as the bicTree leaf
 type Account interface {
 	ID() iotago.AccountID
 	Credits() *Credits
-	// ManaHoldings returns the updated stored and potential value of an account collected on the UTXO layer - used by the Scheduler.
-	ManaHoldings() *ManaHoldings
 	IsPublicKeyAllowed(ed25519.PublicKey) bool
 	Clone() Account
 }
@@ -36,10 +37,9 @@ type Account interface {
 type AccountImpl struct {
 	api iotago.API
 
-	id           iotago.AccountID `serix:"0"`
-	credits      *Credits         `serix:"1"`
-	manaHoldings *ManaHoldings
-	pubKeysMap   *shrinkingmap.ShrinkingMap[crypto.PublicKey, types.Empty]
+	id         iotago.AccountID `serix:"0"`
+	credits    *Credits         `serix:"1"`
+	pubKeysMap *shrinkingmap.ShrinkingMap[crypto.PublicKey, types.Empty]
 }
 
 func NewAccount(api iotago.API, id iotago.AccountID, credits *Credits, pubKeys ...ed25519.PublicKey) *AccountImpl {
@@ -64,10 +64,6 @@ func (a *AccountImpl) ID() iotago.AccountID {
 
 func (a *AccountImpl) Credits() *Credits {
 	return a.credits
-}
-
-func (a *AccountImpl) ManaHoldings() *ManaHoldings {
-	return a.manaHoldings
 }
 
 func (a *AccountImpl) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
