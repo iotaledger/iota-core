@@ -15,6 +15,7 @@ const (
 	sybilProtectionPrefix byte = iota
 	attestationsPrefix
 	ledgerPrefix
+	accountsPrefix
 )
 
 type Permanent struct {
@@ -29,6 +30,7 @@ type Permanent struct {
 	sybilProtection kvstore.KVStore
 	attestations    kvstore.KVStore
 	ledger          kvstore.KVStore
+	accounts        kvstore.KVStore
 }
 
 // New returns a new permanent storage instance.
@@ -56,6 +58,7 @@ func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(e
 		p.sybilProtection = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{sybilProtectionPrefix}))
 		p.attestations = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{attestationsPrefix}))
 		p.ledger = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{ledgerPrefix}))
+		p.accounts = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{accountsPrefix}))
 	})
 }
 
@@ -79,9 +82,9 @@ func (p *Permanent) SybilProtection(optRealm ...byte) kvstore.KVStore {
 // Accounts returns the "BIC" storage (or a specialized sub-storage if a realm is provided).
 func (p *Permanent) Accounts(optRealm ...byte) kvstore.KVStore {
 	if len(optRealm) == 0 {
-		return p.sybilProtection
+		return p.accounts
 	}
-	return lo.PanicOnErr(p.sybilProtection.WithExtendedRealm(optRealm))
+	return lo.PanicOnErr(p.accounts.WithExtendedRealm(optRealm))
 }
 
 // Attestations returns the "attestations" storage (or a specialized sub-storage if a realm is provided).

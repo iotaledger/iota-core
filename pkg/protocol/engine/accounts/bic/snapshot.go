@@ -28,10 +28,9 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 	}
 
 	var relativeCountersPosition int64
+	// TODO write the bic index
 
 	// TODO Write BIC to snapshot
-
-	// write the slot diffs
 	var slotDiffCount uint64
 
 	// The amount of slot diffs contained within this snapshot.

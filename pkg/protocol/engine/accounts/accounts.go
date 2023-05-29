@@ -12,7 +12,7 @@ import (
 // BlockIssuanceCredits is the minimal interface for the Accounts component of the IOTA protocol.
 type BlockIssuanceCredits interface {
 	// BIC returns Block Issuer Credits of a specific account for a specific slot index.
-	BIC(id iotago.AccountID, slot iotago.SlotIndex) (account *Credits, err error)
+	BIC(id iotago.AccountID, slot iotago.SlotIndex) (account Account, err error)
 
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface

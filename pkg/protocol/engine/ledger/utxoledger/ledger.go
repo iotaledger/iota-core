@@ -155,7 +155,6 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	var outputs ledgerstate.Outputs
 	var spents ledgerstate.Spents
 	var allotments map[iotago.AccountID]uint64
-	var burns map[iotago.AccountID]uint64
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
@@ -199,10 +198,6 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return true
 	})
 
-	stateDiff.BurnedMana().ForEach(func(b *iotago.Block, burn uint64) bool {
-		burns[b.IssuerID] += burn
-		return true
-	})
 	if innerErr != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
 	}
@@ -211,7 +206,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
 	}
 
-	if bicRoot, err = l.accountsLedger.CommitSlot(index, allotments, burns); err != nil {
+	if bicRoot, err = l.accountsLedger.CommitSlot(index, allotments); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
@@ -271,8 +266,7 @@ func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempoo
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
 	switch block.Block().Payload.(type) {
 	case *iotago.Transaction:
-		l.memPool.MarkAttachmentIncluded(block)
-
+		l.memPool.MarkAttachmentIncluded(block.ID())
 	default:
 		return
 	}

@@ -2,11 +2,16 @@ package bic
 
 import (
 	"fmt"
+	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"sync"
 
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -15,40 +20,22 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// Diff stores a changes in bic balances for a given slot.
-type Diff struct {
-	index      iotago.SlotIndex           `serix:"0"`
-	bicChanges map[iotago.AccountID]int64 `serix:"1,lengthPrefixType=uint32,omitempty"`
-}
-
-// newBICDiff creates a new BIC diff from the given allotments and burns.
-func newBICDiff(index iotago.SlotIndex, allotments map[iotago.AccountID]uint64, burns map[iotago.AccountID]uint64) *Diff {
-	bicChanges := make(map[iotago.AccountID]int64)
-	for id, allotment := range allotments {
-		bicChanges[id] += int64(allotment)
-	}
-	for id, burn := range burns {
-		bicChanges[id] -= int64(burn)
-	}
-
-	return &Diff{
-		index:      index,
-		bicChanges: bicChanges,
-	}
-}
-
 // BICManager is a Block Issuer Credits module responsible for tracking block issuance credit balances.
 type BICManager struct {
-	// slot diffs for the BIC between [LatestCommitedSlot - MCA, LatestCommitedSlot]
-	slotDiffs *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Diff]
+	workers *workerpool.Group
 
-	// todo abstact BICTree into separate component to hide the diff moving implementation
-	store kvstore.KVStore
+	// slot diffs for the BIC between [LatestCommitedSlot - MCA, LatestCommitedSlot]
+	slotDiffFunc func(iotago.SlotIndex) *prunable.BicDiffs
+	// todo add in memory shrink version of the slot diffs
+
+	blockCache *blocks.Blocks
+	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]]
 
 	// TODO: store the index
 	// the slot index of the bic vector ("LatestCommitedSlot")
 	bicIndex iotago.SlotIndex
 
+	// todo abstact BICTree into separate component to hide the diff moving implementation
 	// TODO on reading from the snapshot: create the BIC tree from the bic vector and the slot diffs
 	// bic represents the Block Issuer Credits vector of all registered accounts for bicTreeindex slot, it is updated on the slot commitment.
 	bicTree *ads.Map[iotago.AccountID, accounts.AccountImpl, *iotago.AccountID, *accounts.AccountImpl]
@@ -59,13 +46,28 @@ type BICManager struct {
 	module.Module
 }
 
-// TODO initialise this componen in the ledger manager, keep it behind the interface
+func (b *BICManager) trackBlock(block *blocks.Block) {
+	set, _ := b.blockBurns.GetOrCreate(block.ID().Index(), func() *advancedset.AdvancedSet[iotago.BlockID] {
+		return advancedset.New[iotago.BlockID]()
+	})
+	set.Add(block.ID())
+}
 
-func New(store kvstore.KVStore, apiProviderFunc func() iotago.API) *BICManager {
-	return &BICManager{
-		slotDiffs: shrinkingmap.New[iotago.SlotIndex, *Diff](),
-		bicTree:   ads.NewMap[iotago.AccountID, accounts.AccountImpl](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixBICTree}))),
-	}
+func NewProvider(opts ...options.Option[BICManager]) module.Provider[*engine.Engine, accounts.BlockIssuanceCredits] {
+	return module.Provide(func(e *engine.Engine) accounts.BlockIssuanceCredits {
+
+		return options.Apply(&BICManager{
+			blockBurns: shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
+			bicTree:    ads.NewMap[iotago.AccountID, accounts.AccountImpl](e.Storage.Accounts()),
+			blockCache: e.BlockCache,
+			workers:    e.Workers.CreateGroup("BICManager"),
+		}, opts, func(b *BICManager) {
+			e.HookConstructed(func() {
+				wpBic := b.workers.CreatePool("trackBurnt", 1)
+				e.Events.BlockGadget.BlockRatifiedAccepted.Hook(b.trackBlock, event.WithWorkerPool(wpBic))
+			})
+		})
+	})
 }
 
 func (b *BICManager) API() iotago.API {
@@ -76,13 +78,28 @@ func (b *BICManager) BICTreeRoot() iotago.Identifier {
 	return iotago.Identifier(b.bicTree.Root())
 }
 
-func (b *BICManager) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotago.AccountID]uint64, burns map[iotago.AccountID]uint64) (bicRoot iotago.Identifier, err error) {
+func (b *BICManager) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotago.AccountID]uint64) (bicRoot iotago.Identifier, err error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
+	if b.bicIndex+1 != slotIndex {
+		return iotago.Identifier{}, errors.Errorf("cannot apply the ned diff, there is a gap in committed slots, bic vector index: %d, slot to commit: %d", b.bicIndex, slotIndex)
+	}
 
-	diff := newBICDiff(slotIndex, allotments, burns)
+	burns := make(map[iotago.AccountID]uint64)
+	if set, exists := b.blockBurns.Get(slotIndex); exists {
+		for it := set.Iterator(); it.HasNext(); {
+			blockID := it.Next()
+			block, exists := b.blockCache.Block(blockID)
+			if !exists {
+				return iotago.Identifier{}, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
+			}
+			burns[block.Block().IssuerID] += block.Block().BurnedMana
+		}
+	}
 
-	if bicRoot, err = b.applyDiff(diff); err != nil {
+	changes := newSummarisedChanges(allotments, burns)
+
+	if bicRoot, err = b.applyDiff(slotIndex, changes); err != nil {
 		return iotago.Identifier{}, err
 	}
 
@@ -109,13 +126,15 @@ func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex)
 	}
 	// last applied diff should be the diff for slotIndex + 1
 	for diffIndex := b.bicIndex; diffIndex > slotIndex; diffIndex-- {
-		slotDiff, exists := b.slotDiffs.Get(diffIndex)
-		if !exists {
+		diffStore := b.slotDiffFunc(diffIndex)
+		if diffStore == nil {
+			return nil, fmt.Errorf("can't retrieve BIC, could not find diff store for slot (%d)", diffIndex)
+		}
+		change, err := diffStore.Load(accountID)
+		if err != nil {
 			return nil, fmt.Errorf("can't calculate BIC, slot index doesn't exist (%d)", diffIndex)
 		}
-		if change, exists := slotDiff.bicChanges[accountID]; exists {
-			loadedAccount.Credits().Update(-change)
-		}
+		loadedAccount.Credits().Update(-change)
 	}
 	return loadedAccount, nil
 
@@ -125,39 +144,54 @@ func (b *BICManager) Shutdown() {
 	// TODO implement shutdown
 }
 
-func (b *BICManager) applyDiff(newDiff *Diff) (iotago.Identifier, error) {
-	if b.bicIndex+1 != newDiff.index {
-		return iotago.Identifier{}, errors.Errorf("cannot apply the ned diff, there is a gap in committed slots, bic vector index: %d, slot to commit: %d", b.bicIndex, newDiff.index)
+func (b *BICManager) applyDiff(slotIndex iotago.SlotIndex, changes map[iotago.AccountID]int64) (iotago.Identifier, error) {
+	diffStore := b.slotDiffFunc(slotIndex)
+	for accountID, valueChange := range changes {
+		err := diffStore.Store(accountID, valueChange)
+		if err != nil {
+			return iotago.Identifier{}, errors.Wrapf(err, "could not store diff to slot %d", slotIndex)
+		}
 	}
-	// add the new diff to the map
-	b.slotDiffs.Set(newDiff.index, newDiff)
 
-	bicRoot, err := b.commitBICTree(newDiff)
+	bicRoot, err := b.commitBICTree(slotIndex, changes)
 	if err != nil {
-		return iotago.Identifier{}, errors.Wrapf(err, "could not apply diff to slot %d", newDiff.index)
+		return iotago.Identifier{}, errors.Wrapf(err, "could not apply diff to slot %d", slotIndex)
 	}
 	// set the new balances index
-	b.bicIndex = newDiff.index
+	b.bicIndex = slotIndex
 
 	return bicRoot, nil
 }
 
-func (b *BICManager) commitBICTree(diff *Diff) (bicRoot iotago.Identifier, err error) {
+func (b *BICManager) commitBICTree(index iotago.SlotIndex, changes map[iotago.AccountID]int64) (bicRoot iotago.Identifier, err error) {
 	// update the bic tree to latestCommitted slot index
-	for accountID, valueChange := range diff.bicChanges {
+	for accountID, valueChange := range changes {
 		loadedAccount, exists := b.bicTree.Get(accountID)
 		if !exists {
-			loadedAccount = accounts.NewAccount(b.API(), accountID, accounts.NewCredits(0, diff.index), nil)
+			loadedAccount = accounts.NewAccount(b.API(), accountID, accounts.NewCredits(0, index), nil)
 		}
-		loadedAccount.Credits().Update(valueChange, diff.index)
+		loadedAccount.Credits().Update(valueChange, index)
 		b.bicTree.Set(accountID, loadedAccount)
 	}
-	b.bicIndex = diff.index
+	b.bicIndex = index
 
 	return b.BICTreeRoot(), nil
 }
 
 func (b *BICManager) removeOldDiff(index iotago.SlotIndex) {
-	// delete the old slot diff that was applied
-	b.slotDiffs.Delete(index)
+	// todo delete the old slot diff that was applied
+
+}
+
+// newBICDiff creates a new BIC diff from the given allotments and burns.
+func newSummarisedChanges(allotments map[iotago.AccountID]uint64, burns map[iotago.AccountID]uint64) map[iotago.AccountID]int64 {
+	bicChanges := make(map[iotago.AccountID]int64)
+	for id, allotment := range allotments {
+		bicChanges[id] += int64(allotment)
+	}
+	for id, burn := range burns {
+		bicChanges[id] -= int64(burn)
+	}
+
+	return bicChanges
 }

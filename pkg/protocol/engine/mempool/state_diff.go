@@ -23,7 +23,4 @@ type StateDiff interface {
 
 	// Mutations returns an authenticated data structure that allows to commit to the applied mutations.
 	Mutations() *ads.Set[iotago.TransactionID, *iotago.TransactionID]
-
-	// BurnedMana returns the
-	BurnedMana() *shrinkingmap.ShrinkingMap[*iotago.Block, uint64]
 }
