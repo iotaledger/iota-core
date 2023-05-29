@@ -184,7 +184,14 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 		})
 
 		if len(references[model.StrongParentType]) == 0 {
-			references[model.StrongParentType] = t.retrieveRootBlocks()[:t.optMaxStrongParents]
+			rootBlocks := t.retrieveRootBlocks()
+
+			rootBlockCount := len(rootBlocks)
+			if rootBlockCount > t.optMaxStrongParents {
+				rootBlockCount = t.optMaxStrongParents
+			}
+
+			references[model.StrongParentType] = rootBlocks[:rootBlockCount]
 		}
 
 		return nil
