@@ -39,8 +39,6 @@ func newBICDiff(index iotago.SlotIndex, allotments map[iotago.AccountID]uint64, 
 
 // BICManager is a Block Issuer Credits module responsible for tracking block issuance credit balances.
 type BICManager struct {
-	// TODO: store allotment diffs in the account ledger directly
-
 	// slot diffs for the BIC between [LatestCommitedSlot - MCA, LatestCommitedSlot]
 	slotDiffs *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Diff]
 
@@ -49,12 +47,10 @@ type BICManager struct {
 
 	// TODO: store the index
 	// the slot index of the bic vector ("LatestCommitedSlot")
-	bicIndex     iotago.SlotIndex
-	bicTreeIndex iotago.SlotIndex
+	bicIndex iotago.SlotIndex
 
 	// TODO on reading from the snapshot: create the BIC tree from the bic vector and the slot diffs
 	// bic represents the Block Issuer Credits vector of all registered accounts for bicTreeindex slot, it is updated on the slot commitment.
-	// TODO decide if we remove pubkey to the seperate component, if so use Credits instead of AccountImpl
 	bicTree *ads.Map[iotago.AccountID, accounts.AccountImpl, *iotago.AccountID, *accounts.AccountImpl]
 
 	apiProviderFunc func() iotago.API
@@ -118,7 +114,7 @@ func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex)
 			return nil, fmt.Errorf("can't calculate BIC, slot index doesn't exist (%d)", diffIndex)
 		}
 		if change, exists := slotDiff.bicChanges[accountID]; exists {
-			loadedAccount.Credits().Update(change)
+			loadedAccount.Credits().Update(-change)
 		}
 	}
 	return loadedAccount, nil
@@ -130,9 +126,8 @@ func (b *BICManager) Shutdown() {
 }
 
 func (b *BICManager) applyDiff(newDiff *Diff) (iotago.Identifier, error) {
-	// check if the expected next slot diff is applied
-	if newDiff.index != b.bicTreeIndex+1 {
-		return iotago.Identifier{}, errors.Errorf("could not apply diff, expected slot index %d, got %d", b.bicTreeIndex+1, newDiff.index)
+	if b.bicIndex+1 != newDiff.index {
+		return iotago.Identifier{}, errors.Errorf("cannot apply the ned diff, there is a gap in committed slots, bic vector index: %d, slot to commit: %d", b.bicIndex, newDiff.index)
 	}
 	// add the new diff to the map
 	b.slotDiffs.Set(newDiff.index, newDiff)
@@ -148,20 +143,16 @@ func (b *BICManager) applyDiff(newDiff *Diff) (iotago.Identifier, error) {
 }
 
 func (b *BICManager) commitBICTree(diff *Diff) (bicRoot iotago.Identifier, err error) {
-	// previous bic tree should be at index -1
-	if b.bicTreeIndex != diff.index+1 {
-		return iotago.Identifier{}, errors.Errorf("the difference between already committed bic: %d and the target commit: %d is different than 1", b.bicTreeIndex, diff.index)
-	}
 	// update the bic tree to latestCommitted slot index
 	for accountID, valueChange := range diff.bicChanges {
 		loadedAccount, exists := b.bicTree.Get(accountID)
 		if !exists {
 			loadedAccount = accounts.NewAccount(b.API(), accountID, accounts.NewCredits(0, diff.index), nil)
 		}
-		loadedAccount.Credits().Update(valueChange, diff.index) // TODO decay?
+		loadedAccount.Credits().Update(valueChange, diff.index)
 		b.bicTree.Set(accountID, loadedAccount)
 	}
-	b.bicTreeIndex = diff.index
+	b.bicIndex = diff.index
 
 	return b.BICTreeRoot(), nil
 }

@@ -26,9 +26,6 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 	if err := utils.WriteValueFunc(writer, "bicIndex", b.bicIndex); err != nil {
 		return err
 	}
-	if err := utils.WriteValueFunc(writer, "latestSlotDiffsIndex", b.latestSlotDiffsIndex); err != nil {
-		return err
-	}
 
 	var relativeCountersPosition int64
 
@@ -42,7 +39,7 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 		return err
 	}
 
-	for diffIndex := b.bicIndex + 1; diffIndex > b.latestSlotDiffsIndex; diffIndex-- {
+	for diffIndex := b.bicIndex + 1; diffIndex > b.bicIndex-iotago.MaxCommitableSlotAge; diffIndex-- {
 		slotDiff, exists := b.slotDiffs.Get(diffIndex)
 		if !exists {
 			return errors.Errorf("could not export BIC diffs, slot diff for index %d not found", diffIndex)
