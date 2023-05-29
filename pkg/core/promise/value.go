@@ -33,9 +33,9 @@ type Value[T comparable] struct {
 	// setOrderMutex is an additional mutex that is used to ensure that the order of updates is ensured.
 	setOrderMutex sync.Mutex
 
-	// optTriggerWithInitialEmptyValue is an option that can be set to make the OnUpdate callbacks trigger immediately
-	// on subscription even if the current value is empty.
-	optTriggerWithInitialEmptyValue bool
+	// optTriggerWithInitialZeroValue is an option that can be set to make the OnUpdate callbacks trigger immediately
+	// on subscription even if the current value is the zero value.
+	optTriggerWithInitialZeroValue bool
 }
 
 // NewValue creates a new Value instance.
@@ -91,7 +91,7 @@ func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe f
 	defer createdCallback.triggerMutex.Unlock()
 	v.mutex.Unlock()
 
-	if v.optTriggerWithInitialEmptyValue || previousValue != currentValue {
+	if v.optTriggerWithInitialZeroValue || previousValue != currentValue {
 		createdCallback.callback(previousValue, currentValue)
 	}
 
@@ -100,16 +100,16 @@ func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe f
 	}
 }
 
-// WithTriggerWithInitialEmptyValue is an option that can be set to make the OnUpdate callbacks trigger immediately on
+// WithTriggerWithInitialZeroValue is an option that can be set to make the OnUpdate callbacks trigger immediately on
 // subscription even if the current value is empty.
-func (v *Value[T]) WithTriggerWithInitialEmptyValue(trigger bool) *Value[T] {
-	v.optTriggerWithInitialEmptyValue = trigger
+func (v *Value[T]) WithTriggerWithInitialZeroValue(trigger bool) *Value[T] {
+	v.optTriggerWithInitialZeroValue = trigger
 
 	return v
 }
 
-// prepareDynamicTrigger atomically prepares the trigger by setting the new value and returning the previous value, the
-// triggerID and the callbacks to trigger.
+// prepareDynamicTrigger atomically prepares the trigger by setting the new value and returning the new value, the
+// previous value, the triggerID and the callbacks to trigger.
 func (v *Value[T]) prepareDynamicTrigger(newValueGenerator func(T) T) (newValue, previousValue T, triggerID int, callbacksToTrigger []*valueCallback[T]) {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
