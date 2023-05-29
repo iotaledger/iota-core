@@ -104,6 +104,15 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 
+	// events.Network.AttestationsReceived.Hook(func(event *network.AttestationsReceivedEvent) {
+	// 	fmt.Printf("%s > Network.AttestationsReceived: from %s for %s\n", n.Name, event.Source, event.Commitment.ID())
+	// })
+	//
+	// events.Network.AttestationsRequestReceived.Hook(func(event *network.AttestationsRequestReceivedEvent) {
+	// 	fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s -> %d\n", n.Name, event.Source, event.Commitment.ID(), event.EndIndex)
+	// })
+	//
+
 	events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
 		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
 	})
@@ -124,21 +133,13 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
 	})
 
-	// events.Network.AttestationsReceived.Hook(func(event *network.AttestationsReceivedEvent) {
-	// 	fmt.Printf("%s > Network.AttestationsReceived: from %s for %s\n", n.Name, event.Source, event.Commitment.ID())
-	// })
-	//
-	// events.Network.AttestationsRequestReceived.Hook(func(event *network.AttestationsRequestReceivedEvent) {
-	// 	fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s -> %d\n", n.Name, event.Source, event.Commitment.ID(), event.EndIndex)
-	// })
-	//
-	// events.Network.SlotCommitmentReceived.Hook(func(event *network.SlotCommitmentReceivedEvent) {
-	// 	fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, event.Source, event.Commitment.ID())
-	// })
-	//
-	// events.Network.SlotCommitmentRequestReceived.Hook(func(event *network.SlotCommitmentRequestReceivedEvent) {
-	// 	fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, event.Source, event.CommitmentID)
-	// })
+	events.TipManager.TipAdded.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > TipManager.TipAdded: %s\n", n.Name, block.ID())
+	})
+
+	events.TipManager.TipRemoved.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > TipManager.TipRemoved: %s\n", n.Name, block.ID())
+	})
 
 	events.Network.Error.Hook(func(err error, id identity.ID) {
 		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)

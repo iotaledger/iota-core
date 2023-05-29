@@ -288,7 +288,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) 
 
 func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, strongParentsCountOpt ...int) (model.ParentReferences, error) {
 	strongParentsCount := iotago.BlockMaxParents
-	if len(strongParentsCountOpt) > 0 {
+	if len(strongParentsCountOpt) > 0 && strongParentsCountOpt[0] > 0 {
 		strongParentsCount = strongParentsCountOpt[0]
 	}
 
