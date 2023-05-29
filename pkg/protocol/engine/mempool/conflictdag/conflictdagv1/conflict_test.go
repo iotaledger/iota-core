@@ -421,6 +421,32 @@ func TestLikedInstead21(t *testing.T) {
 	require.True(t, conflictJ.LikedInstead().Has(conflictH))
 }
 
+func TestConflictSet_AllMembersEvicted(t *testing.T) {
+	weights := account.NewSelectedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+
+	pendingTasks := syncutils.NewCounter()
+	yellow := NewTestConflictSet(id("yellow"))
+	green := NewTestConflictSet(id("green"))
+
+	conflict1 := NewTestConflict(transactionID("conflict1"), nil, advancedset.New(yellow), weight.New(weights), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
+	evictedConflicts := conflict1.Evict()
+	require.Len(t, evictedConflicts, 1)
+	require.Contains(t, evictedConflicts, conflict1.ID)
+
+	// evict the conflict another time and make sure that none conflicts were evicted
+	evictedConflicts = conflict1.Evict()
+	require.Len(t, evictedConflicts, 0)
+
+	// conflict tries to join conflictset who's all members were evicted
+	conflict2 := NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower](transactionID("conflict1"), weight.New(weights), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
+	_, err := conflict2.JoinConflictSets(advancedset.New(yellow))
+	require.Error(t, err)
+
+	// evicted conflict tries to join conflictset
+	_, err = conflict1.JoinConflictSets(advancedset.New(green))
+	require.Error(t, err)
+}
+
 func TestConflict_Compare(t *testing.T) {
 	weights := account.NewSelectedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
 	pendingTasks := syncutils.NewCounter()

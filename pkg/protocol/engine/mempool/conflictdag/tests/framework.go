@@ -78,7 +78,12 @@ func (f *Framework) CastVotes(nodeAlias string, votePower int, conflictAliases .
 	return f.Instance.CastVotes(vote.NewVote[vote.MockedPower](f.Accounts.ID(nodeAlias), vote.MockedPower(votePower)), f.ConflictIDs(conflictAliases...))
 }
 
-// iotago.TransactionIDs translates the given aliases into an AdvancedSet of iotago.TransactionIDs.
+// EvictConflict evicts given conflict from the ConflictDAG.
+func (f *Framework) EvictConflict(conflictAlias string) error {
+	return f.Instance.EvictConflict(f.ConflictID(conflictAlias))
+}
+
+// ConflictIDs translates the given aliases into an AdvancedSet of iotago.TransactionIDs.
 func (f *Framework) ConflictIDs(aliases ...string) *advancedset.AdvancedSet[iotago.TransactionID] {
 	conflictIDs := advancedset.New[iotago.TransactionID]()
 	for _, alias := range aliases {

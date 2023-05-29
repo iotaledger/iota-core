@@ -53,7 +53,7 @@ func (c *ConflictSet[ConflictID, ResourceID, VotePower]) Remove(removedConflict 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if removed = !c.members.Delete(removedConflict); removed && c.members.IsEmpty() {
+	if removed = c.members.Delete(removedConflict); removed && c.members.IsEmpty() {
 		c.allMembersEvicted.Set(true)
 	}
 

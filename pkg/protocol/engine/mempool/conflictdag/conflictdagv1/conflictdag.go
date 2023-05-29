@@ -108,7 +108,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 		joinedConflictSets, err := conflict.JoinConflictSets(conflictSets)
 
 		// evict the conflict only when it didn't exist before.
-		// if existed before, that means that we only tried to join a single ConflictSet and failed (MemOool forks on double spend on a single Resource, not always on booking on all input Resources)
+		// if existed before, that means that we only tried to join a single ConflictSet and failed (MemPool forks on double spend on a single Resource, not always on booking on all input Resources)
 		if isNewConflict && err != nil {
 			// evict the newly created conflict to leave the ConflictDAG in an unchanged state in case of an error when trying to join ConflictSets
 			c.evictConflict(id)
@@ -125,7 +125,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 
 	if isNewConflict {
 		c.events.ConflictCreated.Trigger(id)
-	} else {
+	} else if !joinedConflictSets.IsEmpty() {
 		c.events.ConflictingResourcesAdded.Trigger(id, joinedConflictSets)
 	}
 
@@ -154,6 +154,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UpdateConflictParents(c
 		if !currentConflictExists {
 			return false, xerrors.Errorf("tried to modify evicted conflict with %s: %w", conflictID, conflictdag.ErrEntityEvicted)
 		}
+
 		addedParents := advancedset.New[*Conflict[ConflictID, ResourceID, VotePower]]()
 
 		if err := addedParentIDs.ForEach(func(addedParentID ConflictID) error {
@@ -516,7 +517,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) conflictSetFactory(reso
 
 		conflictSet.OnAllMembersEvicted(func(prevValue, newValue bool) {
 			if newValue && !prevValue {
-				c.conflictSetsByID.Delete(conflictSet.ID, conflictSet.allMembersEvicted.Get)
+				c.conflictSetsByID.Delete(conflictSet.ID)
 			}
 		})
 

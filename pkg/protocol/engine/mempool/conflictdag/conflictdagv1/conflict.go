@@ -320,6 +320,15 @@ func (c *Conflict[ConflictID, ResourceID, VotePower]) Evict() (evictedConflicts 
 	}
 
 	c.ConflictingConflicts.Remove(c.ID)
+
+	c.preferredInsteadMutex.Lock()
+	defer c.preferredInsteadMutex.Unlock()
+	c.likedInsteadMutex.Lock()
+	defer c.likedInsteadMutex.Unlock()
+
+	c.likedInsteadSources.Clear()
+	c.preferredInstead = nil
+
 	evictedConflicts = append(evictedConflicts, c.ID)
 
 	return evictedConflicts
