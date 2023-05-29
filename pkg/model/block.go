@@ -120,28 +120,32 @@ func (blk *Block) ParentsWithType() (parents []Parent) {
 
 // ForEachParent executes a consumer func for each parent.
 func (blk *Block) ForEachParent(consumer func(parent Parent)) {
+	if blk == nil {
+		return
+	}
+
 	// TODO: is this even correct to ignore parents?
 	seenBlockIDs := make(map[iotago.BlockID]types.Empty)
-	block := blk.Block()
-
-	for _, parentBlockID := range block.StrongParents {
-		if _, exists := seenBlockIDs[parentBlockID]; !exists {
-			seenBlockIDs[parentBlockID] = types.Void
-			consumer(Parent{parentBlockID, StrongParentType})
+	if block := blk.Block(); block != nil {
+		for _, parentBlockID := range block.StrongParents {
+			if _, exists := seenBlockIDs[parentBlockID]; !exists {
+				seenBlockIDs[parentBlockID] = types.Void
+				consumer(Parent{parentBlockID, StrongParentType})
+			}
 		}
-	}
 
-	for _, parentBlockID := range block.WeakParents {
-		if _, exists := seenBlockIDs[parentBlockID]; !exists {
-			seenBlockIDs[parentBlockID] = types.Void
-			consumer(Parent{parentBlockID, WeakParentType})
+		for _, parentBlockID := range block.WeakParents {
+			if _, exists := seenBlockIDs[parentBlockID]; !exists {
+				seenBlockIDs[parentBlockID] = types.Void
+				consumer(Parent{parentBlockID, WeakParentType})
+			}
 		}
-	}
 
-	for _, parentBlockID := range block.ShallowLikeParents {
-		if _, exists := seenBlockIDs[parentBlockID]; !exists {
-			seenBlockIDs[parentBlockID] = types.Void
-			consumer(Parent{parentBlockID, ShallowLikeParentType})
+		for _, parentBlockID := range block.ShallowLikeParents {
+			if _, exists := seenBlockIDs[parentBlockID]; !exists {
+				seenBlockIDs[parentBlockID] = types.Void
+				consumer(Parent{parentBlockID, ShallowLikeParentType})
+			}
 		}
 	}
 }
