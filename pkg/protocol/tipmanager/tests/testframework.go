@@ -41,6 +41,8 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t.Instance = tipmanagerv1.NewTipManager(conflictDAG, func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]
 		return block, exists
+	}, func() iotago.BlockIDs {
+		return iotago.BlockIDs{iotago.EmptyBlockID()}
 	})
 
 	return t

@@ -27,6 +27,9 @@ type TipManager struct {
 	// retrieveBlock is a function that retrieves a Block from the Tangle.
 	retrieveBlock func(blockID iotago.BlockID) (block *blocks.Block, exists bool)
 
+	// retrieveRootBlocks is a function that returns the current root blocks.
+	retrieveRootBlocks func() iotago.BlockIDs
+
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
 
@@ -51,6 +54,9 @@ type TipManager struct {
 	// evictionMutex is used to synchronize the eviction of slots.
 	evictionMutex sync.RWMutex
 
+	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
+	optMaxStrongParents int
+
 	// optMaxLikedInsteadReferences contains the maximum number of liked instead references that are allowed.
 	optMaxLikedInsteadReferences int
 
@@ -67,7 +73,7 @@ type TipManager struct {
 // NewProvider creates a new TipManager provider.
 func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
-		t := NewTipManager(e.Ledger.ConflictDAG(), e.BlockCache.Block, opts...)
+		t := NewTipManager(e.Ledger.ConflictDAG(), e.BlockCache.Block, e.EvictionState.LatestRootBlocks, opts...)
 
 		e.Events.Booker.BlockBooked.Hook(t.AddBlock, event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
 		e.BlockCache.Evict.Hook(t.Evict)
@@ -81,14 +87,16 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 }
 
 // NewTipManager creates a new TipManager.
-func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), opts ...options.Option[TipManager]) *TipManager {
+func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipManager]) *TipManager {
 	return options.Apply(&TipManager{
 		retrieveBlock:                blockRetriever,
+		retrieveRootBlocks:           rootBlocksRetriever,
 		conflictDAG:                  conflictDAG,
 		tipMetadataStorage:           shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
 		strongTipSet:                 randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:                   randommap.New[iotago.BlockID, *TipMetadata](),
 		events:                       tipmanager.NewEvents(),
+		optMaxStrongParents:          8,
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,
 	}, opts, func(t *TipManager) {
@@ -176,8 +184,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 		})
 
 		if len(references[model.StrongParentType]) == 0 {
-			// TODO: REPLACE WITH ROOT BLOCKS
-			references[model.StrongParentType] = append(references[model.StrongParentType], iotago.EmptyBlockID())
+			references[model.StrongParentType] = t.retrieveRootBlocks()[:t.optMaxStrongParents]
 		}
 
 		return nil
