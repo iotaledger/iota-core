@@ -508,8 +508,7 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 			tf.RequireBooked(txAlias)
 
 			tf.MarkAttachmentIncluded(blockAlias)
-			tf.ConflictDAG.
-				prevStateAlias = fmt.Sprintf("tx%d:0", index)
+			prevStateAlias = fmt.Sprintf("tx%d:0", index)
 
 			tf.CommitSlot(iotago.SlotIndex(index))
 			tf.Instance.EvictUntil(iotago.SlotIndex(index))
