@@ -81,16 +81,14 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) Events() *conflictdag.E
 
 // CreateOrUpdateConflict creates a new Conflict that is conflicting over the given ResourceIDs. If the conflict already exists, it adds it any new passed ConflictSets.
 func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID]) error {
-	joinedConflictSets, err := func() (*advancedset.AdvancedSet[ResourceID], error) {
+	joinedConflictSets, isNewConflict, err := func() (*advancedset.AdvancedSet[ResourceID], bool, error) {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
 		conflictSets := c.conflictSets(resourceIDs)
 
-		if conflict, isNew := c.conflictsByID.GetOrCreate(id, func() *Conflict[ConflictID, ResourceID, VotePower] {
-			initialWeight := weight.New(c.committeeSet)
-
-			newConflict := NewConflict(id, conflictSets, initialWeight, c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
+		conflict, isNewConflict := c.conflictsByID.GetOrCreate(id, func() *Conflict[ConflictID, ResourceID, VotePower] {
+			newConflict := NewConflict[ConflictID, ResourceID, VotePower](id, weight.New(c.committeeSet), c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
 
 			// attach to the acceptance state updated event and propagate that event to the outside.
 			// also need to remember the unhook method to properly evict the conflict.
@@ -105,25 +103,33 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 			}).Unhook)
 
 			return newConflict
-		}); !isNew {
-			joinedConflictSets, err := conflict.JoinConflictSets(conflictSets)
-			if err != nil {
-				return advancedset.New[ResourceID](), xerrors.Errorf("failed to join conflict sets: %w", err)
-			}
+		})
 
-			return joinedConflictSets, nil
+		joinedConflictSets, err := conflict.JoinConflictSets(conflictSets)
+
+		// evict the conflict only when it didn't exist before.
+		// if existed before, that means that we only tried to join a single ConflictSet and failed (MemOool forks on double spend on a single Resource, not always on booking on all input Resources)
+		if isNewConflict && err != nil {
+			// evict the newly created conflict to leave the ConflictDAG in an unchanged state in case of an error when trying to join ConflictSets
+			c.evictConflict(id)
+
+			return nil, false, err
 		}
 
-		return advancedset.New[ResourceID](), nil
+		return joinedConflictSets, isNewConflict, err
 	}()
 
-	if err == nil && joinedConflictSets.IsEmpty() {
+	if err != nil {
+		return xerrors.Errorf("conflict %s failed to join conflict sets: %w", id, err)
+	}
+
+	if isNewConflict {
 		c.events.ConflictCreated.Trigger(id)
-	} else if err == nil && !joinedConflictSets.IsEmpty() {
+	} else {
 		c.events.ConflictingResourcesAdded.Trigger(id, joinedConflictSets)
 	}
 
-	return err
+	return nil
 }
 
 // ReadConsistent write locks the ConflictDAG and exposes read-only methods to the callback to perform multiple reads while maintaining the same ConflictDAG state.
@@ -395,46 +401,40 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UnacceptedConflicts(con
 
 // EvictConflict removes conflict with given ConflictID from ConflictDAG.
 func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) EvictConflict(conflictID ConflictID) error {
-	evictedConflictIDs, err := func() ([]ConflictID, error) {
-		c.mutex.Lock()
-		defer c.mutex.Unlock()
+	for _, evictedConflictID := range func() []ConflictID {
+		c.mutex.RLock()
+		defer c.mutex.RUnlock()
 
-		// evicting an already evicted conflict is fine
-		conflict, exists := c.conflictsByID.Get(conflictID)
-		if !exists {
-			return nil, nil
-		}
-
-		// abort if we faced an error while evicting the conflict
-		evictedConflictIDs, err := conflict.Evict()
-		if err != nil {
-			return nil, xerrors.Errorf("failed to evict conflict with %s: %w", conflictID, err)
-		}
-
-		// remove the conflicts from the ConflictDAG dictionary
-		for _, evictedConflictID := range evictedConflictIDs {
-			c.conflictsByID.Delete(evictedConflictID)
-		}
-
-		// unhook the conflict events and remove the unhook method from the storage
-		unhookFunc, unhookExists := c.conflictUnhooks.Get(conflictID)
-		if unhookExists {
-			unhookFunc()
-			c.conflictUnhooks.Delete(conflictID)
-		}
-
-		return evictedConflictIDs, nil
-	}()
-	if err != nil {
-		return xerrors.Errorf("failed to evict conflict with %s: %w", conflictID, err)
-	}
-
-	// trigger the ConflictEvicted event
-	for _, evictedConflictID := range evictedConflictIDs {
+		return c.evictConflict(conflictID)
+	}() {
 		c.events.ConflictEvicted.Trigger(evictedConflictID)
 	}
 
 	return nil
+}
+
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) evictConflict(conflictID ConflictID) []ConflictID {
+	// evicting an already evicted conflict is fine
+	conflict, exists := c.conflictsByID.Get(conflictID)
+	if !exists {
+		return nil
+	}
+
+	evictedConflictIDs := conflict.Evict()
+
+	// remove the conflicts from the ConflictDAG dictionary
+	for _, evictedConflictID := range evictedConflictIDs {
+		c.conflictsByID.Delete(evictedConflictID)
+	}
+
+	// unhook the conflict events and remove the unhook method from the storage
+	unhookFunc, unhookExists := c.conflictUnhooks.Get(conflictID)
+	if unhookExists {
+		unhookFunc()
+		c.conflictUnhooks.Delete(conflictID)
+	}
+
+	return evictedConflictIDs
 }
 
 // conflicts returns the Conflicts that are associated with the given ConflictIDs. If ignoreMissing is set to true, it
@@ -513,6 +513,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) determineVotes(conflict
 func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) conflictSetFactory(resourceID ResourceID) func() *ConflictSet[ConflictID, ResourceID, VotePower] {
 	return func() *ConflictSet[ConflictID, ResourceID, VotePower] {
 		conflictSet := NewConflictSet[ConflictID, ResourceID, VotePower](resourceID)
+
 		conflictSet.OnAllMembersEvicted(func(prevValue, newValue bool) {
 			if newValue && !prevValue {
 				c.conflictSetsByID.Delete(conflictSet.ID, conflictSet.allMembersEvicted.Get)

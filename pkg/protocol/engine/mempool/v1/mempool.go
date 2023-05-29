@@ -142,23 +142,19 @@ func (m *MemPool[VotePower]) StateDiff(index iotago.SlotIndex) mempool.StateDiff
 
 // EvictUntil evicts all slots with the given index and smaller from the MemPool.
 func (m *MemPool[VotePower]) EvictUntil(slotIndex iotago.SlotIndex) {
-	for m.lastEvictedSlot < slotIndex {
-		if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *TransactionMetadata] {
-			m.evictionMutex.Lock()
-			defer m.evictionMutex.Unlock()
+	if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *TransactionMetadata] {
+		m.evictionMutex.Lock()
+		defer m.evictionMutex.Unlock()
 
-			m.lastEvictedSlot++
+		m.stateDiffs.Delete(slotIndex)
 
-			m.stateDiffs.Delete(m.lastEvictedSlot)
+		return m.attachments.Evict(slotIndex)
+	}(); evictedAttachments != nil {
+		evictedAttachments.ForEach(func(blockID iotago.BlockID, transaction *TransactionMetadata) bool {
+			transaction.evictAttachment(blockID)
 
-			return m.attachments.Evict(m.lastEvictedSlot)
-		}(); evictedAttachments != nil {
-			evictedAttachments.ForEach(func(blockID iotago.BlockID, transaction *TransactionMetadata) bool {
-				transaction.evictAttachment(blockID)
-
-				return true
-			})
-		}
+			return true
+		})
 	}
 }
 
@@ -221,9 +217,6 @@ func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata
 }
 
 func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
-	m.evictionMutex.RLock()
-	defer m.evictionMutex.RUnlock()
-
 	var forkingErr error
 	if m.optForkAllTransactions {
 		forkingErr = m.forkTransaction(transaction, transaction.inputs...)
@@ -232,7 +225,6 @@ func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
 			input.OnDoubleSpent(func() {
 				forkingErr = m.forkTransaction(transaction, input)
 			})
-
 		})
 	}
 
@@ -244,9 +236,7 @@ func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
 				outputRequest.Reject(xerrors.Errorf("state incorrect: %w", forkingErr))
 			}
 		}
-	}
-
-	if transaction.setBooked() {
+	} else if !transaction.IsOrphaned() && transaction.setBooked() {
 		m.publishOutputs(transaction)
 	}
 }
@@ -272,11 +262,12 @@ func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionMetadata)
 	})
 
 	m.cachedTransactions.Delete(transaction.ID())
-	if transaction.IsConflicting() {
+
+	transaction.OnConflicting(func() {
 		if err := m.conflictDAG.EvictConflict(transaction.ID()); err != nil {
 			panic(err)
 		}
-	}
+	})
 }
 
 func (m *MemPool[VotePower]) requestStateWithMetadata(stateRef iotago.IndexedUTXOReferencer, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
@@ -302,15 +293,11 @@ func (m *MemPool[VotePower]) requestStateWithMetadata(stateRef iotago.IndexedUTX
 func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, inputs ...*StateMetadata) error {
 	inputIDs := advancedset.New[iotago.OutputID]()
 	for _, input := range inputs {
-		if committedSpender, isSpenderCommitted := input.CommittedSpender(); isSpenderCommitted {
-			return xerrors.Errorf("failed to fork transaction because spend %s of %s is already committed", committedSpender.ID(), input.ID())
-		}
-
 		inputIDs.Add(input.ID())
 	}
 
 	if err := m.conflictDAG.CreateOrUpdateConflict(transaction.ID(), inputIDs); err != nil {
-		return err
+		return xerrors.Errorf("failed to join conflict sets: %w", err)
 	}
 
 	transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
@@ -349,10 +336,6 @@ func (m *MemPool[VotePower]) transactionByAttachment(blockID iotago.BlockID) (*T
 func (m *MemPool[VotePower]) updateStateDiffs(transaction *TransactionMetadata, prevIndex iotago.SlotIndex, newIndex iotago.SlotIndex) {
 	if prevIndex == newIndex {
 		return
-	}
-
-	if m.lastEvictedSlot >= newIndex {
-		panic("tried to include a transaction in an already evicted slot")
 	}
 
 	if prevIndex != 0 {

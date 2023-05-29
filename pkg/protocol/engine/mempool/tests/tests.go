@@ -496,19 +496,20 @@ func TestConflictPropagation(t *testing.T, tf *TestFramework) {
 }
 
 func TestMemoryRelease(t *testing.T, tf *TestFramework) {
+
 	issueTransactions := func(startIndex, transactionCount int, prevStateAlias string) (int, string) {
 		index := startIndex
 		for ; index < startIndex+transactionCount; index++ {
 			txAlias := fmt.Sprintf("tx%d", index)
 			blockAlias := fmt.Sprintf("block%d", index)
 			tf.CreateTransaction(txAlias, []string{prevStateAlias}, 2)
-
+			fmt.Println("attach", txAlias)
 			require.NoError(t, tf.AttachTransaction(txAlias, blockAlias, iotago.SlotIndex(index)))
 			tf.RequireBooked(txAlias)
 
 			tf.MarkAttachmentIncluded(blockAlias)
-
-			prevStateAlias = fmt.Sprintf("tx%d:0", index)
+			tf.ConflictDAG.
+				prevStateAlias = fmt.Sprintf("tx%d:0", index)
 
 			tf.CommitSlot(iotago.SlotIndex(index))
 			tf.Instance.EvictUntil(iotago.SlotIndex(index))

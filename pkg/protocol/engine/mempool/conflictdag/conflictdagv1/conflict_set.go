@@ -3,6 +3,8 @@ package conflictdagv1
 import (
 	"sync"
 
+	"golang.org/x/xerrors"
+
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -31,15 +33,19 @@ func NewConflictSet[ConflictID, ResourceID conflictdag.IDType, VotePower conflic
 }
 
 // Add adds a Conflict to the ConflictSet and returns all other members of the set.
-func (c *ConflictSet[ConflictID, ResourceID, VotePower]) Add(addedConflict *Conflict[ConflictID, ResourceID, VotePower]) (otherMembers *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VotePower]]) {
+func (c *ConflictSet[ConflictID, ResourceID, VotePower]) Add(addedConflict *Conflict[ConflictID, ResourceID, VotePower]) (otherMembers *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VotePower]], err error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if otherMembers = c.members.Clone(); c.members.Add(addedConflict) {
-		return otherMembers
+	if c.allMembersEvicted.Get() {
+		return nil, xerrors.Errorf("cannot join a ConflictSet whose all members are evicted")
 	}
 
-	return nil
+	if otherMembers = c.members.Clone(); c.members.Add(addedConflict) {
+		return otherMembers, nil
+	}
+
+	return nil, nil
 }
 
 // Remove removes a Conflict from the ConflictSet and returns all remaining members of the set.

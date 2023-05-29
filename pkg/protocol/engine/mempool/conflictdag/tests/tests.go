@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 )
 
 func TestAll(t *testing.T, frameworkProvider func(*testing.T) *Framework) {
@@ -25,17 +23,22 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *Framework) {
 }
 
 func TestExistingConflictJoinsConflictSets(t *testing.T, tf *Framework) {
-	require.NoError(tf.test, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}, acceptance.Pending))
-	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}, acceptance.Rejected))
+	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
+	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}))
+	tf.Assert.ConflictSetMembers("resource1", "conflict1", "conflict2")
 
 	// require.ErrorIs(t, tf.JoinConflictSets("conflict2", "resource2"), conflictdag.ErrEntityEvicted, "modifying rejected conflicts should fail with ErrEntityEvicted")
 
-	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource2"}, acceptance.Pending))
+	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource2"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource2"}))
+
 	tf.Assert.ConflictSetMembers("resource2", "conflict1", "conflict3")
+	tf.Assert.ConflictSetMembers("resource1", "conflict1", "conflict2")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource2"}))
+
 	tf.Assert.ConflictSetMembers("resource2", "conflict1", "conflict2", "conflict3")
+	tf.Assert.ConflictSetMembers("resource1", "conflict1", "conflict2")
 
 	tf.Assert.LikedInstead([]string{"conflict3"}, "conflict1")
 }
