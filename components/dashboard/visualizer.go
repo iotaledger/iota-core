@@ -67,11 +67,11 @@ func runVisualizer(component *app.Component) {
 			deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 				sendVertex(block, block.IsAccepted())
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(block tipmanager.TipMetadata) {
-				sendTipInfo(block.Block(), true)
+			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+				sendTipInfo(tipMetadata.Block(), true)
 
-				block.OnEvicted(func() {
-					sendTipInfo(block.Block(), false)
+				tipMetadata.OnEvicted(func() {
+					sendTipInfo(tipMetadata.Block(), false)
 				})
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 		)
