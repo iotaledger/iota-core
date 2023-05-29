@@ -124,17 +124,18 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 		return strongTips
 	}
 
-	t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]) error {
+	_ = t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]) error {
 		likedConflicts := advancedset.New[iotago.TransactionID]()
 
 		likedInsteadReferences := func(tipMetadata *TipMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {
 			necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
 			if err = conflictDAG.LikedInstead(tipMetadata.Block().ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
-				if transactionMetadata, exists := t.memPool.TransactionMetadata(likedConflictID); !exists {
+				transactionMetadata, exists := t.memPool.TransactionMetadata(likedConflictID)
+				if !exists {
 					return xerrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedConflictID)
-				} else {
-					necessaryReferences[likedConflictID] = lo.First(transactionMetadata.Attachments())
 				}
+
+				necessaryReferences[likedConflictID] = lo.First(transactionMetadata.Attachments())
 
 				return nil
 			}); err != nil {

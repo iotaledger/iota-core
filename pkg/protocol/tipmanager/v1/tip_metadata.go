@@ -160,14 +160,10 @@ func (t *TipMetadata) joinTipPool(isReferencedByTips *promise.Value[bool], isTip
 }
 
 // setTipPool sets the TipPool of the Block.
-func (t *TipMetadata) setTipPool(newType tipmanager.TipPool) (updated bool) {
+func (t *TipMetadata) setTipPool(newType tipmanager.TipPool) {
 	t.tipPool.Compute(func(prevType tipmanager.TipPool) tipmanager.TipPool {
-		updated = newType > prevType
-
-		return lo.Cond(updated, newType, prevType)
+		return lo.Cond(newType > prevType, newType, prevType)
 	})
-
-	return updated
 }
 
 // propagateConnectedChildren returns the rules for the propagation of the internal connected children counters.
