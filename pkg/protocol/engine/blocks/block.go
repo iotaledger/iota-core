@@ -97,6 +97,10 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 }
 
 func (b *Block) Block() *iotago.Block {
+	if b.modelBlock == nil {
+		return nil
+	}
+
 	return b.modelBlock.Block()
 }
 
