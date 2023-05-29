@@ -3,6 +3,7 @@ package testsuite
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -72,8 +73,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*100),
 			SlotDurationInSeconds: 10,
 		},
-		optsWaitFor: 10 * time.Second,
-		optsTick:    10 * time.Millisecond,
+		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 	}, opts, func(t *TestSuite) {
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
@@ -385,4 +386,18 @@ func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Optio
 	return func(opts *TestSuite) {
 		opts.optsSnapshotOptions = snapshotOptions
 	}
+}
+
+func durationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time.Duration {
+	waitFor := os.Getenv(envKey)
+	if waitFor == "" {
+		return defaultDuration
+	}
+
+	d, err := time.ParseDuration(waitFor)
+	if err != nil {
+		panic(err)
+	}
+
+	return d
 }

@@ -5,8 +5,11 @@ on:
     paths-ignore:
       - 'documentation/**'
 
-jobs:
+env:
+  CI_UNIT_TESTS_WAIT_FOR: 30s
+  CI_UNIT_TESTS_TICK: 100ms
 
+jobs:
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
