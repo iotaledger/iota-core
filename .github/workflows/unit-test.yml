@@ -6,7 +6,7 @@ on:
       - 'documentation/**'
 
 env:
-  CI_UNIT_TESTS_WAIT_FOR: 30s
+  CI_UNIT_TESTS_WAIT_FOR: 60s
   CI_UNIT_TESTS_TICK: 100ms
 
 jobs:

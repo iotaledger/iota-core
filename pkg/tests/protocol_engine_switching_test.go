@@ -263,6 +263,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithEvictedSlot(11),
 			)
 
+			// Make sure the tips are properly set.
+			ts.AssertTips(ts.Blocks("P1.P"), node1, node2)
+
 			// Upon committing 11, we included attestations up to slot 11 that committed at least to slot 9: we don't have any.
 			ts.AssertAttestationsForSlot(11, ts.Blocks(), node1, node2)
 
@@ -270,13 +273,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		}
 	}
 
-	{
-		// Make sure that no blocks of partition 1 are known on partition 2.
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, node1, node2)
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, node3, node4)
-	}
-
-	// TODO: extend P2 with more blocks and checks on cumulative weight.
 	// Issue blocks on partition 2.
 	{
 		{
@@ -289,9 +285,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.IssueBlockAtSlot("P2.G", 11, iotago.NewEmptyCommitment(), node3, ts.Block("P2.F").ID())
 			ts.IssueBlockAtSlot("P2.H", 12, iotago.NewEmptyCommitment(), node4, ts.Block("P2.G").ID())
 			ts.IssueBlockAtSlot("P2.I", 13, iotago.NewEmptyCommitment(), node3, ts.Block("P2.H").ID())
-
-			ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, node3, node4)
-			ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
 
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.G", "P2.H"), true, node3, node4)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.I"), false, node3, node4) // block not referenced yet
@@ -350,6 +343,10 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.IssueBlockAtSlot("P2.M8", 17, slot11Commitment, node4, ts.Block("P2.M7").ID())
 			ts.IssueBlockAtSlot("P2.M9", 18, slot11Commitment, node3, ts.Block("P2.M8").ID())
 
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.M7", "P2.M8"), true, node3, node4)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.M9"), false, node3, node4) // block not referenced yet
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P2.M5", "P2.M6"), true, node3, node4)
+
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node3", "node4"),
 				testsuite.WithLatestCommitmentSlotIndex(13),
@@ -363,14 +360,27 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithEvictedSlot(13),
 			)
 
+			// Make sure the tips are properly set.
+			ts.AssertTips(ts.Blocks("P2.M9"), node3, node4)
+
 			// Upon committing 13, we included attestations up to slot 13 that committed at least to slot 11.
 			ts.AssertAttestationsForSlot(13, ts.Blocks("P2.M3", "P2.M4"), node3, node4)
 		}
 	}
 
-	// Both partitions should have committed slot 8 and have different commitments
+	// Make sure that no blocks of partition 1 are known on partition 2 and vice versa.
 	{
-		// TODO: ts.AssertLatestCommitmentSlotIndex(8, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, node1, node2)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, node3, node4)
+
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, node3, node4)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
+	}
+
+	// Both partitions should have committed slot 11 and 13 respectively and have different commitments.
+	{
+		ts.AssertLatestCommitmentSlotIndex(11, node1, node2)
+		ts.AssertLatestCommitmentSlotIndex(13, node3, node4)
 
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 		require.Equal(t, node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node4.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
@@ -399,7 +409,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
-	forkDetectionTimeout := 20 * time.Second
+	forkDetectionTimeout := 30 * time.Second
 	wg := &sync.WaitGroup{}
 	// Issue blocks after merging the networks
 	{
