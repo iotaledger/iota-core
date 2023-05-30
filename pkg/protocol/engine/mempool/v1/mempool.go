@@ -256,22 +256,6 @@ func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionMetadata) {
 	}
 }
 
-func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionMetadata) {
-	transaction.attachments.ForEach(func(blockID iotago.BlockID, _ bool) bool {
-		if slotAttachments := m.attachments.Get(blockID.Index(), false); slotAttachments != nil {
-			slotAttachments.Delete(blockID)
-		}
-
-		return true
-	})
-
-	m.cachedTransactions.Delete(transaction.ID())
-
-	transaction.OnConflicting(func() {
-		m.conflictDAG.EvictConflict(transaction.ID())
-	})
-}
-
 func (m *MemPool[VotePower]) requestStateWithMetadata(stateRef iotago.IndexedUTXOReferencer, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
 	return promise.New(func(p *promise.Promise[*StateMetadata]) {
 		request := m.requestInput(stateRef)
@@ -362,24 +346,34 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) 
 	transaction.OnConflicting(func() {
 		m.conflictDAG.CreateConflict(transaction.ID())
 
-		transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
-			err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements)
-			if err != nil {
+		unsubscribe := transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
+			if err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements); err != nil {
 				panic(err)
 			}
 		})
+
+		transaction.OnEvicted(func() {
+			unsubscribe()
+
+			m.conflictDAG.EvictConflict(transaction.ID())
+		})
+
 	})
 
 	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
 		m.updateStateDiffs(transaction, prevBlock.Index(), newBlock.Index())
 	})
 
-	transaction.OnCommitted(func() {
-		m.removeTransaction(transaction)
-	})
+	transaction.OnEvicted(func() {
+		if m.cachedTransactions.Delete(transaction.ID()) {
+			transaction.attachments.ForEach(func(blockID iotago.BlockID, _ bool) bool {
+				if slotAttachments := m.attachments.Get(blockID.Index(), false); slotAttachments != nil {
+					slotAttachments.Delete(blockID)
+				}
 
-	transaction.OnOrphaned(func() {
-		m.removeTransaction(transaction)
+				return true
+			})
+		}
 	})
 }
 
