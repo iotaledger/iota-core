@@ -392,14 +392,13 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		)
 		ts.Wait()
 
-		slot1Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 		ts.AssertNodeState(ts.Nodes("node2.1"),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
 			testsuite.WithLatestCommitmentSlotIndex(9),
 			testsuite.WithLatestStateMutationSlot(0),
 			testsuite.WithLatestFinalizedSlot(7),
-			testsuite.WithChainID(slot1Commitment.MustID()),
+			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(9),
