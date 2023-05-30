@@ -2,6 +2,7 @@ package conflictdagv1
 
 import (
 	"bytes"
+	"errors"
 	"sync"
 
 	"go.uber.org/atomic"
@@ -145,7 +146,7 @@ func (c *Conflict[ConflictID, ResourceID, VotePower]) JoinConflictSets(conflictS
 
 	return joinedConflictSets, conflictSets.ForEach(func(conflictSet *ConflictSet[ConflictID, ResourceID, VotePower]) error {
 		otherConflicts, err := conflictSet.Add(c)
-		if err != nil {
+		if err != nil && !errors.Is(err, conflictdag.ErrAlreadyPartOfConflictSet) {
 			return err
 		}
 

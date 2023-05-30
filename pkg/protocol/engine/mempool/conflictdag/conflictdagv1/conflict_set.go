@@ -41,11 +41,12 @@ func (c *ConflictSet[ConflictID, ResourceID, VotePower]) Add(addedConflict *Conf
 		return nil, xerrors.Errorf("cannot join a ConflictSet whose all members are evicted")
 	}
 
-	if otherMembers = c.members.Clone(); c.members.Add(addedConflict) {
-		return otherMembers, nil
+	if otherMembers = c.members.Clone(); !c.members.Add(addedConflict) {
+		return nil, conflictdag.ErrAlreadyPartOfConflictSet
 	}
 
-	return nil, nil
+	return otherMembers, nil
+
 }
 
 // Remove removes a Conflict from the ConflictSet and returns all remaining members of the set.
