@@ -161,7 +161,7 @@ func (b *BICManager) commitBICTree(index iotago.SlotIndex, changes map[iotago.Ac
 	for accountID, valueChange := range changes {
 		loadedAccount, exists := b.bicTree.Get(accountID)
 		if !exists {
-			loadedAccount = accounts.NewAccount(b.API(), accountID, accounts.NewCredits(0, index), nil)
+			loadedAccount = accounts.NewAccount(b.API(), accountID, accounts.NewCredits(0, index))
 		}
 		loadedAccount.Credits().Update(valueChange, index)
 		b.bicTree.Set(accountID, loadedAccount)
