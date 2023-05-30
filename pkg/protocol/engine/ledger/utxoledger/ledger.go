@@ -9,6 +9,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
@@ -38,6 +39,8 @@ type Ledger struct {
 func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) ledger.Ledger {
 		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), executeStardustVM, e.API, e.SybilProtection.OnlineCommittee(), e.ErrorHandler("ledger"))
+
+		e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
 		// TODO: should this attach to RatifiedAccepted instead?
 		e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
@@ -188,8 +191,12 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	return l.ledgerState.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), nil
 }
 
-func (l *Ledger) IsOutputSpent(outputID iotago.OutputID) (bool, error) {
+func (l *Ledger) IsOutputUnspent(outputID iotago.OutputID) (bool, error) {
 	return l.ledgerState.IsOutputIDUnspentWithoutLocking(outputID)
+}
+
+func (l *Ledger) Spent(outputID iotago.OutputID) (*ledgerstate.Spent, error) {
+	return l.ledgerState.ReadSpentForOutputIDWithoutLocking(outputID)
 }
 
 func (l *Ledger) StateDiffs(index iotago.SlotIndex) (*ledgerstate.SlotDiff, error) {
@@ -215,6 +222,17 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 
 		return nil, false
 	}
+}
+
+func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
+	l.memPool.OnTransactionAttached(handler, opts...)
+}
+
+func (l *Ledger) TransactionMetadata(transactionID iotago.TransactionID) (mempool.TransactionMetadata, bool) {
+	return l.memPool.TransactionMetadata(transactionID)
+}
+func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempool.TransactionMetadata, bool) {
+	return l.memPool.TransactionMetadataByAttachment(blockID)
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {

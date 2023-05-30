@@ -46,7 +46,7 @@ if [ $FEATURE -ne 0 ]
 then
   pushd ../genesis-snapshot; go run -tags=rocksdb . --config feature
 else
-  pushd ../genesis-snapshot; go run -tags=rocksdb . --config docker
+  pushd ../genesis-snapshot; go run -tags=rocksdb . --config docker --seed 7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih
 fi
 popd
 mv ../genesis-snapshot/*.snapshot .

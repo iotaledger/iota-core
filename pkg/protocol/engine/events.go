@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -26,6 +27,7 @@ type Events struct {
 	BlockGadget    *blockgadget.Events
 	SlotGadget     *slotgadget.Events
 	Notarization   *notarization.Events
+	ConflictDAG    *conflictdag.Events[iotago.TransactionID, iotago.OutputID]
 
 	event.Group[Events, *Events]
 }
@@ -43,5 +45,6 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		BlockGadget:    blockgadget.NewEvents(),
 		SlotGadget:     slotgadget.NewEvents(),
 		Notarization:   notarization.NewEvents(),
+		ConflictDAG:    conflictdag.NewEvents[iotago.TransactionID, iotago.OutputID](),
 	}
 })

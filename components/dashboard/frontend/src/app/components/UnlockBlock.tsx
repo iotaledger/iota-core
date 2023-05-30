@@ -4,7 +4,8 @@ import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
 import Badge from "react-bootstrap/Badge";
 import ListGroup from "react-bootstrap/ListGroup";
-import {resolveSignatureType} from "../utils/unlock_block";
+import {SignatureType, resolveSignatureType} from "../utils/unlock_block";
+import { Ed25519Signature } from "./Ed25519Signature";
 
 interface UnlockProps {
     block: unlockBlockJSON;
@@ -13,6 +14,13 @@ interface UnlockProps {
 }
 
 export class UnlockBlock extends React.Component<UnlockProps, any> {
+    renderSignatureComponent() {
+        switch (this.props.block.signatureType) {
+            case SignatureType.Ed25519:
+                return <Ed25519Signature signature={this.props.block.signature} />
+        }
+    }
+
     render() {
         let block = this.props.block;
         return (
@@ -26,13 +34,10 @@ export class UnlockBlock extends React.Component<UnlockProps, any> {
                         }
                         {
                             block.signatureType && <ListGroup.Item>Signature Type: {resolveSignatureType(block.signatureType)}</ListGroup.Item>
-                        }
+                        } 
                         {
-                            block.signature && <ListGroup.Item>Signature: {block.signature}</ListGroup.Item>
-                        }
-                        {
-                            block.publicKey && <ListGroup.Item>Public Key: {block.publicKey}</ListGroup.Item>
-                        }
+                            this.renderSignatureComponent()
+                        }                        
                     </ListGroup>
                 </Col>
             </Row>
