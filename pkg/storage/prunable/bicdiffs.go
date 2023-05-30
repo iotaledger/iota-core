@@ -46,9 +46,9 @@ func (r *BicDiffs) Delete(accountID iotago.AccountID) (err error) {
 }
 
 // Stream streams all accountIDs for a slot index.
-func (r *BicDiffs) Stream(consumer func(accountID iotago.AccountID, change int64) error) error {
+func (r *BicDiffs) Stream(consumer func(accountID iotago.AccountID, change int64) bool) error {
 	if storageErr := r.store.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, storableChange storable.SerializableInt64) (advance bool) {
-		return consumer(accountID, int64(storableChange)) != nil
+		return consumer(accountID, int64(storableChange))
 	}); storageErr != nil {
 		return errors.Wrapf(storageErr, "failed to iterate over bic diffs for slot %s", r.slot)
 	}

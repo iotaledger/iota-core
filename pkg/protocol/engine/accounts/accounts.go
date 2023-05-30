@@ -1,11 +1,12 @@
 package accounts
 
 import (
-	"crypto"
-	"crypto/ed25519"
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -39,11 +40,11 @@ type AccountImpl struct {
 
 	id         iotago.AccountID `serix:"0"`
 	credits    *Credits         `serix:"1"`
-	pubKeysMap *shrinkingmap.ShrinkingMap[crypto.PublicKey, types.Empty]
+	pubKeysMap *shrinkingmap.ShrinkingMap[ed25519.PublicKey, types.Empty]
 }
 
 func NewAccount(api iotago.API, id iotago.AccountID, credits *Credits, pubKeys ...ed25519.PublicKey) *AccountImpl {
-	pubKeysMap := shrinkingmap.New[crypto.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
+	pubKeysMap := shrinkingmap.New[ed25519.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
 	if pubKeys != nil {
 		for _, pubKey := range pubKeys {
 			_ = pubKeysMap.Set(pubKey, types.Void)
@@ -71,8 +72,8 @@ func (a *AccountImpl) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
 }
 
 func (a *AccountImpl) Clone() Account {
-	keyMapCopy := shrinkingmap.New[crypto.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
-	a.pubKeysMap.ForEachKey(func(key crypto.PublicKey) bool {
+	keyMapCopy := shrinkingmap.New[ed25519.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
+	a.pubKeysMap.ForEachKey(func(key ed25519.PublicKey) bool {
 		keyMapCopy.Set(key, types.Void)
 		return true
 	})
@@ -97,4 +98,17 @@ func (a AccountImpl) Bytes() ([]byte, error) {
 		return nil, err
 	}
 	return b, nil
+}
+
+func (a *AccountImpl) SnapshotBytes() []byte {
+	m := marshalutil.New()
+	m.WriteInt64(a.Credits().Value)
+	m.WriteBytes(a.Credits().UpdateTime.Bytes())
+	m.WriteUint64(uint64(a.pubKeysMap.Size()))
+	a.pubKeysMap.ForEachKey(func(pubKey ed25519.PublicKey) bool {
+		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
+		return true
+	})
+
+	return m.Bytes()
 }
