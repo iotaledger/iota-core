@@ -3,10 +3,7 @@ package bic
 import (
 	"fmt"
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"sync"
@@ -22,52 +19,48 @@ import (
 
 // BICManager is a Block Issuer Credits module responsible for tracking block issuance credit balances.
 type BICManager struct {
-	workers *workerpool.Group
-
-	// slot diffs for the BIC between [LatestCommitedSlot - MCA, LatestCommitedSlot]
-	slotDiffFunc func(iotago.SlotIndex) *prunable.BicDiffs
+	// blockBurns stores in memory only, the block IDs of the blocks that were issued per slot up to LatestCommitedSlot,
+	// we need it to calculate mana burns on slot commitment
+	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]]
 	// todo add in memory shrink version of the slot diffs
 
-	blockCache *blocks.Blocks
-	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]]
-
-	// TODO: store the index
 	// the slot index of the bic vector ("LatestCommitedSlot")
 	bicIndex iotago.SlotIndex
 
-	// todo abstact BICTree into separate component to hide the diff moving implementation
 	// TODO on reading from the snapshot: create the BIC tree from the bic vector and the slot diffs
 	// bic represents the Block Issuer Credits vector of all registered accounts for bicTreeindex slot, it is updated on the slot commitment.
 	bicTree *ads.Map[iotago.AccountID, accounts.AccountImpl, *iotago.AccountID, *accounts.AccountImpl]
 
+	// slot diffs for the BIC between [LatestCommitedSlot - MCA, LatestCommitedSlot]
+	slotDiffFunc func(iotago.SlotIndex) *prunable.BicDiffs
+
+	// blockFunc is a function that returns a block from the cache or from the database
+	blockFunc func(id iotago.BlockID) (*blocks.Block, bool)
+
 	apiProviderFunc func() iotago.API
 	mutex           sync.RWMutex
 
+	// TODO reevaluate locking
 	module.Module
 }
 
-func (b *BICManager) trackBlock(block *blocks.Block) {
+func (b *BICManager) SetBICIndex(index iotago.SlotIndex) {
+	b.bicIndex = index
+}
+
+func (b *BICManager) TrackBlock(block *blocks.Block) {
 	set, _ := b.blockBurns.GetOrCreate(block.ID().Index(), func() *advancedset.AdvancedSet[iotago.BlockID] {
 		return advancedset.New[iotago.BlockID]()
 	})
 	set.Add(block.ID())
 }
 
-func NewProvider(opts ...options.Option[BICManager]) module.Provider[*engine.Engine, accounts.BlockIssuanceCredits] {
-	return module.Provide(func(e *engine.Engine) accounts.BlockIssuanceCredits {
-
-		return options.Apply(&BICManager{
-			blockBurns: shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
-			bicTree:    ads.NewMap[iotago.AccountID, accounts.AccountImpl](e.Storage.Accounts()),
-			blockCache: e.BlockCache,
-			workers:    e.Workers.CreateGroup("BICManager"),
-		}, opts, func(b *BICManager) {
-			e.HookConstructed(func() {
-				wpBic := b.workers.CreatePool("trackBurnt", 1)
-				e.Events.BlockGadget.BlockRatifiedAccepted.Hook(b.trackBlock, event.WithWorkerPool(wpBic))
-			})
-		})
-	})
+func New(blocksCache func(id iotago.BlockID) (*blocks.Block, bool), accountsStore kvstore.KVStore) *BICManager {
+	return &BICManager{
+		blockBurns: shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
+		bicTree:    ads.NewMap[iotago.AccountID, accounts.AccountImpl](accountsStore),
+		blockFunc:  blocksCache,
+	}
 }
 
 func (b *BICManager) API() iotago.API {
@@ -89,7 +82,7 @@ func (b *BICManager) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotag
 	if set, exists := b.blockBurns.Get(slotIndex); exists {
 		for it := set.Iterator(); it.HasNext(); {
 			blockID := it.Next()
-			block, exists := b.blockCache.Block(blockID)
+			block, exists := b.blockFunc(blockID)
 			if !exists {
 				return iotago.Identifier{}, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
 			}

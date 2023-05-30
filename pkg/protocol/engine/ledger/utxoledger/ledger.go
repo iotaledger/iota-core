@@ -41,22 +41,51 @@ type Ledger struct {
 
 func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) ledger.Ledger {
-		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), executeStardustVM, e.API, e.SybilProtection.OnlineCommittee(), e.ErrorHandler("ledger"))
+		ledgerWorkers := e.Workers.CreateGroup("Ledger")
+
+		l := New(
+			ledgerWorkers,
+			executeStardustVM,
+			e.Storage.Ledger(),
+			e.Storage.Accounts(),
+			e.SybilProtection.OnlineCommittee(),
+			e.BlockCache.Block,
+			e.API,
+			e.ErrorHandler("ledger"),
+		)
 
 		e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
 		// TODO: should this attach to RatifiedAccepted instead?
 		e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
 
+		e.HookConstructed(func() {
+			wpBic := ledgerWorkers.CreateGroup("BIC").CreatePool("trackBurnt", 1)
+			e.Events.BlockGadget.BlockRatifiedAccepted.Hook(l.accountsLedger.TrackBlock, event.WithWorkerPool(wpBic))
+		})
+		e.HookInitialized(func() {
+			l.accountsLedger.SetBICIndex(e.Storage.Settings().LatestCommitment().Index())
+		})
+
 		return l
 	})
 }
 
-func New(workers *workerpool.Group, store kvstore.KVStore, vm mempool.VM, apiProviderFunc func() iotago.API, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], errorHandler func(error)) *Ledger {
+func New(
+	workers *workerpool.Group,
+	vm mempool.VM,
+	utxoStore kvstore.KVStore,
+	accountsStore kvstore.KVStore,
+	committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID],
+	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
+	apiProviderFunc func() iotago.API,
+	errorHandler func(error),
+) *Ledger {
 	l := &Ledger{
-		utxoLedger:   ledgerstate.New(store, apiProviderFunc),
-		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
-		errorHandler: errorHandler,
+		utxoLedger:     ledgerstate.New(utxoStore, apiProviderFunc),
+		accountsLedger: bic.New(blocksFunc, accountsStore),
+		conflictDAG:    conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
+		errorHandler:   errorHandler,
 	}
 
 	l.memPool = mempoolv1.New(vm, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[booker.BlockVotePower](true))
@@ -192,7 +221,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		}
 
 		for _, allotment := range tx.Essence.Allotments {
-			allotments[allotment.AccountID] += allotment.Amount
+			allotments[allotment.AccountID] += allotment.Value
 		}
 
 		return true
