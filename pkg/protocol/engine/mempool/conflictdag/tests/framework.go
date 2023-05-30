@@ -53,7 +53,9 @@ func NewFramework(
 
 // CreateOrUpdateConflict creates a new conflict or adds it to the given ConflictSets.
 func (f *Framework) CreateOrUpdateConflict(alias string, resourceAliases []string) error {
-	return f.Instance.CreateOrUpdateConflict(f.ConflictID(alias), f.ConflictSetIDs(resourceAliases...))
+	f.Instance.CreateConflict(f.ConflictID(alias))
+	return f.Instance.UpdateConflictingResources(f.ConflictID(alias), f.ConflictSetIDs(resourceAliases...))
+
 }
 
 // UpdateConflictParents updates the parents of the conflict with the given alias.

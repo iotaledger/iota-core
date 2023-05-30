@@ -11,14 +11,12 @@ import (
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempooltests "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -97,56 +95,6 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 
 	fmt.Println("------------\nMemory report after:")
 	fmt.Println(memanalyzer.MemoryReport(tf))
-}
-
-// TestForkEvictedTransaction_1 tests the scenario in which transaction is evicted before `forkTransaction` method is called.
-func TestForkEvictedTransaction_1(t *testing.T) {
-	tf := newTestFramework(t)
-	memPool := tf.Instance.(*MemPool[vote.MockedPower])
-	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
-	require.NoError(t, tf.AttachTransactions("tx1"))
-
-	tf.RequireBooked("tx1")
-
-	transactionMetadata, exists := tf.TransactionMetadata("tx1")
-	require.True(t, exists)
-
-	genesisState, err := tf.Instance.StateMetadata(tf.StateID("genesis").UTXOInput())
-	require.NoError(t, err)
-
-	memPool.EvictUntil(1)
-
-	require.ErrorIs(t, memPool.forkTransaction(transactionMetadata.(*TransactionMetadata), genesisState.(*StateMetadata)), conflictdag.ErrEntityEvicted)
-
-	tf.RequireTransactionsEvicted(map[string]bool{"tx1": true})
-
-	require.False(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))))
-}
-
-// TestForkEvictedTransaction_2 tests the scenario in which transaction is evicted after `forkTransaction` method is called and after the first internal eviction check passes.
-func TestForkEvictedTransaction_2(t *testing.T) {
-	tf := newTestFramework(t)
-	memPool := tf.Instance.(*MemPool[vote.MockedPower])
-	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
-	require.NoError(t, tf.AttachTransactions("tx1"))
-
-	tf.RequireBooked("tx1")
-
-	transactionMetadata, exists := tf.TransactionMetadata("tx1")
-	require.True(t, exists)
-
-	genesisState, err := tf.Instance.StateMetadata(tf.StateID("genesis").UTXOInput())
-	require.NoError(t, err)
-
-	tf.ConflictDAG.Events().ConflictCreated.Hook(func(id iotago.TransactionID) {
-		transactionMetadata.Commit()
-	})
-
-	require.ErrorIs(t, memPool.forkTransaction(transactionMetadata.(*TransactionMetadata), genesisState.(*StateMetadata)), conflictdag.ErrEntityEvicted)
-
-	tf.RequireTransactionsEvicted(map[string]bool{"tx1": true})
-
-	require.False(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))))
 }
 
 func newTestFramework(t *testing.T) *mempooltests.TestFramework {

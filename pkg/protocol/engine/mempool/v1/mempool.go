@@ -220,33 +220,28 @@ func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata
 
 func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
 	if m.optForkAllTransactions {
-		forkingErr := m.forkTransaction(transaction, transaction.inputs...)
-		// if MemPool is forking all transactions and there is a forking error, it's safe to reject all outputRequests instead of publishing them.
-		if forkingErr != nil {
-			for _, output := range transaction.outputs {
-				outputRequest, requestExists := m.cachedStateRequests.Get(output.id)
-
-				if requestExists {
-					outputRequest.Reject(xerrors.Errorf("state incorrect: %w", forkingErr))
-				}
-			}
-
-			return
-		}
+		m.forkTransaction(transaction, advancedset.New(lo.Map(transaction.inputs, (*StateMetadata).ID)...))
 	} else {
 		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 			input.OnDoubleSpent(func() {
-				if forkingErr := m.forkTransaction(transaction, input); forkingErr != nil {
-					// If forking is done on double spend and there is a forkingError, then it's only useful to log the error.
-					// TODO: use errorHandler mechanism instead.
-					fmt.Println(forkingErr)
-				}
+				m.forkTransaction(transaction, advancedset.New(input.ID()))
 			})
 		})
 	}
 
 	if !transaction.IsOrphaned() && transaction.setBooked() {
 		m.publishOutputs(transaction)
+	}
+}
+
+func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, resourceIDs *advancedset.AdvancedSet[iotago.OutputID]) {
+	transaction.setConflicting()
+
+	if err := m.conflictDAG.UpdateConflictingResources(transaction.ID(), resourceIDs); err != nil {
+		transaction.setOrphaned()
+
+		// TODO: use errorHandler mechanism instead.
+		fmt.Println(err)
 	}
 }
 
@@ -295,39 +290,6 @@ func (m *MemPool[VotePower]) requestStateWithMetadata(stateRef iotago.IndexedUTX
 			}
 		})
 	})
-}
-
-func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, inputs ...*StateMetadata) error {
-	inputIDs := advancedset.New[iotago.OutputID]()
-	for _, input := range inputs {
-		inputIDs.Add(input.ID())
-	}
-
-	if transaction.IsCommitted() || transaction.IsOrphaned() {
-		return xerrors.Errorf("evicted transaction cannot be forked: %w", conflictdag.ErrEntityEvicted)
-	}
-
-	if err := m.conflictDAG.CreateOrUpdateConflict(transaction.ID(), inputIDs); err != nil {
-		return xerrors.Errorf("failed to join conflict sets: %w", err)
-	}
-
-	transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
-		err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements)
-		if err != nil {
-			panic(err)
-		}
-	})
-
-	transaction.setConflicting()
-
-	// If the transaction was evicted after the previous eviction check, but before creating new conflict,
-	// then the conflict needs to be removed here manually, otherwise it would never be evicted.
-	if transaction.IsCommitted() || transaction.IsOrphaned() {
-		m.conflictDAG.EvictConflict(transaction.ID())
-		return xerrors.Errorf("evicted transaction could not be forked: %w", conflictdag.ErrEntityEvicted)
-	}
-
-	return nil
 }
 
 func (m *MemPool[VotePower]) updateAttachment(blockID iotago.BlockID, updateFunc func(transaction *TransactionMetadata, blockID iotago.BlockID) bool) bool {
@@ -395,6 +357,17 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) 
 				stateDiff.AddTransaction(transaction)
 			}
 		}
+	})
+
+	transaction.OnConflicting(func() {
+		m.conflictDAG.CreateConflict(transaction.ID())
+
+		transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
+			err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements)
+			if err != nil {
+				panic(err)
+			}
+		})
 	})
 
 	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {

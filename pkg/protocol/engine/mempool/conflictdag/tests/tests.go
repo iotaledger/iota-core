@@ -359,22 +359,22 @@ func JoinConflictSetTwice(t *testing.T, tf *Framework) {
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.Equal(t, 1, conflictCreatedEventCount)
-	require.Equal(t, 0, resourceAddedEventCount)
+	require.Equal(t, 1, resourceAddedEventCount)
 	tf.Assert.ConflictSets("conflict1", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource2"}))
 	require.Equal(t, 1, conflictCreatedEventCount)
-	require.Equal(t, 1, resourceAddedEventCount)
+	require.Equal(t, 2, resourceAddedEventCount)
 	tf.Assert.ConflictSets("conflict1", "resource1", "resource2")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1", "resource2"}))
 	require.Equal(t, 1, conflictCreatedEventCount)
-	require.Equal(t, 1, resourceAddedEventCount)
+	require.Equal(t, 2, resourceAddedEventCount)
 	tf.Assert.ConflictSets("conflict1", "resource1", "resource2")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1", "resource2", "resource3", "resource4"}))
 	require.Equal(t, 1, conflictCreatedEventCount)
-	require.Equal(t, 2, resourceAddedEventCount)
+	require.Equal(t, 3, resourceAddedEventCount)
 	tf.Assert.ConflictSets("conflict1", "resource1", "resource2", "resource3", "resource4")
 }
 

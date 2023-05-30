@@ -57,7 +57,7 @@ func outputID(alias string) iotago.OutputID {
 }
 
 func TestMemoryRelease(t *testing.T) {
-	t.Skip("skip memory test as for some reason it's failing")
+	//t.Skip("skip memory test as for some reason it's failing")
 	tf := newTestFramework(t)
 
 	createConflictSets := func(startIndex, conflictSetCount, evictionDelay, conflictsInConflictSet int, prevConflictSetAlias string) (int, string) {
@@ -83,18 +83,23 @@ func TestMemoryRelease(t *testing.T) {
 
 		return index, prevConflictSetAlias
 	}
+	_, prevAlias := createConflictSets(0, 30000, 1, 2, "")
+
+	tf.Instance.EvictConflict(tf.ConflictID(prevAlias + ":0"))
+	tf.Instance.EvictConflict(tf.ConflictID(prevAlias + ":1"))
+
+	iotago.UnregisterIdentifierAliases()
 
 	fmt.Println("Memory report before:")
 	fmt.Println(memanalyzer.MemoryReport(tf))
 	memStatsStart := memStats()
-	_, alias := createConflictSets(0, 2000, 1, 2, "")
+	_, alias := createConflictSets(0, 30000, 1, 2, "")
 
 	tf.Instance.EvictConflict(tf.ConflictID(alias + ":0"))
 	tf.Instance.EvictConflict(tf.ConflictID(alias + ":1"))
 
 	tf.Instance.Shutdown()
 
-	//identity.UnregisterIDAliases()
 	iotago.UnregisterIdentifierAliases()
 
 	time.Sleep(time.Second)
@@ -102,7 +107,6 @@ func TestMemoryRelease(t *testing.T) {
 	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]).conflictSetsByID.Size())
 	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]).conflictsByID.Size())
 	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]).conflictUnhooks.Size())
-
 	memStatsEnd := memStats()
 
 	fmt.Println("\n\nMemory report after:")

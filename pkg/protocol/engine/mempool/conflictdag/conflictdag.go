@@ -11,7 +11,9 @@ type ConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePowe
 	Shutdown()
 	Events() *Events[ConflictID, ResourceID]
 
-	CreateOrUpdateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID]) error
+	CreateConflict(id ConflictID)
+	UpdateConflictingResources(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID]) error
+
 	ReadConsistent(callback func(conflictDAG ReadLockedConflictDAG[ConflictID, ResourceID, VotePower]) error) error
 	UpdateConflictParents(conflictID ConflictID, addedParentIDs, removedParentIDs *advancedset.AdvancedSet[ConflictID]) error
 	FutureCone(conflictIDs *advancedset.AdvancedSet[ConflictID]) (futureCone *advancedset.AdvancedSet[ConflictID])
