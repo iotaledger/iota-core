@@ -324,7 +324,7 @@ func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, i
 	// then the conflict needs to be removed here manually, otherwise it would never be evicted.
 	if transaction.IsCommitted() || transaction.IsOrphaned() {
 		m.conflictDAG.EvictConflict(transaction.ID())
-		return xerrors.Errorf("evicted transaction cannot be forked: %w", conflictdag.ErrEntityEvicted)
+		return xerrors.Errorf("evicted transaction could not be forked: %w", conflictdag.ErrEntityEvicted)
 	}
 
 	return nil
