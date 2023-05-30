@@ -56,7 +56,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 			prevStateAlias = fmt.Sprintf("tx%d:0", index)
 
 			tf.CommitSlot(iotago.SlotIndex(index))
-			tf.Instance.EvictUntil(iotago.SlotIndex(index))
+			tf.Instance.Evict(iotago.SlotIndex(index))
 
 			require.Nil(t, mempoolInstance.attachments.Get(iotago.SlotIndex(index), false))
 

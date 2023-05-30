@@ -141,8 +141,8 @@ func (m *MemPool[VotePower]) StateDiff(index iotago.SlotIndex) mempool.StateDiff
 	return NewStateDiff(index)
 }
 
-// EvictUntil evicts all slots with the given index and smaller from the MemPool.
-func (m *MemPool[VotePower]) EvictUntil(slotIndex iotago.SlotIndex) {
+// Evict evicts the slot with the given index from the MemPool.
+func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
 	if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *TransactionMetadata] {
 		m.evictionMutex.Lock()
 		defer m.evictionMutex.Unlock()
