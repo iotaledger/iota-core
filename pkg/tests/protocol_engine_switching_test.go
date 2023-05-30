@@ -394,39 +394,39 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}
 
 	var forksDetected atomic.Uint32
-	var commitmentsBelowRootDetected atomic.Uint32
-	node1.Protocol.Events.ChainManager.CommitmentBelowRoot.Hook(func(commitment iotago.CommitmentID) {
-		commitmentsBelowRootDetected.Add(1)
-	})
-	node2.Protocol.Events.ChainManager.CommitmentBelowRoot.Hook(func(commitment iotago.CommitmentID) {
-		commitmentsBelowRootDetected.Add(1)
-	})
-	node3.Protocol.Events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
-		forksDetected.Add(1)
-	})
-	node4.Protocol.Events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
-		forksDetected.Add(1)
-	})
+	for _, node := range ts.Nodes() {
+		node.Protocol.Events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
+			forksDetected.Add(1)
+		})
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	forkDetectionTimeout := 30 * time.Second
 	wg := &sync.WaitGroup{}
-	// Issue blocks after merging the networks
-	{
-		wg.Add(4)
+	wg.Add(4)
 
-		node1.IssueActivity(ctx, forkDetectionTimeout, wg)
-		node2.IssueActivity(ctx, forkDetectionTimeout, wg)
+	// Issue blocks on partition 2 after merging the networks.
+	{
 		node3.IssueActivity(ctx, forkDetectionTimeout, wg)
 		node4.IssueActivity(ctx, forkDetectionTimeout, wg)
+
+		// node 1 and 2 finalized until slot 10. However, the rootcommitment is still at slot 0, that's why we expect a fork detection.
+		expectedForksDetected := uint32(2)
+		require.Eventually(t, func() bool {
+			return expectedForksDetected == forksDetected.Load()
+		}, forkDetectionTimeout, 100*time.Millisecond)
 	}
 
-	expectedForksDetected := uint32(2)
-	// node1 and node2 detect CommitmentBelowRoot for requested commitments: both nodes 3 and 4 will send it. Thus, in total 4.
-	expectedCommitmentsBelowRootDetected := uint32(4)
-	require.Eventually(t, func() bool {
-		return expectedForksDetected == forksDetected.Load() && expectedCommitmentsBelowRootDetected == commitmentsBelowRootDetected.Load()
-	}, forkDetectionTimeout, 100*time.Millisecond)
+	// Issue blocks on partition 1 after merging the networks.
+	{
+		node1.IssueActivity(ctx, forkDetectionTimeout, wg)
+		node2.IssueActivity(ctx, forkDetectionTimeout, wg)
+
+		expectedForksDetected := uint32(4)
+		require.Eventually(t, func() bool {
+			return expectedForksDetected == forksDetected.Load()
+		}, forkDetectionTimeout, 100*time.Millisecond)
+	}
 
 	// After we detected all forks we can stop issuing activity blocks.
 	cancel()

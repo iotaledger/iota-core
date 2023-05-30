@@ -59,13 +59,16 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 			if !block.IsAccepted() {
 				t.AddTip(block)
 			}
-			_ = t.AddTip(block)
 		}, event.WithWorkerPool(t.workers.CreatePool("AddTip", 2)))
 
+		// TODO: this is dirty but we need to make sure old tips are removed
 		e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 			t.RemoveTip(block.ID())
 		})
 		e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+			t.RemoveTip(block.ID())
+		})
+		e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 			t.RemoveTip(block.ID())
 		})
 

@@ -1,6 +1,7 @@
 package eviction
 
 import (
+	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -66,34 +67,55 @@ func (s *State) LastEvictedSlot() iotago.SlotIndex {
 }
 
 // EarliestRootCommitmentID returns the earliest commitment that rootblocks are committing to across all rootblocks.
-func (s *State) EarliestRootCommitmentID() (earliestCommitment iotago.CommitmentID) {
+func (s *State) EarliestRootCommitmentID(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment iotago.CommitmentID, valid bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
 	earliestCommitment = iotago.NewSlotIdentifier(math.MaxInt64, [32]byte{})
 
-	start, end := s.activeIndexRange()
-	for index := start; index <= end; index++ {
-		storage := s.rootBlocks.Get(index)
-		if storage == nil {
+	start, _ := s.delayedBlockEvictionThreshold(lastFinalizedSlot)
+	for index := start; index <= lastFinalizedSlot; index++ {
+		// Try loading from the cache first.
+		slotBlocks := s.rootBlocks.Get(index, false)
+		if slotBlocks != nil {
+			slotBlocks.ForEach(func(id iotago.BlockID, commitmentID iotago.CommitmentID) bool {
+				fmt.Println(id, "EarliestRootCommitmentID (from cache): ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
+				if commitmentID.Index() < earliestCommitment.Index() {
+					earliestCommitment = commitmentID
+				}
+
+				return true
+			})
+
 			continue
 		}
 
-		storage.ForEach(func(id iotago.BlockID, commitmentID iotago.CommitmentID) bool {
-			// fmt.Println(id, "EarliestRootCommitmentID: ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
+		// Load rootblocks from the storage.
+		storage := s.rootBlockStorageFunc(index)
+		if storage == nil {
+			continue
+		}
+		err := storage.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
+			fmt.Println(id, "EarliestRootCommitmentID (from storage): ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
 			if commitmentID.Index() < earliestCommitment.Index() {
 				earliestCommitment = commitmentID
 			}
 
-			return true
+			return nil
 		})
+		if err != nil {
+			panic(err)
+		}
 	}
+
+	fmt.Println("EarliestRootCommitmentID: ", start, " ", lastFinalizedSlot, " ", earliestCommitment.String(), " ", earliestCommitment.Index())
 
 	if earliestCommitment.Index() == math.MaxInt64 {
-		return iotago.NewEmptyCommitment().MustID()
+		fmt.Println("returning empty commitment")
+		return iotago.NewEmptyCommitment().MustID(), false
 	}
 
-	return earliestCommitment
+	return earliestCommitment, true
 }
 
 // InRootBlockSlot checks if the Block associated with the given id is too old.

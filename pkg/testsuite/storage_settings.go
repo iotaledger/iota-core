@@ -110,13 +110,14 @@ func (t *TestSuite) AssertLatestFinalizedSlot(slot iotago.SlotIndex, nodes ...*m
 	}
 }
 
-func (t *TestSuite) AssertChainID(chainID iotago.CommitmentID, nodes ...*mock.Node) {
+func (t *TestSuite) AssertChainID(expectedChainID iotago.CommitmentID, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if chainID != node.Protocol.MainEngineInstance().ChainID() {
-				return errors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, chainID.String(), chainID.Index(), node.Protocol.MainEngineInstance().EvictionState.EarliestRootCommitmentID().String(), node.Protocol.MainEngineInstance().EvictionState.EarliestRootCommitmentID().Index())
+			actualChainID := node.Protocol.MainEngineInstance().ChainID()
+			if expectedChainID != node.Protocol.MainEngineInstance().ChainID() {
+				return errors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID.String(), expectedChainID.Index(), actualChainID, actualChainID.Index())
 			}
 
 			return nil
