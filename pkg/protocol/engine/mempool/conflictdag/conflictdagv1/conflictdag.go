@@ -401,7 +401,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UnacceptedConflicts(con
 }
 
 // EvictConflict removes conflict with given ConflictID from ConflictDAG.
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) EvictConflict(conflictID ConflictID) error {
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) EvictConflict(conflictID ConflictID) {
 	for _, evictedConflictID := range func() []ConflictID {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
@@ -410,8 +410,6 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) EvictConflict(conflictI
 	}() {
 		c.events.ConflictEvicted.Trigger(evictedConflictID)
 	}
-
-	return nil
 }
 
 func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) evictConflict(conflictID ConflictID) []ConflictID {

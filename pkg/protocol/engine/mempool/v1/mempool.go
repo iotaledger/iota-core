@@ -3,6 +3,7 @@ package mempoolv1
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"golang.org/x/xerrors"
@@ -146,6 +147,8 @@ func (m *MemPool[VotePower]) EvictUntil(slotIndex iotago.SlotIndex) {
 		m.evictionMutex.Lock()
 		defer m.evictionMutex.Unlock()
 
+		m.lastEvictedSlot = slotIndex
+
 		m.stateDiffs.Delete(slotIndex)
 
 		return m.attachments.Evict(slotIndex)
@@ -161,7 +164,6 @@ func (m *MemPool[VotePower]) EvictUntil(slotIndex iotago.SlotIndex) {
 func (m *MemPool[VotePower]) storeTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (storedTransaction *TransactionMetadata, isNew bool, err error) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
-
 	if m.lastEvictedSlot >= blockID.Index() {
 		return nil, false, xerrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
 	}
@@ -217,26 +219,33 @@ func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata
 }
 
 func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
-	var forkingErr error
 	if m.optForkAllTransactions {
-		forkingErr = m.forkTransaction(transaction, transaction.inputs...)
+		forkingErr := m.forkTransaction(transaction, transaction.inputs...)
+		// if MemPool is forking all transactions and there is a forking error, it's safe to reject all outputRequests instead of publishing them.
+		if forkingErr != nil {
+			for _, output := range transaction.outputs {
+				outputRequest, requestExists := m.cachedStateRequests.Get(output.id)
+
+				if requestExists {
+					outputRequest.Reject(xerrors.Errorf("state incorrect: %w", forkingErr))
+				}
+			}
+
+			return
+		}
 	} else {
 		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 			input.OnDoubleSpent(func() {
-				forkingErr = m.forkTransaction(transaction, input)
+				if forkingErr := m.forkTransaction(transaction, input); forkingErr != nil {
+					// If forking is done on double spend and there is a forkingError, then it's only useful to log the error.
+					// TODO: use errorHandler mechanism instead.
+					fmt.Println(forkingErr)
+				}
 			})
 		})
 	}
 
-	if forkingErr != nil {
-		for _, output := range transaction.outputs {
-			outputRequest, requestExists := m.cachedStateRequests.Get(output.id)
-
-			if requestExists {
-				outputRequest.Reject(xerrors.Errorf("state incorrect: %w", forkingErr))
-			}
-		}
-	} else if !transaction.IsOrphaned() && transaction.setBooked() {
+	if !transaction.IsOrphaned() && transaction.setBooked() {
 		m.publishOutputs(transaction)
 	}
 }
@@ -264,9 +273,7 @@ func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionMetadata)
 	m.cachedTransactions.Delete(transaction.ID())
 
 	transaction.OnConflicting(func() {
-		if err := m.conflictDAG.EvictConflict(transaction.ID()); err != nil {
-			panic(err)
-		}
+		m.conflictDAG.EvictConflict(transaction.ID())
 	})
 }
 
@@ -296,6 +303,10 @@ func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, i
 		inputIDs.Add(input.ID())
 	}
 
+	if transaction.IsCommitted() || transaction.IsOrphaned() {
+		return xerrors.Errorf("evicted transaction cannot be forked: %w", conflictdag.ErrEntityEvicted)
+	}
+
 	if err := m.conflictDAG.CreateOrUpdateConflict(transaction.ID(), inputIDs); err != nil {
 		return xerrors.Errorf("failed to join conflict sets: %w", err)
 	}
@@ -308,6 +319,13 @@ func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, i
 	})
 
 	transaction.setConflicting()
+
+	// If the transaction was evicted after the previous eviction check, but before creating new conflict,
+	// then the conflict needs to be removed here manually, otherwise it would never be evicted.
+	if transaction.IsCommitted() || transaction.IsOrphaned() {
+		m.conflictDAG.EvictConflict(transaction.ID())
+		return xerrors.Errorf("evicted transaction cannot be forked: %w", conflictdag.ErrEntityEvicted)
+	}
 
 	return nil
 }

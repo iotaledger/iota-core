@@ -79,8 +79,8 @@ func (f *Framework) CastVotes(nodeAlias string, votePower int, conflictAliases .
 }
 
 // EvictConflict evicts given conflict from the ConflictDAG.
-func (f *Framework) EvictConflict(conflictAlias string) error {
-	return f.Instance.EvictConflict(f.ConflictID(conflictAlias))
+func (f *Framework) EvictConflict(conflictAlias string) {
+	f.Instance.EvictConflict(f.ConflictID(conflictAlias))
 }
 
 // ConflictIDs translates the given aliases into an AdvancedSet of iotago.TransactionIDs.

@@ -7,9 +7,10 @@ import (
 )
 
 type Transaction struct {
-	id          iotago.TransactionID
-	inputs      []iotago.IndexedUTXOReferencer
-	outputCount uint16
+	id                 iotago.TransactionID
+	inputs             []iotago.IndexedUTXOReferencer
+	outputCount        uint16
+	invalidTransaction bool
 }
 
 func NewTransaction(outputCount uint16, inputs ...iotago.IndexedUTXOReferencer) *Transaction {

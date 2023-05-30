@@ -11,9 +11,8 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
-	iotago "github.com/iotaledger/iota.go/v4"
-
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestAllWithoutForkingEverything(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
@@ -24,10 +23,12 @@ func TestAllWithoutForkingEverything(t *testing.T, frameworkProvider func(*testi
 		"TestSetTransactionOrphanage":                TestSetTransactionOrphanage,
 		"TestSetAllAttachmentsOrphaned":              TestSetAllAttachmentsOrphaned,
 		"TestSetNotAllAttachmentsOrphaned":           TestSetNotAllAttachmentsOrphaned,
-		"TestSetTxOrphanageMultipleAttachments":      TestSetTxOrphanageMultipleAttachments,
 		"TestSetNotAllAttachmentsOrphanedFutureCone": TestSetNotAllAttachmentsOrphanedFutureCone,
 		"TestStateDiff":                              TestStateDiff,
 		"TestMemoryRelease":                          TestMemoryRelease,
+		"TestInvalidTransaction":                     TestInvalidTransaction,
+		"TestStoreAttachmentInEvictedSlot":           TestStoreAttachmentInEvictedSlot,
+		"TestConflictPropagationForkOnDoubleSpend":   TestConflictPropagationForkOnDoubleSpend,
 	} {
 		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
 	}
@@ -35,7 +36,13 @@ func TestAllWithoutForkingEverything(t *testing.T, frameworkProvider func(*testi
 
 func TestAllWithForkingEverything(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 	for testName, testCase := range map[string]func(*testing.T, *TestFramework){
-		"TestConflictPropagation": TestConflictPropagation,
+		"TestConflictPropagationForkAll":        TestConflictPropagationForkAll,
+		"TestSetTxOrphanageMultipleAttachments": TestSetTxOrphanageMultipleAttachments,
+		"TestProcessTransaction":                TestProcessTransaction,
+		"TestProcessTransactionsOutOfOrder":     TestProcessTransactionsOutOfOrder,
+		"TestSetTransactionOrphanage":           TestSetTransactionOrphanage,
+		"TestInvalidTransaction":                TestInvalidTransaction,
+		"TestStoreAttachmentInEvictedSlot":      TestStoreAttachmentInEvictedSlot,
 	} {
 		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
 	}
@@ -415,16 +422,23 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 	require.False(t, tx3Metadata.IsAccepted())
 
 	tf.Instance.EvictUntil(1)
-
 	require.False(t, tx1Metadata.IsOrphaned())
 	require.False(t, tx2Metadata.IsOrphaned())
 	require.False(t, tx3Metadata.IsOrphaned())
+
+	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))))
+	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx2"))))
+	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx3"))))
 
 	tf.Instance.EvictUntil(2)
 
 	require.True(t, tx1Metadata.IsOrphaned())
 	require.True(t, tx2Metadata.IsOrphaned())
 	require.True(t, tx3Metadata.IsOrphaned())
+
+	require.False(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))))
+	require.False(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx2"))))
+	require.False(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx3"))))
 
 	tf.RequireTransactionsEvicted(map[string]bool{"tx1": true, "tx2": true, "tx3": true})
 
@@ -462,7 +476,7 @@ func TestStateDiff(t *testing.T, tf *TestFramework) {
 	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx3:0"}, []string{"tx1", "tx2", "tx3"})
 }
 
-func TestConflictPropagation(t *testing.T, tf *TestFramework) {
+func TestConflictPropagationForkAll(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
 	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
@@ -492,18 +506,70 @@ func TestConflictPropagation(t *testing.T, tf *TestFramework) {
 
 	tf.RequireBooked("tx4")
 	tf.RequireConflictIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx3"}, "tx4": {"tx4"}, "tx1*": {"tx1*"}, "tx2*": {"tx2*"}, "tx3*": {"tx3*"}})
+}
 
+func TestConflictPropagationForkOnDoubleSpend(t *testing.T, tf *TestFramework) {
+	debug.SetEnabled(true)
+	defer debug.SetEnabled(false)
+	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateTransaction("tx1*", []string{"genesis"}, 1)
+
+	tf.CreateTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateTransaction("tx2*", []string{"tx1*:0"}, 1)
+	tf.CreateTransaction("tx3", []string{"tx2:0"}, 1)
+	tf.CreateTransaction("tx3*", []string{"tx2*:0"}, 1)
+	tf.CreateTransaction("tx4", []string{"tx1:0"}, 1)
+
+	require.NoError(t, tf.AttachTransaction("tx3", "block3", 3))
+	require.NoError(t, tf.AttachTransaction("tx2", "block2", 2))
+	require.NoError(t, tf.AttachTransaction("tx1", "block1", 1))
+
+	tf.RequireBooked("tx1", "tx2", "tx3")
+	tf.RequireConflictIDs(map[string][]string{"tx1": {}, "tx2": {}, "tx3": {}})
+
+	require.NoError(t, tf.AttachTransaction("tx3*", "block3*", 3))
+	require.NoError(t, tf.AttachTransaction("tx2*", "block2*", 2))
+	require.NoError(t, tf.AttachTransaction("tx1*", "block1*", 1))
+
+	tf.RequireBooked("tx1*", "tx2*", "tx3*")
+	tf.RequireConflictIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx1"}, "tx3": {"tx1"}, "tx1*": {"tx1*"}, "tx2*": {"tx1*"}, "tx3*": {"tx1*"}})
+
+	require.NoError(t, tf.AttachTransaction("tx4", "block4", 2))
+
+	tf.RequireBooked("tx4")
+	tf.RequireConflictIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx2"}, "tx4": {"tx4"}, "tx1*": {"tx1*"}, "tx2*": {"tx1*"}, "tx3*": {"tx1*"}})
+}
+
+func TestInvalidTransaction(t *testing.T, tf *TestFramework) {
+	debug.SetEnabled(true)
+	defer debug.SetEnabled(false)
+
+	tf.CreateTransaction("tx1", []string{"genesis"}, 1, true)
+	require.NoError(t, tf.AttachTransaction("tx1", "block2", 1))
+
+	tf.RequireInvalid("tx1")
+}
+
+func TestStoreAttachmentInEvictedSlot(t *testing.T, tf *TestFramework) {
+	debug.SetEnabled(true)
+	defer debug.SetEnabled(false)
+
+	tf.Instance.EvictUntil(iotago.SlotIndex(5))
+
+	tf.CreateTransaction("tx1", []string{"genesis"}, 1, true)
+	require.Error(t, tf.AttachTransaction("tx1", "block2", 1))
+
+	require.False(t, lo.Return2(tf.TransactionMetadata("tx1")))
 }
 
 func TestMemoryRelease(t *testing.T, tf *TestFramework) {
-
 	issueTransactions := func(startIndex, transactionCount int, prevStateAlias string) (int, string) {
 		index := startIndex
 		for ; index < startIndex+transactionCount; index++ {
 			txAlias := fmt.Sprintf("tx%d", index)
 			blockAlias := fmt.Sprintf("block%d", index)
 			tf.CreateTransaction(txAlias, []string{prevStateAlias}, 2)
-			fmt.Println("attach", txAlias)
+
 			require.NoError(t, tf.AttachTransaction(txAlias, blockAlias, iotago.SlotIndex(index)))
 			tf.RequireBooked(txAlias)
 
@@ -512,7 +578,6 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 
 			tf.CommitSlot(iotago.SlotIndex(index))
 			tf.Instance.EvictUntil(iotago.SlotIndex(index))
-
 		}
 
 		return index, prevStateAlias

@@ -339,12 +339,11 @@ func CastVotesAcceptance(t *testing.T, tf *Framework) {
 	tf.Assert.Rejected("conflict5")
 
 	// Evict conflict and try to add non-existing parent to a rejected conflict.
-	require.NoError(t, tf.EvictConflict("conflict2"))
+	tf.EvictConflict("conflict2")
 	require.ErrorIs(t, tf.UpdateConflictParents("conflict4", []string{"conflict2"}, []string{}), conflictdag.ErrEntityEvicted)
 
 	// Try to update parents of evicted conflict
 	require.ErrorIs(t, tf.UpdateConflictParents("conflict2", []string{"conflict1"}, []string{}), conflictdag.ErrEntityEvicted)
-
 }
 
 func JoinConflictSetTwice(t *testing.T, tf *Framework) {
@@ -424,7 +423,7 @@ func EvictAcceptedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Rejected("conflict4")
 	tf.Assert.Pending("conflict5", "conflict6")
 
-	require.NoError(t, tf.EvictConflict("conflict2"))
+	tf.EvictConflict("conflict2")
 	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict1"))))
 	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict2"))))
 	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict3"))))
@@ -490,7 +489,7 @@ func EvictRejectedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Rejected("conflict4")
 	tf.Assert.Pending("conflict5", "conflict6")
 
-	require.NoError(t, tf.EvictConflict("conflict1"))
+	tf.EvictConflict("conflict1")
 	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict1"))))
 	require.True(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict2"))))
 	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict3"))))
@@ -499,7 +498,7 @@ func EvictRejectedConflict(t *testing.T, tf *Framework) {
 	require.True(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict6"))))
 	require.Equal(t, 3, conflictEvictedEventCount)
 
-	require.NoError(t, tf.EvictConflict("conflict1"))
+	tf.EvictConflict("conflict1")
 	require.Equal(t, 3, conflictEvictedEventCount)
 
 	tf.Assert.ConflictSetMembers("resource1", "conflict2")
@@ -508,7 +507,7 @@ func EvictRejectedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("conflict5", "conflict2")
 	tf.Assert.Parents("conflict6", "conflict2")
 
-	require.NoError(t, tf.EvictConflict("conflict6"))
+	tf.EvictConflict("conflict6")
 	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict1"))))
 	require.True(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict2"))))
 	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict3"))))
