@@ -216,6 +216,15 @@ func (m *Manager) SwitchMainChain(head iotago.CommitmentID) error {
 }
 
 func (m *Manager) processCommitment(commitment *model.Commitment) (isNew bool, isSolid bool, chainCommitment *ChainCommitment) {
+	// Lock access to the parent commitment. We need to lock this first as we are trying to update children later within this function.
+	// Failure to do so, leads to a deadlock, where a child is locked and tries to lock its parent, which is locked by the parent which tries to lock the child.
+	m.commitmentEntityMutex.Lock(commitment.PrevID())
+	defer m.commitmentEntityMutex.Unlock(commitment.PrevID())
+
+	// Lock access to the chainCommitment so no children are added while we are propagating solidity
+	m.commitmentEntityMutex.Lock(commitment.ID())
+	defer m.commitmentEntityMutex.Unlock(commitment.ID())
+
 	if isBelowRootCommitment, isRootCommitment := m.evaluateAgainstRootCommitment(commitment.Commitment()); isBelowRootCommitment || isRootCommitment {
 		if isRootCommitment {
 			chainCommitment = m.rootCommitment
@@ -230,10 +239,6 @@ func (m *Manager) processCommitment(commitment *model.Commitment) (isNew bool, i
 	if !isNew || chainCommitment.Chain() == nil {
 		return
 	}
-
-	// Lock access to the chainCommitment so no children are added while we are propagating solidity
-	m.commitmentEntityMutex.Lock(chainCommitment.ID())
-	defer m.commitmentEntityMutex.Unlock(chainCommitment.ID())
 
 	if mainChild := chainCommitment.mainChild(); mainChild != nil {
 		for childWalker := walker.New[*ChainCommitment]().Push(chainCommitment.mainChild()); childWalker.HasNext(); {
@@ -340,13 +345,6 @@ func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*Ch
 }
 
 func (m *Manager) registerCommitment(commitment *model.Commitment) (isNew bool, isSolid bool, wasForked bool, chainCommitment *ChainCommitment) {
-	m.commitmentEntityMutex.Lock(commitment.ID())
-	defer m.commitmentEntityMutex.Unlock(commitment.ID())
-
-	// Lock access to the parent commitment
-	m.commitmentEntityMutex.Lock(commitment.PrevID())
-	defer m.commitmentEntityMutex.Unlock(commitment.PrevID())
-
 	parentCommitment, commitmentCreated := m.getOrCreateCommitment(commitment.PrevID())
 	if commitmentCreated {
 		m.Events.CommitmentMissing.Trigger(parentCommitment.ID())
