@@ -61,6 +61,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				g.workers = e.Workers.CreateGroup("SlotGadget")
 
 				g.slotTracker.Events.VotersUpdated.Hook(func(evt *slottracker.VoterUpdatedEvent) {
+					// This needs to be called with only one worker as it's otherwise prone to read after write race conditions.
 					g.refreshSlotFinalization(evt.PrevLatestSlotIndex, evt.NewLatestSlotIndex)
 				}, event.WithWorkerPool(g.workers.CreatePool("Refresh", 1)))
 
@@ -94,20 +95,21 @@ func (g *Gadget) latestFinalizedSlot() iotago.SlotIndex {
 }
 
 func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
 	g.lastFinalizedSlot = i
 	g.storeLastFinalizedSlotFunc(i)
 }
 
 func (g *Gadget) trackVotes(block *blocks.Block) {
-	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, block.Block().IssuerID)
+	g.slotTracker.TrackVotes(block.SlotCommitmentID().Index(), block.Block().IssuerID)
 }
 
 func (g *Gadget) refreshSlotFinalization(previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) {
 	committee := g.sybilProtection.Committee()
 	committeeTotalWeight := committee.TotalWeight()
 
-	finalizedSlots := make([]iotago.SlotIndex, 0)
-	g.mutex.Lock()
 	for i := lo.Max(g.lastFinalizedSlot, previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
 		attestorsTotalWeight := committee.SelectAccounts(g.slotTracker.Voters(i).Slice()...).TotalWeight()
 
@@ -115,13 +117,11 @@ func (g *Gadget) refreshSlotFinalization(previousLatestSlotIndex iotago.SlotInde
 			break
 		}
 
+		// Lock here, so that SlotVotersTotalWeight is not inside the lock. Otherwise, it might cause a deadlock,
+		// because one thread owns write-lock on the SlotTracker and needs read lock on SlotGadget lock (for the cutoff),
+		// while this method holds WriteLock on SlotGadget lock and is waiting for ReadLock on SlotTracker.
 		g.setLastFinalizedSlot(i)
 
-		finalizedSlots = append(finalizedSlots, i)
-	}
-	g.mutex.Unlock()
-
-	for _, i := range finalizedSlots {
 		g.events.SlotFinalized.Trigger(i)
 		g.slotTracker.EvictSlot(i)
 	}
