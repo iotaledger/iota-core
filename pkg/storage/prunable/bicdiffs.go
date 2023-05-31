@@ -2,27 +2,49 @@ package prunable
 
 import (
 	"github.com/iotaledger/hive.go/core/storable"
+	"github.com/iotaledger/hive.go/crypto/ed25519"
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/kvstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+type Changes struct {
+	PubKeysAdded   []ed25519.PublicKey `serix:"0"`
+	PubKeysRemoved []ed25519.PublicKey `serix:"1"`
+	Change         int64               `serix:"2"`
+	api            iotago.API
+}
+
+func (p *Changes) Bytes() ([]byte, error) {
+	return p.api.Encode(p)
+}
+
+func (p *Changes) FromBytes(bytes []byte) (n int, err error) {
+	return p.api.Decode(bytes, p)
+}
+
 type BicDiffs struct {
-	slot  iotago.SlotIndex
-	store *kvstore.TypedStore[iotago.AccountID, storable.SerializableInt64, *iotago.AccountID, *storable.SerializableInt64]
+	slot              iotago.SlotIndex
+	store             *kvstore.TypedStore[iotago.AccountID, Changes, *iotago.AccountID, *Changes]
+	destroyedAccounts *kvstore.TypedStore[iotago.AccountID, types.Empty, *iotago.AccountID, *types.Empty] // TODO is there any store for set of keys only?
+	api               iotago.API
 }
 
 // NewBicDiffs creates a new BicDiffs instance.
-func NewBicDiffs(slot iotago.SlotIndex, store kvstore.KVStore) *BicDiffs {
+func NewBicDiffs(api iotago.API, slot iotago.SlotIndex, store kvstore.KVStore) *BicDiffs {
 	return &BicDiffs{
-		slot:  slot,
-		store: kvstore.NewTypedStore[iotago.AccountID, storable.SerializableInt64](store),
+		slot:              slot,
+		store:             kvstore.NewTypedStore[iotago.AccountID, Changes](store),
+		destroyedAccounts: kvstore.NewTypedStore[iotago.AccountID, types.Empty](store),
+
+		api: api,
 	}
 }
 
 // Store stores the given accountID as a root block.
-func (r *BicDiffs) Store(accountID iotago.AccountID, change int64) (err error) {
+func (r *BicDiffs) Store(accountID iotago.AccountID, change int64, pubKeys ...ed25519.PublicKey) (err error) {
 	return r.store.Set(accountID, storable.SerializableInt64(change))
 }
 

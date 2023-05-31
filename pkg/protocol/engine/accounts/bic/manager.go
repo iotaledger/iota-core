@@ -71,13 +71,14 @@ func (b *BICManager) BICTreeRoot() iotago.Identifier {
 	return iotago.Identifier(b.bicTree.Root())
 }
 
+// todo record also changes to pubKeys and accounts deletions
+
 func (b *BICManager) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotago.AccountID]uint64) (bicRoot iotago.Identifier, err error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	if b.latestCommittedSlot+1 != slotIndex {
 		return iotago.Identifier{}, errors.Errorf("cannot apply the ned diff, there is a gap in committed slots, bic vector index: %d, slot to commit: %d", b.latestCommittedSlot, slotIndex)
 	}
-
 	burns := make(map[iotago.AccountID]uint64)
 	if set, exists := b.blockBurns.Get(slotIndex); exists {
 		for it := set.Iterator(); it.HasNext(); {

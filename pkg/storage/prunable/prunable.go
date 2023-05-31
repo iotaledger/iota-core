@@ -63,7 +63,7 @@ func (p *Prunable) BicDiffs(slot iotago.SlotIndex) *BicDiffs {
 		return nil
 	}
 
-	return NewBicDiffs(slot, store)
+	return NewBicDiffs(p.api, slot, store)
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.
