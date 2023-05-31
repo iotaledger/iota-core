@@ -3,12 +3,14 @@ package bic
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
+
+	"github.com/pkg/errors"
+
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
-	"github.com/pkg/errors"
-	"io"
 
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -88,6 +90,7 @@ func (b *BICManager) importBICTree(reader io.ReadSeeker, accountCount uint64) er
 	}
 	return nil
 }
+
 func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -98,10 +101,10 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 	pWriter := utils.NewPositionedWriter(writer)
 
 	if err := pWriter.WriteValue("accounts count", accountCount, true); err != nil {
-		return err
+		return errors.Wrap(err, "unable to write accounts count")
 	}
 	if err := pWriter.WriteValue("slot diffs count", slotDiffCount, true); err != nil {
-		return err
+		return errors.Wrap(err, "unable to write slot diffs count")
 	}
 
 	accountCount = b.exportTargetBIC(pWriter, targetIndex, accountCount)
@@ -109,11 +112,11 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 	var err error
 	slotDiffCount, err = b.exportSlotDiffs(targetIndex, pWriter, slotDiffCount)
 
-	if err = pWriter.WriteValueAt("accounts count", accountCount); err != nil {
-		return err
+	if err = pWriter.WriteValueAtBookmark("accounts count", accountCount); err != nil {
+		return errors.Wrap(err, "unable to write accounts count")
 	}
-	if err = pWriter.WriteValueAt("slot diff count", slotDiffCount); err != nil {
-		return err
+	if err = pWriter.WriteValueAtBookmark("slot diff count", slotDiffCount); err != nil {
+		return errors.Wrap(err, "unable to write slot diffs count")
 	}
 
 	return nil
@@ -162,8 +165,8 @@ func (b *BICManager) exportSlotDiffs(targetIndex iotago.SlotIndex, pWriter *util
 
 		err := b.slotDiffFunc(index).Stream(func(accountID iotago.AccountID, change int64) bool {
 			diffBytes := slotDiffSnapshotBytes(accountID, change)
-			if err := pWriter.WriteBytes("diff", diffBytes); err != nil {
-				panic(err)
+			if err := pWriter.WriteBytes(diffBytes); err != nil {
+				panic(errors.Wrap(err, "unable to write slot diff bytes"))
 			}
 			accountsCount++
 			return true
@@ -172,7 +175,7 @@ func (b *BICManager) exportSlotDiffs(targetIndex iotago.SlotIndex, pWriter *util
 			return slotDiffCount, errors.Wrapf(err, "unable to stream slot diff for index %d", index)
 		}
 		// The amount of slot diffs contained within this snapshot.
-		if err = pWriter.WriteValueAt("diff count", accountsCount); err != nil {
+		if err = pWriter.WriteValueAtBookmark("diff count", accountsCount); err != nil {
 			return slotDiffCount, err
 		}
 
@@ -247,7 +250,7 @@ func writeAccountID(writer *utils.PositionedWriter, accountID iotago.AccountID) 
 	if err != nil {
 		return err
 	}
-	if err = writer.WriteBytes("account id", accountIDBytes); err != nil {
+	if err = writer.WriteBytes(accountIDBytes); err != nil {
 		return errors.Wrapf(err, "unable to write account id %s", accountID.String())
 	}
 	return nil

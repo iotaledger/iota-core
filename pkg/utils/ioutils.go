@@ -3,8 +3,9 @@ package utils
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
 func increaseOffsets(amount int64, offsets ...*int64) {
@@ -13,14 +14,14 @@ func increaseOffsets(amount int64, offsets ...*int64) {
 	}
 }
 
-func WriteValueFunc(writeSeeker io.WriteSeeker, variableName string, value any, offsetsToIncrease ...*int64) error {
+func WriteValueFunc(writeSeeker io.WriteSeeker, value any, offsetsToIncrease ...*int64) error {
 	length := binary.Size(value)
 	if length == -1 {
-		return fmt.Errorf("unable to determine length of %s", variableName)
+		return fmt.Errorf("unable to determine length of value")
 	}
 
 	if err := binary.Write(writeSeeker, binary.LittleEndian, value); err != nil {
-		return fmt.Errorf("unable to write LS %s: %w", variableName, err)
+		return errors.Wrap(err, "unable to write value")
 	}
 
 	increaseOffsets(int64(length), offsetsToIncrease...)
@@ -28,10 +29,10 @@ func WriteValueFunc(writeSeeker io.WriteSeeker, variableName string, value any, 
 	return nil
 }
 
-func WriteBytesFunc(writeSeeker io.WriteSeeker, variableName string, bytes []byte, offsetsToIncrease ...*int64) error {
+func WriteBytesFunc(writeSeeker io.WriteSeeker, bytes []byte, offsetsToIncrease ...*int64) error {
 	length, err := writeSeeker.Write(bytes)
 	if err != nil {
-		return fmt.Errorf("unable to write LS %s: %w", variableName, err)
+		return errors.Wrap(err, "unable to write bytes")
 	}
 
 	increaseOffsets(int64(length), offsetsToIncrease...)
@@ -40,66 +41,59 @@ func WriteBytesFunc(writeSeeker io.WriteSeeker, variableName string, bytes []byt
 }
 
 type PositionedWriter struct {
-	saved  map[string]int64
-	writer io.WriteSeeker
+	bookmarks map[string]int64
+	writer    io.WriteSeeker
 }
 
 func NewPositionedWriter(writer io.WriteSeeker) *PositionedWriter {
 	p := &PositionedWriter{
-		saved:  make(map[string]int64),
-		writer: writer,
+		bookmarks: make(map[string]int64),
+		writer:    writer,
 	}
 	return p
 }
 
-func (p *PositionedWriter) save(name string, position int64) {
-	p.saved[name] = position
-}
-
-func (p *PositionedWriter) WriteBytes(name string, bytes []byte) error {
-	if err := WriteBytesFunc(p.writer, name, bytes); err != nil {
+func (p *PositionedWriter) WriteBytes(bytes []byte) error {
+	if err := WriteBytesFunc(p.writer, bytes); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *PositionedWriter) WriteValue(name string, value interface{}, saveAs ...bool) error {
-	if len(saveAs) > 0 {
-		currPosition, err := p.writer.Seek(0, io.SeekCurrent)
+func (p *PositionedWriter) WriteValue(name string, value interface{}, saveBookmark ...bool) error {
+	if len(saveBookmark) > 0 && saveBookmark[0] {
+		currentPosition, err := p.writer.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return err
 		}
-		p.save(name, currPosition)
+		p.bookmarks[name] = currentPosition
 	}
-	if err := WriteValueFunc(p.writer, name, value); err != nil {
-		return err
+	if err := WriteValueFunc(p.writer, value); err != nil {
+		return errors.Wrapf(err, "unable to write value %s", name)
 	}
 	return nil
 }
 
-func (p *PositionedWriter) WriteValueAt(name string, value interface{}) error {
-	// seek back to the file position of the counters
-	position, ok := p.saved[name]
-	currPosition, err := p.writer.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return err
-	}
+func (p *PositionedWriter) WriteValueAtBookmark(name string, value interface{}) error {
+	bookmarkPosition, ok := p.bookmarks[name]
 	if !ok {
-		return errors.Errorf("unable to find saved position for %s", name)
+		return errors.Errorf("unable to find saved position for bookmark %s", name)
 	}
-	if currPosition >= position {
-		return errors.Errorf("cannot write into the future, current write position %d is greater than or equal to the saved position %d", currPosition, position)
+	originalPosition, err := p.writer.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return errors.Wrap(err, "unable to seek to current position")
 	}
-	diff := currPosition - position
-	if _, err := p.writer.Seek(-diff, io.SeekCurrent); err != nil {
-		return fmt.Errorf("unable to seek to LS counter placeholders: %w", err)
+	if bookmarkPosition >= originalPosition {
+		return errors.Errorf("cannot write into the future, current write position %d is greater than or equal to the bookmark position %d", originalPosition, bookmarkPosition)
 	}
-	if err := WriteValueFunc(p.writer, name, value); err != nil {
-		return err
+	if _, err := p.writer.Seek(bookmarkPosition, io.SeekStart); err != nil {
+		return errors.Wrapf(err, "unable to seek back to bookmark %s position", name)
 	}
-	// seek back to the file position of the counters
-	if _, err := p.writer.Seek(diff, io.SeekCurrent); err != nil {
-		return fmt.Errorf("unable to seek to LS counter placeholders: %w", err)
+	if err := WriteValueFunc(p.writer, value); err != nil {
+		return errors.Wrapf(err, "unable to write value %s", name)
+	}
+	if _, err := p.writer.Seek(originalPosition, io.SeekStart); err != nil {
+		return errors.Wrap(err, "unable to seek to original position: %w")
 	}
 	return nil
 }
