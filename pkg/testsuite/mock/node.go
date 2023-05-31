@@ -104,14 +104,13 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 
-	// events.Network.AttestationsReceived.Hook(func(event *network.AttestationsReceivedEvent) {
-	// 	fmt.Printf("%s > Network.AttestationsReceived: from %s for %s\n", n.Name, event.Source, event.Commitment.ID())
-	// })
-	//
-	// events.Network.AttestationsRequestReceived.Hook(func(event *network.AttestationsRequestReceivedEvent) {
-	// 	fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s -> %d\n", n.Name, event.Source, event.Commitment.ID(), event.EndIndex)
-	// })
-	//
+	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, source network.PeerID) {
+		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d\n", n.Name, source, commitment.ID(), len(attestations))
+	})
+
+	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source network.PeerID) {
+		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
+	})
 
 	events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
 		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
@@ -139,6 +138,14 @@ func (n *Node) HookLogging() {
 
 	events.TipManager.TipRemoved.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > TipManager.TipRemoved: %s\n", n.Name, block.ID())
+	})
+
+	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
+		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+	})
+
+	events.MainEngineSwitched.Hook(func(e *engine.Engine) {
+		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
 	})
 
 	events.Network.Error.Hook(func(err error, id identity.ID) {

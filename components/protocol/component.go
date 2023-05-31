@@ -134,6 +134,8 @@ func configure() error {
 		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})
 
+	// TODO: check whether we hooked to all events
+
 	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
 		Component.LogInfof("BlockReceived: %s", block.ID())
 	})
