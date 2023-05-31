@@ -135,6 +135,7 @@ func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex)
 
 type BicDiffChange struct {
 	Change         accounts.Credits
+	PreviousUpdatedTime iotago.SlotIndex
 	PubKeysAdded   *advancedset.AdvancedSet[ed25519.PublicKey]
 	PubKeysRemoved *advancedset.AdvancedSet[ed25519.PublicKey]
 }
@@ -150,7 +151,7 @@ func (b *BICManager) BICDiffTo(targetSlot iotago.SlotIndex) (bicDiffChanges map[
 		if diffStore == nil {
 			return nil, nil
 		}
-		diffStore.Stream(func(accountID iotago.AccountID, change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool) bool {
+		diffStore.Stream(func(accountID iotago.AccountID, bicDiffChange prunable.BicDiffChange, destroyed bool) bool {
 			// We rollback things here, hence -change and removedPubKeys are added and addedPubKeys are removed.
 			bicDiffChange, ok := bicDiffChanges[accountID]
 			if !ok {
@@ -158,7 +159,7 @@ func (b *BICManager) BICDiffTo(targetSlot iotago.SlotIndex) (bicDiffChanges map[
 					Change:         *accounts.NewCredits(-change, index),
 					PubKeysAdded:   advancedset.New[ed25519.PublicKey](removedPubKeys...),
 					PubKeysRemoved: advancedset.New[ed25519.PublicKey](addedPubKeys...),
-				}
+				}}
 
 				return true
 			}

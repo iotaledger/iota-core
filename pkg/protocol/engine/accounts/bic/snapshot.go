@@ -107,10 +107,6 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 		return errors.Wrap(err, "unable to write slot diffs count")
 	}
 
-	// 		MCA			BIC
-	// ^ 	        ^
-	// diffs        target
-
 	accountCount, err := b.exportTargetBIC(pWriter, targetIndex)
 	if err != nil {
 		return errors.Wrapf(err, "unable to export BIC for target index %d", targetIndex)
@@ -120,7 +116,7 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 		return errors.Wrap(err, "unable to write accounts count")
 	}
 
-	if slotDiffCount, err := b.exportSlotDiffs(pWriter, targetIndex); err != nil {
+	if slotDiffCount, err = b.exportSlotDiffs(pWriter, targetIndex); err != nil {
 		return errors.Wrapf(err, "unable to export slot diffs for target index %d", targetIndex)
 	}
 
@@ -133,11 +129,11 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 
 // exportTargetBIC exports the BICTree at a certain target slot, returning the total amount of exported accounts
 func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64, err error) {
-	changesToBIC := b.BICDiffTo(targetIndex)
+	changesToBIC, destroyedAccounts := b.BICDiffTo(targetIndex)
 	if err = b.bicTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) bool {
 		if change, exists := changesToBIC[accountID]; exists {
-			accountData.Credits().Value += change.Value
-			accountData.Credits().UpdateTime = change.UpdateTime
+			accountData.Credits().Value += change.Change.Value
+			accountData.Credits().UpdateTime = change.Change.UpdateTime
 		}
 		err = writeAccountID(pWriter, accountID)
 		if err != nil {
