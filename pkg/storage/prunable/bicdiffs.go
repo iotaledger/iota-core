@@ -1,78 +1,106 @@
 package prunable
 
 import (
-	"github.com/iotaledger/hive.go/core/storable"
+	"github.com/pkg/errors"
+
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/types"
-	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/kvstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type Changes struct {
+// bicDiffChange represent the storable changes of an account's BIC between two slots.
+type bicDiffChange struct {
+	api            iotago.API
+	Change         int64               `serix:"2"`
 	PubKeysAdded   []ed25519.PublicKey `serix:"0"`
 	PubKeysRemoved []ed25519.PublicKey `serix:"1"`
-	Change         int64               `serix:"2"`
-	api            iotago.API
 }
 
-func (p *Changes) Bytes() ([]byte, error) {
-	return p.api.Encode(p)
+func (c bicDiffChange) Bytes() ([]byte, error) {
+	return c.api.Encode(c)
 }
 
-func (p *Changes) FromBytes(bytes []byte) (n int, err error) {
-	return p.api.Decode(bytes, p)
+func (c *bicDiffChange) FromBytes(bytes []byte) (int, error) {
+	return c.api.Decode(bytes, c)
 }
 
 type BicDiffs struct {
-	slot              iotago.SlotIndex
-	store             *kvstore.TypedStore[iotago.AccountID, Changes, *iotago.AccountID, *Changes]
-	destroyedAccounts *kvstore.TypedStore[iotago.AccountID, types.Empty, *iotago.AccountID, *types.Empty] // TODO is there any store for set of keys only?
 	api               iotago.API
+	slot              iotago.SlotIndex
+	diffChangeStore   *kvstore.TypedStore[iotago.AccountID, bicDiffChange, *iotago.AccountID, *bicDiffChange]
+	destroyedAccounts *kvstore.TypedStore[iotago.AccountID, types.Empty, *iotago.AccountID, *types.Empty] // TODO is there any store for set of keys only?
 }
 
 // NewBicDiffs creates a new BicDiffs instance.
-func NewBicDiffs(api iotago.API, slot iotago.SlotIndex, store kvstore.KVStore) *BicDiffs {
+func NewBicDiffs(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.API) *BicDiffs {
 	return &BicDiffs{
+		api:               api,
 		slot:              slot,
-		store:             kvstore.NewTypedStore[iotago.AccountID, Changes](store),
+		diffChangeStore:   kvstore.NewTypedStore[iotago.AccountID, bicDiffChange](store),
 		destroyedAccounts: kvstore.NewTypedStore[iotago.AccountID, types.Empty](store),
-
-		api: api,
 	}
 }
 
 // Store stores the given accountID as a root block.
-func (r *BicDiffs) Store(accountID iotago.AccountID, change int64, pubKeys ...ed25519.PublicKey) (err error) {
-	return r.store.Set(accountID, storable.SerializableInt64(change))
+func (b *BicDiffs) Store(accountID iotago.AccountID, change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool) (err error) {
+	if destroyed {
+		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
+			return errors.Wrapf(err, "failed to set destroyed account")
+		}
+		return nil
+	}
+
+	bicDiffChange := bicDiffChange{
+		api:            b.api,
+		Change:         change,
+		PubKeysAdded:   addedPubKeys,
+		PubKeysRemoved: removedPubKeys,
+	}
+	return b.diffChangeStore.Set(accountID, bicDiffChange)
 }
 
 // Load loads accountID and commitmentID for the given blockID.
-func (r *BicDiffs) Load(accountID iotago.AccountID) (int64, error) {
-	storableInt64, err := r.store.Get(accountID)
-	if err != nil {
-		return 0, errors.Wrapf(err, "failed to get BIC diff for account %s", accountID.String())
+func (b *BicDiffs) Load(accountID iotago.AccountID) (change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool, err error) {
+	if destroyed, err = b.destroyedAccounts.Has(accountID); err != nil {
+		return 0, nil, nil, false, errors.Wrapf(err, "failed to get destroyed account")
+	} else if destroyed {
+		return 0, nil, nil, true, nil
 	}
-	return int64(storableInt64), nil
+
+	bicDiffChange, err := b.diffChangeStore.Get(accountID)
+	if err != nil {
+		return 0, nil, nil, false, errors.Wrapf(err, "failed to get BIC diff for account %s", accountID.String())
+	}
+
+	return bicDiffChange.Change, bicDiffChange.PubKeysAdded, bicDiffChange.PubKeysRemoved, false, nil
 }
 
 // Has returns true if the given accountID is a root block.
-func (r *BicDiffs) Has(accountID iotago.AccountID) (has bool, err error) {
-	return r.store.Has(accountID)
+func (b *BicDiffs) Has(accountID iotago.AccountID) (has bool, err error) {
+	return b.diffChangeStore.Has(accountID)
 }
 
 // Delete deletes the given accountID from the root blocks.
-func (r *BicDiffs) Delete(accountID iotago.AccountID) (err error) {
-	return r.store.Delete(accountID)
+func (b *BicDiffs) Delete(accountID iotago.AccountID) (err error) {
+	return b.diffChangeStore.Delete(accountID)
 }
 
-// Stream streams all accountIDs for a slot index.
-func (r *BicDiffs) Stream(consumer func(accountID iotago.AccountID, change int64) bool) error {
-	if storageErr := r.store.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, storableChange storable.SerializableInt64) (advance bool) {
-		return consumer(accountID, int64(storableChange))
+// Stream streams all accountIDs changes for a slot index.
+func (b *BicDiffs) Stream(consumer func(accountID iotago.AccountID, change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool) bool) error {
+	// We firstly iterate over the destroyed accounts, as they won't have a corresponding bicDiffChange.
+	if storageErr := b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, empty types.Empty) bool {
+		return consumer(accountID, 0, nil, nil, true)
 	}); storageErr != nil {
-		return errors.Wrapf(storageErr, "failed to iterate over bic diffs for slot %s", r.slot)
+		return errors.Wrapf(storageErr, "failed to iterate over bic diffs for slot %s", b.slot)
+	}
+
+	// For those accounts that still exist we might have a bicDiffChange.
+	if storageErr := b.diffChangeStore.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, bicDiffChange bicDiffChange) bool {
+		return consumer(accountID, bicDiffChange.Change, bicDiffChange.PubKeysAdded, bicDiffChange.PubKeysRemoved, false)
+	}); storageErr != nil {
+		return errors.Wrapf(storageErr, "failed to iterate over bic diffs for slot %s", b.slot)
 	}
 
 	return nil
