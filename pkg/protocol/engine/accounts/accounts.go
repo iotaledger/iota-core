@@ -19,6 +19,24 @@ type BlockIssuanceCredits interface {
 	module.Interface
 }
 
+type BicDiffChange struct {
+	Change              int64
+	PreviousUpdatedTime iotago.SlotIndex
+	// PubKeysAddedAndRemoved is a map of public keys that were added and removed from the account.
+	// The value is true if the public key was added and false if it was removed.
+	PubKeysAddedAndRemoved map[ed25519.PublicKey]bool
+}
+
+// UpdateKeys updates the added and removed keys of the account, operation is true if the key was added and false if it was removed.
+func (b *BicDiffChange) UpdateKeys(pubKey ed25519.PublicKey, operation bool) {
+	previousOperation, ok := b.PubKeysAddedAndRemoved[pubKey]
+	if !ok {
+		b.PubKeysAddedAndRemoved[pubKey] = operation
+	} else if previousOperation != operation {
+		delete(b.PubKeysAddedAndRemoved, pubKey)
+	}
+}
+
 type ManaHoldings interface {
 	// Mana is the stored and potential value of an account collected on the UTXO layer - used by the Scheduler.
 	Mana(id iotago.AccountID) (mana *ManaHoldings, err error)
@@ -69,6 +87,18 @@ func (a *AccountData) Credits() *Credits {
 
 func (a *AccountData) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
 	return a.pubKeysMap.Has(pubKey)
+}
+
+func (a *AccountData) AddPublicKey(pubKeys ...ed25519.PublicKey) {
+	for _, pubKey := range pubKeys {
+		_ = a.pubKeysMap.Set(pubKey, types.Void)
+	}
+}
+
+func (a *AccountData) RemovePublicKey(pubKeys ...ed25519.PublicKey) {
+	for _, pubKey := range pubKeys {
+		_ = a.pubKeysMap.Delete(pubKey)
+	}
 }
 
 func (a *AccountData) Clone() Account {

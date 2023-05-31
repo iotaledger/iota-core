@@ -133,52 +133,6 @@ func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex)
 	return loadedAccount, nil
 }
 
-type BicDiffChange struct {
-	Change         accounts.Credits
-	PreviousUpdatedTime iotago.SlotIndex
-	PubKeysAdded   *advancedset.AdvancedSet[ed25519.PublicKey]
-	PubKeysRemoved *advancedset.AdvancedSet[ed25519.PublicKey]
-}
-
-// BICDiffTo returns the accumulated diff between targetSlot and latestCommittedSlot (where the bic vector is at).
-func (b *BICManager) BICDiffTo(targetSlot iotago.SlotIndex) (bicDiffChanges map[iotago.AccountID]*BicDiffChange, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) {
-	bicDiffChanges = make(map[iotago.AccountID]*BicDiffChange)
-	destroyedAccounts = advancedset.New[iotago.AccountID]()
-
-	// TODO: take care that an account might be destroyed and created in between starting slot and targetSlot
-	for index := b.latestCommittedSlot; index >= targetSlot+1; index-- {
-		diffStore := b.slotDiffFunc(index)
-		if diffStore == nil {
-			return nil, nil
-		}
-		diffStore.Stream(func(accountID iotago.AccountID, bicDiffChange prunable.BicDiffChange, destroyed bool) bool {
-			// We rollback things here, hence -change and removedPubKeys are added and addedPubKeys are removed.
-			bicDiffChange, ok := bicDiffChanges[accountID]
-			if !ok {
-				bicDiffChange = &BicDiffChange{
-					Change:         *accounts.NewCredits(-change, index),
-					PubKeysAdded:   advancedset.New[ed25519.PublicKey](removedPubKeys...),
-					PubKeysRemoved: advancedset.New[ed25519.PublicKey](addedPubKeys...),
-				}}
-
-				return true
-			}
-
-			bicDiffChange.Change.Value -= change
-			bicDiffChange.Change.UpdateTime = index
-			bicDiffChange.PubKeysAdded.
-				bicDiffChanges[accountID] = &prunable.BicDiffChange{
-				Change: change,
-			}
-			changes[accountID].Value += change
-			changes[accountID].UpdateTime = index
-
-			return true
-		})
-	}
-	return nil, nil, changes
-}
-
 func (b *BICManager) Shutdown() {
 	// TODO: implement shutdown
 	b.TriggerStopped()

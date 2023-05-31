@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -129,11 +130,18 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 
 // exportTargetBIC exports the BICTree at a certain target slot, returning the total amount of exported accounts
 func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64, err error) {
-	changesToBIC, destroyedAccounts := b.BICDiffTo(targetIndex)
+	changesToRollback := b.diffRollbackTo(targetIndex)
 	if err = b.bicTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) bool {
-		if change, exists := changesToBIC[accountID]; exists {
-			accountData.Credits().Value += change.Change.Value
-			accountData.Credits().UpdateTime = change.Change.UpdateTime
+		if change, exists := changesToRollback[accountID]; exists {
+			accountData.Credits().Value += change.Change
+			accountData.Credits().UpdateTime = change.PreviousUpdatedTime
+			for pubKey, operation := range change.PubKeysAddedAndRemoved {
+				if operation {
+					accountData.AddPublicKey(pubKey)
+				} else {
+					accountData.RemovePublicKey(pubKey)
+				}
+			}
 		}
 		err = writeAccountID(pWriter, accountID)
 		if err != nil {
@@ -150,9 +158,51 @@ func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetInde
 	}
 
 	// we might have entries that were destroyed, that are present in diff, but not in the tree from the latestCommittedIndex
-	accountCount = b.includeDestroyedAccountsToTargetBIC(pWriter, changesToBIC, accountCount)
+	accountCount = b.includeDestroyedAccountsToTargetBIC(pWriter, changesToRollback, accountCount)
 
 	return accountCount, err
+}
+
+// BICDiffTo returns the accumulated diff between targetSlot and latestCommittedSlot (where the bic vector is at).
+func (b *BICManager) diffRollbackTo(targetSlot iotago.SlotIndex) (cumulativeBICDiffChanges map[iotago.AccountID]*accounts.BicDiffChange) {
+	cumulativeBICDiffChanges = make(map[iotago.AccountID]*accounts.BicDiffChange)
+
+	for index := b.latestCommittedSlot; index >= targetSlot+1; index-- {
+		diffStore := b.slotDiffFunc(index)
+		if diffStore == nil {
+			return nil
+		}
+		diffStore.Stream(func(accountID iotago.AccountID, bicDiffChange prunable.BicDiffChange, destroyed bool) bool {
+			// We rollback things here, hence -change and removedPubKeys are added and addedPubKeys are removed.
+			diffChange, ok := cumulativeBICDiffChanges[accountID]
+			if !ok {
+				diffChange = &accounts.BicDiffChange{
+					Change:                 -bicDiffChange.Change,
+					PreviousUpdatedTime:    bicDiffChange.PreviousUpdatedTime,
+					PubKeysAddedAndRemoved: make(map[ed25519.PublicKey]bool),
+				}
+
+				return true
+			}
+
+			// In case we are rolling back an account deletion, we will have a diff with change=0, the previousUpdateTime and the removedPubKeys.
+			diffChange.Change -= bicDiffChange.Change
+			// We apply the earliest previous updated time as we are processing the diffs towards the past.
+			diffChange.PreviousUpdatedTime = bicDiffChange.PreviousUpdatedTime
+
+			for _, addedKey := range bicDiffChange.PubKeysAdded {
+				diffChange.UpdateKeys(addedKey, false)
+			}
+
+			for _, removedKey := range bicDiffChange.PubKeysRemoved {
+				diffChange.UpdateKeys(removedKey, true)
+			}
+
+			return true
+		})
+	}
+
+	return cumulativeBICDiffChanges
 }
 
 func (b *BICManager) exportSlotDiffs(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (slotDiffCount uint64, err error) {
