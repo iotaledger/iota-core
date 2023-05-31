@@ -107,7 +107,7 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 		return errors.Wrap(err, "unable to write slot diffs count")
 	}
 
-	accountCount = b.exportTargetBIC(pWriter, targetIndex, accountCount)
+	accountCount = b.exportTargetBIC(pWriter, targetIndex)
 
 	var err error
 	slotDiffCount, err = b.exportSlotDiffs(targetIndex, pWriter, slotDiffCount)
@@ -122,8 +122,8 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 	return nil
 }
 
-// exportTargetBIC export and firstly evaluates the BIC tree at targetIndex by applying the diffs to the BICTree.
-func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex, accountCount uint64) uint64 {
+// exportTargetBIC exports the BICTree at a certain target slot, returning the total amount of exported accounts
+func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64) {
 	changesToBIC := b.BICDiffTo(targetIndex)
 	err := b.bicTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) bool {
 		if change, exists := changesToBIC[accountID]; exists {
@@ -226,7 +226,7 @@ func (b *BICManager) accountDataFromSnapshotReader(reader io.ReadSeeker, id iota
 		}
 		pubKeys[i] = pubKey
 	}
-	accountData := accounts.NewAccount(b.API(), id, credits, pubKeys...)
+	accountData := accounts.NewAccount(b.api, id, credits, pubKeys...)
 	return accountData, nil
 }
 
