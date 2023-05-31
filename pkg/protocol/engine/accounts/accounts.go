@@ -35,7 +35,7 @@ type Account interface {
 	Clone() Account
 }
 
-type AccountImpl struct {
+type AccountData struct {
 	api iotago.API
 
 	id         iotago.AccountID `serix:"0"`
@@ -43,7 +43,7 @@ type AccountImpl struct {
 	pubKeysMap *shrinkingmap.ShrinkingMap[ed25519.PublicKey, types.Empty]
 }
 
-func NewAccount(api iotago.API, id iotago.AccountID, credits *Credits, pubKeys ...ed25519.PublicKey) *AccountImpl {
+func NewAccount(api iotago.API, id iotago.AccountID, credits *Credits, pubKeys ...ed25519.PublicKey) *AccountData {
 	pubKeysMap := shrinkingmap.New[ed25519.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
 	if pubKeys != nil {
 		for _, pubKey := range pubKeys {
@@ -51,7 +51,7 @@ func NewAccount(api iotago.API, id iotago.AccountID, credits *Credits, pubKeys .
 		}
 	}
 
-	return &AccountImpl{
+	return &AccountData{
 		id:         id,
 		credits:    credits,
 		pubKeysMap: pubKeysMap,
@@ -59,26 +59,26 @@ func NewAccount(api iotago.API, id iotago.AccountID, credits *Credits, pubKeys .
 	}
 }
 
-func (a *AccountImpl) ID() iotago.AccountID {
+func (a *AccountData) ID() iotago.AccountID {
 	return a.id
 }
 
-func (a *AccountImpl) Credits() *Credits {
+func (a *AccountData) Credits() *Credits {
 	return a.credits
 }
 
-func (a *AccountImpl) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
+func (a *AccountData) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
 	return a.pubKeysMap.Has(pubKey)
 }
 
-func (a *AccountImpl) Clone() Account {
+func (a *AccountData) Clone() Account {
 	keyMapCopy := shrinkingmap.New[ed25519.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
 	a.pubKeysMap.ForEachKey(func(key ed25519.PublicKey) bool {
 		keyMapCopy.Set(key, types.Void)
 		return true
 	})
 
-	return &AccountImpl{
+	return &AccountData{
 		id: a.ID(),
 		credits: &Credits{
 			Value:      a.Credits().Value,
@@ -88,11 +88,11 @@ func (a *AccountImpl) Clone() Account {
 	}
 }
 
-func (a *AccountImpl) FromBytes(bytes []byte) (int, error) {
+func (a *AccountData) FromBytes(bytes []byte) (int, error) {
 	return a.api.Decode(bytes, a)
 }
 
-func (a AccountImpl) Bytes() ([]byte, error) {
+func (a AccountData) Bytes() ([]byte, error) {
 	b, err := a.api.Encode(a) // TODO do we need to add here any options?
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (a AccountImpl) Bytes() ([]byte, error) {
 	return b, nil
 }
 
-func (a *AccountImpl) SnapshotBytes() []byte {
+func (a *AccountData) SnapshotBytes() []byte {
 	m := marshalutil.New()
 	m.WriteInt64(a.Credits().Value)
 	m.WriteBytes(a.Credits().UpdateTime.Bytes())

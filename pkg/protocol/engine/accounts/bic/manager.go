@@ -29,7 +29,7 @@ type BICManager struct {
 
 	// TODO on reading from the snapshot: create the BIC tree from the bic vector and the slot diffs
 	// bic represents the Block Issuer Credits vector of all registered accounts for bicTreeindex slot, it is updated on the slot commitment.
-	bicTree *ads.Map[iotago.AccountID, accounts.AccountImpl, *iotago.AccountID, *accounts.AccountImpl]
+	bicTree *ads.Map[iotago.AccountID, accounts.AccountData, *iotago.AccountID, *accounts.AccountData]
 
 	// slot diffs for the BIC between [LatestCommitedSlot - MCA, LatestCommitedSlot].
 	slotDiffFunc func(iotago.SlotIndex) *prunable.BicDiffs
@@ -47,7 +47,7 @@ type BICManager struct {
 func New(blocksCache func(id iotago.BlockID) (*blocks.Block, bool), accountsStore kvstore.KVStore) *BICManager {
 	return &BICManager{
 		blockBurns: shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
-		bicTree:    ads.NewMap[iotago.AccountID, accounts.AccountImpl](accountsStore),
+		bicTree:    ads.NewMap[iotago.AccountID, accounts.AccountData](accountsStore),
 		blockFunc:  blocksCache,
 	}
 }
