@@ -45,7 +45,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 			errorHandler:                  e.ErrorHandler("slotgadget"),
 		}, opts, func(g *Gadget) {
 			g.sybilProtection = e.SybilProtection
-			g.slotTracker = slottracker.NewSlotTracker(g.LatestFinalizedSlot)
+			g.slotTracker = slottracker.NewSlotTracker(g.latestFinalizedSlot)
 
 			e.Events.SlotGadget.LinkTo(g.events)
 
@@ -61,8 +61,9 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				g.workers = e.Workers.CreateGroup("SlotGadget")
 
 				g.slotTracker.Events.VotersUpdated.Hook(func(evt *slottracker.VoterUpdatedEvent) {
+					// This needs to be called with only one worker as it's otherwise prone to read after write race conditions.
 					g.refreshSlotFinalization(evt.PrevLatestSlotIndex, evt.NewLatestSlotIndex)
-				}, event.WithWorkerPool(g.workers.CreatePool("Refresh", 2)))
+				}, event.WithWorkerPool(g.workers.CreatePool("Refresh", 1)))
 
 				e.HookInitialized(func() {
 					// Can't use setter here as it has a side effect.
@@ -86,7 +87,7 @@ func (g *Gadget) Shutdown() {
 	g.workers.Shutdown()
 }
 
-func (g *Gadget) LatestFinalizedSlot() iotago.SlotIndex {
+func (g *Gadget) latestFinalizedSlot() iotago.SlotIndex {
 	g.mutex.RLock()
 	defer g.mutex.RUnlock()
 
@@ -102,14 +103,14 @@ func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {
 }
 
 func (g *Gadget) trackVotes(block *blocks.Block) {
-	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, block.Block().IssuerID)
+	g.slotTracker.TrackVotes(block.SlotCommitmentID().Index(), block.Block().IssuerID)
 }
 
 func (g *Gadget) refreshSlotFinalization(previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) {
 	committee := g.sybilProtection.Committee()
 	committeeTotalWeight := committee.TotalWeight()
 
-	for i := lo.Max(g.LatestFinalizedSlot(), previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
+	for i := lo.Max(g.lastFinalizedSlot, previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
 		attestorsTotalWeight := committee.SelectAccounts(g.slotTracker.Voters(i).Slice()...).TotalWeight()
 
 		if !votes.IsThresholdReached(attestorsTotalWeight, committeeTotalWeight, g.optsSlotFinalizationThreshold) {
@@ -117,12 +118,11 @@ func (g *Gadget) refreshSlotFinalization(previousLatestSlotIndex iotago.SlotInde
 		}
 
 		// Lock here, so that SlotVotersTotalWeight is not inside the lock. Otherwise, it might cause a deadlock,
-		// because one thread owns write-lock on VirtualVoting lock and needs read lock on SlotGadget lock,
-		// while this method holds WriteLock on SlotGadget lock and is waiting for ReadLock on VirtualVoting.
+		// because one thread owns write-lock on the SlotTracker and needs read lock on SlotGadget lock (for the cutoff),
+		// while this method holds WriteLock on SlotGadget lock and is waiting for ReadLock on SlotTracker.
 		g.setLastFinalizedSlot(i)
 
 		g.events.SlotFinalized.Trigger(i)
-
 		g.slotTracker.EvictSlot(i)
 	}
 }

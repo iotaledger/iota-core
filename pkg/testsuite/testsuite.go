@@ -1,9 +1,12 @@
 package testsuite
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,13 +15,16 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/blockissuer"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TestSuite struct {
@@ -41,7 +47,9 @@ type TestSuite struct {
 	optsWaitFor         time.Duration
 	optsTick            time.Duration
 
-	mutex sync.RWMutex
+	uniqueCounter        atomic.Int64
+	mutex                sync.RWMutex
+	TransactionFramework *TransactionFramework
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
@@ -64,11 +72,11 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 				VBFactorKey:  10,
 			},
 			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*100),
+			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix() - 10*100), // start 100 slots in the past at an even number.
 			SlotDurationInSeconds: 10,
 		},
-		optsWaitFor: 10 * time.Second,
-		optsTick:    100 * time.Millisecond,
+		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 	}, opts, func(t *TestSuite) {
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
@@ -137,9 +145,27 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := node.IssueBlockAtSlot(alias, slot, slotCommitment, parents...)
+	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
+	issuingTime := slotTimeProvider.StartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
+
+	block := node.IssueBlock(context.Background(), alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithStrongParents(parents...))
 
 	t.blocks.Set(alias, block)
+	block.ID().RegisterAlias(alias)
+
+	return block
+}
+
+func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	block := node.IssueBlock(context.Background(), alias, blockOpts...)
+
+	t.blocks.Set(alias, block)
+	block.ID().RegisterAlias(alias)
 
 	return block
 }
@@ -150,6 +176,22 @@ func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {
 
 	t.blocks.Set(alias, block)
 	block.ID().RegisterAlias(alias)
+}
+
+func (t *TestSuite) CreateTransactionWithInputsAndOutputs(consumedInputs ledgerstate.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) *iotago.Transaction {
+	if t.TransactionFramework == nil {
+		panic("cannot create a transaction without running the network first")
+	}
+
+	return lo.PanicOnErr(t.TransactionFramework.CreateTransactionWithInputsAndOutputs(consumedInputs, outputs, signingWallets))
+}
+
+func (t *TestSuite) CreateTransaction(alias string, outputCount int, inputAliases ...string) *iotago.Transaction {
+	if t.TransactionFramework == nil {
+		panic("cannot create a transaction without running the network first")
+	}
+
+	return lo.PanicOnErr(t.TransactionFramework.CreateTransaction(alias, outputCount, inputAliases...))
 }
 
 func (t *TestSuite) Node(name string) *mock.Node {
@@ -238,8 +280,9 @@ func (t *TestSuite) RemoveNode(name string) {
 func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
+	genesisSeed := tpkg.RandEd25519Seed()
 
-	err := snapshotcreator.CreateSnapshot(t.optsSnapshotOptions...)
+	err := snapshotcreator.CreateSnapshot(append([]options.Option[snapshotcreator.Options]{snapshotcreator.WithGenesisSeed(genesisSeed[:])}, t.optsSnapshotOptions...)...)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
@@ -259,6 +302,10 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		}
 
 		node.Initialize(baseOpts...)
+
+		if t.TransactionFramework == nil {
+			t.TransactionFramework = NewTransactionFramework(node.Protocol, genesisSeed[:])
+		}
 	}
 
 	t.running = true
@@ -346,4 +393,18 @@ func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Optio
 	return func(opts *TestSuite) {
 		opts.optsSnapshotOptions = snapshotOptions
 	}
+}
+
+func durationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time.Duration {
+	waitFor := os.Getenv(envKey)
+	if waitFor == "" {
+		return defaultDuration
+	}
+
+	d, err := time.ParseDuration(waitFor)
+	if err != nil {
+		panic(err)
+	}
+
+	return d
 }

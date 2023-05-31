@@ -335,7 +335,7 @@ func (m *MemPool[VotePower]) updateStateDiffs(transaction *TransactionMetadata, 
 
 func (m *MemPool[VotePower]) setup() {
 	m.conflictDAG.Events().ConflictAccepted.Hook(func(id iotago.TransactionID) {
-		if transaction, exists := m.cachedTransactions.Get(id); !exists {
+		if transaction, exists := m.cachedTransactions.Get(id); exists {
 			transaction.setConflictAccepted()
 		}
 	})

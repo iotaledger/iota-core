@@ -149,7 +149,11 @@ func (m *Manager) RestoreFromDisk() {
 
 	// Set the maxPruned slot to the baseIndex-1 of the oldest dbInstance.
 	m.pruningMutex.Lock()
-	m.lastPrunedSlot.MarkEvicted(dbInfos[0].baseIndex - 1)
+	if dbInfos[0].baseIndex > 0 {
+		m.lastPrunedSlot.MarkEvicted(dbInfos[0].baseIndex - 1)
+	} else {
+		m.lastPrunedSlot.MarkEvicted(0)
+	}
 	m.pruningMutex.Unlock()
 
 	// Open all the dbInstances (perform health checks) and add them to the openDBs cache. Also fills the dbSizes map (when evicted from the cache).

@@ -17,18 +17,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsBaseDirectory = baseDirectory
-	}
-}
-
-func WithPruningDelay(pruningDelay iotago.SlotIndex) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsPruningDelay = pruningDelay
 	}
 }
 

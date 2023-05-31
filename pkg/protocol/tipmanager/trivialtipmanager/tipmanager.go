@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -31,8 +32,8 @@ type (
 type TipManager struct {
 	events *tipmanager.Events
 
-	evictionState *eviction.State
-	// blockAcceptanceGadget blockgadget.Gadget
+	evictionState         *eviction.State
+	blockAcceptanceGadget blockgadget.Gadget
 
 	workers            *workerpool.Group
 	blockRetrieverFunc blockRetrieverFunc
@@ -52,11 +53,24 @@ type TipManager struct {
 // NewProvider creates a new TipManager provider.
 func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
-		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.BlockCache.Block, e.IsBootstrapped, opts...)
+		t := New(e.Workers.CreateGroup("TipManager"), e.EvictionState, e.BlockCache.Block, e.IsBootstrapped, e.BlockGadget, opts...)
 
 		e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
-			_ = t.AddTip(block)
+			if !block.IsAccepted() {
+				t.AddTip(block)
+			}
 		}, event.WithWorkerPool(t.workers.CreatePool("AddTip", 2)))
+
+		// TODO: this is dirty but we need to make sure old tips are removed
+		e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+			t.RemoveTip(block.ID())
+		})
+		e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+			t.RemoveTip(block.ID())
+		})
+		e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+			t.RemoveTip(block.ID())
+		})
 
 		e.BlockCache.Evict.Hook(t.evict)
 
@@ -67,13 +81,14 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 }
 
 // New creates a new TipManager.
-func New(workers *workerpool.Group, evictionState *eviction.State, blockRetriever blockRetrieverFunc, isBootstrappedFunc isBootstrappedFunc, opts ...options.Option[TipManager]) (t *TipManager) {
+func New(workers *workerpool.Group, evictionState *eviction.State, blockRetriever blockRetrieverFunc, isBootstrappedFunc isBootstrappedFunc, blockGadget blockgadget.Gadget, opts ...options.Option[TipManager]) (t *TipManager) {
 	t = options.Apply(&TipManager{
 		events:                             tipmanager.NewEvents(),
 		evictionState:                      evictionState,
 		workers:                            workers,
 		blockRetrieverFunc:                 blockRetriever,
 		isBootstrappedFunc:                 isBootstrappedFunc,
+		blockAcceptanceGadget:              blockGadget,
 		tips:                               randommap.New[iotago.BlockID, *blocks.Block](),
 		walkerCache:                        memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, types.Empty](),
 		optsTimeSinceConfirmationThreshold: time.Minute,
@@ -257,23 +272,22 @@ func (t *TipManager) selectTips(count int) (strongParents iotago.BlockIDs) {
 // checkMonotonicity returns true if the block has any accepted or scheduled child.
 // nolint:revive,unparam // code is commented out
 func (t *TipManager) checkMonotonicity(block *blocks.Block) (anyScheduledOrAccepted bool) {
-	//for _, child := range block.Children() {
-	//	if child.IsOrphaned() {
-	//		continue
-	//	}
-	//
-	//	// TODO: add when we have acceptance
-	//	// if t.blockAcceptanceGadget.IsBlockAccepted(child.ID()) {
-	//	// 	return true
-	//	// }
-	//
-	//	// TODO: add when we have a scheduler
-	//	// if childBlock, exists := t.blockRetrieverFunc(child.ID()); exists {
-	//	// 	if childBlock.IsScheduled() {
-	//	return true
-	//	// 	}
-	//	// }
-	//}
+	for _, child := range block.Children() {
+		//	if child.IsOrphaned() {
+		//		continue
+		//	}
+		//
+		if t.blockAcceptanceGadget.IsBlockAccepted(child.ID()) {
+			return true
+		}
+		//
+		//	// TODO: add when we have a scheduler
+		//	// if childBlock, exists := t.blockRetrieverFunc(child.ID()); exists {
+		//	// 	if childBlock.IsScheduled() {
+		//	return true
+		//	// 	}
+		//	// }
+	}
 
 	return false
 }

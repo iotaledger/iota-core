@@ -64,7 +64,6 @@ type Protocol struct {
 
 	optsBaseDirectory string
 	optsSnapshotPath  string
-	optsPruningDelay  iotago.SlotIndex
 
 	optsEngineOptions       []options.Option[engine.Engine]
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
@@ -103,7 +102,6 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsLedgerProvider:          utxoledger.NewProvider(),
 
 		optsBaseDirectory: "",
-		optsPruningDelay:  360,
 	}, opts,
 		(*Protocol).initEngineManager,
 		(*Protocol).initChainManager,
@@ -118,7 +116,10 @@ func (p *Protocol) Run() {
 		panic(err)
 	}
 
-	rootCommitment := p.mainEngine.EarliestRootCommitment()
+	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
+	if !valid {
+		panic("no root commitment found")
+	}
 
 	// The root commitment is the earliest commitment we will ever need to know to solidify commitment chains, we can
 	// then initialize the chain manager with it, and identify our engine to be on such chain.
@@ -244,13 +245,6 @@ func (p *Protocol) initEngineManager() {
 		p.optsLedgerProvider,
 	)
 
-	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		if index < p.optsPruningDelay {
-			return
-		}
-		p.MainEngineInstance().Storage.PruneUntilSlot(index - p.optsPruningDelay)
-	}, event.WithWorkerPool(p.Workers.CreatePool("PruneEngine", 2)))
-
 	mainEngine, err := p.engineManager.LoadActiveEngine()
 	if err != nil {
 		panic(fmt.Sprintf("could not load active engine: %s", err))
@@ -269,7 +263,11 @@ func (p *Protocol) initChainManager() {
 	}, event.WithWorkerPool(wp))
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		rootCommitment := p.MainEngineInstance().EarliestRootCommitment()
+		rootCommitment, valid := p.MainEngineInstance().EarliestRootCommitment(index)
+		fmt.Println("Slot finalized:", index, "root commitment:", rootCommitment, "valid:", valid)
+		if !valid {
+			return
+		}
 
 		// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
 		// we first specify the chain's cut-off point, and only then evict the state. It is also important to

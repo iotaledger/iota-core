@@ -17,7 +17,7 @@ func TestState_RootBlocks(t *testing.T) {
 	prunableStorage := prunable.New(database.Config{
 		Engine:    hivedb.EngineMapDB,
 		Directory: t.TempDir(),
-	}, errorHandler)
+	}, 0, errorHandler)
 
 	ts := NewTestFramework(t, prunableStorage, eviction.NewState(prunableStorage.RootBlocks, eviction.WithRootBlocksEvictionDelay(3)))
 	ts.CreateAndAddRootBlock("Genesis", 0, iotago.NewEmptyCommitment().MustID())

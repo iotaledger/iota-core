@@ -49,7 +49,7 @@ type Engine struct {
 	BlockGadget     blockgadget.Gadget
 	SlotGadget      slotgadget.Gadget
 	Notarization    notarization.Notarization
-	Attestation     attestation.Attestations
+	Attestations    attestation.Attestations
 	Ledger          ledger.Ledger
 
 	Workers      *workerpool.Group
@@ -110,7 +110,7 @@ func New(
 			e.BlockGadget = blockGadgetProvider(e)
 			e.SlotGadget = slotGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
-			e.Attestation = attestationProvider(e)
+			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
 
 			e.HookInitialized(lo.Batch(
@@ -125,6 +125,7 @@ func New(
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
 		(*Engine).setupBlockRequester,
+		(*Engine).setupPruning,
 		(*Engine).TriggerConstructed,
 	)
 }
@@ -134,6 +135,7 @@ func (e *Engine) Shutdown() {
 		e.TriggerStopped()
 
 		e.BlockRequester.Shutdown()
+		e.Attestations.Shutdown()
 		e.Notarization.Shutdown()
 		e.Booker.Shutdown()
 		e.Ledger.Shutdown()
@@ -212,8 +214,9 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		if err = e.readSnapshot(snapshot[0]); err != nil {
 			return errors.Wrapf(err, "failed to read snapshot from file '%s'", snapshot)
 		}
+
+		// Only mark any pruning indexes if we loaded a non-genesis snapshot
 		if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-			// Only mark any pruning indexes if we loaded a non-genesis snapshot
 			e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
 		}
 	} else {
@@ -222,8 +225,9 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		e.Storage.Commitments().TriggerInitialized()
 		e.Storage.Prunable.RestoreFromDisk()
 		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
-
-		// TODO: restore attestation tracker from disk?
+		if err := e.Attestations.RestoreFromDisk(); err != nil {
+			return errors.Wrap(err, "failed to restore attestations from disk")
+		}
 	}
 
 	e.TriggerInitialized()
@@ -258,9 +262,8 @@ func (e *Engine) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to import ledger")
 	} else if err = e.EvictionState.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import eviction state")
-		// TODO: call import on attestations?
-		// } else if err = e.Notarization.Import(reader); err != nil {
-		// 	return errors.Wrap(err, "failed to import notarization state")
+	} else if err = e.Attestations.Import(reader); err != nil {
+		return errors.Wrap(err, "failed to import attestation state")
 	}
 
 	return
@@ -275,9 +278,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export ledger")
 	} else if err = e.EvictionState.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export eviction state")
-		// TODO: call export on attestations?
-		// } else if err = e.Notarization.Export(writer, targetSlot); err != nil {
-		// 	return errors.Wrap(err, "failed to export notarization state")
+	} else if err = e.Attestations.Export(writer, targetSlot); err != nil {
+		return errors.Wrap(err, "failed to export attestation state")
 	}
 
 	return
@@ -364,6 +366,12 @@ func (e *Engine) setupBlockRequester() {
 	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", 1))) // Using just 1 worker to avoid contention
 }
 
+func (e *Engine) setupPruning() {
+	e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		e.Storage.PruneUntilSlot(index)
+	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))
+}
+
 func (e *Engine) readSnapshot(filePath string) (err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -387,14 +395,17 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 // EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
 // commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
 // from being processed as their chain will be deemed unsolid.
-func (e *Engine) EarliestRootCommitment() *model.Commitment {
-	earliestRootCommitmentID := e.EvictionState.EarliestRootCommitmentID()
+func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment *model.Commitment, valid bool) {
+	earliestRootCommitmentID, valid := e.EvictionState.EarliestRootCommitmentID(lastFinalizedSlot)
+	if !valid {
+		return nil, false
+	}
 	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentID.Index())
 	if err != nil {
 		panic(fmt.Sprintln("could not load earliest commitment after engine initialization", err))
 	}
 
-	return rootCommitment
+	return rootCommitment, true
 }
 
 func (e *Engine) ErrorHandler(componentName string) func(error) {
