@@ -47,8 +47,8 @@ RUN if [ "${WITH_GO_WORK}" = "0" ]; then go mod verify; fi
 RUN go build -o /app/iota-core -a -tags="$BUILD_TAGS" -ldflags='-w -s'
 
 # Copy the assets
-COPY ./config_defaults.json /app/config.json
-COPY ./peering.json /app/peering.json
+RUN cp ./config_defaults.json /app/config.json
+RUN cp ./peering.json /app/peering.json
 
 RUN mkdir -p /app/data/peerdb
 

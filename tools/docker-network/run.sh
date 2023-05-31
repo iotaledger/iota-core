@@ -24,14 +24,19 @@ export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 echo "Build iota-core"
 
-# Allow docker compose to build and cache an image
+# Setup necessary environment variables.
+export DOCKER_BUILD_CONTEXT="../../"
+export DOCKERFILE_PATH="./Dockerfile"
+
 if [[ "$WITH_GO_WORK" -eq 1 ]]
 then
   export DOCKER_BUILD_CONTEXT="../../../"
   export DOCKERFILE_PATH="./iota-core/Dockerfile"
 fi
+
+# Allow docker compose to build and cache an image
 echo $DOCKER_BUILD_CONTEXT $DOCKERFILE_PATH
-docker compose -f $DOCKER_COMPOSE_FILE build --build-arg WITH_GO_WORK=${WITH_GO_WORK:-0} --build-arg DOCKER_BUILD_CONTEXT=${DOCKER_BUILD_CONTEXT:-"../../"} --build-arg DOCKERFILE_PATH=${DOCKERFILE_PATH:-"./Dockerfile"}
+docker compose -f $DOCKER_COMPOSE_FILE build --build-arg WITH_GO_WORK=${WITH_GO_WORK:-0} --build-arg DOCKER_BUILD_CONTEXT=${DOCKER_BUILD_CONTEXT} --build-arg DOCKERFILE_PATH=${DOCKERFILE_PATH}
 
 # check exit code of builder
 if [ $? -ne 0 ]
