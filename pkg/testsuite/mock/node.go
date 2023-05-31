@@ -312,14 +312,6 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 	return blocks.NewBlock(modelBlock)
 }
 
-func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, parents ...iotago.BlockID) *blocks.Block {
-	slotTimeProvider := n.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
-	issuingTime := slotTimeProvider.StartTime(slot)
-	require.Truef(n.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", n.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
-
-	return n.IssueBlock(context.Background(), alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithStrongParents(parents...))
-}
-
 func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sync.WaitGroup) {
 	go func() {
 		defer wg.Done()

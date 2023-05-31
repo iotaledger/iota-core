@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -46,6 +47,7 @@ type TestSuite struct {
 	optsWaitFor         time.Duration
 	optsTick            time.Duration
 
+	uniqueCounter        atomic.Int64
 	mutex                sync.RWMutex
 	TransactionFramework *TransactionFramework
 }
@@ -143,7 +145,12 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := node.IssueBlockAtSlot(alias, slot, slotCommitment, parents...)
+	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
+	issuingTime := slotTimeProvider.StartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
+
+	block := node.IssueBlock(context.Background(), alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithStrongParents(parents...))
 
 	t.blocks.Set(alias, block)
 	block.ID().RegisterAlias(alias)

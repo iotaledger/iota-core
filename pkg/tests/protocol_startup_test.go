@@ -191,6 +191,9 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
+		ts.AssertLatestCommitmentCumulativeWeight(100, ts.Nodes()...)
+		ts.AssertAttestationsForSlot(3, ts.Blocks("3.1", "2.2*"), ts.Nodes()...)
+
 		// Make slot 7 committed.
 		{
 			slot3Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(3)).Commitment()
@@ -353,7 +356,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// We have committed to slot 9 where we referenced slot 7 with commitments -> there should be cumulative weight and attestations for slot 9.
-		ts.AssertLatestCommitmentCumulativeWeight(100, ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(200, ts.Nodes()...)
 		ts.AssertAttestationsForSlot(9, ts.Blocks("9.1", "9.2"), ts.Nodes()...)
 
 		ts.AssertNodeState(ts.Nodes("node1"),
@@ -410,7 +413,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// Verify attestations state.
-		ts.AssertLatestCommitmentCumulativeWeight(100, ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(200, ts.Nodes()...)
 		ts.AssertAttestationsForSlot(9, ts.Blocks("9.1", "9.2"), ts.Nodes()...)
 	}
 
@@ -467,8 +470,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// Verify attestations state.
-		ts.AssertLatestCommitmentCumulativeWeight(100, ts.Nodes()...)
-		// ts.AssertAttestationsForSlot(9, ts.Blocks("9.1", "9.2"), ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(200, ts.Nodes()...)
 	}
 
 	{
@@ -503,7 +505,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
-			ts.AssertLatestCommitmentCumulativeWeight(200, ts.Nodes()...)
+			ts.AssertLatestCommitmentCumulativeWeight(300, ts.Nodes()...)
 			ts.AssertAttestationsForSlot(10, ts.Blocks("9.1", "10.2"), ts.Nodes()...)
 			ts.AssertAttestationsForSlot(11, ts.Blocks(), ts.Nodes()...)
 		}

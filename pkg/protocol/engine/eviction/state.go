@@ -1,7 +1,6 @@
 package eviction
 
 import (
-	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -79,7 +78,6 @@ func (s *State) EarliestRootCommitmentID(lastFinalizedSlot iotago.SlotIndex) (ea
 		slotBlocks := s.rootBlocks.Get(index, false)
 		if slotBlocks != nil {
 			slotBlocks.ForEach(func(id iotago.BlockID, commitmentID iotago.CommitmentID) bool {
-				fmt.Println(id, "EarliestRootCommitmentID (from cache): ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
 				if commitmentID.Index() < earliestCommitment.Index() {
 					earliestCommitment = commitmentID
 				}
@@ -96,7 +94,6 @@ func (s *State) EarliestRootCommitmentID(lastFinalizedSlot iotago.SlotIndex) (ea
 			continue
 		}
 		err := storage.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
-			fmt.Println(id, "EarliestRootCommitmentID (from storage): ", commitmentID.String(), " ", earliestCommitment.String(), " ", commitmentID.Index(), " ", earliestCommitment.Index())
 			if commitmentID.Index() < earliestCommitment.Index() {
 				earliestCommitment = commitmentID
 			}
@@ -108,10 +105,7 @@ func (s *State) EarliestRootCommitmentID(lastFinalizedSlot iotago.SlotIndex) (ea
 		}
 	}
 
-	fmt.Println("EarliestRootCommitmentID: ", start, " ", lastFinalizedSlot, " ", earliestCommitment.String(), " ", earliestCommitment.Index())
-
 	if earliestCommitment.Index() == math.MaxInt64 {
-		fmt.Println("returning empty commitment")
 		return iotago.NewEmptyCommitment().MustID(), false
 	}
 
