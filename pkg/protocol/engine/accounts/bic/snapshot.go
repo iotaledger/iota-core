@@ -29,21 +29,20 @@ func (b *BICManager) Import(reader io.ReadSeeker) error {
 		return errors.Wrap(err, "unable to read slot diffs count")
 	}
 
-	// populate the bic tree, bic tree should be empty at this point
-	for i := uint64(0); i < accountCount; i++ {
-		accountID, err := accountIDFromSnapshotReader(reader)
-		if err != nil {
-			return errors.Wrapf(err, "unable to read account ID")
-		}
-
-		accountImpl, err := b.accountDataFromSnapshotReader(reader, accountID)
-		if err != nil {
-			return errors.Wrapf(err, "unable to read account data")
-		}
-		b.bicTree.Set(accountID, accountImpl)
+	err := b.importBICTree(reader, accountCount)
+	if err != nil {
+		return errors.Wrapf(err, "unable to import BIC tree")
 	}
 
-	// load the slot diffs
+	err = b.importSlotDiffs(reader, slotDiffCount)
+	if err != nil {
+		return errors.Wrap(err, "unable to import slot diffs")
+	}
+
+	return nil
+}
+
+func (b *BICManager) importSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) error {
 	for i := uint64(0); i < slotDiffCount; i++ {
 		var slotIndex iotago.SlotIndex
 		if err := binary.Read(reader, binary.LittleEndian, &slotIndex); err != nil {
@@ -70,7 +69,23 @@ func (b *BICManager) Import(reader io.ReadSeeker) error {
 			}
 		}
 	}
+	return nil
+}
 
+func (b *BICManager) importBICTree(reader io.ReadSeeker, accountCount uint64) error {
+	// populate the bic tree, bic tree should be empty at this point
+	for i := uint64(0); i < accountCount; i++ {
+		accountID, err := accountIDFromSnapshotReader(reader)
+		if err != nil {
+			return errors.Wrapf(err, "unable to read account ID")
+		}
+
+		accountImpl, err := b.accountDataFromSnapshotReader(reader, accountID)
+		if err != nil {
+			return errors.Wrapf(err, "unable to read account data")
+		}
+		b.bicTree.Set(accountID, accountImpl)
+	}
 	return nil
 }
 func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error {
@@ -89,15 +104,10 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 		return err
 	}
 
-	changesToBIC, accountCount := b.exportTargetBIC(pWriter, targetIndex, accountCount)
+	accountCount = b.exportTargetBIC(pWriter, targetIndex, accountCount)
 
-	// we might have entries that were destroyed, that are present in diff, but not in the tree from the latestCommittedIndex
-	accountCount = b.includeDestroyedAccountsToTargetBIC(pWriter, changesToBIC, accountCount)
-
-	slotDiffCount, err, done := b.exportSlotDiffs(targetIndex, pWriter, slotDiffCount)
-	if done {
-		return err
-	}
+	var err error
+	slotDiffCount, err = b.exportSlotDiffs(targetIndex, pWriter, slotDiffCount)
 
 	if err = pWriter.WriteValueAt("accounts count", accountCount); err != nil {
 		return err
@@ -109,7 +119,8 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 	return nil
 }
 
-func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex, accountCount uint64) (map[iotago.AccountID]*accounts.Credits, uint64) {
+// exportTargetBIC export and firstly evaluates the BIC tree at targetIndex by applying the diffs to the BICTree.
+func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex, accountCount uint64) uint64 {
 	changesToBIC := b.BICDiffTo(targetIndex)
 	err := b.bicTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) bool {
 		if change, exists := changesToBIC[accountID]; exists {
@@ -120,7 +131,7 @@ func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetInde
 		if err != nil {
 			panic(err)
 		}
-		if err := pWriter.WriteValue("account data", accountData.SnapshotBytes()); err != nil {
+		if err = pWriter.WriteValue("account data", accountData.SnapshotBytes()); err != nil {
 			panic(err)
 		}
 		accountCount++
@@ -130,19 +141,23 @@ func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetInde
 	if err != nil {
 		panic(err)
 	}
-	return changesToBIC, accountCount
+
+	// we might have entries that were destroyed, that are present in diff, but not in the tree from the latestCommittedIndex
+	accountCount = b.includeDestroyedAccountsToTargetBIC(pWriter, changesToBIC, accountCount)
+
+	return accountCount
 }
 
-func (b *BICManager) exportSlotDiffs(targetIndex iotago.SlotIndex, pWriter *utils.PositionedWriter, slotDiffCount uint64) (uint64, error, bool) {
+func (b *BICManager) exportSlotDiffs(targetIndex iotago.SlotIndex, pWriter *utils.PositionedWriter, slotDiffCount uint64) (uint64, error) {
 	for index := targetIndex - iotago.MaxCommitableSlotAge; index <= targetIndex; index++ {
-		var diffCount uint64
+		var accountsCount uint64
 		// The index of the slot diff.
 		if err := pWriter.WriteValue("index", index); err != nil {
-			return 0, err, true
+			return slotDiffCount, err
 		}
 		// The amount of account entriess contained within this slot diff.
-		if err := pWriter.WriteValue("diff count", diffCount, true); err != nil {
-			return 0, err, true
+		if err := pWriter.WriteValue("diff count", accountsCount, true); err != nil {
+			return slotDiffCount, err
 		}
 
 		err := b.slotDiffFunc(index).Stream(func(accountID iotago.AccountID, change int64) bool {
@@ -150,20 +165,20 @@ func (b *BICManager) exportSlotDiffs(targetIndex iotago.SlotIndex, pWriter *util
 			if err := pWriter.WriteBytes("diff", diffBytes); err != nil {
 				panic(err)
 			}
-			diffCount++
+			accountsCount++
 			return true
 		})
 		if err != nil {
-			return 0, errors.Wrapf(err, "unable to stream slot diff for index %d", index), true
+			return slotDiffCount, errors.Wrapf(err, "unable to stream slot diff for index %d", index)
 		}
 		// The amount of slot diffs contained within this snapshot.
-		if err := pWriter.WriteValueAt("diff count", diffCount); err != nil {
-			return 0, err, true
+		if err = pWriter.WriteValueAt("diff count", accountsCount); err != nil {
+			return slotDiffCount, err
 		}
 
 		slotDiffCount++
 	}
-	return slotDiffCount, nil, false
+	return slotDiffCount, nil
 }
 
 func (b *BICManager) includeDestroyedAccountsToTargetBIC(pWriter *utils.PositionedWriter, changesToBIC map[iotago.AccountID]*accounts.Credits, accountCount uint64) uint64 {
