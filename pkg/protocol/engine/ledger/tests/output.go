@@ -19,6 +19,11 @@ func (m *MockedOutput) Deposit() uint64 {
 	panic("implement me")
 }
 
+func (m *MockedOutput) StoredMana() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *MockedOutput) NativeTokenList() iotago.NativeTokens {
 	//TODO implement me
 	panic("implement me")
