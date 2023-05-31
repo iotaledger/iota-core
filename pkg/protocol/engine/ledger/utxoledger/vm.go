@@ -43,12 +43,24 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 	}
 
+	commitmentInputSet := iotago.CommitmentInputSet{}
+	commitmentInputs, err := tx.CommitmentInputs()
+	if err != nil {
+		return nil, xerrors.Errorf("could not get Commitment inputs: %w", err)
+	}
+	for _, inp := range commitmentInputs {
+		c, err := l.commitmentLoader(inp.CommitmentID.Index())
+		if err != nil {
+			return nil, xerrors.Errorf("could not get Commitment inputs: %w", err)
+		}
+		commitmentInputSet[inp.CommitmentID] = c.Commitment()
+	}
 	// TODO: get Commitment inputs from storage
-	// l.commitmentLoader(input.CommitmentID.Index())
 
 	resolvedInputs := iotago.ResolvedInputs{
-		InputSet:    inputSet,
-		BICInputSet: bicInputSet,
+		InputSet:           inputSet,
+		BICInputSet:        bicInputSet,
+		CommitmentInputSet: commitmentInputSet,
 	}
 
 	if err := stardust.NewVirtualMachine().Execute(tx, &iotagovm.Params{}, resolvedInputs); err != nil {
