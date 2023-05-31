@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -132,22 +133,49 @@ func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex)
 	return loadedAccount, nil
 }
 
+type BicDiffChange struct {
+	Change         accounts.Credits
+	PubKeysAdded   *advancedset.AdvancedSet[ed25519.PublicKey]
+	PubKeysRemoved *advancedset.AdvancedSet[ed25519.PublicKey]
+}
+
 // BICDiffTo returns the accumulated diff between targetSlot and latestCommittedSlot (where the bic vector is at).
-func (b *BICManager) BICDiffTo(targetSlot iotago.SlotIndex) map[iotago.AccountID]*accounts.Credits {
-	changes := make(map[iotago.AccountID]*accounts.Credits)
-	for index := targetSlot + 1; index <= b.latestCommittedSlot; index++ {
+func (b *BICManager) BICDiffTo(targetSlot iotago.SlotIndex) (bicDiffChanges map[iotago.AccountID]*BicDiffChange, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) {
+	bicDiffChanges = make(map[iotago.AccountID]*BicDiffChange)
+	destroyedAccounts = advancedset.New[iotago.AccountID]()
+
+	// TODO: take care that an account might be destroyed and created in between starting slot and targetSlot
+	for index := b.latestCommittedSlot; index >= targetSlot+1; index-- {
 		diffStore := b.slotDiffFunc(index)
 		if diffStore == nil {
-			return nil
+			return nil, nil
 		}
-		diffStore.Stream(func(accountID iotago.AccountID, change int64) bool {
+		diffStore.Stream(func(accountID iotago.AccountID, change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool) bool {
+			// We rollback things here, hence -change and removedPubKeys are added and addedPubKeys are removed.
+			bicDiffChange, ok := bicDiffChanges[accountID]
+			if !ok {
+				bicDiffChange = &BicDiffChange{
+					Change:         *accounts.NewCredits(-change, index),
+					PubKeysAdded:   advancedset.New[ed25519.PublicKey](removedPubKeys...),
+					PubKeysRemoved: advancedset.New[ed25519.PublicKey](addedPubKeys...),
+				}
+
+				return true
+			}
+
+			bicDiffChange.Change.Value -= change
+			bicDiffChange.Change.UpdateTime = index
+			bicDiffChange.PubKeysAdded.
+				bicDiffChanges[accountID] = &prunable.BicDiffChange{
+				Change: change,
+			}
 			changes[accountID].Value += change
 			changes[accountID].UpdateTime = index
 
 			return true
 		})
 	}
-	return changes
+	return nil, nil, changes
 }
 
 func (b *BICManager) Shutdown() {

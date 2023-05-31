@@ -10,26 +10,27 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// bicDiffChange represent the storable changes of an account's BIC between two slots.
-type bicDiffChange struct {
-	api            iotago.API
-	Change         int64               `serix:"2"`
-	PubKeysAdded   []ed25519.PublicKey `serix:"0"`
-	PubKeysRemoved []ed25519.PublicKey `serix:"1"`
+// BicDiffChange represent the storable changes of an account's BIC between two slots.
+type BicDiffChange struct {
+	api                 iotago.API
+	Change              int64               `serix:"0"`
+	PreviousUpdatedTime iotago.SlotIndex    `serix:"1"`
+	PubKeysAdded        []ed25519.PublicKey `serix:"2"`
+	PubKeysRemoved      []ed25519.PublicKey `serix:"3"`
 }
 
-func (c bicDiffChange) Bytes() ([]byte, error) {
+func (c BicDiffChange) Bytes() ([]byte, error) {
 	return c.api.Encode(c)
 }
 
-func (c *bicDiffChange) FromBytes(bytes []byte) (int, error) {
+func (c *BicDiffChange) FromBytes(bytes []byte) (int, error) {
 	return c.api.Decode(bytes, c)
 }
 
 type BicDiffs struct {
 	api               iotago.API
 	slot              iotago.SlotIndex
-	diffChangeStore   *kvstore.TypedStore[iotago.AccountID, bicDiffChange, *iotago.AccountID, *bicDiffChange]
+	diffChangeStore   *kvstore.TypedStore[iotago.AccountID, BicDiffChange, *iotago.AccountID, *BicDiffChange]
 	destroyedAccounts *kvstore.TypedStore[iotago.AccountID, types.Empty, *iotago.AccountID, *types.Empty] // TODO is there any store for set of keys only?
 }
 
@@ -38,43 +39,36 @@ func NewBicDiffs(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.API) *
 	return &BicDiffs{
 		api:               api,
 		slot:              slot,
-		diffChangeStore:   kvstore.NewTypedStore[iotago.AccountID, bicDiffChange](store),
+		diffChangeStore:   kvstore.NewTypedStore[iotago.AccountID, BicDiffChange](store),
 		destroyedAccounts: kvstore.NewTypedStore[iotago.AccountID, types.Empty](store),
 	}
 }
 
 // Store stores the given accountID as a root block.
-func (b *BicDiffs) Store(accountID iotago.AccountID, change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool) (err error) {
+func (b *BicDiffs) Store(accountID iotago.AccountID, bicDiffChange BicDiffChange, destroyed bool) (err error) {
 	if destroyed {
 		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
 			return errors.Wrapf(err, "failed to set destroyed account")
 		}
-		return nil
 	}
 
-	bicDiffChange := bicDiffChange{
-		api:            b.api,
-		Change:         change,
-		PubKeysAdded:   addedPubKeys,
-		PubKeysRemoved: removedPubKeys,
-	}
 	return b.diffChangeStore.Set(accountID, bicDiffChange)
 }
 
 // Load loads accountID and commitmentID for the given blockID.
-func (b *BicDiffs) Load(accountID iotago.AccountID) (change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool, err error) {
+func (b *BicDiffs) Load(accountID iotago.AccountID) (bicDiffChange BicDiffChange, destroyed bool, err error) {
 	if destroyed, err = b.destroyedAccounts.Has(accountID); err != nil {
-		return 0, nil, nil, false, errors.Wrapf(err, "failed to get destroyed account")
+		return bicDiffChange, false, errors.Wrapf(err, "failed to get destroyed account")
 	} else if destroyed {
-		return 0, nil, nil, true, nil
+		return bicDiffChange, true, nil
 	}
 
-	bicDiffChange, err := b.diffChangeStore.Get(accountID)
+	bicDiffChange, err = b.diffChangeStore.Get(accountID)
 	if err != nil {
-		return 0, nil, nil, false, errors.Wrapf(err, "failed to get BIC diff for account %s", accountID.String())
+		return bicDiffChange, false, errors.Wrapf(err, "failed to get BIC diff for account %s", accountID.String())
 	}
 
-	return bicDiffChange.Change, bicDiffChange.PubKeysAdded, bicDiffChange.PubKeysRemoved, false, nil
+	return bicDiffChange, false, err
 }
 
 // Has returns true if the given accountID is a root block.
@@ -88,17 +82,17 @@ func (b *BicDiffs) Delete(accountID iotago.AccountID) (err error) {
 }
 
 // Stream streams all accountIDs changes for a slot index.
-func (b *BicDiffs) Stream(consumer func(accountID iotago.AccountID, change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool) bool) error {
+func (b *BicDiffs) Stream(consumer func(accountID iotago.AccountID, bicDiffChange BicDiffChange, destroyed bool) bool) error {
 	// We firstly iterate over the destroyed accounts, as they won't have a corresponding bicDiffChange.
 	if storageErr := b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, empty types.Empty) bool {
-		return consumer(accountID, 0, nil, nil, true)
+		return consumer(accountID, BicDiffChange{}, true)
 	}); storageErr != nil {
 		return errors.Wrapf(storageErr, "failed to iterate over bic diffs for slot %s", b.slot)
 	}
 
 	// For those accounts that still exist we might have a bicDiffChange.
-	if storageErr := b.diffChangeStore.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, bicDiffChange bicDiffChange) bool {
-		return consumer(accountID, bicDiffChange.Change, bicDiffChange.PubKeysAdded, bicDiffChange.PubKeysRemoved, false)
+	if storageErr := b.diffChangeStore.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, bicDiffChange BicDiffChange) bool {
+		return consumer(accountID, bicDiffChange, false)
 	}); storageErr != nil {
 		return errors.Wrapf(storageErr, "failed to iterate over bic diffs for slot %s", b.slot)
 	}

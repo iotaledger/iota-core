@@ -107,14 +107,23 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 		return errors.Wrap(err, "unable to write slot diffs count")
 	}
 
-	accountCount = b.exportTargetBIC(pWriter, targetIndex)
+	// 		MCA			BIC
+	// ^ 	        ^
+	// diffs        target
 
-	var err error
-	slotDiffCount, err = b.exportSlotDiffs(targetIndex, pWriter, slotDiffCount)
+	accountCount, err := b.exportTargetBIC(pWriter, targetIndex)
+	if err != nil {
+		return errors.Wrapf(err, "unable to export BIC for target index %d", targetIndex)
+	}
 
-	if err = pWriter.WriteValueAtBookmark("accounts count", accountCount); err != nil {
+	if err := pWriter.WriteValueAtBookmark("accounts count", accountCount); err != nil {
 		return errors.Wrap(err, "unable to write accounts count")
 	}
+
+	if slotDiffCount, err := b.exportSlotDiffs(pWriter, targetIndex); err != nil {
+		return errors.Wrapf(err, "unable to export slot diffs for target index %d", targetIndex)
+	}
+
 	if err = pWriter.WriteValueAtBookmark("slot diff count", slotDiffCount); err != nil {
 		return errors.Wrap(err, "unable to write slot diffs count")
 	}
@@ -123,35 +132,34 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 }
 
 // exportTargetBIC exports the BICTree at a certain target slot, returning the total amount of exported accounts
-func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64) {
+func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64, err error) {
 	changesToBIC := b.BICDiffTo(targetIndex)
-	err := b.bicTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) bool {
+	if err = b.bicTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) bool {
 		if change, exists := changesToBIC[accountID]; exists {
 			accountData.Credits().Value += change.Value
 			accountData.Credits().UpdateTime = change.UpdateTime
 		}
-		err := writeAccountID(pWriter, accountID)
+		err = writeAccountID(pWriter, accountID)
 		if err != nil {
-			panic(err)
+			return false
 		}
 		if err = pWriter.WriteValue("account data", accountData.SnapshotBytes()); err != nil {
-			panic(err)
+			return false
 		}
 		accountCount++
 
 		return true
-	})
-	if err != nil {
-		panic(err)
+	}); err != nil {
+		return 0, errors.Wrap(err, "error in exporting BIC tree")
 	}
 
 	// we might have entries that were destroyed, that are present in diff, but not in the tree from the latestCommittedIndex
 	accountCount = b.includeDestroyedAccountsToTargetBIC(pWriter, changesToBIC, accountCount)
 
-	return accountCount
+	return accountCount, err
 }
 
-func (b *BICManager) exportSlotDiffs(targetIndex iotago.SlotIndex, pWriter *utils.PositionedWriter, slotDiffCount uint64) (uint64, error) {
+func (b *BICManager) exportSlotDiffs(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (slotDiffCount uint64, err error) {
 	for index := targetIndex - iotago.MaxCommitableSlotAge; index <= targetIndex; index++ {
 		var accountsCount uint64
 		// The index of the slot diff.
@@ -163,17 +171,17 @@ func (b *BICManager) exportSlotDiffs(targetIndex iotago.SlotIndex, pWriter *util
 			return slotDiffCount, err
 		}
 
-		err := b.slotDiffFunc(index).Stream(func(accountID iotago.AccountID, change int64) bool {
-			diffBytes := slotDiffSnapshotBytes(accountID, change)
+		if err := b.slotDiffFunc(index).Stream(func(accountID iotago.AccountID, change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool) bool {
+			diffBytes := slotDiffSnapshotBytes(accountID, change, addedPubKeys, removedPubKeys, destroyed)
 			if err := pWriter.WriteBytes(diffBytes); err != nil {
 				panic(errors.Wrap(err, "unable to write slot diff bytes"))
 			}
 			accountsCount++
 			return true
-		})
-		if err != nil {
+		}); err != nil {
 			return slotDiffCount, errors.Wrapf(err, "unable to stream slot diff for index %d", index)
 		}
+
 		// The amount of slot diffs contained within this snapshot.
 		if err = pWriter.WriteValueAtBookmark("diff count", accountsCount); err != nil {
 			return slotDiffCount, err
@@ -230,10 +238,21 @@ func (b *BICManager) accountDataFromSnapshotReader(reader io.ReadSeeker, id iota
 	return accountData, nil
 }
 
-func slotDiffSnapshotBytes(accountID iotago.AccountID, value int64) []byte {
+func slotDiffSnapshotBytes(accountID iotago.AccountID, change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool) []byte {
 	m := marshalutil.New()
 	m.WriteBytes(lo.PanicOnErr(accountID.Bytes()))
-	m.WriteInt64(value)
+	m.WriteInt64(change)
+	// Length of the added public keys slice.
+	m.WriteUint64(uint64(len(addedPubKeys)))
+	for _, addedPubKey := range addedPubKeys {
+		m.WriteBytes(lo.PanicOnErr(addedPubKey.Bytes()))
+	}
+	// Length of the removed public keys slice.
+	m.WriteUint64(uint64(len(removedPubKeys)))
+	for _, removedPubKey := range removedPubKeys {
+		m.WriteBytes(lo.PanicOnErr(removedPubKey.Bytes()))
+	}
+	m.WriteBool(destroyed)
 	return m.Bytes()
 }
 
