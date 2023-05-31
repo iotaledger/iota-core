@@ -44,6 +44,10 @@ func (o *Output) OutputID() iotago.OutputID {
 	return o.outputID
 }
 
+func (o *Output) CreationTime() iotago.SlotIndex {
+	return o.slotCreated
+}
+
 func (o *Output) MapKey() string {
 	return string(o.outputID[:])
 }

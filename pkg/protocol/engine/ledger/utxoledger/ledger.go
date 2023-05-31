@@ -2,8 +2,10 @@ package utxoledger
 
 import (
 	"fmt"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/bic"
 	"io"
+
+	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/bic"
 
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
@@ -29,8 +31,9 @@ import (
 var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
 
 type Ledger struct {
-	utxoLedger     *ledgerstate.Manager
-	accountsLedger *bic.BICManager
+	utxoLedger       *ledgerstate.Manager
+	accountsLedger   *bic.BICManager
+	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
 	memPool      mempool.MemPool[booker.BlockVotePower]
 	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
@@ -45,9 +48,9 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 		l := New(
 			ledgerWorkers,
-			executeStardustVM,
 			e.Storage.Ledger(),
 			e.Storage.Accounts(),
+			e.Storage.Commitments().Load,
 			e.SybilProtection.OnlineCommittee(),
 			e.BlockCache.Block,
 			e.API,
@@ -73,22 +76,23 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 func New(
 	workers *workerpool.Group,
-	vm mempool.VM,
 	utxoStore kvstore.KVStore,
 	accountsStore kvstore.KVStore,
+	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID],
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	apiProviderFunc func() iotago.API,
 	errorHandler func(error),
 ) *Ledger {
 	l := &Ledger{
-		utxoLedger:     ledgerstate.New(utxoStore, apiProviderFunc),
-		accountsLedger: bic.New(blocksFunc, accountsStore),
-		conflictDAG:    conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
-		errorHandler:   errorHandler,
+		utxoLedger:       ledgerstate.New(utxoStore, apiProviderFunc),
+		accountsLedger:   bic.New(blocksFunc, accountsStore, apiProviderFunc()),
+		commitmentLoader: commitmentLoader,
+		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
+		errorHandler:     errorHandler,
 	}
 
-	l.memPool = mempoolv1.New(vm, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[booker.BlockVotePower](true))
+	l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[booker.BlockVotePower](true))
 
 	return l
 }
