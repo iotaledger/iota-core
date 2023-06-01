@@ -1,13 +1,10 @@
 package utxoledger
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
-	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/bic"
-
-	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/core/account"
@@ -16,7 +13,9 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/bic"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -25,6 +24,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -53,6 +53,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.Commitments().Load,
 			e.SybilProtection.OnlineCommittee(),
 			e.BlockCache.Block,
+			e.Storage.BicDiffs,
 			e.API,
 			e.ErrorHandler("ledger"),
 		)
@@ -81,12 +82,13 @@ func New(
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID],
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
+	slotDiffFunc func(iotago.SlotIndex) *prunable.BicDiffs,
 	apiProviderFunc func() iotago.API,
 	errorHandler func(error),
 ) *Ledger {
 	l := &Ledger{
 		utxoLedger:       ledgerstate.New(utxoStore, apiProviderFunc),
-		accountsLedger:   bic.New(blocksFunc, accountsStore, apiProviderFunc()),
+		accountsLedger:   bic.New(blocksFunc, slotDiffFunc, accountsStore, apiProviderFunc()),
 		commitmentLoader: commitmentLoader,
 		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
 		errorHandler:     errorHandler,
