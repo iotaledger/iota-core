@@ -58,29 +58,9 @@ func (b *BICManager) importSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64)
 		diffStore := b.slotDiffFunc(slotIndex)
 
 		for j := uint64(0); j < accountsCount; j++ {
-			bicDiffChange := prunable.BicDiffChange{
-				PubKeysAdded:   make([]ed25519.PublicKey, 0),
-				PubKeysRemoved: make([]ed25519.PublicKey, 0),
-			}
-			accountID, err := accountIDFromSnapshotReader(reader)
+			bicDiffChange, accountID, destroyed, err := slotDiffSnapshotReader(reader)
 			if err != nil {
-				return errors.Wrapf(err, "unable to read account ID")
-			}
-			var value int64
-			if err = binary.Read(reader, binary.LittleEndian, &value); err != nil {
-				return errors.Wrapf(err, "unable to read BIC balance value in the diff")
-			}
-			err = readPubKeysFromSnapshot(reader, bicDiffChange.PubKeysAdded)
-			if err != nil {
-				return errors.Wrap(err, "unable to read added pubKeys in the diff")
-			}
-			err = readPubKeysFromSnapshot(reader, bicDiffChange.PubKeysRemoved)
-			if err != nil {
-				return errors.Wrap(err, "unable to read added pubKeys in the diff")
-			}
-			var destroyed bool
-			if err = binary.Read(reader, binary.LittleEndian, &destroyed); err != nil {
-				return errors.Wrapf(err, "unable to read destroyed flag in the diff")
+				return errors.Wrapf(err, "unable to read slot diff")
 			}
 			err = diffStore.Store(accountID, bicDiffChange, destroyed)
 			if err != nil {
@@ -89,6 +69,34 @@ func (b *BICManager) importSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64)
 		}
 	}
 	return nil
+}
+
+func slotDiffSnapshotReader(reader io.ReadSeeker) (prunable.BicDiffChange, iotago.AccountID, bool, error) {
+	bicDiffChange := prunable.BicDiffChange{
+		PubKeysAdded:   make([]ed25519.PublicKey, 0),
+		PubKeysRemoved: make([]ed25519.PublicKey, 0),
+	}
+	accountID, err := accountIDFromSnapshotReader(reader)
+	if err != nil {
+		return prunable.BicDiffChange{}, iotago.AccountID{}, false, errors.Wrapf(err, "unable to read account ID")
+	}
+	var value int64
+	if err = binary.Read(reader, binary.LittleEndian, &value); err != nil {
+		return prunable.BicDiffChange{}, iotago.AccountID{}, false, errors.Wrapf(err, "unable to read BIC balance value in the diff")
+	}
+	err = readPubKeysFromSnapshot(reader, bicDiffChange.PubKeysAdded)
+	if err != nil {
+		return prunable.BicDiffChange{}, iotago.AccountID{}, false, errors.Wrap(err, "unable to read added pubKeys in the diff")
+	}
+	err = readPubKeysFromSnapshot(reader, bicDiffChange.PubKeysRemoved)
+	if err != nil {
+		return prunable.BicDiffChange{}, iotago.AccountID{}, false, errors.Wrap(err, "unable to read added pubKeys in the diff")
+	}
+	var destroyed bool
+	if err = binary.Read(reader, binary.LittleEndian, &destroyed); err != nil {
+		return prunable.BicDiffChange{}, iotago.AccountID{}, false, errors.Wrapf(err, "unable to read destroyed flag in the diff")
+	}
+	return bicDiffChange, accountID, destroyed, nil
 }
 
 func readPubKeysFromSnapshot(reader io.ReadSeeker, pubKeysToUpdate []ed25519.PublicKey) error {

@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"math"
 	"math/big"
@@ -229,4 +230,17 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 	}
 
 	return iotaOutput
+}
+
+func RandPubKey() ed25519.PublicKey {
+	return ed25519.PublicKey(RandBytes(32))
+}
+
+func RandPubKeys() []ed25519.PublicKey {
+	length := RandomIntn(10)
+	pubKeys := make([]ed25519.PublicKey, length)
+	for i := 0; i < length; i++ {
+		pubKeys[i] = RandPubKey()
+	}
+	return pubKeys
 }
