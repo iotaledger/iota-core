@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -19,20 +20,35 @@ type BlockIssuanceCredits interface {
 	module.Interface
 }
 
+type KeyOperation bool
+
+var KeyAdded KeyOperation = true
+var KeyRemoved KeyOperation = false
+
 type BicDiffChange struct {
 	Change              int64
 	PreviousUpdatedTime iotago.SlotIndex
 	// PubKeysAddedAndRemoved is a map of public keys that were added and removed from the account.
-	// The value is true if the public key was added and false if it was removed.
-	PubKeysAddedAndRemoved map[ed25519.PublicKey]bool
+	PubKeysAddedAndRemoved map[ed25519.PublicKey]KeyOperation
 }
 
-// UpdateKeys updates the added and removed keys of the account, operation is true if the key was added and false if it was removed.
-func (b *BicDiffChange) UpdateKeys(pubKey ed25519.PublicKey, operation bool) {
+// UpdateKeys updates the PubKeysAddedAndRemoved map with the added and removed keys from the updateFromDiff.
+func (b *BicDiffChange) UpdateKeys(updateFromDiff prunable.BicDiffChange) {
+	// operations are already reversed here, as we rollback
+	for _, addedKey := range updateFromDiff.PubKeysAdded {
+		b.updateKey(addedKey, KeyRemoved)
+	}
+	for _, removedKey := range updateFromDiff.PubKeysRemoved {
+		b.updateKey(removedKey, KeyAdded)
+	}
+}
+
+// UpdateKeys updates the added and removed keys of the account. It makes sure that two opposite consecutive operations calncel each other.
+func (b *BicDiffChange) updateKey(pubKey ed25519.PublicKey, operation KeyOperation) {
 	previousOperation, ok := b.PubKeysAddedAndRemoved[pubKey]
 	if !ok {
 		b.PubKeysAddedAndRemoved[pubKey] = operation
-	} else if previousOperation != operation {
+	} else if previousOperation != operation { // cancel the previous operation
 		delete(b.PubKeysAddedAndRemoved, pubKey)
 	}
 }

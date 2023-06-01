@@ -58,19 +58,50 @@ func (b *BICManager) importSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64)
 		diffStore := b.slotDiffFunc(slotIndex)
 
 		for j := uint64(0); j < accountsCount; j++ {
+			bicDiffChange := prunable.BicDiffChange{
+				PubKeysAdded:   make([]ed25519.PublicKey, 0),
+				PubKeysRemoved: make([]ed25519.PublicKey, 0),
+			}
 			accountID, err := accountIDFromSnapshotReader(reader)
 			if err != nil {
 				return errors.Wrapf(err, "unable to read account ID")
 			}
 			var value int64
-			if err := binary.Read(reader, binary.LittleEndian, &value); err != nil {
+			if err = binary.Read(reader, binary.LittleEndian, &value); err != nil {
 				return errors.Wrapf(err, "unable to read BIC balance value in the diff")
 			}
-			err = diffStore.Store(accountID, value)
+			err = readPubKeysFromSnapshot(reader, bicDiffChange.PubKeysAdded)
 			if err != nil {
-				return errors.Wrapf(err, "unable to store BIC balance value in the diff, slotIndex: %d, accountID: %s", slotIndex, accountID)
+				return errors.Wrap(err, "unable to read added pubKeys in the diff")
+			}
+			err = readPubKeysFromSnapshot(reader, bicDiffChange.PubKeysRemoved)
+			if err != nil {
+				return errors.Wrap(err, "unable to read added pubKeys in the diff")
+			}
+			var destroyed bool
+			if err = binary.Read(reader, binary.LittleEndian, &destroyed); err != nil {
+				return errors.Wrapf(err, "unable to read destroyed flag in the diff")
+			}
+			err = diffStore.Store(accountID, bicDiffChange, destroyed)
+			if err != nil {
+				return errors.Wrapf(err, "unable to store slot diff")
 			}
 		}
+	}
+	return nil
+}
+
+func readPubKeysFromSnapshot(reader io.ReadSeeker, pubKeysToUpdate []ed25519.PublicKey) error {
+	var pubKeysLength uint64
+	if err := binary.Read(reader, binary.LittleEndian, &pubKeysLength); err != nil {
+		return errors.Wrapf(err, "unable to read added pubKeys length in the diff")
+	}
+	for k := uint64(0); k < pubKeysLength; k++ {
+		pubKey, err := pubKeyFromSnapshotReader(reader)
+		if err != nil {
+			return err
+		}
+		pubKeysToUpdate = append(pubKeysToUpdate, pubKey)
 	}
 	return nil
 }
@@ -136,9 +167,10 @@ func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetInde
 			accountData.Credits().Value += change.Change
 			accountData.Credits().UpdateTime = change.PreviousUpdatedTime
 			for pubKey, operation := range change.PubKeysAddedAndRemoved {
-				if operation {
+				switch operation {
+				case accounts.KeyAdded:
 					accountData.AddPublicKey(pubKey)
-				} else {
+				case accounts.KeyRemoved:
 					accountData.RemovePublicKey(pubKey)
 				}
 			}
@@ -179,7 +211,7 @@ func (b *BICManager) diffRollbackTo(targetSlot iotago.SlotIndex) (cumulativeBICD
 				diffChange = &accounts.BicDiffChange{
 					Change:                 -bicDiffChange.Change,
 					PreviousUpdatedTime:    bicDiffChange.PreviousUpdatedTime,
-					PubKeysAddedAndRemoved: make(map[ed25519.PublicKey]bool),
+					PubKeysAddedAndRemoved: make(map[ed25519.PublicKey]accounts.KeyOperation),
 				}
 
 				return true
@@ -189,14 +221,8 @@ func (b *BICManager) diffRollbackTo(targetSlot iotago.SlotIndex) (cumulativeBICD
 			diffChange.Change -= bicDiffChange.Change
 			// We apply the earliest previous updated time as we are processing the diffs towards the past.
 			diffChange.PreviousUpdatedTime = bicDiffChange.PreviousUpdatedTime
-
-			for _, addedKey := range bicDiffChange.PubKeysAdded {
-				diffChange.UpdateKeys(addedKey, false)
-			}
-
-			for _, removedKey := range bicDiffChange.PubKeysRemoved {
-				diffChange.UpdateKeys(removedKey, true)
-			}
+			// crate final set of changes for pubKeys that needs to be applied to the BIC tree.
+			diffChange.UpdateKeys(bicDiffChange)
 
 			return true
 		})
@@ -217,8 +243,8 @@ func (b *BICManager) exportSlotDiffs(pWriter *utils.PositionedWriter, targetInde
 			return slotDiffCount, err
 		}
 
-		if err := b.slotDiffFunc(index).Stream(func(accountID iotago.AccountID, change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool) bool {
-			diffBytes := slotDiffSnapshotBytes(accountID, change, addedPubKeys, removedPubKeys, destroyed)
+		if err := b.slotDiffFunc(index).Stream(func(accountID iotago.AccountID, bicDiffChange prunable.BicDiffChange, destroyed bool) bool {
+			diffBytes := slotDiffSnapshotBytes(accountID, bicDiffChange, destroyed)
 			if err := pWriter.WriteBytes(diffBytes); err != nil {
 				panic(errors.Wrap(err, "unable to write slot diff bytes"))
 			}
@@ -238,14 +264,15 @@ func (b *BICManager) exportSlotDiffs(pWriter *utils.PositionedWriter, targetInde
 	return slotDiffCount, nil
 }
 
-func (b *BICManager) includeDestroyedAccountsToTargetBIC(pWriter *utils.PositionedWriter, changesToBIC map[iotago.AccountID]*accounts.Credits, accountCount uint64) uint64 {
+func (b *BICManager) includeDestroyedAccountsToTargetBIC(pWriter *utils.PositionedWriter, changesToBIC map[iotago.AccountID]*accounts.BicDiffChange, accountCount uint64) uint64 {
 	for accountID := range changesToBIC {
+		// account was destroyed after the target slot, and it was not present in BIC vector, so we need to add it.
 		if exists := b.bicTree.Has(accountID); !exists {
 			err := writeAccountID(pWriter, accountID)
 			if err != nil {
 				panic(err)
 			}
-			accountData := createNewAccountDataBasedOnChanges(accountID, changesToBIC[accountID], b.API())
+			accountData := createNewAccountDataBasedOnChanges(accountID, changesToBIC[accountID], b.api)
 			if err = pWriter.WriteValue("account data", accountData.SnapshotBytes()); err != nil {
 				panic(err)
 			}
@@ -284,18 +311,18 @@ func (b *BICManager) accountDataFromSnapshotReader(reader io.ReadSeeker, id iota
 	return accountData, nil
 }
 
-func slotDiffSnapshotBytes(accountID iotago.AccountID, change int64, addedPubKeys, removedPubKeys []ed25519.PublicKey, destroyed bool) []byte {
+func slotDiffSnapshotBytes(accountID iotago.AccountID, bicDiffChange prunable.BicDiffChange, destroyed bool) []byte {
 	m := marshalutil.New()
 	m.WriteBytes(lo.PanicOnErr(accountID.Bytes()))
-	m.WriteInt64(change)
+	m.WriteInt64(bicDiffChange.Change)
 	// Length of the added public keys slice.
-	m.WriteUint64(uint64(len(addedPubKeys)))
-	for _, addedPubKey := range addedPubKeys {
+	m.WriteUint64(uint64(len(bicDiffChange.PubKeysAdded)))
+	for _, addedPubKey := range bicDiffChange.PubKeysAdded {
 		m.WriteBytes(lo.PanicOnErr(addedPubKey.Bytes()))
 	}
 	// Length of the removed public keys slice.
-	m.WriteUint64(uint64(len(removedPubKeys)))
-	for _, removedPubKey := range removedPubKeys {
+	m.WriteUint64(uint64(len(bicDiffChange.PubKeysRemoved)))
+	for _, removedPubKey := range bicDiffChange.PubKeysRemoved {
 		m.WriteBytes(lo.PanicOnErr(removedPubKey.Bytes()))
 	}
 	m.WriteBool(destroyed)
@@ -310,6 +337,14 @@ func accountIDFromSnapshotReader(reader io.ReadSeeker) (iotago.AccountID, error)
 	return accountID, nil
 }
 
+func pubKeyFromSnapshotReader(reader io.ReadSeeker) (ed25519.PublicKey, error) {
+	var pubKey ed25519.PublicKey
+	if _, err := io.ReadFull(reader, pubKey[:]); err != nil {
+		return ed25519.PublicKey{}, fmt.Errorf("unable to read public key: %w", err)
+	}
+	return pubKey, nil
+}
+
 func writeAccountID(writer *utils.PositionedWriter, accountID iotago.AccountID) error {
 	accountIDBytes, err := accountID.Bytes()
 	if err != nil {
@@ -321,7 +356,16 @@ func writeAccountID(writer *utils.PositionedWriter, accountID iotago.AccountID) 
 	return nil
 }
 
-func createNewAccountDataBasedOnChanges(accountID iotago.AccountID, changes *accounts.Credits, api iotago.API) *accounts.AccountData {
-	//  TODO store pubkeys for diffs pubKeys := make([]ed25519.PublicKey, 0)
-	return accounts.NewAccount(api, accountID, changes)
+func createNewAccountDataBasedOnChanges(accountID iotago.AccountID, changes *accounts.BicDiffChange, api iotago.API) *accounts.AccountData {
+	credits := accounts.NewCredits(-changes.Change, changes.PreviousUpdatedTime)
+	accountData := accounts.NewAccount(api, accountID, credits)
+	for pubKey, op := range changes.PubKeysAddedAndRemoved {
+		switch op {
+		case accounts.KeyAdded:
+			accountData.AddPublicKey(pubKey)
+		case accounts.KeyRemoved:
+			accountData.RemovePublicKey(pubKey)
+		}
+	}
+	return accountData
 }
