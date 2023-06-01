@@ -101,7 +101,7 @@ func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iot
 		optMaxWeakReferences:         8,
 	}, opts, func(t *TipManager) {
 		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
-	})
+	}, (*TipManager).TriggerConstructed)
 }
 
 // AddBlock adds a Block to the TipManager.
@@ -119,12 +119,16 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 
 	seenStrongTips := advancedset.New[iotago.BlockID]()
 	selectStrongTips := func(amount int) (strongTips []*TipMetadata) {
-		if amount > 0 {
-			for _, strongTip := range t.strongTipSet.RandomUniqueEntries(amount + seenStrongTips.Size()) {
-				if seenStrongTips.Add(strongTip.Block().ID()) {
-					if strongTips = append(strongTips, strongTip); len(strongTips) == amount {
-						return strongTips
-					}
+		if amount <= 0 {
+			return strongTips
+		}
+
+		for _, strongTip := range t.strongTipSet.RandomUniqueEntries(amount + seenStrongTips.Size()) {
+			if seenStrongTips.Add(strongTip.Block().ID()) {
+				strongTips = append(strongTips, strongTip)
+
+				if len(strongTips) == amount {
+					return strongTips
 				}
 			}
 		}
@@ -225,14 +229,16 @@ func (t *TipManager) WeakTipSet() (tipSet []*blocks.Block) {
 
 // Evict evicts a slot from the TipManager.
 func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
-	if t.markSlotAsEvicted(slotIndex) {
-		if evictedObjects, deleted := t.tipMetadataStorage.DeleteAndReturn(slotIndex); deleted {
-			evictedObjects.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
-				tipMetadata.evicted.Trigger()
+	if !t.markSlotAsEvicted(slotIndex) {
+		return
+	}
 
-				return true
-			})
-		}
+	if evictedObjects, deleted := t.tipMetadataStorage.DeleteAndReturn(slotIndex); deleted {
+		evictedObjects.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
+			tipMetadata.evicted.Trigger()
+
+			return true
+		})
 	}
 }
 
