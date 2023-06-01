@@ -169,74 +169,25 @@ func (b *BICManager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex)
 
 // exportTargetBIC exports the BICTree at a certain target slot, returning the total amount of exported accounts
 func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64, err error) {
-	changesToRollback := b.diffRollbackTo(targetIndex)
 	if err = b.bicTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) bool {
-		if change, exists := changesToRollback[accountID]; exists {
-			accountData.Credits().Value += change.Change
-			accountData.Credits().UpdateTime = change.PreviousUpdatedTime
-			for pubKey, operation := range change.PubKeysAddedAndRemoved {
-				switch operation {
-				case accounts.KeyAdded:
-					accountData.AddPublicKey(pubKey)
-				case accounts.KeyRemoved:
-					accountData.RemovePublicKey(pubKey)
-				}
-			}
-		}
-		err = writeAccountID(pWriter, accountID)
+		_, err = b.rollbackAccountTo(targetIndex, accountID, accountData)
 		if err != nil {
 			return false
 		}
-		if err = pWriter.WriteValue("account data", accountData.SnapshotBytes()); err != nil {
+		err = accountDiffSnapshotWriter(pWriter, accountData)
+		if err != nil {
 			return false
 		}
 		accountCount++
-
 		return true
 	}); err != nil {
 		return 0, errors.Wrap(err, "error in exporting BIC tree")
 	}
 
 	// we might have entries that were destroyed, that are present in diff, but not in the tree from the latestCommittedIndex
-	accountCount = b.includeDestroyedAccountsToTargetBIC(pWriter, changesToRollback, accountCount)
+	accountCount, err = b.includeDestroyedAccountsToTargetBIC(pWriter, targetIndex, accountCount)
 
 	return accountCount, err
-}
-
-// BICDiffTo returns the accumulated diff between targetSlot and latestCommittedSlot (where the bic vector is at).
-func (b *BICManager) diffRollbackTo(targetSlot iotago.SlotIndex) (cumulativeBICDiffChanges map[iotago.AccountID]*accounts.BicDiffChange) {
-	cumulativeBICDiffChanges = make(map[iotago.AccountID]*accounts.BicDiffChange)
-
-	for index := b.latestCommittedSlot; index >= targetSlot+1; index-- {
-		diffStore := b.slotDiffFunc(index)
-		if diffStore == nil {
-			return nil
-		}
-		diffStore.Stream(func(accountID iotago.AccountID, bicDiffChange prunable.BicDiffChange, destroyed bool) bool {
-			// We rollback things here, hence -change and removedPubKeys are added and addedPubKeys are removed.
-			diffChange, ok := cumulativeBICDiffChanges[accountID]
-			if !ok {
-				diffChange = &accounts.BicDiffChange{
-					Change:                 -bicDiffChange.Change,
-					PreviousUpdatedTime:    bicDiffChange.PreviousUpdatedTime,
-					PubKeysAddedAndRemoved: make(map[ed25519.PublicKey]accounts.KeyOperation),
-				}
-
-				return true
-			}
-
-			// In case we are rolling back an account deletion, we will have a diff with change=0, the previousUpdateTime and the removedPubKeys.
-			diffChange.Change -= bicDiffChange.Change
-			// We apply the earliest previous updated time as we are processing the diffs towards the past.
-			diffChange.PreviousUpdatedTime = bicDiffChange.PreviousUpdatedTime
-			// crate final set of changes for pubKeys that needs to be applied to the BIC tree.
-			diffChange.UpdateKeys(bicDiffChange)
-
-			return true
-		})
-	}
-
-	return cumulativeBICDiffChanges
 }
 
 func (b *BICManager) exportSlotDiffs(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (slotDiffCount uint64, err error) {
@@ -272,22 +223,36 @@ func (b *BICManager) exportSlotDiffs(pWriter *utils.PositionedWriter, targetInde
 	return slotDiffCount, nil
 }
 
-func (b *BICManager) includeDestroyedAccountsToTargetBIC(pWriter *utils.PositionedWriter, changesToBIC map[iotago.AccountID]*accounts.BicDiffChange, accountCount uint64) uint64 {
-	for accountID := range changesToBIC {
-		// account was destroyed after the target slot, and it was not present in BIC vector, so we need to add it.
-		if exists := b.bicTree.Has(accountID); !exists {
-			err := writeAccountID(pWriter, accountID)
+func (b *BICManager) includeDestroyedAccountsToTargetBIC(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex, accountCount uint64) (uint64, error) {
+	destroyedAccounts := make(map[iotago.AccountID]*accounts.AccountData)
+	for index := b.latestCommittedSlot; index >= targetIndex+1; index-- {
+		diffStore := b.slotDiffFunc(index)
+		diffStore.StreamDestroyed(func(accountID iotago.AccountID) bool {
+			bicDiffChange, _, err := diffStore.Load(accountID)
 			if err != nil {
-				panic(err)
+				return false
 			}
-			accountData := createNewAccountDataBasedOnChanges(accountID, changesToBIC[accountID], b.api)
-			if err = pWriter.WriteValue("account data", accountData.SnapshotBytes()); err != nil {
-				panic(err)
-			}
+			// TODO make sure that when we store diff, there are no duplicates beftween removed and added pubKeys,
+			//  if key is present in both maps it should be removed from both
+			accountData := accounts.NewAccount(b.api, accountID, accounts.NewCredits(-bicDiffChange.Change, index), bicDiffChange.PubKeysRemoved...)
+
+			destroyedAccounts[accountID] = accountData
 			accountCount++
+			return true
+		})
+	}
+	for accountID, accountData := range destroyedAccounts {
+		_, err := b.rollbackAccountTo(targetIndex, accountID, accountData)
+		if err != nil {
+			return accountCount, errors.Wrapf(err, "unable to rollback account %s to target slot index %d", accountID.String(), targetIndex)
+		}
+		err = accountDiffSnapshotWriter(pWriter, accountData)
+		if err != nil {
+			return accountCount, errors.Wrapf(err, "unable to write account %s to snapshot", accountID.String())
 		}
 	}
-	return accountCount
+
+	return accountCount, nil
 }
 
 func (b *BICManager) accountDataFromSnapshotReader(reader io.ReadSeeker, id iotago.AccountID) (*accounts.AccountData, error) {
@@ -364,16 +329,13 @@ func writeAccountID(writer *utils.PositionedWriter, accountID iotago.AccountID) 
 	return nil
 }
 
-func createNewAccountDataBasedOnChanges(accountID iotago.AccountID, changes *accounts.BicDiffChange, api iotago.API) *accounts.AccountData {
-	credits := accounts.NewCredits(-changes.Change, changes.PreviousUpdatedTime)
-	accountData := accounts.NewAccount(api, accountID, credits)
-	for pubKey, op := range changes.PubKeysAddedAndRemoved {
-		switch op {
-		case accounts.KeyAdded:
-			accountData.AddPublicKey(pubKey)
-		case accounts.KeyRemoved:
-			accountData.RemovePublicKey(pubKey)
-		}
+func accountDiffSnapshotWriter(writer *utils.PositionedWriter, accountData *accounts.AccountData) error {
+	err := writeAccountID(writer, accountData.ID())
+	if err != nil {
+		return errors.Wrapf(err, "unable to write account id %s", accountData.ID().String())
 	}
-	return accountData
+	if err = writer.WriteValue("account data", accountData.SnapshotBytes()); err != nil {
+		return errors.Wrapf(err, "unable to write account data for account id %s", accountData.ID().String())
+	}
+	return nil
 }

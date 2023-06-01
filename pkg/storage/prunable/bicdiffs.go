@@ -99,3 +99,9 @@ func (b *BicDiffs) Stream(consumer func(accountID iotago.AccountID, bicDiffChang
 
 	return nil
 }
+
+func (b *BicDiffs) StreamDestroyed(consumer func(accountID iotago.AccountID) bool) error {
+	return b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, empty types.Empty) bool {
+		return consumer(accountID)
+	})
+}

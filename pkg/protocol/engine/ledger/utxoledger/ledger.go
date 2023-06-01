@@ -8,6 +8,8 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/core/account"
+	"github.com/iotaledger/hive.go/crypto/ed25519"
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -240,8 +242,11 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	if err := l.utxoLedger.ApplyDiff(index, outputs, spents); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
 	}
-
-	if bicRoot, err = l.accountsLedger.CommitSlot(index, allotments); err != nil {
+	//todo polulate these maps freom ledgerstate
+	var removedPubKeys map[iotago.AccountID][]ed25519.PublicKey
+	var addedPubKeys map[iotago.AccountID][]ed25519.PublicKey
+	var destroyedAccount *advancedset.AdvancedSet[iotago.AccountID]
+	if bicRoot, err = l.accountsLedger.CommitSlot(index, allotments, removedPubKeys, addedPubKeys, destroyedAccount); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
