@@ -164,7 +164,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 			return references, updatedLikedConflicts, nil
 		}
 
-		for strongTipCandidates := selectStrongTips(amount - len(references[model.StrongParentType])); len(strongTipCandidates) != 0; strongTipCandidates = selectStrongTips(amount - len(references[model.StrongParentType])) {
+		for strongTipCandidates := selectStrongTips(amount); len(strongTipCandidates) != 0; strongTipCandidates = selectStrongTips(amount - len(references[model.StrongParentType])) {
 			for _, strongTip := range strongTipCandidates {
 				if addedLikedInsteadReferences, updatedLikedConflicts, err := likedInsteadReferences(strongTip); err != nil {
 					// TODO: LOG REASON FOR DOWNGRADE?
