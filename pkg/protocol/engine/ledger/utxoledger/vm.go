@@ -24,6 +24,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		}
 	}
 
+	// resolve the BIC inputs from the BIC Manager
 	bicInputSet := iotago.BICInputSet{}
 	bicInputs, err := tx.BICInputs()
 	if err != nil {
@@ -31,6 +32,9 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 	for _, inp := range bicInputs {
 		// get the BIC inputs from bic manager
+		if _, err := l.loadCommitment(inp.CommitmentID); err != nil {
+			return nil, xerrors.Errorf("could not load commitment: %w", err)
+		}
 		b, err := l.accountsLedger.BIC(inp.AccountID, inp.CommitmentID.Index())
 		if err != nil {
 			return nil, xerrors.Errorf("could not get BIC inputs: %w", err)
@@ -40,22 +44,21 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 			CommitmentID: inp.CommitmentID,
 			Value:        b.Credits().Value,
 		}
-
 	}
 
+	// resolve the commitment inputs from storage
 	commitmentInputSet := iotago.CommitmentInputSet{}
 	commitmentInputs, err := tx.CommitmentInputs()
 	if err != nil {
 		return nil, xerrors.Errorf("could not get Commitment inputs: %w", err)
 	}
 	for _, inp := range commitmentInputs {
-		c, err := l.commitmentLoader(inp.CommitmentID.Index())
+		c, err := l.loadCommitment(inp.CommitmentID)
 		if err != nil {
-			return nil, xerrors.Errorf("could not get Commitment inputs: %w", err)
+			return nil, xerrors.Errorf("could not load commitment: %w", err)
 		}
-		commitmentInputSet[inp.CommitmentID] = c.Commitment()
+		commitmentInputSet[inp.CommitmentID] = c
 	}
-	// TODO: get Commitment inputs from storage
 
 	resolvedInputs := iotago.ResolvedInputs{
 		InputSet:           inputSet,
@@ -82,4 +85,20 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 
 	return created, nil
+}
+
+func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.Commitment, error) {
+	// TODO: cache the loaded commitments
+	c, err := l.commitmentLoader(inputCommitmentID.Index())
+	if err != nil {
+		return nil, xerrors.Errorf("could not get commitment inputs: %w", err)
+	}
+	storedCommitmentID, err := c.Commitment().ID()
+	if err != nil {
+		return nil, xerrors.Errorf("could compute commitment ID: %w", err)
+	}
+	if storedCommitmentID != inputCommitmentID {
+		return nil, xerrors.Errorf("commitment ID of input %s different to stored commitment %s", inputCommitmentID, storedCommitmentID)
+	}
+	return c.Commitment(), nil
 }
