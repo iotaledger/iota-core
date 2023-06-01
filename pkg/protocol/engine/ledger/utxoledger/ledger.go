@@ -8,7 +8,6 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/core/account"
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -191,7 +190,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	var innerErr error
 	var outputs ledgerstate.Outputs
 	var spents ledgerstate.Spents
-	var allotments map[iotago.AccountID]uint64
+	bicDiffChanges := make(map[iotago.AccountID]*prunable.BicDiffChange)
+	destroyedAccounts := advancedset.New[iotago.AccountID]()
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
@@ -229,7 +229,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		}
 
 		for _, allotment := range tx.Essence.Allotments {
-			allotments[allotment.AccountID] += allotment.Value
+			bicDiffChanges[allotment.AccountID].Change += int64(allotment.Value)
 		}
 
 		return true
@@ -242,11 +242,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	if err := l.utxoLedger.ApplyDiff(index, outputs, spents); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
 	}
-	//todo polulate these maps freom ledgerstate
-	var removedPubKeys map[iotago.AccountID][]ed25519.PublicKey
-	var addedPubKeys map[iotago.AccountID][]ed25519.PublicKey
-	var destroyedAccount *advancedset.AdvancedSet[iotago.AccountID]
-	if bicRoot, err = l.accountsLedger.CommitSlot(index, allotments, removedPubKeys, addedPubKeys, destroyedAccount); err != nil {
+	//todo polulate pubKeys, destroyed accounts before commiting
+	if bicRoot, err = l.accountsLedger.CommitSlot(index, bicDiffChanges, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
 	}
 

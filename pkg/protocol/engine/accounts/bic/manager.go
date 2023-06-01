@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
-
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -73,35 +71,23 @@ func (b *BICManager) BICTreeRoot() iotago.Identifier {
 	return iotago.Identifier(b.bicTree.Root())
 }
 
-// TODO: record also changes to pubKeys and accounts deletions
-
 func (b *BICManager) CommitSlot(
 	slotIndex iotago.SlotIndex,
-	allotments map[iotago.AccountID]uint64,
-	removedPubKeys map[iotago.AccountID][]ed25519.PublicKey,
-	addedPubKeys map[iotago.AccountID][]ed25519.PublicKey,
-	destroyedAccount *advancedset.AdvancedSet[iotago.AccountID],
+	bicDiffChanges map[iotago.AccountID]*prunable.BicDiffChange,
+	destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID],
 ) (bicRoot iotago.Identifier, err error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	if b.latestCommittedSlot+1 != slotIndex {
 		return iotago.Identifier{}, errors.Errorf("cannot apply the ned diff, there is a gap in committed slots, bic vector index: %d, slot to commit: %d", b.latestCommittedSlot, slotIndex)
 	}
-	burns := make(map[iotago.AccountID]uint64)
-	if set, exists := b.blockBurns.Get(slotIndex); exists {
-		for it := set.Iterator(); it.HasNext(); {
-			blockID := it.Next()
-			block, exists := b.blockFunc(blockID)
-			if !exists {
-				return iotago.Identifier{}, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
-			}
-			burns[block.Block().IssuerID] += block.Block().BurnedMana
-		}
+	burns, err := b.createBlockBurnsForSlot(slotIndex)
+	if err != nil {
+		return iotago.Identifier{}, err
 	}
+	updateBicDiffChangesWithBurns(bicDiffChanges, burns)
 
-	changes := newSummarisedChanges(allotments, burns)
-
-	if bicRoot, err = b.applyDiff(slotIndex, changes); err != nil {
+	if bicRoot, err = b.applyDiff(slotIndex, bicDiffChanges, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, err
 	}
 
@@ -109,6 +95,21 @@ func (b *BICManager) CommitSlot(
 	b.evict(slotIndex - iotago.MaxCommitableSlotAge - 1)
 
 	return bicRoot, nil
+}
+
+func (b *BICManager) createBlockBurnsForSlot(slotIndex iotago.SlotIndex) (map[iotago.AccountID]uint64, error) {
+	burns := make(map[iotago.AccountID]uint64)
+	if set, exists := b.blockBurns.Get(slotIndex); exists {
+		for it := set.Iterator(); it.HasNext(); {
+			blockID := it.Next()
+			block, exists2 := b.blockFunc(blockID)
+			if !exists2 {
+				return nil, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
+			}
+			burns[block.Block().IssuerID] += block.Block().BurnedMana
+		}
+	}
+	return burns, nil
 }
 
 func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (accounts.Account, bool, error) {
@@ -180,22 +181,16 @@ func (b *BICManager) Shutdown() {
 	b.TriggerStopped()
 }
 
-func (b *BICManager) applyDiff(slotIndex iotago.SlotIndex, changes map[iotago.AccountID]int64) (iotago.Identifier, error) {
+func (b *BICManager) applyDiff(slotIndex iotago.SlotIndex, bicDiffChanges map[iotago.AccountID]*prunable.BicDiffChange, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) (iotago.Identifier, error) {
 	diffStore := b.slotDiffFunc(slotIndex)
-	for accountID, valueChange := range changes {
-		bicDiffChange := prunable.BicDiffChange{
-			Change:              0,
-			PreviousUpdatedTime: 0,
-			PubKeysAdded:        nil,
-			PubKeysRemoved:      nil,
-		}
-		err := diffStore.Store(accountID, bicDiffChange, false)
+	for accountID, bicDiffChange := range bicDiffChanges {
+		err := diffStore.Store(accountID, *bicDiffChange, destroyedAccounts.Has(accountID))
 		if err != nil {
 			return iotago.Identifier{}, errors.Wrapf(err, "could not store diff to slot %d", slotIndex)
 		}
 	}
 
-	bicRoot, err := b.commitBICTree(slotIndex, changes)
+	bicRoot, err := b.commitBICTree(slotIndex, bicDiffChanges, destroyedAccounts)
 	if err != nil {
 		return iotago.Identifier{}, errors.Wrapf(err, "could not apply diff to slot %d", slotIndex)
 	}
@@ -205,14 +200,21 @@ func (b *BICManager) applyDiff(slotIndex iotago.SlotIndex, changes map[iotago.Ac
 	return bicRoot, nil
 }
 
-func (b *BICManager) commitBICTree(index iotago.SlotIndex, changes map[iotago.AccountID]int64) (bicRoot iotago.Identifier, err error) {
+func (b *BICManager) commitBICTree(index iotago.SlotIndex, bicDiffChanges map[iotago.AccountID]*prunable.BicDiffChange, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) (bicRoot iotago.Identifier, err error) {
 	// update the bic tree to latestCommitted slot index
-	for accountID, valueChange := range changes {
+	for accountID, diffChange := range bicDiffChanges {
+		// remove destroyed account, no need to update with diffs
+		if destroyedAccounts.Has(accountID) {
+			b.bicTree.Delete(accountID)
+			continue
+		}
 		loadedAccount, exists := b.bicTree.Get(accountID)
 		if !exists {
 			loadedAccount = accounts.NewAccount(b.api, accountID, accounts.NewCredits(0, index))
 		}
-		loadedAccount.Credits().Update(valueChange, index)
+		loadedAccount.Credits().Update(diffChange.Change, index)
+		loadedAccount.AddPublicKey(diffChange.PubKeysAdded...)
+		loadedAccount.RemovePublicKey(diffChange.PubKeysRemoved...)
 		b.bicTree.Set(accountID, loadedAccount)
 	}
 	b.latestCommittedSlot = index
@@ -224,16 +226,9 @@ func (b *BICManager) evict(index iotago.SlotIndex) {
 	// TODO: delete the old slot diff that was applied
 }
 
-// newBICDiff creates a new BIC diff from the given allotments and burns.
-func newSummarisedChanges(allotments map[iotago.AccountID]uint64, burns map[iotago.AccountID]uint64) map[iotago.AccountID]int64 {
-	// todo use the same struct for all slot changes as in import/export
-	bicChanges := make(map[iotago.AccountID]int64)
-	for id, allotment := range allotments {
-		bicChanges[id] += int64(allotment)
-	}
+// includeBurnsToBicDiffChanges creates a new BIC diff from the given allotments and burns.
+func updateBicDiffChangesWithBurns(bicDiffChanges map[iotago.AccountID]*prunable.BicDiffChange, burns map[iotago.AccountID]uint64) {
 	for id, burn := range burns {
-		bicChanges[id] -= int64(burn)
+		bicDiffChanges[id].Change += int64(burn)
 	}
-
-	return bicChanges
 }
