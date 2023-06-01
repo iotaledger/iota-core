@@ -3,6 +3,7 @@ package ledgerstate_test
 
 import (
 	"encoding/binary"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	"github.com/stretchr/testify/require"
 	"sort"
 	"testing"
@@ -16,12 +17,12 @@ import (
 
 func TestSimpleSlotDiffSerialization(t *testing.T) {
 	indexBooked := iotago.SlotIndex(255975)
-	slotCreated := tpkg.RandSlotIndex()
+	slotCreated := utils.RandSlotIndex()
 
 	api := tpkg.API()
-	outputID := tpkg.RandOutputID()
-	blockID := tpkg.RandBlockID()
-	address := tpkg.RandAddress(iotago.AddressEd25519)
+	outputID := utils.RandOutputID()
+	blockID := utils.RandBlockID()
+	address := utils.RandAddress(iotago.AddressEd25519)
 	amount := uint64(832493)
 	iotaOutput := &iotago.BasicOutput{
 		Amount: amount,
@@ -33,7 +34,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 	}
 	output := ledgerstate.CreateOutput(api, outputID, blockID, indexBooked, slotCreated, iotaOutput)
 
-	transactionIDSpent := tpkg.RandTransactionID()
+	transactionIDSpent := utils.RandTransactionID()
 
 	indexSpent := indexBooked + 1
 
@@ -69,8 +70,8 @@ func TestSlotDiffSerialization(t *testing.T) {
 	index := iotago.SlotIndex(756)
 
 	spents := ledgerstate.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index, tpkg.RandTimestamp()),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, tpkg.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index, utils.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, utils.RandTimestamp()),
 	}
 
 	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))

@@ -3,6 +3,7 @@ package ledgerstate_test
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	"testing"
 
 	"github.com/orcaman/writerseeker"
@@ -17,11 +18,11 @@ import (
 )
 
 func TestOutput_SnapshotBytes(t *testing.T) {
-	outputID := tpkg.RandOutputID(2)
-	blockID := tpkg.RandBlockID()
-	indexBooked := tpkg.RandSlotIndex()
-	slotCreated := tpkg.RandSlotIndex()
-	iotaOutput := tpkg.RandOutput(iotago.OutputBasic)
+	outputID := utils.RandOutputID(2)
+	blockID := utils.RandBlockID()
+	indexBooked := utils.RandSlotIndex()
+	slotCreated := utils.RandSlotIndex()
+	iotaOutput := utils.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := tpkg.API().Encode(iotaOutput)
 	require.NoError(t, err)
 
@@ -38,11 +39,11 @@ func TestOutput_SnapshotBytes(t *testing.T) {
 }
 
 func TestOutputFromSnapshotReader(t *testing.T) {
-	outputID := tpkg.RandOutputID(2)
-	blockID := tpkg.RandBlockID()
-	indexBooked := tpkg.RandSlotIndex()
-	slotCreated := tpkg.RandSlotIndex()
-	iotaOutput := tpkg.RandOutput(iotago.OutputBasic)
+	outputID := utils.RandOutputID(2)
+	blockID := utils.RandBlockID()
+	indexBooked := utils.RandSlotIndex()
+	slotCreated := utils.RandSlotIndex()
+	iotaOutput := utils.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := tpkg.API().Encode(iotaOutput)
 	require.NoError(t, err)
 
@@ -57,20 +58,20 @@ func TestOutputFromSnapshotReader(t *testing.T) {
 }
 
 func TestSpent_SnapshotBytes(t *testing.T) {
-	outputID := tpkg.RandOutputID(2)
-	blockID := tpkg.RandBlockID()
-	indexBooked := tpkg.RandSlotIndex()
-	slotCreated := tpkg.RandSlotIndex()
-	iotaOutput := tpkg.RandOutput(iotago.OutputBasic)
+	outputID := utils.RandOutputID(2)
+	blockID := utils.RandBlockID()
+	indexBooked := utils.RandSlotIndex()
+	slotCreated := utils.RandSlotIndex()
+	iotaOutput := utils.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := tpkg.API().Encode(iotaOutput)
 	require.NoError(t, err)
 
 	output := ledgerstate.CreateOutput(tpkg.API(), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
 	outputSnapshotBytes := output.SnapshotBytes()
 
-	transactionID := tpkg.RandTransactionID()
-	tsSpent := tpkg.RandTimestamp()
-	indexSpent := tpkg.RandSlotIndex()
+	transactionID := utils.RandTransactionID()
+	tsSpent := utils.RandTimestamp()
+	indexSpent := utils.RandSlotIndex()
 	spent := ledgerstate.NewSpent(output, transactionID, indexSpent)
 
 	snapshotBytes := spent.SnapshotBytes()
@@ -81,18 +82,18 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 }
 
 func TestSpentFromSnapshotReader(t *testing.T) {
-	outputID := tpkg.RandOutputID(2)
-	blockID := tpkg.RandBlockID()
-	indexBooked := tpkg.RandSlotIndex()
-	slotCreated := tpkg.RandSlotIndex()
-	iotaOutput := tpkg.RandOutput(iotago.OutputBasic)
+	outputID := utils.RandOutputID(2)
+	blockID := utils.RandBlockID()
+	indexBooked := utils.RandSlotIndex()
+	slotCreated := utils.RandSlotIndex()
+	iotaOutput := utils.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := tpkg.API().Encode(iotaOutput)
 	require.NoError(t, err)
 
 	output := ledgerstate.CreateOutput(tpkg.API(), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
 
-	transactionID := tpkg.RandTransactionID()
-	indexSpent := tpkg.RandSlotIndex()
+	transactionID := utils.RandTransactionID()
+	indexSpent := utils.RandSlotIndex()
 	spent := ledgerstate.NewSpent(output, transactionID, indexSpent)
 
 	snapshotBytes := spent.SnapshotBytes()
@@ -105,7 +106,7 @@ func TestSpentFromSnapshotReader(t *testing.T) {
 }
 
 func TestReadSlotDiffToSnapshotReader(t *testing.T) {
-	index := tpkg.RandSlotIndex()
+	index := utils.RandSlotIndex()
 	slotDiff := &ledgerstate.SlotDiff{
 		Index: index,
 		Outputs: ledgerstate.Outputs{
@@ -114,8 +115,8 @@ func TestReadSlotDiffToSnapshotReader(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 		},
 		Spents: ledgerstate.Spents{
-			tpkg.RandLedgerStateSpent(index, tpkg.RandTimestamp()),
-			tpkg.RandLedgerStateSpent(index, tpkg.RandTimestamp()),
+			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
 		},
 	}
 
@@ -135,7 +136,7 @@ func TestReadSlotDiffToSnapshotReader(t *testing.T) {
 }
 
 func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
-	index := tpkg.RandSlotIndex()
+	index := utils.RandSlotIndex()
 	slotDiff := &ledgerstate.SlotDiff{
 		Index: index,
 		Outputs: ledgerstate.Outputs{
@@ -144,8 +145,8 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 		},
 		Spents: ledgerstate.Spents{
-			tpkg.RandLedgerStateSpent(index, tpkg.RandTimestamp()),
-			tpkg.RandLedgerStateSpent(index, tpkg.RandTimestamp()),
+			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
 		},
 	}
 
@@ -213,7 +214,7 @@ func TestManager_Import(t *testing.T) {
 			output2,
 			tpkg.RandLedgerStateOutput(),
 		}, ledgerstate.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output1, 1, tpkg.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output1, 1, utils.RandTimestamp()),
 		}))
 
 	ledgerIndex, err = manager.ReadLedgerIndex()
@@ -229,7 +230,7 @@ func TestManager_Import(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
 		}, ledgerstate.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output2, 2, tpkg.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output2, 2, utils.RandTimestamp()),
 		}))
 
 	ledgerIndex, err = manager.ReadLedgerIndex()
@@ -303,7 +304,7 @@ func TestManager_Export(t *testing.T) {
 			output2,
 			tpkg.RandLedgerStateOutput(),
 		}, ledgerstate.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output1, 1, tpkg.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output1, 1, utils.RandTimestamp()),
 		}))
 
 	ledgerIndex, err := manager.ReadLedgerIndex()
@@ -316,7 +317,7 @@ func TestManager_Export(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
 		}, ledgerstate.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output2, 2, tpkg.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output2, 2, utils.RandTimestamp()),
 		}))
 
 	ledgerIndex, err = manager.ReadLedgerIndex()

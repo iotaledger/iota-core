@@ -2,6 +2,7 @@
 package ledgerstate_test
 
 import (
+	"github.com/iotaledger/iota-core/pkg/utils"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,8 +29,8 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 	index := iotago.SlotIndex(756)
 
 	spents := ledgerstate.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index, tpkg.RandTimestamp()),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, tpkg.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index, utils.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, utils.RandTimestamp()),
 	}
 
 	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
@@ -95,7 +96,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 	}
 
 	previousMsIndex := iotago.SlotIndex(48)
-	previousMsTimestamp := tpkg.RandTimestamp()
+	previousMsTimestamp := utils.RandTimestamp()
 	previousSpents := ledgerstate.Spents{
 		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[1], previousMsIndex, previousMsTimestamp),
 	}
@@ -117,8 +118,8 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 	index := iotago.SlotIndex(49)
 
 	spents := ledgerstate.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[2], index, tpkg.RandTimestamp()),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, tpkg.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[2], index, utils.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, utils.RandTimestamp()),
 	}
 	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
 

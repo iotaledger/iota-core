@@ -2,6 +2,7 @@
 package ledgerstate_test
 
 import (
+	"github.com/iotaledger/iota-core/pkg/utils"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,21 +16,21 @@ import (
 func TestUTXOComputeBalance(t *testing.T) {
 	manager := ledgerstate.New(mapdb.NewMapDB(), tpkg.API)
 
-	initialOutput := tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressEd25519), 2_134_656_365)
+	initialOutput := tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, utils.RandAddress(iotago.AddressEd25519), 2_134_656_365)
 	require.NoError(t, manager.AddUnspentOutput(initialOutput))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputAccount, tpkg.RandAddress(iotago.AddressAccount), 56_549_524)))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputFoundry, tpkg.RandAddress(iotago.AddressAccount), 25_548_858)))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputNFT, tpkg.RandAddress(iotago.AddressEd25519), 545_699_656)))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressAccount), 626_659_696)))
+	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputAccount, utils.RandAddress(iotago.AddressAccount), 56_549_524)))
+	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputFoundry, utils.RandAddress(iotago.AddressAccount), 25_548_858)))
+	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputNFT, utils.RandAddress(iotago.AddressEd25519), 545_699_656)))
+	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, utils.RandAddress(iotago.AddressAccount), 626_659_696)))
 
 	index := iotago.SlotIndex(756)
 
 	outputs := ledgerstate.Outputs{
-		tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressNFT), 2_134_656_365),
+		tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, utils.RandAddress(iotago.AddressNFT), 2_134_656_365),
 	}
 
 	spents := ledgerstate.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(initialOutput, index, tpkg.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(initialOutput, index, utils.RandTimestamp()),
 	}
 
 	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
@@ -52,29 +53,29 @@ func TestUTXOIteration(t *testing.T) {
 	manager := ledgerstate.New(mapdb.NewMapDB(), tpkg.API)
 
 	outputs := ledgerstate.Outputs{
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressEd25519)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressNFT)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressAccount)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressEd25519)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressNFT)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressAccount)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, tpkg.RandAddress(iotago.AddressEd25519)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputNFT, tpkg.RandAddress(iotago.AddressEd25519)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputNFT, tpkg.RandAddress(iotago.AddressAccount)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputNFT, tpkg.RandAddress(iotago.AddressNFT)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputNFT, tpkg.RandAddress(iotago.AddressAccount)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputAccount, tpkg.RandAddress(iotago.AddressEd25519)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputFoundry, tpkg.RandAddress(iotago.AddressAccount)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputFoundry, tpkg.RandAddress(iotago.AddressAccount)),
-		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputFoundry, tpkg.RandAddress(iotago.AddressAccount)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, utils.RandAddress(iotago.AddressEd25519)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, utils.RandAddress(iotago.AddressNFT)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, utils.RandAddress(iotago.AddressAccount)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, utils.RandAddress(iotago.AddressEd25519)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, utils.RandAddress(iotago.AddressNFT)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, utils.RandAddress(iotago.AddressAccount)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, utils.RandAddress(iotago.AddressEd25519)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputNFT, utils.RandAddress(iotago.AddressEd25519)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputNFT, utils.RandAddress(iotago.AddressAccount)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputNFT, utils.RandAddress(iotago.AddressNFT)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputNFT, utils.RandAddress(iotago.AddressAccount)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputAccount, utils.RandAddress(iotago.AddressEd25519)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputFoundry, utils.RandAddress(iotago.AddressAccount)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputFoundry, utils.RandAddress(iotago.AddressAccount)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputFoundry, utils.RandAddress(iotago.AddressAccount)),
 	}
 
 	index := iotago.SlotIndex(756)
 
 	spents := ledgerstate.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index, tpkg.RandTimestamp()),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, tpkg.RandTimestamp()),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[9], index, tpkg.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index, utils.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, utils.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[9], index, utils.RandTimestamp()),
 	}
 
 	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
