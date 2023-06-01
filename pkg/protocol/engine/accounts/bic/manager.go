@@ -2,9 +2,9 @@ package bic
 
 import (
 	"fmt"
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"sync"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -73,7 +73,12 @@ func (b *BICManager) BICTreeRoot() iotago.Identifier {
 
 // TODO: record also changes to pubKeys and accounts deletions
 
-func (b *BICManager) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotago.AccountID]uint64) (bicRoot iotago.Identifier, err error) {
+func (b *BICManager) CommitSlot(
+	slotIndex iotago.SlotIndex,
+	allotments map[iotago.AccountID]uint64,
+	pubKeysChanges map[iotago.AccountID]map[ed25519.PublicKey]accounts.KeyOperation,
+	destroyedAccount []iotago.AccountID,
+) (bicRoot iotago.Identifier, err error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	if b.latestCommittedSlot+1 != slotIndex {
@@ -103,34 +108,50 @@ func (b *BICManager) CommitSlot(slotIndex iotago.SlotIndex, allotments map[iotag
 	return bicRoot, nil
 }
 
-func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (accounts.Account, error) {
+func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (accounts.Account, bool, error) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
 	if slotIndex < b.latestCommittedSlot-iotago.MaxCommitableSlotAge {
-		return nil, fmt.Errorf("can't calculate BIC, slot index older than bicIndex (%d<%d)", slotIndex, b.latestCommittedSlot)
+		return nil, false, fmt.Errorf("can't calculate BIC, slot index older than bicIndex (%d<%d)", slotIndex, b.latestCommittedSlot)
 	}
 	if slotIndex > b.latestCommittedSlot {
-		return nil, fmt.Errorf("can't retrieve BIC, slot %d is not committed yet, lastest committed slot: %d", slotIndex, b.latestCommittedSlot)
+		return nil, false, fmt.Errorf("can't retrieve BIC, slot %d is not committed yet, lastest committed slot: %d", slotIndex, b.latestCommittedSlot)
 	}
 	// read start value from the bic vector at b.bicIndex
 	loadedAccount, exists := b.bicTree.Get(accountID)
 	if !exists {
 		loadedAccount = accounts.NewAccount(b.api, accountID, accounts.NewCredits(0, slotIndex))
 	}
+	var wasDestroyed bool
 	// last applied diff should be the diff for slotIndex + 1
 	for diffIndex := b.latestCommittedSlot; diffIndex > slotIndex; diffIndex-- {
 		diffStore := b.slotDiffFunc(diffIndex)
 		if diffStore == nil {
-			return nil, fmt.Errorf("can't retrieve BIC, could not find diff store for slot (%d)", diffIndex)
+			return nil, false, fmt.Errorf("can't retrieve BIC, could not find diff store for slot (%d)", diffIndex)
 		}
-		change, err := diffStore.Load(accountID)
+		if found, err := diffStore.Has(accountID); !found {
+			if err != nil {
+				return nil, false, errors.Wrapf(err, "can't retrieve BIC, could not check if diff store for slot (%d) has account (%s)", diffIndex, accountID)
+			}
+		}
+		diffChange, destroyed, err := diffStore.Load(accountID)
 		if err != nil {
-			return nil, fmt.Errorf("can't calculate BIC, slot index doesn't exist (%d)", diffIndex)
+			// no changes for this account in this slot
+			continue
 		}
-		loadedAccount.Credits().Update(-change)
+		// collected to see if account was destroyed between slotIndex and b.latestCommittedSlot intex.
+		wasDestroyed = wasDestroyed || destroyed
+		loadedAccount.Credits().Update(-diffChange.Change, diffChange.PreviousUpdatedTime)
+		loadedAccount.AddPublicKey(diffChange.PubKeysRemoved...)
+		loadedAccount.RemovePublicKey(diffChange.PubKeysAdded...)
 	}
-	return loadedAccount, nil
+	// acocunt not present in the BIC and it was not marked as destroyed in slots between slotIndex and b.latestCommittedSlot
+	if !exists && !wasDestroyed {
+		return nil, false, nil
+	}
+
+	return loadedAccount, true, nil
 }
 
 func (b *BICManager) Shutdown() {
@@ -141,7 +162,13 @@ func (b *BICManager) Shutdown() {
 func (b *BICManager) applyDiff(slotIndex iotago.SlotIndex, changes map[iotago.AccountID]int64) (iotago.Identifier, error) {
 	diffStore := b.slotDiffFunc(slotIndex)
 	for accountID, valueChange := range changes {
-		err := diffStore.Store(accountID, valueChange)
+		bicDiffChange := prunable.BicDiffChange{
+			Change:              0,
+			PreviousUpdatedTime: 0,
+			PubKeysAdded:        nil,
+			PubKeysRemoved:      nil,
+		}
+		err := diffStore.Store(accountID, bicDiffChange, false)
 		if err != nil {
 			return iotago.Identifier{}, errors.Wrapf(err, "could not store diff to slot %d", slotIndex)
 		}
@@ -178,6 +205,7 @@ func (b *BICManager) evict(index iotago.SlotIndex) {
 
 // newBICDiff creates a new BIC diff from the given allotments and burns.
 func newSummarisedChanges(allotments map[iotago.AccountID]uint64, burns map[iotago.AccountID]uint64) map[iotago.AccountID]int64 {
+	// todo use the same struct for all slot changes as in import/export
 	bicChanges := make(map[iotago.AccountID]int64)
 	for id, allotment := range allotments {
 		bicChanges[id] += int64(allotment)

@@ -31,8 +31,8 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 	for _, inp := range bicInputs {
 		// get the BIC inputs from bic manager
-		b, err := l.accountsLedger.BIC(inp.AccountID, inp.CommitmentID.Index())
-		if err != nil {
+		b, exists, err := l.accountsLedger.BIC(inp.AccountID, inp.CommitmentID.Index())
+		if err != nil || !exists {
 			return nil, xerrors.Errorf("could not get BIC inputs: %w", err)
 		}
 		bicInputSet[inp.AccountID] = iotago.BlockIssuanceCredit{
