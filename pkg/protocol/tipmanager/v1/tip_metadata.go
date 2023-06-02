@@ -113,19 +113,27 @@ func (t *TipMetadata) OnEvicted(handler func()) {
 
 // setup sets up the behavior of the derived properties of the Block.
 func (t *TipMetadata) setup() (self *TipMetadata) {
-	var leaveTipPool func()
+	leaveCurrentTipPool := void
+
+	joinTipPool := func(isReferencedByTips *promise.Value[bool], isTip *promise.Value[bool]) {
+		unsubscribe := isReferencedByTips.OnUpdate(func(_, isReferenced bool) { isTip.Set(!isReferenced) })
+
+		leaveCurrentTipPool = func() {
+			unsubscribe()
+
+			isTip.Set(false)
+
+			leaveCurrentTipPool = void
+		}
+	}
 
 	t.OnTipPoolUpdated(func(tipPool tipmanager.TipPool) {
-		if leaveTipPool != nil {
-			leaveTipPool()
-		}
+		leaveCurrentTipPool()
 
 		if tipPool == tipmanager.StrongTipPool {
-			leaveTipPool = t.joinTipPool(t.stronglyReferencedByTips, t.strongTip)
+			joinTipPool(t.stronglyReferencedByTips, t.strongTip)
 		} else if tipPool == tipmanager.WeakTipPool {
-			leaveTipPool = t.joinTipPool(t.referencedByTips, t.weakTip)
-		} else {
-			leaveTipPool = nil
+			joinTipPool(t.referencedByTips, t.weakTip)
 		}
 
 		t.stronglyConnectedToTips.Compute(func(_ bool) bool {
@@ -164,19 +172,6 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 	return t
 }
 
-// joinTipPool joins the tip pool by setting up the tip pool derived properties.
-func (t *TipMetadata) joinTipPool(isReferencedByTips *promise.Value[bool], isTip *promise.Value[bool]) (leave func()) {
-	unsubscribe := isReferencedByTips.OnUpdate(func(_, isReferenced bool) {
-		isTip.Set(!isReferenced)
-	})
-
-	return func() {
-		unsubscribe()
-
-		isTip.Set(false)
-	}
-}
-
 // setTipPool sets the TipPool of the Block.
 func (t *TipMetadata) setTipPool(newType tipmanager.TipPool) {
 	t.tipPool.Compute(func(prevType tipmanager.TipPool) tipmanager.TipPool {
@@ -209,3 +204,6 @@ func propagateConnectedChildren(isConnected bool, stronglyConnected bool) (propa
 
 // code contract (make sure the type implements all required methods).
 var _ tipmanager.TipMetadata = new(TipMetadata)
+
+// void is a function that does nothing.
+func void() {}
