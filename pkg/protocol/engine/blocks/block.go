@@ -113,6 +113,11 @@ func (b *Block) StrongParents() (parents []iotago.BlockID) {
 	return b.modelBlock.Block().StrongParents
 }
 
+// ParentsWithType returns the parents of the block with their type.
+func (b *Block) ParentsWithType() []model.Parent {
+	return b.modelBlock.ParentsWithType()
+}
+
 // ForEachParent executes a consumer func for each parent.
 func (b *Block) ForEachParent(consumer func(parent model.Parent)) {
 	b.modelBlock.ForEachParent(consumer)
