@@ -93,6 +93,8 @@ func (s *Set[T]) OnUpdate(callback func(updatedSet *advancedset.AdvancedSet[T], 
 
 	return func() {
 		s.updateCallbacks.Delete(newCallback.ID)
+
+		newCallback.MarkUnsubscribed()
 	}
 }
 
