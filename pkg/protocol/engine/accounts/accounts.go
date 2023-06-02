@@ -1,7 +1,10 @@
 package accounts
 
 import (
+	"github.com/pkg/errors"
+
 	"github.com/iotaledger/hive.go/crypto/ed25519"
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
@@ -43,7 +46,7 @@ type AccountData struct {
 	pubKeysMap *shrinkingmap.ShrinkingMap[ed25519.PublicKey, types.Empty]
 }
 
-func NewAccount(api iotago.API, id iotago.AccountID, credits *Credits, pubKeys ...ed25519.PublicKey) *AccountData {
+func NewAccountData(api iotago.API, id iotago.AccountID, credits *Credits, pubKeys ...ed25519.PublicKey) *AccountData {
 	pubKeysMap := shrinkingmap.New[ed25519.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
 	if pubKeys != nil {
 		for _, pubKey := range pubKeys {
@@ -65,6 +68,16 @@ func (a *AccountData) ID() iotago.AccountID {
 
 func (a *AccountData) Credits() *Credits {
 	return a.credits
+}
+
+func (a *AccountData) PubKeys() *advancedset.AdvancedSet[ed25519.PublicKey] {
+	pubKeys := advancedset.New[ed25519.PublicKey]()
+	a.pubKeysMap.ForEachKey(func(key ed25519.PublicKey) bool {
+		pubKeys.Add(key)
+		return true
+	})
+
+	return pubKeys
 }
 
 func (a *AccountData) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
@@ -112,8 +125,13 @@ func (a AccountData) Bytes() ([]byte, error) {
 	return b, nil
 }
 
-func (a *AccountData) SnapshotBytes() []byte {
+func (a *AccountData) SnapshotBytes() ([]byte, error) {
+	idBytes, err := a.id.Bytes()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal account id")
+	}
 	m := marshalutil.New()
+	m.WriteBytes(idBytes)
 	m.WriteInt64(a.Credits().Value)
 	m.WriteBytes(a.Credits().UpdateTime.Bytes())
 	m.WriteUint64(uint64(a.pubKeysMap.Size()))
@@ -122,5 +140,5 @@ func (a *AccountData) SnapshotBytes() []byte {
 		return true
 	})
 
-	return m.Bytes()
+	return m.Bytes(), nil
 }

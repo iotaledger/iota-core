@@ -125,7 +125,7 @@ func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex)
 	// read start value from the bic vector at b.bicIndex
 	loadedAccount, exists := b.bicTree.Get(accountID)
 	if !exists {
-		loadedAccount = accounts.NewAccount(b.api, accountID, accounts.NewCredits(0, slotIndex))
+		loadedAccount = accounts.NewAccountData(b.api, accountID, accounts.NewCredits(0, slotIndex))
 	}
 	wasDestroyed, err := b.rollbackAccountTo(slotIndex, accountID, loadedAccount)
 	if err != nil {
@@ -210,7 +210,7 @@ func (b *BICManager) commitBICTree(index iotago.SlotIndex, bicDiffChanges map[io
 		}
 		loadedAccount, exists := b.bicTree.Get(accountID)
 		if !exists {
-			loadedAccount = accounts.NewAccount(b.api, accountID, accounts.NewCredits(0, index))
+			loadedAccount = accounts.NewAccountData(b.api, accountID, accounts.NewCredits(0, index))
 		}
 		loadedAccount.Credits().Update(diffChange.Change, index)
 		loadedAccount.AddPublicKey(diffChange.PubKeysAdded...)
