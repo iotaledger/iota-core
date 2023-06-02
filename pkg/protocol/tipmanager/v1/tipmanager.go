@@ -265,31 +265,35 @@ func (t *TipManager) Shutdown() {
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
-	tipMetadata.stronglyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-		t.updateParents(tipMetadata, propagateConnectedChildren(isConnected, true))
-	})
+	unsubscribe := lo.Batch(
+		tipMetadata.stronglyConnectedToTips.OnUpdate(func(_, isConnected bool) {
+			t.updateParents(tipMetadata, propagateConnectedChildren(isConnected, true))
+		}),
 
-	tipMetadata.weaklyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-		t.updateParents(tipMetadata, propagateConnectedChildren(isConnected, false))
-	})
+		tipMetadata.weaklyConnectedToTips.OnUpdate(func(_, isConnected bool) {
+			t.updateParents(tipMetadata, propagateConnectedChildren(isConnected, false))
+		}),
 
-	tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
-		if isStrongTip {
-			t.strongTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
-		} else {
-			t.strongTipSet.Delete(tipMetadata.Block().ID())
-		}
-	})
+		tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
+			if isStrongTip {
+				t.strongTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
+			} else {
+				t.strongTipSet.Delete(tipMetadata.Block().ID())
+			}
+		}),
 
-	tipMetadata.OnIsWeakTipUpdated(func(isWeakTip bool) {
-		if isWeakTip {
-			t.weakTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
-		} else {
-			t.weakTipSet.Delete(tipMetadata.Block().ID())
-		}
-	})
+		tipMetadata.OnIsWeakTipUpdated(func(isWeakTip bool) {
+			if isWeakTip {
+				t.weakTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
+			} else {
+				t.weakTipSet.Delete(tipMetadata.Block().ID())
+			}
+		}),
+	)
 
 	tipMetadata.OnEvicted(func() {
+		unsubscribe()
+
 		t.strongTipSet.Delete(tipMetadata.Block().ID())
 		t.weakTipSet.Delete(tipMetadata.Block().ID())
 	})
