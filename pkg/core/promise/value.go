@@ -98,9 +98,7 @@ func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe f
 	return func() {
 		v.updateCallbacks.Delete(createdCallback.id)
 
-		// wait until a possibly running trigger is finished
-		createdCallback.triggerMutex.Lock()
-		createdCallback.triggerMutex.Unlock()
+		createdCallback.markUnsubscribed()
 	}
 }
 
@@ -144,6 +142,9 @@ type valueCallback[T comparable] struct {
 	// lastTriggerID is the last triggerID that was used to trigger the callback.
 	lastTriggerID int
 
+	// unsubscribed is a flag that indicates whether the callback was unsubscribed.
+	unsubscribed bool
+
 	// triggerMutex is used to ensure that the callback is only triggered once per triggerID.
 	triggerMutex sync.Mutex
 }
@@ -162,11 +163,19 @@ func (c *valueCallback[T]) trigger(triggerID int, prevValue, newValue T) {
 	c.triggerMutex.Lock()
 	defer c.triggerMutex.Unlock()
 
-	if triggerID != c.lastTriggerID {
+	if !c.unsubscribed && triggerID != c.lastTriggerID {
 		c.lastTriggerID = triggerID
 
 		c.callback(prevValue, newValue)
 	}
+}
+
+// markUnsubscribed marks the callback as unsubscribed.
+func (c *valueCallback[T]) markUnsubscribed() {
+	c.triggerMutex.Lock()
+	defer c.triggerMutex.Unlock()
+
+	c.unsubscribed = true
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
