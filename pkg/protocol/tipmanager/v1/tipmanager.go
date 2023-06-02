@@ -292,10 +292,9 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	)
 
 	tipMetadata.OnEvicted(func() {
-		unsubscribe()
+		tipMetadata.setTipPool(tipmanager.DroppedTipPool)
 
-		t.strongTipSet.Delete(tipMetadata.Block().ID())
-		t.weakTipSet.Delete(tipMetadata.Block().ID())
+		unsubscribe()
 	})
 
 	tipMetadata.setTipPool(t.determineTipPool(tipMetadata))
