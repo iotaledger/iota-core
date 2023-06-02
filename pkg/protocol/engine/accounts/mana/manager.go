@@ -23,24 +23,26 @@ type Manager struct {
 	module.Module
 }
 
-func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotago.SlotIndex) (updatedValue uint64, err error) {
+func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotago.SlotIndex) (uint64, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	oldMana, exists := m.manaVector.Get(accountID)
+	mana, exists := m.manaVector.Get(accountID)
 	if !exists {
 		return 0, errors.Errorf("mana for accountID %s does not exist in this slot", accountID)
 	}
-	// apply decay to stored Mana and potential that was added on last update
-	updatedValue += m.protocolParams.StoredManaWithDecay(oldMana.Value(), currentSlot-oldMana.UpdateTime())
-	// get newly generated potential since last update and apply decay
-	updatedValue += m.protocolParams.PotentialManaWithDecay(oldMana.Deposit(), currentSlot-oldMana.UpdateTime())
 
-	if currentSlot > oldMana.UpdateTime() {
-		oldMana.UpdateValue(updatedValue, currentSlot)
+	if currentSlot == mana.UpdateTime() {
+		return mana.Value(), nil
 	}
 
-	return updatedValue, nil
+	// apply decay to stored Mana and potential that was added on last update
+	updatedValue := m.protocolParams.StoredManaWithDecay(mana.Value(), currentSlot-mana.UpdateTime())
+	// get newly generated potential since last update and apply decay
+	updatedValue += m.protocolParams.PotentialManaWithDecay(mana.Deposit(), currentSlot-mana.UpdateTime())
+	mana.UpdateValue(updatedValue, currentSlot)
+
+	return mana.Value(), nil
 }
 
 func (m *Manager) CommitSlot(slotIndex iotago.SlotIndex, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], accountOutputs map[iotago.AccountID]*iotago.AccountOutput) {
