@@ -97,6 +97,10 @@ func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe f
 
 	return func() {
 		v.updateCallbacks.Delete(createdCallback.id)
+
+		// wait until a possibly running trigger is finished
+		createdCallback.triggerMutex.Lock()
+		createdCallback.triggerMutex.Unlock()
 	}
 }
 
