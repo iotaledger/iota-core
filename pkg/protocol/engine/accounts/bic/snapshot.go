@@ -62,7 +62,7 @@ func (b *BICManager) importSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64)
 			if err != nil {
 				return errors.Wrapf(err, "unable to read slot diff")
 			}
-			err = diffStore.Store(accountID, bicDiffChange, destroyed)
+			err = diffStore.Store(accountID, *bicDiffChange, destroyed)
 			if err != nil {
 				return errors.Wrapf(err, "unable to store slot diff")
 			}
@@ -71,47 +71,53 @@ func (b *BICManager) importSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64)
 	return nil
 }
 
-func slotDiffSnapshotReader(reader io.ReadSeeker) (prunable.BicDiffChange, iotago.AccountID, bool, error) {
-	bicDiffChange := prunable.BicDiffChange{
+func slotDiffSnapshotReader(reader io.ReadSeeker) (*prunable.BicDiffChange, iotago.AccountID, bool, error) {
+	bicDiffChange := &prunable.BicDiffChange{
 		PubKeysAdded:   make([]ed25519.PublicKey, 0),
 		PubKeysRemoved: make([]ed25519.PublicKey, 0),
 	}
 	accountID, err := accountIDFromSnapshotReader(reader)
 	if err != nil {
-		return prunable.BicDiffChange{}, iotago.AccountID{}, false, errors.Wrapf(err, "unable to read account ID")
+		return nil, iotago.AccountID{}, false, errors.Wrapf(err, "unable to read account ID")
 	}
-	var value int64
-	if err = binary.Read(reader, binary.LittleEndian, &value); err != nil {
-		return prunable.BicDiffChange{}, iotago.AccountID{}, false, errors.Wrapf(err, "unable to read BIC balance value in the diff")
+	if err = binary.Read(reader, binary.LittleEndian, &bicDiffChange.Change); err != nil {
+		return nil, iotago.AccountID{}, false, errors.Wrapf(err, "unable to read BIC balance value in the diff")
 	}
-	err = readPubKeysFromSnapshot(reader, bicDiffChange.PubKeysAdded)
+	var updatedTime uint64
+	if err = binary.Read(reader, binary.LittleEndian, &updatedTime); err != nil {
+		return nil, iotago.AccountID{}, false, errors.Wrapf(err, "unable to read updated time in the diff")
+	}
+	bicDiffChange.PreviousUpdatedTime = iotago.SlotIndex(updatedTime)
+	updatedKeys, err := readPubKeysFromSnapshot(reader, bicDiffChange.PubKeysAdded)
 	if err != nil {
-		return prunable.BicDiffChange{}, iotago.AccountID{}, false, errors.Wrap(err, "unable to read added pubKeys in the diff")
+		return nil, iotago.AccountID{}, false, errors.Wrap(err, "unable to read added pubKeys in the diff")
 	}
-	err = readPubKeysFromSnapshot(reader, bicDiffChange.PubKeysRemoved)
+	bicDiffChange.PubKeysAdded = updatedKeys
+	updatedKeys, err = readPubKeysFromSnapshot(reader, bicDiffChange.PubKeysRemoved)
 	if err != nil {
-		return prunable.BicDiffChange{}, iotago.AccountID{}, false, errors.Wrap(err, "unable to read added pubKeys in the diff")
+		return nil, iotago.AccountID{}, false, errors.Wrap(err, "unable to read added pubKeys in the diff")
 	}
+	bicDiffChange.PubKeysRemoved = updatedKeys
 	var destroyed bool
 	if err = binary.Read(reader, binary.LittleEndian, &destroyed); err != nil {
-		return prunable.BicDiffChange{}, iotago.AccountID{}, false, errors.Wrapf(err, "unable to read destroyed flag in the diff")
+		return nil, iotago.AccountID{}, false, errors.Wrapf(err, "unable to read destroyed flag in the diff")
 	}
 	return bicDiffChange, accountID, destroyed, nil
 }
 
-func readPubKeysFromSnapshot(reader io.ReadSeeker, pubKeysToUpdate []ed25519.PublicKey) error {
+func readPubKeysFromSnapshot(reader io.ReadSeeker, pubKeysToUpdate []ed25519.PublicKey) ([]ed25519.PublicKey, error) {
 	var pubKeysLength uint64
 	if err := binary.Read(reader, binary.LittleEndian, &pubKeysLength); err != nil {
-		return errors.Wrapf(err, "unable to read added pubKeys length in the diff")
+		return nil, errors.Wrapf(err, "unable to read added pubKeys length in the diff")
 	}
 	for k := uint64(0); k < pubKeysLength; k++ {
 		pubKey, err := pubKeyFromSnapshotReader(reader)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		pubKeysToUpdate = append(pubKeysToUpdate, pubKey)
 	}
-	return nil
+	return pubKeysToUpdate, nil
 }
 
 func (b *BICManager) importBICTree(reader io.ReadSeeker, accountCount uint64) error {
@@ -288,6 +294,7 @@ func slotDiffSnapshotBytes(accountID iotago.AccountID, bicDiffChange prunable.Bi
 	m := marshalutil.New()
 	m.WriteBytes(lo.PanicOnErr(accountID.Bytes()))
 	m.WriteInt64(bicDiffChange.Change)
+	m.WriteUint64(uint64(bicDiffChange.PreviousUpdatedTime))
 	// Length of the added public keys slice.
 	m.WriteUint64(uint64(len(bicDiffChange.PubKeysAdded)))
 	for _, addedPubKey := range bicDiffChange.PubKeysAdded {
