@@ -128,19 +128,37 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 			leaveTipPool = nil
 		}
 
-		t.stronglyConnectedToTips.Set(tipPool == tipmanager.StrongTipPool || t.stronglyConnectedChildren.Get() > 0)
-		t.weaklyConnectedToTips.Set(tipPool == tipmanager.WeakTipPool || t.weaklyConnectedChildren.Get() > 0)
+		t.stronglyConnectedToTips.Compute(func(_ bool) bool {
+			return tipPool == tipmanager.StrongTipPool || t.stronglyConnectedChildren.Get() > 0
+		})
+
+		t.weaklyConnectedToTips.Compute(func(_ bool) bool {
+			return tipPool == tipmanager.WeakTipPool || t.weaklyConnectedChildren.Get() > 0
+		})
 	})
 
-	t.stronglyConnectedChildren.OnUpdate(func(_, strongChildren int) {
-		t.stronglyConnectedToTips.Set(strongChildren > 0 || t.tipPool.Get() == tipmanager.StrongTipPool)
-		t.referencedByTips.Set(strongChildren > 0 || t.weaklyConnectedChildren.Get() > 0)
-		t.stronglyReferencedByTips.Set(strongChildren > 0)
+	t.stronglyConnectedChildren.OnUpdate(func(_, stronglyConnectedChildren int) {
+		t.stronglyConnectedToTips.Compute(func(_ bool) bool {
+			return stronglyConnectedChildren > 0 || t.tipPool.Get() == tipmanager.StrongTipPool
+		})
+
+		t.referencedByTips.Compute(func(_ bool) bool {
+			return stronglyConnectedChildren > 0 || t.weaklyConnectedChildren.Get() > 0
+		})
+
+		t.stronglyReferencedByTips.Compute(func(_ bool) bool {
+			return stronglyConnectedChildren > 0
+		})
 	})
 
 	t.weaklyConnectedChildren.OnUpdate(func(_, newCount int) {
-		t.weaklyConnectedToTips.Set(newCount > 0 || t.tipPool.Get() == tipmanager.WeakTipPool)
-		t.referencedByTips.Set(newCount > 0 || t.stronglyConnectedChildren.Get() > 0)
+		t.weaklyConnectedToTips.Compute(func(_ bool) bool {
+			return newCount > 0 || t.tipPool.Get() == tipmanager.WeakTipPool
+		})
+
+		t.referencedByTips.Compute(func(_ bool) bool {
+			return newCount > 0 || t.stronglyConnectedChildren.Get() > 0
+		})
 	})
 
 	return t
