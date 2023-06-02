@@ -20,7 +20,7 @@ import (
 )
 
 type TestFramework struct {
-	Instance *tipmanagerv1.tipmanagerv1
+	Instance *tipmanagerv1.TipManager
 
 	blockIDsByAlias map[string]iotago.BlockID
 	blocksByID      map[iotago.BlockID]*blocks.Block
