@@ -1,13 +1,15 @@
 package mana
 
 import (
+	"github.com/zyedidia/generic/cache"
+	"golang.org/x/xerrors"
+
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/pkg/errors"
 )
 
 // For stored Mana added to account, or stored/potential Mana spent, we will update on commitment
@@ -15,7 +17,9 @@ import (
 type Manager struct {
 	protocolParams iotago.ProtocolParameters
 
-	manaVector *shrinkingmap.ShrinkingMap[iotago.AccountID, *accounts.Mana]
+	manaVectorCache *cache.Cache[iotago.AccountID, *accounts.Mana]
+
+	accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*ledgerstate.Output, error)
 
 	// TODO: properly lock across methods
 	mutex syncutils.RWMutex
@@ -23,13 +27,28 @@ type Manager struct {
 	module.Module
 }
 
+func NewManager(protocolParams iotago.ProtocolParameters, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*ledgerstate.Output, error)) *Manager {
+	return &Manager{
+		protocolParams:           protocolParams,
+		accountOutputResolveFunc: accountOutputResolveFunc,
+		manaVectorCache:          cache.New[iotago.AccountID, *accounts.Mana](10000),
+	}
+}
+
 func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotago.SlotIndex) (uint64, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	mana, exists := m.manaVector.Get(accountID)
+	mana, exists := m.manaVectorCache.Get(accountID)
 	if !exists {
-		return 0, errors.Errorf("mana for accountID %s does not exist in this slot", accountID)
+		output, err := m.accountOutputResolveFunc(accountID, currentSlot)
+		if err != nil {
+			return 0, xerrors.Errorf("failed to resolve AccountOutput for %s in  slot %s: %w", accountID, currentSlot, err)
+		}
+
+		mana = accounts.NewMana(output.StoredMana(), output.Deposit(), output.CreationTime())
+
+		m.manaVectorCache.Put(accountID, mana)
 	}
 
 	if currentSlot == mana.UpdateTime() {
@@ -45,18 +64,18 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	return mana.Value(), nil
 }
 
-func (m *Manager) CommitSlot(slotIndex iotago.SlotIndex, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], accountOutputs map[iotago.AccountID]*iotago.AccountOutput) {
+func (m *Manager) CommitSlot(slotIndex iotago.SlotIndex, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], accountOutputs map[iotago.AccountID]*ledgerstate.Output) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	destroyedAccounts.Range(func(accountID iotago.AccountID) {
-		m.manaVector.Delete(accountID)
+		m.manaVectorCache.Remove(accountID)
 	})
 
-	for accountID, accountOutput := range accountOutputs {
-		mana, _ := m.manaVector.GetOrCreate(accountID, func() *accounts.Mana {
-			return accounts.NewMana(accountOutput.StoredMana(), accountOutput.Deposit(), slotIndex)
-		})
-		mana.Update(accountOutput.StoredMana(), accountOutput.Deposit(), slotIndex)
+	for accountID, output := range accountOutputs {
+		mana, exists := m.manaVectorCache.Get(accountID)
+		if exists {
+			mana.Update(output.Output().StoredMana(), output.Output().Deposit(), slotIndex)
+		}
 	}
 }

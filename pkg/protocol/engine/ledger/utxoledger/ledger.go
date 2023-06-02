@@ -92,6 +92,7 @@ func New(
 	l := &Ledger{
 		utxoLedger:       ledgerstate.New(utxoStore, apiProviderFunc),
 		accountsLedger:   bic.New(blocksFunc, slotDiffFunc, accountsStore, apiProviderFunc()),
+		manaManager:      mana.NewManager(apiProviderFunc()),
 		commitmentLoader: commitmentLoader,
 		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
 		errorHandler:     errorHandler,
@@ -194,8 +195,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	var spents ledgerstate.Spents
 	bicDiffChanges := make(map[iotago.AccountID]*prunable.BicDiffChange)
 	destroyedAccounts := advancedset.New[iotago.AccountID]()
-	consumedAccounts := make(map[iotago.AccountID]*iotago.AccountOutput)
-	outputAccounts := make(map[iotago.AccountID]*iotago.AccountOutput)
+	consumedAccounts := advancedset.New[iotago.AccountID]()
+	outputAccounts := make(map[iotago.AccountID]*ledgerstate.Output)
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
@@ -223,7 +224,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 			if spent.OutputType() == iotago.OutputAccount {
 				accountOutput := spent.Output().Output().(*iotago.AccountOutput)
-				consumedAccounts[accountOutput.AccountID] = accountOutput
+				consumedAccounts.Add(accountOutput.AccountID)
 				delete(outputAccounts, accountOutput.AccountID)
 			}
 		}
@@ -234,7 +235,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 			if output.OutputType() == iotago.OutputAccount {
 				accountOutput := output.Output().(*iotago.AccountOutput)
-				outputAccounts[accountOutput.AccountID] = accountOutput
+				outputAccounts[accountOutput.AccountID] = output
 			}
 
 			return nil
@@ -250,11 +251,11 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return true
 	})
 
-	for accountID := range consumedAccounts {
+	consumedAccounts.Range(func(accountID iotago.AccountID) {
 		if _, exists := outputAccounts[accountID]; !exists {
 			destroyedAccounts.Add(accountID)
 		}
-	}
+	})
 
 	l.manaManager.CommitSlot(index, destroyedAccounts, outputAccounts)
 
