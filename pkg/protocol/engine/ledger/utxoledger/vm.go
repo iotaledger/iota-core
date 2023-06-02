@@ -66,7 +66,10 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		CommitmentInputSet: commitmentInputSet,
 	}
 
-	if err := stardust.NewVirtualMachine().Execute(tx, &iotagovm.Params{}, resolvedInputs); err != nil {
+	vmParams := &iotagovm.Params{External: &iotago.ExternalUnlockParameters{
+		ProtocolParameters: *l.protocolParameters,
+	}}
+	if err := stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
 		return nil, err
 	}
 

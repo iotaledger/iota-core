@@ -38,9 +38,10 @@ type Ledger struct {
 	manaManager      *mana.Manager
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
-	memPool      mempool.MemPool[booker.BlockVotePower]
-	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
-	errorHandler func(error)
+	memPool            mempool.MemPool[booker.BlockVotePower]
+	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	errorHandler       func(error)
+	protocolParameters *iotago.ProtocolParameters
 
 	module.Module
 }
@@ -59,6 +60,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.BicDiffs,
 			e.API,
 			e.ErrorHandler("ledger"),
+			e.Storage.Settings().ProtocolParameters(),
 		)
 
 		e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
@@ -88,17 +90,19 @@ func New(
 	slotDiffFunc func(iotago.SlotIndex) *prunable.BicDiffs,
 	apiProviderFunc func() iotago.API,
 	errorHandler func(error),
+	protocolParameters *iotago.ProtocolParameters,
 ) *Ledger {
 	l := &Ledger{
-		utxoLedger:       ledgerstate.New(utxoStore, apiProviderFunc),
-		accountsLedger:   bic.New(blocksFunc, slotDiffFunc, accountsStore, apiProviderFunc()),
-		manaManager:      mana.NewManager(apiProviderFunc()),
-		commitmentLoader: commitmentLoader,
-		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
-		errorHandler:     errorHandler,
+		utxoLedger:         ledgerstate.New(utxoStore, apiProviderFunc),
+		accountsLedger:     bic.New(blocksFunc, slotDiffFunc, accountsStore, apiProviderFunc()),
+		commitmentLoader:   commitmentLoader,
+		conflictDAG:        conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
+		errorHandler:       errorHandler,
+		protocolParameters: protocolParameters,
 	}
 
 	l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[booker.BlockVotePower](true))
+	l.manaManager = mana.NewManager(*protocolParameters, l.resolveAccountOutput)
 
 	return l
 }
@@ -134,6 +138,33 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 	}
 
 	return nil
+}
+
+func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (*ledgerstate.Output, error) {
+
+	// make sure that slotIndex is committed
+	account, _, err := l.accountsLedger.BIC(accountID, slotIndex)
+	if err != nil {
+		return nil, xerrors.Errorf("could not get account information for account %s in slot %d: %w", accountID, slotIndex, err)
+	}
+
+	l.utxoLedger.ReadLockLedger()
+	defer l.utxoLedger.ReadUnlockLedger()
+
+	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(account.OutputID())
+	if err != nil {
+		return nil, xerrors.Errorf("error while checking account output %s is unspent: %w", account.OutputID(), err)
+	}
+	if !isUnspent {
+		return nil, xerrors.Errorf("unspent account output %s not found: %w", account.OutputID(), mempool.ErrStateNotFound)
+	}
+
+	accountOutput, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(account.OutputID())
+	if err != nil {
+		return nil, xerrors.Errorf("error while retrieving account output %s: %w", account.OutputID(), err)
+	}
+
+	return accountOutput, nil
 }
 
 func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
