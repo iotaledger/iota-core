@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 )
 
 // var (

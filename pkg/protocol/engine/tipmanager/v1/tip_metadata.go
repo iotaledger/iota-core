@@ -5,7 +5,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 )
 
 // TipMetadata represents the metadata for a block in the TipManager.

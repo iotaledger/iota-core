@@ -14,13 +14,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
-	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 type TestFramework struct {
-	Instance *tipmanagerv1.TipManager
+	Instance *tipmanagerv1.tipmanagerv1
 
 	blockIDsByAlias map[string]iotago.BlockID
 	blocksByID      map[iotago.BlockID]*blocks.Block
