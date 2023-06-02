@@ -90,6 +90,10 @@ func (o *Output) Deposit() uint64 {
 	return o.Output().Deposit()
 }
 
+func (o *Output) StoredMana() uint64 {
+	return o.Output().StoredMana()
+}
+
 type Outputs []*Output
 
 func (o Outputs) ToOutputSet() iotago.OutputSet {
