@@ -117,23 +117,26 @@ func (t *TipManager) AddBlock(block *blocks.Block) {
 func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
 
-	seenStrongTips := advancedset.New[iotago.BlockID]()
-	selectStrongTips := func(amount int) (strongTips []*TipMetadata) {
-		if amount <= 0 {
-			return strongTips
-		}
+	tipSelector := func(tips *randommap.RandomMap[iotago.BlockID, *TipMetadata]) func(amount int) (strongTips []*TipMetadata) {
+		seenStrongTips := advancedset.New[iotago.BlockID]()
 
-		for _, strongTip := range t.strongTipSet.RandomUniqueEntries(amount + seenStrongTips.Size()) {
-			if seenStrongTips.Add(strongTip.Block().ID()) {
-				strongTips = append(strongTips, strongTip)
+		return func(amount int) (strongTips []*TipMetadata) {
+			if amount <= 0 {
+				return strongTips
+			}
 
-				if len(strongTips) == amount {
-					return strongTips
+			for _, strongTip := range tips.RandomUniqueEntries(amount + seenStrongTips.Size()) {
+				if seenStrongTips.Add(strongTip.Block().ID()) {
+					strongTips = append(strongTips, strongTip)
+
+					if len(strongTips) == amount {
+						return strongTips
+					}
 				}
 			}
-		}
 
-		return strongTips
+			return strongTips
+		}
 	}
 
 	_ = t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]) error {
@@ -168,6 +171,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 			return references, updatedLikedConflicts, nil
 		}
 
+		selectStrongTips := tipSelector(t.strongTipSet)
 		for strongTipCandidates := selectStrongTips(amount); len(strongTipCandidates) != 0; strongTipCandidates = selectStrongTips(amount - len(references[model.StrongParentType])) {
 			for _, strongTip := range strongTipCandidates {
 				if addedLikedInsteadReferences, updatedLikedConflicts, err := likedInsteadReferences(strongTip); err != nil {
@@ -183,10 +187,6 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 			}
 		}
 
-		references[model.WeakParentType] = lo.Map(t.weakTipSet.RandomUniqueEntries(t.optMaxWeakReferences), func(sourceType *TipMetadata) iotago.BlockID {
-			return sourceType.Block().ID()
-		})
-
 		if len(references[model.StrongParentType]) == 0 {
 			rootBlocks := t.retrieveRootBlocks()
 
@@ -196,6 +196,17 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 			}
 
 			references[model.StrongParentType] = rootBlocks[:rootBlockCount]
+		}
+
+		selectWeakTips := tipSelector(t.weakTipSet)
+		for weakTipCandidates := selectWeakTips(t.optMaxWeakReferences); len(weakTipCandidates) != 0; weakTipCandidates = selectWeakTips(t.optMaxWeakReferences - len(references[model.WeakParentType])) {
+			for _, weakTip := range weakTipCandidates {
+				if tipPool := t.determineTipPool(weakTip, tipmanager.WeakTipPool); tipPool != tipmanager.WeakTipPool {
+					weakTip.setTipPool(tipPool)
+				} else {
+					references[model.WeakParentType] = append(references[model.WeakParentType], weakTip.Block().ID())
+				}
+			}
 		}
 
 		return nil
