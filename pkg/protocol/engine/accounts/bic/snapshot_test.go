@@ -41,17 +41,17 @@ func TestAccountDiffSnapshotWriter(t *testing.T) {
 	accountData := tpkg.RandomAccountData()
 	writer := &writerseeker.WriterSeeker{}
 	pWriter := utils.NewPositionedWriter(writer)
-	err := bic.AccountDiffSnapshotWriter(pWriter, accountData)
+	err := bic.AccountDataSnapshotWriter(pWriter, accountData)
 	require.NoError(t, err)
 	readAccountsData, err := bic.AccountDataFromSnapshotReader(tpkg.API(), writer.BytesReader())
 	require.NoError(t, err)
 	tpkg.EqualAccountData(t, accountData, readAccountsData)
 }
 
-func TestBICSnapshotBytes(t *testing.T) {
+func TestManager_Import(t *testing.T) {
 
 }
 
-func TestTargetBICCreation(t *testing.T) {
+func TestManager_Export(t *testing.T) {
 
 }

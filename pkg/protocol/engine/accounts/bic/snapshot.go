@@ -126,7 +126,7 @@ func (b *BICManager) exportTargetBIC(pWriter *utils.PositionedWriter, targetInde
 		if err != nil {
 			return false
 		}
-		err = AccountDiffSnapshotWriter(pWriter, accountData)
+		err = AccountDataSnapshotWriter(pWriter, accountData)
 		if err != nil {
 			return false
 		}
@@ -165,7 +165,7 @@ func (b *BICManager) includeDestroyedAccountsToTargetBIC(pWriter *utils.Position
 		if err != nil {
 			return accountCount, errors.Wrapf(err, "unable to rollback account %s to target slot index %d", accountID.String(), targetIndex)
 		}
-		err = AccountDiffSnapshotWriter(pWriter, accountData)
+		err = AccountDataSnapshotWriter(pWriter, accountData)
 		if err != nil {
 			return accountCount, errors.Wrapf(err, "unable to write account %s to snapshot", accountID.String())
 		}
@@ -343,7 +343,7 @@ func accountIDFromSnapshotReader(reader io.ReadSeeker) (iotago.AccountID, error)
 	return accountID, nil
 }
 
-func AccountDiffSnapshotWriter(writer *utils.PositionedWriter, accountData *accounts.AccountData) error {
+func AccountDataSnapshotWriter(writer *utils.PositionedWriter, accountData *accounts.AccountData) error {
 	accountBytes, err := accountData.SnapshotBytes()
 	if err != nil {
 		return errors.Wrap(err, "unable to get account data snapshot bytes")
