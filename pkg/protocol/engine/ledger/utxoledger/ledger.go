@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/bic"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/mana"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -34,6 +35,7 @@ var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provide
 type Ledger struct {
 	utxoLedger       *ledgerstate.Manager
 	accountsLedger   *bic.BICManager
+	manaManager      *mana.Manager
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
 	memPool      mempool.MemPool[booker.BlockVotePower]
@@ -192,6 +194,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	var spents ledgerstate.Spents
 	bicDiffChanges := make(map[iotago.AccountID]*prunable.BicDiffChange)
 	destroyedAccounts := advancedset.New[iotago.AccountID]()
+	consumedAccounts := make(map[iotago.AccountID]*iotago.AccountOutput)
+	outputAccounts := make(map[iotago.AccountID]*iotago.AccountOutput)
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
@@ -216,11 +220,22 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 			spent := ledgerstate.NewSpent(inputState, txWithMeta.ID(), index)
 			spents = append(spents, spent)
+
+			if spent.OutputType() == iotago.OutputAccount {
+				accountOutput := spent.Output().Output().(*iotago.AccountOutput)
+				consumedAccounts[accountOutput.AccountID] = accountOutput
+				delete(outputAccounts, accountOutput.AccountID)
+			}
 		}
 
 		if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateMetadata) error {
 			output := ledgerstate.CreateOutput(l.utxoLedger.API(), element.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, element.State().Output())
 			outputs = append(outputs, output)
+
+			if output.OutputType() == iotago.OutputAccount {
+				accountOutput := output.Output().(*iotago.AccountOutput)
+				outputAccounts[accountOutput.AccountID] = accountOutput
+			}
 
 			return nil
 		}); createOutputErr != nil {
@@ -234,6 +249,14 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 		return true
 	})
+
+	for accountID := range consumedAccounts {
+		if _, exists := outputAccounts[accountID]; !exists {
+			destroyedAccounts.Add(accountID)
+		}
+	}
+
+	l.manaManager.CommitSlot(index, destroyedAccounts, outputAccounts)
 
 	if innerErr != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
