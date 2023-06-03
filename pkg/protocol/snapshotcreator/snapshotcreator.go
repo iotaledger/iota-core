@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -66,6 +67,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		totalweightslotgadget.NewProvider(),
 		slotnotarization.NewProvider(),
 		opt.LedgerProvider(),
+		tipmanagerv1.NewProvider(),
 	)
 	defer engineInstance.Shutdown()
 

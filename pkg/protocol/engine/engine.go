@@ -29,6 +29,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -49,6 +50,7 @@ type Engine struct {
 	SlotGadget      slotgadget.Gadget
 	Notarization    notarization.Notarization
 	Ledger          ledger.Ledger
+	TipManager      tipmanager.TipManager
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -82,6 +84,7 @@ func New(
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
+	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -108,6 +111,7 @@ func New(
 			e.SlotGadget = slotGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
 			e.Ledger = ledgerProvider(e)
+			e.TipManager = tipManagerProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings().TriggerInitialized,
@@ -129,6 +133,7 @@ func (e *Engine) Shutdown() {
 	if !e.WasStopped() {
 		e.TriggerStopped()
 
+		e.TipManager.Shutdown()
 		e.BlockRequester.Shutdown()
 		e.Notarization.Shutdown()
 		e.Booker.Shutdown()

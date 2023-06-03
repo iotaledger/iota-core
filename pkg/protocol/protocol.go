@@ -44,7 +44,6 @@ import (
 
 type Protocol struct {
 	Events        *Events
-	TipManager    tipmanager.TipManager
 	SyncManager   syncmanager.SyncManager
 	engineManager *enginemanager.EngineManager
 	ChainManager  *chainmanager.Manager
@@ -104,7 +103,6 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 // Run runs the protocol.
 func (p *Protocol) Run() {
 	p.Events.Engine.LinkTo(p.mainEngine.Events)
-	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
 	p.SyncManager = p.optsSyncManagerProvider(p.mainEngine)
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
@@ -139,7 +137,6 @@ func (p *Protocol) Shutdown() {
 	p.Workers.Shutdown()
 	p.mainEngine.Shutdown()
 	p.ChainManager.Shutdown()
-	p.TipManager.Shutdown()
 	p.SyncManager.Shutdown()
 }
 
@@ -204,6 +201,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsSlotGadgetProvider,
 		p.optsNotarizationProvider,
 		p.optsLedgerProvider,
+		p.optsTipManagerProvider,
 	)
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
