@@ -27,8 +27,12 @@ type Set[T comparable] struct {
 	// mutex is the mutex that is used to synchronize the access to the value.
 	mutex sync.RWMutex
 
-	// applyMutex is an additional mutex that is used to ensure that the application order of mutations is ensured.
-	applyMutex sync.Mutex
+	// applyOrderMutex is an additional mutex that is used to ensure that the application order of mutations is ensured.
+	applyOrderMutex sync.Mutex
+
+	// optTriggerWithInitialEmptyValue is an option that can be set to make the OnUpdate callbacks trigger immediately
+	// on subscription even if the current value is empty.
+	optTriggerWithInitialEmptyValue bool
 }
 
 // NewSet is the constructor for the Set type.
@@ -39,10 +43,18 @@ func NewSet[T comparable]() *Set[T] {
 	}
 }
 
+// Get returns the current value of the set.
+func (s *Set[T]) Get() *advancedset.AdvancedSet[T] {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	return s.value
+}
+
 // Set sets the given value as the new value of the set.
 func (s *Set[T]) Set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T]) {
-	s.applyMutex.Lock()
-	defer s.applyMutex.Unlock()
+	s.applyOrderMutex.Lock()
+	defer s.applyOrderMutex.Unlock()
 
 	appliedMutations, updateID, callbacksToTrigger := s.set(value)
 	for _, callback := range callbacksToTrigger {
@@ -57,8 +69,8 @@ func (s *Set[T]) Set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMu
 
 // Apply applies the given SetMutations to the set.
 func (s *Set[T]) Apply(mutations *SetMutations[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T]) {
-	s.applyMutex.Lock()
-	defer s.applyMutex.Unlock()
+	s.applyOrderMutex.Lock()
+	defer s.applyOrderMutex.Unlock()
 
 	updatedSet, appliedMutations, updateID, callbacksToTrigger := s.applyMutations(mutations)
 	for _, callback := range callbacksToTrigger {
@@ -106,14 +118,6 @@ func (s *Set[T]) Add(elements *advancedset.AdvancedSet[T]) (updatedSet *advanced
 // Remove removes the given elements from the set and returns the updated set and the applied mutations.
 func (s *Set[T]) Remove(elements *advancedset.AdvancedSet[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T]) {
 	return s.Apply(NewSetMutations(WithRemovedElements(elements)))
-}
-
-// Get returns the current value of the set.
-func (s *Set[T]) Get() *advancedset.AdvancedSet[T] {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	return s.value
 }
 
 // InheritFrom registers the given sets to inherit their mutations to the set.
@@ -199,6 +203,14 @@ func (s *Set[T]) Iterator() *walker.Walker[T] {
 // String returns a human-readable version of the set.
 func (s *Set[T]) String() string {
 	return s.Get().String()
+}
+
+// WithTriggerWithInitialEmptyValue is an option that can be set to make the OnUpdate callbacks trigger immediately on
+// subscription even if the current value is empty.
+func (s *Set[T]) WithTriggerWithInitialEmptyValue(trigger bool) *Set[T] {
+	s.optTriggerWithInitialEmptyValue = trigger
+
+	return s
 }
 
 // set sets the given value as the new value of the set.
