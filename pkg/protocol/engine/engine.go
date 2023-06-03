@@ -133,7 +133,6 @@ func (e *Engine) Shutdown() {
 	if !e.WasStopped() {
 		e.TriggerStopped()
 
-		e.TipManager.Shutdown()
 		e.BlockRequester.Shutdown()
 		e.Notarization.Shutdown()
 		e.Booker.Shutdown()
