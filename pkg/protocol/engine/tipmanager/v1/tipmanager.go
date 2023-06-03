@@ -117,25 +117,25 @@ func (t *TipManager) AddBlock(block *blocks.Block) {
 func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
 
-	tipSelector := func(tips *randommap.RandomMap[iotago.BlockID, *TipMetadata]) func(amount int) (strongTips []*TipMetadata) {
-		seenStrongTips := advancedset.New[iotago.BlockID]()
+	createUniqueTipSelector := func(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]) func(amount int) []*TipMetadata {
+		seenTips := advancedset.New[iotago.BlockID]()
 
-		return func(amount int) (strongTips []*TipMetadata) {
+		return func(amount int) (uniqueTips []*TipMetadata) {
 			if amount <= 0 {
-				return strongTips
+				return uniqueTips
 			}
 
-			for _, strongTip := range tips.RandomUniqueEntries(amount + seenStrongTips.Size()) {
-				if seenStrongTips.Add(strongTip.Block().ID()) {
-					strongTips = append(strongTips, strongTip)
+			for _, strongTip := range tipSet.RandomUniqueEntries(amount + seenTips.Size()) {
+				if seenTips.Add(strongTip.Block().ID()) {
+					uniqueTips = append(uniqueTips, strongTip)
 
-					if len(strongTips) == amount {
-						return strongTips
+					if len(uniqueTips) == amount {
+						return uniqueTips
 					}
 				}
 			}
 
-			return strongTips
+			return uniqueTips
 		}
 	}
 
@@ -171,7 +171,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 			return references, updatedLikedConflicts, nil
 		}
 
-		selectStrongTips := tipSelector(t.strongTipSet)
+		selectStrongTips := createUniqueTipSelector(t.strongTipSet)
 		for strongTipCandidates := selectStrongTips(amount); len(strongTipCandidates) != 0; strongTipCandidates = selectStrongTips(amount - len(references[model.StrongParentType])) {
 			for _, strongTip := range strongTipCandidates {
 				if addedLikedInsteadReferences, updatedLikedConflicts, err := likedInsteadReferences(strongTip); err != nil {
@@ -198,7 +198,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 			references[model.StrongParentType] = rootBlocks[:rootBlockCount]
 		}
 
-		selectWeakTips := tipSelector(t.weakTipSet)
+		selectWeakTips := createUniqueTipSelector(t.weakTipSet)
 		for weakTipCandidates := selectWeakTips(t.optMaxWeakReferences); len(weakTipCandidates) != 0; weakTipCandidates = selectWeakTips(t.optMaxWeakReferences - len(references[model.WeakParentType])) {
 			for _, weakTip := range weakTipCandidates {
 				if tipPool := t.determineTipPool(weakTip, tipmanager.WeakTipPool); tipPool != tipmanager.WeakTipPool {
