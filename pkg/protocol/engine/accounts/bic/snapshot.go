@@ -186,7 +186,7 @@ func (b *BICManager) SlotDiffsSnapshotWriter(pWriter *utils.PositionedWriter, ta
 			return slotDiffCount, err
 		}
 
-		if err = b.slotDiffFunc(index).Stream(func(accountID iotago.AccountID, bicDiffChange prunable.BicDiffChange, destroyed bool) bool {
+		if err = b.slotDiffFunc(index).Stream(func(accountID iotago.AccountID, bicDiffChange prunable.BICDiff, destroyed bool) bool {
 			err = SlotDiffSnapshotWriter(pWriter, accountID, bicDiffChange, destroyed)
 			if err != nil {
 				panic(err)
@@ -240,7 +240,7 @@ func AccountDataFromSnapshotReader(api iotago.API, reader io.ReadSeeker) (*accou
 	return accountData, nil
 }
 
-func SlotDiffSnapshotWriter(writer *utils.PositionedWriter, accountID iotago.AccountID, bicDiffChange prunable.BicDiffChange, destroyed bool) error {
+func SlotDiffSnapshotWriter(writer *utils.PositionedWriter, accountID iotago.AccountID, bicDiffChange prunable.BICDiff, destroyed bool) error {
 	slotDiffBytes := slotDiffSnapshotBytes(accountID, bicDiffChange, destroyed)
 	if err := writer.WriteBytes(slotDiffBytes); err != nil {
 		return errors.Wrap(err, "unable to write slot diff bytes")
@@ -248,7 +248,7 @@ func SlotDiffSnapshotWriter(writer *utils.PositionedWriter, accountID iotago.Acc
 	return nil
 }
 
-func slotDiffSnapshotBytes(accountID iotago.AccountID, bicDiffChange prunable.BicDiffChange, destroyed bool) []byte {
+func slotDiffSnapshotBytes(accountID iotago.AccountID, bicDiffChange prunable.BICDiff, destroyed bool) []byte {
 	m := marshalutil.New()
 	m.WriteBytes(lo.PanicOnErr(accountID.Bytes()))
 	m.WriteInt64(bicDiffChange.Change)
@@ -267,8 +267,8 @@ func slotDiffSnapshotBytes(accountID iotago.AccountID, bicDiffChange prunable.Bi
 	return m.Bytes()
 }
 
-func SlotDiffSnapshotReader(reader io.ReadSeeker) (*prunable.BicDiffChange, iotago.AccountID, bool, error) {
-	bicDiffChange := &prunable.BicDiffChange{
+func SlotDiffSnapshotReader(reader io.ReadSeeker) (*prunable.BICDiff, iotago.AccountID, bool, error) {
+	bicDiffChange := &prunable.BICDiff{
 		PubKeysAdded:   make([]ed25519.PublicKey, 0),
 		PubKeysRemoved: make([]ed25519.PublicKey, 0),
 	}

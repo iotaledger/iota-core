@@ -44,10 +44,11 @@ type AccountData struct {
 
 	id         iotago.AccountID `serix:"0"`
 	credits    *Credits         `serix:"1"`
+	outputID   iotago.OutputID  `serix:"2"`
 	pubKeysMap *shrinkingmap.ShrinkingMap[ed25519.PublicKey, types.Empty]
 }
 
-func NewAccountData(api iotago.API, id iotago.AccountID, credits *Credits, pubKeys ...ed25519.PublicKey) *AccountData {
+func NewAccountData(api iotago.API, id iotago.AccountID, credits *Credits, outputID iotago.OutputID, pubKeys ...ed25519.PublicKey) *AccountData {
 	pubKeysMap := shrinkingmap.New[ed25519.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
 	if pubKeys != nil {
 		for _, pubKey := range pubKeys {
@@ -58,6 +59,7 @@ func NewAccountData(api iotago.API, id iotago.AccountID, credits *Credits, pubKe
 	return &AccountData{
 		id:         id,
 		credits:    credits,
+		outputID:   outputID,
 		pubKeysMap: pubKeysMap,
 		api:        api,
 	}
@@ -69,6 +71,10 @@ func (a *AccountData) ID() iotago.AccountID {
 
 func (a *AccountData) Credits() *Credits {
 	return a.credits
+}
+
+func (a *AccountData) OutputID() iotago.OutputID {
+	return a.outputID
 }
 
 func (a *AccountData) PubKeys() *advancedset.AdvancedSet[ed25519.PublicKey] {

@@ -57,13 +57,13 @@ func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
 	return p.manager.Get(slot, kvstore.Realm{attestationsPrefix})
 }
 
-func (p *Prunable) BicDiffs(slot iotago.SlotIndex) *BicDiffs {
+func (p *Prunable) BICDiffs(slot iotago.SlotIndex) *BICDiffs {
 	store := p.manager.Get(slot, kvstore.Realm{bicDiffsPrefix})
 	if store == nil {
 		return nil
 	}
 
-	return NewBicDiffs(slot, store, p.api)
+	return NewBICDiffs(slot, store, p.api)
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.

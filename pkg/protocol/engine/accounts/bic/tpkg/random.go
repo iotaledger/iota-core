@@ -9,8 +9,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/utils"
 )
 
-func RandomBicDiffChange() *prunable.BicDiffChange {
-	return &prunable.BicDiffChange{
+func RandomBicDiffChange() *prunable.BICDiff {
+	return &prunable.BICDiff{
 		Change:              int64(rand.Int()),
 		PreviousUpdatedTime: utils.RandSlotIndex(),
 		PubKeysAdded:        utils.RandPubKeys(),

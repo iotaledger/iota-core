@@ -9,7 +9,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertStorageBicDiffs(slotIndex iotago.SlotIndex, bicDiffs map[iotago.AccountID]*prunable.BicDiffChange, nodes ...*mock.Node) {
+func (t *TestSuite) AssertStorageBicDiffs(slotIndex iotago.SlotIndex, bicDiffs map[iotago.AccountID]*prunable.BICDiff, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -25,7 +25,6 @@ func (t *TestSuite) AssertStorageBicDiffs(slotIndex iotago.SlotIndex, bicDiffs m
 				}
 				return nil
 			})
-
 		}
 	}
 }
