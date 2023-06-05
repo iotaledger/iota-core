@@ -190,6 +190,10 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
 
+	events.BlockGadget.BlockRatifiedConfirmed.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockRatifiedConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+	})
+
 	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
 		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotConfirmed: %s\n", n.Name, engineName, slotIndex)
 	})

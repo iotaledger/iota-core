@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/timed"
@@ -66,9 +65,9 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 						}
 					})
 
-					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
-					}, event.WithWorkerPool(s.workers.CreatePool("SybilProtection", 1)))
+					})
 				})
 			})
 	})

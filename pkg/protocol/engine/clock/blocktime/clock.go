@@ -38,6 +38,8 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 				e.Storage.Settings().HookInitialized(func() {
 					c.acceptedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index()))
 					c.ratifiedAcceptedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index()))
+
+					// TODO: should this be last finalized slot?
 					c.confirmedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index()))
 
 					c.TriggerInitialized()
@@ -60,7 +62,6 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 
 					e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 						c.acceptedTime.Advance(block.IssuingTime())
-						c.ratifiedAcceptedTime.Advance(block.IssuingTime())
 						c.confirmedTime.Advance(block.IssuingTime())
 					}, asyncOpt).Unhook,
 

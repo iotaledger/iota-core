@@ -33,10 +33,12 @@ type Block struct {
 	payloadConflictIDs *advancedset.AdvancedSet[iotago.TransactionID]
 
 	// BlockGadget block
-	accepted         bool
-	ratifiers        *advancedset.AdvancedSet[iotago.AccountID]
-	ratifiedAccepted bool
-	confirmed        bool
+	accepted              bool
+	acceptanceRatifiers   *advancedset.AdvancedSet[iotago.AccountID]
+	ratifiedAccepted      bool
+	confirmed             bool
+	confirmationRatifiers *advancedset.AdvancedSet[iotago.AccountID]
+	ratifiedConfirmed     bool
 
 	mutex sync.RWMutex
 
@@ -62,37 +64,46 @@ func (r *rootBlock) String() string {
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
 	return &Block{
-		witnesses:          advancedset.New[iotago.AccountID](),
-		conflictIDs:        advancedset.New[iotago.TransactionID](),
-		payloadConflictIDs: advancedset.New[iotago.TransactionID](),
-		ratifiers:          advancedset.New[iotago.AccountID](),
-		modelBlock:         data,
+		witnesses:             advancedset.New[iotago.AccountID](),
+		conflictIDs:           advancedset.New[iotago.TransactionID](),
+		payloadConflictIDs:    advancedset.New[iotago.TransactionID](),
+		acceptanceRatifiers:   advancedset.New[iotago.AccountID](),
+		confirmationRatifiers: advancedset.New[iotago.AccountID](),
+		modelBlock:            data,
 	}
 }
 
 func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
 	return &Block{
-		witnesses: advancedset.New[iotago.AccountID](),
-		ratifiers: advancedset.New[iotago.AccountID](),
+		witnesses:             advancedset.New[iotago.AccountID](),
+		conflictIDs:           advancedset.New[iotago.TransactionID](),
+		payloadConflictIDs:    advancedset.New[iotago.TransactionID](),
+		acceptanceRatifiers:   advancedset.New[iotago.AccountID](),
+		confirmationRatifiers: advancedset.New[iotago.AccountID](),
+
 		rootBlock: &rootBlock{
 			blockID:      blockID,
 			commitmentID: commitmentID,
 			issuingTime:  issuingTime,
 		},
-		solid:            true,
-		booked:           true,
-		accepted:         true,
-		ratifiedAccepted: true, // TODO: check if this should be true
-		confirmed:        true, // TODO: check if this should be true
+		solid:             true,
+		booked:            true,
+		accepted:          true,
+		ratifiedAccepted:  true, // This should be true since we commit and evict on ratified acceptance.
+		confirmed:         true, // TODO: this should be false
+		ratifiedConfirmed: true, // TODO: this should be false
 	}
 }
 
 func NewMissingBlock(blockID iotago.BlockID) *Block {
 	return &Block{
-		missing:        true,
-		missingBlockID: blockID,
-		witnesses:      advancedset.New[iotago.AccountID](),
-		ratifiers:      advancedset.New[iotago.AccountID](),
+		missing:               true,
+		missingBlockID:        blockID,
+		witnesses:             advancedset.New[iotago.AccountID](),
+		conflictIDs:           advancedset.New[iotago.TransactionID](),
+		payloadConflictIDs:    advancedset.New[iotago.TransactionID](),
+		acceptanceRatifiers:   advancedset.New[iotago.AccountID](),
+		confirmationRatifiers: advancedset.New[iotago.AccountID](),
 	}
 }
 
@@ -392,18 +403,18 @@ func (b *Block) SetAccepted() (wasUpdated bool) {
 	return wasUpdated
 }
 
-func (b *Block) AddRatifier(id iotago.AccountID) (added bool) {
+func (b *Block) AddAcceptanceRatifier(id iotago.AccountID) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	return b.ratifiers.Add(id)
+	return b.acceptanceRatifiers.Add(id)
 }
 
-func (b *Block) Ratifiers() []iotago.AccountID {
+func (b *Block) AcceptanceRatifiers() []iotago.AccountID {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	return b.ratifiers.Slice()
+	return b.acceptanceRatifiers.Slice()
 }
 
 // IsRatifiedAccepted returns true if the Block was ratified accepted.
@@ -421,6 +432,39 @@ func (b *Block) SetRatifiedAccepted() (wasUpdated bool) {
 
 	if wasUpdated = !b.ratifiedAccepted; wasUpdated {
 		b.ratifiedAccepted = true
+	}
+
+	return wasUpdated
+}
+
+func (b *Block) AddConfirmationRatifier(id iotago.AccountID) (added bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	fmt.Println("AddConfirmationRatifier", id, b.confirmationRatifiers, b.confirmationRatifiers == nil)
+	return b.confirmationRatifiers.Add(id)
+}
+
+func (b *Block) ConfirmationRatifiers() []iotago.AccountID {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.confirmationRatifiers.Slice()
+}
+
+func (b *Block) IsRatifiedConfirmed() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.ratifiedConfirmed
+}
+
+func (b *Block) SetRatifiedConfirmed() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.ratifiedConfirmed; wasUpdated {
+		b.ratifiedConfirmed = true
 	}
 
 	return wasUpdated
@@ -456,9 +500,11 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("Booked", b.booked))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
 	builder.AddField(stringify.NewStructField("Accepted", b.accepted))
-	builder.AddField(stringify.NewStructField("Ratifiers", b.ratifiers))
+	builder.AddField(stringify.NewStructField("AcceptanceRatifiers", b.acceptanceRatifiers))
 	builder.AddField(stringify.NewStructField("RatifiedAccepted", b.ratifiedAccepted))
 	builder.AddField(stringify.NewStructField("Confirmed", b.confirmed))
+	builder.AddField(stringify.NewStructField("ConfirmationRatifiers", b.confirmationRatifiers))
+	builder.AddField(stringify.NewStructField("RatifiedConfirmed", b.ratifiedConfirmed))
 
 	for index, child := range b.strongChildren {
 		builder.AddField(stringify.NewStructField(fmt.Sprintf("strongChildren%d", index), child.ID().String()))
