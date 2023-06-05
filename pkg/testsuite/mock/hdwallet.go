@@ -8,7 +8,7 @@ import (
 	"github.com/wollac/iota-crypto-demo/pkg/slip10"
 	"github.com/wollac/iota-crypto-demo/pkg/slip10/eddsa"
 
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -20,7 +20,7 @@ type HDWallet struct {
 	name  string
 	seed  []byte
 	index uint64
-	utxo  []*ledgerstate.Output
+	utxo  []*utxoledger.Output
 }
 
 func NewHDWallet(name string, seed []byte, index uint64) *HDWallet {
@@ -28,18 +28,18 @@ func NewHDWallet(name string, seed []byte, index uint64) *HDWallet {
 		name:  name,
 		seed:  seed,
 		index: index,
-		utxo:  make([]*ledgerstate.Output, 0),
+		utxo:  make([]*utxoledger.Output, 0),
 	}
 }
 
-func (hd *HDWallet) BookSpents(spentOutputs []*ledgerstate.Output) {
+func (hd *HDWallet) BookSpents(spentOutputs []*utxoledger.Output) {
 	for _, spent := range spentOutputs {
 		hd.BookSpent(spent)
 	}
 }
 
-func (hd *HDWallet) BookSpent(spentOutput *ledgerstate.Output) {
-	newUtxo := make([]*ledgerstate.Output, 0)
+func (hd *HDWallet) BookSpent(spentOutput *utxoledger.Output) {
+	newUtxo := make([]*utxoledger.Output, 0)
 	for _, u := range hd.utxo {
 		if u.OutputID() == spentOutput.OutputID() {
 			fmt.Printf("%s spent %s\n", hd.name, u.OutputID().ToHex())
@@ -64,7 +64,7 @@ func (hd *HDWallet) Balance() uint64 {
 	return balance
 }
 
-func (hd *HDWallet) BookOutput(output *ledgerstate.Output) {
+func (hd *HDWallet) BookOutput(output *utxoledger.Output) {
 	if output != nil {
 		fmt.Printf("%s book %s\n", hd.name, output.OutputID().ToHex())
 		hd.utxo = append(hd.utxo, output)
@@ -73,7 +73,6 @@ func (hd *HDWallet) BookOutput(output *ledgerstate.Output) {
 
 // KeyPair calculates an ed25519 key pair by using slip10.
 func (hd *HDWallet) KeyPair() (ed25519.PrivateKey, ed25519.PublicKey) {
-
 	path, err := bip32path.ParsePath(fmt.Sprintf(pathString, hd.index))
 	if err != nil {
 		panic(err)
@@ -97,7 +96,7 @@ func (hd *HDWallet) AddressSigner() iotago.AddressSigner {
 	return iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(address, privKey))
 }
 
-func (hd *HDWallet) Outputs() []*ledgerstate.Output {
+func (hd *HDWallet) Outputs() []*utxoledger.Output {
 	return hd.utxo
 }
 

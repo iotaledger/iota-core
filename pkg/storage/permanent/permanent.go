@@ -79,7 +79,7 @@ func (p *Permanent) SybilProtection(optRealm ...byte) kvstore.KVStore {
 	return lo.PanicOnErr(p.sybilProtection.WithExtendedRealm(optRealm))
 }
 
-// Accounts returns the "BIC" storage (or a specialized sub-storage if a realm is provided).
+// Accounts returns the Accounts storage (or a specialized sub-storage if a realm is provided).
 func (p *Permanent) Accounts(optRealm ...byte) kvstore.KVStore {
 	if len(optRealm) == 0 {
 		return p.accounts

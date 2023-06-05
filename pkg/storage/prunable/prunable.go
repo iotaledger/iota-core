@@ -11,7 +11,7 @@ const (
 	blocksPrefix byte = iota
 	rootBlocksPrefix
 	attestationsPrefix
-	bicDiffsPrefix
+	accountDiffsPrefix
 )
 
 type Prunable struct {
@@ -57,13 +57,13 @@ func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
 	return p.manager.Get(slot, kvstore.Realm{attestationsPrefix})
 }
 
-func (p *Prunable) BICDiffs(slot iotago.SlotIndex) *BICDiffs {
-	store := p.manager.Get(slot, kvstore.Realm{bicDiffsPrefix})
+func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
+	store := p.manager.Get(slot, kvstore.Realm{accountDiffsPrefix})
 	if store == nil {
 		return nil
 	}
 
-	return NewBICDiffs(slot, store, p.api)
+	return NewAccountDiffs(slot, store, p.api)
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.

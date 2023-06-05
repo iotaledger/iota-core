@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -19,14 +19,14 @@ type Manager struct {
 
 	manaVectorCache *cache.Cache[iotago.AccountID, *accounts.Mana]
 
-	accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*ledgerstate.Output, error)
+	accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)
 
 	mutex syncutils.Mutex
 
 	module.Module
 }
 
-func NewManager(decayProvider *iotago.DecayProvider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*ledgerstate.Output, error)) *Manager {
+func NewManager(decayProvider *iotago.DecayProvider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
 	return &Manager{
 		decayProvider:            decayProvider,
 		accountOutputResolveFunc: accountOutputResolveFunc,
@@ -63,7 +63,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	return mana.Value(), nil
 }
 
-func (m *Manager) CommitSlot(slotIndex iotago.SlotIndex, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], accountOutputs map[iotago.AccountID]*ledgerstate.Output) {
+func (m *Manager) CommitSlot(slotIndex iotago.SlotIndex, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], accountOutputs map[iotago.AccountID]*utxoledger.Output) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

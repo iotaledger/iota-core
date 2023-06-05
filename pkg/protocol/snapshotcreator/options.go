@@ -5,7 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/utxoledger"
+	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -32,7 +32,7 @@ func NewOptions(opts ...options.Option[Options]) *Options {
 		FilePath:           "snapshot.bin",
 		DataBaseVersion:    1,
 		ProtocolParameters: iotago.ProtocolParameters{},
-		LedgerProvider:     utxoledger.NewProvider,
+		LedgerProvider:     ledger1.NewProvider,
 	}, opts)
 }
 

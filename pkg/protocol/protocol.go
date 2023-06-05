@@ -28,7 +28,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/utxoledger"
+	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
@@ -91,7 +91,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
-		optsLedgerProvider:          utxoledger.NewProvider(),
+		optsLedgerProvider:          ledger1.NewProvider(),
 
 		optsBaseDirectory: "",
 		optsPruningDelay:  360,

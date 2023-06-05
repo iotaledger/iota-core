@@ -1,7 +1,6 @@
 package slotnotarization
 
 import (
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"io"
 	"sync"
 	"time"
@@ -38,7 +37,6 @@ type Manager struct {
 	errorHandler func(error)
 
 	ledger ledger.Ledger
-	bic    accounts.BlockIssuanceCredits
 
 	storage *storage.Storage
 
@@ -230,7 +228,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		}
 	}
 
-	stateRoot, mutationRoot, bicRoot, err := m.ledger.CommitSlot(index)
+	stateRoot, mutationRoot, accountRoot, err := m.ledger.CommitSlot(index)
 	if err != nil {
 		m.errorHandler(errors.Wrap(err, "failed to commit ledger"))
 		return false
@@ -244,7 +242,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 			mutationRoot,
 			iotago.Identifier(attestations.Root()),
 			stateRoot,
-			bicRoot,
+			accountRoot,
 		).ID(),
 		m.storage.Settings().LatestCommitment().CumulativeWeight()+uint64(attestationsWeight),
 	)

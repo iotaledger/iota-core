@@ -14,7 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/blockissuer"
+	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -33,7 +33,7 @@ type Node struct {
 	Name   string
 	Weight int64
 
-	blockIssuer *blockissuer.BlockIssuer
+	blockIssuer *blockfactory.BlockIssuer
 
 	privateKey ed25519.PrivateKey
 	pubKey     ed25519.PublicKey
@@ -78,7 +78,7 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 		n.Endpoint,
 		opts...,
 	)
-	n.blockIssuer = blockissuer.New(n.Protocol, blockissuer.NewEd25519Account(n.AccountID, n.privateKey), blockissuer.WithTipSelectionTimeout(3*time.Second), blockissuer.WithTipSelectionRetryInterval(time.Millisecond*100))
+	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
 	n.Protocol.Run()
 }
@@ -270,7 +270,7 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.AccountID.RegisterAlias(n.Name)
 }
 
-func (n *Node) IssueBlock(alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+func (n *Node) IssueBlock(alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	modelBlock, err := n.blockIssuer.CreateBlock(context.Background(), opts...)
 	require.NoError(n.Testing, err)
 
@@ -288,7 +288,7 @@ func (n *Node) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitm
 	issuingTime := slotTimeProvider.StartTime(slot)
 	require.Truef(n.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", n.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
 
-	return n.IssueBlock(alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithStrongParents(parents...))
+	return n.IssueBlock(alias, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...))
 }
 
 func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sync.WaitGroup) {
@@ -334,7 +334,6 @@ func (n *Node) issueActivityBlock(alias string, parents ...iotago.BlockID) bool 
 			}).
 			Sign(n.AccountID, n.privateKey).
 			Build()
-
 		if err != nil {
 			panic(err)
 		}

@@ -8,7 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -20,7 +20,7 @@ type TransactionFramework struct {
 	protoParams *iotago.ProtocolParameters
 
 	wallet       *mock.HDWallet
-	states       map[string]*ledgerstate.Output
+	states       map[string]*utxoledger.Output
 	transactions map[string]*iotago.Transaction
 }
 
@@ -33,14 +33,14 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte) *T
 	return &TransactionFramework{
 		api:          protocol.API(),
 		protoParams:  protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(),
-		states:       map[string]*ledgerstate.Output{"Genesis": genesisOutput},
+		states:       map[string]*utxoledger.Output{"Genesis": genesisOutput},
 		transactions: make(map[string]*iotago.Transaction),
 		wallet:       mock.NewHDWallet("genesis", genesisSeed, 0),
 	}
 }
 
 func (t *TransactionFramework) CreateTransaction(alias string, outputCount int, inputAliases ...string) (*iotago.Transaction, error) {
-	inputStates := make([]*ledgerstate.Output, 0, len(inputAliases))
+	inputStates := make([]*utxoledger.Output, 0, len(inputAliases))
 	totalInputDeposits := uint64(0)
 	for _, inputAlias := range inputAliases {
 		output := t.Output(inputAlias)
@@ -76,13 +76,13 @@ func (t *TransactionFramework) CreateTransaction(alias string, outputCount int, 
 	t.transactions[alias] = transaction
 
 	for idx, output := range outputStates {
-		t.states[fmt.Sprintf("%s:%d", alias, idx)] = ledgerstate.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), uint16(idx)), iotago.EmptyBlockID(), 0, time.Now(), output)
+		t.states[fmt.Sprintf("%s:%d", alias, idx)] = utxoledger.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), uint16(idx)), iotago.EmptyBlockID(), 0, time.Now(), output)
 	}
 
 	return transaction, err
 }
 
-func (t *TransactionFramework) CreateTransactionWithInputsAndOutputs(consumedInputs ledgerstate.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) (*iotago.Transaction, error) {
+func (t *TransactionFramework) CreateTransactionWithInputsAndOutputs(consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) (*iotago.Transaction, error) {
 	walletKeys := make([]iotago.AddressKeys, len(signingWallets))
 	for i, wallet := range signingWallets {
 		inputPrivateKey, _ := wallet.KeyPair()
@@ -112,7 +112,7 @@ func (t *TransactionFramework) CreateTransactionWithInputsAndOutputs(consumedInp
 	return txBuilder.Build(t.protoParams, iotago.NewInMemoryAddressSigner(walletKeys...))
 }
 
-func (t *TransactionFramework) Output(alias string) *ledgerstate.Output {
+func (t *TransactionFramework) Output(alias string) *utxoledger.Output {
 	output, exists := t.states[alias]
 	if !exists {
 		panic(xerrors.Errorf("output with given alias does not exist %s", alias))
@@ -120,6 +120,7 @@ func (t *TransactionFramework) Output(alias string) *ledgerstate.Output {
 
 	return output
 }
+
 func (t *TransactionFramework) OutputID(alias string) iotago.OutputID {
 	return t.Output(alias).OutputID()
 }
