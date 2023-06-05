@@ -36,6 +36,7 @@ type Account interface {
 	Credits() *Credits
 	OutputID() iotago.OutputID
 	IsPublicKeyAllowed(ed25519.PublicKey) bool
+	PubKeys() *advancedset.AdvancedSet[ed25519.PublicKey]
 	Clone() Account
 }
 

@@ -136,7 +136,7 @@ func (b *BICManager) createBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns 
 }
 
 // BIC loads the account's data at a specific slot index.
-func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (accounts.Account, bool, error) {
+func (b *BICManager) BIC(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (account accounts.Account, exists bool, err error) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 

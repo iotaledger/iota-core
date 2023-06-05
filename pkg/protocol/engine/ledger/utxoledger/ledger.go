@@ -1,15 +1,19 @@
 package utxoledger
 
 import (
-	"errors"
+	cryptoed25519 "crypto/ed25519"
 	"fmt"
 	"io"
 
 	"golang.org/x/xerrors"
 
+	"github.com/pkg/errors"
+
 	"github.com/iotaledger/hive.go/core/account"
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -33,6 +37,8 @@ import (
 var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
 
 type Ledger struct {
+	apiProviderFunc func() iotago.API
+
 	utxoLedger       *ledgerstate.Manager
 	accountsLedger   *bic.BICManager
 	manaManager      *mana.Manager
@@ -57,7 +63,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.Commitments().Load,
 			e.SybilProtection.OnlineCommittee(),
 			e.BlockCache.Block,
-			e.Storage.BicDiffs,
+			e.Storage.BICDiffs,
 			e.API,
 			e.ErrorHandler("ledger"),
 			e.Storage.Settings().ProtocolParameters(),
@@ -87,12 +93,13 @@ func New(
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID],
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
-	slotDiffFunc func(iotago.SlotIndex) *prunable.BicDiffs,
+	slotDiffFunc func(iotago.SlotIndex) *prunable.BICDiffs,
 	apiProviderFunc func() iotago.API,
 	errorHandler func(error),
 	protocolParameters *iotago.ProtocolParameters,
 ) *Ledger {
 	l := &Ledger{
+		apiProviderFunc:    apiProviderFunc,
 		utxoLedger:         ledgerstate.New(utxoStore, apiProviderFunc),
 		accountsLedger:     bic.New(blocksFunc, slotDiffFunc, accountsStore, apiProviderFunc()),
 		commitmentLoader:   commitmentLoader,
@@ -141,7 +148,6 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 }
 
 func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (*ledgerstate.Output, error) {
-
 	// make sure that slotIndex is committed
 	account, _, err := l.accountsLedger.BIC(accountID, slotIndex)
 	if err != nil {
@@ -224,10 +230,10 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	var innerErr error
 	var outputs ledgerstate.Outputs
 	var spents ledgerstate.Spents
-	bicDiffChanges := make(map[iotago.AccountID]*prunable.BicDiffChange)
+	bicDiffs := make(map[iotago.AccountID]*prunable.BICDiff)
 	destroyedAccounts := advancedset.New[iotago.AccountID]()
-	consumedAccounts := advancedset.New[iotago.AccountID]()
-	outputAccounts := make(map[iotago.AccountID]*ledgerstate.Output)
+	consumedAccounts := make(map[iotago.AccountID]*ledgerstate.Output)
+	createdAccounts := make(map[iotago.AccountID]*ledgerstate.Output)
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
@@ -243,6 +249,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			return false
 		}
 
+		// input side
 		for _, inputRef := range inputRefs {
 			inputState, outputErr := l.Output(inputRef)
 			if outputErr != nil {
@@ -252,22 +259,12 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 			spent := ledgerstate.NewSpent(inputState, txWithMeta.ID(), index)
 			spents = append(spents, spent)
-
-			if spent.OutputType() == iotago.OutputAccount {
-				accountOutput := spent.Output().Output().(*iotago.AccountOutput)
-				consumedAccounts.Add(accountOutput.AccountID)
-				delete(outputAccounts, accountOutput.AccountID)
-			}
 		}
 
+		// output side
 		if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateMetadata) error {
 			output := ledgerstate.CreateOutput(l.utxoLedger.API(), element.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, element.State().Output())
 			outputs = append(outputs, output)
-
-			if output.OutputType() == iotago.OutputAccount {
-				accountOutput := output.Output().(*iotago.AccountOutput)
-				outputAccounts[accountOutput.AccountID] = output
-			}
 
 			return nil
 		}); createOutputErr != nil {
@@ -276,30 +273,149 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		}
 
 		for _, allotment := range tx.Essence.Allotments {
-			bicDiffChanges[allotment.AccountID].Change += int64(allotment.Value)
+			bicDiff, exists := bicDiffs[allotment.AccountID]
+			if !exists {
+				bicDiff = prunable.NewBICDiff(l.apiProviderFunc())
+				bicDiffs[allotment.AccountID] = bicDiff
+			}
+			bicDiff.Change += int64(allotment.Value)
+			// TODO: what about the PreviousUpdatedTime?
 		}
 
 		return true
 	})
 
-	consumedAccounts.Range(func(accountID iotago.AccountID) {
-		if _, exists := outputAccounts[accountID]; !exists {
-			destroyedAccounts.Add(accountID)
-		}
-	})
+	if innerErr != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+	}
 
-	l.manaManager.CommitSlot(index, destroyedAccounts, outputAccounts)
+	// Now we process the account changes, for that we consume the compacted state diff to get the overrall account changes
+	// at UTXO level without needing to worry about multiple spends of the same account in the same slot, we only care
+	// about the initial account output to be consumed and the final account output to be created.
+
+	// output side
+	stateDiff.CreatedStates().ForEachKey(func(outputID iotago.OutputID) bool {
+		createdOutput, err := l.Output(outputID.UTXOInput())
+		if err != nil {
+			innerErr = err
+			return false
+		}
+
+		if createdOutput.OutputType() == iotago.OutputAccount {
+			createdAccount := createdOutput.Output().(*iotago.AccountOutput)
+			createdAccounts[createdAccount.AccountID] = createdOutput
+		}
+
+		return true
+	})
 
 	if innerErr != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
 	}
 
-	if err := l.utxoLedger.ApplyDiff(index, outputs, spents); err != nil {
+	// input side
+	stateDiff.DestroyedStates().ForEachKey(func(outputID iotago.OutputID) bool {
+		spentOutput, err := l.Output(outputID.UTXOInput())
+		if err != nil {
+			innerErr = err
+			return false
+		}
+
+		if spentOutput.OutputType() == iotago.OutputAccount {
+			consumedAccount := spentOutput.Output().(*iotago.AccountOutput)
+			consumedAccounts[consumedAccount.AccountID] = spentOutput
+
+			// if we have consumed accounts that are not created in the same slot, we need to track them as destroyed
+			if _, exists := createdAccounts[consumedAccount.AccountID]; !exists {
+				destroyedAccounts.Add(consumedAccount.AccountID)
+			}
+		}
+
+		return true
+	})
+
+	if innerErr != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
 	}
-	//todo polulate pubKeys, destroyed accounts before commiting
-	if bicRoot, err = l.accountsLedger.CommitSlot(index, bicDiffChanges, destroyedAccounts); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
+
+	// process destroyed and transitioned accounts
+	for consumedAccountID, consumedAccountOutput := range consumedAccounts {
+		// We might have had an allotment on this account, and the diff already exists
+		bicDiff, exists := bicDiffs[consumedAccountID]
+		if !exists {
+			bicDiff = prunable.NewBICDiff(l.apiProviderFunc())
+			bicDiffs[consumedAccountID] = bicDiff
+		}
+		accountData, exists, err := l.accountsLedger.BIC(consumedAccountID, index-1)
+		if !exists {
+			panic(fmt.Errorf("could not find destroyed account %s in slot %d", consumedAccountID, index-1))
+		}
+		if err != nil {
+			panic(fmt.Errorf("error loading account %s in slot %d: %w", consumedAccountID, index-1, err))
+		}
+
+		// the account was destroyed, reverse all the current account data
+		if _, exists := createdAccounts[consumedAccountID]; !exists {
+			bicDiff.Change -= accountData.Credits().Value
+			bicDiff.PreviousUpdatedTime = accountData.Credits().UpdateTime
+			bicDiff.NewOutputID = iotago.OutputID{}
+			bicDiff.PreviousOutputID = consumedAccountOutput.OutputID()
+			bicDiff.PubKeysRemoved = accountData.PubKeys().Slice()
+		} else { // the account was transitioned, fill in the diff with the previous information to allow rollback
+			// TODO: do not apply any Change, is it correct?
+			createdOutput := createdAccounts[consumedAccountID]
+			bicDiff.NewOutputID = createdOutput.OutputID()
+			bicDiff.PreviousOutputID = consumedAccountOutput.OutputID()
+
+			oldPubKeysSet := accountData.PubKeys()
+			newPubKeysSet := advancedset.New[ed25519.PublicKey]()
+			for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
+				newPubKeysSet.Add(ed25519.PublicKey(pubKey))
+			}
+
+			// Add public keys that are not in the old set
+			bicDiff.PubKeysAdded = newPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
+				return !oldPubKeysSet.Has(key)
+			}).Slice()
+
+			bicDiff.PubKeysRemoved = oldPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
+				return !newPubKeysSet.Has(key)
+			}).Slice()
+		}
+	}
+
+	// process created accounts
+	for createdAccountID, createdAccountOutput := range createdAccounts {
+		// If it is also consumed it is covered by the previous cases
+		if _, exists := consumedAccounts[createdAccountID]; exists {
+			continue
+		}
+
+		// We might have had an allotment on this account, and the diff already exists
+		bicDiff, exists := bicDiffs[createdAccountID]
+		if !exists {
+			bicDiff = prunable.NewBICDiff(l.apiProviderFunc())
+			bicDiffs[createdAccountID] = bicDiff
+		}
+
+		bicDiff.NewOutputID = createdAccountOutput.OutputID()
+		bicDiff.PreviousOutputID = iotago.OutputID{}
+		bicDiff.PubKeysAdded = lo.Map(createdAccountOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
+
+	}
+
+	l.manaManager.CommitSlot(index, destroyedAccounts, createdAccounts)
+
+	if innerErr != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+	}
+
+	if err = l.utxoLedger.ApplyDiff(index, outputs, spents); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+	}
+	// TODO: polulate pubKeys, destroyed accounts before commiting
+	if bicRoot, err = l.accountsLedger.CommitSlot(index, bicDiffs, destroyedAccounts); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, errors.Wrapf(err, "failed to commit slot %d", index)
 	}
 
 	// Mark the transactions as committed so the mempool can evict it.
@@ -351,6 +467,7 @@ func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.Transact
 func (l *Ledger) TransactionMetadata(transactionID iotago.TransactionID) (mempool.TransactionMetadata, bool) {
 	return l.memPool.TransactionMetadata(transactionID)
 }
+
 func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempool.TransactionMetadata, bool) {
 	return l.memPool.TransactionMetadataByAttachment(blockID)
 }
