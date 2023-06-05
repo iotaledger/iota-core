@@ -2,11 +2,12 @@
 package utxoledger_test
 
 import (
-	"github.com/iotaledger/iota-core/pkg/utils"
 	"math"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/iotaledger/iota-core/pkg/utils"
 
 	"github.com/stretchr/testify/require"
 

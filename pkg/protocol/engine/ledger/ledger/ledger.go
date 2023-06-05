@@ -253,6 +253,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			return false
 		}
 
+		// TODO: translate this to the "compacted" version, there is no need to go through intermediate outputs
 		// input side
 		for _, inputRef := range inputRefs {
 			inputState, outputErr := l.Output(inputRef)
@@ -360,11 +361,11 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		}
 
 		// the account was destroyed, reverse all the current account data
-		if _, exists := createdAccounts[consumedAccountID]; !exists {
-			accountDiff.Change -= accountData.BlockIssuanceCredits().Value
+		if destroyedAccounts.Has(consumedAccountID) {
+			accountDiff.Change = -accountData.BlockIssuanceCredits().Value
 			accountDiff.PreviousUpdatedTime = accountData.BlockIssuanceCredits().UpdateTime
 			accountDiff.NewOutputID = iotago.OutputID{}
-			accountDiff.PreviousOutputID = consumedAccountOutput.OutputID()
+			accountDiff.PreviousOutputID = accountData.OutputID()
 			accountDiff.PubKeysRemoved = accountData.PubKeys().Slice()
 		} else { // the account was transitioned, fill in the diff with the previous information to allow rollback
 			// TODO: do not apply any Change, is it correct?
@@ -383,6 +384,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 				return !oldPubKeysSet.Has(key)
 			}).Slice()
 
+			// Remove the keys that are not in the new set
 			accountDiff.PubKeysRemoved = oldPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
 				return !newPubKeysSet.Has(key)
 			}).Slice()
@@ -406,19 +408,14 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		accountDiff.NewOutputID = createdAccountOutput.OutputID()
 		accountDiff.PreviousOutputID = iotago.OutputID{}
 		accountDiff.PubKeysAdded = lo.Map(createdAccountOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
-
 	}
 
 	l.manaManager.CommitSlot(index, destroyedAccounts, createdAccounts)
 
-	if innerErr != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
-	}
-
 	if err = l.utxoLedger.ApplyDiff(index, outputs, spents); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
 	}
-	// TODO: polulate pubKeys, destroyed accounts before commiting
+
 	if accountRoot, err = l.accountsLedger.CommitSlot(index, accountDiffs, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, errors.Wrapf(err, "failed to commit slot %d", index)
 	}
@@ -429,6 +426,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return true
 	})
 
+	// TODO: obtain the stateroot when we ApplyDiff and rename it to CommitSlot
 	return l.utxoLedger.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), accountRoot, nil
 }
 

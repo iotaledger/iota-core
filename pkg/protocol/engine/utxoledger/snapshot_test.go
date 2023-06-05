@@ -3,8 +3,9 @@ package utxoledger_test
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	"testing"
+
+	"github.com/iotaledger/iota-core/pkg/utils"
 
 	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
