@@ -102,7 +102,12 @@ func New(
 	}
 
 	l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[booker.BlockVotePower](true))
-	l.manaManager = mana.NewManager(protocolParameters.DecayProvider(), l.resolveAccountOutput)
+
+	// TODO: We wanted to avoid having logic in `ProtocolParams` struct, so we created a separate DecayProvider.
+	// DecayProvider is created here once and once during each transaction execution.
+	// Is it better to have a single instance that is passed to the VM from the outside through vmParams? Or something else?
+	// `protocolParameters` are always passed to the VM, and DecayProvider can be derived from that.
+	l.manaManager = mana.NewManager(l.protocolParameters.DecayProvider(), l.resolveAccountOutput)
 
 	return l
 }
@@ -141,9 +146,7 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 }
 
 func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (*ledgerstate.Output, error) {
-
-	// make sure that slotIndex is committed
-	account, _, err := l.accountsLedger.BIC(accountID, slotIndex)
+	accountMetadata, _, err := l.accountsLedger.BIC(accountID, slotIndex)
 	if err != nil {
 		return nil, xerrors.Errorf("could not get account information for account %s in slot %d: %w", accountID, slotIndex, err)
 	}
@@ -151,17 +154,17 @@ func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iota
 	l.utxoLedger.ReadLockLedger()
 	defer l.utxoLedger.ReadUnlockLedger()
 
-	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(account.OutputID())
+	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(accountMetadata.OutputID())
 	if err != nil {
-		return nil, xerrors.Errorf("error while checking account output %s is unspent: %w", account.OutputID(), err)
+		return nil, xerrors.Errorf("error while checking account output %s is unspent: %w", accountMetadata.OutputID(), err)
 	}
 	if !isUnspent {
-		return nil, xerrors.Errorf("unspent account output %s not found: %w", account.OutputID(), mempool.ErrStateNotFound)
+		return nil, xerrors.Errorf("unspent account output %s not found: %w", accountMetadata.OutputID(), mempool.ErrStateNotFound)
 	}
 
-	accountOutput, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(account.OutputID())
+	accountOutput, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(accountMetadata.OutputID())
 	if err != nil {
-		return nil, xerrors.Errorf("error while retrieving account output %s: %w", account.OutputID(), err)
+		return nil, xerrors.Errorf("error while retrieving account output %s: %w", accountMetadata.OutputID(), err)
 	}
 
 	return accountOutput, nil
