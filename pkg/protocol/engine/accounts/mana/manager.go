@@ -15,7 +15,7 @@ import (
 // For stored Mana added to account, or stored/potential Mana spent, we will update on commitment
 // For potential Mana updates and decay, we update on demand if the Mana vector is accessed (by the scheduler)
 type Manager struct {
-	protocolParams iotago.ProtocolParameters
+	decayProvider *iotago.DecayProvider
 
 	manaVectorCache *cache.Cache[iotago.AccountID, *accounts.Mana]
 
@@ -27,9 +27,9 @@ type Manager struct {
 	module.Module
 }
 
-func NewManager(protocolParams iotago.ProtocolParameters, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*ledgerstate.Output, error)) *Manager {
+func NewManager(decayProvider *iotago.DecayProvider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*ledgerstate.Output, error)) *Manager {
 	return &Manager{
-		protocolParams:           protocolParams,
+		decayProvider:            decayProvider,
 		accountOutputResolveFunc: accountOutputResolveFunc,
 		manaVectorCache:          cache.New[iotago.AccountID, *accounts.Mana](10000),
 	}

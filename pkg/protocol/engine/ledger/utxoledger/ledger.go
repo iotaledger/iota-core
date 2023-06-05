@@ -102,7 +102,7 @@ func New(
 	}
 
 	l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[booker.BlockVotePower](true))
-	l.manaManager = mana.NewManager(*protocolParameters, l.resolveAccountOutput)
+	l.manaManager = mana.NewManager(protocolParameters.DecayProvider(), l.resolveAccountOutput)
 
 	return l
 }
