@@ -21,8 +21,7 @@ type Manager struct {
 
 	accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*ledgerstate.Output, error)
 
-	// TODO: properly lock across methods
-	mutex syncutils.RWMutex
+	mutex syncutils.Mutex
 
 	module.Module
 }
@@ -56,9 +55,9 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	}
 
 	// apply decay to stored Mana and potential that was added on last update
-	updatedValue := m.protocolParams.StoredManaWithDecay(mana.Value(), currentSlot-mana.UpdateTime())
+	updatedValue := m.decayProvider.StoredManaWithDecay(mana.Value(), currentSlot-mana.UpdateTime())
 	// get newly generated potential since last update and apply decay
-	updatedValue += m.protocolParams.PotentialManaWithDecay(mana.Deposit(), currentSlot-mana.UpdateTime())
+	updatedValue += m.decayProvider.PotentialManaWithDecay(mana.Deposit(), currentSlot-mana.UpdateTime())
 	mana.UpdateValue(updatedValue, currentSlot)
 
 	return mana.Value(), nil
