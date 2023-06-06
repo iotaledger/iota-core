@@ -14,6 +14,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -57,7 +59,6 @@ type Protocol struct {
 
 	optsBaseDirectory string
 	optsSnapshotPath  string
-	optsPruningDelay  iotago.SlotIndex
 
 	optsEngineOptions       []options.Option[engine.Engine]
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
@@ -72,6 +73,7 @@ type Protocol struct {
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
+	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsLedgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
 }
@@ -89,12 +91,12 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
-		optsNotarizationProvider:    slotnotarization.NewProvider(),
+		optsNotarizationProvider:    slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
+		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          utxoledger.NewProvider(),
 
 		optsBaseDirectory: "",
-		optsPruningDelay:  360,
 	}, opts,
 		(*Protocol).initEngineManager,
 		(*Protocol).initChainManager,
@@ -112,7 +114,10 @@ func (p *Protocol) Run() {
 		panic(err)
 	}
 
-	rootCommitment := p.mainEngine.EarliestRootCommitment()
+	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
+	if !valid {
+		panic("no root commitment found")
+	}
 
 	// The root commitment is the earliest commitment we will ever need to know to solidify commitment chains, we can
 	// then initialize the chain manager with it, and identify our engine to be on such chain.
@@ -204,15 +209,9 @@ func (p *Protocol) initEngineManager() {
 		p.optsBlockGadgetProvider,
 		p.optsSlotGadgetProvider,
 		p.optsNotarizationProvider,
+		p.optsAttestationProvider,
 		p.optsLedgerProvider,
 	)
-
-	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		if index < p.optsPruningDelay {
-			return
-		}
-		p.MainEngineInstance().Storage.PruneUntilSlot(index - p.optsPruningDelay)
-	}, event.WithWorkerPool(p.Workers.CreatePool("PruneEngine", 2)))
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
 	if err != nil {
@@ -232,7 +231,11 @@ func (p *Protocol) initChainManager() {
 	}, event.WithWorkerPool(wp))
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		rootCommitment := p.MainEngineInstance().EarliestRootCommitment()
+		rootCommitment, valid := p.MainEngineInstance().EarliestRootCommitment(index)
+		fmt.Println("Slot finalized:", index, "root commitment:", rootCommitment, "valid:", valid)
+		if !valid {
+			return
+		}
 
 		// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
 		// we first specify the chain's cut-off point, and only then evict the state. It is also important to

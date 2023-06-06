@@ -5,6 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
@@ -16,18 +17,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsBaseDirectory = baseDirectory
-	}
-}
-
-func WithPruningDelay(pruningDelay iotago.SlotIndex) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsPruningDelay = pruningDelay
 	}
 }
 
@@ -88,6 +82,12 @@ func WithSlotGadgetProvider(optsSlotGadgetProvider module.Provider[*engine.Engin
 func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.Engine, notarization.Notarization]) options.Option[Protocol] {
 	return func(n *Protocol) {
 		n.optsNotarizationProvider = optsNotarizationProvider
+	}
+}
+
+func WithAttestationProvider(optsAttestationProvider module.Provider[*engine.Engine, attestation.Attestations]) options.Option[Protocol] {
+	return func(n *Protocol) {
+		n.optsAttestationProvider = optsAttestationProvider
 	}
 }
 

@@ -14,13 +14,15 @@ const (
 )
 
 type Prunable struct {
+	pruningDelay iotago.SlotIndex
 	api          iotago.API
 	manager      *Manager
 	errorHandler func(error)
 }
 
-func New(dbConfig database.Config, errorHandler func(error), opts ...options.Option[Manager]) *Prunable {
+func New(dbConfig database.Config, pruningDelay iotago.SlotIndex, errorHandler func(error), opts ...options.Option[Manager]) *Prunable {
 	return &Prunable{
+		pruningDelay: pruningDelay,
 		errorHandler: errorHandler,
 		manager:      NewManager(dbConfig, errorHandler, opts...),
 	}
@@ -58,7 +60,11 @@ func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.
 func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
-	p.manager.PruneUntilSlot(index)
+	if index < p.pruningDelay {
+		return
+	}
+
+	p.manager.PruneUntilSlot(index - p.pruningDelay)
 }
 
 func (p *Prunable) Size() int64 {
