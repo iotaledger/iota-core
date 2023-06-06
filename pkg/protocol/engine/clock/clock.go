@@ -15,6 +15,8 @@ type Clock interface {
 	// Confirmed returns a notion of time that is anchored to the latest confirmed block.
 	Confirmed() RelativeTime
 
+	RatifiedConfirmed() RelativeTime
+
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface
 }

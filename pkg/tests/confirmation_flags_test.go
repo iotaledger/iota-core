@@ -126,14 +126,18 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.IssueBlockAtSlot("B.5.0", 5, slot2Commitment, nodeB, ts.BlockID("C.5.0"))
 
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3.0", "A.4.0", "B.4.0", "C.5.0"), true, ts.Nodes()...)
-		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("A.3.0", "A.4.0"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.3.0", "A.4.0", "B.4.0", "C.5.0"), true, ts.Nodes()...)
-		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("A.3.0", "A.4.0"), true, ts.Nodes()...)
+
+		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("A.3.0", "A.4.0"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("A.4.0"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.5.0", "B.5.0"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("B.4.0", "C.5.0"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.5.0", "B.5.0"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("B.4.0", "A.4.1"), false, ts.Nodes()...)
+
+		// Not ratified confirmed because slot 3 <= 5 (ratifier index) - 2 (confirmation ratification threshold).
+		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("A.3.0"), false, ts.Nodes()...)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
@@ -161,13 +165,13 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.6.0", "B.6.0", "C.6.0"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("B.4.0", "A.4.1", "C.5.0", "A.5.0", "B.5.0"), true, ts.Nodes()...)
-		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("B.4.0", "A.4.1", "C.5.0", "A.5.0", "B.5.0"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("B.4.0", "A.4.1", "C.5.0", "A.5.0", "B.5.0"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.6.1", "B.6.1", "C.6.1"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.6.1", "B.6.1", "C.6.1"), false, ts.Nodes()...)
 
 		ts.AssertNodeState(ts.Nodes(),
-			testsuite.WithLatestFinalizedSlot(0),
+			testsuite.WithLatestFinalizedSlot(1), // TODO: implement this properly
 			testsuite.WithLatestCommitmentSlotIndex(3),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee),

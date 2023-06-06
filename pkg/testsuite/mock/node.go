@@ -157,6 +157,14 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Clock.RatifiedAcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
 	})
 
+	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
+		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s\n", n.Name, engineName, newTime)
+	})
+
+	events.Clock.RatifiedConfirmedTimeUpdated.Hook(func(newTime time.Time) {
+		fmt.Printf("%s > [%s] Clock.RatifiedConfirmedTimeUpdated: %s\n", n.Name, engineName, newTime)
+	})
+
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
 		fmt.Printf("%s > [%s] Filter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
 	})

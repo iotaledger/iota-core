@@ -49,7 +49,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 
 			e.Events.SlotGadget.LinkTo(g.events)
 
-			e.Events.BlockGadget.BlockRatifiedAccepted.Hook(g.trackVotes)
+			e.Events.BlockGadget.BlockRatifiedConfirmed.Hook(g.trackVotes)
 
 			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
 				if err := e.Storage.Settings().SetLatestFinalizedSlot(index); err != nil {

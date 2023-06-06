@@ -53,8 +53,7 @@ func (g *Gadget) propagateAcceptanceAndConfirmation(initialBlock *blocks.Block, 
 		}
 
 		if confirmed && !walkerBlock.IsConfirmed() {
-			fmt.Println("queing for confirmation", walkerBlock.ID())
-			g.confirmationOrder.Queue(walkerBlock)
+			g.markAsConfirmed(walkerBlock)
 			shouldWalkPastCone = true
 		}
 
@@ -70,7 +69,7 @@ func (g *Gadget) propagateAcceptanceAndConfirmation(initialBlock *blocks.Block, 
 				if weakParent, exists := g.blockCache.Block(parent.ID); !exists {
 					g.acceptanceOrder.Queue(weakParent)
 					if confirmed {
-						g.confirmationOrder.Queue(weakParent)
+						g.markAsConfirmed(weakParent)
 					}
 				}
 			}
@@ -88,19 +87,14 @@ func (g *Gadget) markAsAccepted(block *blocks.Block) (err error) {
 	return nil
 }
 
-func (g *Gadget) markAsConfirmed(block *blocks.Block) (err error) {
+func (g *Gadget) markAsConfirmed(block *blocks.Block) {
 	if block.SetConfirmed() {
 		g.events.BlockConfirmed.Trigger(block)
 
 		g.trackConfirmationRatifierWeight(block)
 	}
-
-	return nil
 }
 
 func (g *Gadget) acceptanceFailed(block *blocks.Block, err error) {
 	panic(errors.Wrapf(err, "could not mark block %s as accepted", block.ID()))
-}
-func (g *Gadget) confirmationFailed(block *blocks.Block, err error) {
-	panic(errors.Wrapf(err, "could not mark block %s as confirmed", block.ID()))
 }

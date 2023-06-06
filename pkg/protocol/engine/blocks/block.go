@@ -441,7 +441,6 @@ func (b *Block) AddConfirmationRatifier(id iotago.AccountID) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	fmt.Println("AddConfirmationRatifier", id, b.confirmationRatifiers, b.confirmationRatifiers == nil)
 	return b.confirmationRatifiers.Add(id)
 }
 

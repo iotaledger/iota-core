@@ -17,6 +17,9 @@ type Events struct {
 	// ConfirmedTimeUpdated is triggered when the confirmed time is updated.
 	ConfirmedTimeUpdated *event.Event1[time.Time]
 
+	// RatifiedConfirmedTimeUpdated is triggered when the confirmed time is updated.
+	RatifiedConfirmedTimeUpdated *event.Event1[time.Time]
+
 	// Group is trait that makes the dictionary linkable.
 	event.Group[Events, *Events]
 }
@@ -24,8 +27,9 @@ type Events struct {
 // NewEvents is the constructor of the Events object.
 var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 	return &Events{
-		AcceptedTimeUpdated:         event.New1[time.Time](),
-		RatifiedAcceptedTimeUpdated: event.New1[time.Time](),
-		ConfirmedTimeUpdated:        event.New1[time.Time](),
+		AcceptedTimeUpdated:          event.New1[time.Time](),
+		RatifiedAcceptedTimeUpdated:  event.New1[time.Time](),
+		ConfirmedTimeUpdated:         event.New1[time.Time](),
+		RatifiedConfirmedTimeUpdated: event.New1[time.Time](),
 	}
 })
