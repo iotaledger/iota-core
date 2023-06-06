@@ -33,12 +33,12 @@ type Block struct {
 	payloadConflictIDs *advancedset.AdvancedSet[iotago.TransactionID]
 
 	// BlockGadget block
-	accepted              bool
+	preAccepted           bool
 	acceptanceRatifiers   *advancedset.AdvancedSet[iotago.AccountID]
-	ratifiedAccepted      bool
-	confirmed             bool
+	accepted              bool
+	preConfirmed          bool
 	confirmationRatifiers *advancedset.AdvancedSet[iotago.AccountID]
-	ratifiedConfirmed     bool
+	confirmed             bool
 
 	mutex sync.RWMutex
 
@@ -86,12 +86,10 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 			commitmentID: commitmentID,
 			issuingTime:  issuingTime,
 		},
-		solid:             true,
-		booked:            true,
-		accepted:          true,
-		ratifiedAccepted:  true, // This should be true since we commit and evict on ratified acceptance.
-		confirmed:         true, // TODO: this should be false
-		ratifiedConfirmed: true, // TODO: this should be false
+		solid:       true,
+		booked:      true,
+		preAccepted: true,
+		accepted:    true, // This should be true since we commit and evict on acceptance.
 	}
 }
 
@@ -383,6 +381,40 @@ func (b *Block) SetPayloadConflictIDs(payloadConflictIDs *advancedset.AdvancedSe
 	b.payloadConflictIDs = payloadConflictIDs
 }
 
+// IsPreAccepted returns true if the Block was preAccepted.
+func (b *Block) IsPreAccepted() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.preAccepted
+}
+
+// SetPreAccepted sets the Block as preAccepted.
+func (b *Block) SetPreAccepted() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.preAccepted; wasUpdated {
+		b.preAccepted = true
+	}
+
+	return wasUpdated
+}
+
+func (b *Block) AddAcceptanceRatifier(id iotago.AccountID) (added bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return b.acceptanceRatifiers.Add(id)
+}
+
+func (b *Block) AcceptanceRatifiers() []iotago.AccountID {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.acceptanceRatifiers.Slice()
+}
+
 // IsAccepted returns true if the Block was accepted.
 func (b *Block) IsAccepted() bool {
 	b.mutex.RLock()
@@ -403,40 +435,6 @@ func (b *Block) SetAccepted() (wasUpdated bool) {
 	return wasUpdated
 }
 
-func (b *Block) AddAcceptanceRatifier(id iotago.AccountID) (added bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	return b.acceptanceRatifiers.Add(id)
-}
-
-func (b *Block) AcceptanceRatifiers() []iotago.AccountID {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return b.acceptanceRatifiers.Slice()
-}
-
-// IsRatifiedAccepted returns true if the Block was ratified accepted.
-func (b *Block) IsRatifiedAccepted() bool {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return b.ratifiedAccepted
-}
-
-// SetRatifiedAccepted sets the Block as ratified accepted.
-func (b *Block) SetRatifiedAccepted() (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if wasUpdated = !b.ratifiedAccepted; wasUpdated {
-		b.ratifiedAccepted = true
-	}
-
-	return wasUpdated
-}
-
 func (b *Block) AddConfirmationRatifier(id iotago.AccountID) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -449,24 +447,6 @@ func (b *Block) ConfirmationRatifiers() []iotago.AccountID {
 	defer b.mutex.RUnlock()
 
 	return b.confirmationRatifiers.Slice()
-}
-
-func (b *Block) IsRatifiedConfirmed() bool {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return b.ratifiedConfirmed
-}
-
-func (b *Block) SetRatifiedConfirmed() (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if wasUpdated = !b.ratifiedConfirmed; wasUpdated {
-		b.ratifiedConfirmed = true
-	}
-
-	return wasUpdated
 }
 
 func (b *Block) IsConfirmed() bool {
@@ -487,6 +467,24 @@ func (b *Block) SetConfirmed() (wasUpdated bool) {
 	return wasUpdated
 }
 
+func (b *Block) IsPreConfirmed() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.preConfirmed
+}
+
+func (b *Block) SetPreConfirmed() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.preConfirmed; wasUpdated {
+		b.preConfirmed = true
+	}
+
+	return wasUpdated
+}
+
 func (b *Block) String() string {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
@@ -498,12 +496,12 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("Future", b.future))
 	builder.AddField(stringify.NewStructField("Booked", b.booked))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
-	builder.AddField(stringify.NewStructField("Accepted", b.accepted))
+	builder.AddField(stringify.NewStructField("PreAccepted", b.preAccepted))
 	builder.AddField(stringify.NewStructField("AcceptanceRatifiers", b.acceptanceRatifiers))
-	builder.AddField(stringify.NewStructField("RatifiedAccepted", b.ratifiedAccepted))
-	builder.AddField(stringify.NewStructField("Confirmed", b.confirmed))
+	builder.AddField(stringify.NewStructField("Accepted", b.accepted))
+	builder.AddField(stringify.NewStructField("PreConfirmed", b.preConfirmed))
 	builder.AddField(stringify.NewStructField("ConfirmationRatifiers", b.confirmationRatifiers))
-	builder.AddField(stringify.NewStructField("RatifiedConfirmed", b.ratifiedConfirmed))
+	builder.AddField(stringify.NewStructField("Confirmed", b.confirmed))
 
 	for index, child := range b.strongChildren {
 		builder.AddField(stringify.NewStructField(fmt.Sprintf("strongChildren%d", index), child.ID().String()))

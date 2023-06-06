@@ -185,7 +185,7 @@ func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 		return true
 	}
 
-	if isBootstrapped = time.Since(e.Clock.Accepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsBootstrapped(); isBootstrapped {
+	if isBootstrapped = time.Since(e.Clock.PreAccepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsBootstrapped(); isBootstrapped {
 		e.isBootstrapped = true
 	}
 
@@ -193,7 +193,7 @@ func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 }
 
 func (e *Engine) IsSynced() (isBootstrapped bool) {
-	return e.IsBootstrapped() // && time.Since(e.Clock.Accepted().Time()) < e.optsBootstrappedThreshold
+	return e.IsBootstrapped() // && time.Since(e.Clock.PreAccepted().Time()) < e.optsBootstrappedThreshold
 }
 
 func (e *Engine) API() iotago.API {
@@ -306,7 +306,7 @@ func (e *Engine) SetChainID(chainID iotago.CommitmentID) {
 func (e *Engine) setupBlockStorage() {
 	wp := e.Workers.CreatePool("BlockStorage", 1) // Using just 1 worker to avoid contention
 
-	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		store := e.Storage.Blocks(block.ID().Index())
 		if store == nil {
 			e.errorHandler(errors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
@@ -323,7 +323,7 @@ func (e *Engine) setupEvictionState() {
 
 	wp := e.Workers.CreatePool("EvictionState", 1) // Using just 1 worker to avoid contention
 
-	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		block.ForEachParent(func(parent model.Parent) {
 			// TODO: ONLY ADD STRONG PARENTS AFTER NOT DOWNLOADING PAST WEAK ARROWS
 			// TODO: is this correct? could this lock acceptance in some extreme corner case? something like this happened, that confirmation is correctly advancing per block, but acceptance does not. I think it might have something to do with root blocks

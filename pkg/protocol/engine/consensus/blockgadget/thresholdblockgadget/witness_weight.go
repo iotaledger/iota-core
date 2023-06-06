@@ -12,7 +12,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (g *Gadget) tryAcceptAndConfirm(block *blocks.Block) {
+func (g *Gadget) tryPreAcceptAndPreConfirm(block *blocks.Block) {
 	committee := g.sybilProtection.Committee()
 	committeeTotalWeight := committee.TotalWeight()
 	blockWeight := committee.SelectAccounts(block.Witnesses()...).TotalWeight()
@@ -21,17 +21,14 @@ func (g *Gadget) tryAcceptAndConfirm(block *blocks.Block) {
 	onlineCommitteeTotalWeight := onlineCommittee.TotalWeight()
 	blockWeightOnline := onlineCommittee.SelectAccounts(block.Witnesses()...).TotalWeight()
 
-	fmt.Println("tryAcceptAndConfirm", block.ID(), "blockWeight", blockWeight, "blockWeightOnline", blockWeightOnline, "committeeTotalWeight", committeeTotalWeight, "onlineCommitteeTotalWeight", onlineCommitteeTotalWeight)
-
 	if votes.IsThresholdReached(blockWeight, committeeTotalWeight, g.optsConfirmationThreshold) {
-		fmt.Println("tryAcceptAndConfirm", block.ID(), "is confirmed")
-		g.propagateAcceptanceAndConfirmation(block, true)
+		g.propagatePreAcceptanceAndPreConfirmation(block, true)
 	} else if votes.IsThresholdReached(blockWeightOnline, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {
-		g.propagateAcceptanceAndConfirmation(block, false)
+		g.propagatePreAcceptanceAndPreConfirmation(block, false)
 	}
 }
 
-func (g *Gadget) propagateAcceptanceAndConfirmation(initialBlock *blocks.Block, confirmed bool) {
+func (g *Gadget) propagatePreAcceptanceAndPreConfirmation(initialBlock *blocks.Block, preConfirmed bool) {
 	pastConeWalker := walker.New[iotago.BlockID](false).Push(initialBlock.ID())
 	for pastConeWalker.HasNext() {
 		blockID := pastConeWalker.Next()
@@ -40,20 +37,18 @@ func (g *Gadget) propagateAcceptanceAndConfirmation(initialBlock *blocks.Block, 
 			panic(fmt.Sprintf("parent %s does not exist", blockID))
 		}
 
-		fmt.Println("propagateAcceptanceAndConfirmation", walkerBlock.ID(), "confirmed", confirmed)
-
 		if walkerBlock.IsRootBlock() {
 			continue
 		}
 
 		shouldWalkPastCone := false
-		if !walkerBlock.IsAccepted() {
-			g.acceptanceOrder.Queue(walkerBlock)
+		if !walkerBlock.IsPreAccepted() {
+			g.preAcceptanceOrder.Queue(walkerBlock)
 			shouldWalkPastCone = true
 		}
 
-		if confirmed && !walkerBlock.IsConfirmed() {
-			g.markAsConfirmed(walkerBlock)
+		if preConfirmed && !walkerBlock.IsPreConfirmed() {
+			g.markAsPreConfirmed(walkerBlock)
 			shouldWalkPastCone = true
 		}
 
@@ -67,9 +62,9 @@ func (g *Gadget) propagateAcceptanceAndConfirmation(initialBlock *blocks.Block, 
 				pastConeWalker.Push(parent.ID)
 			case model.ShallowLikeParentType, model.WeakParentType:
 				if weakParent, exists := g.blockCache.Block(parent.ID); !exists {
-					g.acceptanceOrder.Queue(weakParent)
-					if confirmed {
-						g.markAsConfirmed(weakParent)
+					g.preAcceptanceOrder.Queue(weakParent)
+					if preConfirmed {
+						g.markAsPreConfirmed(weakParent)
 					}
 				}
 			}
@@ -77,9 +72,9 @@ func (g *Gadget) propagateAcceptanceAndConfirmation(initialBlock *blocks.Block, 
 	}
 }
 
-func (g *Gadget) markAsAccepted(block *blocks.Block) (err error) {
-	if block.SetAccepted() {
-		g.events.BlockAccepted.Trigger(block)
+func (g *Gadget) markAsPreAccepted(block *blocks.Block) (err error) {
+	if block.SetPreAccepted() {
+		g.events.BlockPreAccepted.Trigger(block)
 
 		g.trackAcceptanceRatifierWeight(block)
 	}
@@ -87,14 +82,14 @@ func (g *Gadget) markAsAccepted(block *blocks.Block) (err error) {
 	return nil
 }
 
-func (g *Gadget) markAsConfirmed(block *blocks.Block) {
-	if block.SetConfirmed() {
-		g.events.BlockConfirmed.Trigger(block)
+func (g *Gadget) markAsPreConfirmed(block *blocks.Block) {
+	if block.SetPreConfirmed() {
+		g.events.BlockPreConfirmed.Trigger(block)
 
 		g.trackConfirmationRatifierWeight(block)
 	}
 }
 
-func (g *Gadget) acceptanceFailed(block *blocks.Block, err error) {
+func (g *Gadget) preAcceptanceFailed(block *blocks.Block, err error) {
 	panic(errors.Wrapf(err, "could not mark block %s as accepted", block.ID()))
 }

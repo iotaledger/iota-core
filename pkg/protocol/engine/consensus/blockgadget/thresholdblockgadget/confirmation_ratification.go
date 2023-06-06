@@ -38,7 +38,7 @@ func (g *Gadget) trackConfirmationRatifierWeight(ratifierBlock *blocks.Block) {
 			continue
 		}
 
-		if block.IsRatifiedConfirmed() {
+		if block.IsConfirmed() {
 			continue
 		}
 
@@ -54,23 +54,23 @@ func (g *Gadget) trackConfirmationRatifierWeight(ratifierBlock *blocks.Block) {
 			case model.ShallowLikeParentType, model.WeakParentType:
 				if weakParent, exists := g.blockCache.Block(parent.ID); exists {
 					if weakParent.AddConfirmationRatifier(ratifier) {
-						g.tryRatifyConfirm(weakParent)
+						g.tryConfirm(weakParent)
 					}
 				}
 			}
 		})
 
-		g.tryRatifyConfirm(block)
+		g.tryConfirm(block)
 	}
 }
 
-func (g *Gadget) tryRatifyConfirm(block *blocks.Block) {
+func (g *Gadget) tryConfirm(block *blocks.Block) {
 	blockWeight := g.sybilProtection.Committee().SelectAccounts(block.ConfirmationRatifiers()...).TotalWeight()
 	totalCommitteeWeight := g.sybilProtection.Committee().TotalWeight()
 
 	if votes.IsThresholdReached(blockWeight, totalCommitteeWeight, g.optsConfirmationThreshold) {
-		if block.SetRatifiedConfirmed() {
-			g.events.BlockRatifiedConfirmed.Trigger(block)
+		if block.SetConfirmed() {
+			g.events.BlockConfirmed.Trigger(block)
 		}
 	}
 }

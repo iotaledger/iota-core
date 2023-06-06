@@ -39,7 +39,7 @@ func (c State) String() string {
 	case Pending:
 		return "Pending"
 	case Accepted:
-		return "Accepted"
+		return "PreAccepted"
 	case Rejected:
 		return "Rejected"
 	default:

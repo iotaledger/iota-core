@@ -152,28 +152,28 @@ func configure() error {
 		Component.LogInfof("WitnessAdded: %s", block.ID())
 	})
 
+	deps.Protocol.Events.Engine.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+		Component.LogInfof("BlockPreAccepted: %s", block.ID())
+	})
+
 	deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockAccepted: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockRatifiedAccepted: %s", block.ID())
+	deps.Protocol.Events.Engine.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
+		Component.LogInfof("BlockPreConfirmed: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockConfirmed: %s", block.ID())
+	deps.Protocol.Events.Engine.Clock.PreAcceptedTimeUpdated.Hook(func(time time.Time) {
+		Component.LogInfof("PreAcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
 	})
 
 	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
 		Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
 	})
 
-	deps.Protocol.Events.Engine.Clock.RatifiedAcceptedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("RatifiedAcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
-	})
-
-	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
+	deps.Protocol.Events.Engine.Clock.PreConfirmedTimeUpdated.Hook(func(time time.Time) {
+		Component.LogInfof("PreConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
 	})
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {

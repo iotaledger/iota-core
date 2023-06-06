@@ -132,9 +132,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, node1, node2)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, node3, node4)
 
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.G", "P1.H"), true, node1, node2)
-		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P1.E", "P1.F"), true, node1, node2)
-		ts.AssertBlocksInCacheConfirmed(ts.Blocks("P1.E", "P1.F"), true, node1, node2)
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("P1.G", "P1.H"), true, node1, node2)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.E", "P1.F"), true, node1, node2)
+		ts.AssertBlocksInCachePreConfirmed(ts.Blocks("P1.E", "P1.F"), true, node1, node2)
 
 		// Verify that nodes have the expected states.
 		ts.AssertNodeState(ts.Nodes("node1", "node2"),
@@ -164,11 +164,11 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, node3, node4)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
 
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.G", "P2.H"), true, node3, node4)
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.I"), false, node3, node4) // block not referenced yet
-		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P2.E", "P2.F"), true, node3, node4)
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.G", "P2.H"), true, node3, node4)
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.I"), false, node3, node4) // block not referenced yet
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.E", "P2.F"), true, node3, node4)
 
-		ts.AssertBlocksInCacheConfirmed(ts.Blocks("P2.E", "P2.F"), false, node3, node4)
+		ts.AssertBlocksInCachePreConfirmed(ts.Blocks("P2.E", "P2.F"), false, node3, node4)
 
 		// Verify that nodes have the expected states.
 		ts.AssertNodeState(ts.Nodes("node3", "node4"),

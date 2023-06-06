@@ -166,7 +166,7 @@ func (t *TestFramework) RequireBooked(transactionAliases ...string) {
 }
 
 func (t *TestFramework) RequireAccepted(transactionAliases map[string]bool) {
-	//t.requireAcceptedTriggered(transactionAliases)
+	// t.requireAcceptedTriggered(transactionAliases)
 	t.requireMarkedAccepted(transactionAliases)
 }
 
@@ -249,7 +249,7 @@ func (t *TestFramework) setupHookedEvents() {
 			//		t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
 			//	}
 			//
-			//	require.False(t.test, metadata.IsAccepted(), "transaction is not marked as pending")
+			//	require.False(t.test, metadata.IsPreAccepted(), "transaction is not marked as pending")
 			//
 			//	t.markTransactionAcceptedTriggered(metadata.ID(), true)
 		})

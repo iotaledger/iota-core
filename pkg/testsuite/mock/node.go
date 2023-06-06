@@ -149,20 +149,20 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
 	})
 
+	events.Clock.PreAcceptedTimeUpdated.Hook(func(newTime time.Time) {
+		fmt.Printf("%s > [%s] Clock.PreAcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
+	})
+
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
 		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
 	})
 
-	events.Clock.RatifiedAcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.RatifiedAcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
+	events.Clock.PreConfirmedTimeUpdated.Hook(func(newTime time.Time) {
+		fmt.Printf("%s > [%s] Clock.PreConfirmedTimeUpdated: %s\n", n.Name, engineName, newTime)
 	})
 
 	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
 		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s\n", n.Name, engineName, newTime)
-	})
-
-	events.Clock.RatifiedConfirmedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.RatifiedConfirmedTimeUpdated: %s\n", n.Name, engineName, newTime)
 	})
 
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
@@ -186,20 +186,20 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment)
 	})
 
+	events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+	})
+
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
 
-	events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockRatifiedAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
 
 	events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
-	})
-
-	events.BlockGadget.BlockRatifiedConfirmed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockRatifiedConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
 
 	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {

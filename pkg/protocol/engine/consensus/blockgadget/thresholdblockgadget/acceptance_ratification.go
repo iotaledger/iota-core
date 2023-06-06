@@ -33,8 +33,8 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 			continue
 		}
 
-		// Skip propagation if the block is already ratified accepted.
-		if block.IsRatifiedAccepted() {
+		// Skip propagation if the block is already accepted.
+		if block.IsAccepted() {
 			continue
 		}
 
@@ -50,26 +50,26 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 			case model.ShallowLikeParentType, model.WeakParentType:
 				if weakParent, exists := g.blockCache.Block(parent.ID); exists {
 					if weakParent.AddAcceptanceRatifier(ratifier) {
-						g.tryRatifyAccept(weakParent)
+						g.tryAccept(weakParent)
 					}
 				}
 			}
 		})
 
-		g.tryRatifyAccept(block)
+		g.tryAccept(block)
 	}
 }
 
-func (g *Gadget) tryRatifyAccept(block *blocks.Block) {
+func (g *Gadget) tryAccept(block *blocks.Block) {
 	blockWeight := g.sybilProtection.OnlineCommittee().SelectAccounts(block.AcceptanceRatifiers()...).TotalWeight()
 	onlineCommitteeTotalWeight := g.sybilProtection.OnlineCommittee().TotalWeight()
 
 	if votes.IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {
-		g.propagateRatifiedAcceptance(block)
+		g.propagateAcceptance(block)
 	}
 }
 
-func (g *Gadget) propagateRatifiedAcceptance(initialBlock *blocks.Block) {
+func (g *Gadget) propagateAcceptance(initialBlock *blocks.Block) {
 	pastConeWalker := walker.New[iotago.BlockID](false).Push(initialBlock.ID())
 	for pastConeWalker.HasNext() {
 		blockID := pastConeWalker.Next()
@@ -82,11 +82,11 @@ func (g *Gadget) propagateRatifiedAcceptance(initialBlock *blocks.Block) {
 			continue
 		}
 
-		if walkerBlock.IsRatifiedAccepted() {
+		if walkerBlock.IsAccepted() {
 			continue
 		}
 
-		g.ratifiedAcceptanceOrder.Queue(walkerBlock)
+		g.acceptanceOrder.Queue(walkerBlock)
 
 		walkerBlock.ForEachParent(func(parent model.Parent) {
 			switch parent.Type {
@@ -94,21 +94,21 @@ func (g *Gadget) propagateRatifiedAcceptance(initialBlock *blocks.Block) {
 				pastConeWalker.Push(parent.ID)
 			case model.ShallowLikeParentType, model.WeakParentType:
 				if weakParent, exists := g.blockCache.Block(parent.ID); !exists {
-					g.ratifiedAcceptanceOrder.Queue(weakParent)
+					g.acceptanceOrder.Queue(weakParent)
 				}
 			}
 		})
 	}
 }
 
-func (g *Gadget) markAsRatifiedAccepted(block *blocks.Block) (err error) {
-	if block.SetRatifiedAccepted() {
-		g.events.BlockRatifiedAccepted.Trigger(block)
+func (g *Gadget) markAsAccepted(block *blocks.Block) (err error) {
+	if block.SetAccepted() {
+		g.events.BlockAccepted.Trigger(block)
 	}
 
 	return nil
 }
 
-func (g *Gadget) ratifiedAcceptanceFailed(block *blocks.Block, err error) {
-	panic(errors.Wrapf(err, "could not mark block %s as ratified accepted", block.ID()))
+func (g *Gadget) acceptanceFailed(block *blocks.Block, err error) {
+	panic(errors.Wrapf(err, "could not mark block %s as accepted", block.ID()))
 }

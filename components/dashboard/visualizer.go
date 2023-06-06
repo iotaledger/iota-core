@@ -63,8 +63,8 @@ func runVisualizer(component *app.Component) {
 				// 	currentSlot.Store(int64(block.ID().Index()))
 				// }
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-				sendVertex(block, block.IsAccepted())
+			deps.Protocol.Events.Engine.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+				sendVertex(block, block.IsPreAccepted())
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.TipManager.TipAdded.Hook(func(block *blocks.Block) {
 				sendTipInfo(block, true)
@@ -93,7 +93,7 @@ func runVisualizer(component *app.Component) {
 // 				res = append(res, vertex{
 // 					ID:              element.ID().Base58(),
 // 					ParentIDsByType: prepareParentReferences(element.M.Block),
-// 					IsFinalized:     element.M.Accepted,
+// 					IsFinalized:     element.M.PreAccepted,
 // 					IsTx:            element.M.Block.Payload().Type() == devnetvm.TransactionType,
 // 					IssuingTime:     element.M.Block.IssuingTime(),
 // 				})

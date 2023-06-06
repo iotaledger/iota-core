@@ -169,7 +169,7 @@ func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) error {
 		}
 
 		// Skip propagation if the block is already accepted.
-		if block.IsAccepted() {
+		if block.IsPreAccepted() {
 			continue
 		}
 

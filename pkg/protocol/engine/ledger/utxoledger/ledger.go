@@ -42,8 +42,8 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 		e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
-		// TODO: should this attach to RatifiedAccepted instead?
-		e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
+		// TODO: should this attach to Accepted instead?
+		e.Events.BlockGadget.BlockPreAccepted.Hook(l.BlockAccepted)
 
 		return l
 	})

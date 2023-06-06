@@ -53,7 +53,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 			e.Events.SlotGadget.LinkTo(g.events)
 			g.workers = e.Workers.CreateGroup("SlotGadget")
 
-			e.Events.BlockGadget.BlockRatifiedConfirmed.Hook(g.trackVotes, event.WithWorkerPool(g.workers.CreatePool("TrackAndRefresh", 1))) // Using just 1 worker to avoid contention
+			e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes, event.WithWorkerPool(g.workers.CreatePool("TrackAndRefresh", 1))) // Using just 1 worker to avoid contention
 
 			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
 				if err := e.Storage.Settings().SetLatestFinalizedSlot(index); err != nil {

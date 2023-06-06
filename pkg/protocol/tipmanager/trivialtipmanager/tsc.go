@@ -14,8 +14,8 @@ func (t *TipManager) isValidTip(tip *blocks.Block) (err error) {
 	// if !t.isPastConeTimestampCorrect(tip) {
 	// 	return errors.Errorf("cannot select tip due to TSC condition tip issuing time (%s), time (%s), min supported time (%s), block id (%s), tip pool size (%d), scheduled: (%t), orphaned: (%t), accepted: (%t)",
 	// 		tip.IssuingTime(),
-	// 		t.engine.Clock.Accepted().Time(),
-	// 		t.engine.Clock.Accepted().Time().Add(-t.optsTimeSinceConfirmationThreshold),
+	// 		t.engine.Clock.PreAccepted().Time(),
+	// 		t.engine.Clock.PreAccepted().Time().Add(-t.optsTimeSinceConfirmationThreshold),
 	// 		tip.ID().Base58(),
 	// 		t.tips.Size(),
 	// 		tip.IsScheduled(),
@@ -37,7 +37,7 @@ func (t *TipManager) isValidTip(tip *blocks.Block) (err error) {
 //	If there's any unaccepted block >TSC threshold, then the oldest accepted block will be >TSC threshold, too.
 func (t *TipManager) isPastConeTimestampCorrect(block *blocks.Block) (timestampValid bool) {
 	// TODO: add when we have acceptance and clock
-	// minSupportedTimestamp := t.engine.Clock.Accepted().Time().Add(-t.optsTimeSinceConfirmationThreshold)
+	// minSupportedTimestamp := t.engine.Clock.PreAccepted().Time().Add(-t.optsTimeSinceConfirmationThreshold)
 
 	if !t.isBootstrappedFunc() {
 		// If the node is not bootstrapped we do not have a valid timestamp to compare against.
@@ -72,9 +72,9 @@ func (t *TipManager) checkBlockRecursive(block *blocks.Block, minSupportedTimest
 	// 	return true
 	// }
 
-	//if block.IsOrphaned() {
+	// if block.IsOrphaned() {
 	//	return false
-	//}
+	// }
 
 	// if block is younger than TSC and not accepted, walk through strong parents' past cones
 	for _, strongParentID := range block.Block().StrongParents {
