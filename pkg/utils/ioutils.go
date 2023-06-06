@@ -81,7 +81,7 @@ func (p *PositionedWriter) WriteValueAtBookmark(name string, value interface{}) 
 	}
 	originalPosition, err := p.writer.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return errors.Wrap(err, "unable to seek to current position")
+		return errors.Wrap(err, "unable to obtain current seek position")
 	}
 	if bookmarkPosition >= originalPosition {
 		return errors.Errorf("cannot write into the future, current write position %d is greater than or equal to the bookmark position %d", originalPosition, bookmarkPosition)

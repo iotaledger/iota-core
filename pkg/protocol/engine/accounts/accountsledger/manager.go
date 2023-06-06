@@ -108,7 +108,7 @@ func (b *Manager) CommitSlot(
 	}
 
 	// store the diff and apply it to the account vector tree, obtaining the new root
-	if accountsTreeRoot, err = b.applyDiff(slotIndex, accountDiffs, destroyedAccounts); err != nil {
+	if accountsTreeRoot, err = b.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, errors.Wrap(err, "could not apply diff to account tree")
 	}
 
@@ -191,6 +191,7 @@ func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 
 		// update the account data with the diff
 		accountData.BlockIssuanceCredits().Update(-diffChange.Change, diffChange.PreviousUpdatedTime)
+		accountData.SetOutputID(diffChange.PreviousOutputID)
 		accountData.AddPublicKey(diffChange.PubKeysRemoved...)
 		accountData.RemovePublicKey(diffChange.PubKeysAdded...)
 
@@ -205,7 +206,7 @@ func (b *Manager) Shutdown() {
 	b.TriggerStopped()
 }
 
-func (b *Manager) applyDiff(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) (iotago.Identifier, error) {
+func (b *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) (iotago.Identifier, error) {
 	// load diffs storage for the slot
 	diffStore := b.slotDiff(slotIndex)
 	for accountID, accountDiff := range accountDiffs {
@@ -234,9 +235,10 @@ func (b *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 
 		accountData, exists := b.accountsTree.Get(accountID)
 		if !exists {
-			accountData = accounts.NewAccountData(b.api, accountID, accounts.NewBlockIssuanceCredits(0, index), accountData.OutputID())
+			accountData = accounts.NewAccountData(b.api, accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
 		}
 		accountData.BlockIssuanceCredits().Update(diffChange.Change, index)
+		accountData.SetOutputID(diffChange.NewOutputID)
 		accountData.AddPublicKey(diffChange.PubKeysAdded...)
 		accountData.RemovePublicKey(diffChange.PubKeysRemoved...)
 		b.accountsTree.Set(accountID, accountData)

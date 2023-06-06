@@ -368,7 +368,6 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			accountDiff.PreviousOutputID = accountData.OutputID()
 			accountDiff.PubKeysRemoved = accountData.PubKeys().Slice()
 		} else { // the account was transitioned, fill in the diff with the previous information to allow rollback
-			// TODO: do not apply any Change, is it correct?
 			createdOutput := createdAccounts[consumedAccountID]
 			accountDiff.NewOutputID = createdOutput.OutputID()
 			accountDiff.PreviousOutputID = consumedAccountOutput.OutputID()

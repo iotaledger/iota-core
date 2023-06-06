@@ -37,7 +37,7 @@ func NewAccountData(api iotago.API, id iotago.AccountID, credits *BlockIssuanceC
 		id:       id,
 		credits:  credits,
 		outputID: outputID,
-		pubKeys:  advancedset.New[ed25519.PublicKey](pubKeys...),
+		pubKeys:  advancedset.New(pubKeys...),
 		api:      api,
 	}
 }
@@ -52,6 +52,10 @@ func (a *AccountData) BlockIssuanceCredits() *BlockIssuanceCredits {
 
 func (a *AccountData) OutputID() iotago.OutputID {
 	return a.outputID
+}
+
+func (a *AccountData) SetOutputID(outputID iotago.OutputID) {
+	a.outputID = outputID
 }
 
 func (a *AccountData) PubKeys() *advancedset.AdvancedSet[ed25519.PublicKey] {
@@ -111,6 +115,7 @@ func (a *AccountData) SnapshotBytes() ([]byte, error) {
 	m.WriteBytes(idBytes)
 	m.WriteInt64(a.BlockIssuanceCredits().Value)
 	m.WriteBytes(a.BlockIssuanceCredits().UpdateTime.Bytes())
+	m.WriteBytes(lo.PanicOnErr(a.OutputID().Bytes()))
 	m.WriteUint64(uint64(a.pubKeys.Size()))
 	a.pubKeys.Range(func(pubKey ed25519.PublicKey) {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
