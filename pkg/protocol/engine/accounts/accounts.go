@@ -5,8 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -28,26 +26,19 @@ type Account interface {
 type AccountData struct {
 	api iotago.API
 
-	id         iotago.AccountID      `serix:"0"`
-	credits    *BlockIssuanceCredits `serix:"1"`
-	outputID   iotago.OutputID       `serix:"2"`
-	pubKeysMap *shrinkingmap.ShrinkingMap[ed25519.PublicKey, types.Empty]
+	id       iotago.AccountID      `serix:"0"`
+	credits  *BlockIssuanceCredits `serix:"1"`
+	outputID iotago.OutputID       `serix:"2"`
+	pubKeys  *advancedset.AdvancedSet[ed25519.PublicKey]
 }
 
 func NewAccountData(api iotago.API, id iotago.AccountID, credits *BlockIssuanceCredits, outputID iotago.OutputID, pubKeys ...ed25519.PublicKey) *AccountData {
-	pubKeysMap := shrinkingmap.New[ed25519.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
-	if pubKeys != nil {
-		for _, pubKey := range pubKeys {
-			_ = pubKeysMap.Set(pubKey, types.Void)
-		}
-	}
-
 	return &AccountData{
-		id:         id,
-		credits:    credits,
-		outputID:   outputID,
-		pubKeysMap: pubKeysMap,
-		api:        api,
+		id:       id,
+		credits:  credits,
+		outputID: outputID,
+		pubKeys:  advancedset.New[ed25519.PublicKey](pubKeys...),
+		api:      api,
 	}
 }
 
@@ -64,36 +55,29 @@ func (a *AccountData) OutputID() iotago.OutputID {
 }
 
 func (a *AccountData) PubKeys() *advancedset.AdvancedSet[ed25519.PublicKey] {
-	pubKeys := advancedset.New[ed25519.PublicKey]()
-	a.pubKeysMap.ForEachKey(func(key ed25519.PublicKey) bool {
-		pubKeys.Add(key)
-		return true
-	})
-
-	return pubKeys
+	return a.pubKeys
 }
 
 func (a *AccountData) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
-	return a.pubKeysMap.Has(pubKey)
+	return a.pubKeys.Has(pubKey)
 }
 
 func (a *AccountData) AddPublicKey(pubKeys ...ed25519.PublicKey) {
 	for _, pubKey := range pubKeys {
-		_ = a.pubKeysMap.Set(pubKey, types.Void)
+		a.pubKeys.Add(pubKey)
 	}
 }
 
 func (a *AccountData) RemovePublicKey(pubKeys ...ed25519.PublicKey) {
 	for _, pubKey := range pubKeys {
-		_ = a.pubKeysMap.Delete(pubKey)
+		_ = a.pubKeys.Delete(pubKey)
 	}
 }
 
 func (a *AccountData) Clone() Account {
-	keyMapCopy := shrinkingmap.New[ed25519.PublicKey, types.Empty](shrinkingmap.WithShrinkingThresholdCount(10))
-	a.pubKeysMap.ForEachKey(func(key ed25519.PublicKey) bool {
-		keyMapCopy.Set(key, types.Void)
-		return true
+	keyCopy := advancedset.New[ed25519.PublicKey]()
+	a.pubKeys.Range(func(key ed25519.PublicKey) {
+		keyCopy.Add(key)
 	})
 
 	return &AccountData{
@@ -102,7 +86,7 @@ func (a *AccountData) Clone() Account {
 			Value:      a.BlockIssuanceCredits().Value,
 			UpdateTime: a.BlockIssuanceCredits().UpdateTime,
 		},
-		pubKeysMap: keyMapCopy,
+		pubKeys: keyCopy,
 	}
 }
 
@@ -111,7 +95,7 @@ func (a *AccountData) FromBytes(bytes []byte) (int, error) {
 }
 
 func (a AccountData) Bytes() ([]byte, error) {
-	b, err := a.api.Encode(a) // TODO do we need to add here any options?
+	b, err := a.api.Encode(a) // TODO: do we need to add here any options?
 	if err != nil {
 		return nil, err
 	}
@@ -127,10 +111,9 @@ func (a *AccountData) SnapshotBytes() ([]byte, error) {
 	m.WriteBytes(idBytes)
 	m.WriteInt64(a.BlockIssuanceCredits().Value)
 	m.WriteBytes(a.BlockIssuanceCredits().UpdateTime.Bytes())
-	m.WriteUint64(uint64(a.pubKeysMap.Size()))
-	a.pubKeysMap.ForEachKey(func(pubKey ed25519.PublicKey) bool {
+	m.WriteUint64(uint64(a.pubKeys.Size()))
+	a.pubKeys.Range(func(pubKey ed25519.PublicKey) {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
-		return true
 	})
 
 	return m.Bytes(), nil

@@ -216,7 +216,7 @@ func (b *Manager) applyDiff(slotIndex iotago.SlotIndex, accountDiffs map[iotago.
 		}
 	}
 
-	accountRoot, err := b.commitaccountTree(slotIndex, accountDiffs, destroyedAccounts)
+	accountRoot, err := b.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts)
 	if err != nil {
 		return iotago.Identifier{}, errors.Wrapf(err, "could not apply diff to slot %d", slotIndex)
 	}
@@ -224,7 +224,7 @@ func (b *Manager) applyDiff(slotIndex iotago.SlotIndex, accountDiffs map[iotago.
 	return accountRoot, nil
 }
 
-func (b *Manager) commitaccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) (accountRoot iotago.Identifier, err error) {
+func (b *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) (accountRoot iotago.Identifier, err error) {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
 		// remove destroyed account, no need to update with diffs
