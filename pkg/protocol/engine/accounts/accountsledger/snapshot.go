@@ -99,7 +99,7 @@ func (b *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 		return errors.Wrap(err, "unable to write slot diffs count")
 	}
 
-	accountCount, err := b.exportTargetAccount(pWriter, targetIndex)
+	accountCount, err := b.exportAccountTree(pWriter, targetIndex)
 	if err != nil {
 		return errors.Wrapf(err, "unable to export Account for target index %d", targetIndex)
 	}
@@ -119,10 +119,10 @@ func (b *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	return nil
 }
 
-// exportTargetAccount exports the AccountTree at a certain target slot, returning the total amount of exported accounts
-func (b *Manager) exportTargetAccount(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64, err error) {
+// exportAccountTree exports the AccountTree at a certain target slot, returning the total amount of exported accounts
+func (b *Manager) exportAccountTree(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64, err error) {
 	if err = b.accountsTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) bool {
-		_, err = b.rollbackAccountTo(targetIndex, accountID, accountData)
+		_, err = b.rollbackAccountTo(accountData, targetIndex)
 		if err != nil {
 			return false
 		}
@@ -137,12 +137,12 @@ func (b *Manager) exportTargetAccount(pWriter *utils.PositionedWriter, targetInd
 	}
 
 	// we might have entries that were destroyed, that are present in diff, but not in the tree from the latestCommittedIndex
-	accountCount, err = b.includeDestroyedAccountsToTargetAccount(pWriter, targetIndex, accountCount)
+	recreatedAccountsCount, err := b.recreateDestroyedAccountsAt(pWriter, targetIndex)
 
-	return accountCount, err
+	return accountCount + recreatedAccountsCount, err
 }
 
-func (b *Manager) includeDestroyedAccountsToTargetAccount(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex, accountCount uint64) (uint64, error) {
+func (b *Manager) recreateDestroyedAccountsAt(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (recreatedAccountsCount uint64, err error) {
 	destroyedAccounts := make(map[iotago.AccountID]*accounts.AccountData)
 	for index := b.latestCommittedSlot; index >= targetIndex+1; index-- {
 		diffStore := b.slotDiffFunc(index)
@@ -157,22 +157,22 @@ func (b *Manager) includeDestroyedAccountsToTargetAccount(pWriter *utils.Positio
 			accountData := accounts.NewAccountData(b.api, accountID, accounts.NewBlockIssuanceCredits(-accountDiffChange.Change, index), accountDiffChange.NewOutputID, accountDiffChange.PubKeysRemoved...)
 
 			destroyedAccounts[accountID] = accountData
-			accountCount++
+			recreatedAccountsCount++
 			return true
 		})
 	}
 	for accountID, accountData := range destroyedAccounts {
-		_, err := b.rollbackAccountTo(targetIndex, accountID, accountData)
+		_, err := b.rollbackAccountTo(accountData, targetIndex)
 		if err != nil {
-			return accountCount, errors.Wrapf(err, "unable to rollback account %s to target slot index %d", accountID.String(), targetIndex)
+			return recreatedAccountsCount, errors.Wrapf(err, "unable to rollback account %s to target slot index %d", accountID.String(), targetIndex)
 		}
 		err = AccountDataSnapshotWriter(pWriter, accountData)
 		if err != nil {
-			return accountCount, errors.Wrapf(err, "unable to write account %s to snapshot", accountID.String())
+			return recreatedAccountsCount, errors.Wrapf(err, "unable to write account %s to snapshot", accountID.String())
 		}
 	}
 
-	return accountCount, nil
+	return recreatedAccountsCount, nil
 }
 
 func (b *Manager) SlotDiffsSnapshotWriter(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (slotDiffCount uint64, err error) {

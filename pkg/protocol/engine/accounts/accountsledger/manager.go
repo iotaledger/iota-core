@@ -98,7 +98,7 @@ func (b *Manager) CommitSlot(
 	}
 
 	// load blocks burned in this slot
-	burns, err := b.CreateBlockBurnsForSlot(slotIndex)
+	burns, err := b.ComputeBlockBurnsForSlot(slotIndex)
 	if err != nil {
 		return iotago.Identifier{}, errors.Wrap(err, "could not create block burns for slot")
 	}
@@ -121,7 +121,7 @@ func (b *Manager) CommitSlot(
 	return accountsTreeRoot, nil
 }
 
-func (b *Manager) CreateBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
+func (b *Manager) ComputeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
 	burns = make(map[iotago.AccountID]uint64)
 	if set, exists := b.blockBurns.Get(slotIndex); exists {
 		for it := set.Iterator(); it.HasNext(); {
@@ -153,7 +153,7 @@ func (b *Manager) Account(accountID iotago.AccountID, slotIndex iotago.SlotIndex
 	if !exists {
 		loadedAccount = accounts.NewAccountData(b.api, accountID, accounts.NewBlockIssuanceCredits(0, slotIndex), loadedAccount.OutputID())
 	}
-	wasDestroyed, err := b.rollbackAccountTo(slotIndex, accountID, loadedAccount)
+	wasDestroyed, err := b.rollbackAccountTo(loadedAccount, slotIndex)
 	if err != nil {
 		return nil, false, err
 	}
@@ -165,41 +165,39 @@ func (b *Manager) Account(accountID iotago.AccountID, slotIndex iotago.SlotIndex
 	return loadedAccount, true, nil
 }
 
-func (b *Manager) rollbackAccountTo(targetIndex iotago.SlotIndex, accountID iotago.AccountID, accountData *accounts.AccountData) (bool, error) {
-	wasDestroyed := false
+func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetIndex iotago.SlotIndex) (wasDestroyed bool, err error) {
 	// last applied diff should be the diff for slotIndex + 1
 	for diffIndex := b.latestCommittedSlot; diffIndex > targetIndex; diffIndex-- {
-		destroyed, err := b.rollbackAccountOnce(diffIndex, accountID, accountData)
-		if err != nil {
-			return false, err
+		diffStore := b.slotDiffFunc(diffIndex)
+		if diffStore == nil {
+			return false, errors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
 		}
-		// collected to see if account was destroyed between slotIndex and b.latestCommittedSlot intex.
+
+		found, err := diffStore.Has(accountData.ID())
+		if err != nil {
+			return false, errors.Wrapf(err, "can't retrieve account, could not check if diff store for slot (%d) has account (%s)", diffIndex, accountData.ID())
+		}
+
+		// no changes for this account in this slot
+		if !found {
+			return false, nil
+		}
+
+		diffChange, destroyed, err := diffStore.Load(accountData.ID())
+		if err != nil {
+			return false, errors.Wrapf(err, "can't retrieve account, could not load diff for account (%s) in slot (%d)", accountData.ID(), diffIndex)
+		}
+
+		// update the account data with the diff
+		accountData.BlockIssuanceCredits().Update(-diffChange.Change, diffChange.PreviousUpdatedTime)
+		accountData.AddPublicKey(diffChange.PubKeysRemoved...)
+		accountData.RemovePublicKey(diffChange.PubKeysAdded...)
+
+		// collected to see if account was destroyed between slotIndex and b.latestCommittedSlot index.
 		wasDestroyed = wasDestroyed || destroyed
 	}
-	return wasDestroyed, nil
-}
 
-func (b *Manager) rollbackAccountOnce(diffIndex iotago.SlotIndex, accountID iotago.AccountID, accountData *accounts.AccountData) (destroyed bool, err error) {
-	diffStore := b.slotDiffFunc(diffIndex)
-	if diffStore == nil {
-		return false, errors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
-	}
-	found, err := diffStore.Has(accountID)
-	if err != nil {
-		return false, errors.Wrapf(err, "can't retrieve account, could not check if diff store for slot (%d) has account (%s)", diffIndex, accountID)
-	}
-	if !found {
-		// no changes for this account in this slot
-		return false, nil
-	}
-	diffChange, destroyed, err := diffStore.Load(accountID)
-	if err != nil {
-		return false, errors.Wrapf(err, "can't retrieve account, could not load diff for account (%s) in slot (%d)", accountID, diffIndex)
-	}
-	accountData.BlockIssuanceCredits().Update(-diffChange.Change, diffChange.PreviousUpdatedTime)
-	accountData.AddPublicKey(diffChange.PubKeysRemoved...)
-	accountData.RemovePublicKey(diffChange.PubKeysAdded...)
-	return destroyed, nil
+	return wasDestroyed, nil
 }
 
 func (b *Manager) Shutdown() {
