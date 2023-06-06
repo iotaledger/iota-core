@@ -1,4 +1,4 @@
-package accountsledger_test
+package accountsledger
 
 import (
 	"bytes"
@@ -7,7 +7,6 @@ import (
 	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/utils"
 )
@@ -17,9 +16,9 @@ func TestSlotDiffSnapshotWriter(t *testing.T) {
 	accountDiff := tpkg.RandomAccountDiff()
 	writer := &writerseeker.WriterSeeker{}
 	pWriter := utils.NewPositionedWriter(writer)
-	err := accountsledger.SlotDiffSnapshotWriter(pWriter, accountID, *accountDiff, true)
+	err := writeSlotDiff(pWriter, accountID, *accountDiff, true)
 
-	accountDiffRead, accountIDRead, destroyedRead, err := accountsledger.SlotDiffSnapshotReader(writer.BytesReader())
+	accountDiffRead, accountIDRead, destroyedRead, err := readSlotDiff(writer.BytesReader())
 	require.NoError(t, err)
 	require.Equal(t, accountDiff, accountDiffRead)
 	require.Equal(t, accountID, accountIDRead)
@@ -31,7 +30,7 @@ func TestAccountDataSnapshotWriter(t *testing.T) {
 	accountsDataBytes, _ := accountData.SnapshotBytes()
 	buf := bytes.NewReader(accountsDataBytes)
 
-	readAccountsData, err := accountsledger.AccountDataFromSnapshotReader(tpkg.API(), buf)
+	readAccountsData, err := readAccountData(tpkg.API(), buf)
 	require.NoError(t, err)
 
 	tpkg.EqualAccountData(t, accountData, readAccountsData)
@@ -41,9 +40,9 @@ func TestAccountDiffSnapshotWriter(t *testing.T) {
 	accountData := tpkg.RandomAccountData()
 	writer := &writerseeker.WriterSeeker{}
 	pWriter := utils.NewPositionedWriter(writer)
-	err := accountsledger.AccountDataSnapshotWriter(pWriter, accountData)
+	err := writeAccountData(pWriter, accountData)
 	require.NoError(t, err)
-	readAccountsData, err := accountsledger.AccountDataFromSnapshotReader(tpkg.API(), writer.BytesReader())
+	readAccountsData, err := readAccountData(tpkg.API(), writer.BytesReader())
 	require.NoError(t, err)
 	tpkg.EqualAccountData(t, accountData, readAccountsData)
 }

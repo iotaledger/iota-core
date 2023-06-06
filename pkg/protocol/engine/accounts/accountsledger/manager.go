@@ -36,10 +36,10 @@ type Manager struct {
 	accountsTree *ads.Map[iotago.AccountID, accounts.AccountData, *iotago.AccountID, *accounts.AccountData]
 
 	// slot diffs for the Account between [LatestCommitedSlot - MCA, LatestCommitedSlot].
-	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs
+	slotDiff func(iotago.SlotIndex) *prunable.AccountDiffs
 
-	// blockFunc is a function that returns a block from the cache or from the database.
-	blockFunc func(id iotago.BlockID) (*blocks.Block, bool)
+	// block is a function that returns a block from the cache or from the database.
+	block func(id iotago.BlockID) (*blocks.Block, bool)
 
 	// TODO: properly lock across methods
 	mutex sync.RWMutex
@@ -52,8 +52,8 @@ func New(blockFunc func(id iotago.BlockID) (*blocks.Block, bool), slotDiffFunc f
 		api:          api,
 		blockBurns:   shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
 		accountsTree: ads.NewMap[iotago.AccountID, accounts.AccountData](accountsStore),
-		blockFunc:    blockFunc,
-		slotDiffFunc: slotDiffFunc,
+		block:        blockFunc,
+		slotDiff:     slotDiffFunc,
 	}
 }
 
@@ -126,7 +126,7 @@ func (b *Manager) ComputeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 	if set, exists := b.blockBurns.Get(slotIndex); exists {
 		for it := set.Iterator(); it.HasNext(); {
 			blockID := it.Next()
-			block, blockLoaded := b.blockFunc(blockID)
+			block, blockLoaded := b.block(blockID)
 			if !blockLoaded {
 				return nil, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
 			}
@@ -137,27 +137,28 @@ func (b *Manager) ComputeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 }
 
 // Account loads the account's data at a specific slot index.
-func (b *Manager) Account(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (account accounts.Account, exists bool, err error) {
+func (b *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (account accounts.Account, exists bool, err error) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	if slotIndex < b.latestCommittedSlot-iotago.MaxCommitableSlotAge {
-		return nil, false, fmt.Errorf("can't calculate account, slot index older than accountIndex (%d<%d)", slotIndex, b.latestCommittedSlot)
+	if targetIndex < b.latestCommittedSlot-iotago.MaxCommitableSlotAge {
+		return nil, false, fmt.Errorf("can't calculate account, slot index older than accountIndex (%d<%d)", targetIndex, b.latestCommittedSlot)
 	}
-	if slotIndex > b.latestCommittedSlot {
-		return nil, false, fmt.Errorf("can't retrieve account, slot %d is not committed yet, lastest committed slot: %d", slotIndex, b.latestCommittedSlot)
+	if targetIndex > b.latestCommittedSlot {
+		return nil, false, fmt.Errorf("can't retrieve account, slot %d is not committed yet, lastest committed slot: %d", targetIndex, b.latestCommittedSlot)
 	}
 
 	// read initial account data at the latest committed slot
 	loadedAccount, exists := b.accountsTree.Get(accountID)
 	if !exists {
-		loadedAccount = accounts.NewAccountData(b.api, accountID, accounts.NewBlockIssuanceCredits(0, slotIndex), loadedAccount.OutputID())
+		loadedAccount = accounts.NewAccountData(b.api, accountID, accounts.NewBlockIssuanceCredits(0, targetIndex), loadedAccount.OutputID())
 	}
-	wasDestroyed, err := b.rollbackAccountTo(loadedAccount, slotIndex)
+	wasDestroyed, err := b.rollbackAccountTo(loadedAccount, targetIndex)
 	if err != nil {
 		return nil, false, err
 	}
-	// account not present in the account and it was not marked as destroyed in slots between slotIndex and b.latestCommittedSlot
+
+	// account not present in the account and it was not marked as destroyed in slots between targetIndex and latestCommittedSlot
 	if !exists && !wasDestroyed {
 		return nil, false, nil
 	}
@@ -166,9 +167,9 @@ func (b *Manager) Account(accountID iotago.AccountID, slotIndex iotago.SlotIndex
 }
 
 func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetIndex iotago.SlotIndex) (wasDestroyed bool, err error) {
-	// last applied diff should be the diff for slotIndex + 1
+	// to reach targetIndex, we need to rollback diffs from the current latestCommittedSlot down to targetIndex + 1
 	for diffIndex := b.latestCommittedSlot; diffIndex > targetIndex; diffIndex-- {
-		diffStore := b.slotDiffFunc(diffIndex)
+		diffStore := b.slotDiff(diffIndex)
 		if diffStore == nil {
 			return false, errors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
 		}
@@ -180,7 +181,7 @@ func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 
 		// no changes for this account in this slot
 		if !found {
-			return false, nil
+			continue
 		}
 
 		diffChange, destroyed, err := diffStore.Load(accountData.ID())
@@ -206,7 +207,7 @@ func (b *Manager) Shutdown() {
 
 func (b *Manager) applyDiff(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) (iotago.Identifier, error) {
 	// load diffs storage for the slot
-	diffStore := b.slotDiffFunc(slotIndex)
+	diffStore := b.slotDiff(slotIndex)
 	for accountID, accountDiff := range accountDiffs {
 		err := diffStore.Store(accountID, *accountDiff, destroyedAccounts.Has(accountID))
 		if err != nil {
