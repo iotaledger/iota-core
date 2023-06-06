@@ -83,10 +83,6 @@ func (t *TestSuite) AssertLatestFinalizedSlot(slot iotago.SlotIndex, nodes ...*m
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if slot != node.Protocol.MainEngineInstance().SlotGadget.LatestFinalizedSlot() {
-				return errors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d from slot gadget", node.Name, slot, node.Protocol.MainEngineInstance().SlotGadget.LatestFinalizedSlot())
-			}
-
 			if slot != node.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot() {
 				return errors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d from settings", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot())
 			}

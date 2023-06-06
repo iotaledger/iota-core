@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -23,7 +24,9 @@ type Gadget struct {
 	events  *slotgadget.Events
 	workers *workerpool.Group
 
-	slotTracker     *slottracker.SlotTracker
+	// Keep track of votes on slots (from commitments) per slot of blocks. I.e. a slot can only be finalized if
+	// optsSlotFinalizationThreshold is reached within a slot.
+	slotTrackers    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *slottracker.SlotTracker]
 	sybilProtection sybilprotection.SybilProtection
 
 	lastFinalizedSlot          iotago.SlotIndex
@@ -45,11 +48,12 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 			errorHandler:                  e.ErrorHandler("slotgadget"),
 		}, opts, func(g *Gadget) {
 			g.sybilProtection = e.SybilProtection
-			g.slotTracker = slottracker.NewSlotTracker(g.LatestFinalizedSlot)
+			g.slotTrackers = shrinkingmap.New[iotago.SlotIndex, *slottracker.SlotTracker]()
 
 			e.Events.SlotGadget.LinkTo(g.events)
+			g.workers = e.Workers.CreateGroup("SlotGadget")
 
-			e.Events.BlockGadget.BlockRatifiedConfirmed.Hook(g.trackVotes)
+			e.Events.BlockGadget.BlockRatifiedConfirmed.Hook(g.trackVotes, event.WithWorkerPool(g.workers.CreatePool("TrackAndRefresh", 1))) // Using just 1 worker to avoid contention
 
 			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
 				if err := e.Storage.Settings().SetLatestFinalizedSlot(index); err != nil {
@@ -57,23 +61,15 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				}
 			}
 
-			e.HookConstructed(func() {
-				g.workers = e.Workers.CreateGroup("SlotGadget")
+			e.HookInitialized(func() {
+				// Can't use setter here as it has a side effect.
+				func() {
+					g.mutex.Lock()
+					defer g.mutex.Unlock()
+					g.lastFinalizedSlot = e.Storage.Permanent.Settings().LatestFinalizedSlot()
+				}()
 
-				g.slotTracker.Events.VotersUpdated.Hook(func(evt *slottracker.VoterUpdatedEvent) {
-					g.refreshSlotFinalization(evt.PrevLatestSlotIndex, evt.NewLatestSlotIndex)
-				}, event.WithWorkerPool(g.workers.CreatePool("Refresh", 2)))
-
-				e.HookInitialized(func() {
-					// Can't use setter here as it has a side effect.
-					func() {
-						g.mutex.Lock()
-						defer g.mutex.Unlock()
-						g.lastFinalizedSlot = e.Storage.Permanent.Settings().LatestFinalizedSlot()
-					}()
-
-					g.TriggerInitialized()
-				})
+				g.TriggerInitialized()
 			})
 		},
 			(*Gadget).TriggerConstructed,
@@ -86,45 +82,52 @@ func (g *Gadget) Shutdown() {
 	g.workers.Shutdown()
 }
 
-func (g *Gadget) LatestFinalizedSlot() iotago.SlotIndex {
-	g.mutex.RLock()
-	defer g.mutex.RUnlock()
-
-	return g.lastFinalizedSlot
-}
-
 func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
 	g.lastFinalizedSlot = i
 	g.storeLastFinalizedSlotFunc(i)
 }
 
 func (g *Gadget) trackVotes(block *blocks.Block) {
-	g.slotTracker.TrackVotes(block.Block().SlotCommitment.Index, block.Block().IssuerID)
+	finalizedSlots := func() []iotago.SlotIndex {
+		g.mutex.Lock()
+		defer g.mutex.Unlock()
+
+		tracker, _ := g.slotTrackers.GetOrCreate(block.ID().Index(), func() *slottracker.SlotTracker {
+			return slottracker.NewSlotTracker()
+		})
+
+		prevLatestSlot, latestSlot, updated := tracker.TrackVotes(block.SlotCommitmentID().Index(), block.Block().IssuerID, g.lastFinalizedSlot)
+		if !updated {
+			return nil
+		}
+
+		return g.refreshSlotFinalization(tracker, prevLatestSlot, latestSlot)
+	}()
+
+	for _, finalizedSlot := range finalizedSlots {
+		g.events.SlotFinalized.Trigger(finalizedSlot)
+
+		g.slotTrackers.Delete(finalizedSlot)
+	}
 }
 
-func (g *Gadget) refreshSlotFinalization(previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) {
+func (g *Gadget) refreshSlotFinalization(tracker *slottracker.SlotTracker, previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) (finalizedSlots []iotago.SlotIndex) {
 	committee := g.sybilProtection.Committee()
 	committeeTotalWeight := committee.TotalWeight()
 
-	for i := lo.Max(g.LatestFinalizedSlot(), previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
-		attestorsTotalWeight := committee.SelectAccounts(g.slotTracker.Voters(i).Slice()...).TotalWeight()
+	for i := lo.Max(g.lastFinalizedSlot, previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
+		attestorsTotalWeight := committee.SelectAccounts(tracker.Voters(i)...).TotalWeight()
 
 		if !votes.IsThresholdReached(attestorsTotalWeight, committeeTotalWeight, g.optsSlotFinalizationThreshold) {
 			break
 		}
 
-		// Lock here, so that SlotVotersTotalWeight is not inside the lock. Otherwise, it might cause a deadlock,
-		// because one thread owns write-lock on VirtualVoting lock and needs read lock on SlotGadget lock,
-		// while this method holds WriteLock on SlotGadget lock and is waiting for ReadLock on VirtualVoting.
 		g.setLastFinalizedSlot(i)
 
-		g.events.SlotFinalized.Trigger(i)
-
-		g.slotTracker.EvictSlot(i)
+		finalizedSlots = append(finalizedSlots, i)
 	}
+
+	return finalizedSlots
 }
 
 var _ slotgadget.Gadget = new(Gadget)

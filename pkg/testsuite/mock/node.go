@@ -203,7 +203,7 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
-		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotConfirmed: %s\n", n.Name, engineName, slotIndex)
+		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
 	})
 
 	instance.Events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {

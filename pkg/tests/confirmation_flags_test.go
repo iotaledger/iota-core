@@ -96,15 +96,27 @@ func TestConfirmationFlags(t *testing.T) {
 
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.1.0", "A.1.1", "A.2.0", "A.2.1", "A.3.0"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("A.1.0", "A.1.1", "A.2.0", "A.2.1", "A.3.0"), false, ts.Nodes()...)
+
+		// Make slot 1 committed.
+		ts.IssueBlockAtSlot("A.3.1", 3, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.3.0"))
+
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3.1"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("A.3.0"), true, ts.Nodes()...)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithLatestCommitmentSlotIndex(1),
+		)
 	}
 
 	{
-		ts.IssueBlockAtSlot("A.4.0", 4, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.3.0"))
-		ts.IssueBlockAtSlot("B.4.0", 4, iotago.NewEmptyCommitment(), nodeB, ts.BlockID("A.4.0"))
-		ts.IssueBlockAtSlot("A.4.1", 4, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("B.4.0"))
+		slot1Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
+
+		ts.IssueBlockAtSlot("A.4.0", 4, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.3.1"))
+		ts.IssueBlockAtSlot("B.4.0", 4, slot1Commitment, nodeB, ts.BlockID("A.4.0"))
+		ts.IssueBlockAtSlot("A.4.1", 4, slot1Commitment, nodeA, ts.BlockID("B.4.0"))
 
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.4.0", "B.4.0"), true, ts.Nodes()...)
-		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("A.3.0", "A.4.0"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("A.3.1", "A.4.0"), true, ts.Nodes()...)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
@@ -124,6 +136,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.IssueBlockAtSlot("C.5.0", 5, slot1Commitment, nodeC, ts.BlockID("A.4.1"))
 		ts.IssueBlockAtSlot("A.5.0", 5, slot2Commitment, nodeA, ts.BlockID("C.5.0"))
 		ts.IssueBlockAtSlot("B.5.0", 5, slot2Commitment, nodeB, ts.BlockID("C.5.0"))
+		ts.IssueBlockAtSlot("C.5.1", 5, slot1Commitment, nodeC, ts.BlockID("C.5.0"))
 
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3.0", "A.4.0", "B.4.0", "C.5.0"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.3.0", "A.4.0", "B.4.0", "C.5.0"), true, ts.Nodes()...)
@@ -131,9 +144,9 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("A.3.0", "A.4.0"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("A.4.0"), true, ts.Nodes()...)
 
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.5.0", "B.5.0"), false, ts.Nodes()...)
-		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("B.4.0", "C.5.0"), false, ts.Nodes()...)
-		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.5.0", "B.5.0"), false, ts.Nodes()...)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.5.0", "B.5.0", "C.5.1"), false, ts.Nodes()...)
+		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("B.4.0", "C.5.0", "C.5.1"), false, ts.Nodes()...)
+		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.5.0", "B.5.0", "C.5.1"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("B.4.0", "A.4.1"), false, ts.Nodes()...)
 
 		// Not ratified confirmed because slot 3 <= 5 (ratifier index) - 2 (confirmation ratification threshold).
@@ -150,12 +163,33 @@ func TestConfirmationFlags(t *testing.T) {
 		)
 	}
 
+	// Ratify confirm C.5.0 -> slot 1 should not be finalized as there's no supermajority within slot 4.
 	{
 		slot2Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(2)).Commitment()
 
-		ts.IssueBlockAtSlot("A.6.0", 6, slot2Commitment, nodeA, ts.BlockIDs("A.5.0", "B.5.0")...)
-		ts.IssueBlockAtSlot("B.6.0", 6, slot2Commitment, nodeB, ts.BlockIDs("A.5.0", "B.5.0")...)
-		ts.IssueBlockAtSlot("C.6.0", 6, slot2Commitment, nodeC, ts.BlockIDs("A.5.0", "B.5.0")...)
+		ts.IssueBlockAtSlot("A.6.0", 6, slot2Commitment, nodeA, ts.BlockIDs("A.5.0", "B.5.0", "C.5.1")...)
+		ts.IssueBlockAtSlot("B.6.0", 6, slot2Commitment, nodeB, ts.BlockIDs("A.5.0", "B.5.0", "C.5.1")...)
+		ts.IssueBlockAtSlot("C.6.0", 6, slot2Commitment, nodeC, ts.BlockIDs("A.5.0", "B.5.0", "C.5.1")...)
+
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.5.0", "B.5.0", "C.5.1"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.5.0", "B.5.0", "C.5.1"), true, ts.Nodes()...)
+
+		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("B.4.0", "A.4.1", "C.5.0"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("B.4.0", "A.4.1", "C.5.0"), true, ts.Nodes()...)
+
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.6.0", "B.6.0", "C.6.0"), false, ts.Nodes()...)
+		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.6.0", "B.6.0", "C.6.0"), false, ts.Nodes()...)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithLatestFinalizedSlot(0),
+			testsuite.WithLatestCommitmentSlotIndex(3),
+			testsuite.WithEvictedSlot(3),
+		)
+	}
+
+	// Confirm "A.6.0", "B.6.0", "C.6.0", ratify confirm "A.5.0", "B.5.0", "C.5.1" -> slot 1 should be finalized.
+	{
+		slot2Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(2)).Commitment()
 
 		ts.IssueBlockAtSlot("A.6.1", 6, slot2Commitment, nodeA, ts.BlockIDs("A.6.0", "B.6.0", "C.6.0")...)
 		ts.IssueBlockAtSlot("B.6.1", 6, slot2Commitment, nodeB, ts.BlockIDs("A.6.0", "B.6.0", "C.6.0")...)
@@ -164,14 +198,14 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.6.0", "B.6.0", "C.6.0"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.6.0", "B.6.0", "C.6.0"), true, ts.Nodes()...)
 
-		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("B.4.0", "A.4.1", "C.5.0", "A.5.0", "B.5.0"), true, ts.Nodes()...)
-		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("B.4.0", "A.4.1", "C.5.0", "A.5.0", "B.5.0"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("B.4.0", "A.4.1", "C.5.0", "A.5.0", "B.5.0", "C.5.1"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheRatifiedConfirmed(ts.Blocks("B.4.0", "A.4.1", "C.5.0", "A.5.0", "B.5.0", "C.5.1"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.6.1", "B.6.1", "C.6.1"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.6.1", "B.6.1", "C.6.1"), false, ts.Nodes()...)
 
 		ts.AssertNodeState(ts.Nodes(),
-			testsuite.WithLatestFinalizedSlot(1), // TODO: implement this properly
+			testsuite.WithLatestFinalizedSlot(1),
 			testsuite.WithLatestCommitmentSlotIndex(3),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee),
