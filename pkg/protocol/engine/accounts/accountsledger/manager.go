@@ -98,7 +98,7 @@ func (b *Manager) CommitSlot(
 	}
 
 	// load blocks burned in this slot
-	burns, err := b.createBlockBurnsForSlot(slotIndex)
+	burns, err := b.CreateBlockBurnsForSlot(slotIndex)
 	if err != nil {
 		return iotago.Identifier{}, errors.Wrap(err, "could not create block burns for slot")
 	}
@@ -121,7 +121,7 @@ func (b *Manager) CommitSlot(
 	return accountsTreeRoot, nil
 }
 
-func (b *Manager) createBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
+func (b *Manager) CreateBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
 	burns = make(map[iotago.AccountID]uint64)
 	if set, exists := b.blockBurns.Get(slotIndex); exists {
 		for it := set.Iterator(); it.HasNext(); {
