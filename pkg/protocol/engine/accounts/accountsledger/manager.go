@@ -30,7 +30,6 @@ type Manager struct {
 	// latestCommittedSlot is where the Account tree is kept at.
 	latestCommittedSlot iotago.SlotIndex
 
-	// TODO: on reading from the snapshot: create the Account tree from the account vector and the slot diffs
 	// accountsTree represents the Block Issuer data vector for all registered accounts that have a block issuer feature
 	// at the latest committed slot, it is updated on the slot commitment.
 	accountsTree *ads.Map[iotago.AccountID, accounts.AccountData, *iotago.AccountID, *accounts.AccountData]
@@ -41,7 +40,6 @@ type Manager struct {
 	// block is a function that returns a block from the cache or from the database.
 	block func(id iotago.BlockID) (*blocks.Block, bool)
 
-	// TODO: properly lock across methods
 	mutex sync.RWMutex
 
 	module.Module
@@ -55,6 +53,10 @@ func New(blockFunc func(id iotago.BlockID) (*blocks.Block, bool), slotDiffFunc f
 		block:        blockFunc,
 		slotDiff:     slotDiffFunc,
 	}
+}
+
+func (b *Manager) Shutdown() {
+	b.TriggerStopped()
 }
 
 func (b *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
@@ -122,6 +124,9 @@ func (b *Manager) CommitSlot(
 }
 
 func (b *Manager) ComputeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
 	burns = make(map[iotago.AccountID]uint64)
 	if set, exists := b.blockBurns.Get(slotIndex); exists {
 		for it := set.Iterator(); it.HasNext(); {
@@ -133,6 +138,7 @@ func (b *Manager) ComputeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 			burns[block.Block().IssuerID] += block.Block().BurnedMana
 		}
 	}
+
 	return burns, nil
 }
 
@@ -205,10 +211,6 @@ func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 	}
 
 	return wasDestroyed, nil
-}
-
-func (b *Manager) Shutdown() {
-	b.TriggerStopped()
 }
 
 func (b *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) (iotago.Identifier, error) {
