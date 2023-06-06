@@ -2,6 +2,7 @@ package conflictdagv1
 
 import (
 	"bytes"
+	"errors"
 	"sync"
 
 	"go.uber.org/atomic"
@@ -87,7 +88,7 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.V
 }
 
 // NewConflict creates a new Conflict.
-func NewConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.VotePowerType[VotePower]](id ConflictID, conflictSets *advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VotePower]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[ConflictID, ResourceID, VotePower] {
+func NewConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.VotePowerType[VotePower]](id ConflictID, initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[ConflictID, ResourceID, VotePower] {
 	c := &Conflict[ConflictID, ResourceID, VotePower]{
 		ID:                      id,
 		Parents:                 advancedset.New[*Conflict[ConflictID, ResourceID, VotePower]](),
@@ -121,9 +122,6 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictda
 
 	c.ConflictingConflicts = NewSortedConflicts(c, pendingTasksCounter)
 
-	// error can only occur when conflict is evicted, which is impossible because it was just created
-	_, _ = c.JoinConflictSets(conflictSets)
-
 	return c
 }
 
@@ -145,9 +143,15 @@ func (c *Conflict[ConflictID, ResourceID, VotePower]) JoinConflictSets(conflictS
 	}
 
 	joinedConflictSets = advancedset.New[ResourceID]()
-	conflictSets.Range(func(conflictSet *ConflictSet[ConflictID, ResourceID, VotePower]) {
+
+	return joinedConflictSets, conflictSets.ForEach(func(conflictSet *ConflictSet[ConflictID, ResourceID, VotePower]) error {
+		otherConflicts, err := conflictSet.Add(c)
+		if err != nil && !errors.Is(err, conflictdag.ErrAlreadyPartOfConflictSet) {
+			return err
+		}
+
 		if c.ConflictSets.Add(conflictSet) {
-			if otherConflicts := conflictSet.Add(c); otherConflicts != nil {
+			if otherConflicts != nil {
 				otherConflicts.Range(func(otherConflict *Conflict[ConflictID, ResourceID, VotePower]) {
 					registerConflictingConflict(c, otherConflict)
 					registerConflictingConflict(otherConflict, c)
@@ -156,9 +160,9 @@ func (c *Conflict[ConflictID, ResourceID, VotePower]) JoinConflictSets(conflictS
 				joinedConflictSets.Add(conflictSet.ID)
 			}
 		}
-	})
 
-	return joinedConflictSets, nil
+		return nil
+	})
 }
 
 func (c *Conflict[ConflictID, ResourceID, VotePower]) removeParent(parent *Conflict[ConflictID, ResourceID, VotePower]) (removed bool) {
@@ -269,17 +273,20 @@ func (c *Conflict[ConflictID, ResourceID, VotePower]) Shutdown() {
 }
 
 // Evict cleans up the sortedConflict.
-func (c *Conflict[ConflictID, ResourceID, VotePower]) Evict() (evictedConflicts []ConflictID, err error) {
+func (c *Conflict[ConflictID, ResourceID, VotePower]) Evict() (evictedConflicts []ConflictID) {
 	if firstEvictCall := !c.evicted.Swap(true); !firstEvictCall {
-		return nil, nil
+		return nil
 	}
 
 	c.unhookAcceptanceMonitoring()
 
 	switch c.Weight.AcceptanceState() {
-	case acceptance.Pending:
-		return nil, xerrors.Errorf("tried to evict pending conflict with %s: %w", c.ID, conflictdag.ErrFatal)
-	case acceptance.Accepted:
+	case acceptance.Rejected:
+		// evict the entire future cone of rejected conflicts
+		c.Children.Range(func(childConflict *Conflict[ConflictID, ResourceID, VotePower]) {
+			evictedConflicts = append(evictedConflicts, childConflict.Evict()...)
+		})
+	default:
 		// remove evicted conflict from parents of children (merge to master)
 		c.Children.Range(func(childConflict *Conflict[ConflictID, ResourceID, VotePower]) {
 			childConflict.structureMutex.Lock()
@@ -287,20 +294,6 @@ func (c *Conflict[ConflictID, ResourceID, VotePower]) Evict() (evictedConflicts 
 
 			childConflict.removeParent(c)
 		})
-	case acceptance.Rejected:
-		// evict the entire future cone of rejected conflicts
-		if err = c.Children.ForEach(func(childConflict *Conflict[ConflictID, ResourceID, VotePower]) (err error) {
-			evictedChildConflicts, err := childConflict.Evict()
-			if err != nil {
-				return xerrors.Errorf("failed to evict child conflict %s: %w", childConflict.ID, err)
-			}
-
-			evictedConflicts = append(evictedConflicts, evictedChildConflicts...)
-
-			return nil
-		}); err != nil {
-			return nil, err
-		}
 	}
 
 	c.structureMutex.Lock()
@@ -322,20 +315,24 @@ func (c *Conflict[ConflictID, ResourceID, VotePower]) Evict() (evictedConflicts 
 			c.ConflictingConflicts.Remove(conflict.ID)
 
 			if c.IsAccepted() {
-				evictedChildConflicts, err := conflict.Evict()
-				if err != nil {
-					return nil, xerrors.Errorf("failed to evict child conflict %s: %w", conflict.ID, err)
-				}
-
-				evictedConflicts = append(evictedConflicts, evictedChildConflicts...)
+				evictedConflicts = append(evictedConflicts, conflict.Evict()...)
 			}
 		}
 	}
 
 	c.ConflictingConflicts.Remove(c.ID)
+
+	c.preferredInsteadMutex.Lock()
+	defer c.preferredInsteadMutex.Unlock()
+	c.likedInsteadMutex.Lock()
+	defer c.likedInsteadMutex.Unlock()
+
+	c.likedInsteadSources.Clear()
+	c.preferredInstead = nil
+
 	evictedConflicts = append(evictedConflicts, c.ID)
 
-	return evictedConflicts, nil
+	return evictedConflicts
 }
 
 // Compare compares the Conflict to the given other Conflict.

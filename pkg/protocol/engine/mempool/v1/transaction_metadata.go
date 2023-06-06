@@ -29,6 +29,7 @@ type TransactionMetadata struct {
 	executed           *promise.Event
 	invalid            *promise.Event1[error]
 	booked             *promise.Event
+	evicted            *promise.Event
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
@@ -73,6 +74,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		solid:              promise.NewEvent(),
 		executed:           promise.NewEvent(),
 		invalid:            promise.NewEvent1[error](),
+		evicted:            promise.NewEvent(),
 
 		unacceptedInputsCount: uint64(len(inputReferences)),
 		allInputsAccepted:     promise.NewValue[bool](),
@@ -172,6 +174,18 @@ func (t *TransactionMetadata) IsBooked() bool {
 
 func (t *TransactionMetadata) OnBooked(callback func()) {
 	t.booked.OnTrigger(callback)
+}
+
+func (t *TransactionMetadata) IsEvicted() bool {
+	return t.evicted.WasTriggered()
+}
+
+func (t *TransactionMetadata) OnEvicted(callback func()) {
+	t.evicted.OnTrigger(callback)
+}
+
+func (t *TransactionMetadata) setEvicted() {
+	t.evicted.Trigger()
 }
 
 func (t *TransactionMetadata) setSolid() bool {
@@ -289,6 +303,9 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 			}
 		}
 	})
+
+	t.OnCommitted(t.setEvicted)
+	t.OnOrphaned(t.setEvicted)
 
 	return t
 }

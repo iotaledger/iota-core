@@ -3,6 +3,7 @@ package mempoolv1
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"golang.org/x/xerrors"
@@ -14,7 +15,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -164,7 +164,6 @@ func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
 func (m *MemPool[VotePower]) storeTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (storedTransaction *TransactionMetadata, isNew bool, err error) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
-
 	if m.lastEvictedSlot >= blockID.Index() {
 		return nil, false, xerrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
 	}
@@ -227,11 +226,22 @@ func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
 			input.OnDoubleSpent(func() {
 				m.forkTransaction(transaction, advancedset.New(input.ID()))
 			})
-
 		})
 	}
-	if transaction.setBooked() {
+
+	if !transaction.IsOrphaned() && transaction.setBooked() {
 		m.publishOutputs(transaction)
+	}
+}
+
+func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, resourceIDs *advancedset.AdvancedSet[iotago.OutputID]) {
+	transaction.setConflicting()
+
+	if err := m.conflictDAG.UpdateConflictingResources(transaction.ID(), resourceIDs); err != nil {
+		transaction.setOrphaned()
+
+		// TODO: use errorHandler mechanism instead.
+		fmt.Println(err)
 	}
 }
 
@@ -244,18 +254,6 @@ func (m *MemPool[VotePower]) publishOutputs(transaction *TransactionMetadata) {
 			m.setupState(output)
 		}
 	}
-}
-
-func (m *MemPool[VotePower]) removeTransaction(transaction *TransactionMetadata) {
-	transaction.attachments.ForEach(func(blockID iotago.BlockID, _ bool) bool {
-		if slotAttachments := m.attachments.Get(blockID.Index(), false); slotAttachments != nil {
-			slotAttachments.Delete(blockID)
-		}
-
-		return true
-	})
-
-	m.cachedTransactions.Delete(transaction.ID())
 }
 
 func (m *MemPool[VotePower]) requestStateWithMetadata(stateRef iotago.IndexedUTXOReferencer, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
@@ -276,20 +274,6 @@ func (m *MemPool[VotePower]) requestStateWithMetadata(stateRef iotago.IndexedUTX
 			}
 		})
 	})
-}
-
-func (m *MemPool[VotePower]) forkTransaction(transaction *TransactionMetadata, inputs *advancedset.AdvancedSet[iotago.OutputID]) {
-	if err := m.conflictDAG.CreateOrUpdateConflict(transaction.ID(), inputs, acceptance.Pending); err != nil {
-		panic(err)
-	}
-	transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
-		err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements)
-		if err != nil {
-			panic(err)
-		}
-	})
-
-	transaction.setConflicting()
 }
 
 func (m *MemPool[VotePower]) updateAttachment(blockID iotago.BlockID, updateFunc func(transaction *TransactionMetadata, blockID iotago.BlockID) bool) bool {
@@ -314,8 +298,6 @@ func (m *MemPool[VotePower]) transactionByAttachment(blockID iotago.BlockID) (*T
 }
 
 func (m *MemPool[VotePower]) updateStateDiffs(transaction *TransactionMetadata, prevIndex iotago.SlotIndex, newIndex iotago.SlotIndex) {
-	// TODO: CHECK AGAINST last evicted slot
-
 	if prevIndex == newIndex {
 		return
 	}
@@ -361,16 +343,37 @@ func (m *MemPool[VotePower]) setupTransaction(transaction *TransactionMetadata) 
 		}
 	})
 
+	transaction.OnConflicting(func() {
+		m.conflictDAG.CreateConflict(transaction.ID())
+
+		unsubscribe := transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *promise.SetMutations[iotago.TransactionID]) {
+			if err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements); err != nil {
+				panic(err)
+			}
+		})
+
+		transaction.OnEvicted(func() {
+			unsubscribe()
+
+			m.conflictDAG.EvictConflict(transaction.ID())
+		})
+
+	})
+
 	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
 		m.updateStateDiffs(transaction, prevBlock.Index(), newBlock.Index())
 	})
 
-	transaction.OnCommitted(func() {
-		m.removeTransaction(transaction)
-	})
+	transaction.OnEvicted(func() {
+		if m.cachedTransactions.Delete(transaction.ID()) {
+			transaction.attachments.ForEach(func(blockID iotago.BlockID, _ bool) bool {
+				if slotAttachments := m.attachments.Get(blockID.Index(), false); slotAttachments != nil {
+					slotAttachments.Delete(blockID)
+				}
 
-	transaction.OnOrphaned(func() {
-		m.removeTransaction(transaction)
+				return true
+			})
+		}
 	})
 }
 
