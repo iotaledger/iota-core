@@ -63,7 +63,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	return mana.Value(), nil
 }
 
-func (m *Manager) CommitSlot(slotIndex iotago.SlotIndex, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], accountOutputs map[iotago.AccountID]*utxoledger.Output) {
+func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], accountOutputs map[iotago.AccountID]*utxoledger.Output) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

@@ -85,24 +85,24 @@ func (b *Manager) AccountsTreeRoot() iotago.Identifier {
 	return iotago.Identifier(b.accountsTree.Root())
 }
 
-// CommitSlot applies the given accountDiffChanges to the Account tree and returns the new accountRoot.
-func (b *Manager) CommitSlot(
+// ApplyDiff applies the given accountDiffChanges to the Account tree and returns the new accountRoot.
+func (b *Manager) ApplyDiff(
 	slotIndex iotago.SlotIndex,
 	accountDiffs map[iotago.AccountID]*prunable.AccountDiff,
 	destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID],
-) (accountsTreeRoot iotago.Identifier, err error) {
+) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
 	// sanity check if the slotIndex is the next slot to commit
 	if slotIndex != b.latestCommittedSlot+1 {
-		return iotago.Identifier{}, errors.Errorf("cannot apply the ned diff, there is a gap in committed slots, account vector index: %d, slot to commit: %d", b.latestCommittedSlot, slotIndex)
+		return errors.Errorf("cannot apply the ned diff, there is a gap in committed slots, account vector index: %d, slot to commit: %d", b.latestCommittedSlot, slotIndex)
 	}
 
 	// load blocks burned in this slot
 	burns, err := b.ComputeBlockBurnsForSlot(slotIndex)
 	if err != nil {
-		return iotago.Identifier{}, errors.Wrap(err, "could not create block burns for slot")
+		return errors.Wrap(err, "could not create block burns for slot")
 	}
 	// apply the burns to the accountDiffs
 	for id, burn := range burns {
@@ -110,8 +110,8 @@ func (b *Manager) CommitSlot(
 	}
 
 	// store the diff and apply it to the account vector tree, obtaining the new root
-	if accountsTreeRoot, err = b.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
-		return iotago.Identifier{}, errors.Wrap(err, "could not apply diff to account tree")
+	if err = b.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
+		return errors.Wrap(err, "could not apply diff to account tree")
 	}
 
 	// set the index where the tree is now at
@@ -120,7 +120,7 @@ func (b *Manager) CommitSlot(
 	// TODO: when to exactly evict?
 	b.evict(slotIndex - iotago.MaxCommitableSlotAge - 1)
 
-	return accountsTreeRoot, nil
+	return nil
 }
 
 func (b *Manager) ComputeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
@@ -213,25 +213,24 @@ func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 	return wasDestroyed, nil
 }
 
-func (b *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) (iotago.Identifier, error) {
+func (b *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) error {
 	// load diffs storage for the slot
 	diffStore := b.slotDiff(slotIndex)
 	for accountID, accountDiff := range accountDiffs {
 		err := diffStore.Store(accountID, *accountDiff, destroyedAccounts.Has(accountID))
 		if err != nil {
-			return iotago.Identifier{}, errors.Wrapf(err, "could not store diff to slot %d", slotIndex)
+			return errors.Wrapf(err, "could not store diff to slot %d", slotIndex)
 		}
 	}
 
-	accountRoot, err := b.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts)
-	if err != nil {
-		return iotago.Identifier{}, errors.Wrapf(err, "could not apply diff to slot %d", slotIndex)
+	if err := b.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
+		return errors.Wrapf(err, "could not apply diff to slot %d", slotIndex)
 	}
 
-	return accountRoot, nil
+	return nil
 }
 
-func (b *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) (accountRoot iotago.Identifier, err error) {
+func (b *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) error {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
 		// remove destroyed account, no need to update with diffs
@@ -251,7 +250,7 @@ func (b *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		b.accountsTree.Set(accountID, accountData)
 	}
 
-	return b.AccountsTreeRoot(), nil
+	return nil
 }
 
 func (b *Manager) evict(index iotago.SlotIndex) {

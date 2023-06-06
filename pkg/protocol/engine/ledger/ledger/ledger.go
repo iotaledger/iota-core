@@ -239,208 +239,246 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	consumedAccounts := make(map[iotago.AccountID]*utxoledger.Output)
 	createdAccounts := make(map[iotago.AccountID]*utxoledger.Output)
 
-	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
-		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
-		if !ok {
-			innerErr = ErrUnexpectedUnderlyingType
-			return false
-		}
-		txCreationTime := tx.Essence.CreationTime
+	// collect outputs and allotments from the "uncompacted" statediff
+	// outputs need to be processed in the "uncompacted" version of the state diff, as we need to be able to store
+	// and retrieve intermediate outputs to show to the user
+	{
+		stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
+			tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
+			if !ok {
+				innerErr = ErrUnexpectedUnderlyingType
+				return false
+			}
+			txCreationTime := tx.Essence.CreationTime
 
-		inputRefs, errInput := tx.Inputs()
-		if errInput != nil {
-			innerErr = errInput
-			return false
-		}
-
-		// TODO: translate this to the "compacted" version, there is no need to go through intermediate outputs
-		// input side
-		for _, inputRef := range inputRefs {
-			inputState, outputErr := l.Output(inputRef)
-			if outputErr != nil {
-				innerErr = outputErr
+			inputRefs, errInput := tx.Inputs()
+			if errInput != nil {
+				innerErr = errInput
 				return false
 			}
 
-			spent := utxoledger.NewSpent(inputState, txWithMeta.ID(), index)
-			spents = append(spents, spent)
-		}
+			// process outputs
+			{
+				// input side
+				for _, inputRef := range inputRefs {
+					inputState, outputErr := l.Output(inputRef)
+					if outputErr != nil {
+						innerErr = outputErr
+						return false
+					}
 
+					spent := utxoledger.NewSpent(inputState, txWithMeta.ID(), index)
+					spents = append(spents, spent)
+				}
+
+				// output side
+				if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateMetadata) error {
+					output := utxoledger.CreateOutput(l.utxoLedger.API(), element.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, element.State().Output())
+					outputs = append(outputs, output)
+
+					return nil
+				}); createOutputErr != nil {
+					innerErr = createOutputErr
+					return false
+				}
+			}
+
+			// process allotments
+			{
+				// TODO: who checks that the allotment goes to an Account with a BIC feature?
+				for _, allotment := range tx.Essence.Allotments {
+					accountDiff, exists := accountDiffs[allotment.AccountID]
+					if !exists {
+						// allotments won't change the outputID of the Account, so the diff defaults to empty new and previous outputIDs
+						accountDiff = prunable.NewAccountDiff(l.apiProvider())
+						accountDiffs[allotment.AccountID] = accountDiff
+					}
+
+					accountData, exists, err := l.accountsLedger.Account(allotment.AccountID)
+					if !exists {
+						panic(fmt.Errorf("could not find destroyed account %s in slot %d", allotment.AccountID, index-1))
+					}
+					if err != nil {
+						panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, index-1, err))
+					}
+
+					accountDiff.Change += int64(allotment.Value)
+					accountDiff.PreviousUpdatedTime = accountData.BlockIssuanceCredits().UpdateTime
+
+					// we are not transitioning the allotted account, so the new and previous outputIDs are the same
+					accountDiff.NewOutputID = accountData.OutputID()
+					accountDiff.PreviousOutputID = accountData.OutputID()
+				}
+			}
+
+			return true
+		})
+
+		if innerErr != nil {
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+		}
+	}
+
+	// Now we process the collect account changes, for that we consume the "compacted" state diff to get the overrall
+	// account changes at UTXO level without needing to worry about multiple spends of the same account in the same slot,
+	// we only care about the initial account output to be consumed and the final account output to be created.
+	{
 		// output side
-		if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateMetadata) error {
-			output := utxoledger.CreateOutput(l.utxoLedger.API(), element.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, element.State().Output())
-			outputs = append(outputs, output)
-
-			return nil
-		}); createOutputErr != nil {
-			innerErr = createOutputErr
-			return false
-		}
-
-		// TODO: who checks that the allotment goes to an Account with a BIC feature?
-		for _, allotment := range tx.Essence.Allotments {
-			accountDiff, exists := accountDiffs[allotment.AccountID]
-			if !exists {
-				// allotments won't change the outputID of the Account, so the diff defaults to empty new and previous outputIDs
-				accountDiff = prunable.NewAccountDiff(l.apiProvider())
-				accountDiffs[allotment.AccountID] = accountDiff
-			}
-
-			accountData, exists, err := l.accountsLedger.Account(allotment.AccountID)
-			if !exists {
-				panic(fmt.Errorf("could not find destroyed account %s in slot %d", allotment.AccountID, index-1))
-			}
+		stateDiff.CreatedStates().ForEachKey(func(outputID iotago.OutputID) bool {
+			createdOutput, err := l.Output(outputID.UTXOInput())
 			if err != nil {
-				panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, index-1, err))
+				innerErr = err
+				return false
 			}
 
-			accountDiff.Change += int64(allotment.Value)
-			accountDiff.PreviousUpdatedTime = accountData.BlockIssuanceCredits().UpdateTime
+			if createdOutput.OutputType() == iotago.OutputAccount {
+				createdAccount := createdOutput.Output().(*iotago.AccountOutput)
+				createdAccounts[createdAccount.AccountID] = createdOutput
+			}
 
-			// we are not transitioning the allotted account, so the new and previous outputIDs are the same
-			accountDiff.NewOutputID = accountData.OutputID()
-			accountDiff.PreviousOutputID = accountData.OutputID()
+			return true
+		})
+
+		if innerErr != nil {
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
 		}
 
-		return true
-	})
+		// input side
+		stateDiff.DestroyedStates().ForEachKey(func(outputID iotago.OutputID) bool {
+			spentOutput, err := l.Output(outputID.UTXOInput())
+			if err != nil {
+				innerErr = err
+				return false
+			}
 
-	if innerErr != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+			if spentOutput.OutputType() == iotago.OutputAccount {
+				consumedAccount := spentOutput.Output().(*iotago.AccountOutput)
+				consumedAccounts[consumedAccount.AccountID] = spentOutput
+
+				// if we have consumed accounts that are not created in the same slot, we need to track them as destroyed
+				if _, exists := createdAccounts[consumedAccount.AccountID]; !exists {
+					destroyedAccounts.Add(consumedAccount.AccountID)
+				}
+			}
+
+			return true
+		})
+
+		if innerErr != nil {
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+		}
 	}
 
-	// Now we process the account changes, for that we consume the compacted state diff to get the overrall account changes
-	// at UTXO level without needing to worry about multiple spends of the same account in the same slot, we only care
-	// about the initial account output to be consumed and the final account output to be created.
+	// process the collected account changes.
+	// There are 3 possible cases:
+	// 1. The account was only consumed but not created in this slot, therefore it is marked as destroyed and its latest
+	// state is stored as diff to allow a rollback.
+	// 2. The account was consumed and created in the same slot, the account was transitioned, and we have to store the
+	// changes in the diff.
+	// 3. The account was only created in this slot, in this case we need to track the output's values as the diff.
+	{
+		for consumedAccountID, consumedOutput := range consumedAccounts {
+			// We might have had an allotment on this account, and the diff already exists
+			accountDiff, exists := accountDiffs[consumedAccountID]
+			if !exists {
+				accountDiff = prunable.NewAccountDiff(l.apiProvider())
+				accountDiffs[consumedAccountID] = accountDiff
+			}
 
-	// output side
-	stateDiff.CreatedStates().ForEachKey(func(outputID iotago.OutputID) bool {
-		createdOutput, err := l.Output(outputID.UTXOInput())
-		if err != nil {
-			innerErr = err
-			return false
-		}
+			accountData, exists, err := l.accountsLedger.Account(consumedAccountID, index-1)
+			if err != nil {
+				panic(fmt.Errorf("error loading account %s in slot %d: %w", consumedAccountID, index-1, err))
+			}
+			if !exists {
+				panic(fmt.Errorf("could not find destroyed account %s in slot %d", consumedAccountID, index-1))
+			}
 
-		if createdOutput.OutputType() == iotago.OutputAccount {
-			createdAccount := createdOutput.Output().(*iotago.AccountOutput)
-			createdAccounts[createdAccount.AccountID] = createdOutput
-		}
+			// case 1. the account was destroyed, the diff is the reverse of all current account's data
+			{
+				if destroyedAccounts.Has(consumedAccountID) {
+					accountDiff.Change = -accountData.BlockIssuanceCredits().Value
+					accountDiff.PreviousUpdatedTime = accountData.BlockIssuanceCredits().UpdateTime
+					accountDiff.NewOutputID = iotago.OutputID{}
+					accountDiff.PreviousOutputID = accountData.OutputID()
+					accountDiff.PubKeysRemoved = accountData.PubKeys().Slice()
 
-		return true
-	})
+					continue
+				}
+			}
 
-	if innerErr != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
-	}
+			// case 2. the account was transitioned, fill in the diff with the delta information
+			// Change and PreviousUpdatedTime are either 0 if we did not have an allotment for this account, or we already
+			// have some values from the allotment, so no need to set them explicitly.
+			{
+				createdOutput := createdAccounts[consumedAccountID]
+				accountDiff.NewOutputID = createdOutput.OutputID()
+				accountDiff.PreviousOutputID = consumedOutput.OutputID()
 
-	// input side
-	stateDiff.DestroyedStates().ForEachKey(func(outputID iotago.OutputID) bool {
-		spentOutput, err := l.Output(outputID.UTXOInput())
-		if err != nil {
-			innerErr = err
-			return false
-		}
+				oldPubKeysSet := accountData.PubKeys()
+				newPubKeysSet := advancedset.New[ed25519.PublicKey]()
+				for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
+					newPubKeysSet.Add(ed25519.PublicKey(pubKey))
+				}
 
-		if spentOutput.OutputType() == iotago.OutputAccount {
-			consumedAccount := spentOutput.Output().(*iotago.AccountOutput)
-			consumedAccounts[consumedAccount.AccountID] = spentOutput
+				// Add public keys that are not in the old set
+				accountDiff.PubKeysAdded = newPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
+					return !oldPubKeysSet.Has(key)
+				}).Slice()
 
-			// if we have consumed accounts that are not created in the same slot, we need to track them as destroyed
-			if _, exists := createdAccounts[consumedAccount.AccountID]; !exists {
-				destroyedAccounts.Add(consumedAccount.AccountID)
+				// Remove the keys that are not in the new set
+				accountDiff.PubKeysRemoved = oldPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
+					return !newPubKeysSet.Has(key)
+				}).Slice()
 			}
 		}
 
-		return true
-	})
+		// case 3. the account was created, fill in the diff with the information of the created output.
+		{
+			for createdAccountID, createdOutput := range createdAccounts {
+				// If it is also consumed we are in case 2.
+				if _, exists := consumedAccounts[createdAccountID]; exists {
+					continue
+				}
 
-	if innerErr != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
-	}
+				// We might have had an allotment on this account, and the diff already exists
+				accountDiff, exists := accountDiffs[createdAccountID]
+				if !exists {
+					accountDiff = prunable.NewAccountDiff(l.apiProvider())
+					accountDiffs[createdAccountID] = accountDiff
+				}
 
-	// process destroyed and transitioned accounts
-	for consumedAccountID, consumedAccountOutput := range consumedAccounts {
-		// We might have had an allotment on this account, and the diff already exists
-		accountDiff, exists := accountDiffs[consumedAccountID]
-		if !exists {
-			accountDiff = prunable.NewAccountDiff(l.apiProvider())
-			accountDiffs[consumedAccountID] = accountDiff
-		}
-		accountData, exists, err := l.accountsLedger.Account(consumedAccountID, index-1)
-		if !exists {
-			panic(fmt.Errorf("could not find destroyed account %s in slot %d", consumedAccountID, index-1))
-		}
-		if err != nil {
-			panic(fmt.Errorf("error loading account %s in slot %d: %w", consumedAccountID, index-1, err))
-		}
-
-		// the account was destroyed, reverse all the current account data
-		if destroyedAccounts.Has(consumedAccountID) {
-			accountDiff.Change = -accountData.BlockIssuanceCredits().Value
-			accountDiff.PreviousUpdatedTime = accountData.BlockIssuanceCredits().UpdateTime
-			accountDiff.NewOutputID = iotago.OutputID{}
-			accountDiff.PreviousOutputID = accountData.OutputID()
-			accountDiff.PubKeysRemoved = accountData.PubKeys().Slice()
-		} else { // the account was transitioned, fill in the diff with the previous information to allow rollback
-			createdOutput := createdAccounts[consumedAccountID]
-			accountDiff.NewOutputID = createdOutput.OutputID()
-			accountDiff.PreviousOutputID = consumedAccountOutput.OutputID()
-
-			oldPubKeysSet := accountData.PubKeys()
-			newPubKeysSet := advancedset.New[ed25519.PublicKey]()
-			for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
-				newPubKeysSet.Add(ed25519.PublicKey(pubKey))
+				// Change and PreviousUpdatedTime are either 0 if we did not have an allotment for this account, or we already
+				// have some values from the allotment, so no need to set them explicitly.
+				accountDiff.NewOutputID = createdOutput.OutputID()
+				accountDiff.PreviousOutputID = iotago.OutputID{}
+				accountDiff.PubKeysAdded = lo.Map(createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
 			}
-
-			// Add public keys that are not in the old set
-			accountDiff.PubKeysAdded = newPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
-				return !oldPubKeysSet.Has(key)
-			}).Slice()
-
-			// Remove the keys that are not in the new set
-			accountDiff.PubKeysRemoved = oldPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
-				return !newPubKeysSet.Has(key)
-			}).Slice()
 		}
 	}
 
-	// process created accounts
-	for createdAccountID, createdAccountOutput := range createdAccounts {
-		// If it is also consumed it is covered by the previous cases
-		if _, exists := consumedAccounts[createdAccountID]; exists {
-			continue
+	// Commit the changes
+	{
+		// Update the mana manager's cache
+		l.manaManager.ApplyDiff(index, destroyedAccounts, createdAccounts)
+
+		// Update the UTXO ledger
+		if err = l.utxoLedger.ApplyDiff(index, outputs, spents); err != nil {
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
 		}
 
-		// We might have had an allotment on this account, and the diff already exists
-		accountDiff, exists := accountDiffs[createdAccountID]
-		if !exists {
-			accountDiff = prunable.NewAccountDiff(l.apiProvider())
-			accountDiffs[createdAccountID] = accountDiff
+		// Update the Accounts ledger
+		if err = l.accountsLedger.ApplyDiff(index, accountDiffs, destroyedAccounts); err != nil {
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, errors.Wrapf(err, "failed to commit slot %d", index)
 		}
 
-		accountDiff.NewOutputID = createdAccountOutput.OutputID()
-		accountDiff.PreviousOutputID = iotago.OutputID{}
-		accountDiff.PubKeysAdded = lo.Map(createdAccountOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
+		// Mark each transaction as committed so the mempool can evict it
+		stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, tx mempool.TransactionMetadata) bool {
+			tx.Commit()
+			return true
+		})
 	}
 
-	l.manaManager.CommitSlot(index, destroyedAccounts, createdAccounts)
-
-	if err = l.utxoLedger.ApplyDiff(index, outputs, spents); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
-	}
-
-	if accountRoot, err = l.accountsLedger.CommitSlot(index, accountDiffs, destroyedAccounts); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, errors.Wrapf(err, "failed to commit slot %d", index)
-	}
-
-	// Mark the transactions as committed so the mempool can evict it.
-	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, tx mempool.TransactionMetadata) bool {
-		tx.Commit()
-		return true
-	})
-
-	// TODO: obtain the stateroot when we ApplyDiff and rename it to CommitSlot
-	return l.utxoLedger.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), accountRoot, nil
+	return l.utxoLedger.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), l.accountsLedger.AccountsTreeRoot(), nil
 }
 
 func (l *Ledger) IsOutputUnspent(outputID iotago.OutputID) (bool, error) {
