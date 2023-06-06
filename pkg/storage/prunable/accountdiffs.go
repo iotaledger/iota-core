@@ -32,8 +32,8 @@ func NewAccountDiff(api iotago.API) *AccountDiff {
 		api:                 api,
 		Change:              0,
 		PreviousUpdatedTime: 0,
-		NewOutputID:         iotago.OutputID{},
-		PreviousOutputID:    iotago.OutputID{},
+		NewOutputID:         iotago.EmptyOutputID,
+		PreviousOutputID:    iotago.EmptyOutputID,
 		PubKeysAdded:        make([]ed25519.PublicKey, 0),
 		PubKeysRemoved:      make([]ed25519.PublicKey, 0),
 	}

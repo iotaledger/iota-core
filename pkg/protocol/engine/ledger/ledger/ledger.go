@@ -37,7 +37,7 @@ import (
 var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
 
 type Ledger struct {
-	apiProviderFunc func() iotago.API
+	apiProvider func() iotago.API
 
 	utxoLedger       *utxoledger.Manager
 	accountsLedger   *accountsledger.Manager
@@ -94,14 +94,14 @@ func New(
 	committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID],
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
-	apiProviderFunc func() iotago.API,
+	apiProvider func() iotago.API,
 	errorHandler func(error),
 	protocolParameters *iotago.ProtocolParameters,
 ) *Ledger {
 	l := &Ledger{
-		apiProviderFunc:    apiProviderFunc,
-		utxoLedger:         utxoledger.New(utxoStore, apiProviderFunc),
-		accountsLedger:     accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProviderFunc()),
+		apiProvider:        apiProvider,
+		utxoLedger:         utxoledger.New(utxoStore, apiProvider),
+		accountsLedger:     accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProvider()),
 		commitmentLoader:   commitmentLoader,
 		conflictDAG:        conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
 		errorHandler:       errorHandler,
@@ -281,11 +281,25 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		for _, allotment := range tx.Essence.Allotments {
 			accountDiff, exists := accountDiffs[allotment.AccountID]
 			if !exists {
-				accountDiff = prunable.NewAccountDiff(l.apiProviderFunc())
+				// allotments won't change the outputID of the Account, so the diff defaults to empty new and previous outputIDs
+				accountDiff = prunable.NewAccountDiff(l.apiProvider())
 				accountDiffs[allotment.AccountID] = accountDiff
 			}
+
+			accountData, exists, err := l.accountsLedger.Account(allotment.AccountID)
+			if !exists {
+				panic(fmt.Errorf("could not find destroyed account %s in slot %d", allotment.AccountID, index-1))
+			}
+			if err != nil {
+				panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, index-1, err))
+			}
+
 			accountDiff.Change += int64(allotment.Value)
-			// TODO: what about the PreviousUpdatedTime?
+			accountDiff.PreviousUpdatedTime = accountData.BlockIssuanceCredits().UpdateTime
+
+			// we are not transitioning the allotted account, so the new and previous outputIDs are the same
+			accountDiff.NewOutputID = accountData.OutputID()
+			accountDiff.PreviousOutputID = accountData.OutputID()
 		}
 
 		return true
@@ -349,7 +363,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		// We might have had an allotment on this account, and the diff already exists
 		accountDiff, exists := accountDiffs[consumedAccountID]
 		if !exists {
-			accountDiff = prunable.NewAccountDiff(l.apiProviderFunc())
+			accountDiff = prunable.NewAccountDiff(l.apiProvider())
 			accountDiffs[consumedAccountID] = accountDiff
 		}
 		accountData, exists, err := l.accountsLedger.Account(consumedAccountID, index-1)
@@ -400,7 +414,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		// We might have had an allotment on this account, and the diff already exists
 		accountDiff, exists := accountDiffs[createdAccountID]
 		if !exists {
-			accountDiff = prunable.NewAccountDiff(l.apiProviderFunc())
+			accountDiff = prunable.NewAccountDiff(l.apiProvider())
 			accountDiffs[createdAccountID] = accountDiff
 		}
 

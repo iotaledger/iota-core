@@ -137,9 +137,14 @@ func (b *Manager) ComputeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 }
 
 // Account loads the account's data at a specific slot index.
-func (b *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (account accounts.Account, exists bool, err error) {
+func (b *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (account accounts.Account, exists bool, err error) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
+
+	targetIndex := b.latestCommittedSlot
+	if len(optTargetIndex) > 0 {
+		targetIndex = optTargetIndex[0]
+	}
 
 	if targetIndex < b.latestCommittedSlot-iotago.MaxCommitableSlotAge {
 		return nil, false, fmt.Errorf("can't calculate account, slot index older than accountIndex (%d<%d)", targetIndex, b.latestCommittedSlot)
