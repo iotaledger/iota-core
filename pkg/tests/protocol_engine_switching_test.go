@@ -264,7 +264,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			)
 
 			// Make sure the tips are properly set.
-			ts.AssertTips(ts.Blocks("P1.P"), node1, node2)
+			ts.AssertStrongTips(ts.Blocks("P1.P"), node1, node2)
 
 			// Upon committing 11, we included attestations up to slot 11 that committed at least to slot 9: we don't have any.
 			ts.AssertAttestationsForSlot(11, ts.Blocks(), node1, node2)
@@ -361,7 +361,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			)
 
 			// Make sure the tips are properly set.
-			ts.AssertTips(ts.Blocks("P2.M9"), node3, node4)
+			ts.AssertStrongTips(ts.Blocks("P2.M9"), node3, node4)
 
 			// Upon committing 13, we included attestations up to slot 13 that committed at least to slot 11.
 			ts.AssertAttestationsForSlot(13, ts.Blocks("P2.M3", "P2.M4"), node3, node4)
