@@ -23,9 +23,7 @@ func (g *Gadget) trackConfirmationRatifierWeight(ratifierBlock *blocks.Block) {
 	for walk.HasNext() {
 		blockID := walk.Next()
 
-		fmt.Println("trackConfirmationRatifierWeight", ratifierBlock.ID(), blockID)
 		if blockID.Index() <= ratifierBlockIndex-g.optsConfirmationRatificationThreshold {
-			fmt.Println("trackConfirmationRatifierWeight", ratifierBlock.ID(), blockID, "skipped")
 			continue
 		}
 

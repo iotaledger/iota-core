@@ -83,7 +83,7 @@ func TestConfirmationFlags(t *testing.T) {
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
 	)
 
-	// Slots 1-3: only node A is online and issues blocks.
+	// Slots 1-3: only node A is online and issues blocks, make slot 1 committed.
 	{
 		ts.IssueBlockAtSlot("A.1.0", 1, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("Genesis"))
 		ts.IssueBlockAtSlot("A.1.1", 1, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.1.0"))
@@ -108,14 +108,16 @@ func TestConfirmationFlags(t *testing.T) {
 		)
 	}
 
+	// Issue in slot 4 so that slot 2 becomes committed.
 	{
 		slot1Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 
 		ts.IssueBlockAtSlot("A.4.0", 4, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.3.1"))
-		ts.IssueBlockAtSlot("B.4.0", 4, slot1Commitment, nodeB, ts.BlockID("A.4.0"))
-		ts.IssueBlockAtSlot("A.4.1", 4, slot1Commitment, nodeA, ts.BlockID("B.4.0"))
+		ts.IssueBlockAtSlot("A.4.1", 4, slot1Commitment, nodeA, ts.BlockID("A.4.0"))
+		ts.IssueBlockAtSlot("B.4.0", 4, slot1Commitment, nodeB, ts.BlockID("A.4.1"))
+		ts.IssueBlockAtSlot("A.4.2", 4, slot1Commitment, nodeA, ts.BlockID("B.4.0"))
 
-		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.4.0", "B.4.0"), true, ts.Nodes()...)
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.4.1", "B.4.0"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3.1", "A.4.0"), true, ts.Nodes()...)
 
 		ts.AssertNodeState(ts.Nodes(),
@@ -129,28 +131,29 @@ func TestConfirmationFlags(t *testing.T) {
 		)
 	}
 
+	// Confirm A.4.0 by pre-confirming a block a 3rd validator in slot 5.
 	{
 		slot1Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 		slot2Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(2)).Commitment()
 
-		ts.IssueBlockAtSlot("C.5.0", 5, slot1Commitment, nodeC, ts.BlockID("A.4.1"))
+		ts.IssueBlockAtSlot("C.5.0", 5, slot1Commitment, nodeC, ts.BlockID("A.4.2"))
 		ts.IssueBlockAtSlot("A.5.0", 5, slot2Commitment, nodeA, ts.BlockID("C.5.0"))
 		ts.IssueBlockAtSlot("B.5.0", 5, slot2Commitment, nodeB, ts.BlockID("C.5.0"))
 		ts.IssueBlockAtSlot("C.5.1", 5, slot1Commitment, nodeC, ts.BlockID("C.5.0"))
 
-		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.3.0", "A.4.0", "B.4.0", "C.5.0"), true, ts.Nodes()...)
-		ts.AssertBlocksInCachePreConfirmed(ts.Blocks("A.3.0", "A.4.0", "B.4.0", "C.5.0"), true, ts.Nodes()...)
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.3.0", "A.3.1", "A.4.0", "A.4.1", "A.4.2", "B.4.0", "C.5.0"), true, ts.Nodes()...)
+		ts.AssertBlocksInCachePreConfirmed(ts.Blocks("A.3.0", "A.3.1", "A.4.0", "A.4.1", "A.4.2", "B.4.0", "C.5.0"), true, ts.Nodes()...)
 
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3.0", "A.4.0"), true, ts.Nodes()...)
-		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.4.0"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3.0", "A.3.1", "A.4.0", "A.4.1"), true, ts.Nodes()...)
+		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.4.0", "A.4.1"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.5.0", "B.5.0", "C.5.1"), false, ts.Nodes()...)
-		ts.AssertBlocksInCacheAccepted(ts.Blocks("B.4.0", "C.5.0", "C.5.1"), false, ts.Nodes()...)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("B.4.0", "A.4.2", "C.5.0"), false, ts.Nodes()...)
 		ts.AssertBlocksInCachePreConfirmed(ts.Blocks("A.5.0", "B.5.0", "C.5.1"), false, ts.Nodes()...)
-		ts.AssertBlocksInCacheConfirmed(ts.Blocks("B.4.0", "A.4.1"), false, ts.Nodes()...)
+		ts.AssertBlocksInCacheConfirmed(ts.Blocks("B.4.0", "A.4.2", "C.5.0"), false, ts.Nodes()...)
 
 		// Not confirmed because slot 3 <= 5 (ratifier index) - 2 (confirmation ratification threshold).
-		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.3.0"), false, ts.Nodes()...)
+		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.3.0", "A.3.1"), false, ts.Nodes()...)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
@@ -163,7 +166,7 @@ func TestConfirmationFlags(t *testing.T) {
 		)
 	}
 
-	// Confirm C.5.0 -> slot 1 should not be finalized as there's no supermajority within slot 4.
+	// Confirm C.5.0 -> slot 1 should not be finalized as there's no supermajority within slot 4 or slot 5.
 	{
 		slot2Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(2)).Commitment()
 
@@ -212,5 +215,4 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithEvictedSlot(3),
 		)
 	}
-
 }
