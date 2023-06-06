@@ -331,6 +331,10 @@ func (t *TransactionMetadata) markAttachmentOrphaned(blockID iotago.BlockID) (or
 	return true
 }
 
+func (t *TransactionMetadata) Attachments() []iotago.BlockID {
+	return t.attachments.Keys()
+}
+
 func (t *TransactionMetadata) EarliestIncludedAttachment() iotago.BlockID {
 	return t.earliestIncludedAttachment.Get()
 }

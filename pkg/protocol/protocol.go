@@ -35,18 +35,17 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Protocol struct {
 	Events        *Events
-	TipManager    tipmanager.TipManager
 	SyncManager   syncmanager.SyncManager
 	engineManager *enginemanager.EngineManager
 	ChainManager  *chainmanager.Manager
@@ -85,7 +84,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		dispatcher:                  dispatcher,
 		optsFilterProvider:          blockfilter.NewProvider(),
 		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
-		optsTipManagerProvider:      trivialtipmanager.NewProvider(),
+		optsTipManagerProvider:      tipmanagerv1.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
 		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),
@@ -106,8 +105,6 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 // Run runs the protocol.
 func (p *Protocol) Run() {
 	p.Events.Engine.LinkTo(p.mainEngine.Events)
-	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
-	p.Events.TipManager.LinkTo(p.TipManager.Events())
 	p.SyncManager = p.optsSyncManagerProvider(p.mainEngine)
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
@@ -145,7 +142,6 @@ func (p *Protocol) Shutdown() {
 	p.Workers.Shutdown()
 	p.mainEngine.Shutdown()
 	p.ChainManager.Shutdown()
-	p.TipManager.Shutdown()
 	p.SyncManager.Shutdown()
 }
 
@@ -211,6 +207,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsNotarizationProvider,
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,
+		p.optsTipManagerProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()

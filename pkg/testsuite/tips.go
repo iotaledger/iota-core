@@ -10,7 +10,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertTips(expectedBlocks []*blocks.Block, nodes ...*mock.Node) {
+func (t *TestSuite) AssertStrongTips(expectedBlocks []*blocks.Block, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	expectedBlockIDs := lo.Map(expectedBlocks, func(block *blocks.Block) iotago.BlockID {
@@ -19,7 +19,7 @@ func (t *TestSuite) AssertTips(expectedBlocks []*blocks.Block, nodes ...*mock.No
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			storedTipsBlocks := node.Protocol.TipManager.AllTips()
+			storedTipsBlocks := node.Protocol.MainEngineInstance().TipManager.StrongTipSet()
 			storedTipsBlockIDs := lo.Map(storedTipsBlocks, func(block *blocks.Block) iotago.BlockID {
 				return block.ID()
 			})

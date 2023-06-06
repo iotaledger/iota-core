@@ -24,6 +24,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -133,12 +134,8 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
 	})
 
-	events.TipManager.TipAdded.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > TipManager.TipAdded: %s\n", n.Name, block.ID())
-	})
-
-	events.TipManager.TipRemoved.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > TipManager.TipRemoved: %s\n", n.Name, block.ID())
+	events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+		fmt.Printf("%s > TipManager.TipAdded: %s in pool %d\n", n.Name, tipMetadata.Block().ID(), tipMetadata.TipPool())
 	})
 
 	events.Network.Error.Hook(func(err error, id identity.ID) {
