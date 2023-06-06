@@ -17,7 +17,7 @@ func setupTipsRoutes(routeGroup *echo.Group) {
 }
 
 func tips() *TipsResponse {
-	allTips := deps.Protocol.TipManager.AllTips()
+	allTips := append(deps.Protocol.MainEngineInstance().TipManager.StrongTipSet(), deps.Protocol.MainEngineInstance().TipManager.WeakTipSet()...)
 	t := make([]string, len(allTips))
 
 	for i, tip := range allTips {

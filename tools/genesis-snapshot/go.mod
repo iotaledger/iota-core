@@ -7,7 +7,7 @@ replace github.com/iotaledger/iota-core => ../../
 require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230509142214-c542bb85ed3c
 	github.com/iotaledger/iota-core v0.0.0-20230414140919-e676d4aef341
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230517140417-5a7e3d76d50a
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230523075055-ffbefd1ca5bc
 	github.com/mr-tron/base58 v1.2.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2

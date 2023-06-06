@@ -30,6 +30,7 @@ type ConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePowe
 	ConflictWeight(conflictID ConflictID) int64
 	ConflictChildren(conflictID ConflictID) (conflictIDs *advancedset.AdvancedSet[ConflictID], exists bool)
 	ConflictVoters(conflictID ConflictID) (voters map[iotago.AccountID]int64)
+	LikedInstead(conflictIDs *advancedset.AdvancedSet[ConflictID]) *advancedset.AdvancedSet[ConflictID]
 }
 
 type ReadLockedConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePower]] interface {

@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
@@ -19,6 +20,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -64,8 +66,10 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		poa.NewProvider(map[iotago.AccountID]int64{}),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
-		slotnotarization.NewProvider(),
+		slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
+		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
+		tipmanagerv1.NewProvider(),
 	)
 	defer engineInstance.Shutdown()
 

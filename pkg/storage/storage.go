@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
@@ -33,15 +34,17 @@ type Storage struct {
 
 	optsDBEngine               hivedb.Engine
 	optsAllowedDBEngines       []hivedb.Engine
+	optsPruningDelay           iotago.SlotIndex
 	optsPrunableManagerOptions []options.Option[prunable.Manager]
 }
 
 // New creates a new storage instance with the named database version in the given directory.
 func New(directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
 	return options.Apply(&Storage{
-		dir:          utils.NewDirectory(directory, true),
-		errorHandler: errorHandler,
-		optsDBEngine: hivedb.EngineRocksDB,
+		dir:              utils.NewDirectory(directory, true),
+		errorHandler:     errorHandler,
+		optsDBEngine:     hivedb.EngineRocksDB,
+		optsPruningDelay: 360,
 	}, opts,
 		func(s *Storage) {
 			dbConfig := database.Config{
@@ -52,7 +55,7 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 			}
 
 			s.Permanent = permanent.New(s.dir, dbConfig, errorHandler)
-			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), errorHandler, s.optsPrunableManagerOptions...)
+			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPruningDelay, errorHandler, s.optsPrunableManagerOptions...)
 
 			s.Permanent.Settings().HookInitialized(func() {
 				s.Prunable.Initialize(s.Settings().API())

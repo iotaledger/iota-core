@@ -39,6 +39,8 @@ type TransactionMetadata interface {
 
 	OnConflicting(func())
 
+	Attachments() []iotago.BlockID
+
 	EarliestIncludedAttachment() iotago.BlockID
 
 	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID))
