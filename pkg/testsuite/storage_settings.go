@@ -64,6 +64,20 @@ func (t *TestSuite) AssertLatestCommitmentSlotIndex(slot iotago.SlotIndex, nodes
 	}
 }
 
+func (t *TestSuite) AssertLatestCommitmentCumulativeWeight(cw uint64, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			if cw != node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
+				return errors.Errorf("AssertLatestCommitmentCumulativeWeight: %s: expected %v, got %v", node.Name, cw, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight())
+			}
+
+			return nil
+		})
+	}
+}
+
 func (t *TestSuite) AssertLatestStateMutationSlot(slot iotago.SlotIndex, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
@@ -83,10 +97,6 @@ func (t *TestSuite) AssertLatestFinalizedSlot(slot iotago.SlotIndex, nodes ...*m
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if slot != node.Protocol.MainEngineInstance().SlotGadget.LatestFinalizedSlot() {
-				return errors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d from slot gadget", node.Name, slot, node.Protocol.MainEngineInstance().SlotGadget.LatestFinalizedSlot())
-			}
-
 			if slot != node.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot() {
 				return errors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d from settings", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot())
 			}
@@ -96,13 +106,14 @@ func (t *TestSuite) AssertLatestFinalizedSlot(slot iotago.SlotIndex, nodes ...*m
 	}
 }
 
-func (t *TestSuite) AssertChainID(chainID iotago.CommitmentID, nodes ...*mock.Node) {
+func (t *TestSuite) AssertChainID(expectedChainID iotago.CommitmentID, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if chainID != node.Protocol.MainEngineInstance().ChainID() {
-				return errors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, chainID.String(), chainID.Index(), node.Protocol.MainEngineInstance().EvictionState.EarliestRootCommitmentID().String(), node.Protocol.MainEngineInstance().EvictionState.EarliestRootCommitmentID().Index())
+			actualChainID := node.Protocol.MainEngineInstance().ChainID()
+			if expectedChainID != node.Protocol.MainEngineInstance().ChainID() {
+				return errors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID.String(), expectedChainID.Index(), actualChainID, actualChainID.Index())
 			}
 
 			return nil

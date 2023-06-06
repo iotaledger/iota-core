@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -27,21 +28,27 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
-			protocol.WithPruningDelay(2),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+				storage.WithPruningDelay(3),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
+			),
+			protocol.WithAttestationProvider(
+				slotattestation.NewProvider(3),
 			),
 		},
 		"node2": {
-			protocol.WithPruningDelay(1),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+				storage.WithPruningDelay(4),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
+				slotnotarization.NewProvider(1),
+			),
+			protocol.WithAttestationProvider(
+				slotattestation.NewProvider(3),
 			),
 		},
 	})
@@ -184,32 +191,30 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
-		// Slot 9-12
+		ts.AssertLatestCommitmentCumulativeWeight(100, ts.Nodes()...)
+		ts.AssertAttestationsForSlot(3, ts.Blocks("3.1", "2.2*"), ts.Nodes()...)
+
+		// Make slot 7 committed.
 		{
 			slot3Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(3)).Commitment()
+			ts.IssueBlockAtSlot("9.1.2", 9, slot3Commitment, node1, ts.BlockID("8.2"))
+			ts.IssueBlockAtSlot("9.2.2", 9, slot3Commitment, node2, ts.BlockID("9.1.2"))
+			ts.IssueBlockAtSlot("9.1.3", 9, slot3Commitment, node1, ts.BlockID("9.2.2"))
+			ts.IssueBlockAtSlot("9.2.3", 9, slot3Commitment, node2, ts.BlockID("9.1.3"))
 
-			// Slot 9
-			ts.IssueBlockAtSlot("9.1", 9, slot3Commitment, node1, ts.BlockID("8.2"))
-			// Slot 10
-			ts.IssueBlockAtSlot("10.2", 10, slot3Commitment, node2, ts.BlockID("9.1"))
-			// Slot 11
-			ts.IssueBlockAtSlot("11.1", 11, slot3Commitment, node1, ts.BlockID("10.2"))
-			// Slot 12
-			ts.IssueBlockAtSlot("12.2", 12, slot3Commitment, node2, ts.BlockID("11.1"))
+			ts.AssertBlocksExist(ts.Blocks("9.1.2", "9.2.2", "9.1.3", "9.2.3"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("9.1.2", "9.2.2", "9.1.3"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("9.2.3"), false, ts.Nodes()...)
 
-			ts.AssertBlocksExist(ts.Blocks("9.1", "10.2", "11.1", "12.2"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("8.2", "9.1", "10.2", "11.1"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("12.2"), false, ts.Nodes()...)
-
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("8.2", "9.1"), true, ts.Nodes()...)
-			ts.AssertBlocksInCacheConfirmed(ts.Blocks("8.2", "9.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("8.2", "9.1.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("8.2", "9.1.2"), true, ts.Nodes()...)
 		}
 
 		// Verify nodes' states:
-		// - Slot 9 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 11.
-		// - 9.1 is ratified accepted and commits to slot 5 -> slot 5 should be evicted.
-		// - rootblocks are evicted until slot 2 as RootBlocksEvictionDelay is 3.
-		// - slot 1 is finalized: there is a supermajority of ratified accepted blocks that commits to it.
+		// - Slot 3 should be committed as the MinCommittableSlotAge is 1, and we ratified accepted a block at slot 5.
+		// - 5.1 is ratified accepted and commits to slot 1 -> slot 1 should be evicted.
+		// - rootblocks are still not evicted as RootBlocksEvictionDelay is 3.
+		// - slot 1 is still not finalized: there is no supermajority of ratified accepted blocks that commits to it.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -224,14 +229,55 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
+		// Slot 9-12
+		{
+			slot7Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(7)).Commitment()
+
+			// Slot 9
+			ts.IssueBlockAtSlot("9.1", 9, slot7Commitment, node1, ts.BlockID("9.2.3"))
+			ts.IssueBlockAtSlot("9.2", 9, slot7Commitment, node2, ts.BlockID("9.1"))
+			// Slot 10
+			ts.IssueBlockAtSlot("10.2", 10, slot7Commitment, node2, ts.BlockID("9.2"))
+			// Slot 11
+			ts.IssueBlockAtSlot("11.1", 11, slot7Commitment, node1, ts.BlockID("10.2"))
+			// Slot 12
+			ts.IssueBlockAtSlot("12.2", 12, slot7Commitment, node2, ts.BlockID("11.1"))
+
+			ts.AssertBlocksExist(ts.Blocks("9.1", "9.2", "10.2", "11.1", "12.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("9.1", "9.2", "10.2", "11.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("12.2"), false, ts.Nodes()...)
+
+			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("9.1", "9.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("9.1", "9.2"), true, ts.Nodes()...)
+		}
+
+		// Verify nodes' states:
+		// - Slot 9 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 11.
+		// - 9.1 is ratified accepted and commits to slot 5 -> slot 5 should be evicted.
+		// - rootblocks are evicted until slot 2 as RootBlocksEvictionDelay is 3.
+		// - slot 1 is finalized: there is a supermajority of ratified accepted blocks that commits to it.
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithSnapshotImported(true),
+			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithLatestCommitmentSlotIndex(7),
+			testsuite.WithLatestStateMutationSlot(0),
+			testsuite.WithLatestFinalizedSlot(7),
+			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithSybilProtectionCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithEvictedSlot(7),
+			testsuite.WithActiveRootBlocks(ts.Blocks("5.1", "6.2", "7.1")),
+		)
+		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+
 		ts.AssertNodeState(ts.Nodes("node1"),
-			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2")),
-			testsuite.WithPrunedSlot(0, false),
+			testsuite.WithStorageRootBlocks(ts.Blocks("5.1", "6.2", "7.1", "8.2")),
+			testsuite.WithPrunedSlot(4, true),
 		)
 
 		ts.AssertNodeState(ts.Nodes("node2"),
-			testsuite.WithStorageRootBlocks(ts.Blocks("1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2")),
-			testsuite.WithPrunedSlot(0, true),
+			testsuite.WithStorageRootBlocks(ts.Blocks("4.2", "5.1", "6.2", "7.1", "8.2")),
+			testsuite.WithPrunedSlot(3, true),
 		)
 
 		// Slot 13
@@ -258,7 +304,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
 			testsuite.WithLatestCommitmentSlotIndex(8),
 			testsuite.WithLatestStateMutationSlot(0),
-			testsuite.WithLatestFinalizedSlot(3),
+			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
@@ -268,13 +314,13 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		ts.AssertNodeState(ts.Nodes("node1"),
-			testsuite.WithStorageRootBlocks(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(1, true),
+			testsuite.WithStorageRootBlocks(ts.Blocks("5.1", "6.2", "7.1", "8.2", "9.2")),
+			testsuite.WithPrunedSlot(4, true),
 		)
 
 		ts.AssertNodeState(ts.Nodes("node2"),
-			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(2, true),
+			testsuite.WithStorageRootBlocks(ts.Blocks("4.2", "5.1", "6.2", "7.1", "8.2", "9.2")),
+			testsuite.WithPrunedSlot(3, true),
 		)
 
 		// Slot 14
@@ -295,29 +341,32 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - 10.2 is ratified accepted and commits to slot 5 -> slot 5 should be evicted.
 		// - rootblocks are evicted until slot 2 as RootBlocksEvictionDelay is 3.
 		// - slot 5 is finalized: there is a supermajority of ratified accepted blocks that commits to it.
-
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
 			testsuite.WithLatestCommitmentSlotIndex(9),
 			testsuite.WithLatestStateMutationSlot(0),
-			testsuite.WithLatestFinalizedSlot(3),
+			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(9),
-			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
+			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
+		// We have committed to slot 9 where we referenced slot 7 with commitments -> there should be cumulative weight and attestations for slot 9.
+		ts.AssertLatestCommitmentCumulativeWeight(200, ts.Nodes()...)
+		ts.AssertAttestationsForSlot(9, ts.Blocks("9.1", "9.2"), ts.Nodes()...)
+
 		ts.AssertNodeState(ts.Nodes("node1"),
-			testsuite.WithStorageRootBlocks(ts.Blocks("2.2", "2.2*", "3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(1, true),
+			testsuite.WithStorageRootBlocks(ts.Blocks("5.1", "6.2", "7.1", "8.2", "9.2")),
+			testsuite.WithPrunedSlot(4, true),
 		)
 
 		ts.AssertNodeState(ts.Nodes("node2"),
-			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(2, true),
+			testsuite.WithStorageRootBlocks(ts.Blocks("4.2", "5.1", "6.2", "7.1", "8.2", "9.2")),
+			testsuite.WithPrunedSlot(3, true),
 		)
 	}
 
@@ -333,33 +382,39 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(ts.Validators()),
 			),
-			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
-			),
-			protocol.WithPruningDelay(1),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+				storage.WithPruningDelay(4),
+			),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(1),
+			),
+			protocol.WithAttestationProvider(
+				slotattestation.NewProvider(3),
 			),
 		)
 		ts.Wait()
 
-		slot1Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 		ts.AssertNodeState(ts.Nodes("node2.1"),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
 			testsuite.WithLatestCommitmentSlotIndex(9),
 			testsuite.WithLatestStateMutationSlot(0),
-			testsuite.WithLatestFinalizedSlot(3),
-			testsuite.WithChainID(slot1Commitment.MustID()),
+			testsuite.WithLatestFinalizedSlot(7),
+			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(9),
-			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("3.1", "4.2", "5.1", "6.2", "7.1", "8.2", "9.1", "10.2")),
-			testsuite.WithPrunedSlot(2, true),
+			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.2")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("4.2", "5.1", "6.2", "7.1", "8.2", "9.2")),
+			testsuite.WithPrunedSlot(3, true),
 			testsuite.WithChainManagerIsSolid(),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+
+		// Verify attestations state.
+		ts.AssertLatestCommitmentCumulativeWeight(200, ts.Nodes()...)
+		ts.AssertAttestationsForSlot(9, ts.Blocks("9.1", "9.2"), ts.Nodes()...)
 	}
 
 	// Create snapshot.
@@ -375,12 +430,15 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(ts.Validators()),
 			),
-			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(slotnotarization.WithMinCommittableSlotAge(1)),
-			),
-			protocol.WithPruningDelay(2),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+				storage.WithPruningDelay(4),
+			),
+			protocol.WithNotarizationProvider(
+				slotnotarization.NewProvider(1),
+			),
+			protocol.WithAttestationProvider(
+				slotattestation.NewProvider(3),
 			),
 		)
 		ts.Wait()
@@ -398,24 +456,29 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(9),
 			testsuite.WithLatestCommitment(latestCommitment),
 			testsuite.WithLatestStateMutationSlot(0),
-			testsuite.WithLatestFinalizedSlot(3),
+			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(slot1Commitment.MustID()),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(9),
-			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("7.1", "8.2", "9.1")),
-			testsuite.WithPrunedSlot(3, true),
+			testsuite.WithActiveRootBlocks(ts.Blocks("7.1", "8.2", "9.2")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("7.1", "8.2", "9.2")),
+			testsuite.WithPrunedSlot(3, true), // latestFinalizedSlot - PruningDelay
 			testsuite.WithChainManagerIsSolid(),
 		)
-		require.Nil(t, node3.Protocol.MainEngineInstance().Storage.RootBlocks(2))
+		require.Nil(t, node3.Protocol.MainEngineInstance().Storage.RootBlocks(3))
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+
+		// Verify attestations state.
+		ts.AssertLatestCommitmentCumulativeWeight(200, ts.Nodes()...)
 	}
 
 	{
 		// Slot 15
 		{
 			node21 := ts.Node("node2.1")
+			node3 := ts.Node("node3")
+
 			slot9Commitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(9)).Commitment()
 			ts.IssueBlockAtSlot("15.1", 15, slot9Commitment, node1, ts.BlockID("14.2"))
 			ts.IssueBlockAtSlot("16.2", 16, slot9Commitment, node21, ts.BlockID("15.1"))
@@ -426,6 +489,25 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("13.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCacheConfirmed(ts.Blocks("13.1"), true, ts.Nodes()...)
+
+			ts.AssertNodeState(ts.Nodes(),
+				testsuite.WithSnapshotImported(true),
+				testsuite.WithProtocolParameters(ts.ProtocolParameters),
+				testsuite.WithLatestCommitmentSlotIndex(11),
+				testsuite.WithLatestStateMutationSlot(0),
+				testsuite.WithLatestFinalizedSlot(7),
+				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+				testsuite.WithEvictedSlot(11),
+				testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.1")),
+				testsuite.WithChainManagerIsSolid(),
+			)
+			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+
+			ts.AssertLatestCommitmentCumulativeWeight(300, ts.Nodes()...)
+			ts.AssertAttestationsForSlot(10, ts.Blocks("9.1", "10.2"), ts.Nodes()...)
+			ts.AssertAttestationsForSlot(11, ts.Blocks(), ts.Nodes()...)
 		}
 	}
 }
