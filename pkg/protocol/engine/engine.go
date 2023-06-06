@@ -395,6 +395,10 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 // EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
 // commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
 // from being processed as their chain will be deemed unsolid.
+// lastFinalizedSlot is needed to make sure that the root commitment is not younger than the last finalized slot.
+// If setting the root commitment based on the last evicted slot this basically means we won't be able to solidify another
+// chain beyond a window based on eviction, which in turn is based on acceptance. In case of a partition, this behavior is
+// clearly not desired.
 func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment *model.Commitment, valid bool) {
 	earliestRootCommitmentID, valid := e.EvictionState.EarliestRootCommitmentID(lastFinalizedSlot)
 	if !valid {

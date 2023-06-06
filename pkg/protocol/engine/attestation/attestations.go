@@ -12,7 +12,7 @@ import (
 
 type Attestations interface {
 	// Get returns the attestations that are included in the commitment of the given slot.
-	// If attestationOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
+	// If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
 	Get(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error)
 	AddAttestationFromBlock(block *blocks.Block)
 	Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot types.Identifier, err error)
