@@ -1,4 +1,4 @@
-package accountsledger_test
+package accountsledger
 
 import (
 	"testing"
@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/utils"
@@ -29,14 +28,14 @@ func TestManager_TrackBlock(t *testing.T) {
 		return nil
 	}
 	accountsStore := mapdb.NewMapDB()
-	manager := accountsledger.New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
+	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
 
 	for _, blockID := range blockIDs {
 		block, exist := blockFunc(blockID)
 		require.True(t, exist)
 		manager.TrackBlock(block)
 	}
-	managerBurns, err := manager.CreateBlockBurnsForSlot(1)
+	managerBurns, err := manager.ComputeBlockBurnsForSlot(1)
 	require.NoError(t, err)
 	assert.EqualValues(t, burns[1], managerBurns)
 }
