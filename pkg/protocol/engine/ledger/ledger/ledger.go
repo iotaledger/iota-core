@@ -73,6 +73,8 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 		// TODO: should this attach to RatifiedAccepted instead?
 		e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
+		e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
+		// TODO: when should ledgerState be pruned?
 
 		e.HookConstructed(func() {
 			wpAccounts := ledgerWorkers.CreateGroup("Accounts").CreatePool("trackBurnt", 1)
@@ -180,8 +182,21 @@ func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iota
 func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
 	p := promise.New[mempool.State]()
 
+	l.ledgerState.ReadLockLedger()
+	defer l.ledgerState.ReadUnlockLedger()
+
+	isUnspent, err := l.ledgerState.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
+	if err != nil {
+		p.Reject(xerrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
+	}
+
+	if !isUnspent {
+		p.Reject(xerrors.Errorf("unspent output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+	}
+
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
 	output, err := l.utxoLedger.ReadOutputByOutputID(stateRef.Ref())
+
 	if err != nil {
 		p.Reject(xerrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	} else {
