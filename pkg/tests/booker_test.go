@@ -100,9 +100,10 @@ func Test_DoubleSpend(t *testing.T) {
 		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
 	}
 
-	// Issue a valid block that resolves the conflict.
+	// Issue a valid blocks that resolves the conflict.
 	{
 		ts.IssueBlock("block6", node2, blockissuer.WithStrongParents(ts.BlockIDs("block3", "block4")...), blockissuer.WithShallowLikeParents(ts.BlockID("block2")))
+		ts.IssueBlock("block7", node1, blockissuer.WithStrongParents(ts.BlockIDs("block6")...))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block6"): {"Tx2"},
@@ -130,7 +131,10 @@ func Test_MultipleAttachments(t *testing.T) {
 
 		ts.IssueBlock("block1", node1, blockissuer.WithPayload(tx1), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueBlock("block2", node2, blockissuer.WithPayload(tx1), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
-
+		ts.IssueBlock("block3*", node2, blockissuer.WithStrongParents(ts.BlockID("block1")))
+		ts.IssueBlock("block4*", node1, blockissuer.WithStrongParents(ts.BlockID("block2")))
+		ts.IssueBlock("block5*", node1, blockissuer.WithStrongParents(ts.BlockID("block3*")))
+		ts.IssueBlock("block6*", node2, blockissuer.WithStrongParents(ts.BlockID("block4*")))
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("Tx1"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("Tx1"), true, node1, node2)
 		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("Tx1"), true, node1, node2)
@@ -150,6 +154,7 @@ func Test_MultipleAttachments(t *testing.T) {
 
 		ts.IssueBlock("block3", node1, blockissuer.WithPayload(tx2), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueBlock("block4", node2, blockissuer.WithStrongParents(ts.BlockID("block3")))
+		ts.IssueBlock("block5*", node1, blockissuer.WithStrongParents(ts.BlockID("block4")))
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
@@ -170,6 +175,7 @@ func Test_MultipleAttachments(t *testing.T) {
 	//Issue a block that includes Tx1, and make sure that Tx2 is accepted as well as a consequence.
 	{
 		ts.IssueBlock("block5", node2, blockissuer.WithStrongParents(ts.BlockID("block1")))
+		ts.IssueBlock("block6", node1, blockissuer.WithStrongParents(ts.BlockID("block5")))
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("Tx1", "Tx2"), true, node1, node2)
