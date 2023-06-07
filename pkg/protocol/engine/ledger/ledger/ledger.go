@@ -182,10 +182,10 @@ func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iota
 func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
 	p := promise.New[mempool.State]()
 
-	l.ledgerState.ReadLockLedger()
-	defer l.ledgerState.ReadUnlockLedger()
+	l.utxoLedger.ReadLockLedger()
+	defer l.utxoLedger.ReadUnlockLedger()
 
-	isUnspent, err := l.ledgerState.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
+	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
 	if err != nil {
 		p.Reject(xerrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
 	}

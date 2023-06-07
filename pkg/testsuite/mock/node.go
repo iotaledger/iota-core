@@ -322,7 +322,7 @@ func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sy
 				return
 			}
 
-			n.IssueBlock(ctx, fmt.Sprintf("activity %s.%d", n.Name, counter), blockissuer.WithPayload(&iotago.TaggedData{
+			n.IssueBlock(ctx, fmt.Sprintf("activity %s.%d", n.Name, counter), blockfactory.WithPayload(&iotago.TaggedData{
 				Tag: []byte(fmt.Sprintf("activity %s.%d", n.Name, counter)),
 			}))
 
