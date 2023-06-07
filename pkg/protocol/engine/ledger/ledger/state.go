@@ -18,4 +18,6 @@ func (s *ExecutionOutput) Output() iotago.Output {
 	return s.output
 }
 
-func (s *ExecutionOutput) CreationTime() iotago.SlotIndex
+func (s *ExecutionOutput) CreationTime() iotago.SlotIndex {
+	return s.creationTime
+}
