@@ -2,6 +2,7 @@ package tests
 
 import (
 	"testing"
+	"time"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -37,7 +38,7 @@ func TestConfirmationFlags(t *testing.T) {
 				slotnotarization.NewProvider(1),
 			),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID)),
+				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
 			),
 		},
 		"nodeB": {
@@ -45,7 +46,7 @@ func TestConfirmationFlags(t *testing.T) {
 				slotnotarization.NewProvider(1),
 			),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID)),
+				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
 			),
 		},
 		"nodeC": {
@@ -53,7 +54,7 @@ func TestConfirmationFlags(t *testing.T) {
 				slotnotarization.NewProvider(1),
 			),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID)),
+				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
 			),
 		},
 		"nodeD": {
@@ -61,7 +62,7 @@ func TestConfirmationFlags(t *testing.T) {
 				slotnotarization.NewProvider(1),
 			),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID)),
+				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
 			),
 		},
 	})

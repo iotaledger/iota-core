@@ -1,65 +1,48 @@
 package thresholdblockgadget
 
 import (
-	"fmt"
-
-	"github.com/iotaledger/hive.go/ds/walker"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/votes"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (g *Gadget) trackConfirmationRatifierWeight(ratifierBlock *blocks.Block) {
-	ratifier := ratifierBlock.Block().IssuerID
-	ratifierBlockIndex := ratifierBlock.ID().Index()
+func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
+	ratifier := votingBlock.Block().IssuerID
+	ratifierBlockIndex := votingBlock.ID().Index()
 
 	// Only track ratifier weight for issuers that are part of the committee.
 	if !g.sybilProtection.Committee().Has(ratifier) {
 		return
 	}
 
-	walk := walker.New[iotago.BlockID]().PushAll(ratifierBlock.Parents()...)
-	for walk.HasNext() {
-		blockID := walk.Next()
-
-		if blockID.Index() <= ratifierBlockIndex-g.optsConfirmationRatificationThreshold {
-			continue
+	evaluateFunc := func(block *blocks.Block) bool {
+		// Do not propagate further than g.optsConfirmationRatificationThreshold slots.
+		// This means that confirmations need to be achieved within g.optsConfirmationRatificationThreshold slots.
+		if block.ID().Index() <= ratifierBlockIndex-g.optsConfirmationRatificationThreshold {
+			return false
 		}
 
-		block, exists := g.blockCache.Block(blockID)
-		if !exists {
-			panic(fmt.Sprintf("parent %s does not exist", blockID))
-		}
-
-		if block.IsRootBlock() {
-			continue
-		}
-
+		// Skip propagation if the block is already accepted.
 		if block.IsConfirmed() {
-			continue
+			return false
 		}
 
-		// Skip further propagation if the ratifier is not new.
+		// Skip further propagation if the witness is not new.
 		if !block.AddConfirmationRatifier(ratifier) {
-			continue
+			return false
 		}
-
-		block.ForEachParent(func(parent model.Parent) {
-			switch parent.Type {
-			case model.StrongParentType:
-				walk.Push(parent.ID)
-			case model.ShallowLikeParentType, model.WeakParentType:
-				if weakParent, exists := g.blockCache.Block(parent.ID); exists {
-					if weakParent.AddConfirmationRatifier(ratifier) {
-						g.tryConfirm(weakParent)
-					}
-				}
-			}
-		})
 
 		g.tryConfirm(block)
+
+		return true
 	}
+
+	weakFunc := func(block *blocks.Block) {
+		if block.AddConfirmationRatifier(ratifier) {
+			g.tryConfirm(block)
+		}
+	}
+
+	g.propagate(votingBlock.Parents(), evaluateFunc, weakFunc)
 }
 
 func (g *Gadget) tryConfirm(block *blocks.Block) {

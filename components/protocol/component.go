@@ -150,10 +150,6 @@ func configure() error {
 		Component.LogInfof("BlockBooked: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.Booker.WitnessAdded.Hook(func(block *blocks.Block) {
-		Component.LogInfof("WitnessAdded: %s", block.ID())
-	})
-
 	deps.Protocol.Events.Engine.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
 		Component.LogInfof("BlockPreAccepted: %s", block.ID())
 	})

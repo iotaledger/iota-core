@@ -1,10 +1,14 @@
 package thresholdblockgadget
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/core/causalorder"
+	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
@@ -77,4 +81,32 @@ func (g *Gadget) evictUntil(index iotago.SlotIndex) {
 	g.acceptanceOrder.EvictUntil(index)
 }
 
-var _ blockgadget.Gadget = new(Gadget)
+func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(block *blocks.Block) bool, weakFunc func(block *blocks.Block)) {
+	walk := walker.New[iotago.BlockID](false).PushAll(initialBlockIDs...)
+	for walk.HasNext() {
+		blockID := walk.Next()
+		block, exists := g.blockCache.Block(blockID)
+		if !exists {
+			panic(fmt.Sprintf("parent %s does not exist", blockID))
+		}
+
+		if block.IsRootBlock() {
+			continue
+		}
+
+		if !evaluateFunc(block) {
+			continue
+		}
+
+		block.ForEachParent(func(parent model.Parent) {
+			switch parent.Type {
+			case model.StrongParentType:
+				walk.Push(parent.ID)
+			case model.ShallowLikeParentType, model.WeakParentType:
+				if weakParent, exists := g.blockCache.Block(parent.ID); exists {
+					weakFunc(weakParent)
+				}
+			}
+		})
+	}
+}
