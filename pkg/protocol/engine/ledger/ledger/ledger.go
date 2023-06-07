@@ -549,3 +549,19 @@ func (l *Ledger) BlockAccepted(block *blocks.Block) {
 		return
 	}
 }
+
+func (l *Ledger) IsAccountLocked(block *iotago.Block) bool {
+	blockSlotIndex := l.protocolParameters.SlotTimeProvider().IndexFromTime(block.IssuingTime)
+	bicSlot := blockSlotIndex - iotago.SlotIndex(l.protocolParameters.MaxCommitableAge)
+	account, exists, err := l.accountsLedger.Account(block.IssuerID, bicSlot)
+	if err != nil {
+		return true
+	}
+	if !exists {
+		return true
+	}
+	if account.BlockIssuanceCredits().Value < 0 {
+		return true
+	}
+	return false
+}

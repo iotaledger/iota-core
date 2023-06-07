@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
@@ -24,14 +25,14 @@ type TestFramework struct {
 	api    iotago.API
 }
 
-func NewTestFramework(t *testing.T, protocolParams *iotago.ProtocolParameters, optsFilter ...options.Option[Filter]) *TestFramework {
+func NewTestFramework(t *testing.T, protocolParams *iotago.ProtocolParameters, ledger ledger.Ledger, optsFilter ...options.Option[Filter]) *TestFramework {
 	tf := &TestFramework{
 		Test: t,
 		api:  iotago.V3API(protocolParams),
 
 		Filter: New(func() *iotago.ProtocolParameters {
 			return protocolParams
-		}, optsFilter...),
+		}, ledger, optsFilter...),
 	}
 
 	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {

@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -19,6 +20,8 @@ var (
 	ErrBlockTimeTooFarAheadInFuture = errors.New("a block cannot be too far ahead in the future")
 	ErrInvalidSignature             = errors.New("block has invalid signature")
 	ErrInvalidProofOfWork           = errors.New("error validating PoW")
+	ErrInsufficientBurnedMana       = errors.New("a block must burn at least the reference mana cost")
+	ErrNegativeBIC                  = errors.New("a block issuer must have non-negative block issuance credit")
 )
 
 // Filter filters blocks.
@@ -31,12 +34,17 @@ type Filter struct {
 	optsMinCommittableSlotAge    iotago.SlotIndex
 	optsSignatureValidation      bool
 
+	ledger ledger.Ledger
+
+	// TODO: replace this placeholder for RMC with a link to the accounts manager with RMC provider.
+	optsReferenceManaCost uint64
+
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
 	return module.Provide(func(e *engine.Engine) filter.Filter {
-		f := New(e.Storage.Settings().ProtocolParameters, opts...)
+		f := New(e.Storage.Settings().ProtocolParameters, e.Ledger, opts...)
 
 		e.HookConstructed(func() {
 			e.Events.Filter.LinkTo(f.events)
@@ -49,11 +57,12 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 var _ filter.Filter = new(Filter)
 
 // New creates a new Filter.
-func New(protocolParamsFunc func() *iotago.ProtocolParameters, opts ...options.Option[Filter]) *Filter {
+func New(protocolParamsFunc func() *iotago.ProtocolParameters, ledger ledger.Ledger, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
 		events:                  filter.NewEvents(),
 		protocolParamsFunc:      protocolParamsFunc,
 		optsSignatureValidation: true,
+		ledger:                  ledger,
 	}, opts,
 		(*Filter).TriggerConstructed,
 		(*Filter).TriggerInitialized,
@@ -87,6 +96,28 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 			return
 		}
+	}
+
+	// Check that the block burns sufficient Mana to cover RMC
+	if block.Block().BurnedMana < f.optsReferenceManaCost {
+		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.WithMessagef(ErrInsufficientBurnedMana, "block with burned mana %d while reference mana cost is %d", block.Block().BurnedMana, f.optsReferenceManaCost),
+			Source: source,
+		})
+
+		return
+	}
+
+	// Check that the issuer of this block has non-negative block issuance credit
+	if f.ledger.IsAccountLocked(block.Block()) {
+		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.WithMessagef(ErrNegativeBIC, "block issuer account is locked due to negative or non-existant BIC"),
+			Source: source,
+		})
+
+		return
 	}
 
 	// Check if the block is trying to commit to a slot that is not yet committable.
@@ -163,5 +194,12 @@ func WithMaxAllowedWallClockDrift(d time.Duration) options.Option[Filter] {
 func WithSignatureValidation(validation bool) options.Option[Filter] {
 	return func(filter *Filter) {
 		filter.optsSignatureValidation = validation
+	}
+}
+
+// WithReferenceManaCost specifies a placeholder for RMC.
+func WithReferenceManaCost(rmc uint64) options.Option[Filter] {
+	return func(filter *Filter) {
+		filter.optsReferenceManaCost = rmc
 	}
 }
