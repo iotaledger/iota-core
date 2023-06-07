@@ -1,8 +1,9 @@
 package tpkg
 
 import (
-	"github.com/iotaledger/iota-core/pkg/utils"
 	"time"
+
+	"github.com/iotaledger/iota-core/pkg/utils"
 
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -22,6 +23,7 @@ var (
 		TokenSupply:           utils.RandAmount(),
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
+		MaxCommitableAge:      10,
 	}
 	api = iotago.LatestAPI(protocolParams)
 )

@@ -40,18 +40,27 @@ type Manager struct {
 	// block is a function that returns a block from the cache or from the database.
 	block func(id iotago.BlockID) (*blocks.Block, bool)
 
+	maxCommitableAge iotago.SlotIndex
+
 	mutex sync.RWMutex
 
 	module.Module
 }
 
-func New(blockFunc func(id iotago.BlockID) (*blocks.Block, bool), slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs, accountsStore kvstore.KVStore, api iotago.API) *Manager {
+func New(
+	blockFunc func(id iotago.BlockID) (*blocks.Block, bool),
+	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
+	accountsStore kvstore.KVStore,
+	api iotago.API,
+	maxCommitableAge uint32,
+) *Manager {
 	return &Manager{
-		api:          api,
-		blockBurns:   shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
-		accountsTree: ads.NewMap[iotago.AccountID, accounts.AccountData](accountsStore),
-		block:        blockFunc,
-		slotDiff:     slotDiffFunc,
+		api:              api,
+		blockBurns:       shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
+		accountsTree:     ads.NewMap[iotago.AccountID, accounts.AccountData](accountsStore),
+		block:            blockFunc,
+		slotDiff:         slotDiffFunc,
+		maxCommitableAge: iotago.SlotIndex(maxCommitableAge),
 	}
 }
 
@@ -118,7 +127,7 @@ func (b *Manager) ApplyDiff(
 	b.latestCommittedSlot = slotIndex
 
 	// TODO: when to exactly evict?
-	b.evict(slotIndex - iotago.MaxCommitableSlotAge - 1)
+	b.evict(slotIndex - b.maxCommitableAge - 1)
 
 	return nil
 }
@@ -152,7 +161,7 @@ func (b *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 		targetIndex = optTargetIndex[0]
 	}
 
-	if targetIndex < b.latestCommittedSlot-iotago.MaxCommitableSlotAge {
+	if targetIndex < b.latestCommittedSlot-b.maxCommitableAge {
 		return nil, false, fmt.Errorf("can't calculate account, slot index older than accountIndex (%d<%d)", targetIndex, b.latestCommittedSlot)
 	}
 	if targetIndex > b.latestCommittedSlot {

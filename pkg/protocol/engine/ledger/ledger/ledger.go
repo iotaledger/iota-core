@@ -101,7 +101,7 @@ func New(
 	l := &Ledger{
 		apiProvider:        apiProvider,
 		utxoLedger:         utxoledger.New(utxoStore, apiProvider),
-		accountsLedger:     accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProvider()),
+		accountsLedger:     accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProvider(), protocolParameters.MaxCommitableAge),
 		commitmentLoader:   commitmentLoader,
 		conflictDAG:        conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
 		errorHandler:       errorHandler,

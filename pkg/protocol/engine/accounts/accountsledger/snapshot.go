@@ -228,7 +228,7 @@ func readSlotDiff(reader io.ReadSeeker, api iotago.API) (accountID iotago.Accoun
 
 func (b *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (slotDiffsCount uint64, err error) {
 	// write slot diffs until being able to reach targetIndex, where the exported tree is at
-	for slotIndex := targetIndex - iotago.MaxCommitableSlotAge; slotIndex <= targetIndex; slotIndex++ {
+	for slotIndex := targetIndex - b.maxCommitableAge; slotIndex <= targetIndex; slotIndex++ {
 		var accountsInDiffCount uint64
 
 		// The index of the slot diffs.

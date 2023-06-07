@@ -70,6 +70,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			TokenSupply:           1_000_0000,
 			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*100),
 			SlotDurationInSeconds: 10,
+			MaxCommitableAge:      10,
 		},
 		optsWaitFor: 10 * time.Second,
 		optsTick:    100 * time.Millisecond,
