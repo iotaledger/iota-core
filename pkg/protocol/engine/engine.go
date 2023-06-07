@@ -280,7 +280,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export commitments")
 	} else if err = e.Ledger.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export ledger")
-	} else if err = e.EvictionState.Export(writer, targetSlot); err != nil {
+	} else if err = e.EvictionState.Export(writer, e.Storage.Settings().LatestFinalizedSlot(), targetSlot); err != nil {
+		// The rootcommitment is determined from the rootblocks. Therefore, we need to export starting from the last finalized slot.
 		return errors.Wrap(err, "failed to export eviction state")
 	} else if err = e.Attestations.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export attestation state")
