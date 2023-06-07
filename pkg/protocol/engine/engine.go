@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -29,6 +30,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -48,7 +50,9 @@ type Engine struct {
 	BlockGadget     blockgadget.Gadget
 	SlotGadget      slotgadget.Gadget
 	Notarization    notarization.Notarization
+	Attestations    attestation.Attestations
 	Ledger          ledger.Ledger
+	TipManager      tipmanager.TipManager
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -81,8 +85,9 @@ func New(
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
+	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
-
+	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -108,7 +113,9 @@ func New(
 			e.BlockGadget = blockGadgetProvider(e)
 			e.SlotGadget = slotGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
+			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
+			e.TipManager = tipManagerProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings().TriggerInitialized,
@@ -122,6 +129,7 @@ func New(
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
 		(*Engine).setupBlockRequester,
+		(*Engine).setupPruning,
 		(*Engine).TriggerConstructed,
 	)
 }
@@ -131,6 +139,7 @@ func (e *Engine) Shutdown() {
 		e.TriggerStopped()
 
 		e.BlockRequester.Shutdown()
+		e.Attestations.Shutdown()
 		e.Notarization.Shutdown()
 		e.Booker.Shutdown()
 		e.Ledger.Shutdown()
@@ -209,8 +218,9 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		if err = e.readSnapshot(snapshot[0]); err != nil {
 			return errors.Wrapf(err, "failed to read snapshot from file '%s'", snapshot)
 		}
+
+		// Only mark any pruning indexes if we loaded a non-genesis snapshot
 		if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-			// Only mark any pruning indexes if we loaded a non-genesis snapshot
 			e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
 		}
 	} else {
@@ -219,11 +229,9 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 		e.Storage.Commitments().TriggerInitialized()
 		e.Storage.Prunable.RestoreFromDisk()
 		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
-
-		// e.Notarization.attestations().SetLastCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
-		// e.Notarization.attestations().TriggerInitialized()
-		//
-		// e.Notarization.TriggerInitialized()
+		if err := e.Attestations.RestoreFromDisk(); err != nil {
+			return errors.Wrap(err, "failed to restore attestations from disk")
+		}
 	}
 
 	e.TriggerInitialized()
@@ -258,8 +266,8 @@ func (e *Engine) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to import ledger")
 	} else if err = e.EvictionState.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import eviction state")
-		// } else if err = e.Notarization.Import(reader); err != nil {
-		// 	return errors.Wrap(err, "failed to import notarization state")
+	} else if err = e.Attestations.Import(reader); err != nil {
+		return errors.Wrap(err, "failed to import attestation state")
 	}
 
 	return
@@ -274,8 +282,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export ledger")
 	} else if err = e.EvictionState.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export eviction state")
-		// } else if err = e.Notarization.Export(writer, targetSlot); err != nil {
-		// 	return errors.Wrap(err, "failed to export notarization state")
+	} else if err = e.Attestations.Export(writer, targetSlot); err != nil {
+		return errors.Wrap(err, "failed to export attestation state")
 	}
 
 	return
@@ -362,6 +370,12 @@ func (e *Engine) setupBlockRequester() {
 	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", 1))) // Using just 1 worker to avoid contention
 }
 
+func (e *Engine) setupPruning() {
+	e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		e.Storage.PruneUntilSlot(index)
+	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))
+}
+
 func (e *Engine) readSnapshot(filePath string) (err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -385,14 +399,21 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 // EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
 // commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
 // from being processed as their chain will be deemed unsolid.
-func (e *Engine) EarliestRootCommitment() *model.Commitment {
-	earliestRootCommitmentID := e.EvictionState.EarliestRootCommitmentID()
+// lastFinalizedSlot is needed to make sure that the root commitment is not younger than the last finalized slot.
+// If setting the root commitment based on the last evicted slot this basically means we won't be able to solidify another
+// chain beyond a window based on eviction, which in turn is based on acceptance. In case of a partition, this behavior is
+// clearly not desired.
+func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment *model.Commitment, valid bool) {
+	earliestRootCommitmentID, valid := e.EvictionState.EarliestRootCommitmentID(lastFinalizedSlot)
+	if !valid {
+		return nil, false
+	}
 	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentID.Index())
 	if err != nil {
 		panic(fmt.Sprintln("could not load earliest commitment after engine initialization", err))
 	}
 
-	return rootCommitment
+	return rootCommitment, true
 }
 
 func (e *Engine) ErrorHandler(componentName string) func(error) {

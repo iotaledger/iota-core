@@ -4,6 +4,7 @@ import (
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func WithDBEngine(optsDBEngine hivedb.Engine) options.Option[Storage] {
@@ -21,5 +22,11 @@ func WithAllowedDBEngines(optsAllowedDBEngines []hivedb.Engine) options.Option[S
 func WithPrunableManagerOptions(opts ...options.Option[prunable.Manager]) options.Option[Storage] {
 	return func(s *Storage) {
 		s.optsPrunableManagerOptions = append(s.optsPrunableManagerOptions, opts...)
+	}
+}
+
+func WithPruningDelay(optsPruningDelay iotago.SlotIndex) options.Option[Storage] {
+	return func(s *Storage) {
+		s.optsPruningDelay = optsPruningDelay
 	}
 }

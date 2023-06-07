@@ -15,6 +15,10 @@ func VM(_ context.Context, inputTransaction mempool.Transaction, _ []mempool.Sta
 		return nil, xerrors.Errorf("invalid transaction type in MockedVM")
 	}
 
+	if transaction.invalidTransaction {
+		return nil, xerrors.Errorf("invalid transaction")
+	}
+
 	for i := uint16(0); i < transaction.outputCount; i++ {
 		id, err := transaction.ID()
 		if err != nil {

@@ -403,6 +403,9 @@ func (s *SortedConflicts[ConflictID, ResourceID, VotePower]) Shutdown() []*Confl
 	s.pendingPreferredInsteadUpdates.Clear()
 	s.pendingPreferredInsteadMutex.Unlock()
 
+	s.pendingPreferredInsteadSignal.Broadcast()
+	s.pendingWeightUpdatesSignal.Broadcast()
+
 	return lo.Map(s.members.Values(), func(conflict *sortedConflict[ConflictID, ResourceID, VotePower]) *Conflict[ConflictID, ResourceID, VotePower] {
 		return conflict.Conflict
 	})

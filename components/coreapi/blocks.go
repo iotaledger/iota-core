@@ -47,7 +47,7 @@ func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
 }
 
 func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
-	references := deps.Protocol.TipManager.Tips(iotago.BlockMaxParents)
+	references := deps.Protocol.MainEngineInstance().TipManager.SelectTips(iotago.BlockMaxParents)
 	slotCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
 	if len(references[model.StrongParentType]) == 0 {

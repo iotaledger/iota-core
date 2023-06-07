@@ -22,6 +22,9 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.latestCommitmentSlotIndex != nil {
 		t.AssertLatestCommitmentSlotIndex(*state.latestCommitmentSlotIndex, nodes...)
 	}
+	if state.latestCommitmentCumulativeWeight != nil {
+		t.AssertLatestCommitmentCumulativeWeight(*state.latestCommitmentCumulativeWeight, nodes...)
+	}
 	if state.latestMutationSlot != nil {
 		t.AssertLatestStateMutationSlot(*state.latestMutationSlot, nodes...)
 	}
@@ -58,13 +61,14 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 }
 
 type NodeState struct {
-	snapshotImported          *bool
-	protocolParameters        *iotago.ProtocolParameters
-	latestCommitment          *iotago.Commitment
-	latestCommitmentSlotIndex *iotago.SlotIndex
-	latestMutationSlot        *iotago.SlotIndex
-	latestFinalizedSlot       *iotago.SlotIndex
-	chainID                   *iotago.CommitmentID
+	snapshotImported                 *bool
+	protocolParameters               *iotago.ProtocolParameters
+	latestCommitment                 *iotago.Commitment
+	latestCommitmentSlotIndex        *iotago.SlotIndex
+	latestCommitmentCumulativeWeight *uint64
+	latestMutationSlot               *iotago.SlotIndex
+	latestFinalizedSlot              *iotago.SlotIndex
+	chainID                          *iotago.CommitmentID
 
 	sybilProtectionCommittee       *map[iotago.AccountID]int64
 	sybilProtectionOnlineCommittee *map[iotago.AccountID]int64
@@ -102,6 +106,12 @@ func WithLatestCommitment(commitment *iotago.Commitment) options.Option[NodeStat
 func WithLatestCommitmentSlotIndex(slotIndex iotago.SlotIndex) options.Option[NodeState] {
 	return func(state *NodeState) {
 		state.latestCommitmentSlotIndex = &slotIndex
+	}
+}
+
+func WithLatestCommitmentCumulativeWeight(cumulativeWeight uint64) options.Option[NodeState] {
+	return func(state *NodeState) {
+		state.latestCommitmentCumulativeWeight = &cumulativeWeight
 	}
 }
 

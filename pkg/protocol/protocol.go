@@ -14,6 +14,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -33,18 +35,17 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager/trivialtipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Protocol struct {
 	Events        *Events
-	TipManager    tipmanager.TipManager
 	SyncManager   syncmanager.SyncManager
 	engineManager *enginemanager.EngineManager
 	ChainManager  *chainmanager.Manager
@@ -57,7 +58,6 @@ type Protocol struct {
 
 	optsBaseDirectory string
 	optsSnapshotPath  string
-	optsPruningDelay  iotago.SlotIndex
 
 	optsEngineOptions       []options.Option[engine.Engine]
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
@@ -72,6 +72,7 @@ type Protocol struct {
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
+	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsLedgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
 }
@@ -83,18 +84,18 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		dispatcher:                  dispatcher,
 		optsFilterProvider:          blockfilter.NewProvider(),
 		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
-		optsTipManagerProvider:      trivialtipmanager.NewProvider(),
+		optsTipManagerProvider:      tipmanagerv1.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
 		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
-		optsNotarizationProvider:    slotnotarization.NewProvider(),
+		optsNotarizationProvider:    slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
+		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          ledger1.NewProvider(),
 
 		optsBaseDirectory: "",
-		optsPruningDelay:  360,
 	}, opts,
 		(*Protocol).initEngineManager,
 		(*Protocol).initChainManager,
@@ -104,15 +105,16 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 // Run runs the protocol.
 func (p *Protocol) Run() {
 	p.Events.Engine.LinkTo(p.mainEngine.Events)
-	p.TipManager = p.optsTipManagerProvider(p.mainEngine)
-	p.Events.TipManager.LinkTo(p.TipManager.Events())
 	p.SyncManager = p.optsSyncManagerProvider(p.mainEngine)
 
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
 		panic(err)
 	}
 
-	rootCommitment := p.mainEngine.EarliestRootCommitment()
+	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
+	if !valid {
+		panic("no root commitment found")
+	}
 
 	// The root commitment is the earliest commitment we will ever need to know to solidify commitment chains, we can
 	// then initialize the chain manager with it, and identify our engine to be on such chain.
@@ -140,7 +142,6 @@ func (p *Protocol) Shutdown() {
 	p.Workers.Shutdown()
 	p.mainEngine.Shutdown()
 	p.ChainManager.Shutdown()
-	p.TipManager.Shutdown()
 	p.SyncManager.Shutdown()
 }
 
@@ -204,15 +205,10 @@ func (p *Protocol) initEngineManager() {
 		p.optsBlockGadgetProvider,
 		p.optsSlotGadgetProvider,
 		p.optsNotarizationProvider,
+		p.optsAttestationProvider,
 		p.optsLedgerProvider,
+		p.optsTipManagerProvider,
 	)
-
-	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		if index < p.optsPruningDelay {
-			return
-		}
-		p.MainEngineInstance().Storage.PruneUntilSlot(index - p.optsPruningDelay)
-	}, event.WithWorkerPool(p.Workers.CreatePool("PruneEngine", 2)))
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
 	if err != nil {
@@ -232,7 +228,11 @@ func (p *Protocol) initChainManager() {
 	}, event.WithWorkerPool(wp))
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		rootCommitment := p.MainEngineInstance().EarliestRootCommitment()
+		rootCommitment, valid := p.MainEngineInstance().EarliestRootCommitment(index)
+		fmt.Println("Slot finalized:", index, "root commitment:", rootCommitment, "valid:", valid)
+		if !valid {
+			return
+		}
 
 		// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
 		// we first specify the chain's cut-off point, and only then evict the state. It is also important to

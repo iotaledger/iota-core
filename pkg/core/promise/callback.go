@@ -12,6 +12,9 @@ type Callback[T any] struct {
 	// Invoke is the callback function that is invoked when the callback is triggered.
 	Invoke T
 
+	// unsubscribed is a flag that indicates whether the callback was unsubscribed.
+	unsubscribed bool
+
 	// lastUpdate is the last update that was applied to the callback.
 	lastUpdate UniqueID
 
@@ -31,7 +34,7 @@ func NewCallback[T any](id UniqueID, invoke T) *Callback[T] {
 func (c *Callback[T]) Lock(updateID UniqueID) bool {
 	c.mutex.Lock()
 
-	if updateID != 0 && updateID == c.lastUpdate {
+	if c.unsubscribed || updateID != 0 && updateID == c.lastUpdate {
 		c.mutex.Unlock()
 
 		return false
@@ -45,4 +48,12 @@ func (c *Callback[T]) Lock(updateID UniqueID) bool {
 // Unlock unlocks the callback.
 func (c *Callback[T]) Unlock() {
 	c.mutex.Unlock()
+}
+
+// MarkUnsubscribed marks the callback as unsubscribed (it will no longer trigger).
+func (c *Callback[T]) MarkUnsubscribed() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.unsubscribed = true
 }
