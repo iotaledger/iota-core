@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -54,8 +52,10 @@ func NewFramework(
 }
 
 // CreateOrUpdateConflict creates a new conflict or adds it to the given ConflictSets.
-func (f *Framework) CreateOrUpdateConflict(alias string, resourceAliases []string, initialAcceptanceState ...acceptance.State) error {
-	return f.Instance.CreateOrUpdateConflict(f.ConflictID(alias), f.ConflictSetIDs(resourceAliases...), lo.First(initialAcceptanceState))
+func (f *Framework) CreateOrUpdateConflict(alias string, resourceAliases []string) error {
+	f.Instance.CreateConflict(f.ConflictID(alias))
+	return f.Instance.UpdateConflictingResources(f.ConflictID(alias), f.ConflictSetIDs(resourceAliases...))
+
 }
 
 // UpdateConflictParents updates the parents of the conflict with the given alias.
@@ -80,7 +80,12 @@ func (f *Framework) CastVotes(nodeAlias string, votePower int, conflictAliases .
 	return f.Instance.CastVotes(vote.NewVote[vote.MockedPower](f.Accounts.ID(nodeAlias), vote.MockedPower(votePower)), f.ConflictIDs(conflictAliases...))
 }
 
-// iotago.TransactionIDs translates the given aliases into an AdvancedSet of iotago.TransactionIDs.
+// EvictConflict evicts given conflict from the ConflictDAG.
+func (f *Framework) EvictConflict(conflictAlias string) {
+	f.Instance.EvictConflict(f.ConflictID(conflictAlias))
+}
+
+// ConflictIDs translates the given aliases into an AdvancedSet of iotago.TransactionIDs.
 func (f *Framework) ConflictIDs(aliases ...string) *advancedset.AdvancedSet[iotago.TransactionID] {
 	conflictIDs := advancedset.New[iotago.TransactionID]()
 	for _, alias := range aliases {

@@ -50,9 +50,11 @@ func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower
 	return t
 }
 
-func (t *TestFramework) CreateTransaction(alias string, referencedStates []string, outputCount uint16) {
+func (t *TestFramework) CreateTransaction(alias string, referencedStates []string, outputCount uint16, invalid ...bool) {
 	// create transaction
 	transaction := NewTransaction(outputCount, lo.Map(referencedStates, t.stateReference)...)
+	transaction.invalidTransaction = len(invalid) > 0 && invalid[0]
+
 	t.transactionByAlias[alias] = transaction
 
 	// register the transaction ID alias
@@ -166,8 +168,23 @@ func (t *TestFramework) RequireBooked(transactionAliases ...string) {
 }
 
 func (t *TestFramework) RequireAccepted(transactionAliases map[string]bool) {
-	// t.requireAcceptedTriggered(transactionAliases)
-	t.requireMarkedAccepted(transactionAliases)
+	for transactionAlias, accepted := range transactionAliases {
+		transactionMetadata, transactionMetadataExists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
+
+		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
+		require.Equal(t.test, accepted, transactionMetadata.IsAccepted(), "transaction %s was incorrectly accepted", transactionAlias)
+	}
+}
+
+func (t *TestFramework) RequireInvalid(transactionAliases ...string) {
+	t.waitInvalid(transactionAliases...)
+
+	for _, transactionAlias := range transactionAliases {
+		transactionMetadata, transactionMetadataExists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
+
+		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
+		require.True(t.test, transactionMetadata.IsInvalid(), "transaction %s was incorrectly accepted", transactionAlias)
+	}
 }
 
 func (t *TestFramework) RequireTransactionsEvicted(transactionAliases map[string]bool) {
@@ -249,7 +266,7 @@ func (t *TestFramework) setupHookedEvents() {
 			//		t.test.Logf("[TRIGGERED] mempool.Events.TransactionAccepted with '%s'", metadata.ID())
 			//	}
 			//
-			//	require.False(t.test, metadata.IsPreAccepted(), "transaction is not marked as pending")
+			//	require.False(t.test, metadata.IsAccepted(), "transaction is not marked as pending")
 			//
 			//	t.markTransactionAcceptedTriggered(metadata.ID(), true)
 		})
@@ -274,21 +291,28 @@ func (t *TestFramework) waitBooked(transactionAliases ...string) {
 	allBooked.Wait()
 }
 
+func (t *TestFramework) waitInvalid(transactionAliases ...string) {
+	var allInvalid sync.WaitGroup
+
+	allInvalid.Add(len(transactionAliases))
+	for _, transactionAlias := range transactionAliases {
+		transactionMetadata, exists := t.TransactionMetadata(transactionAlias)
+		require.True(t.test, exists, "transaction '%s' does not exist", transactionAlias)
+
+		transactionMetadata.OnInvalid(func(_ error) {
+			allInvalid.Done()
+		})
+	}
+
+	allInvalid.Wait()
+}
+
 func (t *TestFramework) requireMarkedBooked(transactionAliases ...string) {
 	for _, transactionAlias := range transactionAliases {
 		transactionMetadata, transactionMetadataExists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
 
 		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
 		require.True(t.test, transactionMetadata.IsBooked(), "transaction %s was not booked", transactionAlias)
-	}
-}
-
-func (t *TestFramework) requireMarkedAccepted(transactionAliases map[string]bool) {
-	for transactionAlias, accepted := range transactionAliases {
-		transactionMetadata, transactionMetadataExists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
-
-		require.True(t.test, transactionMetadataExists, "transaction %s should exist", transactionAlias)
-		require.Equal(t.test, accepted, transactionMetadata.IsAccepted(), "transaction %s was incorrectly accepted", transactionAlias)
 	}
 }
 

@@ -106,6 +106,10 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 }
 
 func (b *Block) Block() *iotago.Block {
+	if b.modelBlock == nil {
+		return nil
+	}
+
 	return b.modelBlock.Block()
 }
 
@@ -116,6 +120,11 @@ func (b *Block) Parents() (parents []iotago.BlockID) {
 
 func (b *Block) StrongParents() (parents []iotago.BlockID) {
 	return b.modelBlock.Block().StrongParents
+}
+
+// ParentsWithType returns the parents of the block with their type.
+func (b *Block) ParentsWithType() []model.Parent {
+	return b.modelBlock.ParentsWithType()
 }
 
 // ForEachParent executes a consumer func for each parent.

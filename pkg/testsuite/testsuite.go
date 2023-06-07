@@ -1,9 +1,12 @@
 package testsuite
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,6 +47,7 @@ type TestSuite struct {
 	optsWaitFor         time.Duration
 	optsTick            time.Duration
 
+	uniqueCounter        atomic.Int64
 	mutex                sync.RWMutex
 	TransactionFramework *TransactionFramework
 }
@@ -68,11 +72,11 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 				VBFactorKey:  10,
 			},
 			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Unix() - 10*100),
+			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix() - 10*100), // start 100 slots in the past at an even number.
 			SlotDurationInSeconds: 10,
 		},
-		optsWaitFor: 3 * time.Second,
-		optsTick:    10 * time.Millisecond,
+		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 	}, opts, func(t *TestSuite) {
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
@@ -141,7 +145,12 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := node.IssueBlockAtSlot(alias, slot, slotCommitment, parents...)
+	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
+	issuingTime := slotTimeProvider.StartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
+
+	block := node.IssueBlock(context.Background(), alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithStrongParents(parents...))
 
 	t.blocks.Set(alias, block)
 	block.ID().RegisterAlias(alias)
@@ -153,7 +162,7 @@ func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...optio
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := node.IssueBlock(alias, blockOpts...)
+	block := node.IssueBlock(context.Background(), alias, blockOpts...)
 
 	t.blocks.Set(alias, block)
 	block.ID().RegisterAlias(alias)
@@ -384,4 +393,18 @@ func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Optio
 	return func(opts *TestSuite) {
 		opts.optsSnapshotOptions = snapshotOptions
 	}
+}
+
+func durationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time.Duration {
+	waitFor := os.Getenv(envKey)
+	if waitFor == "" {
+		return defaultDuration
+	}
+
+	d, err := time.ParseDuration(waitFor)
+	if err != nil {
+		panic(err)
+	}
+
+	return d
 }

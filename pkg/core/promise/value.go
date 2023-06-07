@@ -6,8 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 )
 
-// region Value ////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // Value is a thread safe value that allows multiple consumers to subscribe to changes by registering callbacks that are
 // executed when the value is updated.
 //
@@ -20,24 +18,29 @@ type Value[T comparable] struct {
 	value T
 
 	// updateCallbacks are the registered callbacks that are triggered when the value changes.
-	updateCallbacks *shrinkingmap.ShrinkingMap[UniqueID, *valueCallback[T]]
+	updateCallbacks *shrinkingmap.ShrinkingMap[UniqueID, *Callback[func(prevValue, newValue T)]]
 
-	callbackIDs UniqueID
+	// uniqueUpdateID is the unique ID that is used to identify an update.
+	uniqueUpdateID UniqueID
 
-	// triggerIDCounter is the counter that is used to assign a unique triggerID to each update.
-	triggerIDCounter int
+	// uniqueCallbackID is the unique ID that is used to identify a callback.
+	uniqueCallbackID UniqueID
 
 	// mutex is used to ensure that updating the value and registering/unregistering callbacks is thread safe.
 	mutex sync.RWMutex
 
 	// setOrderMutex is an additional mutex that is used to ensure that the order of updates is ensured.
 	setOrderMutex sync.Mutex
+
+	// optTriggerWithInitialZeroValue is an option that can be set to make the OnUpdate callbacks trigger immediately
+	// on subscription even if the current value is the zero value.
+	optTriggerWithInitialZeroValue bool
 }
 
 // NewValue creates a new Value instance.
 func NewValue[T comparable]() *Value[T] {
 	return &Value[T]{
-		updateCallbacks: shrinkingmap.New[UniqueID, *valueCallback[T]](),
+		updateCallbacks: shrinkingmap.New[UniqueID, *Callback[func(prevValue, newValue T)]](),
 	}
 }
 
@@ -51,12 +54,20 @@ func (v *Value[T]) Get() T {
 
 // Set sets the new value and triggers the registered callbacks if the value has changed.
 func (v *Value[T]) Set(newValue T) (previousValue T) {
+	return v.Compute(func(T) T { return newValue })
+}
+
+// Compute computes the new value based on the current value and triggers the registered callbacks if the value changed.
+func (v *Value[T]) Compute(computeFunc func(currentValue T) T) (previousValue T) {
 	v.setOrderMutex.Lock()
 	defer v.setOrderMutex.Unlock()
 
-	previousValue, triggerID, callbacksToTrigger := v.prepareTrigger(newValue)
+	newValue, previousValue, updateID, callbacksToTrigger := v.prepareDynamicTrigger(computeFunc)
 	for _, callback := range callbacksToTrigger {
-		callback.trigger(triggerID, previousValue, newValue)
+		if callback.Lock(updateID) {
+			callback.Invoke(previousValue, newValue)
+			callback.Unlock()
+		}
 	}
 
 	return previousValue
@@ -66,86 +77,49 @@ func (v *Value[T]) Set(newValue T) (previousValue T) {
 func (v *Value[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe func()) {
 	v.mutex.Lock()
 
-	var (
-		previousValue      T
-		currentValue       = v.value
-		currentUpdateIndex = v.triggerIDCounter
-	)
+	currentValue := v.value
 
-	createdCallback := newValueCallback[T](v.callbackIDs.Next(), callback, currentUpdateIndex)
-
-	v.updateCallbacks.Set(createdCallback.id, createdCallback)
+	newCallback := NewCallback[func(prevValue, newValue T)](v.uniqueCallbackID.Next(), callback)
+	v.updateCallbacks.Set(newCallback.ID, newCallback)
 
 	// we intertwine the mutexes to ensure that the callback is guaranteed to be triggered with the current value from
 	// here first even if the value is updated in parallel.
-	createdCallback.triggerMutex.Lock()
-	defer createdCallback.triggerMutex.Unlock()
+	newCallback.Lock(v.uniqueUpdateID)
+	defer newCallback.Unlock()
+
 	v.mutex.Unlock()
 
-	if previousValue != currentValue {
-		createdCallback.callback(previousValue, currentValue)
+	var emptyValue T
+	if v.optTriggerWithInitialZeroValue || currentValue != emptyValue {
+		newCallback.Invoke(emptyValue, currentValue)
 	}
 
 	return func() {
-		v.updateCallbacks.Delete(createdCallback.id)
+		v.updateCallbacks.Delete(newCallback.ID)
+
+		newCallback.MarkUnsubscribed()
 	}
 }
 
-// prepareTrigger atomically prepares the trigger by setting the new value and returning the previous value, the
-// triggerID and the callbacks to trigger.
-func (v *Value[T]) prepareTrigger(newValue T) (previousValue T, triggerID int, callbacksToTrigger []*valueCallback[T]) {
+// WithTriggerWithInitialZeroValue is an option that can be set to make the OnUpdate callbacks trigger immediately on
+// subscription even if the current value is empty.
+func (v *Value[T]) WithTriggerWithInitialZeroValue(trigger bool) *Value[T] {
+	v.optTriggerWithInitialZeroValue = trigger
+
+	return v
+}
+
+// prepareDynamicTrigger atomically prepares the trigger by setting the new value and returning the new value, the
+// previous value, the triggerID and the callbacks to trigger.
+func (v *Value[T]) prepareDynamicTrigger(newValueGenerator func(T) T) (newValue, previousValue T, triggerID UniqueID, callbacksToTrigger []*Callback[func(prevValue, newValue T)]) {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 
-	if previousValue = v.value; newValue == previousValue {
-		return previousValue, 0, nil
+	if previousValue, newValue = v.value, newValueGenerator(previousValue); newValue == previousValue {
+		return newValue, previousValue, 0, nil
 	}
 
-	v.triggerIDCounter++
 	v.value = newValue
 
-	return previousValue, v.triggerIDCounter, v.updateCallbacks.Values()
+	return newValue, previousValue, v.uniqueUpdateID.Next(), v.updateCallbacks.Values()
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// region valueCallback ////////////////////////////////////////////////////////////////////////////////////////////////
-
-// valueCallback is a utility struct that holds a callback function and additional information that are required to
-// ensure the correct execution order of callbacks in the Value.
-type valueCallback[T comparable] struct {
-	// id is the unique identifier of the callback.
-	id UniqueID
-
-	// callback is the function that is executed when the callback is triggered.
-	callback func(prevValue, newValue T)
-
-	// lastTriggerID is the last triggerID that was used to trigger the callback.
-	lastTriggerID int
-
-	// triggerMutex is used to ensure that the callback is only triggered once per triggerID.
-	triggerMutex sync.Mutex
-}
-
-// newValueCallback creates a new valueCallback instance.
-func newValueCallback[T comparable](id UniqueID, callbackFunc func(prevValue, newValue T), updateIndex int) *valueCallback[T] {
-	return &valueCallback[T]{
-		id:            id,
-		callback:      callbackFunc,
-		lastTriggerID: updateIndex,
-	}
-}
-
-// trigger triggers the callback if the triggerID is different from the last triggerID.
-func (c *valueCallback[T]) trigger(triggerID int, prevValue, newValue T) {
-	c.triggerMutex.Lock()
-	defer c.triggerMutex.Unlock()
-
-	if triggerID != c.lastTriggerID {
-		c.lastTriggerID = triggerID
-
-		c.callback(prevValue, newValue)
-	}
-}
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

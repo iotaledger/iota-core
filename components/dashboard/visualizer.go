@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 )
 
 // var (
@@ -66,11 +67,12 @@ func runVisualizer(component *app.Component) {
 			deps.Protocol.Events.Engine.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
 				sendVertex(block, block.IsPreAccepted())
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.TipManager.TipAdded.Hook(func(block *blocks.Block) {
-				sendTipInfo(block, true)
-			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.TipManager.TipRemoved.Hook(func(block *blocks.Block) {
-				sendTipInfo(block, false)
+			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+				sendTipInfo(tipMetadata.Block(), true)
+
+				tipMetadata.OnEvicted(func() {
+					sendTipInfo(tipMetadata.Block(), false)
+				})
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 		)
 		<-ctx.Done()

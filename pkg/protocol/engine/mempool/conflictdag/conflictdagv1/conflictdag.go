@@ -79,22 +79,14 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) Events() *conflictdag.E
 	return c.events
 }
 
-// CreateOrUpdateConflict creates a new Conflict that is conflicting over the given ResourceIDs. If the conflict already exists, it adds it any new passed ConflictSets.
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error {
-	joinedConflictSets, err := func() (*advancedset.AdvancedSet[ResourceID], error) {
+// CreateConflict creates a new Conflict.
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateConflict(id ConflictID) {
+	if func() (created bool) {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
-		conflictSets, err := c.conflictSets(resourceIDs, true /*!initialAcceptanceState.IsRejected()*/)
-		if err != nil {
-			return advancedset.New[ResourceID](), xerrors.Errorf("failed to create ConflictSet: %w", err)
-		}
-
-		if conflict, isNew := c.conflictsByID.GetOrCreate(id, func() *Conflict[ConflictID, ResourceID, VotePower] {
-			initialWeight := weight.New(c.committeeSet)
-			initialWeight.SetAcceptanceState(initialAcceptanceState)
-
-			newConflict := NewConflict(id, conflictSets, initialWeight, c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
+		_, isNewConflict := c.conflictsByID.GetOrCreate(id, func() *Conflict[ConflictID, ResourceID, VotePower] {
+			newConflict := NewConflict[ConflictID, ResourceID, VotePower](id, weight.New(c.committeeSet), c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
 
 			// attach to the acceptance state updated event and propagate that event to the outside.
 			// also need to remember the unhook method to properly evict the conflict.
@@ -109,25 +101,36 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateOrUpdateConflict(
 			}).Unhook)
 
 			return newConflict
-		}); !isNew {
-			joinedConflictSets, err := conflict.JoinConflictSets(conflictSets)
-			if err != nil {
-				return advancedset.New[ResourceID](), xerrors.Errorf("failed to join conflict sets: %w", err)
-			}
+		})
 
-			return joinedConflictSets, nil
+		return isNewConflict
+	}() {
+		c.events.ConflictCreated.Trigger(id)
+	}
+}
+
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UpdateConflictingResources(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID]) error {
+	joinedConflictSets, err := func() (*advancedset.AdvancedSet[ResourceID], error) {
+		c.mutex.RLock()
+		defer c.mutex.RUnlock()
+
+		conflict, exists := c.conflictsByID.Get(id)
+		if !exists {
+			return nil, xerrors.Errorf("conflict already evicted: %w", conflictdag.ErrEntityEvicted)
 		}
 
-		return advancedset.New[ResourceID](), nil
+		return conflict.JoinConflictSets(c.conflictSets(resourceIDs))
 	}()
 
-	if err == nil && joinedConflictSets.IsEmpty() {
-		c.events.ConflictCreated.Trigger(id)
-	} else if err == nil && !joinedConflictSets.IsEmpty() {
+	if err != nil {
+		return xerrors.Errorf("conflict %s failed to join conflict sets: %w", id, err)
+	}
+
+	if !joinedConflictSets.IsEmpty() {
 		c.events.ConflictingResourcesAdded.Trigger(id, joinedConflictSets)
 	}
 
-	return err
+	return nil
 }
 
 // ReadConsistent write locks the ConflictDAG and exposes read-only methods to the callback to perform multiple reads while maintaining the same ConflictDAG state.
@@ -152,6 +155,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UpdateConflictParents(c
 		if !currentConflictExists {
 			return false, xerrors.Errorf("tried to modify evicted conflict with %s: %w", conflictID, conflictdag.ErrEntityEvicted)
 		}
+
 		addedParents := advancedset.New[*Conflict[ConflictID, ResourceID, VotePower]]()
 
 		if err := addedParentIDs.ForEach(func(addedParentID ConflictID) error {
@@ -334,6 +338,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CastVotes(vote *vote.Vo
 	defer c.mutex.RUnlock()
 	c.votingMutex.Lock(vote.Voter)
 	defer c.votingMutex.Unlock(vote.Voter)
+
 	supportedConflicts, revokedConflicts, err := c.determineVotes(conflictIDs)
 	if err != nil {
 		return xerrors.Errorf("failed to determine votes: %w", err)
@@ -397,47 +402,39 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) UnacceptedConflicts(con
 }
 
 // EvictConflict removes conflict with given ConflictID from ConflictDAG.
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) EvictConflict(conflictID ConflictID) error {
-	evictedConflictIDs, err := func() ([]ConflictID, error) {
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) EvictConflict(conflictID ConflictID) {
+	for _, evictedConflictID := range func() []ConflictID {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
-		// evicting an already evicted conflict is fine
-		conflict, exists := c.conflictsByID.Get(conflictID)
-		if !exists {
-			return nil, nil
-		}
-
-		// abort if we faced an error while evicting the conflict
-		evictedConflictIDs, err := conflict.Evict()
-		if err != nil {
-			return nil, xerrors.Errorf("failed to evict conflict with %s: %w", conflictID, err)
-		}
-
-		// remove the conflicts from the ConflictDAG dictionary
-		for _, evictedConflictID := range evictedConflictIDs {
-			c.conflictsByID.Delete(evictedConflictID)
-		}
-
-		// unhook the conflict events and remove the unhook method from the storage
-		unhookFunc, unhookExists := c.conflictUnhooks.Get(conflictID)
-		if unhookExists {
-			unhookFunc()
-			c.conflictUnhooks.Delete(conflictID)
-		}
-
-		return evictedConflictIDs, nil
-	}()
-	if err != nil {
-		return xerrors.Errorf("failed to evict conflict with %s: %w", conflictID, err)
-	}
-
-	// trigger the ConflictEvicted event
-	for _, evictedConflictID := range evictedConflictIDs {
+		return c.evictConflict(conflictID)
+	}() {
 		c.events.ConflictEvicted.Trigger(evictedConflictID)
 	}
+}
 
-	return nil
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) evictConflict(conflictID ConflictID) []ConflictID {
+	// evicting an already evicted conflict is fine
+	conflict, exists := c.conflictsByID.Get(conflictID)
+	if !exists {
+		return nil
+	}
+
+	evictedConflictIDs := conflict.Evict()
+
+	// remove the conflicts from the ConflictDAG dictionary
+	for _, evictedConflictID := range evictedConflictIDs {
+		c.conflictsByID.Delete(evictedConflictID)
+	}
+
+	// unhook the conflict events and remove the unhook method from the storage
+	unhookFunc, unhookExists := c.conflictUnhooks.Get(conflictID)
+	if unhookExists {
+		unhookFunc()
+		c.conflictUnhooks.Delete(conflictID)
+	}
+
+	return evictedConflictIDs
 }
 
 // conflicts returns the Conflicts that are associated with the given ConflictIDs. If ignoreMissing is set to true, it
@@ -451,30 +448,20 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) conflicts(ids *advanced
 			conflicts.Add(existingConflict)
 		}
 
-		return lo.Cond(exists || ignoreMissing, nil, xerrors.Errorf("tried to retrieve an evicted conflict with %s: %w", id, conflictdag.ErrEntityEvicted))
+		return lo.Cond(exists || ignoreMissing, nil, xerrors.Errorf("tried to retrieve a non-existing conflict with %s: %w", id, conflictdag.ErrEntityEvicted))
 	})
 }
 
 // conflictSets returns the ConflictSets that are associated with the given ResourceIDs. If createMissing is set to
 // true, it will create an empty ConflictSet for each missing ResourceID.
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) conflictSets(resourceIDs *advancedset.AdvancedSet[ResourceID], createMissing bool) (*advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VotePower]], error) {
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) conflictSets(resourceIDs *advancedset.AdvancedSet[ResourceID]) *advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VotePower]] {
 	conflictSets := advancedset.New[*ConflictSet[ConflictID, ResourceID, VotePower]]()
 
-	return conflictSets, resourceIDs.ForEach(func(resourceID ResourceID) (err error) {
-		if createMissing {
-			conflictSets.Add(lo.Return1(c.conflictSetsByID.GetOrCreate(resourceID, c.conflictSetFactory(resourceID))))
-
-			return nil
-		}
-
-		if conflictSet, exists := c.conflictSetsByID.Get(resourceID); exists {
-			conflictSets.Add(conflictSet)
-
-			return nil
-		}
-
-		return xerrors.Errorf("tried to create a Conflict with evicted Resource: %w", conflictdag.ErrEntityEvicted)
+	resourceIDs.Range(func(resourceID ResourceID) {
+		conflictSets.Add(lo.Return1(c.conflictSetsByID.GetOrCreate(resourceID, c.conflictSetFactory(resourceID))))
 	})
+
+	return conflictSets
 }
 
 // determineVotes determines the Conflicts that are supported and revoked by the given ConflictIDs.
@@ -525,8 +512,14 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) determineVotes(conflict
 
 func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) conflictSetFactory(resourceID ResourceID) func() *ConflictSet[ConflictID, ResourceID, VotePower] {
 	return func() *ConflictSet[ConflictID, ResourceID, VotePower] {
-		// TODO: listen to ConflictEvicted events and remove the Conflict from the ConflictSet
+		conflictSet := NewConflictSet[ConflictID, ResourceID, VotePower](resourceID)
 
-		return NewConflictSet[ConflictID, ResourceID, VotePower](resourceID)
+		conflictSet.OnAllMembersEvicted(func(prevValue, newValue bool) {
+			if newValue && !prevValue {
+				c.conflictSetsByID.Delete(conflictSet.ID)
+			}
+		})
+
+		return conflictSet
 	}
 }
