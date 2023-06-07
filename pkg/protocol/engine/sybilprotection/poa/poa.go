@@ -61,7 +61,7 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 
 					e.Clock.HookInitialized(func() {
 						for _, v := range s.optsOnlineCommitteeStartup {
-							s.markValidatorActive(v, e.Clock.PreAccepted().RelativeTime())
+							s.markValidatorActive(v, e.Clock.Accepted().RelativeTime())
 						}
 					})
 
@@ -133,7 +133,7 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 
 	s.lastActivities.Set(id, activityTime)
 
-	s.inactivityManager.ExecuteAfter(id, func() { s.markValidatorInactive(id) }, activityTime.Add(s.optsActivityWindow).Sub(s.clock.PreAccepted().RelativeTime()))
+	s.inactivityManager.ExecuteAfter(id, func() { s.markValidatorInactive(id) }, activityTime.Add(s.optsActivityWindow).Sub(s.clock.Accepted().RelativeTime()))
 }
 
 func (s *SybilProtection) markValidatorInactive(id iotago.AccountID) {

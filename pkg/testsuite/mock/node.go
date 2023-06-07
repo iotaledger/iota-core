@@ -175,16 +175,8 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.Clock.PreAcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.PreAcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
-	})
-
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
 		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
-	})
-
-	events.Clock.PreConfirmedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.PreConfirmedTimeUpdated: %s\n", n.Name, engineName, newTime)
 	})
 
 	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {

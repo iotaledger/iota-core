@@ -160,10 +160,10 @@ func currentNodeStatus() *nodestatus {
 		ConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
 		CommittedSlot:    int64(syncStatus.LatestCommittedSlot),
 		ConfirmedSlot:    int64(syncStatus.FinalizedSlot),
-		ATT:              cl.PreAccepted().Time().UnixNano(),
-		RATT:             cl.PreAccepted().RelativeTime().UnixNano(),
-		CTT:              cl.PreConfirmed().Time().UnixNano(),
-		RCTT:             cl.PreConfirmed().RelativeTime().UnixNano(),
+		ATT:              cl.Accepted().Time().UnixNano(),
+		RATT:             cl.Accepted().RelativeTime().UnixNano(),
+		CTT:              cl.Confirmed().Time().UnixNano(),
+		RCTT:             cl.Confirmed().RelativeTime().UnixNano(),
 	}
 
 	return status
