@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -122,15 +121,8 @@ func (b *Booker) book(block *blocks.Block) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
 	}
+
 	block.SetConflictIDs(conflictsToInherit)
-
-	votePower := booker.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
-	if err := b.conflictDAG.CastVotes(vote.NewVote(block.Block().IssuerID, votePower), conflictsToInherit); err != nil {
-		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
-		//  Do we track witness weight of invalid blocks?
-		return errors.Wrapf(err, "failed to cast votes for conflicts of block %s", block.ID())
-	}
-
 	block.SetBooked()
 	b.events.BlockBooked.Trigger(block)
 
