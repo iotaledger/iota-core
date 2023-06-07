@@ -37,13 +37,7 @@ func (g *Gadget) trackWitnessWeight(votingBlock *blocks.Block) {
 		return true
 	}
 
-	weakFunc := func(block *blocks.Block) {
-		if block.AddWitness(witness) {
-			g.tryPreAcceptAndPreConfirm(block)
-		}
-	}
-
-	g.propagate(votingBlock.Parents(), evaluateFunc, weakFunc)
+	g.propagate(votingBlock.Parents(), evaluateFunc)
 }
 
 func (g *Gadget) tryPreAcceptAndPreConfirm(block *blocks.Block) {
@@ -79,14 +73,7 @@ func (g *Gadget) propagatePreAcceptanceAndPreConfirmation(initialBlock *blocks.B
 		return shouldWalkPastCone
 	}
 
-	weakFunc := func(block *blocks.Block) {
-		g.preAcceptanceOrder.Queue(block)
-		if preConfirmed {
-			g.markAsPreConfirmed(block)
-		}
-	}
-
-	g.propagate([]iotago.BlockID{initialBlock.ID()}, evaluateFunc, weakFunc)
+	g.propagate([]iotago.BlockID{initialBlock.ID()}, evaluateFunc)
 }
 
 func (g *Gadget) markAsPreAccepted(block *blocks.Block) (err error) {

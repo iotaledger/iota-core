@@ -31,13 +31,7 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 		return true
 	}
 
-	weakFunc := func(block *blocks.Block) {
-		if block.AddAcceptanceRatifier(ratifier) {
-			g.tryAccept(block)
-		}
-	}
-
-	g.propagate(votingBlock.Parents(), evaluateFunc, weakFunc)
+	g.propagate(votingBlock.Parents(), evaluateFunc)
 }
 
 func (g *Gadget) tryAccept(block *blocks.Block) {

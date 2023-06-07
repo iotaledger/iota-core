@@ -36,13 +36,7 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 		return true
 	}
 
-	weakFunc := func(block *blocks.Block) {
-		if block.AddConfirmationRatifier(ratifier) {
-			g.tryConfirm(block)
-		}
-	}
-
-	g.propagate(votingBlock.Parents(), evaluateFunc, weakFunc)
+	g.propagate(votingBlock.Parents(), evaluateFunc)
 }
 
 func (g *Gadget) tryConfirm(block *blocks.Block) {

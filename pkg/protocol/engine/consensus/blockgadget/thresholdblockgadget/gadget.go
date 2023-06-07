@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
@@ -81,7 +80,7 @@ func (g *Gadget) evictUntil(index iotago.SlotIndex) {
 	g.acceptanceOrder.EvictUntil(index)
 }
 
-func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(block *blocks.Block) bool, weakFunc func(block *blocks.Block)) {
+func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(block *blocks.Block) bool) {
 	walk := walker.New[iotago.BlockID](false).PushAll(initialBlockIDs...)
 	for walk.HasNext() {
 		blockID := walk.Next()
@@ -98,15 +97,6 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 			continue
 		}
 
-		block.ForEachParent(func(parent model.Parent) {
-			switch parent.Type {
-			case model.StrongParentType:
-				walk.Push(parent.ID)
-			case model.ShallowLikeParentType, model.WeakParentType:
-				if weakParent, exists := g.blockCache.Block(parent.ID); exists {
-					weakFunc(weakParent)
-				}
-			}
-		})
+		walk.PushAll(block.Parents()...)
 	}
 }
