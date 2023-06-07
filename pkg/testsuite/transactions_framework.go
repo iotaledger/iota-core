@@ -76,7 +76,7 @@ func (t *TransactionFramework) CreateTransaction(alias string, outputCount int, 
 	t.transactions[alias] = transaction
 
 	for idx, output := range outputStates {
-		t.states[fmt.Sprintf("%s:%d", alias, idx)] = utxoledger.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), uint16(idx)), iotago.EmptyBlockID(), 0, time.Now(), output)
+		t.states[fmt.Sprintf("%s:%d", alias, idx)] = utxoledger.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), uint16(idx)), iotago.EmptyBlockID(), 0, t.api.SlotTimeProvider().IndexFromTime(time.Now()), output)
 	}
 
 	return transaction, err
@@ -94,12 +94,33 @@ func (t *TransactionFramework) CreateTransactionWithInputsAndOutputs(consumedInp
 		switch input.OutputType() {
 		case iotago.OutputFoundry:
 			// For foundries we need to unlock the alias
-			txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Output().UnlockConditionSet().ImmutableAlias().Address, InputID: input.OutputID(), Input: input.Output()})
-		case iotago.OutputAlias:
+			txBuilder.AddInput(&builder.TxInput{
+				UnlockTarget: input.Output().UnlockConditionSet().ImmutableAccount().Address,
+				InputID:      input.OutputID(),
+				Input: iotago.OutputWithCreationTime{
+					Output:       input.Output(),
+					CreationTime: input.CreationTime(),
+				},
+			})
+		case iotago.OutputAccount:
 			// For alias we need to unlock the state controller
-			txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Output().UnlockConditionSet().StateControllerAddress().Address, InputID: input.OutputID(), Input: input.Output()})
+			txBuilder.AddInput(&builder.TxInput{
+				UnlockTarget: input.Output().UnlockConditionSet().StateControllerAddress().Address,
+				InputID:      input.OutputID(),
+				Input: iotago.OutputWithCreationTime{
+					Output:       input.Output(),
+					CreationTime: input.CreationTime(),
+				},
+			})
 		default:
-			txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Output().UnlockConditionSet().Address().Address, InputID: input.OutputID(), Input: input.Output()})
+			txBuilder.AddInput(&builder.TxInput{
+				UnlockTarget: input.Output().UnlockConditionSet().Address().Address,
+				InputID:      input.OutputID(),
+				Input: iotago.OutputWithCreationTime{
+					Output:       input.Output(),
+					CreationTime: input.CreationTime(),
+				},
+			})
 		}
 	}
 

@@ -94,7 +94,7 @@ func (b *Manager) AccountsTreeRoot() iotago.Identifier {
 	return iotago.Identifier(b.accountsTree.Root())
 }
 
-// ApplyDiff applies the given accountDiffChanges to the Account tree and returns the new accountRoot.
+// ApplyDiff applies the given accountDiff to the Account tree.
 func (b *Manager) ApplyDiff(
 	slotIndex iotago.SlotIndex,
 	accountDiffs map[iotago.AccountID]*prunable.AccountDiff,
@@ -113,6 +113,7 @@ func (b *Manager) ApplyDiff(
 	if err != nil {
 		return errors.Wrap(err, "could not create block burns for slot")
 	}
+
 	// apply the burns to the accountDiffs
 	for id, burn := range burns {
 		accountDiffs[id].Change -= int64(burn)
