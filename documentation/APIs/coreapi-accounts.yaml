@@ -175,6 +175,13 @@ paths:
       description: >-
         Returns information that are ideal for attaching a block. If slotIndex is not provided, the returned status would be current slot index. 
       parameters:
+        - in: path
+          name: accountId
+          schema:
+            type: string
+          example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
+          required: true
+          description: Identifier of the account.
         - in: query
           name: slotIndex
           schema:
@@ -198,6 +205,13 @@ paths:
       description: >-
         Returns mana of an account.
       parameters:
+        - in: path
+          name: accountId
+          schema:
+            type: string
+          example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
+          required: true
+          description: Identifier of the account.
         - in: query
           name: slotIndex
           schema:
@@ -220,6 +234,14 @@ paths:
       summary: Returns the totally available rewards of the output ID. 
       description: >-
         Returns mana of an account.
+      parameters:
+        - in: path
+          name: outputId
+          schema:
+            type: string
+          example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
+          required: true
+          description: Identifier of the output.
       responses:
         '200':
           description: "Successful operation."
@@ -250,6 +272,14 @@ paths:
       summary: TODO, return performance factor of the account, total pool stake.
       description: >-
         Returns mana of an account.
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            type: string
+          example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
+          required: true
+          description: Identifier of the account.
       responses:
         '200':
           description: "Successful operation."
