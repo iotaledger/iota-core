@@ -16,16 +16,22 @@ servers:
 tags:
   - name: node
     description: Everything about the node itself.
+  - name: congestion
+    description: Everything about the congestion.
+  - name: accounts
+    description: Everything about the accounts.
+  - name: rewards
+    description: Everything about the accounts.
+  - name: staking
+    description: Everything about the node itself.
+  - name: committee
+    description: Everything about the committee.
   - name: blocks
     description: Everything about blocks.
-  - name: congestion
-    description: Everything about rate and mana costs.
   - name: UTXO
     description: Everything about UTXOs.
   - name: commitments
     description: Everything about commitments.
-  - name: account
-    description: Everything about accounts. - TO BE FINISHED, only easy to retrieve info, more details in indexer api.
   - name: peers
     description: Everything about the peers of the node.
   - name: control
@@ -37,8 +43,8 @@ paths:
         - node
       summary: Returns the health of the node.
       description: >-
-        Returns the health of the node. A node considers itself healthy if its bootstrapped and his Accepted Tangle Time (ATT) is not further behind his local clock tha BootstrapWindow. 
-        This information might be useful for load-balancing or uptime monitoring.
+        Returns the health of the node. A node considers itself healthy if it is bootstrapped and its Accepted Tangle Time (ATT) is not 
+        further behind its local clock than BootstrapWindow.
       responses:
         '200':
           description: "Successful operation: indicates that the node is healthy."
@@ -87,10 +93,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/InfoResponse'
               examples:
-                IOTA:
+                default:
                   $ref: '#/components/examples/get-info-response-example'
-                Shimmer:
-                  $ref: '#/components/examples/get-info-response-example-shimmer'
         '403':
           description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
           content:
@@ -103,6 +107,156 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
+
+  '/api/core/v3/congestion':
+    get:
+      tags:
+        - congestion
+      summary: Check readiness of the node to issue a new block, and the mana cost based on the rate setter and current network congestion.
+      description: >-
+        Check readiness of the node to issue a new block based on the rate setter and current network congestion. If no accountID is provided in the
+        query string parameter, return the congestion info of the node that the request is sent to.
+      parameters:
+        - in: query
+          name: accountID
+          schema:
+            type: string
+          example: "did:iota:123456789abcdefghi"
+          required: false
+          description: Identifier of the account to be checked for readines.
+        - in: query
+          name: slotIndex
+          schema:
+            type: integer
+          example: 1622568540
+          required: false
+          description: Check the cost and issuance readiness for a specific slot index.
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CongestionResponse'
+              examples:
+                CongestionResponse:
+                  $ref: '#/components/examples/get-congestion-estimate-response-example'
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+        '503':
+          description: "Unsuccessful operation: indicates that the node is not synced."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableResponse'
+
+
+  /api/core/v3/accounts/{accountId}/status:
+    get:
+      tags:
+        - accounts
+      summary: Returns information of an account.
+      description: >-
+        Returns information that are ideal for attaching a block. If slotIndex is not provided, the returned status would be current slot index. 
+      parameters:
+        - in: query
+          name: slotIndex
+          schema:
+            type: integer
+          example: 1622568540
+          required: false
+          description: Check the account status for a specific slot index.
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+
+  /api/core/v3/accounts/{accountId}/mana:
+    get:
+      tags:
+        - accounts
+      summary: Returns the potential and stored mana of the account. If slotIndex is not provided, the returned status would be current slot index. 
+      description: >-
+        Returns mana of an account.
+      parameters:
+        - in: query
+          name: slotIndex
+          schema:
+            type: integer
+          example: 1622568540
+          required: false
+          description: Check the mana of an account for a specific slot index.
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountManaResponse'
+
+  /api/core/v3/rewards/{outputId}:
+    get:
+      tags:
+        - rewards
+      summary: Returns the totally available rewards of the output ID. 
+      description: >-
+        Returns mana of an account.
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountManaResponse'
+
+  /api/core/v3/committee:
+    get:
+      tags:
+        - committee
+      summary: Return the information of committee members. 
+      description: >-
+        TODO, performance factor, total pool stake
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountStakingResponse'
+
+  /api/core/v3/staking/{accountId}:
+    get:
+      tags:
+        - staking
+      summary: TODO, return performance factor of the account, total pool stake.
+      description: >-
+        Returns mana of an account.
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountStakingResponse'
 
   /api/core/v3/blocks/issuance:
     get:
@@ -146,24 +300,24 @@ paths:
         - blocks
       summary: Submit a block.
       description: >-
-        Submit a block or transaction. This endpoint will return the identifier of the built block. `protocolVersion` is always required!
+        Submit a block or a payload. This endpoint will return the identifier of the built block. `protocolVersion` is always required!
       requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/SubmitBlockRequest'
             examples:
-              Minimal Block with Tagged Data Payload:
+              Minimal block with Tagged Data Payload:
                 $ref: "#/components/examples/post-tagged-data-block-request-example-minimal"
-              Full block with Transaction Payload:
+              Full block with Tagged Data Payload:
                 $ref: >-
-                  #/components/examples/post-transaction-block-request-example-full
+                  #/components/examples/post-tagged-data-block-request-example-full
               Minimal Block with Transaction Payload:
                 $ref: >-
                   #/components/examples/post-transaction-block-request-example-minimal
-              Only Transaction payload:
+              Full block with Transaction Payload:
                 $ref: >-
-                  #/components/examples/post-transaction-block-transaction-request-example
+                  #/components/examples/post-transaction-block-request-example-full
           application/vnd.iota.serializer-v1:
             schema:
               type: string
@@ -296,17 +450,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlockMetadataResponse'
               examples:
-                New Block:
+                New Block with Transaction Payload:
+                  $ref: '#/components/examples/get-block-by-id-response-example-new-transaction'
+                New Block without Transaction Payload:
                   $ref: '#/components/examples/get-block-by-id-response-example-new'
-                Solid:
+                Confirmed with Transaction Payload:
                   $ref: >-
-                    #/components/examples/get-block-by-id-response-example-solid
-                Confirmed:
+                    #/components/examples/get-block-by-id-response-example-confirmed-transaction
+                Confirmed without Transaction Payload:
                   $ref: >-
                     #/components/examples/get-block-by-id-response-example-confirmed
-                Conflicting:
+                Conflicting with Transaction Payload:
                   $ref: >-
-                    #/components/examples/get-block-by-id-response-example-conflicting
+                    #/components/examples/get-block-by-id-response-example-conflicting-transaction
         '400':
           description: "Unsuccessful operation: indicates that the provided data is invalid."
           content:
@@ -338,64 +494,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceUnavailableResponse'
 
-  '/api/core/v3/congestion':
-    get:
-      tags:
-        - congestion
-      summary: Check readiness of the node to issue a new block, and the mana cost based on the rate setter and current network congestion.
-      description: >-
-        Check readiness of the node to issue a new block based on the rate setter and current network congestion. If no accountID is provided in the
-        query string parameter, return the congestion info of the node that the request is sent to.
-      parameters:
-        - in: query
-          name: accountID
-          schema:
-            type: string
-          example: "did:iota:123456789abcdefghi"
-          required: false
-          description: Identifier of the account to be checked for readines.
-        - in: query
-          name: slotIndex
-          schema:
-            type: integer
-          example: 1622568540
-          required: false
-          description: Check the cost and issuance readiness for a specific slot index.
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CongestionResponse'
-              examples:
-                CongestionResponse:
-                  $ref: '#/components/examples/get-congestion-estimate-response-example'
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-        '503':
-          description: "Unsuccessful operation: indicates that the node is not synced."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ServiceUnavailableResponse'
-
   '/api/core/v3/outputs/{outputId}':
     get:
       tags:
@@ -410,7 +508,8 @@ paths:
           required: true
           description: >-
             Identifier of the output encoded in hex. An output is identified by
-            the concatenation of `transactionId+outputIndex`. Hex-encoded with 0x prefix.
+            the concatenation of `transactionId+outputIndex` where `outputIndex` needs to be converted to little endian first.
+            Hex-encoded with 0x prefix.
           example: "0xfa0de75d225cca2799395e5fc340702fc7eac821d2bdd79911126f131ae097a20100"
       responses:
         '200':
@@ -420,10 +519,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/OutputResponse'
               examples:
-                unspent:
-                  $ref: '#/components/examples/get-outputs-by-id-response-unspent-example'
-                spent:
-                  $ref: '#/components/examples/get-outputs-by-id-response-spent-example'
+                default:
+                  $ref: '#/components/examples/get-outputs-by-id-response-example'
             application/vnd.iota.serializer-v1:
               schema:
                 type: string
@@ -469,7 +566,8 @@ paths:
           required: true
           description: >-
             Identifier of the output encoded in hex. An output is identified by
-            the concatenation of `transactionId+outputIndex`. Hex-encoded with 0x prefix.
+            the concatenation of `transactionId+outputIndex` where `outputIndex` (u16) needs to be converted to little endian first.
+            Hex-encoded with 0x prefix.
           example: "0xfa0de75d225cca2799395e5fc340702fc7eac821d2bdd79911126f131ae097a20100"
       responses:
         '200':
@@ -508,13 +606,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-
+  
   '/api/core/v3/transactions/{transactionId}/included-block':
     get:
       tags:
         - UTXO
-      summary: Returns the included block of a transaction.
-      description: Returns the included block of a transaction.
+      summary: Returns the earliest block containing the tranaction that get confirmed.
+      description: Returns the earliest block containing the transaction that get confirmed.
       parameters:
         - in: path
           name: transactionId
@@ -532,7 +630,7 @@ paths:
                 $ref: '#/components/schemas/BlockResponse'
               examples:
                 default:
-                  $ref: '#/components/examples/get-included-block-of-transaction-example-json'
+                  $ref: '#/components/examples/get-block-by-id-transaction-response-example'
             application/vnd.iota.serializer-v1:
               schema:
                 type: string
@@ -567,10 +665,10 @@ paths:
   '/api/core/v3/transactions/{transactionId}/included-block/metadata':
     get:
       tags:
-        - UTXO
-      summary: Find the metadata of the included block of a transaction.
+      - UTXO
+      summary: Find the metadata of the earliest block containing the transaction that get confirmed.
       description: >-
-        Find the metadata of the included block of a transaction.
+        Find the metadata of the earliest block containing the tx that get confirmed.
       parameters:
         - in: path
           name: transactionId
@@ -588,7 +686,7 @@ paths:
                 $ref: '#/components/schemas/BlockMetadataResponse'
               examples:
                 default:
-                  $ref: '#/components/examples/get-block-by-id-response-example-included'
+                  $ref: '#/components/examples/get-block-by-id-response-example-confirmed-transaction'
         '400':
           description: "Unsuccessful operation: indicates that the provided data is invalid."
           content:
@@ -620,101 +718,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceUnavailableResponse'
 
-  '/api/core/v3/account/{accountId}':
-    get:
-      tags:
-        - account
-      summary: Get the current state of the account.
-      description: Get the current state of the account.
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AccountResponse'
-              examples:
-                default:
-                  $ref: >-
-                    #/components/examples/get-account-response-example
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '404':
-          description: "Unsuccessful operation: indicates that the requested data was not found."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotFoundResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-
-
-
-  /api/indexer/v2/accounts/{accountId}/mana:
-    get:
-      tags:
-        - account outputs
-      summary: Returns the account mana related data for a given account identifier.
-      description: Returns the account mana related data for a given account identifier.
-      parameters:
-        - in: path
-          name: accountId
-          schema:
-            type: string
-          example: "0x1505ec099896ab05d9e08fbc7101ae4dff0093b3943b28f789ed2ca728bcc8d6"
-          description: Unique identifier of the account.
-          required: true
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AccountManaResponse'
-              examples:
-                Query results in single output:
-                  $ref: >-
-                    #/components/examples/get-account-response-example
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '404':
-          description: "Unsuccessful operation: indicates that the requested data was not found."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotFoundResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-
-  '/api/core/v3/commitment/{commitmentId}':
+  '/api/core/v3/commitments/{commitmentId}':
     get:
       tags:
         - commitments
@@ -772,7 +776,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
-  '/api/core/v3/commitment/{commitmentId}/utxo-changes':
+  '/api/core/v3/commitments/{commitmentId}/utxo-changes':
     get:
       tags:
         - commitments
@@ -821,7 +825,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
-  '/api/core/v3/commitment/by-index/{index}':
+  '/api/core/v3/commitments/by-index/{index}':
     get:
       tags:
         - commitments
@@ -879,7 +883,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
-  '/api/core/v3/commitment/by-index/{index}/utxo-changes':
+  '/api/core/v3/commitments/by-index/{index}/utxo-changes':
     get:
       tags:
         - commitments
@@ -1073,8 +1077,6 @@ paths:
         '500':
           description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
 
-
-
   '/api/core/v3/control/database/prune':
     post:
       tags:
@@ -1187,88 +1189,499 @@ components:
           - "debug/v2"
     get-info-response-example:
       value:
-    get-info-response-example-shimmer:
-      value:
+        name: Example Node
+        version: 1.0.0
+        accountId: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        status:
+          isHealthy: true
+          lastAcceptedBlockId: "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          lastConfirmedBlockId: "0x59daaaba1cd10cd268966376e17710d100c90826fe258753d461acac99b7e3341500000000000000"
+          finalizedSlot: 100
+          ATT: 1682328545
+          RATT: 1682328550
+          CTT: 1682328525
+          RCTT: 1682328535
+          latestCommittedSlot: 107
+          pruningSlot: 20
+        metrics:
+          blocksPerSecond: 17
+          confirmedBlocksPerSecond: 16.2
+          confirmedRate: 98.82352941176471
+        supportedProtocolVersions:
+          - 2
+          - 3
+        protocol:
+          networkName: iota-core-testnet
+          bech32Hrp: rms
+          tokenSupply: "2779530283277761"
+          version: 3
+          minPowScore: 1000
+          belowMaxDepth: 15
+          rentStructure:
+            vByteCost: 500
+            vByteFactorData: 1
+            vByteFactorKey: 10
+          genesisUnixTimestamp: 1582328545
+          slotDurationInSeconds: 10
+        baseToken:
+          baseToken:
+          name: "Shimmer"
+          tickerSymbol: "SMR"
+          unit: "SMR"
+          decimals: 6
+          subunit: "glow"
+          useMetricPrefix: false
+        features:
+          - pow
+          - consensus
+
     get-buildingBlock-response-example:
       value:
+        strongParents:
+          - "0x4f746934d0075179a37ca3e807b7e793ec4ec9189ba31c9ad092d7497b01118c1000000000000000"
+          - "0x59daaaba1cd10cd268966376e17710d100c90826fe258753d461acac99b7e3341500000000000000"
+        weakParents:
+          - "0xebb058f1f1c8f1ac6508465deeee1dd090396f9e6e2b5c103eef5583f20a0c133a00000000000000"
+          - "0xb173e2d2b6f72600f00da84492ddb6eadee703dc39fb846725828059272093fb3b00000000000000"
+        shallowLikeParents:
+          - "0xdbf86c778d69f413296c2d4d3086d76c74bf4d719e6e95c03a3d9a955ed39bcf3e00000000000000"
+          - "0xf15b2ec698e396c9d2e69bc753246631aedebb657da09ba0e0c8d42518a1e8953e00000000000000"
+        latestFinalizedSlot: 1422
+        commitment:
+          index: 1432
+          prevId: "0xbf07dc16986166953f5a72c19d78642aab6cbde63964a2369ec3d425144eb42b3800000000000000"
+          rootsId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
+          cumulativeWeight: 45678
+
     post-blocks-response-example:
       value:
-        blockId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
+        blockId: "0xb173e2d2b6f72600f00da84492ddb6eadee703dc39fb846725828059272093fb3b00000000000000"
 
+    get-block-by-id-response-example-new-transaction:
+      value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "pending"
+        txState: "pending"
+        reissuePayload: false
+    
     get-block-by-id-response-example-new:
       value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "pending"
+        reissuePayload: false
 
-    get-block-by-id-response-example-solid:
+    get-block-by-id-response-example-confirmed-transaction:
       value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "confirmed"
+        txState: "confirmed"
 
     get-block-by-id-response-example-confirmed:
       value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "confirmed"
 
-    get-block-by-id-response-example-conflicting:
+    get-block-by-id-response-example-conflicting-transaction:
       value:
+        blockId: "0x8e7c2d36c236f7d44f26cf8c70b3d99e18e7d7390b32c9637c08c086d9475e6a"
+        strongParents:
+          - "0x1e9d7f2e12552f84db6de00d57d25c7fa037fca5c31b5a354b9e6d2f6d84a6db"
+          - "0x6c91ee6f97a8a04ec92f9a6907baa32bca3c7cb15e83e0070ef0ba4f3f3a2e47"
+        blockState: "pending"
+        txState: "pending"
+        blockStateReason: 1
+        txStateReason: 5
 
     post-tagged-data-block-request-example-minimal:
       value:
+        protocolVersion: 3
+        payload:
+          type: 5
+          tag: "0x72616e646f6d207461673a206769746875622e636f6d"
+          data: "0x5468697320697320616e206578616d706c6520746578742077616c6c20776974682070726f746f636f6c20332e"
 
     post-transaction-block-request-example-minimal:
       value:
+        protocolVersion: 3
+        payload:
+          type: 6
+          essence:
+            type: 1
+            networkId: "1337133713371337"
+            creationTime: 1682328545
+            inputsCommitment: "0x0e6c2998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+            inputs:
+              - type: 0
+                transactionId: "0x0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0xc138ecdc882010245e9574fbc1f1f43cc7c182fa890e46e018365dd49de0f16e"
+                transactionOutputIndex: 0
+            outputs:
+              - type: 3
+                amount: "50000000"
+                unlockConditions:
+                  - type: 0
+                    address:
+                      type: 0
+                      pubKeyHash: "0xd49931814e6bfbb8e221f1b2936e206e5a6b6abeb9c070f8603814c525c9abe3"
+          unlocks:
+            - type: 0
+              signature:
+                type: 0
+                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
+                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
+            - type: 1
+              reference: 0
+            - type: 1
+              reference: 0
 
-    post-transaction-block-transaction-request-example:
+    post-tagged-data-block-request-example-full:
       value:
+        protocolVersion: 3
+        networkId: 10
+        strongParents:
+          - "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          - "0x408a53af982c49d1398ab5c5b5f5b390d4c4da7da48b61bb9ba7f97c1e8dd7f60000000000000000"
+        weakParents:
+          - "0xe8a904ce3ee081f20a68bb38b2d406cfd138775ba52ea555d93a4e4d4b0ad8440000000000000000"
+          - "0xbce912a0f383cd07660d3c08f3d3f3c7fb9de31e2cc1b93d4c29332ef693ba0c0000000000000000"
+        shallowLikeParents:
+          - "0x0276d29ec6b3cbbf3ed6d1f01af8e29b9c6a9ee9c9375e8e5b5b5c5b5b5d45580000000000000000"
+          - "0x70a5ce5d8fc3290a9885b1af5d8766d51db89a67a6a839f6d23a6cb8d6f3b6e30000000000000000"
+        accountId: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
+        issuingTime: 1649442459
+        commitment:
+          index: 110
+          prevId: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
+          rootsId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
+          cumulativeWeight: 12345
+        latestFinalizedSlot: 98
+        payload:
+          type: 5
+          tag: "0x72616e646f6d207461673a206769746875622e636f6d"
+          data: "0x5468697320697320616e206578616d706c6520746578742077616c6c20776974682070726f746f636f6c20332e"
+        nonce: "105368"
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
+
 
     post-transaction-block-request-example-full:
+      value:
+        protocolVersion: 3
+        networkId: 10
+        strongParents:
+          - "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          - "0x408a53af982c49d1398ab5c5b5f5b390d4c4da7da48b61bb9ba7f97c1e8dd7f60000000000000000"
+        weakParents:
+          - "0xe8a904ce3ee081f20a68bb38b2d406cfd138775ba52ea555d93a4e4d4b0ad8440000000000000000"
+          - "0xbce912a0f383cd07660d3c08f3d3f3c7fb9de31e2cc1b93d4c29332ef693ba0c0000000000000000"
+        shallowLikeParents:
+          - "0x0276d29ec6b3cbbf3ed6d1f01af8e29b9c6a9ee9c9375e8e5b5b5c5b5b5d45580000000000000000"
+          - "0x70a5ce5d8fc3290a9885b1af5d8766d51db89a67a6a839f6d23a6cb8d6f3b6e30000000000000000"
+        accountId: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
+        issuingTime: 1649442459
+        commitment:
+          index: 110
+          prevId: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
+          rootsId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
+          cumulativeWeight: 12345
+        latestFinalizedSlot: 98
+        payload:
+          type: 6
+          essence:
+            type: 1
+            networkId: "1337133713371337"
+            creationTime: 1649442459
+            inputsCommitment: "0x0e6c2998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+            inputs:
+              - type: 0
+                transactionId: "0x0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0xc138ecdc882010245e9574fbc1f1f43cc7c182fa890e46e018365dd49de0f16e"
+                transactionOutputIndex: 0
+            outputs:
+              - type: 3
+                amount: "50000000"
+                unlockConditions:
+                  - type: 0
+                    address:
+                      type: 0
+                      pubKeyHash: "0xd49931814e6bfbb8e221f1b2936e206e5a6b6abeb9c070f8603814c525c9abe3"
+            payload:
+          unlocks:
+            - type: 0
+              signature:
+                type: 0
+                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
+                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
+            - type: 1
+              reference: 0
+            - type: 1
+              reference: 0
+        nonce: "105368"
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
+    
+    get-congestion-estimate-response-example:
       value:
 
     get-block-by-id-empty-response-example:
       value:
+        protocolVersion: 3
+        networkId: 10
+        strongParents:
+          - "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          - "0x408a53af982c49d1398ab5c5b5f5b390d4c4da7da48b61bb9ba7f97c1e8dd7f60000000000000000"
+        accountId: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
+        issuingTime: 1649442459
+        commitment:
+          index: 110
+          prevId: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
+          rootsId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
+          cumulativeWeight: 12345
+        latestFinalizedSlot: 98
+        nonce: '8423'
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
 
     get-block-by-id-transaction-response-example:
       value:
+        protocolVersion: 3
+        networkId: 10
+        strongParents:
+          - "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
+          - "0x408a53af982c49d1398ab5c5b5f5b390d4c4da7da48b61bb9ba7f97c1e8dd7f60000000000000000"
+        weakParents:
+          - "0xe8a904ce3ee081f20a68bb38b2d406cfd138775ba52ea555d93a4e4d4b0ad8440000000000000000"
+          - "0xbce912a0f383cd07660d3c08f3d3f3c7fb9de31e2cc1b93d4c29332ef693ba0c0000000000000000"
+        shallowLikeParents:
+          - "0x0276d29ec6b3cbbf3ed6d1f01af8e29b9c6a9ee9c9375e8e5b5b5c5b5b5d45580000000000000000"
+          - "0x70a5ce5d8fc3290a9885b1af5d8766d51db89a67a6a839f6d23a6cb8d6f3b6e30000000000000000"
+        accountId: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
+        issuingTime: 1649442459
+        commitment:
+          index: 2310
+          prevId: "0x78bf1e6c30c6ed9192fa07e1466c09a10e9ea6c58d3b1b6c61a259f1a6f569ed0000000000000000"
+          rootsId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
+          cumulativeWeight: 12345
+        latestFinalizedSlot: 98
+        payload:
+          type: 6
+          essence:
+            type: 1
+            networkId: "1337133713371337"
+            creationTime: 1649442459
+            inputsCommitment: "0x0e6c2998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+            inputs:
+              - type: 0
+                transactionId: "0x0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a79"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+                transactionOutputIndex: 0
+              - type: 0
+                transactionId: "0xc138ecdc882010245e9574fbc1f1f43cc7c182fa890e46e018365dd49de0f16e"
+                transactionOutputIndex: 0
+            outputs:
+              - type: 3
+                amount: "50000000"
+                unlockConditions:
+                  - type: 0
+                    address:
+                      type: 0
+                      pubKeyHash: "0xd49931814e6bfbb8e221f1b2936e206e5a6b6abeb9c070f8603814c525c9abe3"
+            payload:
+          unlocks:
+            - type: 0
+              signature:
+                type: 0
+                publicKey: "0x40d0c00fd629a5f528e4bcab4333926a90d06613a3f36a325defcdaf4c9e4092"
+                signature: "0xed4a63a3e1b22c85f9813b00a21c8576ed72c1f5bc939d01fcea7dcd678c2d0d8d80a2499965d8ce5574c9e92aa0d42b72b969bab3a2a35fe7dbc64659a0d703"
+            - type: 1
+              reference: 0
+            - type: 1
+              reference: 0
+        nonce: "105368"
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
+
 
     get-block-by-id-tagged-data-response-example:
       value:
+        protocolVersion: 3
+        networkId: 10
+        strongParents:
+          - "0x2f746934d0075179a37ca3e807b7e793ec4ec9189ba31c9ad092d7497b01118c1000000000000000"
+          - "0x1a4b52759a4a4e879d38478139913f71c6fcd2ee76c924e5be2b9c9321d61f6e1000000000000000"
+          - "0xb55045d5d57818e93b2c9e75f5e328ce5a04f3db3a5a5cf44949f7c8e4d0b4f10000000000000000"
+        weakParents:
+          - "0xa5ee03d7196d7ab8c0d61740f9c91e16b2bc33d82a22b531c71ccf117951682d1000000000000000"
+          - "0x3d1b7b51c66e2b06c1e819d82e7f20d1870c753bd25d19aae78a8b70e06b1aef1000000000000000"
+          - "0xd2ca3ef0f7d2f0b2d02e857cbe77f33a3bce54cf3d3c5f0446b7f6da3d8a3ea8000000000000000"
+        shallowLikeParents:
+          - "0x4f746934d0075179a37ca3e807b7e793ec4ec9189ba31c9ad092d7497b01118c1000000000000000"
+          - "0xc9e87d77b547deea65e7f1a36d125ef7c901139bebb3158e76ee1e9b71dcbfe4000000000000000"
+          - "0x2d237c37248f1e833c08a1189f9a69c0b3f8c3e039d14291ab7e60a88c4f4d3c000000000000000"
+        accountId: "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c"
+        issuerPublicKey: "0xc6c83a78d06263ca937f21056a32d9b3099d04f0c92863d8b8dceabdd1421d2a"
+        issuingTime: 1649442459
+        commitment:
+          index: 928
+          prevId: "0x6dcf06b23919b4d4c1c4d1f51af7e510618a2cecb7f2d4c4d0b4a4deef531b7e0000000000000000"
+          rootsId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
+          cumulativeWeight: 98765
+        latestFinalizedSlot: 98
+        payload:
+          type: 5
+          tag: "0x68656c6c6f20776f726c64"
+          data: "0x5370616d6d696e6720646174612e0a436f756e743a203037323935320a54696d657374616d703a20323032312d30322d31315431303a32333a34392b30313a30300a54697073656c656374696f6e3a203934c2b573"
+        nonce: "105368"
+        signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
 
-    get-outputs-by-id-response-unspent-example:
+    get-outputs-by-id-response-example:
       value:
-
-    get-outputs-by-id-response-spent-example:
-      value:
+        type: 3
+        amount: "1000"
+        unlockConditions:
+          - type: 0
+            address:
+              type: 0
+              pubKeyHash: "0x8eaf87ac1f52eb05f2c7c0c15502df990a228838dc37bd18de9503d69afd257d"
 
     get-output-metadata-by-id-response-unspent-example:
       value:
+        blockId: "0xd3a0a0c76ab2d9b406a32c30c43e102fe0f39a12a3f6c1e3b19d239db2f18d75"
+        transactionId: "0x1c52e8e630d1c6e45ab6f46c63d8d6cb02e6c2ed6e31b6c97d6f5c5f5a5d5c5b"
+        outputIndex: 3
+        isSpent: false
+        includedCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
+        latestCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
 
     get-output-metadata-by-id-response-spent-example:
       value:
-
-    get-included-block-of-transaction-example-json:
-      value:
+        blockId: "0xd3a0a0c76ab2d9b406a32c30c43e102fe0f39a12a3f6c1e3b19d239db2f18d75"
+        transactionId: "0x1c52e8e630d1c6e45ab6f46c63d8d6cb02e6c2ed6e31b6c97d6f5c5f5a5d5c5b"
+        outputIndex: 3
+        isSpent: true
+        commitmentIdSpent: "0x4b91c935926c77d0ac9b4a569c3eb3b0f0c9918f2d4f4d9bb1c7dfc19b41e4c2"
+        transactionIdSpent: "0x1ee46e19f4219ee65afc10227d0ca22753f76ef32d1e922e5cbe3fbc9b5a5298"
+        includedCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
+        latestCommitmentId: "0x7c62d9b9ed3c1f3ef942a7ea17ec1270d77c109f0ba57b6c2d2b9e9fb3e69a3a"
 
     get-commitment-response-example:
       value:
+        index: 986
+        prevId: "0x8fb6cbb1ecf02c6b5a6a5a6a5f6c5a6a5f6c5a6a5a6a5a6a5f6c5a6a5a6a5f6c50000000000000000"
+        rootsId: "0xa4dd36465af63d495d35a05f592d42a51511c153e1bae8fad00453c8cbb48727"
+        cumulativeWeight: 78901
 
     get-commitment-response-binary-example:
       value: "070000000a1a0000977c626276b19ef8b3c445709f2f0f2ccc4abb98d97617f421f240c0d1ee066d4306e67a0321889ef8ec89b7eff1378049e058f0fa87a78c2452ae72631a5a99d913d1cbb3525b8faa1800e28dfcb28154bcba10154c39ef87ceda793cb44f58ae1549c88ea13fe4a9695bb6f0aba6cb756522209e5066a96039ae12b398b975693bdc21e222997c86ff9bfc5844f0372d58ff6fa510688e53c181bbdf4db41f9b627540a70e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a80000000300d85e5b1590d898d1e0cdebb2e3b5337c8b76270142663d78811683ba47c17c989ad7a8f0ff2c6438bf435786d4a5b0125a5caf7367061b49a739389d5ebea234c0466c86f88a3f8add03bff04c2e34b214683f2f6983641e1d1185da7e2c3e0200d9922819a39e94ddf3907f4b9c8df93f39f026244fcb609205b9a879022599f218be2536d8b7b8547faa3dbdfe98339ebe9e2b2417a8a03eee02b2a8312b9e026dd0a33261a58a240cd0a1b06cdf1775d98d316f162d3eec402f4bf08bea2a0700f9d9656a60049083eef61487632187b351294c1fa23d118060d813db6d03e8b6ca8180d435708e826bc2042ccd667babb59c5cc461ff29dba966359fcd6fc511cdfdf10d6576f36ac2a6e5cb691e13968c13947ffbd9239939d3802b2fbe0f06"
 
     get-utxo-changes-response-example:
       value:
-
-    get-congestion-estimate-response-example:
-      value:
-    
-    get-block-by-id-response-example-included:
-      value:
-
-    get-account-response-example:
-      value:
-
-    get-account-mana-response-example:
-      value:
+        index: 789
+        createdOutputs:
+          - "0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2"
+          - "0x3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4"
+        consumedOutputs:
+          - "0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6"
+          - "0x7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7"
 
     get-peers-response-example:
       value:
+        - id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
+          multiAddresses:
+            - "/dns/abc.com/tcp/15602"
+          alias: abc
+          relation: known
+          connected: true
+          gossip:
+            heartbeat:
+              latestCommittedSlotIndex: 61527
+              prunedSlotIndex: 61200
+              latestConfirmedSlotIndex: 61527
+              connectedNeighbors: 5
+              syncedNeighbors: 7
+            metrics:
+              newBlocks: 3799
+              knownBlocks: 554
+              receivedBlocks: 4370
+              receivedBlockRequests: 0
+              receivedHeartbeats: 1
+              sentBlocks: 6
+              sentBlockRequests: 4325
+              sentHeartbeats: 9
+              droppedPackets: 0
+        - id: 12D3KooWNYDcJqxnWqCLSgeQKqNStwFUqHSJXPdSYTJnfxQESzie
+          multiAddresses:
+            - "/dns/xyz.com/tcp/15600"
+          alias: xyz
+          relation: known
+          connected: true
+          gossip:
+            heartbeat:
+              latestCommittedSlotIndex: 61527
+              prunedSlotIndex: 56508
+              latestConfirmedSlotIndex: 61527
+              connectedNeighbors: 5
+              syncedNeighbors: 6
+            metrics:
+              newBlocks: 510
+              knownBlocks: 79
+              receivedBlocks: 589
+              receivedBlockRequests: 0
+              receivedHeartbeats: 1
+              sentBlocks: 42
+              sentBlockRequests: 576
+              sentHeartbeats: 9
+              droppedPackets: 0
 
     get-peer-response-example:
       value:
+        id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
+        multiAddresses:
+          - "/dns/abc.com/tcp/15602"
+        alias: abc
+        relation: known
+        connected: true
+        gossip:
+          heartbeat:
+            latestCommittedSlotIndex: 61527
+            prunedSlotIndex: 61200
+            latestConfirmedSlotIndex: 61527
+            connectedNeighbors: 5
+            syncedNeighbors: 7
+          metrics:
+            newBlocks: 3799
+            knownBlocks: 554
+            receivedBlocks: 4370
+            receivedBlockRequests: 0
+            receivedHeartbeats: 1
+            sentBlocks: 6
+            sentBlockRequests: 4325
+            sentHeartbeats: 9
+            droppedPackets: 0
 
     post-peer-request-example:
       value:
@@ -1278,6 +1691,29 @@ components:
 
     post-peer-response-example:
       value:
+        id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
+        multiAddresses:
+          - "/dns/abc.com/tcp/15602"
+        alias: abc
+        relation: known
+        connected: true
+        gossip:
+          heartbeat:
+            latestCommittedSlotIndex: 61527
+            prunedSlotIndex: 61200
+            latestConfirmedSlotIndex: 61527
+            connectedNeighbors: 5
+            syncedNeighbors: 7
+          metrics:
+            newBlocks: 3799
+            knownBlocks: 554
+            receivedBlocks: 4370
+            receivedBlockRequests: 0
+            receivedHeartbeats: 1
+            sentBlocks: 6
+            sentBlockRequests: 4325
+            sentHeartbeats: 9
+            droppedPackets: 0
 
     database-prune-request-example:
       value:
@@ -1308,17 +1744,19 @@ components:
   schemas:
 
     Block:
-      description: A block is the object nodes gossip around in the network. It always references two other blocks that are known as parents. It is stored as a vertex on the tangle data structure that the nodes maintain. A block can have a maximum size of 32Kb.
+      description: A block is the object nodes gossip around in the network. It always references other blocks that are known as parents. It is stored as a vertex on the tangle data structure that the nodes maintain. A block can have a maximum size of 32Kb.
       properties:
         protocolVersion:
           type: number
           description: Protocol version identifier. It also tells which protocol rules apply to the block.
-        networkID:
+        networkId:
           type: number
-          description: Protocol version identifier. It also tells which protocol rules apply to the block.
+          description: Network version identifier. It also tells which network the node is running.
         strongParents:
           type: array
           description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
         weakParents:
           type: array
           description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
@@ -1329,29 +1767,37 @@ components:
           description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
           items:
             type: string
-        issuerID:
+        accountId:
           type: string
+          description: The identifier of the account of this block.
         issuerPublicKey:
           type: string
+          description: The public key of the issuer.
         issuingTime:
           type: integer
-        slotCommitment:
-          $ref: '#/components/schemas/Commitment'
-        latestConfirmedSlot:
+          description: The timestamp of issuing this block.
+        burnedMana:
           type: integer
+          description: uint64, The mana burned in this block.
+        commitment:
+          $ref: '#/components/schemas/Commitment'
+          description: The slot commitment contains in this block.
+        latestFinalizedSlot:
+          type: integer
+          description: The latest confirmed slot index of the node when issuing this block.
         payload:
           description: The inner payload of the block. Can be nil.
           oneOf:
             - $ref: '#/components/schemas/TransactionPayload'
             - $ref: '#/components/schemas/TaggedDataPayload'
-        nonce:
-          type: string
-          description: The nonce which lets this block fulfill the Proof-of-Work requirement. Plain string encoded number.
         signature:
           type: string
+          description: The signature of entire block, signed by the issuer.
       required:
         - protocolVersion
-        - payload
+        - strongParents
+        - nonce
+
     TransactionPayload:
       description: The Transaction Payload to be embedded into a block.
       properties:
@@ -1386,7 +1832,7 @@ components:
           description: Network identifier. Plain string encoded number. This field signals for which network the block is meant for. It is computed out of the first 8 bytes of the `BLAKE2b-256` hash of the concatenation of the network name and protocol version string.
         creationTime:
           type: integer
-          description: aaaa
+          description: The timestamp of this transaction is created.
         inputsCommitment:
           type: string
           description: BLAKE2b-256 hash of the BLAKE2b-256 hashes of the serialized outputs referenced in Inputs by their outputIds (transactionId || outputIndex). Hex-encoded data with 0x prefix.
@@ -1706,7 +2152,7 @@ components:
       properties:
         type:
           type: integer
-          description: Set to value 1 to denote an Dust Deposit Return Unlock Condition.
+          description: Set to value 1 to denote a Storage Deposit Return Unlock Condition.
         returnAddress:
           oneOf:
             - $ref: '#/components/schemas/Ed25519Address'
@@ -2060,20 +2506,6 @@ components:
         - sentHeartbeats
         - droppedPackets
 
-    MigratedFundsEntry:
-      properties:
-        tailTransactionHash:
-          type: string
-        address:
-          oneOf:
-            - $ref: '#/components/schemas/Ed25519Address'
-        deposit:
-          type: integer
-      required:
-        - tailTransactionHash
-        - address
-        - deposit
-
     ErrorResponse:
       description: The error format.
       properties:
@@ -2156,47 +2588,47 @@ components:
         version:
           type: string
           description: The semantic version of the node.
-        issuerID:
+        accountId:
           type: string
-          description: The name of the node.
+          description: The account identifier of the node.        
         status:
           description: Status of the node.
           properties:
             isHealthy:
               type: boolean
               description: Tells whether the node is healthy or not.
-            acceptedBlockID:
-              description: The ID of the accepted block
+            lastAcceptedBlockId:
+              description: The identifier of the latest accepted block.
               type: string
-            confirmedBlockID:
-              description: The ID of the confirmed block
+            lastConfirmedBlockId:
+              description: The identifier of the latest confirmed block.
               type: string
-            confirmedSlot:
-              description: The slot number of the confirmed block
+            finalizedSlot:
+              description: The index of latest confirmed slot.
               type: integer
             ATT:
-              description: The current average transaction time
+              description: A notion of time that is anchored to the latest accepted block.
               type: integer
             RATT:
-              description: The recent average transaction time
+              description: The ATT after it has advanced with the system clock.
               type: integer
             CTT:
-              description: The current confirmation time threshold
+              description: A notion of time that is anchored to the latest confirmed block.
               type: integer
             RCTT:
-              description: The recent confirmation time threshold
+              description: The CTT after it has advanced with the system clock.
               type: integer
             latestCommittedSlot:
               type: object
-              description: Information about the latest seen commitment slot ID.
+              description: The latest slot that the node has committed to.
             pruningSlot:
               type: integer
               description: The index of the slot before which the tangle history is pruned.
           required:
             - isHealthy
             - latestCommittedSlot
-            - confirmedSlot
-            - pruningIndex
+            - finalizedSlot
+            - pruningSlot
         metrics:
           description: Node metrics.
           properties:
@@ -2204,18 +2636,18 @@ components:
               description: The current rate of new blocks per second.
               type: number
               format: float
-            referencedBlocksPerSecond:
-              description: The current rate of referenced blocks per second.
+            confirmedBlocksPerSecond:
+              description: The current rate of confirmed blocks per second.
               type: number
               format: float
-            referencedRate:
-              description: The ratio of referenced blocks in relation to new blocks of the last confirmed slot.
+            confirmedRate:
+              description: The ratio of confirmed blocks in relation to new blocks of the last confirmed slot.
               type: number
               format: float
           required:
             - blocksPerSecond
-            - referencedBlocksPerSecond
-            - referencedRate
+            - confirmedBlocksPerSecond
+            - confirmedRate
         supportedProtocolVersions:
           type: array
           description: The supported protocol versions.
@@ -2256,8 +2688,12 @@ components:
                 - vByteCost
                 - vByteFactorData
                 - vByteFactoKey
-            genesisSlotIndex:
+            genesisUnixTimestamp:
               type: integer
+              description: The genesis slot index.
+            slotDurationInSeconds:
+              type: integer
+              description: The duration of a slot, in seconds.
           required:
             - networkName
             - bech32Hrp
@@ -2266,6 +2702,8 @@ components:
             - minPowScore
             - rentStructure
             - version
+            - genesisSlotIndex
+            - slotDurationInSeconds
         baseToken:
           description: Gives info about the base token the network uses.
           properties:
@@ -2294,7 +2732,7 @@ components:
             - decimals
             - useMetricPrefix
         features:
-          description: The features that are supported by the node. For example, a node could support the Proof-of-Work (pow) feature, which would allow the Proof-of-Work to be performed by the node itself. All features must be lowercase.
+          description: The features that are supported by the node. For example, a node could support the feature, which would allow the BIC to be included by the node account. All features must be lowercase.
           type: array
           items:
             type: string
@@ -2308,8 +2746,44 @@ components:
         - baseToken
         - features
 
+    AccountStakingResponse:
+      description: Returns the stored and potential mana of the account.
+      properties:
+        potentialMana:
+          type: integer
+        storedMana:
+          type: integer
+
+    AccountManaResponse:
+      description: Returns the stored and potential mana of the account.
+      properties:
+        potentialMana:
+          type: integer
+        storedMana:
+          type: integer
+
+    AccountResponse:
+      description: Returns information that are ideal for attaching a block.
+      properties:
+        accountStatus:
+          type: string
+          enum:
+            - active
+            - inactive
+            - nonBlockIssuer
+            - locked
+          description: Only 'active' account is allowed to issue blocks. To account to be active, the block issuer feature must be provided and the Block Issuance Credits (BIC) balances of an account should be non-negative. If the block issuer feature is not present, 'nonBlockIssuer' is returned. If the conditions are not met, it's 'inactive'. If the BIC balances is negative, the account is 'locked'.
+        slotIndex: 
+          type: integer
+        blockIssuerKeys:
+          type: array
+          items:
+            type: string
+        bic:
+          type: integer
+
     IssuanceBlockHeaderResponse:
-      description: Returns tips that are ideal for attaching a block.
+      description: Returns information that are ideal for attaching a block.
       properties:
         strongParents:
           type: array
@@ -2326,33 +2800,103 @@ components:
           items:
             type: string
           description: The block identifiers that can be used to a attach a block to. Hex-encoded with 0x prefix.
-        latestConfirmedSlot:
+        latestFinalizedSlot:
           type: integer
+          description: The latest finalized slot index.
         commitment:
-          type: string
+          $ref: '#/components/schemas/Commitment'
+
+    CongestionResponse:
+      description: Provides the cost and readiness to issue estimates.
+      properties:
+        slot-index:
+          type: integer
+          description: The slot index for which the congestion estimate is provided.
+        ready:
+          type: integer
+          description: >
+            Provided only if account specified in the request. Indicates if a node is ready to issue a block in a current congestion or should wait.
+            Values:
+              * `0`: ready to issue a block.
+              * `1`: need to wait.
+        cost:
+          type: integer
+          description: The cost in mana for issuing a block in a current congestion estimated based on RMC and slot index.
+      required:
+        - slot-index
+        - cost
+
 
     Commitment:
-      description: struct of a commitment.
+      description: An object embedded to a block.
       properties:
         index:
           type: integer
-        prevID:
+          description: The slot index of the commitment.
+        prevId:
           type: string
-        rootsID:
+          description: The commitment identifier of the previous slot.
+        rootsId:
           type: string
+          description: The digest of multiple merkle roots within this slot.
         cumulativeWeight:
           type: integer
+          description: 
+            The sum of previous slot commitment cumulative weight and 
+            weight of issuers of accepted blocks within this slot. 
+            It is just an indication of "committed into" this slot,
+            and can not strictly be used for evaluating the switching of a chain.
 
     SubmitBlockRequest:
       description: Submits a block to the node.
       properties:
         protocolVersion:
+          type: number
+          description: Protocol version identifier. It also tells which protocol rules apply to the block.
+        networkId:
+          type: number
+          description: Network version identifier. It also tells which network the node is running.
+        strongParents:
+          type: array
+          description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
+        weakParents:
+          type: array
+          description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
+        shallowLikeParents:
+          type: array
+          description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
+        accountId:
+          type: string
+          description: The identifier of the issuer of this block.
+        issuerPublicKey:
+          type: string
+          description: The public key of the issuer.
+        issuingTime:
           type: integer
-          description: Protocol version number of the block. It also tells which protocol rules apply to the block.
+          description: The timestamp of issuing this block.
+        commitment:
+          $ref: '#/components/schemas/Commitment'
+          description: The slot commitment contains in this block.
+        latestFinalizedSlot:
+          type: integer
+          description: The latest finalized slot index of the node when issuing this block.
         payload:
+          description: The inner payload of the block. Can be nil.
           oneOf:
             - $ref: '#/components/schemas/TransactionPayload'
             - $ref: '#/components/schemas/TaggedDataPayload'
+        nonce:
+          type: string
+          description: The nonce which lets this block fulfill the Proof-of-Work requirement. Plain string encoded number.
+        signature:
+          type: string
+          description: The signature of entire block, signed by the issuer.
       required:
         - protocolVersion
 
@@ -2371,6 +2915,21 @@ components:
         blockId:
           type: string
           description: The identifier of the block. Hex-encoded with 0x prefix.
+        strongParents:
+          type: array
+          description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
+        weakParents:
+          type: array
+          description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
+        shallowLikeParents:
+          type: array
+          description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
+          items:
+            type: string
         blockState:
           type: string
           enum:
@@ -2393,7 +2952,7 @@ components:
               * `1` - denotes that the block is invalid.
               * `2` - denotes that the block is orphaned due to congestion control.
               * `3` - denotes that the block is orphaned due to negative mana balance.
-              * `4` - denotes that ...
+              * Note: more reasons will be added.
         txStateReason:
           type: integer
           enum: [1,2,3,4,5,6,7,8,9,10,11,12,255]
@@ -2411,14 +2970,13 @@ components:
               * `10` - denotes that the inputs commitment is invalid.
               * `11` - denotes that an output contains a Sender with an ident (address) which is not unlocked.
               * `12` - denotes that the chain state transition is invalid.
-              * `13` - denotes that ...
               * `255` - denotes that the semantic validation failed.
         reissuePayload:
           type: boolean
-          description: Tells if the block should be issued again.
+          description: Tells if the payload should be issued again.
       required:
         - blockId
-        - parents
+        - strongParents
 
     BlockResponse:
       description: Returns a given block.
@@ -2451,13 +3009,13 @@ components:
           description: Tells if the output is spent in a confirmed transaction or not.
         commitmentIdSpent:
           type: string
-          description: The commitment index of the slot at which this output was spent.
+          description: The commitment ID of the slot at which this output was spent.
         transactionIdSpent:
           type: string
           description: The transaction this output was spent with. Hex-encoded with 0x prefix.
         includedCommitmentId:
           type: string
-          description: The commitment index at which the output was included into the ledger.
+          description: The commitment ID at which the output was included into the ledger.
         latestCommitmentId:
           type: string
           description: The current latest commitment id for which the request was made.
@@ -2466,7 +3024,6 @@ components:
         - transactionId
         - outputIndex
         - isSpent
-        - includedCommitmentId
         - latestCommitmentId
 
     UTXOChangesResponse:
@@ -2474,7 +3031,7 @@ components:
       properties:
         index:
           type: integer
-          description: The index number of the slot.
+          description: The slot index of the given slot.
         createdOutputs:
           description: The created outputs of the given slot.
           type: array
@@ -2491,9 +3048,6 @@ components:
         - index
         - createdOutputs
         - consumedOutputs
-
-    AccountResponse:
-      description: Returns the account data of a given AccountId.
 
     PeersResponse:
       description: Returns all peers of the node.
@@ -2566,42 +3120,3 @@ components:
       required:
         - index
         - filePath
-
-    CongestionResponse:
-      description: Provides the cost and readiness to issue estimates.
-      properties:
-        slot-index:
-          type: integer
-          description: The slot index for which the congestion estimate is provided.
-        ready:
-          type: integer
-          description: >
-            Provided only if account specified in the request. Indicates if a node is ready to issue a block in a current congestion or should wait.
-            Values:
-              * `0`: ready to issue a block.
-              * `1`: need to wait.
-        cost:
-          type: integer
-          description: The cost in mana for issuing a block in a current congestion estimated based on RMC and slot index.
-      required:
-        - slot-index
-        - cost
-
-    AccountManaResponse:
-      description: Returns the mana related data of the account, mana balance, staking and delegation details.
-      properties:
-        mana:
-          type: integer
-          description: The mana of the account.
-        stake:
-          type: integer
-          description: The total stake of the account.
-        delegated:
-          type: integer
-          description: Total delegated mana of the node.
-        AccountId:
-          type: string
-          description: The account ID of the node.
-      required:
-        - AccountId
-        - mana
