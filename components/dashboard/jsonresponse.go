@@ -117,7 +117,7 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 // Transaction represents the JSON model of a ledgerstate.Transaction.
 type Transaction struct {
 	NetworkID        iotago.NetworkID        `json:"networkId"`
-	CreationTime     int64                   `json:"creationTime"`
+	CreationTime     iotago.SlotIndex        `json:"creationTime"`
 	Inputs           []*Input                `json:"inputs"`
 	InputsCommitment iotago.InputsCommitment `json:"inputsCommitment"`
 	Outputs          []*Output               `json:"outputs"`
@@ -157,7 +157,7 @@ func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
 
 	return &Transaction{
 		NetworkID:    iotaTx.Essence.NetworkID,
-		CreationTime: iotaTx.Essence.CreationTime.Unix(),
+		CreationTime: iotaTx.Essence.CreationTime,
 		Inputs:       inputs,
 		Outputs:      outputs,
 		Unlocks:      unlockBlocks,
