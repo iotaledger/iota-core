@@ -35,7 +35,7 @@ type Gadget struct {
 func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine, blockgadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
 		g := New(e.Workers.CreateGroup("BlockGadget"), e.BlockCache, e.SybilProtection, opts...)
-		e.Events.Booker.WitnessAdded.Hook(g.tryPreAcceptAndPreConfirm)
+		e.Events.Booker.BlockBooked.Hook(g.trackWitnessWeight)
 		e.BlockCache.Evict.Hook(g.evictUntil)
 
 		e.Events.BlockGadget.LinkTo(g.events)

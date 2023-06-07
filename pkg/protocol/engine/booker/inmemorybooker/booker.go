@@ -6,7 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -119,10 +118,6 @@ func (b *Booker) evict(slotIndex iotago.SlotIndex) {
 }
 
 func (b *Booker) book(block *blocks.Block) error {
-	if err := b.trackWitnessWeight(block); err != nil {
-		return errors.Wrapf(err, "failed to track witness weight for block %s", block.ID())
-	}
-
 	conflictsToInherit, err := b.inheritConflicts(block)
 	if err != nil {
 		return errors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
@@ -138,65 +133,6 @@ func (b *Booker) book(block *blocks.Block) error {
 
 	block.SetBooked()
 	b.events.BlockBooked.Trigger(block)
-
-	return nil
-}
-
-func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) error {
-	witness := votingBlock.Block().IssuerID
-
-	// Only track witness weight for issuers that are part of the committee.
-	if !b.committee.Has(witness) {
-		return nil
-	}
-
-	// Add the witness to the voting block itself as each block carries a vote for itself.
-	if votingBlock.AddWitness(witness) {
-		b.events.WitnessAdded.Trigger(votingBlock)
-	}
-
-	// Walk the block's past cone until we reach an accepted or already supported (by this witness) block.
-	walk := walker.New[iotago.BlockID]().PushAll(votingBlock.Parents()...)
-	for walk.HasNext() {
-		blockID := walk.Next()
-		block, exists := b.blockCache.Block(blockID)
-		if !exists {
-			return errors.Errorf("parent %s does not exist", blockID)
-		}
-
-		if block.IsRootBlock() {
-			continue
-		}
-
-		// Skip propagation if the block is already accepted.
-		if block.IsPreAccepted() {
-			continue
-		}
-
-		// Skip further propagation if the witness is not new.
-		if !block.AddWitness(witness) {
-			continue
-		}
-
-		block.ForEachParent(func(parent model.Parent) {
-			switch parent.Type {
-			case model.StrongParentType:
-				walk.Push(parent.ID)
-			case model.ShallowLikeParentType, model.WeakParentType:
-				if weakParent, exists := b.blockCache.Block(parent.ID); exists {
-					if weakParent.AddWitness(witness) {
-						b.events.WitnessAdded.Trigger(weakParent)
-					}
-				}
-			}
-		})
-
-		// TODO: here we might need to trigger an event WitnessAdded or something. However, doing this for each block might
-		//  be a bit expensive. Instead, we could keep track of the lowest rank of blocks and only trigger for those and
-		//  have a modified causal order in the acceptance gadget (with all booked blocks) that checks whether the acceptance threshold
-		//  is reached for these lowest rank blocks and accordingly propagates acceptance to their children.
-		b.events.WitnessAdded.Trigger(block)
-	}
 
 	return nil
 }

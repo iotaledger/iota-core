@@ -69,8 +69,8 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 				}
 			}, event.WithWorkerPool(wpBlocks))
 
-					// Slots are committed whenever ATT advances, start committing only when bootstrapped.
-					e.Events.Clock.AcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
+			// Slots are committed whenever ATT advances, start committing only when bootstrapped.
+			e.Events.Clock.AcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
 
 			e.Events.Notarization.LinkTo(m.events)
 
