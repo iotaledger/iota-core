@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -34,7 +34,7 @@ type Filter struct {
 	optsMinCommittableSlotAge    iotago.SlotIndex
 	optsSignatureValidation      bool
 
-	ledger ledger.Ledger
+	blockIssuerCheck func(*iotago.Block) bool
 
 	// TODO: replace this placeholder for RMC with a link to the accounts manager with RMC provider.
 	optsReferenceManaCost uint64
@@ -44,7 +44,8 @@ type Filter struct {
 
 func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
 	return module.Provide(func(e *engine.Engine) filter.Filter {
-		f := New(e.Storage.Settings().ProtocolParameters, e.Ledger, opts...)
+		blockIssuerCheck := e.Ledger.(*ledger.Ledger).IsBlockIssuerAllowed
+		f := New(e.Storage.Settings().ProtocolParameters, blockIssuerCheck, opts...)
 
 		e.HookConstructed(func() {
 			e.Events.Filter.LinkTo(f.events)
@@ -57,12 +58,12 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 var _ filter.Filter = new(Filter)
 
 // New creates a new Filter.
-func New(protocolParamsFunc func() *iotago.ProtocolParameters, ledger ledger.Ledger, opts ...options.Option[Filter]) *Filter {
+func New(protocolParamsFunc func() *iotago.ProtocolParameters, blockIssuerCheck func(*iotago.Block) bool, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
 		events:                  filter.NewEvents(),
 		protocolParamsFunc:      protocolParamsFunc,
 		optsSignatureValidation: true,
-		ledger:                  ledger,
+		blockIssuerCheck:        blockIssuerCheck,
 	}, opts,
 		(*Filter).TriggerConstructed,
 		(*Filter).TriggerInitialized,
@@ -110,7 +111,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	}
 
 	// Check that the issuer of this block has non-negative block issuance credit
-	if f.ledger.IsAccountLocked(block.Block()) {
+	if !f.blockIssuerCheck(block.Block()) {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
 			Reason: errors.WithMessagef(ErrNegativeBIC, "block issuer account is locked due to negative or non-existant BIC"),

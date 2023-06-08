@@ -25,7 +25,6 @@ type Ledger interface {
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
 	StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 	AddUnspentOutput(unspentOutput *utxoledger.Output) error
-	IsAccountLocked(*iotago.Block) bool
 	Import(reader io.ReadSeeker) error
 	Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error
 
