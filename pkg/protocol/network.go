@@ -13,6 +13,9 @@ func (p *Protocol) runNetworkProtocol() {
 	p.networkProtocol = core.NewProtocol(p.dispatcher, p.Workers.CreatePool("NetworkProtocol"), p.API()) // Use max amount of workers for networking
 	p.Events.Network.LinkTo(p.networkProtocol.Events)
 
+	// TODO: the distinction between different worker pools as it is right now does not make much sense:
+	//  instead we should distinguish between wp for handling requested/requesting and wp for handling received stuff
+
 	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks
 
 	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {
@@ -55,5 +58,5 @@ func (p *Protocol) runNetworkProtocol() {
 	wpAttestations := p.Workers.CreatePool("NetworkEvents.Attestations", 1) // Using just 1 worker to avoid contention
 
 	p.Events.Network.AttestationsRequestReceived.Hook(p.ProcessAttestationsRequest, event.WithWorkerPool(wpAttestations))
-	p.Events.Network.AttestationsReceived.Hook(p.ProcessAttestations, event.WithWorkerPool(wpAttestations))
+	// p.Events.Network.AttestationsReceived.Hook(p.ProcessAttestations, event.WithWorkerPool(wpAttestations))
 }

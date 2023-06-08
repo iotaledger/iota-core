@@ -6,6 +6,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -17,6 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -181,16 +184,18 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
+	roots := iotago.NewRoots(
+		iotago.Identifier(ratifiedAcceptedBlocks.Root()),
+		mutationRoot,
+		iotago.Identifier(attestationsRoot),
+		stateRoot,
+		iotago.Identifier(m.slotMutations.weights.Root()),
+	)
+
 	newCommitment := iotago.NewCommitment(
 		index,
 		latestCommitment.ID(),
-		iotago.NewRoots(
-			iotago.Identifier(ratifiedAcceptedBlocks.Root()),
-			mutationRoot,
-			iotago.Identifier(attestationsRoot),
-			stateRoot,
-			iotago.Identifier(m.slotMutations.weights.Root()),
-		).ID(),
+		roots.ID(),
 		cumulativeWeight,
 	)
 
@@ -205,7 +210,17 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	if err = m.storage.Commitments().Store(newModelCommitment); err != nil {
-		m.errorHandler(errors.Wrap(err, "failed to store latest commitment"))
+		m.errorHandler(errors.Wrapf(err, "failed to store latest commitment %s", newModelCommitment.ID()))
+		return false
+	}
+
+	rootsStorage := m.storage.Roots(index)
+	if rootsStorage == nil {
+		m.errorHandler(errors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
+		return false
+	}
+	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(m.storage.Settings().API().Encode(roots))); err != nil {
+		m.errorHandler(errors.Wrapf(err, "failed to store latest roots for commitment %s", newModelCommitment.ID()))
 		return false
 	}
 
