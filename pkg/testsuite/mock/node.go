@@ -104,8 +104,8 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 
-	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, source network.PeerID) {
-		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d\n", n.Name, source, commitment.ID(), len(attestations))
+	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof iotago.Identifier, source network.PeerID) {
+		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s\n", n.Name, source, commitment.ID(), len(attestations), merkleProof)
 	})
 
 	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source network.PeerID) {

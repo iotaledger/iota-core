@@ -72,10 +72,11 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...network.PeerID
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, to ...network.PeerID) {
+func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof iotago.Identifier, to ...network.PeerID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
 		Commitment:   cm.Data(),
 		Attestations: lo.PanicOnErr(p.api.Encode(attestations)),
+		MerkleProof:  merkleProof[:],
 	}}}, protocolID, to...)
 }
 
@@ -110,7 +111,7 @@ func (p *Protocol) handlePacket(nbr network.PeerID, packet proto.Message) (err e
 		p.workerPool.Submit(func() { p.onSlotCommitmentRequest(packetBody.SlotCommitmentRequest.GetCommitmentId(), nbr) })
 	case *nwmodels.Packet_Attestations:
 		p.workerPool.Submit(func() {
-			p.onAttestations(packetBody.Attestations.GetCommitment(), packetBody.Attestations.GetAttestations(), nbr)
+			p.onAttestations(packetBody.Attestations.GetCommitment(), packetBody.Attestations.GetAttestations(), packetBody.Attestations.GetMerkleProof(), nbr)
 		})
 	case *nwmodels.Packet_AttestationsRequest:
 		p.workerPool.Submit(func() {
@@ -178,7 +179,7 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id network.PeerID) {
 	p.Events.SlotCommitmentRequestReceived.Trigger(iotago.CommitmentID(idBytes), id)
 }
 
-func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []byte, id network.PeerID) {
+func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []byte, merkleProof []byte, id network.PeerID) {
 	cm, err := model.CommitmentFromBytes(commitmentBytes, p.api, serix.WithValidation())
 	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize commitment"), id)
@@ -193,7 +194,13 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 		return
 	}
 
-	p.Events.AttestationsReceived.Trigger(cm, attestations, id)
+	if len(merkleProof) != iotago.IdentifierLength {
+		p.Events.Error.Trigger(errors.Wrapf(iotago.ErrInvalidIdentifierLength, "failed to deserialize merkle proof when receiving attestations for commitment %s", cm.ID()), id)
+
+		return
+	}
+
+	p.Events.AttestationsReceived.Trigger(cm, attestations, iotago.Identifier(merkleProof), id)
 }
 
 func (p *Protocol) onAttestationsRequest(commitmentIDBytes []byte, id network.PeerID) {
