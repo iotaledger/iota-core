@@ -431,4 +431,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	// After we detected all forks we can stop issuing activity blocks.
 	cancel()
 	wg.Wait()
+
+	// TODO: We need to wait until nodes switched the chain.
+	time.Sleep(10 * time.Second)
 }

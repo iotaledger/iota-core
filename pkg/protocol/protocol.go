@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -45,6 +46,8 @@ import (
 )
 
 type Protocol struct {
+	context       context.Context
+	contextCancel context.CancelFunc
 	Events        *Events
 	TipManager    tipmanager.TipManager
 	SyncManager   syncmanager.SyncManager
@@ -81,7 +84,11 @@ type Protocol struct {
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return options.Apply(&Protocol{
+		context:                     ctx,
+		contextCancel:               cancel,
 		Events:                      NewEvents(),
 		Workers:                     workers,
 		dispatcher:                  dispatcher,
@@ -155,6 +162,8 @@ func (p *Protocol) linkToEngine(engineInstance *engine.Engine) {
 }
 
 func (p *Protocol) Shutdown() {
+	p.contextCancel()
+
 	if p.networkProtocol != nil {
 		p.networkProtocol.Shutdown()
 	}
@@ -230,7 +239,8 @@ func (p *Protocol) initChainManager() {
 		}
 	}, event.WithWorkerPool(wp))
 
-	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wp))
+	wpForking := p.Workers.CreatePool("Protocol.Forking", 1) // Using just 1 worker to avoid contention
+	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wpForking))
 }
 
 func (p *Protocol) ProcessOwnBlock(block *model.Block) error {

@@ -11,6 +11,7 @@ type ChainID = iotago.CommitmentID
 
 type Fork struct {
 	Source       network.PeerID
+	Chain        *Chain
 	Commitment   *model.Commitment
 	ForkingPoint *model.Commitment
 }
