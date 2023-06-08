@@ -2,6 +2,7 @@ package testsuite
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 	"os"
 	"strings"
@@ -193,6 +194,14 @@ func (t *TestSuite) CreateTransaction(alias string, outputCount int, inputAliase
 	}
 
 	return lo.PanicOnErr(t.TransactionFramework.CreateTransaction(alias, outputCount, inputAliases...))
+}
+
+func (t *TestSuite) CreateOrTransitionAccount(alias string, deposit uint64, keys ...ed25519.PublicKey) *utxoledger.Output {
+	if t.TransactionFramework == nil {
+		panic("cannot create an account without running the network first")
+	}
+
+	return t.TransactionFramework.CreateOrTransitionAccount(alias, deposit, keys...)
 }
 
 func (t *TestSuite) Node(name string) *mock.Node {

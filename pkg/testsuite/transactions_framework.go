@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"crypto/ed25519"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -39,7 +41,64 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte) *T
 	}
 }
 
+func (t *TransactionFramework) CreateOrTransitionAccount(alias string, deposit uint64, keys ...ed25519.PublicKey) *utxoledger.Output {
+	if len(keys) == 0 {
+		keys = []ed25519.PublicKey{lo.Return2(t.wallet.KeyPair())}
+	}
+
+	accountID := utils.RandAccountID()
+	if output, exists := t.states[alias]; exists {
+		accountID = output.Output().(*iotago.AccountOutput).AccountID
+	}
+
+	accountOutput := &iotago.AccountOutput{
+		Amount:    deposit,
+		AccountID: accountID,
+		Conditions: iotago.AccountOutputUnlockConditions{
+			&iotago.StateControllerAddressUnlockCondition{
+				Address: t.wallet.Address(),
+			},
+			&iotago.GovernorAddressUnlockCondition{
+				Address: t.wallet.Address(),
+			},
+		},
+		Features: iotago.AccountOutputFeatures{
+			&iotago.BlockIssuerFeature{
+				BlockIssuerKeys: keys,
+			},
+		},
+	}
+
+	output := utxoledger.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(utils.RandTransactionID(), 0), iotago.EmptyBlockID(), t.api.SlotTimeProvider().IndexFromTime(time.Now()), t.api.SlotTimeProvider().IndexFromTime(time.Now()), accountOutput)
+
+	t.states[alias] = output
+
+	return output
+}
+
 func (t *TransactionFramework) CreateTransaction(alias string, outputCount int, inputAliases ...string) (*iotago.Transaction, error) {
+	inputStates, outputStates, signingWallets := t.PrepareTransaction(outputCount, inputAliases...)
+	transaction, err := t.CreateTransactionWithInputsAndOutputs(inputStates, outputStates, signingWallets)
+	if err != nil {
+		return nil, err
+	}
+
+	t.RegisterTransaction(alias, transaction)
+
+	return transaction, nil
+}
+
+func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.Transaction) {
+	(lo.PanicOnErr(transaction.ID())).RegisterAlias(alias)
+
+	t.transactions[alias] = transaction
+
+	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
+		t.states[fmt.Sprintf("%s:%d", alias, outputID)] = utxoledger.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), uint16(outputID.Index())), iotago.EmptyBlockID(), 0, t.api.SlotTimeProvider().IndexFromTime(time.Now()), output)
+	}
+}
+
+func (t *TransactionFramework) PrepareTransaction(outputCount int, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
 	inputStates := make([]*utxoledger.Output, 0, len(inputAliases))
 	totalInputDeposits := uint64(0)
 	for _, inputAlias := range inputAliases {
@@ -66,20 +125,7 @@ func (t *TransactionFramework) CreateTransaction(alias string, outputCount int, 
 		})
 	}
 
-	transaction, err := t.CreateTransactionWithInputsAndOutputs(inputStates, outputStates, []*mock.HDWallet{t.wallet})
-	if err != nil {
-		panic(err)
-	}
-
-	lo.PanicOnErr(transaction.ID()).RegisterAlias(alias)
-
-	t.transactions[alias] = transaction
-
-	for idx, output := range outputStates {
-		t.states[fmt.Sprintf("%s:%d", alias, idx)] = utxoledger.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), uint16(idx)), iotago.EmptyBlockID(), 0, t.api.SlotTimeProvider().IndexFromTime(time.Now()), output)
-	}
-
-	return transaction, err
+	return inputStates, outputStates, []*mock.HDWallet{t.wallet}
 }
 
 func (t *TransactionFramework) CreateTransactionWithInputsAndOutputs(consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) (*iotago.Transaction, error) {
