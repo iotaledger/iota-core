@@ -26,71 +26,71 @@ type Account interface {
 type AccountData struct {
 	api iotago.API
 
-	id       iotago.AccountID      `serix:"0"`
-	credits  *BlockIssuanceCredits `serix:"1"`
-	outputID iotago.OutputID       `serix:"2"`
-	pubKeys  *advancedset.AdvancedSet[ed25519.PublicKey]
+	AID       iotago.AccountID                            `serix:"0",mapKey="id"`
+	ACredits  *BlockIssuanceCredits                       `serix:"1",mapKey="credits"`
+	AOutputID iotago.OutputID                             `serix:"2",mapKey="outputID"`
+	APubKeys  *advancedset.AdvancedSet[ed25519.PublicKey] `serix:"3",mapKey="pubKeys"`
 }
 
 func NewAccountData(api iotago.API, id iotago.AccountID, credits *BlockIssuanceCredits, outputID iotago.OutputID, pubKeys ...ed25519.PublicKey) *AccountData {
 	return &AccountData{
-		id:       id,
-		credits:  credits,
-		outputID: outputID,
-		pubKeys:  advancedset.New(pubKeys...),
-		api:      api,
+		AID:       id,
+		ACredits:  credits,
+		AOutputID: outputID,
+		APubKeys:  advancedset.New(pubKeys...),
+		api:       api,
 	}
 }
 
 func (a *AccountData) ID() iotago.AccountID {
-	return a.id
+	return a.AID
 }
 
 func (a *AccountData) BlockIssuanceCredits() *BlockIssuanceCredits {
-	return a.credits
+	return a.ACredits
 }
 
 func (a *AccountData) OutputID() iotago.OutputID {
-	return a.outputID
+	return a.AOutputID
 }
 
 func (a *AccountData) SetOutputID(outputID iotago.OutputID) {
-	a.outputID = outputID
+	a.AOutputID = outputID
 }
 
 func (a *AccountData) PubKeys() *advancedset.AdvancedSet[ed25519.PublicKey] {
-	return a.pubKeys
+	return a.APubKeys
 }
 
 func (a *AccountData) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
-	return a.pubKeys.Has(pubKey)
+	return a.APubKeys.Has(pubKey)
 }
 
 func (a *AccountData) AddPublicKey(pubKeys ...ed25519.PublicKey) {
 	for _, pubKey := range pubKeys {
-		a.pubKeys.Add(pubKey)
+		a.APubKeys.Add(pubKey)
 	}
 }
 
 func (a *AccountData) RemovePublicKey(pubKeys ...ed25519.PublicKey) {
 	for _, pubKey := range pubKeys {
-		_ = a.pubKeys.Delete(pubKey)
+		_ = a.APubKeys.Delete(pubKey)
 	}
 }
 
 func (a *AccountData) Clone() Account {
 	keyCopy := advancedset.New[ed25519.PublicKey]()
-	a.pubKeys.Range(func(key ed25519.PublicKey) {
+	a.APubKeys.Range(func(key ed25519.PublicKey) {
 		keyCopy.Add(key)
 	})
 
 	return &AccountData{
-		id: a.ID(),
-		credits: &BlockIssuanceCredits{
+		AID: a.ID(),
+		ACredits: &BlockIssuanceCredits{
 			Value:      a.BlockIssuanceCredits().Value,
 			UpdateTime: a.BlockIssuanceCredits().UpdateTime,
 		},
-		pubKeys: keyCopy,
+		APubKeys: keyCopy,
 	}
 }
 
@@ -99,7 +99,7 @@ func (a *AccountData) FromBytes(bytes []byte) (int, error) {
 }
 
 func (a AccountData) Bytes() ([]byte, error) {
-	b, err := a.api.Encode(a) // TODO: do we need to add here any options?
+	b, err := a.api.Encode(a)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (a AccountData) Bytes() ([]byte, error) {
 }
 
 func (a *AccountData) SnapshotBytes() ([]byte, error) {
-	idBytes, err := a.id.Bytes()
+	idBytes, err := a.AID.Bytes()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal account id")
 	}
@@ -116,8 +116,8 @@ func (a *AccountData) SnapshotBytes() ([]byte, error) {
 	m.WriteInt64(a.BlockIssuanceCredits().Value)
 	m.WriteBytes(a.BlockIssuanceCredits().UpdateTime.Bytes())
 	m.WriteBytes(lo.PanicOnErr(a.OutputID().Bytes()))
-	m.WriteUint64(uint64(a.pubKeys.Size()))
-	a.pubKeys.Range(func(pubKey ed25519.PublicKey) {
+	m.WriteUint64(uint64(a.APubKeys.Size()))
+	a.APubKeys.Range(func(pubKey ed25519.PublicKey) {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
 	})
 
