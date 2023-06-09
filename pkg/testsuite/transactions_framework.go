@@ -94,7 +94,7 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 	t.transactions[alias] = transaction
 
 	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
-		t.states[fmt.Sprintf("%s:%d", alias, outputID)] = utxoledger.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), uint16(outputID.Index())), iotago.EmptyBlockID(), 0, t.api.SlotTimeProvider().IndexFromTime(time.Now()), output)
+		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), uint16(outputID.Index())), iotago.EmptyBlockID(), 0, t.api.SlotTimeProvider().IndexFromTime(time.Now()), output)
 	}
 }
 
