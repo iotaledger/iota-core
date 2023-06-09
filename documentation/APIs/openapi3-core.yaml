@@ -111,7 +111,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IssuanceBlockHeaderResponse'
+                $ref: '#/components/schemas/BlockIssuanceResponse'
               examples:
                 default:
                   $ref: '#/components/examples/get-buildingBlock-response-example'
@@ -578,7 +578,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Commitment'
+                $ref: '#/components/schemas/CommitmentDetailsResponse'
               examples:
                 default:
                   $ref: >-
@@ -685,7 +685,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Commitment'
+                $ref: '#/components/schemas/CommitmentDetailsResponse'
               examples:
                 default:
                   $ref: >-
@@ -2584,7 +2584,7 @@ components:
         - baseToken
         - features
 
-    IssuanceBlockHeaderResponse:
+    BlockIssuanceResponse:
       description: Returns information that are ideal for attaching a block.
       properties:
         strongParents:
@@ -2607,6 +2607,26 @@ components:
           description: The latest finalized slot index.
         commitment:
           $ref: '#/components/schemas/Commitment'
+
+    CommitmentDetailsResponse:
+      description: All information of a commitment. Note, more detailed information will be added to the response.
+      properties:
+        index:
+          type: integer
+          description: The slot index of the commitment.
+        prevId:
+          type: string
+          description: The commitment identifier of the previous slot.
+        rootsId:
+          type: string
+          description: The digest of multiple merkle roots within this slot.
+        cumulativeWeight:
+          type: integer
+          description: 
+            The sum of previous slot commitment cumulative weight and 
+            weight of issuers of accepted blocks within this slot. 
+            It is just an indication of "committed into" this slot,
+            and can not strictly be used for evaluating the switching of a chain.
 
     Commitment:
       description: An object embedded to a block.

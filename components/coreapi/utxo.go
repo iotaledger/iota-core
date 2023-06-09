@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
 func getOutput(c echo.Context) (*ledgerstate.Output, error) {
@@ -24,7 +25,7 @@ func getOutput(c echo.Context) (*ledgerstate.Output, error) {
 	return output, nil
 }
 
-func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
+func getOutputMetadata(c echo.Context) (*nodeclient.OutputMetadataResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, err
@@ -44,13 +45,13 @@ func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
 	return newSpentMetadataResponse(outputID, latestCommitment)
 }
 
-func newOutputMetadataResponse(outputID iotago.OutputID, latestCommitment *model.Commitment) (*outputMetadataResponse, error) {
+func newOutputMetadataResponse(outputID iotago.OutputID, latestCommitment *model.Commitment) (*nodeclient.OutputMetadataResponse, error) {
 	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID.UTXOInput())
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &outputMetadataResponse{
+	resp := &nodeclient.OutputMetadataResponse{
 		BlockID:            output.BlockID().ToHex(),
 		TransactionID:      outputID.TransactionID().ToHex(),
 		OutputIndex:        outputID.Index(),
@@ -70,13 +71,13 @@ func newOutputMetadataResponse(outputID iotago.OutputID, latestCommitment *model
 	return resp, nil
 }
 
-func newSpentMetadataResponse(outputID iotago.OutputID, latestCommitment *model.Commitment) (*outputMetadataResponse, error) {
+func newSpentMetadataResponse(outputID iotago.OutputID, latestCommitment *model.Commitment) (*nodeclient.OutputMetadataResponse, error) {
 	ledgerOutput, err := deps.Protocol.MainEngineInstance().Ledger.Spent(outputID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &outputMetadataResponse{
+	resp := &nodeclient.OutputMetadataResponse{
 		BlockID:            ledgerOutput.BlockID().ToHex(),
 		TransactionID:      outputID.TransactionID().ToHex(),
 		OutputIndex:        outputID.Index(),

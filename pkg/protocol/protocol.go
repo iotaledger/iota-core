@@ -42,6 +42,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient"
+)
+
+var (
+	SupportedVersions = nodeclient.Versions{3} // make sure to add the versions sorted asc
 )
 
 type Protocol struct {
@@ -308,7 +313,7 @@ func (p *Protocol) API() iotago.API {
 	return p.MainEngineInstance().API()
 }
 
-func (p *Protocol) SupportedVersions() Versions {
+func (p *Protocol) SupportedVersions() nodeclient.Versions {
 	return SupportedVersions
 }
 
