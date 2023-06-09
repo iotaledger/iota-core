@@ -62,8 +62,9 @@ type Protocol struct {
 	mainEngine        *engine.Engine
 	candidateEngine   *engine.Engine
 
-	optsBaseDirectory string
-	optsSnapshotPath  string
+	optsBaseDirectory           string
+	optsSnapshotPath            string
+	optsChainSwitchingThreshold int
 
 	optsEngineOptions       []options.Option[engine.Engine]
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
@@ -105,7 +106,8 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          utxoledger.NewProvider(),
 
-		optsBaseDirectory: "",
+		optsBaseDirectory:           "",
+		optsChainSwitchingThreshold: 3,
 	}, opts,
 		(*Protocol).initEngineManager,
 		(*Protocol).initChainManager,

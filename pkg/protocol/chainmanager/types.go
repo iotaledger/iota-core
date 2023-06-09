@@ -11,15 +11,16 @@ type ChainID = iotago.CommitmentID
 
 type Fork struct {
 	Source       network.PeerID
-	Chain        *Chain
-	Commitment   *model.Commitment
+	MainChain    *Chain
+	ForkedChain  *Chain
 	ForkingPoint *model.Commitment
 }
 
 func (f *Fork) String() string {
 	return stringify.Struct("Fork",
 		stringify.NewStructField("Source", f.Source),
-		stringify.NewStructField("Commitment", f.Commitment),
+		stringify.NewStructField("MainChain", f.MainChain.String()),
+		stringify.NewStructField("ForkedChain", f.ForkedChain.String()),
 		stringify.NewStructField("ForkingPoint", f.ForkingPoint),
 	)
 }

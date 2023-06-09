@@ -26,5 +26,7 @@ type Attestations interface {
 
 	RestoreFromDisk() (err error)
 
+	AttestationCommitmentOffset() iotago.SlotIndex
+
 	module.Interface
 }

@@ -104,6 +104,10 @@ func (m *Manager) Shutdown() {
 	m.TriggerStopped()
 }
 
+func (m *Manager) AttestationCommitmentOffset() iotago.SlotIndex {
+	return m.attestationCommitmentOffset
+}
+
 // Get returns the attestations that are included in the commitment of the given slot as list.
 // If attestationOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
 func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestation, err error) {

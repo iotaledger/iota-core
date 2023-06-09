@@ -316,8 +316,8 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 	// commitment.Index is the index you request attestations for.
 	fork := &Fork{
 		Source:       source,
-		Chain:        forkingPoint.Chain(),
-		Commitment:   latestChainCommitment.Commitment(),
+		MainChain:    m.RootCommitment().Chain(),
+		ForkedChain:  forkingPoint.Chain(),
 		ForkingPoint: forkingPoint.Commitment(),
 	}
 	m.forksByForkingPoint.Set(forkingPoint.ID(), fork)
