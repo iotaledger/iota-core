@@ -44,6 +44,7 @@ type TestSuite struct {
 
 	ProtocolParameters iotago.ProtocolParameters
 
+	optsAccounts        []snapshotcreator.AccountDetails
 	optsSnapshotOptions []options.Option[snapshotcreator.Options]
 	optsWaitFor         time.Duration
 	optsTick            time.Duration
@@ -93,6 +94,9 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			}),
 		}
 		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
+		if t.optsAccounts != nil {
+			t.optsSnapshotOptions = append(t.optsSnapshotOptions, snapshotcreator.WithAccounts(t.optsAccounts...))
+		}
 	})
 }
 
@@ -314,7 +318,7 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		node.Initialize(baseOpts...)
 
 		if t.TransactionFramework == nil {
-			t.TransactionFramework = NewTransactionFramework(node.Protocol, genesisSeed[:])
+			t.TransactionFramework = NewTransactionFramework(node.Protocol, genesisSeed[:], t.optsAccounts...)
 		}
 	}
 
@@ -396,6 +400,12 @@ func WithWaitFor(waitFor time.Duration) options.Option[TestSuite] {
 func WithTick(tick time.Duration) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
 		opts.optsTick = tick
+	}
+}
+
+func WithAccounts(accounts ...snapshotcreator.AccountDetails) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsAccounts = accounts
 	}
 }
 

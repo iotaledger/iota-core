@@ -1,6 +1,7 @@
 package snapshotcreator
 
 import (
+	"crypto/ed25519"
 	"os"
 
 	"github.com/pkg/errors"
@@ -19,10 +20,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -81,6 +83,10 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		return errors.Wrap(err, "failed to create genesis outputs")
 	}
 
+	if err := createGenesisAccounts(opt.Accounts, opt.GenesisSeed, engineInstance); err != nil {
+		return errors.Wrap(err, "failed to create genesis account outputs")
+	}
+
 	return engineInstance.WriteSnapshot(opt.FilePath)
 }
 
@@ -89,7 +95,22 @@ func createGenesisOutput(genesisTokenAmount uint64, genesisSeed []byte, engineIn
 		genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
 		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
 
+		// Genesis output is on Genesis TX index 0
 		if err := engineInstance.Ledger.AddUnspentOutput(utxoledger.CreateOutput(engineInstance.API(), iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0), iotago.EmptyBlockID(), 0, 0, output)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func createGenesisAccounts(accounts []AccountDetails, genesisSeed []byte, engineInstance *engine.Engine) error {
+	genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
+
+	// Account outputs start from Genesis TX index 1
+	for idx, account := range accounts {
+		output := createAccount(genesisWallet.Address(), account.Amount, account.Key)
+		if err := engineInstance.Ledger.AddAccount(utxoledger.CreateOutput(engineInstance.API(), iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)); err != nil {
 			return err
 		}
 	}
@@ -109,6 +130,22 @@ func createOutput(address iotago.Address, tokenAmount uint64) (output iotago.Out
 		Amount: tokenAmount,
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: address},
+		},
+	}
+}
+
+func createAccount(address iotago.Address, tokenAmount uint64, pubkey ed25519.PublicKey) (output iotago.Output) {
+	return &iotago.AccountOutput{
+		AccountID: utils.RandAccountID(),
+		Amount:    tokenAmount,
+		Conditions: iotago.AccountOutputUnlockConditions{
+			&iotago.StateControllerAddressUnlockCondition{Address: address},
+			&iotago.GovernorAddressUnlockCondition{Address: address},
+		},
+		Features: iotago.AccountOutputFeatures{
+			&iotago.BlockIssuerFeature{
+				BlockIssuerKeys: []ed25519.PublicKey{pubkey},
+			},
 		},
 	}
 }

@@ -2,6 +2,7 @@ package testsuite
 
 import (
 	"crypto/ed25519"
+	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -26,19 +28,32 @@ type TransactionFramework struct {
 	transactions map[string]*iotago.Transaction
 }
 
-func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte) *TransactionFramework {
+func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, accounts ...snapshotcreator.AccountDetails) *TransactionFramework {
+	// The genesis output is on index 0 of the genesis TX
 	genesisOutput, err := protocol.MainEngineInstance().Ledger.Output(iotago.OutputID{}.UTXOInput())
 	if err != nil {
 		panic(err)
 	}
 
-	return &TransactionFramework{
+	tf := &TransactionFramework{
 		api:          protocol.API(),
 		protoParams:  protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(),
 		states:       map[string]*utxoledger.Output{"Genesis": genesisOutput},
 		transactions: make(map[string]*iotago.Transaction),
 		wallet:       mock.NewHDWallet("genesis", genesisSeed, 0),
 	}
+
+	for idx, account := range accounts {
+		// Genesis TX
+		outputID := iotago.OutputID{}
+		// Accounts start from index 1 of the genesis TX
+		binary.LittleEndian.PutUint16(outputID[iotago.TransactionIDLength:], uint16(idx+1))
+		if tf.states[account.Alias], err = protocol.MainEngineInstance().Ledger.Output(outputID.UTXOInput()); err != nil {
+			panic(err)
+		}
+	}
+
+	return tf
 }
 
 func (t *TransactionFramework) CreateOrTransitionAccount(alias string, deposit uint64, keys ...ed25519.PublicKey) *utxoledger.Output {
