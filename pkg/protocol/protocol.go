@@ -144,22 +144,13 @@ func (p *Protocol) Run() {
 }
 
 func (p *Protocol) linkToEngine(engineInstance *engine.Engine) {
-	if p.TipManager != nil {
-		p.TipManager.Shutdown()
-		p.TipManager = nil
-	}
-
 	if p.SyncManager != nil {
 		p.SyncManager.Shutdown()
 		p.SyncManager = nil
 	}
+	p.SyncManager = p.optsSyncManagerProvider(engineInstance)
 
 	p.Events.Engine.LinkTo(engineInstance.Events)
-
-	p.TipManager = p.optsTipManagerProvider(engineInstance)
-	p.Events.TipManager.LinkTo(p.TipManager.Events())
-
-	p.SyncManager = p.optsSyncManagerProvider(engineInstance)
 }
 
 func (p *Protocol) Shutdown() {
