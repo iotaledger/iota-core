@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 
 	"github.com/pkg/errors"
@@ -185,6 +187,30 @@ func (b *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 	}
 
 	return loadedAccount, true, nil
+}
+
+// AddAccount adds a new account to the Account tree, allotting to it the balance on the given output.
+// The Account will be created associating the given output as the latest state of the account.
+func (b *Manager) AddAccount(output *utxoledger.Output) error {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	accountOutput, ok := output.Output().(*iotago.AccountOutput)
+	if !ok {
+		return errors.Errorf("can't add account, output is not an account output")
+	}
+
+	accountData := accounts.NewAccountData(
+		b.api,
+		accountOutput.AccountID,
+		accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), b.latestCommittedSlot),
+		output.OutputID(),
+		ed25519.PublicKeysFromBlockIssuerKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...,
+	)
+
+	b.accountsTree.Set(accountOutput.AccountID, accountData)
+
+	return nil
 }
 
 func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetIndex iotago.SlotIndex) (wasDestroyed bool, err error) {

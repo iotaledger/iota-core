@@ -512,17 +512,21 @@ func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
 	return l.utxoLedger.AddUnspentOutput(unspentOutput)
 }
 
+func (l *Ledger) AddAccount(output *utxoledger.Output) error {
+	return l.accountsLedger.AddAccount(output)
+}
+
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
 	switch payload := block.Block().Payload.(type) {
 	case mempool.Transaction:
-		transactioMetadata, err := l.memPool.AttachTransaction(payload, block.ID())
+		transactionMetadata, err := l.memPool.AttachTransaction(payload, block.ID())
 		if err != nil {
 			l.errorHandler(err)
 
 			return nil, true
 		}
 
-		return transactioMetadata, true
+		return transactionMetadata, true
 	default:
 
 		return nil, false
