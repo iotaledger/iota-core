@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,6 +45,10 @@ type Node struct {
 	Workers  *workerpool.Group
 
 	Protocol *protocol.Protocol
+
+	forkDetectedCount             atomic.Uint32
+	candidateEngineActivatedCount atomic.Uint32
+	mainEngineSwitchedCount       atomic.Uint32
 }
 
 func NewNode(t *testing.T, net *Network, partition string, name string, weight int64) *Node {
@@ -78,9 +83,22 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 		n.Endpoint,
 		opts...,
 	)
+
+	n.hookEvents()
+
 	n.blockIssuer = blockissuer.New(n.Protocol, blockissuer.NewEd25519Account(n.AccountID, n.privateKey), blockissuer.WithTipSelectionTimeout(3*time.Second), blockissuer.WithTipSelectionRetryInterval(time.Millisecond*100))
 
 	n.Protocol.Run()
+}
+
+func (n *Node) hookEvents() {
+	events := n.Protocol.Events
+
+	events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) { n.forkDetectedCount.Add(1) })
+
+	events.CandidateEngineActivated.Hook(func(e *engine.Engine) { n.candidateEngineActivatedCount.Add(1) })
+
+	events.MainEngineSwitched.Hook(func(e *engine.Engine) { n.mainEngineSwitchedCount.Add(1) })
 }
 
 func (n *Node) HookLogging() {
@@ -142,6 +160,8 @@ func (n *Node) HookLogging() {
 
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
 		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+
+		n.attachEngineLogs(e)
 	})
 
 	events.MainEngineSwitched.Hook(func(e *engine.Engine) {
@@ -319,16 +339,15 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 	return blocks.NewBlock(modelBlock)
 }
 
-func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sync.WaitGroup) {
+func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {
 	go func() {
 		defer wg.Done()
 
-		start := time.Now()
 		fmt.Println(n.Name, "> Starting activity")
 		var counter int
 		for {
 			if ctx.Err() != nil {
-				fmt.Println(n.Name, "> Stopped activity due to canceled context")
+				fmt.Println(n.Name, "> Stopped activity due to canceled context:", ctx.Err())
 				return
 			}
 
@@ -338,11 +357,19 @@ func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sy
 
 			counter++
 			time.Sleep(1 * time.Second)
-			if duration > 0 && time.Since(start) > duration {
-				fmt.Println(n.Name, "> Stopped activity after", time.Since(start))
-				return
-			}
 		}
 
 	}()
+}
+
+func (n *Node) ForkDetectedCount() int {
+	return int(n.forkDetectedCount.Load())
+}
+
+func (n *Node) CandidateEngineActivatedCount() int {
+	return int(n.candidateEngineActivatedCount.Load())
+}
+
+func (n *Node) MainEngineSwitchedCount() int {
+	return int(n.mainEngineSwitchedCount.Load())
 }
