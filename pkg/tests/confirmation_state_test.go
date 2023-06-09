@@ -14,7 +14,7 @@ import (
 )
 
 func TestConfirmationFlags(t *testing.T) {
-	ts := testsuite.NewTestSuite(t)
+	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
 
 	nodeA := ts.AddValidatorNode("nodeA", 25)

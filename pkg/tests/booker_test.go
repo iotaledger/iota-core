@@ -2,7 +2,6 @@ package tests
 
 import (
 	"testing"
-	"time"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -122,8 +121,6 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	nodeA := ts.AddValidatorNode("nodeA", 1)
 	nodeB := ts.AddValidatorNode("nodeB", 1)
-
-	ts.ProtocolParameters.GenesisUnixTimestamp = uint32(time.Now().Truncate(10 * time.Second).Unix())
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 

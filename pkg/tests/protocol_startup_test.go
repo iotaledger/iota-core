@@ -20,7 +20,7 @@ import (
 )
 
 func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
-	ts := testsuite.NewTestSuite(t)
+	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1", 50)
