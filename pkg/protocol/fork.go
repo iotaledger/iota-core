@@ -68,6 +68,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	if !shouldSwitch {
 		// TODO: The chain might become heavier in the future, or the neighbor could just keep sending stuff from a less heavy chain.
 		//  what do we do in this case?
+		return
 	}
 
 	fmt.Println("Should switch chain", blockIDs)

@@ -168,11 +168,16 @@ func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
 	return nil
 }
 
-func (s *Settings) Export(writer io.WriteSeeker) (err error) {
+func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commitment) (err error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	settingsBytes, err := s.Bytes()
+	// Replace latest commitment with target commitment. Usually it will be the same but we need to make sure to align
+	// if we export a snapshot not from the latest commitment.
+	cloned := s.settingsModel.CloneValues()
+	cloned.LatestCommitment = targetCommitment
+
+	settingsBytes, err := cloned.Bytes()
 	if err != nil {
 		return errors.Wrap(err, "failed to convert settings to bytes")
 	}
@@ -268,6 +273,16 @@ func (s *settingsModel) FromBytes(bytes []byte) (int, error) {
 
 func (s settingsModel) Bytes() ([]byte, error) {
 	return serix.DefaultAPI.Encode(context.Background(), s)
+}
+
+func (s *settingsModel) CloneValues() *settingsModel {
+	return &settingsModel{
+		SnapshotImported:        s.SnapshotImported,
+		ProtocolParameters:      s.ProtocolParameters,
+		LatestCommitment:        s.LatestCommitment,
+		LatestStateMutationSlot: s.LatestStateMutationSlot,
+		LatestFinalizedSlot:     s.LatestFinalizedSlot,
+	}
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
