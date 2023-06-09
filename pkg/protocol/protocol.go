@@ -25,6 +25,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/drr"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -75,6 +77,7 @@ type Protocol struct {
 	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsLedgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
+	optsSchedulerProvider       module.Provider[*engine.Engine, scheduler.Scheduler]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -94,6 +97,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          ledger1.NewProvider(),
+		optsSchedulerProvider:       drr.NewProvider(),
 
 		optsBaseDirectory: "",
 	}, opts,

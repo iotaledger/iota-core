@@ -493,3 +493,9 @@ func (b *Block) ModelBlock() *model.Block {
 
 	return b.modelBlock
 }
+
+func (b *Block) Work() int {
+	// TODO: define a work function which takes more than just payload size into account
+	// e.g. number of parents, payload type etc.
+	return b.Block().Payload.Size()
+}

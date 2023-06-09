@@ -75,7 +75,7 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
 		t := NewTipManager(e.Ledger.ConflictDAG(), e.BlockCache.Block, e.EvictionState.LatestRootBlocks, opts...)
 
-		e.Events.Booker.BlockBooked.Hook(t.AddBlock, event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
+		e.Events.Scheduler.BlockScheduled.Hook(t.AddBlock, event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
 		e.BlockCache.Evict.Hook(t.Evict)
 		e.HookStopped(t.Shutdown)
 		e.Events.TipManager.LinkTo(t.events)
