@@ -7,7 +7,6 @@ import (
 
 type Events struct {
 	BlockBooked  *event.Event1[*blocks.Block]
-	WitnessAdded *event.Event1[*blocks.Block]
 	BlockInvalid *event.Event2[*blocks.Block, error]
 	// TODO: hook this up in engine
 
@@ -18,7 +17,6 @@ type Events struct {
 var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 	return &Events{
 		BlockBooked:  event.New1[*blocks.Block](),
-		WitnessAdded: event.New1[*blocks.Block](),
 		BlockInvalid: event.New2[*blocks.Block, error](),
 	}
 })

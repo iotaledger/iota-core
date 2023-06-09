@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -42,8 +43,11 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 		e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
-		// TODO: should this attach to RatifiedAccepted instead?
+		e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
+
 		e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
+		e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
+		// TODO: when should ledgerState be pruned?
 
 		return l
 	})
@@ -81,8 +85,21 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
 	p := promise.New[mempool.State]()
 
+	l.ledgerState.ReadLockLedger()
+	defer l.ledgerState.ReadUnlockLedger()
+
+	isUnspent, err := l.ledgerState.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
+	if err != nil {
+		p.Reject(xerrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
+	}
+
+	if !isUnspent {
+		p.Reject(xerrors.Errorf("unspent output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+	}
+
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
 	output, err := l.ledgerState.ReadOutputByOutputID(stateRef.Ref())
+
 	if err != nil {
 		p.Reject(xerrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	} else {
@@ -242,5 +259,14 @@ func (l *Ledger) BlockAccepted(block *blocks.Block) {
 
 	default:
 		return
+	}
+}
+
+func (l *Ledger) blockPreAccepted(block *blocks.Block) {
+	votePower := booker.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
+	if err := l.conflictDAG.CastVotes(vote.NewVote(block.Block().IssuerID, votePower), block.ConflictIDs()); err != nil {
+		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
+		//  Do we track witness weight of invalid blocks?
+		l.errorHandler(errors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
 }

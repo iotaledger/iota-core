@@ -1,8 +1,9 @@
 package promise
 
-// UniqueID is an identifier for a resource.
+// UniqueID is a unique identifier.
 type UniqueID uint64
 
+// Next returns the next unique identifier.
 func (u *UniqueID) Next() UniqueID {
 	*u++
 

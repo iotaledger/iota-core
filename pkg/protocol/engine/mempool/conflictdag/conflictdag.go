@@ -11,7 +11,9 @@ type ConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePowe
 	Shutdown()
 	Events() *Events[ConflictID, ResourceID]
 
-	CreateOrUpdateConflict(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID], initialAcceptanceState acceptance.State) error
+	CreateConflict(id ConflictID)
+	UpdateConflictingResources(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID]) error
+
 	ReadConsistent(callback func(conflictDAG ReadLockedConflictDAG[ConflictID, ResourceID, VotePower]) error) error
 	UpdateConflictParents(conflictID ConflictID, addedParentIDs, removedParentIDs *advancedset.AdvancedSet[ConflictID]) error
 	FutureCone(conflictIDs *advancedset.AdvancedSet[ConflictID]) (futureCone *advancedset.AdvancedSet[ConflictID])
@@ -20,7 +22,7 @@ type ConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePowe
 	AcceptanceState(conflictIDs *advancedset.AdvancedSet[ConflictID]) acceptance.State
 	UnacceptedConflicts(conflictIDs *advancedset.AdvancedSet[ConflictID]) *advancedset.AdvancedSet[ConflictID]
 	AllConflictsSupported(issuerID iotago.AccountID, conflictIDs *advancedset.AdvancedSet[ConflictID]) bool
-	EvictConflict(conflictID ConflictID) error
+	EvictConflict(conflictID ConflictID)
 
 	ConflictSets(conflictID ConflictID) (conflictSetIDs *advancedset.AdvancedSet[ResourceID], exists bool)
 	ConflictParents(conflictID ConflictID) (conflictIDs *advancedset.AdvancedSet[ConflictID], exists bool)
@@ -28,6 +30,7 @@ type ConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePowe
 	ConflictWeight(conflictID ConflictID) int64
 	ConflictChildren(conflictID ConflictID) (conflictIDs *advancedset.AdvancedSet[ConflictID], exists bool)
 	ConflictVoters(conflictID ConflictID) (voters map[iotago.AccountID]int64)
+	LikedInstead(conflictIDs *advancedset.AdvancedSet[ConflictID]) *advancedset.AdvancedSet[ConflictID]
 }
 
 type ReadLockedConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePower]] interface {

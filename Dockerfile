@@ -1,6 +1,6 @@
 ARG WITH_GO_WORK=0
 # https://hub.docker.com/_/golang
-FROM golang:1.20-bullseye AS env-with-go-work-0
+FROM golang:1.20-bullseye AS base
 
 ARG BUILD_TAGS=rocksdb
 
@@ -13,14 +13,17 @@ RUN mkdir /scratch /app
 
 WORKDIR /scratch
 
+FROM base AS env-with-go-work-0
+
 # Here we assume our build context is the parent directory of iota-core
-COPY ./iota-core ./iota-core
+COPY . ./iota-core
 
 # We don't want go.work files to interfere in this build environment
 RUN rm -f /scratch/iota-core/go.work /scratch/iota-core/go.work.sum
 
-FROM env-with-go-work-0 AS env-with-go-work-1
+FROM base AS env-with-go-work-1
 
+COPY ./iota-core ./iota-core
 COPY ./iota.go ./iota.go
 COPY ./hive.go ./hive.go
 COPY ./inx/go ./inx/go
@@ -29,7 +32,6 @@ COPY ./go.work ./
 COPY ./go.work.sum ./
 
 FROM env-with-go-work-${WITH_GO_WORK} AS build
-ARG WITH_GO_WORK=0
 
 WORKDIR /scratch/iota-core
 
@@ -45,8 +47,8 @@ RUN if [ "${WITH_GO_WORK}" = "0" ]; then go mod verify; fi
 RUN go build -o /app/iota-core -a -tags="$BUILD_TAGS" -ldflags='-w -s'
 
 # Copy the assets
-COPY ./iota-core/config_defaults.json /app/config.json
-COPY ./iota-core/peering.json /app/peering.json
+RUN cp ./config_defaults.json /app/config.json
+RUN cp ./peering.json /app/peering.json
 
 RUN mkdir -p /app/data/peerdb
 

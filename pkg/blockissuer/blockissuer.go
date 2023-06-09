@@ -26,6 +26,11 @@ var (
 	ErrBlockAttacherIncompleteBlockNotAllowed = errors.New("incomplete block is not allowed on this node")
 )
 
+// TODO: make sure an honest validator does not issue blocks within the same slot ratification period in two conflicting chains.
+//  - this can be achieved by remembering the last issued block together with the engine name/chain.
+//  - if the engine name/chain is the same we can always issue a block.
+//  - if the engine name/chain is different we need to make sure to wait "slot ratification" slots.
+
 // BlockIssuer contains logic to create and issue blocks signed by the given account.
 type BlockIssuer struct {
 	events *Events
@@ -330,7 +335,7 @@ func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, _ iotago.Paylo
 	defer timeutil.CleanupTicker(interval)
 
 	for {
-		references = i.protocol.TipManager.Tips(parentsCount)
+		references = i.protocol.MainEngineInstance().TipManager.SelectTips(parentsCount)
 		if len(references[model.StrongParentType]) > 0 {
 			return references, nil
 		}

@@ -35,7 +35,7 @@ const (
 //
 // Example with attestationCommitmentOffset = 2 and lastCommittedSlot = 12:
 //
-//	|      9     |     10     |     11     |     12     |     13     |     14     |     14     |
+//	|      9     |     10     |     11     |     12     |     13     |     14     |     15     |
 //	|            |            |            |            |            |            |            |
 //	|            |            |<-----------|----------->|<-----------|------------|------------>
 //	|            |            | Pending Attestations    | Future Attestations     |            |
@@ -109,7 +109,7 @@ func (m *Manager) AttestationCommitmentOffset() iotago.SlotIndex {
 }
 
 // Get returns the attestations that are included in the commitment of the given slot as list.
-// If attestationOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
+// If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
 func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestation, err error) {
 	adsMap, err := m.GetMap(index)
 	if err != nil {
@@ -129,7 +129,7 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 }
 
 // GetMap returns the attestations that are included in the commitment of the given slot as ads.Map.
-// If attestationOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
+// If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
 func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
 	m.commitmentMutex.RLock()
 	defer m.commitmentMutex.RUnlock()

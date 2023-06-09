@@ -25,6 +25,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -150,12 +151,8 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
 	})
 
-	events.TipManager.TipAdded.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > TipManager.TipAdded: %s\n", n.Name, block.ID())
-	})
-
-	events.TipManager.TipRemoved.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > TipManager.TipRemoved: %s\n", n.Name, block.ID())
+	events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+		fmt.Printf("%s > TipManager.TipAdded: %s in pool %d\n", n.Name, tipMetadata.Block().ID(), tipMetadata.TipPool())
 	})
 
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
@@ -209,8 +206,8 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
 	})
 
-	events.Clock.RatifiedAcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.RatifiedAcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
+	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
+		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s\n", n.Name, engineName, newTime)
 	})
 
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
@@ -234,12 +231,16 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment)
 	})
 
+	events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+	})
+
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
 
-	events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockRatifiedAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
 
 	events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
@@ -247,7 +248,7 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
-		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotConfirmed: %s\n", n.Name, engineName, slotIndex)
+		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
 	})
 
 	instance.Events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {

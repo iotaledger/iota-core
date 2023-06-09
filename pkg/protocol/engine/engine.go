@@ -30,6 +30,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -51,6 +52,7 @@ type Engine struct {
 	Notarization    notarization.Notarization
 	Attestations    attestation.Attestations
 	Ledger          ledger.Ledger
+	TipManager      tipmanager.TipManager
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -85,6 +87,7 @@ func New(
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
+	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -112,6 +115,7 @@ func New(
 			e.Notarization = notarizationProvider(e)
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
+			e.TipManager = tipManagerProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings().TriggerInitialized,
@@ -199,7 +203,7 @@ func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 }
 
 func (e *Engine) IsSynced() (isBootstrapped bool) {
-	return e.IsBootstrapped() // && time.Since(e.Clock.Accepted().Time()) < e.optsBootstrappedThreshold
+	return e.IsBootstrapped() // && time.Since(e.Clock.PreAccepted().Time()) < e.optsBootstrappedThreshold
 }
 
 func (e *Engine) API() iotago.API {
@@ -281,7 +285,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export commitments")
 	} else if err = e.Ledger.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export ledger")
-	} else if err = e.EvictionState.Export(writer, targetSlot); err != nil {
+	} else if err = e.EvictionState.Export(writer, e.Storage.Settings().LatestFinalizedSlot(), targetSlot); err != nil {
+		// The rootcommitment is determined from the rootblocks. Therefore, we need to export starting from the last finalized slot.
 		return errors.Wrap(err, "failed to export eviction state")
 	} else if err = e.Attestations.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export attestation state")
@@ -316,7 +321,7 @@ func (e *Engine) SetChainID(chainID iotago.CommitmentID) {
 func (e *Engine) setupBlockStorage() {
 	wp := e.Workers.CreatePool("BlockStorage", 1) // Using just 1 worker to avoid contention
 
-	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		store := e.Storage.Blocks(block.ID().Index())
 		if store == nil {
 			e.errorHandler(errors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
@@ -333,7 +338,7 @@ func (e *Engine) setupEvictionState() {
 
 	wp := e.Workers.CreatePool("EvictionState", 1) // Using just 1 worker to avoid contention
 
-	e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		block.ForEachParent(func(parent model.Parent) {
 			// TODO: ONLY ADD STRONG PARENTS AFTER NOT DOWNLOADING PAST WEAK ARROWS
 			// TODO: is this correct? could this lock acceptance in some extreme corner case? something like this happened, that confirmation is correctly advancing per block, but acceptance does not. I think it might have something to do with root blocks
@@ -400,6 +405,10 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 // EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
 // commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
 // from being processed as their chain will be deemed unsolid.
+// lastFinalizedSlot is needed to make sure that the root commitment is not younger than the last finalized slot.
+// If setting the root commitment based on the last evicted slot this basically means we won't be able to solidify another
+// chain beyond a window based on eviction, which in turn is based on acceptance. In case of a partition, this behavior is
+// clearly not desired.
 func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment *model.Commitment, valid bool) {
 	earliestRootCommitmentID, valid := e.EvictionState.EarliestRootCommitmentID(lastFinalizedSlot)
 	if !valid {

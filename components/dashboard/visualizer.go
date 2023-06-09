@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 )
 
 // var (
@@ -63,14 +64,15 @@ func runVisualizer(component *app.Component) {
 				// 	currentSlot.Store(int64(block.ID().Index()))
 				// }
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-				sendVertex(block, block.IsAccepted())
+			deps.Protocol.Events.Engine.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+				sendVertex(block, block.IsPreAccepted())
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.TipManager.TipAdded.Hook(func(block *blocks.Block) {
-				sendTipInfo(block, true)
-			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.TipManager.TipRemoved.Hook(func(block *blocks.Block) {
-				sendTipInfo(block, false)
+			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+				sendTipInfo(tipMetadata.Block(), true)
+
+				tipMetadata.OnEvicted(func() {
+					sendTipInfo(tipMetadata.Block(), false)
+				})
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 		)
 		<-ctx.Done()
@@ -93,7 +95,7 @@ func runVisualizer(component *app.Component) {
 // 				res = append(res, vertex{
 // 					ID:              element.ID().Base58(),
 // 					ParentIDsByType: prepareParentReferences(element.M.Block),
-// 					IsFinalized:     element.M.Accepted,
+// 					IsFinalized:     element.M.PreAccepted,
 // 					IsTx:            element.M.Block.Payload().Type() == devnetvm.TransactionType,
 // 					IssuingTime:     element.M.Block.IssuingTime(),
 // 				})

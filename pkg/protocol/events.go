@@ -5,7 +5,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/tipmanager"
 )
 
 type Events struct {
@@ -15,7 +14,6 @@ type Events struct {
 
 	Network      *core.Events
 	Engine       *engine.Events
-	TipManager   *tipmanager.Events
 	ChainManager *chainmanager.Events
 
 	event.Group[Events, *Events]
@@ -29,7 +27,6 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 
 		Network:      core.NewEvents(),
 		Engine:       engine.NewEvents(),
-		TipManager:   tipmanager.NewEvents(),
 		ChainManager: chainmanager.NewEvents(),
 	}
 })
