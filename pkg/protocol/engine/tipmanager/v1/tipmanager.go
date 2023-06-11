@@ -265,6 +265,15 @@ func (t *TipManager) Shutdown() {
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
+	// TODO: unsubscribe on eviction
+	t.updateParents(tipMetadata, map[model.ParentsType]func(*TipMetadata){
+		model.StrongParentType: func(strongParent *TipMetadata) {
+			strongParent.OnIsOrphanedUpdated(func(isOrphaned bool) {
+				tipMetadata.orphanedStrongParents.Compute(lo.Cond(isOrphaned, increase, decrease))
+			})
+		},
+	})
+
 	unsubscribe := lo.Batch(
 		tipMetadata.stronglyConnectedToTips.OnUpdate(func(_, isConnected bool) {
 			t.updateParents(tipMetadata, propagateConnectedChildren(isConnected, true))

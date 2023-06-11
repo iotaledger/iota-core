@@ -45,6 +45,15 @@ type TipMetadata struct {
 	// weakTip is a derived property that is true if the block is part of the weak tip set.
 	weakTip *promise.Value[bool]
 
+	// orphanedStrongParents holds the number of parents that are orphaned.
+	orphanedStrongParents *promise.Value[int]
+
+	// markedOrphaned is a property that is true if the block was marked as orphaned.
+	markedOrphaned *promise.Value[bool]
+
+	// orphaned is a derived property that is true if the block is orphaned.
+	orphaned *promise.Value[bool]
+
 	// evicted is triggered when the block is removed from the TipManager.
 	evicted *promise.Event
 }
@@ -62,6 +71,9 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		weaklyConnectedToTips:     promise.NewValue[bool](),
 		strongTip:                 promise.NewValue[bool](),
 		weakTip:                   promise.NewValue[bool](),
+		orphanedStrongParents:     promise.NewValue[int](),
+		markedOrphaned:            promise.NewValue[bool](),
+		orphaned:                  promise.NewValue[bool](),
 		evicted:                   promise.NewEvent(),
 	}).setup()
 }
@@ -99,6 +111,16 @@ func (t *TipMetadata) IsWeakTip() bool {
 // OnIsWeakTipUpdated registers a callback that is triggered when the IsWeakTip property of the Block is updated.
 func (t *TipMetadata) OnIsWeakTipUpdated(handler func(isWeakTip bool)) (unsubscribe func()) {
 	return t.weakTip.OnUpdate(func(_, isWeakTip bool) { handler(isWeakTip) })
+}
+
+// IsOrphaned returns true if the Block is orphaned.
+func (t *TipMetadata) IsOrphaned() bool {
+	return t.orphaned.Get()
+}
+
+// OnIsOrphanedUpdated registers a callback that is triggered when the IsOrphaned property of the Block is updated.
+func (t *TipMetadata) OnIsOrphanedUpdated(handler func(isOrphaned bool)) (unsubscribe func()) {
+	return t.orphaned.OnUpdate(func(_, isOrphaned bool) { handler(isOrphaned) })
 }
 
 // IsEvicted returns true if the Block was removed from the TipManager.
@@ -166,6 +188,18 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 
 		t.referencedByTips.Compute(func(_ bool) bool {
 			return newCount > 0 || t.stronglyConnectedChildren.Get() > 0
+		})
+	})
+
+	t.markedOrphaned.OnUpdate(func(_, markedOrphaned bool) {
+		t.orphaned.Compute(func(_ bool) bool {
+			return markedOrphaned || t.orphanedStrongParents.Get() > 0
+		})
+	})
+
+	t.orphanedStrongParents.OnUpdate(func(_, orphanedStrongParents int) {
+		t.orphaned.Compute(func(_ bool) bool {
+			return orphanedStrongParents > 0 || t.markedOrphaned.Get()
 		})
 	})
 
