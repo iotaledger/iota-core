@@ -51,7 +51,8 @@ type TipMetadata struct {
 	// markedOrphaned is a property that is true if the block was marked as orphaned.
 	markedOrphaned *promise.Value[bool]
 
-	// orphaned is a derived property that is true if the block is orphaned.
+	// orphaned is a derived property that is true if the block is either marked as orphaned or has at least one
+	// orphaned strong parent.
 	orphaned *promise.Value[bool]
 
 	// evicted is triggered when the block is removed from the TipManager.
@@ -138,7 +139,19 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 	leaveCurrentTipPool := void
 
 	joinTipPool := func(isReferencedByTips *promise.Value[bool], isTip *promise.Value[bool]) {
-		unsubscribe := isReferencedByTips.OnUpdate(func(_, isReferenced bool) { isTip.Set(!isReferenced) })
+		unsubscribe := lo.Batch(
+			isReferencedByTips.OnUpdate(func(_, isReferenced bool) {
+				isTip.Compute(func(_ bool) bool {
+					return !isReferenced && !t.orphaned.Get()
+				})
+			}),
+
+			t.OnIsOrphanedUpdated(func(isOrphaned bool) {
+				isTip.Compute(func(_ bool) bool {
+					return !isOrphaned && !isReferencedByTips.Get()
+				})
+			}),
+		)
 
 		leaveCurrentTipPool = func() {
 			unsubscribe()
