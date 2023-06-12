@@ -6,11 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
-	"github.com/iotaledger/iota-core/pkg/storage"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/utils"
 )
@@ -21,25 +17,11 @@ func Test_TransitionAccount(t *testing.T) {
 		Amount: 2,
 		Key:    utils.RandPubKey().ToEd25519(),
 	}))
-	// ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1", 50)
-	ts.Run(map[string][]options.Option[protocol.Protocol]{
-		"node1": {
-			protocol.WithStorageOptions(
-				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
-				storage.WithPruningDelay(3),
-			),
-			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
-			),
-			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(3),
-			),
-		},
-	})
 
+	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 	ts.HookLogging()
 	ts.Wait()
 
@@ -62,6 +44,7 @@ func Test_TransitionAccount(t *testing.T) {
 	ts.TransactionFramework.RegisterTransaction("TX1", tx1)
 
 	ts.IssueBlock("block1", node1, blockfactory.WithPayload(tx1))
+	ts.IssueBlock("block2", node1, blockfactory.WithStrongParents(ts.BlockIDs("block1")...))
 
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("TX1"), true, node1)
 }

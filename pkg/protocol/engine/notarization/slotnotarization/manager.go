@@ -82,7 +82,6 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 			m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index())
 			m.TriggerConstructed()
 			m.TriggerInitialized()
-
 		})
 
 		return m

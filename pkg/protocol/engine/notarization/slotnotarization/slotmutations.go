@@ -22,9 +22,6 @@ type SlotMutations struct {
 	// ratifiedAcceptedBlocksBySlot stores the accepted blocks per slot.
 	ratifiedAcceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[iotago.BlockID, *iotago.BlockID]]
 
-	// acceptedTransactionsBySlot stores the accepted transactions per slot.
-	//acceptedTransactionsBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[utxo.TransactionID, *utxo.TransactionID]]
-
 	// latestCommittedIndex stores the index of the latest committed slot.
 	latestCommittedIndex iotago.SlotIndex
 
