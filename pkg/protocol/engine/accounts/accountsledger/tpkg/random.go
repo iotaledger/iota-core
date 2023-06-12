@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -27,7 +26,6 @@ func RandomAccountDiff() *prunable.AccountDiff {
 
 func RandomAccountData() *accounts.AccountData {
 	return accounts.NewAccountData(
-		tpkg.API(),
 		utils.RandAccountID(),
 		accounts.NewBlockIssuanceCredits(10, utils.RandSlotIndex()),
 		utils.RandOutputID(),

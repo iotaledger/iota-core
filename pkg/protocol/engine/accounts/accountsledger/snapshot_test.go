@@ -27,7 +27,7 @@ func TestSlotDiffSnapshotWriter(t *testing.T) {
 
 func TestAccountDataSnapshotWriter(t *testing.T) {
 	accountData := tpkg.RandomAccountData()
-	accountsDataBytes, _ := accountData.SnapshotBytes()
+	accountsDataBytes, _ := accountData.Bytes()
 	buf := bytes.NewReader(accountsDataBytes)
 
 	readAccountsData, err := readAccountData(tpkg.API(), buf)

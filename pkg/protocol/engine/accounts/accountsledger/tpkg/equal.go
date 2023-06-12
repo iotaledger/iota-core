@@ -9,8 +9,8 @@ import (
 )
 
 func EqualAccountData(t *testing.T, expected *accounts.AccountData, actual *accounts.AccountData) {
-	require.Equal(t, expected.ID(), actual.ID())
-	require.Equal(t, expected.BlockIssuanceCredits(), actual.BlockIssuanceCredits())
-	require.Equal(t, expected.PubKeys().Size(), actual.PubKeys().Size())
-	actual.PubKeys().Equal(expected.PubKeys())
+	require.Equal(t, expected.ID, actual.ID)
+	require.Equal(t, expected.Credits, actual.Credits)
+	require.Equal(t, expected.PubKeys.Size(), actual.PubKeys.Size())
+	actual.PubKeys.Equal(expected.PubKeys)
 }

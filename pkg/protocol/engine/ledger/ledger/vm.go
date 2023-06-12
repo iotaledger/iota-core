@@ -43,7 +43,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		bicInputSet[inp.AccountID] = iotago.BlockIssuanceCredit{
 			AccountID:    inp.AccountID,
 			CommitmentID: inp.CommitmentID,
-			Value:        b.BlockIssuanceCredits().Value,
+			Value:        b.Credits.Value,
 		}
 	}
 

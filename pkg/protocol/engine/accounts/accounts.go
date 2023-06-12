@@ -14,110 +14,99 @@ type AccountPublicKeys interface {
 	IsPublicKeyAllowed(iotago.AccountID, iotago.SlotIndex, ed25519.PublicKey) bool
 }
 
-type Account interface {
-	ID() iotago.AccountID
-	BlockIssuanceCredits() *BlockIssuanceCredits
-	OutputID() iotago.OutputID
-	IsPublicKeyAllowed(ed25519.PublicKey) bool
-	PubKeys() *advancedset.AdvancedSet[ed25519.PublicKey]
-	Clone() Account
-}
-
 type AccountData struct {
-	api iotago.API
-
-	AID       iotago.AccountID                            `serix:"0",mapKey="id"`
-	ACredits  *BlockIssuanceCredits                       `serix:"1",mapKey="credits"`
-	AOutputID iotago.OutputID                             `serix:"2",mapKey="outputID"`
-	APubKeys  *advancedset.AdvancedSet[ed25519.PublicKey] `serix:"3",mapKey="pubKeys"`
+	ID       iotago.AccountID
+	Credits  *BlockIssuanceCredits
+	OutputID iotago.OutputID
+	PubKeys  *advancedset.AdvancedSet[ed25519.PublicKey]
 }
 
-func NewAccountData(api iotago.API, id iotago.AccountID, credits *BlockIssuanceCredits, outputID iotago.OutputID, pubKeys ...ed25519.PublicKey) *AccountData {
+func NewAccountData(id iotago.AccountID, credits *BlockIssuanceCredits, outputID iotago.OutputID, pubKeys ...ed25519.PublicKey) *AccountData {
 	return &AccountData{
-		AID:       id,
-		ACredits:  credits,
-		AOutputID: outputID,
-		APubKeys:  advancedset.New(pubKeys...),
-		api:       api,
+		ID:       id,
+		Credits:  credits,
+		OutputID: outputID,
+		PubKeys:  advancedset.New(pubKeys...),
 	}
-}
-
-func (a *AccountData) ID() iotago.AccountID {
-	return a.AID
-}
-
-func (a *AccountData) BlockIssuanceCredits() *BlockIssuanceCredits {
-	return a.ACredits
-}
-
-func (a *AccountData) OutputID() iotago.OutputID {
-	return a.AOutputID
-}
-
-func (a *AccountData) SetOutputID(outputID iotago.OutputID) {
-	a.AOutputID = outputID
-}
-
-func (a *AccountData) PubKeys() *advancedset.AdvancedSet[ed25519.PublicKey] {
-	return a.APubKeys
 }
 
 func (a *AccountData) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
-	return a.APubKeys.Has(pubKey)
+	return a.PubKeys.Has(pubKey)
 }
 
-func (a *AccountData) AddPublicKey(pubKeys ...ed25519.PublicKey) {
+func (a *AccountData) AddPublicKeys(pubKeys ...ed25519.PublicKey) {
 	for _, pubKey := range pubKeys {
-		a.APubKeys.Add(pubKey)
+		a.PubKeys.Add(pubKey)
 	}
 }
 
-func (a *AccountData) RemovePublicKey(pubKeys ...ed25519.PublicKey) {
+func (a *AccountData) RemovePublicKeys(pubKeys ...ed25519.PublicKey) {
 	for _, pubKey := range pubKeys {
-		_ = a.APubKeys.Delete(pubKey)
+		_ = a.PubKeys.Delete(pubKey)
 	}
 }
 
-func (a *AccountData) Clone() Account {
+func (a *AccountData) Clone() *AccountData {
 	keyCopy := advancedset.New[ed25519.PublicKey]()
-	a.APubKeys.Range(func(key ed25519.PublicKey) {
+	a.PubKeys.Range(func(key ed25519.PublicKey) {
 		keyCopy.Add(key)
 	})
 
 	return &AccountData{
-		AID: a.ID(),
-		ACredits: &BlockIssuanceCredits{
-			Value:      a.BlockIssuanceCredits().Value,
-			UpdateTime: a.BlockIssuanceCredits().UpdateTime,
+		ID: a.ID,
+		Credits: &BlockIssuanceCredits{
+			Value:      a.Credits.Value,
+			UpdateTime: a.Credits.UpdateTime,
 		},
-		APubKeys: keyCopy,
+		PubKeys: keyCopy,
 	}
 }
 
 func (a *AccountData) FromBytes(bytes []byte) (int, error) {
-	return a.api.Decode(bytes, a)
+	m := marshalutil.New(bytes)
+
+	if _, err := a.ID.FromBytes(lo.PanicOnErr(m.ReadBytes(iotago.IdentifierLength))); err != nil {
+		return 0, errors.Wrap(err, "failed to unmarshal account id")
+	}
+
+	a.Credits = &BlockIssuanceCredits{}
+	if _, err := a.Credits.FromBytes(lo.PanicOnErr(m.ReadBytes(BlockIssuanceCreditsLength))); err != nil {
+		return 0, errors.Wrap(err, "failed to unmarshal block issuance credits")
+	}
+
+	if _, err := a.OutputID.FromBytes(lo.PanicOnErr(m.ReadBytes(iotago.OutputIDLength))); err != nil {
+		return 0, errors.Wrap(err, "failed to unmarshal output id")
+	}
+
+	pubKeysCount, err := m.ReadUint64()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to unmarshal public keys count")
+	}
+
+	a.PubKeys = advancedset.New[ed25519.PublicKey]()
+	for i := uint64(0); i < pubKeysCount; i++ {
+		pubKey := ed25519.PublicKey{}
+		if _, err = pubKey.FromBytes(lo.PanicOnErr(m.ReadBytes(ed25519.PublicKeySize))); err != nil {
+			return 0, errors.Wrap(err, "failed to unmarshal public key")
+		}
+
+		a.AddPublicKeys(pubKey)
+	}
+
+	return m.ReadOffset(), nil
 }
 
 func (a AccountData) Bytes() ([]byte, error) {
-	b, err := a.api.Encode(a)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
-func (a *AccountData) SnapshotBytes() ([]byte, error) {
-	idBytes, err := a.AID.Bytes()
+	idBytes, err := a.ID.Bytes()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal account id")
 	}
 	m := marshalutil.New()
 	m.WriteBytes(idBytes)
-	m.WriteInt64(a.BlockIssuanceCredits().Value)
-	m.WriteBytes(a.BlockIssuanceCredits().UpdateTime.Bytes())
-	m.WriteBytes(lo.PanicOnErr(a.OutputID().Bytes()))
-	m.WriteUint64(uint64(a.APubKeys.Size()))
-	a.APubKeys.Range(func(pubKey ed25519.PublicKey) {
+	m.WriteBytes(lo.PanicOnErr(a.Credits.Bytes()))
+	m.WriteBytes(lo.PanicOnErr(a.OutputID.Bytes()))
+	m.WriteUint64(uint64(a.PubKeys.Size()))
+	a.PubKeys.Range(func(pubKey ed25519.PublicKey) {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
 	})
 

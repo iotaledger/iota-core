@@ -155,7 +155,7 @@ func (b *Manager) ComputeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 }
 
 // Account loads the account's data at a specific slot index.
-func (b *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (account accounts.Account, exists bool, err error) {
+func (b *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
@@ -174,7 +174,7 @@ func (b *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 	// read initial account data at the latest committed slot
 	loadedAccount, exists := b.accountsTree.Get(accountID)
 	if !exists {
-		loadedAccount = accounts.NewAccountData(b.api, accountID, accounts.NewBlockIssuanceCredits(0, targetIndex), loadedAccount.OutputID())
+		loadedAccount = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, targetIndex), loadedAccount.OutputID)
 	}
 	wasDestroyed, err := b.rollbackAccountTo(loadedAccount, targetIndex)
 	if err != nil {
@@ -201,7 +201,6 @@ func (b *Manager) AddAccount(output *utxoledger.Output) error {
 	}
 
 	accountData := accounts.NewAccountData(
-		b.api,
 		accountOutput.AccountID,
 		accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), b.latestCommittedSlot),
 		output.OutputID(),
@@ -221,9 +220,9 @@ func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 			return false, errors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
 		}
 
-		found, err := diffStore.Has(accountData.ID())
+		found, err := diffStore.Has(accountData.ID)
 		if err != nil {
-			return false, errors.Wrapf(err, "can't retrieve account, could not check if diff store for slot (%d) has account (%s)", diffIndex, accountData.ID())
+			return false, errors.Wrapf(err, "can't retrieve account, could not check if diff store for slot (%d) has account (%s)", diffIndex, accountData.ID)
 		}
 
 		// no changes for this account in this slot
@@ -231,16 +230,16 @@ func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 			continue
 		}
 
-		diffChange, destroyed, err := diffStore.Load(accountData.ID())
+		diffChange, destroyed, err := diffStore.Load(accountData.ID)
 		if err != nil {
-			return false, errors.Wrapf(err, "can't retrieve account, could not load diff for account (%s) in slot (%d)", accountData.ID(), diffIndex)
+			return false, errors.Wrapf(err, "can't retrieve account, could not load diff for account (%s) in slot (%d)", accountData.ID, diffIndex)
 		}
 
 		// update the account data with the diff
-		accountData.BlockIssuanceCredits().Update(-diffChange.Change, diffChange.PreviousUpdatedTime)
-		accountData.SetOutputID(diffChange.PreviousOutputID)
-		accountData.AddPublicKey(diffChange.PubKeysRemoved...)
-		accountData.RemovePublicKey(diffChange.PubKeysAdded...)
+		accountData.Credits.Update(-diffChange.Change, diffChange.PreviousUpdatedTime)
+		accountData.OutputID = diffChange.PreviousOutputID
+		accountData.AddPublicKeys(diffChange.PubKeysRemoved...)
+		accountData.RemovePublicKeys(diffChange.PubKeysAdded...)
 
 		// collected to see if account was destroyed between slotIndex and b.latestCommittedSlot index.
 		wasDestroyed = wasDestroyed || destroyed
@@ -277,12 +276,12 @@ func (b *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 
 		accountData, exists := b.accountsTree.Get(accountID)
 		if !exists {
-			accountData = accounts.NewAccountData(b.api, accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
+			accountData = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
 		}
-		accountData.BlockIssuanceCredits().Update(diffChange.Change, index)
-		accountData.SetOutputID(diffChange.NewOutputID)
-		accountData.AddPublicKey(diffChange.PubKeysAdded...)
-		accountData.RemovePublicKey(diffChange.PubKeysRemoved...)
+		accountData.Credits.Update(diffChange.Change, index)
+		accountData.OutputID = diffChange.NewOutputID
+		accountData.AddPublicKeys(diffChange.PubKeysAdded...)
+		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
 		b.accountsTree.Set(accountID, accountData)
 	}
 

@@ -163,17 +163,17 @@ func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iota
 	l.utxoLedger.ReadLockLedger()
 	defer l.utxoLedger.ReadUnlockLedger()
 
-	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(accountMetadata.OutputID())
+	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(accountMetadata.OutputID)
 	if err != nil {
-		return nil, xerrors.Errorf("error while checking account output %s is unspent: %w", accountMetadata.OutputID(), err)
+		return nil, xerrors.Errorf("error while checking account output %s is unspent: %w", accountMetadata.OutputID, err)
 	}
 	if !isUnspent {
-		return nil, xerrors.Errorf("unspent account output %s not found: %w", accountMetadata.OutputID(), mempool.ErrStateNotFound)
+		return nil, xerrors.Errorf("unspent account output %s not found: %w", accountMetadata.OutputID, mempool.ErrStateNotFound)
 	}
 
-	accountOutput, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(accountMetadata.OutputID())
+	accountOutput, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(accountMetadata.OutputID)
 	if err != nil {
-		return nil, xerrors.Errorf("error while retrieving account output %s: %w", accountMetadata.OutputID(), err)
+		return nil, xerrors.Errorf("error while retrieving account output %s: %w", accountMetadata.OutputID, err)
 	}
 
 	return accountOutput, nil
@@ -318,11 +318,11 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 					}
 
 					accountDiff.Change += int64(allotment.Value)
-					accountDiff.PreviousUpdatedTime = accountData.BlockIssuanceCredits().UpdateTime
+					accountDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
 
 					// we are not transitioning the allotted account, so the new and previous outputIDs are the same
-					accountDiff.NewOutputID = accountData.OutputID()
-					accountDiff.PreviousOutputID = accountData.OutputID()
+					accountDiff.NewOutputID = accountData.OutputID
+					accountDiff.PreviousOutputID = accountData.OutputID
 				}
 			}
 
@@ -411,11 +411,11 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			// case 1. the account was destroyed, the diff is the reverse of all current account's data
 			{
 				if destroyedAccounts.Has(consumedAccountID) {
-					accountDiff.Change = -accountData.BlockIssuanceCredits().Value
-					accountDiff.PreviousUpdatedTime = accountData.BlockIssuanceCredits().UpdateTime
+					accountDiff.Change = -accountData.Credits.Value
+					accountDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
 					accountDiff.NewOutputID = iotago.OutputID{}
-					accountDiff.PreviousOutputID = accountData.OutputID()
-					accountDiff.PubKeysRemoved = accountData.PubKeys().Slice()
+					accountDiff.PreviousOutputID = accountData.OutputID
+					accountDiff.PubKeysRemoved = accountData.PubKeys.Slice()
 
 					continue
 				}
@@ -429,7 +429,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 				accountDiff.NewOutputID = createdOutput.OutputID()
 				accountDiff.PreviousOutputID = consumedOutput.OutputID()
 
-				oldPubKeysSet := accountData.PubKeys()
+				oldPubKeysSet := accountData.PubKeys
 				newPubKeysSet := advancedset.New[ed25519.PublicKey]()
 				for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
 					newPubKeysSet.Add(ed25519.PublicKey(pubKey))

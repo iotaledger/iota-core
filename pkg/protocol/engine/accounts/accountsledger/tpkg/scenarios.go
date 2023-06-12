@@ -182,7 +182,6 @@ func (s *scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
 			currentBalance := int64(0) // TODO calculate balance and time
 			currentkeys := make([]ed25519.PublicKey, 0)
 			expected[slotIndex][accountID] = accounts.NewAccountData(
-				API(),
 				accountID,
 				accounts.NewBlockIssuanceCredits(currentBalance, 0),
 				utils.RandOutputID(1), // TODO update the scenario to include outputIDs

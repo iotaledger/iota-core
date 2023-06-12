@@ -88,7 +88,7 @@ func (b *Manager) importAccountTree(reader io.ReadSeeker, accountCount uint64) e
 		if err != nil {
 			return errors.Wrapf(err, "unable to read account data")
 		}
-		b.accountsTree.Set(accountData.ID(), accountData)
+		b.accountsTree.Set(accountData.ID, accountData)
 	}
 
 	return nil
@@ -129,7 +129,7 @@ func (b *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 	for index := b.latestCommittedSlot; index > targetIndex; index-- {
 		b.slotDiff(index).StreamDestroyed(func(accountID iotago.AccountID) bool {
 			// actual data will be filled in by rollbackAccountTo
-			accountData := accounts.NewAccountData(b.api, accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
+			accountData := accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
 
 			destroyedAccounts[accountID] = accountData
 			recreatedAccountsCount++
@@ -314,17 +314,17 @@ func readAccountData(api iotago.API, reader io.ReadSeeker) (*accounts.AccountDat
 		pubKeys[i] = pubKey
 	}
 
-	return accounts.NewAccountData(api, accountID, accounts.NewBlockIssuanceCredits(value, updatedTime), outputID, pubKeys...), nil
+	return accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(value, updatedTime), outputID, pubKeys...), nil
 }
 
 func writeAccountData(writer *utils.PositionedWriter, accountData *accounts.AccountData) error {
-	accountBytes, err := accountData.SnapshotBytes()
+	accountBytes, err := accountData.Bytes()
 	if err != nil {
 		return errors.Wrap(err, "unable to get account data snapshot bytes")
 	}
 
 	if err = writer.WriteValue("account data", accountBytes); err != nil {
-		return errors.Wrapf(err, "unable to write account data for account id %s", accountData.ID().String())
+		return errors.Wrapf(err, "unable to write account data for account id %s", accountData.ID.String())
 	}
 
 	return nil
