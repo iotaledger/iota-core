@@ -295,8 +295,7 @@ func readAccountData(api iotago.API, reader io.ReadSeeker) (*accounts.AccountDat
 	}
 
 	var outputID iotago.OutputID
-
-	if err := binary.Read(reader, binary.LittleEndian, &updatedTime); err != nil {
+	if err := binary.Read(reader, binary.LittleEndian, &outputID); err != nil {
 		return nil, errors.Wrap(err, "unable to read updatedtime for Account balance")
 	}
 

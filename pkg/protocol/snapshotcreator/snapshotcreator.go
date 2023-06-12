@@ -110,7 +110,11 @@ func createGenesisAccounts(accounts []AccountDetails, genesisSeed []byte, engine
 	// Account outputs start from Genesis TX index 1
 	for idx, account := range accounts {
 		output := createAccount(genesisWallet.Address(), account.Amount, account.Key)
-		if err := engineInstance.Ledger.AddAccount(utxoledger.CreateOutput(engineInstance.API(), iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)); err != nil {
+		accountOutput := utxoledger.CreateOutput(engineInstance.API(), iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)
+		if err := engineInstance.Ledger.AddUnspentOutput(accountOutput); err != nil {
+			return err
+		}
+		if err := engineInstance.Ledger.AddAccount(accountOutput); err != nil {
 			return err
 		}
 	}
