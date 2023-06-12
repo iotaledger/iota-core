@@ -114,6 +114,22 @@ func (t *TestSuite) Block(alias string) *blocks.Block {
 	return block
 }
 
+func (t *TestSuite) AccountOutput(alias string) *utxoledger.Output {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	output, exist := t.TransactionFramework.states[alias]
+	if !exist {
+		panic(fmt.Sprintf("account %s not registered", alias))
+	}
+
+	if _, ok := output.Output().(*iotago.AccountOutput); !ok {
+		panic(fmt.Sprintf("output %s is not an account", alias))
+	}
+
+	return output
+}
+
 func (t *TestSuite) BlockID(alias string) iotago.BlockID {
 	return t.Block(alias).ID()
 }
