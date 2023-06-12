@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/iotaledger/iota-core/pkg/utils"
 
@@ -156,6 +155,7 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 	amount := utils.RandAmount()
 	index := utils.RandSlotIndex()
 	slotCreated := utils.RandSlotIndex()
+	timeLockUnlockSlot := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.BasicOutput{
 		Amount: amount,
@@ -169,7 +169,7 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 				Address: address,
 			},
 			&iotago.TimelockUnlockCondition{
-				UnixTime: uint32(time.Now().Unix()),
+				SlotIndex: timeLockUnlockSlot,
 			},
 		},
 	}
@@ -223,6 +223,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 	amount := utils.RandAmount()
 	index := utils.RandSlotIndex()
 	slotCreated := utils.RandSlotIndex()
+	expirationUnlockSlot := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.NFTOutput{
 		Amount: amount,
@@ -240,7 +241,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 				Address: address.ToAddress(),
 			},
 			&iotago.ExpirationUnlockCondition{
-				UnixTime:      uint32(time.Now().Unix()),
+				SlotIndex:     expirationUnlockSlot,
 				ReturnAddress: issuerAddress,
 			},
 		},
