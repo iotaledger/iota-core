@@ -33,11 +33,10 @@ type Settings struct {
 func NewSettings(path string) (settings *Settings) {
 	s := &Settings{
 		settingsModel: storable.InitStruct(&settingsModel{
-			SnapshotImported:        false,
-			ProtocolParameters:      iotago.ProtocolParameters{},
-			LatestCommitment:        iotago.NewEmptyCommitment(),
-			LatestStateMutationSlot: 0,
-			LatestFinalizedSlot:     0,
+			SnapshotImported:    false,
+			ProtocolParameters:  iotago.ProtocolParameters{},
+			LatestCommitment:    iotago.NewEmptyCommitment(),
+			LatestFinalizedSlot: 0,
 		}, path),
 	}
 
@@ -128,26 +127,6 @@ func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err 
 	return nil
 }
 
-func (s *Settings) LatestStateMutationSlot() iotago.SlotIndex {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	return s.settingsModel.LatestStateMutationSlot
-}
-
-func (s *Settings) SetLatestStateMutationSlot(index iotago.SlotIndex) (err error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.settingsModel.LatestStateMutationSlot = index
-
-	if err = s.ToFile(); err != nil {
-		return errors.Wrap(err, "failed to persist latest state mutation slot")
-	}
-
-	return nil
-}
-
 func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -211,7 +190,6 @@ func (s *Settings) String() string {
 	builder.AddField(stringify.NewStructField("SnapshotImported", s.settingsModel.SnapshotImported))
 	builder.AddField(stringify.NewStructField("ProtocolParameters", s.settingsModel.ProtocolParameters))
 	builder.AddField(stringify.NewStructField("LatestCommitment", s.settingsModel.LatestCommitment))
-	builder.AddField(stringify.NewStructField("LatestStateMutationSlot", s.settingsModel.LatestStateMutationSlot))
 	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.settingsModel.LatestFinalizedSlot))
 
 	return builder.String()
@@ -258,11 +236,10 @@ func (s *Settings) UpdateAPI() {
 // region settingsModel ////////////////////////////////////////////////////////////////////////////////////////////////
 
 type settingsModel struct {
-	SnapshotImported        bool                      `serix:"0"`
-	ProtocolParameters      iotago.ProtocolParameters `serix:"1"`
-	LatestCommitment        *iotago.Commitment        `serix:"2"`
-	LatestStateMutationSlot iotago.SlotIndex          `serix:"3"`
-	LatestFinalizedSlot     iotago.SlotIndex          `serix:"4"`
+	SnapshotImported    bool                      `serix:"0"`
+	ProtocolParameters  iotago.ProtocolParameters `serix:"1"`
+	LatestCommitment    *iotago.Commitment        `serix:"2"`
+	LatestFinalizedSlot iotago.SlotIndex          `serix:"3"`
 
 	storable.Struct[settingsModel, *settingsModel]
 }
@@ -277,11 +254,10 @@ func (s settingsModel) Bytes() ([]byte, error) {
 
 func (s *settingsModel) CloneValues() *settingsModel {
 	return &settingsModel{
-		SnapshotImported:        s.SnapshotImported,
-		ProtocolParameters:      s.ProtocolParameters,
-		LatestCommitment:        s.LatestCommitment,
-		LatestStateMutationSlot: s.LatestStateMutationSlot,
-		LatestFinalizedSlot:     s.LatestFinalizedSlot,
+		SnapshotImported:    s.SnapshotImported,
+		ProtocolParameters:  s.ProtocolParameters,
+		LatestCommitment:    s.LatestCommitment,
+		LatestFinalizedSlot: s.LatestFinalizedSlot,
 	}
 }
 
