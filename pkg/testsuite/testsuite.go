@@ -221,7 +221,7 @@ func (t *TestSuite) CreateOrTransitionAccount(alias string, deposit uint64, keys
 		panic("cannot create an account without running the network first")
 	}
 
-	return t.TransactionFramework.CreateOrTransitionAccount(alias, deposit, keys...)
+	return t.TransactionFramework.TransitionAccount(alias, deposit, keys...)
 }
 
 func (t *TestSuite) Node(name string) *mock.Node {

@@ -56,14 +56,16 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 	return tf
 }
 
-func (t *TransactionFramework) CreateOrTransitionAccount(alias string, deposit uint64, keys ...ed25519.PublicKey) *utxoledger.Output {
+func (t *TransactionFramework) TransitionAccount(alias string, deposit uint64, keys ...ed25519.PublicKey) *utxoledger.Output {
 	if len(keys) == 0 {
 		keys = []ed25519.PublicKey{lo.Return2(t.wallet.KeyPair())}
 	}
 
-	accountID := utils.RandAccountID()
+	var accountID iotago.AccountID
 	if output, exists := t.states[alias]; exists {
 		accountID = output.Output().(*iotago.AccountOutput).AccountID
+	} else {
+		panic(fmt.Sprintf("account with alias %s does not exist", alias))
 	}
 
 	accountOutput := &iotago.AccountOutput{
