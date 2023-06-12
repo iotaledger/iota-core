@@ -26,6 +26,10 @@ var (
 	api = iotago.LatestAPI(protocolParams)
 )
 
+func ProtocolParams() *iotago.ProtocolParameters {
+	return protocolParams
+}
+
 func API() iotago.API {
 	return api
 }

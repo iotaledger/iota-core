@@ -18,7 +18,7 @@ func TestSlotDiffSnapshotWriter(t *testing.T) {
 	pWriter := utils.NewPositionedWriter(writer)
 	err := writeSlotDiff(pWriter, accountID, *accountDiff, true)
 
-	accountDiffRead, accountIDRead, destroyedRead, err := readSlotDiff(writer.BytesReader())
+	accountDiffRead, accountIDRead, destroyedRead, err := readSlotDiff(writer.BytesReader(), tpkg.API())
 	require.NoError(t, err)
 	require.Equal(t, accountDiff, accountDiffRead)
 	require.Equal(t, accountID, accountIDRead)

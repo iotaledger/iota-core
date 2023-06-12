@@ -112,7 +112,7 @@ func scenario1() (s scenario) {
 			},
 			testSuite.AccountID("C"): {
 				totalAllotments: 10,
-				burns:           []uint64{-15}, // going negative
+				burns:           []uint64{15}, // going negative
 				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("C3")},
 				removedKeys:     []ed25519.PublicKey{testSuite.PublicKey("C1")},
 			},

@@ -28,7 +28,8 @@ func TestManager_TrackBlock(t *testing.T) {
 		return nil
 	}
 	accountsStore := mapdb.NewMapDB()
-	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
+	params := tpkg.ProtocolParams()
+	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
 
 	for _, blockID := range blockIDs {
 		block, exist := blockFunc(blockID)
