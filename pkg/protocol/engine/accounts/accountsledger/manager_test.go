@@ -36,7 +36,7 @@ func TestManager_TrackBlock(t *testing.T) {
 		require.True(t, exist)
 		manager.TrackBlock(block)
 	}
-	managerBurns, err := manager.ComputeBlockBurnsForSlot(1)
+	managerBurns, err := manager.computeBlockBurnsForSlot(1)
 	require.NoError(t, err)
 	assert.EqualValues(t, burns[1], managerBurns)
 }

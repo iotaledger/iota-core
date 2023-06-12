@@ -111,7 +111,7 @@ func (b *Manager) ApplyDiff(
 	}
 
 	// load blocks burned in this slot
-	burns, err := b.ComputeBlockBurnsForSlot(slotIndex)
+	burns, err := b.computeBlockBurnsForSlot(slotIndex)
 	if err != nil {
 		return errors.Wrap(err, "could not create block burns for slot")
 	}
@@ -135,10 +135,7 @@ func (b *Manager) ApplyDiff(
 	return nil
 }
 
-func (b *Manager) ComputeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
+func (b *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
 	burns = make(map[iotago.AccountID]uint64)
 	if set, exists := b.blockBurns.Get(slotIndex); exists {
 		for it := set.Iterator(); it.HasNext(); {
