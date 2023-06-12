@@ -49,6 +49,8 @@ type Ledger struct {
 	errorHandler       func(error)
 	protocolParameters *iotago.ProtocolParameters
 
+	decayProvider *iotago.DecayProvider
+
 	module.Module
 }
 
@@ -107,6 +109,7 @@ func New(
 		commitmentLoader:   commitmentLoader,
 		conflictDAG:        conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
 		errorHandler:       errorHandler,
+		decayProvider:      protocolParameters.DecayProvider(),
 		protocolParameters: protocolParameters,
 	}
 

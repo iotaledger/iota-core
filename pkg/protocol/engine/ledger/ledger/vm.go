@@ -68,6 +68,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 
 	vmParams := &iotagovm.Params{External: &iotago.ExternalUnlockParameters{
+		DecayProvider:      l.decayProvider,
 		ProtocolParameters: l.protocolParameters,
 	}}
 	if err := stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
