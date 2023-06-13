@@ -404,8 +404,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		node3.IssueActivity(ctxP2, wg)
 		node4.IssueActivity(ctxP2, wg)
 
-		// node 1 and 2 finalized until slot 10. However, the rootcommitment is still at slot 0, that's why we expect a fork detection.
-		ts.AssertForkDetectedCount(1, node1, node2)
+		// node 1 and 2 finalized until slot 10. We do not expect any forks here because our CW is higher than the other partition's
+		ts.AssertForkDetectedCount(0, node1, node2)
 		// P1's chain is heavier, they should not consider switching the chain.
 		ts.AssertCandidateEngineActivatedCount(0, node1, node2)
 		ctxP2Cancel() // we can stop issuing on P2.

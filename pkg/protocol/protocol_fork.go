@@ -79,8 +79,6 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	}
 
 	if !shouldSwitch {
-		// TODO: The chain might become heavier in the future, or the neighbor could just keep sending stuff from a less heavy chain.
-		//  what do we do in this case?
 		return
 	}
 
@@ -167,6 +165,18 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	ctx, cancel := context.WithTimeout(p.context, 2*time.Minute)
 	defer cancel()
 
+	// Fork-choice rule: switch if p.optsChainSwitchingThreshold slots in a row are heavier than main chain.
+	forkChoiceRule := func(heavierCount int) (decided bool, shouldSwitch bool) {
+		switch heavierCount {
+		case p.optsChainSwitchingThreshold:
+			return true, true
+		case -p.optsChainSwitchingThreshold:
+			return true, false
+		default:
+			return false, false
+		}
+	}
+
 	var heavierCount int
 	// We start from the forking point + AttestationCommitmentOffset as that is where the CW of the chains starts diverging.
 	// Only at this slot can nodes start to commit to the different chains.
@@ -175,7 +185,14 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	for i := start; i <= end; i++ {
 		mainChainChainCommitment := fork.MainChain.Commitment(i)
 		if mainChainChainCommitment == nil {
-			// TODO: What do we do? mainchain is shorter than forked chain.
+			// If the forked chain is longer than our main chain, we consider it to be heavier
+			heavierCount++
+
+			if decided, doSwitch := forkChoiceRule(heavierCount); decided {
+				return anchorBlockIDs, doSwitch, false, nil
+			}
+
+			continue
 		}
 		mainChainCommitment := mainChainChainCommitment.Commitment()
 
@@ -200,12 +217,8 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 				heavierCount = 0
 			}
 
-			// Fork-choice rule: switch if p.optsChainSwitchingThreshold slots in a row are heavier than main chain.
-			switch heavierCount {
-			case p.optsChainSwitchingThreshold:
-				return anchorBlockIDs, true, false, nil
-			case -p.optsChainSwitchingThreshold:
-				return nil, false, false, nil
+			if decided, doSwitch := forkChoiceRule(heavierCount); decided {
+				return anchorBlockIDs, doSwitch, false, nil
 			}
 		case <-ctx.Done():
 			return nil, false, false, errors.Wrapf(ctx.Err(), "failed to verify commitment for slot %d", i)
