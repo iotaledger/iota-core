@@ -309,7 +309,15 @@ func (s *State) withinActiveIndexRange(index iotago.SlotIndex) bool {
 // delayedBlockEvictionThreshold returns the slot index that is the threshold for delayed rootblocks eviction.
 func (s *State) delayedBlockEvictionThreshold(slotIndex iotago.SlotIndex) (threshold iotago.SlotIndex, shouldEvict bool) {
 	if slotIndex >= s.optsRootBlocksEvictionDelay {
-		return slotIndex - s.optsRootBlocksEvictionDelay, true
+		// Check if there are even root blocks at the delayed index (empty slots were committed).
+		// We keep shifting the eviction to the past until we find a slot that has root blocks, or we get to genesis.
+		for ; slotIndex > 0; slotIndex-- {
+			if rb := s.rootBlocks.Get(slotIndex); rb != nil {
+				if rb.Size() > 0 {
+					return slotIndex - s.optsRootBlocksEvictionDelay, true
+				}
+			}
+		}
 	}
 
 	return 0, false
