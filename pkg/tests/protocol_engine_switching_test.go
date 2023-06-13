@@ -21,7 +21,7 @@ import (
 )
 
 func TestProtocol_EngineSwitching(t *testing.T) {
-	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
+	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10), testsuite.WithWaitFor(10*time.Second))
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNodeToPartition("node1", 75, "P1")
@@ -380,9 +380,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertLatestCommitmentSlotIndex(11, node1, node2)
 		ts.AssertLatestCommitmentSlotIndex(13, node3, node4)
 
-		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
-		require.Equal(t, node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node4.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
-		require.NotEqual(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+		ts.AssertStorageCommitmentAtIndex(11, node1, node2)
+		ts.AssertStorageCommitmentAtIndex(13, node3, node4)
 	}
 
 	// Merge the partitions
@@ -393,8 +392,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 
-		ctxP2, ctxP2Cancel := context.WithCancel(ctx)
 		ctxP1, ctxP1Cancel := context.WithCancel(ctx)
+		ctxP2, ctxP2Cancel := context.WithCancel(ctx)
 
 		wg := &sync.WaitGroup{}
 		wg.Add(4)
@@ -414,11 +413,14 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		// Nodes from P2 should switch the chain.
 		ts.AssertForkDetectedCount(1, node3, node4)
 		ts.AssertCandidateEngineActivatedCount(1, node3, node4)
-		// TODO: ts.AssertMainEngineSwitchedCount(1, node3, node4)
+
+		// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
+
+		ts.AssertMainEngineSwitchedCount(1, node3, node4)
 
 		ctxP1Cancel()
 		wg.Wait()
 	}
 
-	// TODO: assert node state and that everyone is at the same commitment etc
+	ts.AssertStorageCommitmentAtIndex(100, ts.Nodes()...)
 }
