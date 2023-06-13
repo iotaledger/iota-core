@@ -55,9 +55,22 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 }
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
+	if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil && candidateEngine.ChainID() == fork.ForkingPoint.ID() {
+		//TODO: log instead of error
+		p.ErrorHandler()(errors.Errorf("we are already processing the fork at forkingPoint %s", fork.ForkingPoint.ID()))
+		return
+	}
+
+	if p.MainEngineInstance().ChainID() == fork.ForkingPoint.ID() {
+		//TODO: log instead of error
+		p.ErrorHandler()(errors.Errorf("we already switched our main engine to the fork at forkingPoint %s", fork.ForkingPoint.ID()))
+		return
+	}
+
 	blockIDs, shouldSwitch, banSrc, err := p.processFork(fork)
 	if err != nil {
 		p.ErrorHandler()(errors.Wrapf(err, "failed to handle fork %s at forking point %s from source %s", fork.ForkedChain.LatestCommitment().ID(), fork.ForkingPoint.ID(), fork.Source))
+		return
 	}
 
 	if banSrc {
@@ -125,20 +138,6 @@ type commitmentVerificationResult struct {
 }
 
 func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.BlockIDs, shouldSwitch, banSource bool, err error) {
-	// TODO: should this already be done before we even solidify a chain?
-	{
-		// TODO: check slot of forked chain commitment not in future and that both chains have a similar height
-
-		forkedChainLatestCommitment := fork.ForkedChain.LatestCommitment().Commitment()
-		mainChainLatestCommitment := fork.MainChain.LatestCommitment().Commitment()
-
-		// Check whether the chain is claiming to be heavier than the current main chain.
-		if forkedChainLatestCommitment.CumulativeWeight() <= mainChainLatestCommitment.CumulativeWeight() {
-			// TODO: ban source?
-			return nil, false, false, errors.Errorf("%s with %d CW <= than main chain %d CW", forkedChainLatestCommitment.ID(), forkedChainLatestCommitment.CumulativeWeight(), mainChainLatestCommitment.CumulativeWeight())
-		}
-	}
-
 	// Flow:
 	//  1. request attestations starting from forking point + AttestationCommitmentOffset
 	//  2. request 1 by 1

@@ -10,10 +10,11 @@ import (
 type ChainID = iotago.CommitmentID
 
 type Fork struct {
-	Source       network.PeerID
-	MainChain    *Chain
-	ForkedChain  *Chain
-	ForkingPoint *model.Commitment
+	Source               network.PeerID
+	MainChain            *Chain
+	ForkedChain          *Chain
+	ForkingPoint         *model.Commitment
+	ForkLatestCommitment *model.Commitment
 }
 
 func (f *Fork) String() string {
@@ -22,5 +23,6 @@ func (f *Fork) String() string {
 		stringify.NewStructField("MainChain", f.MainChain.String()),
 		stringify.NewStructField("ForkedChain", f.ForkedChain.String()),
 		stringify.NewStructField("ForkingPoint", f.ForkingPoint),
+		stringify.NewStructField("ForkLatestCommitment", f.ForkLatestCommitment),
 	)
 }
