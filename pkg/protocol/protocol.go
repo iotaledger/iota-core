@@ -47,7 +47,6 @@ import (
 
 type Protocol struct {
 	context       context.Context
-	contextCancel context.CancelFunc
 	Events        *Events
 	SyncManager   syncmanager.SyncManager
 	engineManager *enginemanager.EngineManager
@@ -84,11 +83,7 @@ type Protocol struct {
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
-	ctx, cancel := context.WithCancel(context.Background())
-
 	return options.Apply(&Protocol{
-		context:                     ctx,
-		contextCancel:               cancel,
 		Events:                      NewEvents(),
 		Workers:                     workers,
 		dispatcher:                  dispatcher,
@@ -114,11 +109,17 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 }
 
 // Run runs the protocol.
-func (p *Protocol) Run() {
+func (p *Protocol) Run(ctx context.Context) error {
+	var innerCtxCancel func()
+
+	p.context, innerCtxCancel = context.WithCancel(ctx)
+	defer innerCtxCancel()
+
 	p.linkToEngine(p.mainEngine)
 
+	//nolint:contextcheck // false positive
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
-		panic(err)
+		return errors.Wrapf(err, "mainEngine initialize failed")
 	}
 
 	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
@@ -141,6 +142,16 @@ func (p *Protocol) Run() {
 	}
 
 	p.runNetworkProtocol()
+
+	p.Events.Started.Trigger()
+
+	<-p.context.Done()
+
+	p.shutdown()
+
+	p.Events.Stopped.Trigger()
+
+	return p.context.Err()
 }
 
 func (p *Protocol) linkToEngine(engineInstance *engine.Engine) {
@@ -153,9 +164,7 @@ func (p *Protocol) linkToEngine(engineInstance *engine.Engine) {
 	p.Events.Engine.LinkTo(engineInstance.Events)
 }
 
-func (p *Protocol) Shutdown() {
-	p.contextCancel()
-
+func (p *Protocol) shutdown() {
 	if p.networkProtocol != nil {
 		p.networkProtocol.Shutdown()
 	}

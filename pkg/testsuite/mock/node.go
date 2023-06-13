@@ -35,6 +35,9 @@ type Node struct {
 	Name   string
 	Weight int64
 
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+
 	blockIssuer *blockissuer.BlockIssuer
 
 	privateKey ed25519.PrivateKey
@@ -89,7 +92,23 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 
 	n.blockIssuer = blockissuer.New(n.Protocol, blockissuer.NewEd25519Account(n.AccountID, n.privateKey), blockissuer.WithTipSelectionTimeout(3*time.Second), blockissuer.WithTipSelectionRetryInterval(time.Millisecond*100))
 
-	n.Protocol.Run()
+	n.ctx, n.ctxCancel = context.WithCancel(context.Background())
+
+	started := make(chan struct{}, 1)
+
+	n.Protocol.Events.Started.Hook(func() {
+		close(started)
+	})
+
+	go func() {
+		defer n.ctxCancel()
+
+		if err := n.Protocol.Run(n.ctx); err != nil {
+			fmt.Printf("%s > Run finished with error: %s\n", n.Name, err.Error())
+		}
+	}()
+
+	<-started
 }
 
 func (n *Node) hookEvents() {
@@ -318,8 +337,16 @@ func (n *Node) Wait() {
 }
 
 func (n *Node) Shutdown() {
-	n.Protocol.Shutdown()
+	stopped := make(chan struct{}, 1)
+
+	n.Protocol.Events.Stopped.Hook(func() {
+		close(stopped)
+	})
+
+	n.ctxCancel()
 	n.Workers.Shutdown()
+
+	<-stopped
 }
 
 func (n *Node) CopyIdentityFromNode(otherNode *Node) {
