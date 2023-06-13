@@ -277,11 +277,13 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 // PopulateFromStorage populates the root blocks from the storage.
 func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 	for index := lo.Return1(s.delayedBlockEvictionThreshold(latestCommitmentIndex)); index <= latestCommitmentIndex; index++ {
-		_ = s.rootBlockStorageFunc(index).Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
-			s.AddRootBlock(id, commitmentID)
+		if storedRootBlocks := s.rootBlockStorageFunc(index); storedRootBlocks != nil {
+			_ = storedRootBlocks.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
+				s.AddRootBlock(id, commitmentID)
 
-			return nil
-		})
+				return nil
+			})
+		}
 	}
 }
 
@@ -314,6 +316,16 @@ func (s *State) delayedBlockEvictionThreshold(slotIndex iotago.SlotIndex) (thres
 		for ; slotIndex > 0; slotIndex-- {
 			if rb := s.rootBlocks.Get(slotIndex); rb != nil {
 				if rb.Size() > 0 {
+					return slotIndex - s.optsRootBlocksEvictionDelay, true
+				}
+			} else if storedRootBlocks := s.rootBlockStorageFunc(slotIndex); storedRootBlocks != nil {
+				found := false
+				_ = storedRootBlocks.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
+					found = true
+					return errors.New("no error, just stop")
+				})
+
+				if found {
 					return slotIndex - s.optsRootBlocksEvictionDelay, true
 				}
 			}
