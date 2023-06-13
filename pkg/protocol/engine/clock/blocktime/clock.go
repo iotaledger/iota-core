@@ -48,7 +48,6 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 					}, asyncOpt).Unhook,
 
 					e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-						c.acceptedTime.Advance(block.IssuingTime())
 						c.confirmedTime.Advance(block.IssuingTime())
 					}, asyncOpt).Unhook,
 

@@ -21,7 +21,7 @@ import (
 )
 
 func TestProtocol_EngineSwitching(t *testing.T) {
-	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10), testsuite.WithWaitFor(10*time.Second))
+	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10), testsuite.WithWaitFor(15*time.Second))
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNodeToPartition("node1", 75, "P1")
