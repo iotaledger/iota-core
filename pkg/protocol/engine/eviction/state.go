@@ -1,7 +1,6 @@
 package eviction
 
 import (
-	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -95,7 +94,6 @@ func (s *State) EarliestRootCommitmentID(lastFinalizedSlot iotago.SlotIndex) (ea
 			continue
 		}
 		err := storage.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
-			fmt.Println("  ", id, commitmentID)
 			if commitmentID.Index() < earliestCommitment.Index() {
 				earliestCommitment = commitmentID
 			}
@@ -217,6 +215,9 @@ func (s *State) LatestRootBlocks() iotago.BlockIDs {
 }
 
 // Export exports the root blocks to the given writer.
+// The lowerTarget is usually going to be the last finalized slot because Rootblocks are special when creating a snapshot.
+// They not only are needed as a Tangle root on the slot we're targeting to export (usually last committed slot) but also to derive the rootcommitment.
+// The rootcommitment, however, must not depend on the committed slot but on the finalized slot. Otherwise, we could never switch a chain after committing (as the rootcommitment is our genesis and we don't solidify/switch chains below it).
 func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targetSlot iotago.SlotIndex) (err error) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()

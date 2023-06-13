@@ -29,7 +29,7 @@ type Booker struct {
 
 	blockCache *blocks.Blocks
 
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
 
 	ledger ledger.Ledger
 

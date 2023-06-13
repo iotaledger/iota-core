@@ -69,7 +69,7 @@ func run() error {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(_ *notarization.SlotCommittedDetails) {
 				deps.MetricsTracker.measure()
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.BlockGadget.BlockPreConfirmed.Hook(func(b *blocks.Block) {
+			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
 				deps.MetricsTracker.metrics.ConfirmedBlocks.Inc()
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
 		)

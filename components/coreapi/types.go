@@ -113,11 +113,11 @@ type nodeStatus struct {
 	LastConfirmedBlockID string `json:"lastConfirmedBlockId"`
 	// The latest finalized slot.
 	FinalizedSlot iotago.SlotIndex `json:"latestFinalizedSlot"`
-	// The PreAccepted Tangle Time
+	// The Accepted Tangle Time
 	ATT time.Time `json:"ATT"`
 	// The Relative PreAccepted Tangle Time
 	RATT time.Time `json:"RATT"`
-	// The PreConfirmed Tangle Time
+	// The Confirmed Tangle Time
 	CTT time.Time `json:"CTT"`
 	// The Relative PreConfirmed Tangle Time
 	RCTT time.Time `json:"RCTT"`

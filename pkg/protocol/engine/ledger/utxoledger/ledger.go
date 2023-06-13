@@ -16,7 +16,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -30,8 +29,8 @@ var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provide
 
 type Ledger struct {
 	ledgerState  *ledgerstate.Manager
-	memPool      mempool.MemPool[booker.BlockVotePower]
-	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	memPool      mempool.MemPool[ledger.BlockVotePower]
+	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
 	errorHandler func(error)
 
 	module.Module
@@ -56,16 +55,16 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 func New(workers *workerpool.Group, store kvstore.KVStore, vm mempool.VM, apiProviderFunc func() iotago.API, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], errorHandler func(error)) *Ledger {
 	l := &Ledger{
 		ledgerState:  ledgerstate.New(store, apiProviderFunc),
-		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
+		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](committee),
 		errorHandler: errorHandler,
 	}
 
-	l.memPool = mempoolv1.New(vm, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[booker.BlockVotePower](true))
+	l.memPool = mempoolv1.New(vm, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVotePower](true))
 
 	return l
 }
 
-func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower] {
+func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower] {
 	return l.conflictDAG
 }
 
@@ -263,7 +262,7 @@ func (l *Ledger) BlockAccepted(block *blocks.Block) {
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
-	votePower := booker.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
+	votePower := ledger.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
 	if err := l.conflictDAG.CastVotes(vote.NewVote(block.Block().IssuerID, votePower), block.ConflictIDs()); err != nil {
 		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
 		//  Do we track witness weight of invalid blocks?
