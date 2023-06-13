@@ -118,7 +118,12 @@ func (b *Manager) ApplyDiff(
 
 	// apply the burns to the accountDiffs
 	for id, burn := range burns {
-		accountDiffs[id].Change -= int64(burn)
+		accountDiff, exists := accountDiffs[id]
+		if !exists {
+			accountDiff = prunable.NewAccountDiff()
+			accountDiffs[id] = accountDiff
+		}
+		accountDiff.Change -= int64(burn)
 	}
 
 	// store the diff and apply it to the account vector tree, obtaining the new root
@@ -201,7 +206,7 @@ func (b *Manager) AddAccount(output *utxoledger.Output) error {
 		accountOutput.AccountID,
 		accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), b.latestCommittedSlot),
 		output.OutputID(),
-		ed25519.PublicKeysFromBlockIssuerKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...,
+		ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...,
 	)
 
 	b.accountsTree.Set(accountOutput.AccountID, accountData)

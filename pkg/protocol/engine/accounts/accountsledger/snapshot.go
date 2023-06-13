@@ -184,7 +184,7 @@ func (b *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 }
 
 func readSlotDiff(reader io.ReadSeeker, api iotago.API) (accountID iotago.AccountID, accountDiff *prunable.AccountDiff, destroyed bool, err error) {
-	accountDiff = prunable.NewAccountDiff(api)
+	accountDiff = prunable.NewAccountDiff()
 
 	accountID, err = readAccountID(reader)
 	if err != nil {

@@ -290,8 +290,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 				}
 
 				// output side
-				if createOutputErr := txWithMeta.Outputs().ForEach(func(element mempool.StateMetadata) error {
-					output := utxoledger.CreateOutput(l.utxoLedger.API(), element.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, element.State().Output())
+				if createOutputErr := txWithMeta.Outputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
+					output := utxoledger.CreateOutput(l.utxoLedger.API(), stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), index, txCreationTime, stateMetadata.State().Output())
 					outputs = append(outputs, output)
 
 					return nil
@@ -308,7 +308,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 					accountDiff, exists := accountDiffs[allotment.AccountID]
 					if !exists {
 						// allotments won't change the outputID of the Account, so the diff defaults to empty new and previous outputIDs
-						accountDiff = prunable.NewAccountDiff(l.apiProvider())
+						accountDiff = prunable.NewAccountDiff()
 						accountDiffs[allotment.AccountID] = accountDiff
 					}
 
@@ -399,7 +399,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			// We might have had an allotment on this account, and the diff already exists
 			accountDiff, exists := accountDiffs[consumedAccountID]
 			if !exists {
-				accountDiff = prunable.NewAccountDiff(l.apiProvider())
+				accountDiff = prunable.NewAccountDiff()
 				accountDiffs[consumedAccountID] = accountDiff
 			}
 
@@ -461,7 +461,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 				// We might have had an allotment on this account, and the diff already exists
 				accountDiff, exists := accountDiffs[createdAccountID]
 				if !exists {
-					accountDiff = prunable.NewAccountDiff(l.apiProvider())
+					accountDiff = prunable.NewAccountDiff()
 					accountDiffs[createdAccountID] = accountDiff
 				}
 

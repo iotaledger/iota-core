@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -56,7 +55,7 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 	return tf
 }
 
-func (t *TransactionFramework) TransitionAccount(alias string, deposit uint64, keys ...ed25519.PublicKey) *utxoledger.Output {
+func (t *TransactionFramework) TransitionAccount(alias string, deposit uint64, keys ...ed25519.PublicKey) *iotago.AccountOutput {
 	if len(keys) == 0 {
 		keys = []ed25519.PublicKey{lo.Return2(t.wallet.KeyPair())}
 	}
@@ -68,7 +67,7 @@ func (t *TransactionFramework) TransitionAccount(alias string, deposit uint64, k
 		panic(fmt.Sprintf("account with alias %s does not exist", alias))
 	}
 
-	accountOutput := &iotago.AccountOutput{
+	return &iotago.AccountOutput{
 		Amount:    deposit,
 		AccountID: accountID,
 		Conditions: iotago.AccountOutputUnlockConditions{
@@ -85,12 +84,6 @@ func (t *TransactionFramework) TransitionAccount(alias string, deposit uint64, k
 			},
 		},
 	}
-
-	output := utxoledger.CreateOutput(t.api, iotago.OutputIDFromTransactionIDAndIndex(utils.RandTransactionID(), 0), iotago.EmptyBlockID(), t.api.SlotTimeProvider().IndexFromTime(time.Now()), t.api.SlotTimeProvider().IndexFromTime(time.Now()), accountOutput)
-
-	t.states[alias] = output
-
-	return output
 }
 
 func (t *TransactionFramework) CreateTransaction(alias string, outputCount int, inputAliases ...string) (*iotago.Transaction, error) {
