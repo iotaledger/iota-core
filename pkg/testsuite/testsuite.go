@@ -66,6 +66,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsTick:                   durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 		optsGenesisTimestampOffset: 0,
 	}, opts, func(t *TestSuite) {
+		fmt.Println("Setup TestSuite -", testingT.Name())
 		t.ProtocolParameters = iotago.ProtocolParameters{
 			Version:     3,
 			NetworkName: testingT.Name(),
