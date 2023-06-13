@@ -95,7 +95,7 @@ func runVisualizer(component *app.Component) {
 // 				res = append(res, vertex{
 // 					ID:              element.ID().Base58(),
 // 					ParentIDsByType: prepareParentReferences(element.M.Block),
-// 					IsFinalized:     element.M.Accepted,
+// 					IsFinalized:     element.M.PreAccepted,
 // 					IsTx:            element.M.Block.Payload().Type() == devnetvm.TransactionType,
 // 					IssuingTime:     element.M.Block.IssuingTime(),
 // 				})

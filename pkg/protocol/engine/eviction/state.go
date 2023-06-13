@@ -215,15 +215,22 @@ func (s *State) LatestRootBlocks() iotago.BlockIDs {
 }
 
 // Export exports the root blocks to the given writer.
-func (s *State) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
+// The lowerTarget is usually going to be the last finalized slot because Rootblocks are special when creating a snapshot.
+// They not only are needed as a Tangle root on the slot we're targeting to export (usually last committed slot) but also to derive the rootcommitment.
+// The rootcommitment, however, must not depend on the committed slot but on the finalized slot. Otherwise, we could never switch a chain after committing (as the rootcommitment is our genesis and we don't solidify/switch chains below it).
+func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targetSlot iotago.SlotIndex) (err error) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	start, _ := s.activeIndexRange()
+	start, _ := s.delayedBlockEvictionThreshold(lowerTarget)
 
 	return stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		for currentSlot := start; currentSlot <= targetSlot; currentSlot++ {
-			if err = s.rootBlockStorageFunc(currentSlot).Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
+			storage := s.rootBlockStorageFunc(currentSlot)
+			if storage == nil {
+				continue
+			}
+			if err = storage.Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
 				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
 					return errors.Wrapf(err, "failed to write root block ID %s", rootBlockID)
 				}
@@ -257,7 +264,11 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 			return errors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
 		}
 
-		s.AddRootBlock(rootBlockID, commitmentID)
+		if s.rootBlocks.Get(rootBlockID.Index(), true).Set(rootBlockID, commitmentID) {
+			if err := s.rootBlockStorageFunc(rootBlockID.Index()).Store(rootBlockID, commitmentID); err != nil {
+				panic(errors.Wrapf(err, "failed to store root block %s", rootBlockID))
+			}
+		}
 
 		return nil
 	})

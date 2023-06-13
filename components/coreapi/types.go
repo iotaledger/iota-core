@@ -98,7 +98,7 @@ type infoResponse struct {
 	// The protocol parameters used by this node.
 	ProtocolParameters json.RawMessage `json:"protocol"`
 	// todo The base token of the network.
-	//BaseToken *protocfg.BaseToken `json:"baseToken"`
+	// BaseToken *protocfg.BaseToken `json:"baseToken"`
 	// The features this node exposes.
 	Features []string `json:"features"`
 }
@@ -115,11 +115,11 @@ type nodeStatus struct {
 	FinalizedSlot iotago.SlotIndex `json:"latestFinalizedSlot"`
 	// The Accepted Tangle Time
 	ATT time.Time `json:"ATT"`
-	// The Relative Accepted Tangle Time
+	// The Relative PreAccepted Tangle Time
 	RATT time.Time `json:"RATT"`
 	// The Confirmed Tangle Time
 	CTT time.Time `json:"CTT"`
-	// The Relative Confirmed Tangle Time
+	// The Relative PreConfirmed Tangle Time
 	RCTT time.Time `json:"RCTT"`
 	// The latest known committed slot info.
 	LatestCommittedSlot iotago.SlotIndex `json:"latestCommittedSlot"`

@@ -22,7 +22,7 @@ import (
 )
 
 func TestProtocol_EngineSwitching(t *testing.T) {
-	ts := testsuite.NewTestSuite(t)
+	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNodeToPartition("node1", 75, "P1")
@@ -144,8 +144,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.IssueBlockAtSlot("P1.E3", 9, iotago.NewEmptyCommitment(), node1, ts.Block("P1.E2").ID())
 			ts.IssueBlockAtSlot("P1.E4", 9, iotago.NewEmptyCommitment(), node2, ts.Block("P1.E3").ID())
 
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.E2", "P1.E3"), true, node1, node2)
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P1.D", "P1.E"), true, node1, node2)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P1.E2", "P1.E3"), true, node1, node2)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.D", "P1.E"), true, node1, node2)
 			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P1.D", "P1.E"), true, node1, node2)
 
 			ts.AssertNodeState(ts.Nodes("node1", "node2"),
@@ -168,14 +168,21 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.IssueBlockAtSlot("P1.E6", 9, slot7Commitment, node2, ts.Block("P1.E5").ID())
 
 			ts.IssueBlockAtSlot("P1.F", 10, slot7Commitment, node2, ts.Block("P1.E6").ID())
-			ts.IssueBlockAtSlot("P1.G", 11, slot7Commitment, node1, ts.Block("P1.F").ID())
+			ts.IssueBlockAtSlot("P1.F2", 10, slot7Commitment, node1, ts.Block("P1.E6").ID())
+
+			ts.IssueBlockAtSlot("P1.G", 11, slot7Commitment, node1, ts.BlockIDs("P1.F", "P1.F2")...)
 			ts.IssueBlockAtSlot("P1.G2", 11, slot7Commitment, node2, ts.Block("P1.G").ID())
 			ts.IssueBlockAtSlot("P1.G3", 11, slot7Commitment, node1, ts.Block("P1.G2").ID())
 			ts.IssueBlockAtSlot("P1.G4", 11, slot7Commitment, node2, ts.Block("P1.G3").ID())
 
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.G2", "P1.G3"), true, node1, node2)
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P1.F", "P1.G"), true, node1, node2)
-			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P1.F", "P1.G"), true, node1, node2)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P1.G2", "P1.G3"), true, node1, node2)
+			ts.AssertBlocksInCachePreConfirmed(ts.Blocks("P1.G2", "P1.G3"), true, node1, node2)
+
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P1.G4"), false, node1, node2)
+			ts.AssertBlocksInCachePreConfirmed(ts.Blocks("P1.G4"), false, node1, node2)
+
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.F", "P1.F2", "P1.G"), true, node1, node2)
+			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P1.F", "P1.F2", "P1.G"), true, node1, node2)
 
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node1", "node2"),
@@ -203,8 +210,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.IssueBlockAtSlot("P1.I2", 13, slot9Commitment, node2, ts.Block("P1.I").ID())
 			ts.IssueBlockAtSlot("P1.I3", 13, slot9Commitment, node1, ts.Block("P1.I2").ID())
 
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.I", "P1.I2"), true, node1, node2)
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P1.H"), true, node1, node2)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P1.I", "P1.I2"), true, node1, node2)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.H"), true, node1, node2)
 			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P1.H"), true, node1, node2)
 
 			// Verify that nodes have the expected states.
@@ -245,8 +252,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.IssueBlockAtSlot("P1.O", 13, slot10Commitment, node1, ts.Block("P1.N").ID())
 			ts.IssueBlockAtSlot("P1.P", 13, slot10Commitment, node2, ts.Block("P1.O").ID())
 
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.L1", "P1.L1", "P1.L2", "P1.M", "P1.N", "P1.O"), true, node1, node2)
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P1.L1", "P1.L2", "P1.M"), true, node1, node2)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P1.L1", "P1.L1", "P1.L2", "P1.M", "P1.N", "P1.O"), true, node1, node2)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.L1", "P1.L2", "P1.M"), true, node1, node2)
 			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P1.L1", "P1.L2", "P1.M"), true, node1, node2)
 
 			// Verify that nodes have the expected states.
@@ -286,11 +293,11 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.IssueBlockAtSlot("P2.H", 12, iotago.NewEmptyCommitment(), node4, ts.Block("P2.G").ID())
 			ts.IssueBlockAtSlot("P2.I", 13, iotago.NewEmptyCommitment(), node3, ts.Block("P2.H").ID())
 
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.G", "P2.H"), true, node3, node4)
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.I"), false, node3, node4) // block not referenced yet
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P2.E", "P2.F"), true, node3, node4)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.G", "P2.H"), true, node3, node4)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.I"), false, node3, node4) // block not referenced yet
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.E", "P2.F"), true, node3, node4)
 
-			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P2.E", "P2.F"), false, node3, node4)
+			ts.AssertBlocksInCachePreConfirmed(ts.Blocks("P2.E", "P2.F"), false, node3, node4)
 
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node3", "node4"),
@@ -313,8 +320,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.IssueBlockAtSlot("P2.L4", 13, slot8Commitment, node3, ts.Block("P2.L3").ID())
 			ts.IssueBlockAtSlot("P2.L5", 13, slot8Commitment, node4, ts.Block("P2.L4").ID())
 
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.L1", "P2.L2", "P2.L3", "P2.L4"), true, node3, node4)
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P2.L1", "P2.L2"), true, node3, node4)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.L1", "P2.L2", "P2.L3", "P2.L4"), true, node3, node4)
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.L1", "P2.L2"), true, node3, node4)
 			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P2.L1", "P2.L2"), false, node3, node4) // No supermajority
 
 			// Verify that nodes have the expected states.
@@ -343,9 +350,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.IssueBlockAtSlot("P2.M8", 17, slot11Commitment, node4, ts.Block("P2.M7").ID())
 			ts.IssueBlockAtSlot("P2.M9", 18, slot11Commitment, node3, ts.Block("P2.M8").ID())
 
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.M7", "P2.M8"), true, node3, node4)
-			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.M9"), false, node3, node4) // block not referenced yet
-			ts.AssertBlocksInCacheRatifiedAccepted(ts.Blocks("P2.M5", "P2.M6"), true, node3, node4)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.M7", "P2.M8"), true, node3, node4)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.M9"), false, node3, node4) // block not referenced yet
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.M5", "P2.M6"), true, node3, node4)
 
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node3", "node4"),
