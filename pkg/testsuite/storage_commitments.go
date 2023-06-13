@@ -37,7 +37,7 @@ func (t *TestSuite) AssertStorageCommitmentAtIndex(index iotago.SlotIndex, nodes
 		for _, node := range nodes {
 			storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
 			if err != nil {
-				return errors.Wrapf(err, "AssertStorageCommitmentAtIndex: %s: error loading commitment: %s", node.Name, commitment.MustID())
+				return errors.Wrapf(err, "AssertStorageCommitmentAtIndex: %s: error loading commitment for slot: %d", node.Name, index)
 			}
 
 			if commitment == nil {
