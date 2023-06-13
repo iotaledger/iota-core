@@ -12,7 +12,10 @@ const (
 	rootBlocksPrefix
 	attestationsPrefix
 	rootsPrefix
-	RootsKey
+)
+
+const (
+	RootsKey byte = iota
 )
 
 type Prunable struct {
