@@ -205,11 +205,11 @@ func (p *Protocol) initChainManager() {
 	p.ChainManager = chainmanager.NewManager(p.optsChainManagerOptions...)
 	p.Events.ChainManager.LinkTo(p.ChainManager.Events)
 
-	wp := p.Workers.CreatePool("ChainManager", 1) // Using just 1 worker to avoid contention
-
+	// This needs to be hooked so that the ChainManager always knows the commitments we issued.
+	// Else our own BlockIssuer might use a commitment that the ChainManager does not know yet.
 	p.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 		p.ChainManager.ProcessCommitment(details.Commitment)
-	}, event.WithWorkerPool(wp))
+	})
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		rootCommitment, valid := p.MainEngineInstance().EarliestRootCommitment(index)
@@ -229,7 +229,7 @@ func (p *Protocol) initChainManager() {
 		if rootCommitment.ID().Index() > 0 {
 			p.ChainManager.EvictUntil(rootCommitment.ID().Index() - 1)
 		}
-	}, event.WithWorkerPool(wp))
+	})
 
 	wpForking := p.Workers.CreatePool("Protocol.Forking", 1) // Using just 1 worker to avoid contention
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wpForking))
