@@ -1,8 +1,6 @@
 package thresholdblockgadget
 
 import (
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/votes"
 )
@@ -15,6 +13,8 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 		return
 	}
 
+	var stack []*blocks.Block
+
 	evaluateFunc := func(block *blocks.Block) bool {
 		// Skip propagation if the block is already accepted.
 		if block.IsAccepted() {
@@ -26,31 +26,25 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 			return false
 		}
 
-		g.tryAccept(block)
+		if g.shouldAccept(block) {
+			stack = append([]*blocks.Block{block}, stack...)
+		}
 
 		return true
 	}
 
 	g.propagate(votingBlock.Parents(), evaluateFunc)
+
+	for _, block := range stack {
+		if block.SetAccepted() {
+			g.events.BlockAccepted.Trigger(block)
+		}
+	}
 }
 
-func (g *Gadget) tryAccept(block *blocks.Block) {
+func (g *Gadget) shouldAccept(block *blocks.Block) bool {
 	blockWeight := g.sybilProtection.OnlineCommittee().SelectAccounts(block.AcceptanceRatifiers()...).TotalWeight()
 	onlineCommitteeTotalWeight := g.sybilProtection.OnlineCommittee().TotalWeight()
 
-	if votes.IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {
-		g.acceptanceOrder.Queue(block)
-	}
-}
-
-func (g *Gadget) markAsAccepted(block *blocks.Block) (err error) {
-	if block.SetAccepted() {
-		g.events.BlockAccepted.Trigger(block)
-	}
-
-	return nil
-}
-
-func (g *Gadget) acceptanceFailed(block *blocks.Block, err error) {
-	panic(errors.Wrapf(err, "could not mark block %s as accepted", block.ID()))
+	return votes.IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold)
 }
