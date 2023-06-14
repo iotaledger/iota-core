@@ -34,6 +34,7 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 
 	t.Eventually(func() error {
 		var commitment *iotago.Commitment
+		var commitmentNode *mock.Node
 		for _, node := range nodes {
 			storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
 			if err != nil {
@@ -42,11 +43,12 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 
 			if commitment == nil {
 				commitment = storedCommitment.Commitment()
+				commitmentNode = node
 				continue
 			}
 
 			if !cmp.Equal(*commitment, *storedCommitment.Commitment()) {
-				return errors.Errorf("AssertEqualStoredCommitmentAtIndex: %s: expected %s, got %s", node.Name, commitment, storedCommitment)
+				return errors.Errorf("AssertEqualStoredCommitmentAtIndex: %s: expected %s (from %s), got %s", node.Name, commitment, commitmentNode.Name, storedCommitment)
 			}
 		}
 
