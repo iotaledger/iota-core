@@ -239,7 +239,10 @@ func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 
 		// update the account data with the diff
 		accountData.Credits.Update(-diffChange.Change, diffChange.PreviousUpdatedTime)
-		accountData.OutputID = diffChange.PreviousOutputID
+		// update the outputID only if the account got actually transitioned, not if it was only an allotment target
+		if diffChange.PreviousOutputID != iotago.EmptyOutputID {
+			accountData.OutputID = diffChange.PreviousOutputID
+		}
 		accountData.AddPublicKeys(diffChange.PubKeysRemoved...)
 		accountData.RemovePublicKeys(diffChange.PubKeysAdded...)
 
@@ -281,7 +284,10 @@ func (b *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 			accountData = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
 		}
 		accountData.Credits.Update(diffChange.Change, index)
-		accountData.OutputID = diffChange.NewOutputID
+		// update the outputID only if the account got actually transitioned, not if it was only an allotment target
+		if diffChange.NewOutputID != iotago.EmptyOutputID {
+			accountData.OutputID = diffChange.NewOutputID
+		}
 		accountData.AddPublicKeys(diffChange.PubKeysAdded...)
 		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
 		b.accountsTree.Set(accountID, accountData)
