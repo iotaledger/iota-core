@@ -17,7 +17,7 @@ import (
 type Wallet struct {
 	ID                walletID
 	walletType        WalletType
-	unspentOutputs    map[string][]*Output // maps addr to its unspentOutput
+	unspentOutputs    map[string]*Output // maps addr to its unspentOutput
 	indexAddrMap      map[uint64]string
 	addrIndexMap      map[string]uint64
 	inputTransactions map[string]types.Empty
@@ -43,7 +43,7 @@ func NewWallet(wType ...WalletType) *Wallet {
 		walletType:        walletType,
 		ID:                -1,
 		seed:              tpkg.RandEd25519Seed(),
-		unspentOutputs:    make(map[string][]*Output),
+		unspentOutputs:    make(map[string]*Output),
 		indexAddrMap:      make(map[uint64]string),
 		addrIndexMap:      make(map[string]uint64),
 		inputTransactions: make(map[string]types.Empty),
@@ -87,7 +87,7 @@ func (w *Wallet) AddressOnIndex(index uint64) *iotago.Ed25519Address {
 }
 
 // UnspentOutput returns the unspent output on the address.
-func (w *Wallet) UnspentOutput(addr string) []*Output {
+func (w *Wallet) UnspentOutput(addr string) *Output {
 	w.RLock()
 	defer w.RUnlock()
 
@@ -95,10 +95,10 @@ func (w *Wallet) UnspentOutput(addr string) []*Output {
 }
 
 // UnspentOutputs returns all unspent outputs on the wallet.
-func (w *Wallet) UnspentOutputs() (outputs map[string][]*Output) {
+func (w *Wallet) UnspentOutputs() (outputs map[string]*Output) {
 	w.RLock()
 	defer w.RUnlock()
-	outputs = make(map[string][]*Output)
+	outputs = make(map[string]*Output)
 	for addr, outs := range w.unspentOutputs {
 		outputs[addr] = outs
 	}
@@ -122,18 +122,10 @@ func (w *Wallet) AddrIndexMap(address string) uint64 {
 }
 
 // AddUnspentOutput adds an unspentOutput of a given wallet.
-func (w *Wallet) AddUnspentOutput(addr *iotago.Ed25519Address, addrIdx uint64, outputID iotago.OutputID, balance uint64) *Output {
+func (w *Wallet) AddUnspentOutput(output *Output) {
 	w.Lock()
 	defer w.Unlock()
-
-	out := &Output{
-		OutputID: outputID,
-		Address:  addr,
-		Index:    addrIdx,
-		Balance:  balance,
-	}
-	w.unspentOutputs[addr.String()] = append(w.unspentOutputs[addr.String()], out)
-	return out
+	w.unspentOutputs[output.Address.String()] = output
 }
 
 // UnspentOutputBalance returns the balance on the unspent output sitting on the address specified.
@@ -142,10 +134,8 @@ func (w *Wallet) UnspentOutputBalance(addr string) uint64 {
 	defer w.RUnlock()
 
 	total := uint64(0)
-	if outs, ok := w.unspentOutputs[addr]; ok {
-		for _, o := range outs {
-			total += o.Balance
-		}
+	if out, ok := w.unspentOutputs[addr]; ok {
+		total += out.Balance
 	}
 	return total
 }
@@ -203,13 +193,13 @@ func (w *Wallet) GetUnspentOutput() *Output {
 	switch w.walletType {
 	case Reuse:
 		addr := w.GetReuseAddress()
-		return w.UnspentOutput(addr)[0]
+		return w.UnspentOutput(addr)
 	default:
 		if w.lastAddrSpent.Load() < w.lastAddrIdxUsed.Load() {
 			idx := w.lastAddrSpent.Add(1)
 			addr := w.IndexAddrMap(uint64(idx))
 			outs := w.UnspentOutput(addr)
-			return outs[0]
+			return outs
 		}
 	}
 	return nil

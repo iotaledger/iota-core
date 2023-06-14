@@ -56,6 +56,7 @@ func blockMetadataFromTransactionID(c echo.Context) (*nodeclient.BlockMetadataRe
 		WeakParents:        block.Block().WeakParents.ToHex(),
 		ShallowLikeParents: block.Block().ShallowLikeParents.ToHex(),
 		BlockState:         blockStatePending.String(),
+		TxState:            blockStateConfirmed.String(),
 	}
 
 	return bmResponse, nil

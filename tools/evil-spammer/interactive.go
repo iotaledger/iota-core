@@ -333,7 +333,7 @@ func (m *Mode) prepareFunds() {
 
 		go func() {
 			m.preparingFunds = true
-			_ = m.evilWallet.RequestFreshFaucetWallet()
+			err = m.evilWallet.RequestFreshFaucetWallet()
 			m.preparingFunds = false
 		}()
 	case "10000":

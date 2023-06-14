@@ -24,10 +24,11 @@ type Input struct {
 
 // Output contains details of an output ID.
 type Output struct {
-	OutputID iotago.OutputID
-	Address  *iotago.Ed25519Address
-	Index    uint64
-	Balance  uint64
+	OutputID     iotago.OutputID
+	Address      *iotago.Ed25519Address
+	Index        uint64
+	Balance      uint64
+	CreationTime iotago.SlotIndex
 
 	OutputStruct iotago.Output
 }
@@ -141,9 +142,17 @@ func (o *OutputManager) Track(outputIDs []iotago.OutputID) (allConfirmed bool) {
 
 // CreateOutputFromAddress creates output, retrieves outputID, and adds it to the wallet.
 // Provided address should be generated from provided wallet. Considers only first output found on address.
-func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519Address, balance uint64, outputID iotago.OutputID) *Output {
+func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519Address, balance uint64, outputID iotago.OutputID, creationTime iotago.SlotIndex, outputStruct iotago.Output) *Output {
 	index := w.AddrIndexMap(addr.String())
-	out := w.AddUnspentOutput(addr, index, outputID, balance)
+	out := &Output{
+		Address:      addr,
+		Index:        index,
+		OutputID:     outputID,
+		Balance:      balance,
+		CreationTime: creationTime,
+		OutputStruct: outputStruct,
+	}
+	w.AddUnspentOutput(out)
 	o.setOutputIDWalletMap(outputID.ToHex(), w)
 	o.setOutputIDAddrMap(outputID.ToHex(), addr.String())
 	return out
@@ -152,7 +161,14 @@ func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519A
 // AddOutput adds existing output from wallet w to the OutputManager.
 func (o *OutputManager) AddOutput(w *Wallet, output *Output) *Output {
 	idx := w.AddrIndexMap(output.Address.String())
-	out := w.AddUnspentOutput(output.Address, idx, output.OutputID, output.Balance)
+	out := &Output{
+		Address:      output.Address,
+		Index:        idx,
+		OutputID:     output.OutputID,
+		Balance:      output.Balance,
+		CreationTime: output.CreationTime,
+	}
+	w.AddUnspentOutput(out)
 	o.setOutputIDWalletMap(output.OutputID.ToHex(), w)
 	o.setOutputIDAddrMap(output.OutputID.ToHex(), output.Address.String())
 
@@ -194,7 +210,7 @@ func (o *OutputManager) getOutputFromWallet(outputID iotago.OutputID) (output *O
 	w, ok := o.outputIDWalletMap[outputID.ToHex()]
 	if ok {
 		addr := o.outputIDAddrMap[outputID.ToHex()]
-		output = w.UnspentOutput(addr)[0]
+		output = w.UnspentOutput(addr)
 	}
 	return
 }
@@ -233,16 +249,14 @@ func (o *OutputManager) RequestOutputsByTxID(txID iotago.TransactionID) (outputI
 // AwaitWalletOutputsToBeConfirmed awaits for all outputs in the wallet are confirmed.
 func (o *OutputManager) AwaitWalletOutputsToBeConfirmed(wallet *Wallet) {
 	wg := sync.WaitGroup{}
-	for _, outputs := range wallet.UnspentOutputs() {
+	for _, output := range wallet.UnspentOutputs() {
 		wg.Add(1)
-		if outputs == nil {
+		if output == nil {
 			continue
 		}
 
 		var outs iotago.OutputIDs
-		for _, out := range outputs {
-			outs = append(outs, out.OutputID)
-		}
+		outs = append(outs, output.OutputID)
 
 		go func(outs iotago.OutputIDs) {
 			defer wg.Done()
@@ -261,7 +275,6 @@ func (o *OutputManager) AwaitOutputToBeAccepted(outputID iotago.OutputID, waitFo
 	accepted = false
 	for ; time.Since(s) < waitFor; time.Sleep(awaitConfirmationSleep) {
 		confirmationState := clt.GetOutputConfirmationState(outputID)
-		// TODO: need to make it pending for now
 		if confirmationState == "confirmed" {
 			accepted = true
 			break
@@ -300,7 +313,7 @@ func (o *OutputManager) AwaitTransactionToBeAccepted(txID iotago.TransactionID, 
 	var accepted bool
 	for ; time.Since(s) < waitFor; time.Sleep(awaitConfirmationSleep) {
 		// TODO: need to change to pending for now
-		if confirmationState := clt.GetTransactionConfirmationState(txID); confirmationState == "confirmed" {
+		if confirmationState := clt.GetTransactionConfirmationState(txID); confirmationState == "pending" {
 			accepted = true
 			break
 		}

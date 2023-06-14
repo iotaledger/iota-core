@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -39,8 +38,8 @@ const (
 )
 
 var (
-	defaultClientsURLs   = []string{}
-	faucetBalance        = uint64(1_000_0000)
+	defaultClientsURLs   = []string{"http://localhost:8080", "http://localhost:8090"}
+	faucetBalance        = uint64(100_000_0000)
 	dockerProtocolParams = func() *iotago.ProtocolParameters {
 		options := snapshotcreator.NewOptions(presets.Docker...)
 		return &options.ProtocolParameters
@@ -86,7 +85,20 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 
 		w.faucet = NewWallet()
 		w.faucet.seed = [32]byte(w.optFaucetSeed)
-		w.faucet.AddUnspentOutput(w.faucet.Address(), 0, iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0), faucetBalance)
+
+		// TODO: need to initialize faucet output with provided seed
+		clt := w.connector.GetClient()
+		faucetOutputID := iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0)
+		faucetOutput := clt.GetOutput(faucetOutputID)
+		fmt.Println(faucetOutput)
+		w.faucet.AddUnspentOutput(&Output{
+			Address:      w.faucet.Address(),
+			Index:        0,
+			OutputID:     faucetOutputID,
+			Balance:      faucetBalance,
+			CreationTime: iotago.SlotIndex(0),
+			OutputStruct: faucetOutput,
+		})
 	})
 }
 
@@ -217,12 +229,19 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 	clt := e.connector.GetClient()
 
 	faucetAddr := e.faucet.AddressOnIndex(0)
-	unspentFaucet := e.faucet.UnspentOutput(faucetAddr.String())[0]
+	unspentFaucet := e.faucet.UnspentOutput(faucetAddr.String())
 	remainderAmount := unspentFaucet.Balance - faucetTokensPerRequest
 
 	txBuilder := builder.NewTransactionBuilder(e.optsProtocolParams.NetworkID())
 
-	txBuilder.AddInput(&builder.TxInput{UnlockTarget: faucetAddr, InputID: unspentFaucet.OutputID, Input: unspentFaucet.OutputStruct})
+	txBuilder.AddInput(&builder.TxInput{
+		UnlockTarget: faucetAddr,
+		InputID:      unspentFaucet.OutputID,
+		Input: iotago.OutputWithCreationTime{
+			Output:       unspentFaucet.OutputStruct,
+			CreationTime: unspentFaucet.CreationTime,
+		},
+	})
 
 	// receiver output
 	txBuilder.AddOutput(&iotago.BasicOutput{
@@ -248,12 +267,24 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 	}
 
 	// send transaction
-	_, err = clt.PostTransaction(tx)
+	blkID, err := clt.PostTransaction(tx)
 	if err != nil {
+		fmt.Println("post faucet request failed", err)
 		return iotago.OutputID{}, err
 	}
+	fmt.Println("post faucet request success", blkID)
 
-	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 0))
+	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 0), tx.Essence.CreationTime, tx.Essence.Outputs[0])
+
+	e.faucet.AddUnspentOutput(&Output{
+		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 1),
+		Address:      faucetAddr,
+		Index:        0,
+		Balance:      tx.Essence.Outputs[1].Deposit(),
+		CreationTime: tx.Essence.CreationTime,
+		OutputStruct: tx.Essence.Outputs[1],
+	})
+
 	// track output in output manager and make sure it's confirmed
 	ok := e.outputManager.Track([]iotago.OutputID{output.OutputID})
 	if !ok {
@@ -329,7 +360,7 @@ func (e *EvilWallet) splitOutputs(inputWallet, outputWallet *Wallet, splitNumber
 }
 
 func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitNumber int, inputWallet *Wallet, inputAddr string) (input iotago.OutputID, outputs []*OutputOption) {
-	evilInput := inputWallet.UnspentOutput(inputAddr)[0]
+	evilInput := inputWallet.UnspentOutput(inputAddr)
 	input = evilInput.OutputID
 
 	inputBalance := evilInput.Balance
@@ -454,6 +485,7 @@ func (e *EvilWallet) addOutputsToOutputManager(tx *iotago.Transaction, outWallet
 			Address:      addr,
 			Balance:      o.Deposit(),
 			OutputStruct: o,
+			CreationTime: tx.Essence.CreationTime,
 		}
 
 		if _, ok := tempAddresses[*addr]; ok {
@@ -529,9 +561,7 @@ func (e *EvilWallet) prepareOutputs(buildOptions *Options, tempWallet *Wallet) (
 	addrAliasMap map[iotago.Ed25519Address]string, tempAddresses map[iotago.Ed25519Address]types.Empty, err error,
 ) {
 	if buildOptions.areOutputsProvidedWithoutAliases() {
-		for _, output := range buildOptions.outputs {
-			outputs = append(outputs, output)
-		}
+		outputs = append(outputs, buildOptions.outputs...)
 	} else {
 		// if outputs were provided with aliases
 		outputs, addrAliasMap, tempAddresses, err = e.matchOutputsWithAliases(buildOptions, tempWallet)
@@ -697,8 +727,12 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[iotago.Output], w *Wallet) (tx *iotago.Transaction, err error) {
 
 	txBuilder := builder.NewTransactionBuilder(e.optsProtocolParams.NetworkID())
+
 	for _, input := range inputs {
-		txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Address, InputID: input.OutputID, Input: input.OutputStruct})
+		txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Address, InputID: input.OutputID, Input: iotago.OutputWithCreationTime{
+			Output:       input.OutputStruct,
+			CreationTime: input.CreationTime,
+		}})
 	}
 
 	for _, output := range outputs {
@@ -725,8 +759,8 @@ func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[io
 	return txBuilder.Build(e.optsProtocolParams, iotago.NewInMemoryAddressSigner(walletKeys...))
 }
 
-func (e *EvilWallet) getAddressFromInput(input *ledgerstate.Output) (addr *iotago.Ed25519Address, err error) {
-	out := e.outputManager.GetOutput(input.OutputID())
+func (e *EvilWallet) getAddressFromInput(input *Output) (addr *iotago.Ed25519Address, err error) {
+	out := e.outputManager.GetOutput(input.OutputID)
 	if out == nil {
 		err = errors.New("output not found in output manager")
 		return

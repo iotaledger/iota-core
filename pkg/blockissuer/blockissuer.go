@@ -195,7 +195,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) 
 		resign = true
 	}
 
-	if iotaBlock.SlotCommitment == nil {
+	if iotaBlock.SlotCommitment == nil || iotaBlock.SlotCommitment.Index == iotago.SlotIndex(0) {
 		iotaBlock.SlotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 		iotaBlock.LatestFinalizedSlot = i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		resign = true

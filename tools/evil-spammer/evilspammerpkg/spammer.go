@@ -251,7 +251,7 @@ func (s *Spammer) handleSolidityForReuseOutputs(clt evilwallet.Client, tx *iotag
 	// if s.EvilScenario.OutputWallet.Type() == evilwallet.Reuse {
 	// 	s.EvilWallet.AddReuseOutputsToThePool(tx.Essence().Outputs())
 	// }
-	return
+	return true
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
