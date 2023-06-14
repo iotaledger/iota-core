@@ -5,8 +5,10 @@ import (
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -57,8 +59,12 @@ func BlockFuncGen(t *testing.T, burnsPerSlot map[iotago.SlotIndex]map[iotago.Acc
 
 func InitSlotDiff() (func(index iotago.SlotIndex) *prunable.AccountDiffs, map[iotago.SlotIndex]*prunable.AccountDiffs) {
 	slotDiffs := make(map[iotago.SlotIndex]*prunable.AccountDiffs)
-	slotDiffFunc := func(index iotago.SlotIndex) *prunable.AccountDiffs {
-		return slotDiffs[index]
+	store := mapdb.NewMapDB()
+	slotDiffFunc = func(index iotago.SlotIndex) *prunable.AccountDiffs {
+		if slotDiff, exists := slotDiffs[index]; exists {
+			return slotDiff
+		}
+		return prunable.NewAccountDiffs(index, store, tpkg.API())
 	}
 	return slotDiffFunc, slotDiffs
 }
