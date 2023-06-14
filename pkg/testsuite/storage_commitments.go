@@ -29,7 +29,7 @@ func (t *TestSuite) AssertStorageCommitments(commitments []*iotago.Commitment, n
 	}
 }
 
-func (t *TestSuite) AssertStorageCommitmentAtIndex(index iotago.SlotIndex, nodes ...*mock.Node) {
+func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	t.Eventually(func() error {
@@ -37,7 +37,7 @@ func (t *TestSuite) AssertStorageCommitmentAtIndex(index iotago.SlotIndex, nodes
 		for _, node := range nodes {
 			storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
 			if err != nil {
-				return errors.Wrapf(err, "AssertStorageCommitmentAtIndex: %s: error loading commitment for slot: %d", node.Name, index)
+				return errors.Wrapf(err, "AssertEqualStoredCommitmentAtIndex: %s: error loading commitment for slot: %d", node.Name, index)
 			}
 
 			if commitment == nil {
@@ -46,7 +46,7 @@ func (t *TestSuite) AssertStorageCommitmentAtIndex(index iotago.SlotIndex, nodes
 			}
 
 			if !cmp.Equal(*commitment, *storedCommitment.Commitment()) {
-				return errors.Errorf("AssertStorageCommitmentAtIndex: %s: expected %s, got %s", node.Name, commitment, storedCommitment)
+				return errors.Errorf("AssertEqualStoredCommitmentAtIndex: %s: expected %s, got %s", node.Name, commitment, storedCommitment)
 			}
 		}
 

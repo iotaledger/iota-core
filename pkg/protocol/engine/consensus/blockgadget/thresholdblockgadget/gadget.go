@@ -74,6 +74,10 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 			continue
 		}
 
+		if !block.IsBooked() {
+			panic(fmt.Sprintf("block %s is not booked", blockID))
+		}
+
 		if !evaluateFunc(block) {
 			continue
 		}

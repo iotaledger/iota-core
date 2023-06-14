@@ -40,6 +40,9 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.storageCommitments != nil {
 		t.AssertStorageCommitments(*state.storageCommitments, nodes...)
 	}
+	if state.storageCommitmentAtIndex != nil {
+		t.AssertEqualStoredCommitmentAtIndex(*state.storageCommitmentAtIndex, nodes...)
+	}
 	if state.storageRootBlocks != nil {
 		t.AssertStorageRootBlocks(*state.storageRootBlocks, nodes...)
 	}
@@ -69,7 +72,8 @@ type NodeState struct {
 	sybilProtectionCommittee       *map[iotago.AccountID]int64
 	sybilProtectionOnlineCommittee *map[iotago.AccountID]int64
 
-	storageCommitments *[]*iotago.Commitment
+	storageCommitments       *[]*iotago.Commitment
+	storageCommitmentAtIndex *iotago.SlotIndex
 
 	storageRootBlocks *[]*blocks.Block
 	activeRootBlocks  *[]*blocks.Block
@@ -102,6 +106,12 @@ func WithLatestCommitment(commitment *iotago.Commitment) options.Option[NodeStat
 func WithLatestCommitmentSlotIndex(slotIndex iotago.SlotIndex) options.Option[NodeState] {
 	return func(state *NodeState) {
 		state.latestCommitmentSlotIndex = &slotIndex
+	}
+}
+
+func WithEqualStoredCommitmentAtIndex(slotIndex iotago.SlotIndex) options.Option[NodeState] {
+	return func(state *NodeState) {
+		state.storageCommitmentAtIndex = &slotIndex
 	}
 }
 
