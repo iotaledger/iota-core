@@ -106,6 +106,8 @@ func (s scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
 			accData.AddPublicKeys(actions.addedKeys...)
 			accData.RemovePublicKeys(actions.removedKeys...)
 
+			expected[slotIndex].AccountsLedger[accountID] = accData
+
 			// populate diffs
 			expected[slotIndex].AccountsDiffs[accountID] = &prunable.AccountDiff{
 				Change:              change,

@@ -1,6 +1,7 @@
 package accountsledger
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -73,6 +74,7 @@ func TestManager_CommitSlot(t *testing.T) {
 		}
 		for accID, expectedDiff := range expectedData.AccountsDiffs {
 			// todo waht with destroyed assertion
+			fmt.Print(accID, expectedDiff.Change)
 			actualAccDiff, _, err := manager.LoadSlotDiff(index, accID)
 			require.NoError(t, err)
 			assert.Equal(t, expectedDiff, actualAccDiff)
