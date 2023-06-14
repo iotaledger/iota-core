@@ -21,6 +21,7 @@ func DataSpammingFunction(s *Spammer) {
 	blkID, err := clt.PostData([]byte("SPAM"))
 	if err != nil {
 		s.ErrCounter.CountError(ErrFailSendDataBlock)
+		s.log.Error(err)
 	}
 
 	count := s.State.txSent.Add(1)

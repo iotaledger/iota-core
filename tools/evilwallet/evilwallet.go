@@ -24,7 +24,7 @@ import (
 const (
 	// FaucetRequestSplitNumber defines the number of outputs to split from a faucet request.
 	FaucetRequestSplitNumber = 100
-	faucetTokensPerRequest   = 10000
+	faucetTokensPerRequest   = 10_0000
 
 	waitForConfirmation   = 150 * time.Second
 	waitForSolidification = 150 * time.Second
@@ -39,7 +39,7 @@ const (
 
 var (
 	defaultClientsURLs   = []string{"http://localhost:8080", "http://localhost:8090"}
-	faucetBalance        = uint64(100_000_0000)
+	faucetBalance        = uint64(100_0000_0000)
 	dockerProtocolParams = func() *iotago.ProtocolParameters {
 		options := snapshotcreator.NewOptions(presets.Docker...)
 		return &options.ProtocolParameters
@@ -237,10 +237,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 	txBuilder.AddInput(&builder.TxInput{
 		UnlockTarget: faucetAddr,
 		InputID:      unspentFaucet.OutputID,
-		Input: iotago.OutputWithCreationTime{
-			Output:       unspentFaucet.OutputStruct,
-			CreationTime: unspentFaucet.CreationTime,
-		},
+		Input:        unspentFaucet.OutputStruct,
 	})
 
 	// receiver output
@@ -274,14 +271,13 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 	}
 	fmt.Println("post faucet request success", blkID)
 
-	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 0), tx.Essence.CreationTime, tx.Essence.Outputs[0])
+	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 0), tx.Essence.Outputs[0])
 
 	e.faucet.AddUnspentOutput(&Output{
 		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 1),
 		Address:      faucetAddr,
 		Index:        0,
 		Balance:      tx.Essence.Outputs[1].Deposit(),
-		CreationTime: tx.Essence.CreationTime,
 		OutputStruct: tx.Essence.Outputs[1],
 	})
 
@@ -484,9 +480,7 @@ func (e *EvilWallet) addOutputsToOutputManager(tx *iotago.Transaction, outWallet
 			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), uint16(idx)),
 			Address:      addr,
 			Balance:      o.Deposit(),
-			OutputStruct: o,
-			CreationTime: tx.Essence.CreationTime,
-		}
+			OutputStruct: o}
 
 		if _, ok := tempAddresses[*addr]; ok {
 			e.outputManager.AddOutput(tmpWallet, out)
@@ -729,10 +723,7 @@ func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[io
 	txBuilder := builder.NewTransactionBuilder(e.optsProtocolParams.NetworkID())
 
 	for _, input := range inputs {
-		txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Address, InputID: input.OutputID, Input: iotago.OutputWithCreationTime{
-			Output:       input.OutputStruct,
-			CreationTime: input.CreationTime,
-		}})
+		txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Address, InputID: input.OutputID, Input: input.OutputStruct})
 	}
 
 	for _, output := range outputs {

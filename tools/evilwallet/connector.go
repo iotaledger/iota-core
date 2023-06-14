@@ -174,9 +174,8 @@ type Client interface {
 
 // WebClient contains a GoShimmer web API to interact with a node.
 type WebClient struct {
-	api          *nodeclient.Client
-	url          string
-	blockBuilder *builder.BlockBuilder
+	api *nodeclient.Client
+	url string
 
 	optsProtocolParams *iotago.ProtocolParameters
 }
@@ -194,17 +193,17 @@ func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
 	}, opts, func(w *WebClient) {
 		v3API := iotago.V3API(w.optsProtocolParams)
 		w.api, _ = nodeclient.New(w.url, nodeclient.WithIOTAGoAPI(v3API))
-		w.blockBuilder = builder.NewBlockBuilder()
 	})
 }
 
 // PostTransaction sends a transaction to the Tangle via a given client.
 func (c *WebClient) PostTransaction(tx *iotago.Transaction) (blockID iotago.BlockID, err error) {
-	c.blockBuilder.ProtocolVersion(c.optsProtocolParams.Version)
+	blockBuilder := builder.NewBlockBuilder()
+	blockBuilder.ProtocolVersion(c.optsProtocolParams.Version)
 
-	c.blockBuilder.Payload(tx)
+	blockBuilder.Payload(tx)
 
-	blk, err := c.blockBuilder.Build()
+	blk, err := blockBuilder.Build()
 	if err != nil {
 		return iotago.EmptyBlockID(), err
 	}
@@ -219,13 +218,14 @@ func (c *WebClient) PostTransaction(tx *iotago.Transaction) (blockID iotago.Bloc
 
 // PostData sends the given data (payload) by creating a block in the backend.
 func (c *WebClient) PostData(data []byte) (blkID string, err error) {
-	c.blockBuilder.ProtocolVersion(c.optsProtocolParams.Version)
+	blockBuilder := builder.NewBlockBuilder()
+	blockBuilder.ProtocolVersion(c.optsProtocolParams.Version)
 
-	c.blockBuilder.Payload(&iotago.TaggedData{
+	blockBuilder.Payload(&iotago.TaggedData{
 		Tag: data,
 	})
 
-	blk, err := c.blockBuilder.Build()
+	blk, err := blockBuilder.Build()
 	if err != nil {
 		return iotago.EmptyBlockID().ToHex(), err
 	}
