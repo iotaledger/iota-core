@@ -4,6 +4,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -33,7 +34,7 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 	mustNodes(nodes)
 
 	t.Eventually(func() error {
-		var commitment *iotago.Commitment
+		var commitment *model.Commitment
 		var commitmentNode *mock.Node
 		for _, node := range nodes {
 			storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
@@ -42,12 +43,12 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 			}
 
 			if commitment == nil {
-				commitment = storedCommitment.Commitment()
+				commitment = storedCommitment
 				commitmentNode = node
 				continue
 			}
 
-			if !cmp.Equal(*commitment, *storedCommitment.Commitment()) {
+			if !cmp.Equal(*commitment.Commitment(), *storedCommitment.Commitment()) {
 				return errors.Errorf("AssertEqualStoredCommitmentAtIndex: %s: expected %s (from %s), got %s", node.Name, commitment, commitmentNode.Name, storedCommitment)
 			}
 		}
