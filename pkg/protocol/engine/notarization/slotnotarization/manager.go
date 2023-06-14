@@ -1,7 +1,6 @@
 package slotnotarization
 
 import (
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -38,8 +37,7 @@ type Manager struct {
 	attestation attestation.Attestations
 	ledger      ledger.Ledger
 
-	storage         *storage.Storage
-	commitmentMutex sync.RWMutex
+	storage *storage.Storage
 
 	acceptedTimeFunc      func() time.Time
 	slotTimeProviderFunc  func() *iotago.SlotTimeProvider
@@ -63,17 +61,14 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 			m.ledger = e.Ledger
 			m.attestation = e.Attestations
 
-			wpBlocks := m.workers.CreatePool("Blocks", 1)           // Using just 1 worker to avoid contention
-			wpCommitments := m.workers.CreatePool("Commitments", 1) // Using just 1 worker to avoid contention
+			wpBlocks := m.workers.CreatePool("Blocks", 1) // Using just 1 worker to avoid contention
 
 			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 				if err := m.notarizeAcceptedBlock(block); err != nil {
 					m.errorHandler(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 				}
+				m.tryCommitUntil(block)
 			}, event.WithWorkerPool(wpBlocks))
-
-			// Slots are committed whenever ATT advances, start committing only when bootstrapped.
-			e.Events.Clock.AcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
 
 			e.Events.Notarization.LinkTo(m.events)
 
@@ -106,11 +101,8 @@ func (m *Manager) Shutdown() {
 }
 
 // tryCommitUntil tries to create slot commitments until the new provided acceptance time.
-func (m *Manager) tryCommitUntil(acceptanceTime time.Time) {
-	m.commitmentMutex.Lock()
-	defer m.commitmentMutex.Unlock()
-
-	if index := m.slotTimeProviderFunc().IndexFromTime(acceptanceTime); index > m.storage.Settings().LatestCommitment().Index() {
+func (m *Manager) tryCommitUntil(block *blocks.Block) {
+	if index := block.ID().Index(); index > m.storage.Settings().LatestCommitment().Index() {
 		m.tryCommitSlotUntil(index)
 	}
 }
@@ -235,12 +227,6 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	return true
-}
-
-func (m *Manager) PerformLocked(perform func(m notarization.Notarization)) {
-	m.commitmentMutex.Lock()
-	defer m.commitmentMutex.Unlock()
-	perform(m)
 }
 
 var _ notarization.Notarization = new(Manager)
