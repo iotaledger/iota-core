@@ -309,6 +309,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			// process allotments
 			{
 				// TODO: who checks that the allotment goes to an Account with a BIC feature?
+				// TODO: Credits should not be increased of Amount
+				// TODO: Support account w/ BIC creation & allotment as part of the same slot
 				for _, allotment := range tx.Essence.Allotments {
 					accountDiff, exists := accountDiffs[allotment.AccountID]
 					if !exists {

@@ -30,7 +30,6 @@ func Test_TransitionAccount(t *testing.T) {
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 	ts.HookLogging()
-	ts.Wait()
 
 	account1 := ts.AccountOutput("A1")
 	account1Output := account1.Output().(*iotago.AccountOutput)
@@ -55,6 +54,10 @@ func Test_TransitionAccount(t *testing.T) {
 	outputs = append(outputs, account2)
 
 	tx1 := ts.CreateTransactionWithInputsAndOutputs(consumedInputs, outputs, wallets)
+	// tx1.Essence.Allotments = append(tx1.Essence.Allotments, iotago.Allotment{
+	// 	AccountID: account1Output.AccountID,
+	// 	Value:     100,
+	// })
 
 	ts.TransactionFramework.RegisterTransaction("TX1", tx1)
 
@@ -82,3 +85,40 @@ func Test_TransitionAccount(t *testing.T) {
 
 	ts.Wait(ts.Node("node1"))
 }
+
+/*
+For Mana allotment and stored:
+1. Collect potential and stored on the input side.
+2. Add options to allot amounts to accounts upon TX creation.
+3. Add option to store mana on the output side.
+4. Optionally add option to split amount on outputs unevenly.
+
+WithAllotments
+{
+	A1: amount
+	A3: amount
+}
+WithStoredOnOutput
+{
+	0: amount
+	3: amount
+}
+*/
+
+/*
+TX involving Accounts:
+1. Add option to add accounts as inputs.
+2. Add option to add accounts as outputs.
+3. Create account.
+4. Destroy accounts.
+5. Accounts w/out and w/ BIC.
+
+Testcases:
+1. Create account w/out BIC from normal UTXO.
+2. Create account w/ BIC from normal UTXO.
+3. Transition non-BIC account to BIC account.
+4. Transition BIC account to non-BIC account.
+5. Transition BIC account to BIC account changing amount/keys/expiry.
+6. Destroy account w/out BIC feature.
+7. Destroy account w/ BIC feature.
+*/
