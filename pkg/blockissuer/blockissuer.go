@@ -190,11 +190,6 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) 
 		resign = true
 	}
 
-	if iotaBlock.IssuingTime.IsZero() {
-		iotaBlock.IssuingTime = time.Now()
-		resign = true
-	}
-
 	if iotaBlock.SlotCommitment == nil || iotaBlock.SlotCommitment.Index == iotago.SlotIndex(0) {
 		iotaBlock.SlotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 		iotaBlock.LatestFinalizedSlot = i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
@@ -234,6 +229,11 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) 
 		references[model.StrongParentType] = iotaBlock.StrongParents
 		references[model.WeakParentType] = iotaBlock.WeakParents
 		references[model.ShallowLikeParentType] = iotaBlock.ShallowLikeParents
+	}
+
+	if iotaBlock.IssuingTime.IsZero() {
+		iotaBlock.IssuingTime = time.Now()
+		resign = true
 	}
 
 	if err := i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitment.Index, references); err != nil {
