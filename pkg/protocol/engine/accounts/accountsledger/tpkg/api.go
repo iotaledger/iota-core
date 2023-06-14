@@ -21,7 +21,7 @@ var (
 		TokenSupply:           utils.RandAmount(),
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
-		MaxCommitableAge:      2,
+		MaxCommitableAge:      10,
 	}
 	api = iotago.LatestAPI(protocolParams)
 )

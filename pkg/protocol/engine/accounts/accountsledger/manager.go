@@ -174,9 +174,9 @@ func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 	if len(optTargetIndex) > 0 {
 		targetIndex = optTargetIndex[0]
 	}
-
-	if targetIndex < m.latestCommittedSlot-m.maxCommitableAge {
-		return nil, false, fmt.Errorf("can't calculate account, slot index older than accountIndex (%d<%d)", targetIndex, m.latestCommittedSlot)
+	// if m.latestCommittedSlot < m.maxCommitableAge we should have all history
+	if m.latestCommittedSlot >= m.maxCommitableAge && targetIndex < m.latestCommittedSlot-m.maxCommitableAge {
+		return nil, false, fmt.Errorf("can't calculate account, target slot index older than accountIndex (%d<%d)", targetIndex, m.latestCommittedSlot-m.maxCommitableAge)
 	}
 	if targetIndex > m.latestCommittedSlot {
 		return nil, false, fmt.Errorf("can't retrieve account, slot %d is not committed yet, lastest committed slot: %d", targetIndex, m.latestCommittedSlot)

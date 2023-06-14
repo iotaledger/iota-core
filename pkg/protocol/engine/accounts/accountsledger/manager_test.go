@@ -53,7 +53,7 @@ func TestManager_CommitSlot(t *testing.T) {
 
 	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
 
-	// todo pass infor about start/stop index through the scenario
+	// todo pass info about start/stop index through the scenario
 	for index := iotago.SlotIndex(1); index <= 5; index++ {
 		for _, burningBlock := range burnedBlocks[index] {
 			block, exists := blockFunc(burningBlock)
