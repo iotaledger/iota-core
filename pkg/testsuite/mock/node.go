@@ -53,6 +53,8 @@ type Node struct {
 	forkDetectedCount             atomic.Uint32
 	candidateEngineActivatedCount atomic.Uint32
 	mainEngineSwitchedCount       atomic.Uint32
+
+	attachedBlocks []*blocks.Block
 }
 
 func NewNode(t *testing.T, net *Network, partition string, name string, weight int64) *Node {
@@ -79,6 +81,8 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 
 		Endpoint: net.Join(peerID, partition),
 		Workers:  workerpool.NewGroup(name),
+
+		attachedBlocks: make([]*blocks.Block, 0),
 	}
 }
 
@@ -201,6 +205,7 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] BlockDAG.BlockAttached: %s\n", n.Name, engineName, block.ID())
+		n.attachedBlocks = append(n.attachedBlocks, block)
 	})
 
 	events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
@@ -408,4 +413,8 @@ func (n *Node) CandidateEngineActivatedCount() int {
 
 func (n *Node) MainEngineSwitchedCount() int {
 	return int(n.mainEngineSwitchedCount.Load())
+}
+
+func (n *Node) AttachedBlocks() []*blocks.Block {
+	return n.attachedBlocks
 }
