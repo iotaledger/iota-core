@@ -220,9 +220,9 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) 
 			return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %s", err.Error())
 		}
 
-		iotaBlock.StrongParents = references[model.StrongParentType]
-		iotaBlock.WeakParents = references[model.WeakParentType]
-		iotaBlock.ShallowLikeParents = references[model.ShallowLikeParentType]
+		iotaBlock.StrongParents = references[model.StrongParentType].RemoveDupsAndSort()
+		iotaBlock.WeakParents = references[model.WeakParentType].RemoveDupsAndSort()
+		iotaBlock.ShallowLikeParents = references[model.ShallowLikeParentType].RemoveDupsAndSort()
 		resign = true
 	} else {
 		references = make(model.ParentReferences)
