@@ -308,9 +308,6 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 			// process allotments
 			{
-				// TODO: who checks that the allotment goes to an Account with a BIC feature?
-				// TODO: Credits should not be increased of Amount
-				// TODO: Support account w/ BIC creation & allotment as part of the same slot
 				for _, allotment := range tx.Essence.Allotments {
 					accountDiff, exists := accountDiffs[allotment.AccountID]
 					if !exists {
@@ -320,11 +317,13 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 					}
 
 					accountData, exists, err := l.accountsLedger.Account(allotment.AccountID)
-					if !exists {
-						panic(fmt.Errorf("could not find destroyed account %s in slot %d", allotment.AccountID, index-1))
-					}
 					if err != nil {
 						panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, index-1, err))
+					}
+					// if the account does not exist in our AccountsLedger it means it doesn't have a BIC feature, so
+					// we burn this allotment.
+					if !exists {
+						continue
 					}
 
 					accountDiff.Change += int64(allotment.Value)
@@ -358,6 +357,10 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 			if createdOutput.OutputType() == iotago.OutputAccount {
 				createdAccount := createdOutput.Output().(*iotago.AccountOutput)
+				// Skip if the account doesn't have a BIC feature.
+				if createdAccount.FeatureSet().BlockIssuer() == nil {
+					return true
+				}
 				createdAccounts[createdAccount.AccountID] = createdOutput
 			}
 
@@ -378,6 +381,10 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 			if spentOutput.OutputType() == iotago.OutputAccount {
 				consumedAccount := spentOutput.Output().(*iotago.AccountOutput)
+				// Skip if the account doesn't have a BIC feature.
+				if consumedAccount.FeatureSet().BlockIssuer() == nil {
+					return true
+				}
 				consumedAccounts[consumedAccount.AccountID] = spentOutput
 
 				// if we have consumed accounts that are not created in the same slot, we need to track them as destroyed
@@ -394,7 +401,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		}
 	}
 
-	// process the collected account changes.
+	// process the collected account changes. The consumedAccounts and createdAccounts maps only contain outputs with a
+	// BIC feature, so allotments made to accounts without a BIC feature are not tracked here and they are burned as a result.
 	// There are 3 possible cases:
 	// 1. The account was only consumed but not created in this slot, therefore it is marked as destroyed and its latest
 	// state is stored as diff to allow a rollback.
