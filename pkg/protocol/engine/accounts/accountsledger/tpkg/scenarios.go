@@ -12,26 +12,22 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-const (
-	MaxCommittedAge = 2
-)
-
 type AccountsLedgerTestScenario struct {
-	latestCommittedSlotIndex iotago.SlotIndex
-	accountsLedger           map[iotago.AccountID]*accounts.AccountData
-	accountsDiffs            map[iotago.AccountID]*prunable.AccountDiff
+	LatestCommittedSlotIndex iotago.SlotIndex
+	AccountsLedger           map[iotago.AccountID]*accounts.AccountData
+	AccountsDiffs            map[iotago.AccountID]*prunable.AccountDiff
 }
 
 type AccountsSlotBuildData struct {
-	slotIndex         iotago.SlotIndex
-	burns             map[iotago.AccountID]uint64
-	slotDiff          map[iotago.AccountID]*prunable.AccountDiff
-	destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]
+	SlotIndex         iotago.SlotIndex
+	Burns             map[iotago.AccountID]uint64
+	SlotDiff          map[iotago.AccountID]*prunable.AccountDiff
+	DestroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]
 }
 
 type SlotActions map[iotago.AccountID]*AccountActions
 
-type ExpectedAccountsLedgers map[iotago.SlotIndex]map[iotago.AccountID]*accounts.AccountData
+type ExpectedAccountsLedgers map[iotago.SlotIndex]AccountsLedgerTestScenario
 
 type AccountActions struct {
 	burns           []uint64
@@ -41,13 +37,14 @@ type AccountActions struct {
 	removedKeys     []ed25519.PublicKey
 }
 
-func BlockFuncGen(t *testing.T, burnsPerSlot map[iotago.SlotIndex]map[iotago.AccountID]uint64) (func(iotago.BlockID) (*blocks.Block, bool), []iotago.BlockID) {
-	blockIDs := make([]iotago.BlockID, 0)
+func BlockFuncGen(t *testing.T, burnsPerSlot map[iotago.SlotIndex]map[iotago.AccountID]uint64) (func(iotago.BlockID) (*blocks.Block, bool), map[iotago.SlotIndex][]iotago.BlockID) {
+	blockIDs := make(map[iotago.SlotIndex][]iotago.BlockID)
 	blocksMap := make(map[iotago.BlockID]*blocks.Block)
 	for slotIndex, burns := range burnsPerSlot {
 		slotBlocksMap := RandomBlocksWithBurns(t, burns, slotIndex)
+		blockIDs[slotIndex] = make([]iotago.BlockID, 0)
 		for blockID, block := range slotBlocksMap {
-			blockIDs = append(blockIDs, blockID)
+			blockIDs[slotIndex] = append(blockIDs[slotIndex], blockID)
 			blocksMap[blockID] = block
 		}
 	}
@@ -58,6 +55,14 @@ func BlockFuncGen(t *testing.T, burnsPerSlot map[iotago.SlotIndex]map[iotago.Acc
 	}, blockIDs
 }
 
+func InitSlotDiff() (func(index iotago.SlotIndex) *prunable.AccountDiffs, map[iotago.SlotIndex]*prunable.AccountDiffs) {
+	slotDiffs := make(map[iotago.SlotIndex]*prunable.AccountDiffs)
+	slotDiffFunc := func(index iotago.SlotIndex) *prunable.AccountDiffs {
+		return slotDiffs[index]
+	}
+	return slotDiffFunc, slotDiffs
+}
+
 var slotDiffFunc = func(iotago.SlotIndex) *prunable.AccountDiffs {
 	return nil
 }
@@ -66,6 +71,62 @@ var slotDiffFunc = func(iotago.SlotIndex) *prunable.AccountDiffs {
 // TODO add outputs to scenario
 
 type scenario map[iotago.SlotIndex]SlotActions
+
+func (s scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
+	expected := make(ExpectedAccountsLedgers)
+	for slotIndex, slotActions := range s {
+		expected[slotIndex] = AccountsLedgerTestScenario{
+			LatestCommittedSlotIndex: slotIndex,
+			AccountsLedger:           make(map[iotago.AccountID]*accounts.AccountData),
+			AccountsDiffs:            make(map[iotago.AccountID]*prunable.AccountDiff),
+		}
+		for accountID, actions := range slotActions {
+			if actions.destroyed {
+				delete(expected[slotIndex].AccountsLedger, accountID)
+			}
+			accData, exists := expected[slotIndex].AccountsLedger[accountID]
+			change := int64(actions.totalAllotments)
+			for _, burn := range actions.burns {
+				change -= int64(burn)
+			}
+			if !exists {
+				accData = accounts.NewAccountData(
+					accountID,
+					accounts.NewBlockIssuanceCredits(int64(0), 0),
+					utils.RandOutputID(1), // TODO update the scenario to include outputIDs
+				)
+			}
+			accData.Credits.Update(change)
+			accData.AddPublicKeys(actions.addedKeys...)
+			accData.RemovePublicKeys(actions.removedKeys...)
+
+			// populate diffs
+			expected[slotIndex].AccountsDiffs[accountID] = &prunable.AccountDiff{
+				Change:              change,
+				PreviousUpdatedTime: 0,                 // TODO update prev updated time
+				NewOutputID:         iotago.OutputID{}, // TODO update outputID
+				PreviousOutputID:    iotago.OutputID{}, // TODO update outputID
+				PubKeysAdded:        actions.addedKeys[:],
+				PubKeysRemoved:      actions.removedKeys[:],
+			}
+		}
+	}
+
+	return expected
+}
+
+func (s scenario) blockFunc(t *testing.T) (func(iotago.BlockID) (*blocks.Block, bool), map[iotago.SlotIndex][]iotago.BlockID) {
+	burns := make(map[iotago.SlotIndex]map[iotago.AccountID]uint64)
+	for slotIndex, slotActions := range s {
+		burns[slotIndex] = make(map[iotago.AccountID]uint64)
+		for accountID, actions := range slotActions {
+			for _, burned := range actions.burns {
+				burns[slotIndex][accountID] += burned
+			}
+		}
+	}
+	return BlockFuncGen(t, burns)
+}
 
 func scenario1() (s scenario) {
 	testSuite := NewTestSuite()
@@ -171,74 +232,43 @@ func scenario1() (s scenario) {
 	}
 }
 
-func (s *scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
-	expected := make(ExpectedAccountsLedgers)
-	for slotIndex, slotActions := range *s {
-		expected[slotIndex] = make(map[iotago.AccountID]*accounts.AccountData)
-		for accountID, actions := range slotActions {
-			if actions.destroyed {
-				continue
-			}
-			currentBalance := int64(0) // TODO calculate balance and time
-			currentkeys := make([]ed25519.PublicKey, 0)
-			expected[slotIndex][accountID] = accounts.NewAccountData(
-				accountID,
-				accounts.NewBlockIssuanceCredits(currentBalance, 0),
-				utils.RandOutputID(1), // TODO update the scenario to include outputIDs
-				currentkeys...,
-			)
-		}
-	}
+func AccountLedgerScenario1() (
+	map[iotago.SlotIndex]*AccountsSlotBuildData,
+	ExpectedAccountsLedgers) {
 
-	return expected
-}
-
-func AccountLedgerScenario1() (map[iotago.SlotIndex]*AccountsSlotBuildData, map[iotago.SlotIndex]*AccountsLedgerTestScenario) {
 	s := scenario1()
-
 	slotBuildData := make(map[iotago.SlotIndex]*AccountsSlotBuildData)
 
 	for slotIndex, slotActions := range s {
 		slotBuildData[slotIndex] = &AccountsSlotBuildData{
-			slotIndex:         slotIndex,
-			destroyedAccounts: advancedset.New[iotago.AccountID](),
-			burns:             make(map[iotago.AccountID]uint64),
-			slotDiff:          make(map[iotago.AccountID]*prunable.AccountDiff),
+			SlotIndex:         slotIndex,
+			DestroyedAccounts: advancedset.New[iotago.AccountID](),
+			Burns:             make(map[iotago.AccountID]uint64),
+			SlotDiff:          make(map[iotago.AccountID]*prunable.AccountDiff),
 		}
 		// populate slot diff data based on scenario
 		for accountID, actions := range slotActions {
 			if actions.burns != nil {
-				slotBuildData[slotIndex].burns[accountID] = sumBurns(actions.burns)
+				slotBuildData[slotIndex].Burns[accountID] = sumBurns(actions.burns)
 			}
 			if actions.destroyed {
-				slotBuildData[slotIndex].destroyedAccounts.Add(accountID)
+				slotBuildData[slotIndex].DestroyedAccounts.Add(accountID)
 			}
-			slotBuildData[slotIndex].slotDiff[accountID] = &prunable.AccountDiff{
+			slotBuildData[slotIndex].SlotDiff[accountID] = &prunable.AccountDiff{
 				Change:         int64(actions.totalAllotments),
-				PubKeysAdded:   actions.addedKeys[:], // TODO does it created a copy
+				PubKeysAdded:   actions.addedKeys[:], // TODO does it creates a copy
 				PubKeysRemoved: actions.removedKeys[:],
 			}
 		}
 	}
 
-	// populate target accounts diffs based on scenario
-	expectedAccountLedger := make(map[iotago.SlotIndex]*AccountsLedgerTestScenario)
-	for slotIndex, slotActions := range s {
-		expectedAccountLedger[slotIndex] = &AccountsLedgerTestScenario{
-			latestCommittedSlotIndex: slotIndex,
-			accountsDiffs:            make(map[iotago.AccountID]*prunable.AccountDiff),
-			accountsLedger:           make(map[iotago.AccountID]*accounts.AccountData),
-		}
-		for accountID, actions := range slotActions {
-			expectedAccountLedger[slotIndex].accountsDiffs[accountID] = &prunable.AccountDiff{
-				Change:         int64(actions.totalAllotments) - int64(sumBurns(actions.burns)),
-				PubKeysAdded:   actions.addedKeys[:],
-				PubKeysRemoved: actions.removedKeys[:],
-			}
-		}
-	}
-	// TODO populate expected vector value
-	return nil, nil
+	expectedAccountLedger := s.populateExpectedAccountsLedger()
+	return slotBuildData, expectedAccountLedger
+}
+
+func BlockFuncScenario1(t *testing.T) (func(iotago.BlockID) (*blocks.Block, bool), map[iotago.SlotIndex][]iotago.BlockID) {
+	f, blks := scenario1().blockFunc(t)
+	return f, blks
 }
 
 func sumBurns(burns []uint64) uint64 {

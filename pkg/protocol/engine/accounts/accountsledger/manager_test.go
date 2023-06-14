@@ -31,7 +31,7 @@ func TestManager_TrackBlock(t *testing.T) {
 	params := tpkg.ProtocolParams()
 	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
 
-	for _, blockID := range blockIDs {
+	for _, blockID := range blockIDs[1] {
 		block, exist := blockFunc(blockID)
 		require.True(t, exist)
 		manager.TrackBlock(block)
@@ -39,4 +39,43 @@ func TestManager_TrackBlock(t *testing.T) {
 	managerBurns, err := manager.computeBlockBurnsForSlot(1)
 	require.NoError(t, err)
 	assert.EqualValues(t, burns[1], managerBurns)
+}
+
+func TestManager_CommitSlot(t *testing.T) {
+	scenarioBuildData, scenarioExpected := tpkg.AccountLedgerScenario1()
+
+	params := tpkg.ProtocolParams()
+	blockFunc, burnedBlocks := tpkg.BlockFuncScenario1(t)
+
+	slotDiffFunc, _ := tpkg.InitSlotDiff()
+	accountsStore := mapdb.NewMapDB()
+
+	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+
+	// todo pass infor about start/stop index through the scenario
+	for index := iotago.SlotIndex(1); index <= 5; index++ {
+		for _, burningBlock := range burnedBlocks[index] {
+			block, exists := blockFunc(burningBlock)
+			assert.True(t, exists)
+			manager.TrackBlock(block)
+		}
+		slotBuildData := scenarioBuildData[index]
+		err := manager.ApplyDiff(index, slotBuildData.SlotDiff, slotBuildData.DestroyedAccounts)
+		require.NoError(t, err)
+
+		// assert accounts vector is updated correctly
+		expectedData := scenarioExpected[index]
+		for accID, expectedAccData := range expectedData.AccountsLedger {
+			actualData, exists, err2 := manager.Account(accID)
+			assert.NoError(t, err2)
+			assert.True(t, exists)
+			assert.Equal(t, expectedAccData, actualData)
+		}
+		for accID, expectedDiff := range expectedData.AccountsDiffs {
+			// todo waht with destroyed assertion
+			actualAccDiff, _, err := manager.LoadSlotDiff(index, accID)
+			require.NoError(t, err)
+			assert.Equal(t, expectedDiff, actualAccDiff)
+		}
+	}
 }

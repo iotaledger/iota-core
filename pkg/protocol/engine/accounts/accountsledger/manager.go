@@ -66,52 +66,61 @@ func New(
 	}
 }
 
-func (b *Manager) Shutdown() {
-	b.TriggerStopped()
+func (m *Manager) Shutdown() {
+	m.TriggerStopped()
 }
 
-func (b *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+func (m *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
-	b.latestCommittedSlot = index
+	m.latestCommittedSlot = index
 }
 
 // TrackBlock adds the block to the blockBurns set to deduct the burn from credits upon slot commitment.
-func (b *Manager) TrackBlock(block *blocks.Block) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
+func (m *Manager) TrackBlock(block *blocks.Block) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
-	set, _ := b.blockBurns.GetOrCreate(block.ID().Index(), func() *advancedset.AdvancedSet[iotago.BlockID] {
+	set, _ := m.blockBurns.GetOrCreate(block.ID().Index(), func() *advancedset.AdvancedSet[iotago.BlockID] {
 		return advancedset.New[iotago.BlockID]()
 	})
 	set.Add(block.ID())
 }
 
-// AccountsTreeRoot returns the root of the Account tree with all the accounts ledger data.
-func (b *Manager) AccountsTreeRoot() iotago.Identifier {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
+func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountID) (*prunable.AccountDiff, bool, error) {
+	s := m.slotDiff(index)
+	accDiff, destroyed, err := s.Load(accountID)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "failed to load slot diff for account %s", accountID.String())
+	}
+	return &accDiff, destroyed, nil
+}
 
-	return iotago.Identifier(b.accountsTree.Root())
+// AccountsTreeRoot returns the root of the Account tree with all the accounts ledger data.
+func (m *Manager) AccountsTreeRoot() iotago.Identifier {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	return iotago.Identifier(m.accountsTree.Root())
 }
 
 // ApplyDiff applies the given accountDiff to the Account tree.
-func (b *Manager) ApplyDiff(
+func (m *Manager) ApplyDiff(
 	slotIndex iotago.SlotIndex,
 	accountDiffs map[iotago.AccountID]*prunable.AccountDiff,
 	destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID],
 ) error {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	// sanity check if the slotIndex is the next slot to commit
-	if slotIndex != b.latestCommittedSlot+1 {
-		return errors.Errorf("cannot apply the ned diff, there is a gap in committed slots, account vector index: %d, slot to commit: %d", b.latestCommittedSlot, slotIndex)
+	if slotIndex != m.latestCommittedSlot+1 {
+		return errors.Errorf("cannot apply the next diff, there is a gap in committed slots, account vector index: %d, slot to commit: %d", m.latestCommittedSlot, slotIndex)
 	}
 
 	// load blocks burned in this slot
-	burns, err := b.computeBlockBurnsForSlot(slotIndex)
+	burns, err := m.computeBlockBurnsForSlot(slotIndex)
 	if err != nil {
 		return errors.Wrap(err, "could not create block burns for slot")
 	}
@@ -127,25 +136,25 @@ func (b *Manager) ApplyDiff(
 	}
 
 	// store the diff and apply it to the account vector tree, obtaining the new root
-	if err = b.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
+	if err = m.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
 		return errors.Wrap(err, "could not apply diff to account tree")
 	}
 
 	// set the index where the tree is now at
-	b.latestCommittedSlot = slotIndex
+	m.latestCommittedSlot = slotIndex
 
 	// TODO: when to exactly evict?
-	b.evict(slotIndex - b.maxCommitableAge - 1)
+	m.evict(slotIndex - m.maxCommitableAge - 1)
 
 	return nil
 }
 
-func (b *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
+func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
 	burns = make(map[iotago.AccountID]uint64)
-	if set, exists := b.blockBurns.Get(slotIndex); exists {
+	if set, exists := m.blockBurns.Get(slotIndex); exists {
 		for it := set.Iterator(); it.HasNext(); {
 			blockID := it.Next()
-			block, blockLoaded := b.block(blockID)
+			block, blockLoaded := m.block(blockID)
 			if !blockLoaded {
 				return nil, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
 			}
@@ -157,28 +166,28 @@ func (b *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 }
 
 // Account loads the account's data at a specific slot index.
-func (b *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
+func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
-	targetIndex := b.latestCommittedSlot
+	targetIndex := m.latestCommittedSlot
 	if len(optTargetIndex) > 0 {
 		targetIndex = optTargetIndex[0]
 	}
 
-	if targetIndex < b.latestCommittedSlot-b.maxCommitableAge {
-		return nil, false, fmt.Errorf("can't calculate account, slot index older than accountIndex (%d<%d)", targetIndex, b.latestCommittedSlot)
+	if targetIndex < m.latestCommittedSlot-m.maxCommitableAge {
+		return nil, false, fmt.Errorf("can't calculate account, slot index older than accountIndex (%d<%d)", targetIndex, m.latestCommittedSlot)
 	}
-	if targetIndex > b.latestCommittedSlot {
-		return nil, false, fmt.Errorf("can't retrieve account, slot %d is not committed yet, lastest committed slot: %d", targetIndex, b.latestCommittedSlot)
+	if targetIndex > m.latestCommittedSlot {
+		return nil, false, fmt.Errorf("can't retrieve account, slot %d is not committed yet, lastest committed slot: %d", targetIndex, m.latestCommittedSlot)
 	}
 
 	// read initial account data at the latest committed slot
-	loadedAccount, exists := b.accountsTree.Get(accountID)
+	loadedAccount, exists := m.accountsTree.Get(accountID)
 	if !exists {
-		loadedAccount = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, targetIndex), loadedAccount.OutputID)
+		loadedAccount = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, targetIndex), iotago.OutputID{})
 	}
-	wasDestroyed, err := b.rollbackAccountTo(loadedAccount, targetIndex)
+	wasDestroyed, err := m.rollbackAccountTo(loadedAccount, targetIndex)
 	if err != nil {
 		return nil, false, err
 	}
@@ -193,9 +202,9 @@ func (b *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 
 // AddAccount adds a new account to the Account tree, allotting to it the balance on the given output.
 // The Account will be created associating the given output as the latest state of the account.
-func (b *Manager) AddAccount(output *utxoledger.Output) error {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+func (m *Manager) AddAccount(output *utxoledger.Output) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	accountOutput, ok := output.Output().(*iotago.AccountOutput)
 	if !ok {
@@ -204,20 +213,20 @@ func (b *Manager) AddAccount(output *utxoledger.Output) error {
 
 	accountData := accounts.NewAccountData(
 		accountOutput.AccountID,
-		accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), b.latestCommittedSlot),
+		accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), m.latestCommittedSlot),
 		output.OutputID(),
 		ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...,
 	)
 
-	b.accountsTree.Set(accountOutput.AccountID, accountData)
+	m.accountsTree.Set(accountOutput.AccountID, accountData)
 
 	return nil
 }
 
-func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetIndex iotago.SlotIndex) (wasDestroyed bool, err error) {
+func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetIndex iotago.SlotIndex) (wasDestroyed bool, err error) {
 	// to reach targetIndex, we need to rollback diffs from the current latestCommittedSlot down to targetIndex + 1
-	for diffIndex := b.latestCommittedSlot; diffIndex > targetIndex; diffIndex-- {
-		diffStore := b.slotDiff(diffIndex)
+	for diffIndex := m.latestCommittedSlot; diffIndex > targetIndex; diffIndex-- {
+		diffStore := m.slotDiff(diffIndex)
 		if diffStore == nil {
 			return false, errors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
 		}
@@ -253,9 +262,9 @@ func (b *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 	return wasDestroyed, nil
 }
 
-func (b *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) error {
+func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) error {
 	// load diffs storage for the slot
-	diffStore := b.slotDiff(slotIndex)
+	diffStore := m.slotDiff(slotIndex)
 	for accountID, accountDiff := range accountDiffs {
 		err := diffStore.Store(accountID, *accountDiff, destroyedAccounts.Has(accountID))
 		if err != nil {
@@ -263,23 +272,23 @@ func (b *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 		}
 	}
 
-	if err := b.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
+	if err := m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
 		return errors.Wrapf(err, "could not apply diff to slot %d", slotIndex)
 	}
 
 	return nil
 }
 
-func (b *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) error {
+func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) error {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
 		// remove destroyed account, no need to update with diffs
 		if destroyedAccounts.Has(accountID) {
-			b.accountsTree.Delete(accountID)
+			m.accountsTree.Delete(accountID)
 			continue
 		}
 
-		accountData, exists := b.accountsTree.Get(accountID)
+		accountData, exists := m.accountsTree.Get(accountID)
 		if !exists {
 			accountData = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
 		}
@@ -290,12 +299,12 @@ func (b *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		}
 		accountData.AddPublicKeys(diffChange.PubKeysAdded...)
 		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
-		b.accountsTree.Set(accountID, accountData)
+		m.accountsTree.Set(accountID, accountData)
 	}
 
 	return nil
 }
 
-func (b *Manager) evict(index iotago.SlotIndex) {
-	b.blockBurns.Delete(index)
+func (m *Manager) evict(index iotago.SlotIndex) {
+	m.blockBurns.Delete(index)
 }
