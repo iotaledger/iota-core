@@ -164,6 +164,8 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.IssueBlock("B.3", nodeB, blockissuer.WithStrongParents(ts.BlockID("A.3")))
 		ts.IssueBlock("A.4", nodeA, blockissuer.WithStrongParents(ts.BlockID("B.3")))
 
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.3"), true, ts.Nodes()...)
+
 		ts.IssueBlock("B.4", nodeB, blockissuer.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
 		ts.IssueBlock("A.5", nodeA, blockissuer.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
 

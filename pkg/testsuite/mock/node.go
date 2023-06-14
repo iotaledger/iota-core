@@ -54,6 +54,7 @@ type Node struct {
 	candidateEngineActivatedCount atomic.Uint32
 	mainEngineSwitchedCount       atomic.Uint32
 
+	mutex          sync.RWMutex
 	attachedBlocks []*blocks.Block
 }
 
@@ -205,6 +206,9 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] BlockDAG.BlockAttached: %s\n", n.Name, engineName, block.ID())
+
+		n.mutex.Lock()
+		defer n.mutex.Unlock()
 		n.attachedBlocks = append(n.attachedBlocks, block)
 	})
 
@@ -416,5 +420,8 @@ func (n *Node) MainEngineSwitchedCount() int {
 }
 
 func (n *Node) AttachedBlocks() []*blocks.Block {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+
 	return n.attachedBlocks
 }

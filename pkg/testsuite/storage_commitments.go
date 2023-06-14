@@ -45,6 +45,7 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 			if commitment == nil {
 				commitment = storedCommitment
 				commitmentNode = node
+
 				continue
 			}
 
