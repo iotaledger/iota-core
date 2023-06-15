@@ -10,6 +10,7 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger/tpkg"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -54,11 +55,27 @@ func TestManager_Import_Export(t *testing.T) {
 	scenarioBuildData, expectedData, blockFunc, burnedBlocks := tpkg.InitScenario(t, tpkg.Scenario1)
 	params := tpkg.ProtocolParams()
 
+	manager := InitAccountLedger(t, blockFunc, params.MaxCommitableAge, scenarioBuildData, burnedBlocks)
+	writer := &writerseeker.WriterSeeker{}
+
+	err := manager.Export(writer, iotago.SlotIndex(1))
+	require.NoError(t, err)
+	slotDiffFunc, _ := tpkg.InitSlotDiff()
+	accountsStore := mapdb.NewMapDB()
+
+	newManager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+	err = newManager.Import(writer.BytesReader())
+	require.NoError(t, err)
+
+	AssertAccountManagerState(t, newManager, expectedData)
+}
+
+func InitAccountLedger(t *testing.T, blockFunc func(iotago.BlockID) (*blocks.Block, bool), mca uint32, scenarioBuildData map[iotago.SlotIndex]*tpkg.AccountsSlotBuildData, burnedBlocks map[iotago.SlotIndex][]iotago.BlockID) *Manager {
 	slotDiffFunc, _ := tpkg.InitSlotDiff()
 	accountsStore := mapdb.NewMapDB()
 
 	// feed the manager with the data
-	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), mca)
 	for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
 		for _, burningBlock := range burnedBlocks[index] {
 			block, exists := blockFunc(burningBlock)
@@ -69,17 +86,7 @@ func TestManager_Import_Export(t *testing.T) {
 		err := manager.ApplyDiff(index, slotBuildData.SlotDiff, slotBuildData.DestroyedAccounts)
 		require.NoError(t, err)
 	}
-	writer := &writerseeker.WriterSeeker{}
-
-	err := manager.Export(writer, iotago.SlotIndex(1))
-	require.NoError(t, err)
-	slotDiffFunc, _ = tpkg.InitSlotDiff()
-	accountsStore = mapdb.NewMapDB()
-	newManager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
-	err = newManager.Import(writer.BytesReader())
-	require.NoError(t, err)
-
-	AssertAccountManagerState(t, newManager, expectedData)
+	return manager
 }
 
 // AssertAccountManagerState asserts the state of the account manager for diffs per slot, and for accountLedger at the end.

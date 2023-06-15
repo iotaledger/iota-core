@@ -88,6 +88,52 @@ func TestManager_CommitAccountTree(t *testing.T) {
 	}
 }
 
+func TestManager_Account(t *testing.T) {
+	tests := []struct {
+		name     string
+		scenario tpkg.ScenarioFunc
+	}{
+		{
+			name:     "Scenario1: Simple allotment and burn",
+			scenario: tpkg.Scenario1,
+		},
+		{
+			name:     "Scenario3: Deletion of an account",
+			scenario: tpkg.Scenario2,
+		},
+		{
+			name:     "Scenario3: Public Keys and allotments",
+			scenario: tpkg.Scenario3,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			params := tpkg.ProtocolParams()
+			// account vector is now on the last slot of the scenario
+			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, test.scenario)
+			manager := InitAccountLedger(t, blockFunc, params.MaxCommitableAge, scenarioBuildData, burnedBlocks)
+			// get the value from the past slots, testing the rollback
+			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData))-1; index++ {
+				for accountID, accData := range scenarioExpected[index].AccountsLedger {
+					actualData, exists, err := manager.Account(accountID, index)
+					assert.NoError(t, err)
+					assert.True(t, exists)
+					assert.Equal(t, accData, actualData)
+				}
+				// check if all destroyed accounts are not found
+				err := scenarioBuildData[index].DestroyedAccounts.ForEach(func(accountID iotago.AccountID) error {
+					_, exists, err := manager.Account(accountID, index)
+					assert.NoError(t, err)
+					assert.False(t, exists)
+
+					return nil
+				})
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestManager_CommitSlot(t *testing.T) {
 	tests := []struct {
 		name     string
