@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger/tpkg"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -41,11 +42,34 @@ func TestManager_TrackBlock(t *testing.T) {
 	assert.EqualValues(t, burns[1], managerBurns)
 }
 
-func TestManager_CommitSlot(t *testing.T) {
-	scenarioBuildData, scenarioExpected := tpkg.InitScenario(tpkg.Scenario1)
-
+func TestManager_CommitAccountTree(t *testing.T) {
 	params := tpkg.ProtocolParams()
-	blockFunc, burnedBlocks := tpkg.BlockFuncScenario1(t)
+	slotDiffFunc, _ := tpkg.InitSlotDiff()
+	blockFunc := func(iotago.BlockID) (*blocks.Block, bool) { return nil, false }
+	accountsStore := mapdb.NewMapDB()
+	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+
+	scenarioBuildData, scenarioExpected, _, _ := tpkg.InitScenario(t, tpkg.Scenario1)
+
+	for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
+		// apply burns to the slot diff
+		manager.updateSlotDiffWithBurns(scenarioBuildData[index].Burns, scenarioBuildData[index].SlotDiff)
+
+		err := manager.commitAccountTree(index, scenarioBuildData[index].SlotDiff, scenarioBuildData[index].DestroyedAccounts)
+		require.NoError(t, err)
+
+		for accountID, expectedData := range scenarioExpected[index].AccountsLedger {
+			actualData, exists, err2 := manager.Account(accountID)
+			assert.NoError(t, err2)
+			assert.True(t, exists)
+			assert.Equal(t, expectedData, actualData)
+		}
+	}
+}
+
+func TestManager_CommitSlot(t *testing.T) {
+	scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, tpkg.Scenario2)
+	params := tpkg.ProtocolParams()
 
 	slotDiffFunc, _ := tpkg.InitSlotDiff()
 	accountsStore := mapdb.NewMapDB()

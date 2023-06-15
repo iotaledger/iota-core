@@ -195,10 +195,6 @@ func Scenario1() (Scenario, *TestSuite) {
 				burns:           []uint64{5},
 				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("A1")},
 			},
-			//testSuite.AccountID("B"): {
-			//	totalAllotments: 8,
-			//	addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("B1")},
-			//},
 		},
 	}
 	return s, testSuite
@@ -309,9 +305,12 @@ func Scenario2() (Scenario, *TestSuite) {
 	return s, testSuite
 }
 
-func InitScenario(scenarioFunc ScenarioFunc) (
+func InitScenario(t *testing.T, scenarioFunc ScenarioFunc) (
 	map[iotago.SlotIndex]*AccountsSlotBuildData,
-	ExpectedAccountsLedgers) {
+	ExpectedAccountsLedgers,
+	func(iotago.BlockID) (*blocks.Block, bool),
+	map[iotago.SlotIndex][]iotago.BlockID,
+) {
 
 	s, testSuite := scenarioFunc()
 	s.updateTimeAndOutputs(testSuite)
@@ -319,13 +318,9 @@ func InitScenario(scenarioFunc ScenarioFunc) (
 	slotBuildData := s.populateSlotBuildData()
 	expectedAccountLedger := s.populateExpectedAccountsLedger()
 
-	return slotBuildData, expectedAccountLedger
-}
-
-func BlockFuncScenario1(t *testing.T) (func(iotago.BlockID) (*blocks.Block, bool), map[iotago.SlotIndex][]iotago.BlockID) {
-	s, _ := Scenario1()
 	f, blks := s.blockFunc(t)
-	return f, blks
+
+	return slotBuildData, expectedAccountLedger, f, blks
 }
 
 func sumBurns(burns []uint64) uint64 {

@@ -122,17 +122,7 @@ func (m *Manager) ApplyDiff(
 	if err != nil {
 		return errors.Wrap(err, "could not create block burns for slot")
 	}
-
-	// apply the burns to the accountDiffs
-	for id, burn := range burns {
-		accountDiff, exists := accountDiffs[id]
-		if !exists {
-			accountDiff = prunable.NewAccountDiff()
-			accountDiffs[id] = accountDiff
-		}
-		accountDiff.Change -= int64(burn)
-	}
-
+	m.updateSlotDiffWithBurns(burns, accountDiffs)
 	// store the diff and apply it to the account vector tree, obtaining the new root
 	if err = m.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
 		return errors.Wrap(err, "could not apply diff to account tree")
@@ -299,6 +289,7 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		accountData.AddPublicKeys(diffChange.PubKeysAdded...)
 		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
 		m.accountsTree.Set(accountID, accountData)
+		accountData, exists = m.accountsTree.Get(accountID)
 	}
 
 	return nil
@@ -306,4 +297,16 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 
 func (m *Manager) evict(index iotago.SlotIndex) {
 	m.blockBurns.Delete(index)
+}
+
+func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]uint64, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) {
+	for id, burn := range burns {
+		accountDiff, exists := accountDiffs[id]
+		if !exists {
+			accountDiff = prunable.NewAccountDiff()
+			accountDiffs[id] = accountDiff
+		}
+		accountDiff.Change -= int64(burn)
+		accountDiffs[id] = accountDiff
+	}
 }
