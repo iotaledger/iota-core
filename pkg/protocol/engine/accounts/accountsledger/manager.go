@@ -34,7 +34,7 @@ type Manager struct {
 	// at the latest committed slot, it is updated on the slot commitment.
 	accountsTree *ads.Map[iotago.AccountID, accounts.AccountData, *iotago.AccountID, *accounts.AccountData]
 
-	// slot diffs for the Account between [LatestCommitedSlot - MCA, LatestCommitedSlot].
+	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
 	slotDiff func(iotago.SlotIndex) *prunable.AccountDiffs
 
 	// block is a function that returns a block from the cache or from the database.
