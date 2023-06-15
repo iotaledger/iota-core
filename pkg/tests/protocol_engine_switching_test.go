@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
@@ -22,7 +21,7 @@ import (
 )
 
 func TestProtocol_EngineSwitching(t *testing.T) {
-	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(14*10), testsuite.WithWaitFor(testsuite.DurationFromEnvOrDefault(10*time.Second, "CI_UNIT_TESTS_WAIT_FOR")))
+	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(19*10), testsuite.WithWaitFor(testsuite.DurationFromEnvOrDefault(10*time.Second, "CI_UNIT_TESTS_WAIT_FOR")))
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNodeToPartition("node1", 75, "P1")
@@ -308,13 +307,12 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		}
 
 		{
-			slot6Commitment := lo.PanicOnErr(node3.Protocol.MainEngineInstance().Storage.Commitments().Load(6)).Commitment()
-
-			ts.IssueBlockAtSlot("P2.L1", 13, slot6Commitment, node4, ts.Block("P2.I").ID())
-			ts.IssueBlockAtSlot("P2.L2", 13, slot6Commitment, node3, ts.Block("P2.L1").ID())
-			ts.IssueBlockAtSlot("P2.L3", 13, slot6Commitment, node4, ts.Block("P2.L2").ID())
-			ts.IssueBlockAtSlot("P2.L4", 13, slot6Commitment, node3, ts.Block("P2.L3").ID())
-			ts.IssueBlockAtSlot("P2.L5", 13, slot6Commitment, node4, ts.Block("P2.L4").ID())
+			slot8Commitment := node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+			ts.IssueBlockAtSlot("P2.L1", 13, slot8Commitment, node4, ts.Block("P2.I").ID())
+			ts.IssueBlockAtSlot("P2.L2", 13, slot8Commitment, node3, ts.Block("P2.L1").ID())
+			ts.IssueBlockAtSlot("P2.L3", 13, slot8Commitment, node4, ts.Block("P2.L2").ID())
+			ts.IssueBlockAtSlot("P2.L4", 13, slot8Commitment, node3, ts.Block("P2.L3").ID())
+			ts.IssueBlockAtSlot("P2.L5", 13, slot8Commitment, node4, ts.Block("P2.L4").ID())
 
 			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.L1", "P2.L2", "P2.L3", "P2.L4"), true, node3, node4)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.L1", "P2.L2"), true, node3, node4)
@@ -332,8 +330,40 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithEvictedSlot(11),
 			)
 
+			slot11Commitment := node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+			ts.IssueBlockAtSlot("P2.M1", 13, slot8Commitment, node3, ts.Block("P2.L5").ID())
+			ts.IssueBlockAtSlot("P2.M2", 13, slot8Commitment, node4, ts.Block("P2.M1").ID())
+			ts.IssueBlockAtSlot("P2.M3", 13, slot11Commitment, node3, ts.Block("P2.M2").ID())
+			ts.IssueBlockAtSlot("P2.M4", 13, slot11Commitment, node4, ts.Block("P2.M3").ID())
+
+			// We are going to commit 13
+			ts.IssueBlockAtSlot("P2.M5", 14, slot11Commitment, node3, ts.Block("P2.M4").ID())
+			ts.IssueBlockAtSlot("P2.M6", 15, slot11Commitment, node4, ts.Block("P2.M5").ID())
+			ts.IssueBlockAtSlot("P2.M7", 16, slot11Commitment, node3, ts.Block("P2.M6").ID())
+			ts.IssueBlockAtSlot("P2.M8", 17, slot11Commitment, node4, ts.Block("P2.M7").ID())
+			ts.IssueBlockAtSlot("P2.M9", 18, slot11Commitment, node3, ts.Block("P2.M8").ID())
+
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.M7", "P2.M8"), true, node3, node4)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.M9"), false, node3, node4) // block not referenced yet
+			ts.AssertBlocksInCacheAccepted(ts.Blocks("P2.M5", "P2.M6"), true, node3, node4)
+
+			// Verify that nodes have the expected states.
+			ts.AssertNodeState(ts.Nodes("node3", "node4"),
+				testsuite.WithLatestCommitmentSlotIndex(13),
+				testsuite.WithLatestCommitmentCumulativeWeight(50),
+				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
+				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
+				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithEvictedSlot(13),
+			)
+
 			// Make sure the tips are properly set.
-			ts.AssertStrongTips(ts.Blocks("P2.L5"), node3, node4)
+			ts.AssertStrongTips(ts.Blocks("P2.M9"), node3, node4)
+
+			// Upon committing 13, we included attestations up to slot 13 that committed at least to slot 11.
+			ts.AssertAttestationsForSlot(13, ts.Blocks("P2.M3", "P2.M4"), node3, node4)
 		}
 	}
 
@@ -346,13 +376,13 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, node1, node2)
 	}
 
-	// Both partitions should have committed slot 11 and have different commitments.
+	// Both partitions should have committed slot 11 and 13 respectively and have different commitments.
 	{
 		ts.AssertLatestCommitmentSlotIndex(11, node1, node2)
-		ts.AssertLatestCommitmentSlotIndex(11, node3, node4)
+		ts.AssertLatestCommitmentSlotIndex(13, node3, node4)
 
 		ts.AssertEqualStoredCommitmentAtIndex(11, node1, node2)
-		ts.AssertEqualStoredCommitmentAtIndex(11, node3, node4)
+		ts.AssertEqualStoredCommitmentAtIndex(13, node3, node4)
 	}
 
 	// Merge the partitions
@@ -392,5 +422,5 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		wg.Wait()
 	}
 
-	ts.AssertEqualStoredCommitmentAtIndex(13, ts.Nodes()...)
+	ts.AssertEqualStoredCommitmentAtIndex(18, ts.Nodes()...)
 }
