@@ -89,7 +89,7 @@ func provide(c *dig.Container) error {
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
 		validators := make(map[iotago.AccountID]int64)
 		for _, validator := range ParamsProtocol.SybilProtection.Committee {
-			hex := lo.PanicOnErr(iotago.DecodeHex(validator.Identity))
+			hex := lo.PanicOnErr(hexutil.DecodeHex(validator.Identity))
 			validators[iotago.AccountID(hex[:])] = validator.Weight
 		}
 

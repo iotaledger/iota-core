@@ -116,7 +116,7 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 		NetworkID:           iotaBlk.NetworkID,
 		IssuanceTimestamp:   iotaBlk.IssuingTime.Unix(),
 		IssuerID:            iotaBlk.IssuerID.String(),
-		Signature:           iotago.EncodeHex(sigBytes),
+		Signature:           hexutil.EncodeHex(sigBytes),
 		StrongParents:       iotaBlk.StrongParents.ToHex(),
 		WeakParents:         iotaBlk.WeakParents.ToHex(),
 		ShallowLikedParents: iotaBlk.ShallowLikeParents.ToHex(),

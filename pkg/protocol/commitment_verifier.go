@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ads"
@@ -9,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
 type CommitmentVerifier struct {
@@ -21,13 +24,13 @@ func NewCommitmentVerifier(mainEngine *engine.Engine) *CommitmentVerifier {
 	}
 }
 
-func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof iotago.Identifier) (iotago.BlockIDs, error) {
+func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (iotago.BlockIDs, error) {
 	// 1. Verify that the provided attestations are indeed the ones that were included in the commitment.
 	tree := ads.NewMap[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation](mapdb.NewMapDB())
 	for _, att := range attestations {
 		tree.Set(att.IssuerID, att)
 	}
-	if !iotago.VerifyRootsAttestationsProof(commitment.RootsID(), merkleProof, iotago.Identifier(tree.Root())) {
+	if !iotago.VerifyProof(merkleProof, iotago.Identifier(tree.Root()), commitment.RootsID()) {
 		return nil, errors.Errorf("invalid merkle proof for attestations for commitment %s", commitment.ID())
 	}
 

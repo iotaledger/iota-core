@@ -19,10 +19,10 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20230526052236-2f12ddd752ca
 	github.com/iotaledger/hive.go/logger v0.0.0-20230526052236-2f12ddd752ca
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230526052236-2f12ddd752ca
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230614165147-2eaff0b87e05
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230526052236-2f12ddd752ca
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230505140033-037b26225f31
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230608040727-f63351606bcb
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230615133219-af623a6eb4a0
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.27.3
@@ -35,7 +35,7 @@ require (
 	github.com/zyedidia/generic v1.2.1
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.0
-	golang.org/x/crypto v0.9.0
+	golang.org/x/crypto v0.10.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 	google.golang.org/protobuf v1.30.0
 )
@@ -57,7 +57,6 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/eclipse/paho.mqtt.golang v1.4.2 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
@@ -123,7 +122,6 @@ require (
 	github.com/oasisprotocol/ed25519 v0.0.0-20210505154701-76d8c688d86e // indirect
 	github.com/onsi/ginkgo/v2 v2.9.2 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
-	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/petermattis/goid v0.0.0-20230518223814-80aa455d8761 // indirect
@@ -153,8 +151,8 @@ require (
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/sys v0.9.0 // indirect
+	golang.org/x/text v0.10.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
