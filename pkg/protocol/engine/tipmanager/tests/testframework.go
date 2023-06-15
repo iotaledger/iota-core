@@ -21,7 +21,7 @@ import (
 )
 
 type TestFramework struct {
-	Instance *tipmanagerv1.TipManager
+	Instance *tipmanagerv1.TipSelection
 
 	blockIDsByAlias map[string]iotago.BlockID
 	blocksByID      map[iotago.BlockID]*blocks.Block
@@ -39,7 +39,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
 
-	t.Instance = tipmanagerv1.NewTipManager(conflictDAG, func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
+	t.Instance = tipmanagerv1.New(conflictDAG, func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]
 		return block, exists
 	}, func() iotago.BlockIDs {
@@ -98,10 +98,10 @@ func (t *TestFramework) BlockID(alias string) iotago.BlockID {
 
 func (t *TestFramework) AssertStrongTips(aliases ...string) {
 	for _, alias := range aliases {
-		require.True(t.test, advancedset.New(lo.Map(t.Instance.StrongTips(), tipmanager.TipMetadata.ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
+		require.True(t.test, advancedset.New(lo.Map(t.Instance.TipManager().StrongTips(), tipmanager.TipMetadata.ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
 	}
 
-	require.Equal(t.test, len(aliases), len(t.Instance.StrongTips()), "strongTips size does not match")
+	require.Equal(t.test, len(aliases), len(t.Instance.TipManager().StrongTips()), "strongTips size does not match")
 }
 
 var protoParams = iotago.ProtocolParameters{
