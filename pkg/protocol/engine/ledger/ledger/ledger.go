@@ -308,13 +308,13 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			// process allotments
 			{
 				for _, allotment := range tx.Essence.Allotments {
+					// TODO: what happens if mana is allotted to non-existent account? Do we even get to this point?
 					accountDiff, exists := accountDiffs[allotment.AccountID]
 					if !exists {
 						// allotments won't change the outputID of the Account, so the diff defaults to empty new and previous outputIDs
 						accountDiff = prunable.NewAccountDiff()
 						accountDiffs[allotment.AccountID] = accountDiff
 					}
-
 					accountData, exists, err := l.accountsLedger.Account(allotment.AccountID)
 					if err != nil {
 						panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, index-1, err))
@@ -342,7 +342,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		}
 	}
 
-	// Now we process the collect account changes, for that we consume the "compacted" state diff to get the overrall
+	// Now we process the collect account changes, for that we consume the "compacted" state diff to get the overall
 	// account changes at UTXO level without needing to worry about multiple spends of the same account in the same slot,
 	// we only care about the initial account output to be consumed and the final account output to be created.
 	{
@@ -360,7 +360,13 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 				if createdAccount.FeatureSet().BlockIssuer() == nil {
 					return true
 				}
-				createdAccounts[createdAccount.AccountID] = createdOutput
+
+				accountID := createdAccount.AccountID
+				if accountID.Empty() {
+					accountID = iotago.AccountIDFromOutputID(outputID)
+				}
+
+				createdAccounts[accountID] = createdOutput
 			}
 
 			return true
@@ -478,7 +484,6 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 					accountDiff = prunable.NewAccountDiff()
 					accountDiffs[createdAccountID] = accountDiff
 				}
-
 				// Change and PreviousUpdatedTime are either 0 if we did not have an allotment for this account, or we already
 				// have some values from the allotment, so no need to set them explicitly.
 				accountDiff.NewOutputID = createdOutput.OutputID()

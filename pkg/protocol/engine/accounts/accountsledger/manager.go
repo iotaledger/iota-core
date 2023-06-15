@@ -163,7 +163,7 @@ func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 		targetIndex = optTargetIndex[0]
 	}
 
-	// if m.latestCommittedSlot < m.maxCommitableAge we should have all history
+	// if m.latestCommittedSlot < m.maxCommittableAge we should have all history
 	if m.latestCommittedSlot >= m.maxCommitableAge && targetIndex < m.latestCommittedSlot-m.maxCommitableAge {
 		return nil, false, fmt.Errorf("can't calculate account, target slot index older than accountIndex (%d<%d)", targetIndex, m.latestCommittedSlot-m.maxCommitableAge)
 	}
@@ -181,7 +181,7 @@ func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 		return nil, false, err
 	}
 
-	// account not present in the accountsTree and it was not marked as destroyed in slots between targetIndex and latestCommittedSlot
+	// account not present in the accountsTree, and it was not marked as destroyed in slots between targetIndex and latestCommittedSlot
 	if !exists && !wasDestroyed {
 		return nil, false, nil
 	}
@@ -195,11 +195,12 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	// TODO: why is this method only called when loading snapshot? is it supposed to be like that?
 	accountOutput, ok := output.Output().(*iotago.AccountOutput)
 	if !ok {
 		return errors.Errorf("can't add account, output is not an account output")
 	}
-
+	fmt.Println("add account", accountOutput.AccountID, output.OutputID())
 	accountData := accounts.NewAccountData(
 		accountOutput.AccountID,
 		accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), m.latestCommittedSlot),
@@ -207,6 +208,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 		ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...,
 	)
 
+	fmt.Println("add new account", accountOutput.AccountID, accountData)
 	m.accountsTree.Set(accountOutput.AccountID, accountData)
 
 	return nil
@@ -277,9 +279,11 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 			m.accountsTree.Delete(accountID)
 			continue
 		}
+		fmt.Printf("commit account modification at slot %d %s, %+v\n", index, accountID, diffChange)
 
 		accountData, exists := m.accountsTree.Get(accountID)
 		if !exists {
+			fmt.Println("account does not exist", accountID)
 			accountData = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
 		}
 		accountData.Credits.Update(diffChange.Change, index)
@@ -287,10 +291,10 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		if diffChange.NewOutputID != iotago.EmptyOutputID {
 			accountData.OutputID = diffChange.NewOutputID
 		}
+
 		accountData.AddPublicKeys(diffChange.PubKeysAdded...)
 		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
 		m.accountsTree.Set(accountID, accountData)
-		accountData, exists = m.accountsTree.Get(accountID)
 	}
 
 	return nil

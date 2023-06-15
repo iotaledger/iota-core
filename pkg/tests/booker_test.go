@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
@@ -16,14 +17,14 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 1)
+	node1 := ts.AddValidatorNode("node1", 1, 10000)
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 
 	node1.HookLogging()
 
-	tx1 := ts.CreateTransaction("Tx1", 1, "Genesis")
+	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("Tx1", 1, "Genesis:0"))
 
-	tx2 := ts.CreateTransaction("Tx2", 1, "Tx1:0")
+	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("Tx2", 1, "Tx1:0"))
 
 	ts.IssueBlock("block1", node1, blockfactory.WithPayload(tx2))
 
@@ -52,8 +53,8 @@ func Test_DoubleSpend(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 1)
-	node2 := ts.AddValidatorNode("node2", 1)
+	node1 := ts.AddValidatorNode("node1", 1, 10000)
+	node2 := ts.AddValidatorNode("node2", 1, 10000)
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 
@@ -61,8 +62,8 @@ func Test_DoubleSpend(t *testing.T) {
 
 	// Create and issue double spends
 	{
-		tx1 := ts.CreateTransaction("Tx1", 1, "Genesis")
-		tx2 := ts.CreateTransaction("Tx2", 1, "Genesis")
+		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("Tx1", 1, "Genesis:0"))
+		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("Tx2", 1, "Genesis:0"))
 
 		ts.IssueBlock("block1", node1, blockfactory.WithPayload(tx1))
 		ts.IssueBlock("block2", node1, blockfactory.WithPayload(tx2))
@@ -117,8 +118,8 @@ func Test_MultipleAttachments(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 1)
-	node2 := ts.AddValidatorNode("node2", 1)
+	node1 := ts.AddValidatorNode("node1", 1, 10000)
+	node2 := ts.AddValidatorNode("node2", 1, 10000)
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 
@@ -126,7 +127,7 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	// Create a transaction and issue it from both nodes, so that the conflict is accepted, but none attachment is not included yet.
 	{
-		tx1 := ts.CreateTransaction("Tx1", 2, "Genesis")
+		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("Tx1", 2, "Genesis:0"))
 
 		ts.IssueBlock("block1", node1, blockfactory.WithPayload(tx1), blockfactory.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueBlock("block2", node2, blockfactory.WithPayload(tx1), blockfactory.WithStrongParents(ts.BlockID("Genesis")))
@@ -146,7 +147,7 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	// Create a transaction that is included and whose conflict is accepted, but whose inputs are not accepted.
 	{
-		tx2 := ts.CreateTransaction("Tx2", 1, "Tx1:1")
+		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("Tx2", 1, "Tx1:1"))
 
 		ts.IssueBlock("block3", node1, blockfactory.WithPayload(tx2), blockfactory.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueBlock("block4", node2, blockfactory.WithStrongParents(ts.BlockID("block3")))

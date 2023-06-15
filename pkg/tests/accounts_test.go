@@ -20,70 +20,112 @@ import (
 func Test_TransitionAccount(t *testing.T) {
 	oldKey := utils.RandPubKey().ToEd25519()
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
-		Alias:  "A1",
-		Amount: 2,
-		Key:    oldKey,
+		Address:   nil, // nil address will be replaced with the address generated from genesis seed
+		Amount:    2,
+		IssuerKey: oldKey,
 	}))
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 50)
+	node1 := ts.AddValidatorNode("node1", 50, 100)
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 	ts.HookLogging()
 
-	account1 := ts.AccountOutput("A1")
-	account1Output := account1.Output().(*iotago.AccountOutput)
+	genesisAccount := ts.AccountOutput("Genesis:1")
+	genesisAccountOutput := genesisAccount.Output().(*iotago.AccountOutput)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:       account1Output.AccountID,
+		ID:       genesisAccountOutput.AccountID,
 		Credits:  accounts.NewBlockIssuanceCredits(2, 0),
-		OutputID: account1.OutputID(),
+		OutputID: genesisAccount.OutputID(),
 		PubKeys:  advancedset.New(ed25519.PublicKey(oldKey)),
-	}, ts.Node("node1"))
+	}, node1)
 
-	// Extract keys and add key for account
-	keys := account1.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
-	newKey := utils.RandPubKey()
-	keys = append(keys, newKey[:])
+	// MODIFY EXISTING GENESIS ACCOUNT AND PREPARE SOME BASIC OUTPUTS
+	{
+		newKey := utils.RandPubKey()
+		accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount("Genesis:1", testsuite.AddBlockIssuerKey(newKey[:]), testsuite.WithBlockIssuerExpirySlot(1))
+		consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(5, "Genesis:0")
 
-	account2 := ts.TransitionAccount("A1", 2, keys...)
+		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
+			testsuite.WithAccountInput(accountInput, true),
+			testsuite.WithInputs(consumedInputs),
+			testsuite.WithOutputs(append(accountOutputs, equalOutputs...)),
+			testsuite.WithAllotments(iotago.Allotments{&iotago.Allotment{
+				AccountID: genesisAccountOutput.AccountID,
+				Value:     0,
+			}}),
+		))
 
-	consumedInputs, outputs, wallets := ts.TransactionFramework.PrepareTransaction(1, "Genesis")
+		ts.IssueBlockAtSlotWithOptions("block1", 1, iotago.NewEmptyCommitment(), node1, blockfactory.WithPayload(tx1))
+		ts.IssueBlockAtSlot("block2", 10, iotago.NewEmptyCommitment(), node1, ts.BlockIDs("block1")...)
+		ts.IssueBlockAtSlot("block3", 10, iotago.NewEmptyCommitment(), node1, ts.BlockIDs("block2")...)
+		ts.AssertLatestCommitmentSlotIndex(3, node1)
 
-	consumedInputs = append(consumedInputs, account1)
-	outputs = append(outputs, account2)
+		ts.AssertAccountDiff(genesisAccountOutput.AccountID, 1, &prunable.AccountDiff{
+			Change:              0,
+			PreviousUpdatedTime: 0,
+			NewOutputID:         iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
+			PreviousOutputID:    genesisAccount.OutputID(),
+			PubKeysRemoved:      []ed25519.PublicKey{},
+			PubKeysAdded:        []ed25519.PublicKey{newKey},
+		}, false, ts.Node("node1"))
 
-	tx1 := ts.CreateTransactionWithInputsAndOutputs(consumedInputs, outputs, wallets)
-	// tx1.Essence.Allotments = append(tx1.Essence.Allotments, iotago.Allotment{
-	// 	AccountID: account1Output.AccountID,
-	// 	Value:     100,
-	// })
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:       genesisAccountOutput.AccountID,
+			Credits:  accounts.NewBlockIssuanceCredits(2, 1),
+			OutputID: iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
+			PubKeys:  advancedset.New(ed25519.PublicKey(oldKey), newKey),
+		}, node1)
+	}
 
-	ts.TransactionFramework.RegisterTransaction("TX1", tx1)
+	// DESTROY ACCOUNT A1, CREATE NEW ACCOUNT FROM BASIC UTXO
+	{
+		newAccountBlockIssuerKey := utils.RandPubKey()
+		inputForNewAccount, newAccountOutputs, newAccountWallets := ts.TransactionFramework.CreateAccountFromInput("TX1:1",
+			testsuite.WithConditions(iotago.AccountOutputUnlockConditions{
+				&iotago.StateControllerAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
+				&iotago.GovernorAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
+			}),
+			testsuite.WithBlockIssuerFeature(&iotago.BlockIssuerFeature{
+				BlockIssuerKeys: iotago.BlockIssuerKeys{newAccountBlockIssuerKey[:]},
+			}),
+		)
 
-	ts.IssueBlockAtSlotWithOptions("block1", 1, iotago.NewEmptyCommitment(), node1, blockfactory.WithPayload(tx1))
-	ts.IssueBlockAtSlot("block2", 10, iotago.NewEmptyCommitment(), node1, ts.BlockIDs("block1")...)
-	ts.IssueBlockAtSlot("block3", 10, iotago.NewEmptyCommitment(), node1, ts.BlockIDs("block2")...)
+		destroyedAccountInput, destroyAccountOutputs, destroyWallets := ts.TransactionFramework.DestroyAccount("TX1:0")
 
-	// account2Output := account2.Output().(*iotago.AccountOutput)
+		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX2", append(newAccountWallets, destroyWallets...),
+			testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
+				&iotago.BICInput{
+					AccountID:    genesisAccountOutput.AccountID,
+					CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+				},
+			}),
+			testsuite.WithInputs(append(inputForNewAccount)),
+			testsuite.WithAccountInput(destroyedAccountInput, true),
+			testsuite.WithOutputs(append(newAccountOutputs, destroyAccountOutputs...)),
+			testsuite.WithCreationTime(11),
+		))
 
-	ts.AssertAccountDiff(account1Output.AccountID, 1, &prunable.AccountDiff{
-		Change:              0,
-		PreviousUpdatedTime: 0,
-		NewOutputID:         iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 1),
-		PreviousOutputID:    account1.OutputID(),
-		PubKeysRemoved:      []ed25519.PublicKey{},
-		PubKeysAdded:        []ed25519.PublicKey{newKey},
-	}, false, ts.Node("node1"))
+		ts.IssueBlockAtSlotWithOptions("block4", 11, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, blockfactory.WithStrongParents(ts.BlockID("block3")), blockfactory.WithPayload(tx2))
+		ts.IssueBlockAtSlot("block5", 20, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block4")...)
+		ts.IssueBlockAtSlot("block6", 20, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block5")...)
 
-	ts.AssertAccountData(&accounts.AccountData{
-		ID:       account1Output.AccountID,
-		Credits:  accounts.NewBlockIssuanceCredits(2, 1),
-		OutputID: iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 1),
-		PubKeys:  advancedset.New(ed25519.PublicKey(oldKey), newKey),
-	}, ts.Node("node1"))
+		ts.AssertLatestCommitmentSlotIndex(13, node1)
 
-	ts.Wait(ts.Node("node1"))
+		ts.AssertAccountDiff(genesisAccountOutput.AccountID, 13, &prunable.AccountDiff{}, true, node1)
+
+		newAccount := ts.AccountOutput("TX2:0")
+		newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
+
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:       newAccountOutput.AccountID,
+			Credits:  accounts.NewBlockIssuanceCredits(0, 11),
+			OutputID: newAccount.OutputID(),
+			PubKeys:  advancedset.New(newAccountBlockIssuerKey),
+		}, node1)
+	}
+	ts.Wait(node1)
 }
 
 /*

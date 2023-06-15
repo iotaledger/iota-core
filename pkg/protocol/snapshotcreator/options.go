@@ -81,9 +81,9 @@ func WithGenesisSeed(genesisSeed []byte) options.Option[Options] {
 }
 
 type AccountDetails struct {
-	Alias  string
-	Amount uint64
-	Key    ed25519.PublicKey
+	Address   iotago.Address
+	Amount    uint64
+	IssuerKey ed25519.PublicKey
 }
 
 func WithAccounts(accounts ...AccountDetails) options.Option[Options] {

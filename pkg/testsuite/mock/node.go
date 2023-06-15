@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
@@ -37,7 +38,7 @@ type Node struct {
 	blockIssuer *blockfactory.BlockIssuer
 
 	privateKey ed25519.PrivateKey
-	pubKey     ed25519.PublicKey
+	PubKey     ed25519.PublicKey
 	AccountID  iotago.AccountID
 	PeerID     network.PeerID
 
@@ -53,8 +54,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 		panic(err)
 	}
 
-	accountID := iotago.AccountID(*iotago.Ed25519AddressFromPubKey(pub))
-	accountID.RegisterAlias(name)
+	accountID := iotago.AccountID(blake2b.Sum256(iotago.Ed25519AddressFromPubKey(pub)[:]))
 
 	peerID := network.PeerID(pub)
 	identity.RegisterIDAlias(peerID, name)
@@ -64,7 +64,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 
 		Name:       name,
 		Weight:     weight,
-		pubKey:     pub,
+		PubKey:     pub,
 		privateKey: priv,
 		AccountID:  accountID,
 		PeerID:     peerID,
@@ -291,9 +291,8 @@ func (n *Node) Shutdown() {
 
 func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.AccountID = otherNode.AccountID
-	n.pubKey = otherNode.pubKey
+	n.PubKey = otherNode.PubKey
 	n.privateKey = otherNode.privateKey
-	n.AccountID.RegisterAlias(n.Name)
 }
 
 func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
