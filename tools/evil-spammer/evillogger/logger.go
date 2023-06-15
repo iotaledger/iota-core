@@ -12,7 +12,7 @@ var New = logger.NewLogger
 
 func init() {
 	config := configuration.New()
-	err := config.Set(logger.ConfigurationKeyOutputPaths, []string{"evil-spammer.log", "stdout"})
+	err := config.Set(logger.ConfigurationKeyOutputPaths, []string{"evil-spammer.log"})
 	if err != nil {
 		fmt.Println(err)
 		return
