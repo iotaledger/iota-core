@@ -179,7 +179,7 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
 	})
 
-	events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipselection.TipMetadata) {
+	events.Engine.TipSelection.BlockAdded.Hook(func(tipMetadata tipselection.TipMetadata) {
 		fmt.Printf("%s > TipSelection.TipAdded: %s in pool %d\n", n.Name, tipMetadata.Block().ID(), tipMetadata.TipPool())
 	})
 

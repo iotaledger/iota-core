@@ -23,7 +23,7 @@ type Events struct {
 	EvictionState   *eviction.Events
 	Filter          *filter.Events
 	BlockRequester  *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
-	TipManager      *tipselection.Events
+	TipSelection    *tipselection.Events
 	BlockDAG        *blockdag.Events
 	Booker          *booker.Events
 	Clock           *clock.Events
@@ -43,7 +43,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		EvictionState:   eviction.NewEvents(),
 		Filter:          filter.NewEvents(),
 		BlockRequester:  eventticker.NewEvents[iotago.SlotIndex, iotago.BlockID](),
-		TipManager:      tipselection.NewEvents(),
+		TipSelection:    tipselection.NewEvents(),
 		BlockDAG:        blockdag.NewEvents(),
 		Booker:          booker.NewEvents(),
 		Clock:           clock.NewEvents(),
