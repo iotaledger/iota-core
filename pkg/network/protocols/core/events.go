@@ -5,6 +5,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
 type Events struct {
@@ -12,7 +13,7 @@ type Events struct {
 	BlockRequestReceived          *event.Event2[iotago.BlockID, network.PeerID]
 	SlotCommitmentReceived        *event.Event2[*model.Commitment, network.PeerID]
 	SlotCommitmentRequestReceived *event.Event2[iotago.CommitmentID, network.PeerID]
-	AttestationsReceived          *event.Event4[*model.Commitment, []*iotago.Attestation, iotago.Identifier, network.PeerID]
+	AttestationsReceived          *event.Event4[*model.Commitment, []*iotago.Attestation, *merklehasher.Proof[iotago.Identifier], network.PeerID]
 	AttestationsRequestReceived   *event.Event2[iotago.CommitmentID, network.PeerID]
 	Error                         *event.Event2[error, network.PeerID]
 
@@ -26,7 +27,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		BlockRequestReceived:          event.New2[iotago.BlockID, network.PeerID](),
 		SlotCommitmentReceived:        event.New2[*model.Commitment, network.PeerID](),
 		SlotCommitmentRequestReceived: event.New2[iotago.CommitmentID, network.PeerID](),
-		AttestationsReceived:          event.New4[*model.Commitment, []*iotago.Attestation, iotago.Identifier, network.PeerID](),
+		AttestationsReceived:          event.New4[*model.Commitment, []*iotago.Attestation, *merklehasher.Proof[iotago.Identifier], network.PeerID](),
 		AttestationsRequestReceived:   event.New2[iotago.CommitmentID, network.PeerID](),
 		Error:                         event.New2[error, network.PeerID](),
 	}

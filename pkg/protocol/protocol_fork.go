@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
 func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
@@ -145,7 +146,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	defer close(ch)
 
 	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance())
-	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof iotago.Identifier, _ network.PeerID) {
+	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
 		blockIDs, err := commitmentVerifier.verifyCommitment(fork.ForkedChain.Commitment(commitment.PrevID().Index()).Commitment(), commitment, attestations, merkleProof)
 
 		result := &commitmentVerificationResult{
@@ -156,11 +157,13 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 		ch <- result
 	}
 
+	wp := p.Workers.CreatePool("AttestationsVerifier", 1)
 	unhook := p.Events.Network.AttestationsReceived.Hook(
 		verifyCommitmentFunc,
-		event.WithWorkerPool(p.Workers.CreatePool("AttestationsVerifier", 1)),
+		event.WithWorkerPool(wp),
 	).Unhook
 	defer unhook()
+	defer wp.Shutdown()
 
 	ctx, cancel := context.WithTimeout(p.context, 2*time.Minute)
 	defer cancel()

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -17,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	nwmodels "github.com/iotaledger/iota-core/pkg/network/protocols/core/models"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
 const (
@@ -72,11 +74,11 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...network.PeerID
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof iotago.Identifier, to ...network.PeerID) {
+func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
 		Commitment:   cm.Data(),
 		Attestations: lo.PanicOnErr(p.api.Encode(attestations)),
-		MerkleProof:  merkleProof[:],
+		MerkleProof:  lo.PanicOnErr(json.Marshal(merkleProof)),
 	}}}, protocolID, to...)
 }
 
@@ -194,13 +196,14 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 		return
 	}
 
-	if len(merkleProof) != iotago.IdentifierLength {
-		p.Events.Error.Trigger(errors.Wrapf(iotago.ErrInvalidIdentifierLength, "failed to deserialize merkle proof when receiving attestations for commitment %s", cm.ID()), id)
+	proof := new(merklehasher.Proof[iotago.Identifier])
+	if err := json.Unmarshal(merkleProof, proof); err != nil {
+		p.Events.Error.Trigger(errors.Wrapf(err, "failed to deserialize merkle proof when receiving attestations for commitment %s", cm.ID()), id)
 
 		return
 	}
 
-	p.Events.AttestationsReceived.Trigger(cm, attestations, iotago.Identifier(merkleProof), id)
+	p.Events.AttestationsReceived.Trigger(cm, attestations, proof, id)
 }
 
 func (p *Protocol) onAttestationsRequest(commitmentIDBytes []byte, id network.PeerID) {
