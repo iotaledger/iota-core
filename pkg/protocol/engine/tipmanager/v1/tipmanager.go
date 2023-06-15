@@ -113,6 +113,16 @@ func (t *TipManager) AddBlock(block *blocks.Block) {
 	}
 }
 
+// StrongTips returns the strong tips of the TipManager (with an optional limit).
+func (t *TipManager) StrongTips(optAmount ...int) []tipmanager.TipMetadata {
+	return t.tips(t.strongTipSet, optAmount...)
+}
+
+// WeakTips returns the weak tips of the TipManager (with an optional limit).
+func (t *TipManager) WeakTips(optAmount ...int) []tipmanager.TipMetadata {
+	return t.tips(t.weakTipSet, optAmount...)
+}
+
 // SelectTips selects the references that should be used for block issuance.
 func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
@@ -213,29 +223,6 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 	})
 
 	return references
-}
-
-// StrongTipSet returns the strong tip set of the TipManager.
-func (t *TipManager) StrongTipSet() []*blocks.Block {
-	var tipSet []*blocks.Block
-	t.strongTipSet.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
-		tipSet = append(tipSet, tipMetadata.Block())
-
-		return true
-	})
-
-	return tipSet
-}
-
-// WeakTipSet returns the weak tip set of the TipManager.
-func (t *TipManager) WeakTipSet() (tipSet []*blocks.Block) {
-	t.weakTipSet.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
-		tipSet = append(tipSet, tipMetadata.Block())
-
-		return true
-	})
-
-	return tipSet
 }
 
 // Evict evicts a slot from the TipManager.
@@ -371,6 +358,23 @@ func (t *TipManager) markSlotAsEvicted(slotIndex iotago.SlotIndex) (success bool
 	}
 
 	return success
+}
+
+// tips returns the given amount of tips from the given tip set.
+func (t *TipManager) tips(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata], optAmount ...int) []tipmanager.TipMetadata {
+	var selectedTips []*TipMetadata
+	if len(optAmount) != 0 {
+		selectedTips = tipSet.RandomUniqueEntries(optAmount[0])
+	} else {
+		selectedTips = tipSet.Values()
+	}
+
+	tips := make([]tipmanager.TipMetadata, len(selectedTips))
+	for i, tip := range selectedTips {
+		tips[i] = tip
+	}
+
+	return tips
 }
 
 // WithMaxLikedInsteadReferences is an option for the TipManager that allows to configure the maximum number of liked

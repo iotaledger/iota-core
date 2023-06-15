@@ -17,11 +17,11 @@ func setupTipsRoutes(routeGroup *echo.Group) {
 }
 
 func tips() *TipsResponse {
-	allTips := append(deps.Protocol.MainEngineInstance().TipManager.StrongTipSet(), deps.Protocol.MainEngineInstance().TipManager.WeakTipSet()...)
+	allTips := append(deps.Protocol.MainEngineInstance().TipManager.StrongTips(), deps.Protocol.MainEngineInstance().TipManager.WeakTips()...)
 	t := make([]string, len(allTips))
 
 	for i, tip := range allTips {
-		t[i] = tip.ID().ToHex()
+		t[i] = tip.Block().ID().ToHex()
 	}
 
 	return &TipsResponse{Tips: t}

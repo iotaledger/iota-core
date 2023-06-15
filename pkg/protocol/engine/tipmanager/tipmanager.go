@@ -15,11 +15,11 @@ type TipManager interface {
 	// SelectTips selects the tips that should be used for the next block.
 	SelectTips(count int) (references model.ParentReferences)
 
-	// StrongTipSet returns the strong tip set of the TipManager.
-	StrongTipSet() []*blocks.Block
+	// StrongTips returns the strong tips of the TipManager (with an optional limit).
+	StrongTips(optAmount ...int) []TipMetadata
 
-	// WeakTipSet returns the weak tip set of the TipManager.
-	WeakTipSet() []*blocks.Block
+	// WeakTips returns the weak tips of the TipManager (with an optional limit).
+	WeakTips(optAmount ...int) []TipMetadata
 
 	// Evict evicts a block from the TipManager.
 	Evict(slotIndex iotago.SlotIndex)

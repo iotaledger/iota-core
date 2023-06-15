@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // TipMetadata represents the metadata for a block in the TipManager.
@@ -77,6 +78,11 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		orphaned:                  promise.NewValue[bool](),
 		evicted:                   promise.NewEvent(),
 	}).setup()
+}
+
+// ID returns the ID of the Block the TipMetadata belongs to.
+func (t *TipMetadata) ID() iotago.BlockID {
+	return t.block.ID()
 }
 
 // Block returns the Block the TipMetadata belongs to.

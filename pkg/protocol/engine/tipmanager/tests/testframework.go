@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -97,10 +98,10 @@ func (t *TestFramework) BlockID(alias string) iotago.BlockID {
 
 func (t *TestFramework) AssertStrongTips(aliases ...string) {
 	for _, alias := range aliases {
-		require.True(t.test, advancedset.New(lo.Map(t.Instance.StrongTipSet(), (*blocks.Block).ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
+		require.True(t.test, advancedset.New(lo.Map(t.Instance.StrongTips(), tipmanager.TipMetadata.ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
 	}
 
-	require.Equal(t.test, len(aliases), len(t.Instance.StrongTipSet()), "strongTips size does not match")
+	require.Equal(t.test, len(aliases), len(t.Instance.StrongTips()), "strongTips size does not match")
 }
 
 var protoParams = iotago.ProtocolParameters{

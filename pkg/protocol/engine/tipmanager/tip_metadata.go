@@ -1,9 +1,15 @@
 package tipmanager
 
-import "github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+import (
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	iotago "github.com/iotaledger/iota.go/v4"
+)
 
 // TipMetadata allows to access the tip related metadata and events of a block in the TipManager.
 type TipMetadata interface {
+	// ID returns the ID of the Block the TipMetadata belongs to.
+	ID() iotago.BlockID
+
 	// Block returns the Block that the TipMetadata belongs to.
 	Block() *blocks.Block
 
