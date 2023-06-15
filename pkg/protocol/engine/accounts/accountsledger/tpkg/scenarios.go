@@ -298,5 +298,6 @@ func sumBurns(burns []uint64) uint64 {
 	for _, b := range burns {
 		sum += b
 	}
+
 	return sum
 }

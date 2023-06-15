@@ -45,5 +45,6 @@ func RandomBlocksWithBurns(t *testing.T, burns map[iotago.AccountID]uint64, inde
 		block := blocks.NewBlock(modelBlock)
 		blocksMap[block.ID()] = block
 	}
+
 	return blocksMap
 }

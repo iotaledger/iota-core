@@ -42,6 +42,7 @@ func (t *TestSuite) AccountID(alias string) iotago.AccountID {
 	}
 	t.accounts[alias] = tpkg2.RandAccountID()
 	t.aliasAcocunts[t.accounts[alias]] = alias
+
 	return t.accounts[alias]
 }
 
@@ -50,6 +51,7 @@ func (t *TestSuite) PublicKey(alias string) ed25519.PublicKey {
 		return pubKey
 	}
 	t.pubKeys[alias] = utils.RandPubKey()
+
 	return t.pubKeys[alias]
 }
 
