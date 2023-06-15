@@ -80,12 +80,16 @@ func (t *TestSuite) assertBlocksInCacheWithFunc(expectedBlocks []*blocks.Block, 
 	}
 }
 
+func (t *TestSuite) AssertBlocksInCachePreAccepted(expectedBlocks []*blocks.Block, expectedPreAccepted bool, nodes ...*mock.Node) {
+	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedPreAccepted, (*blocks.Block).IsPreAccepted, nodes...)
+}
+
 func (t *TestSuite) AssertBlocksInCacheAccepted(expectedBlocks []*blocks.Block, expectedAccepted bool, nodes ...*mock.Node) {
 	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedAccepted, (*blocks.Block).IsAccepted, nodes...)
 }
 
-func (t *TestSuite) AssertBlocksInCacheRatifiedAccepted(expectedBlocks []*blocks.Block, expectedRatifiedAccepted bool, nodes ...*mock.Node) {
-	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedRatifiedAccepted, (*blocks.Block).IsRatifiedAccepted, nodes...)
+func (t *TestSuite) AssertBlocksInCachePreConfirmed(expectedBlocks []*blocks.Block, expectedPreConfirmed bool, nodes ...*mock.Node) {
+	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedPreConfirmed, (*blocks.Block).IsPreConfirmed, nodes...)
 }
 
 func (t *TestSuite) AssertBlocksInCacheConfirmed(expectedBlocks []*blocks.Block, expectedConfirmed bool, nodes ...*mock.Node) {

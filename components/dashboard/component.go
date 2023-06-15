@@ -149,7 +149,7 @@ func currentNodeStatus() *nodestatus {
 		NumGC:        m.NumGC,
 		LastPauseGC:  m.PauseNs[(m.NumGC+255)%256],
 	}
-	//get TangleTime
+	// get TangleTime
 	cl := deps.Protocol.MainEngineInstance().Clock
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 
@@ -182,13 +182,13 @@ func neighborMetrics() []neighbormetric {
 	}
 
 	for _, neighbor := range neighbors {
-		//origin := "Inbound"
-		//for _, p := range deps.P2PManager.AllNeighbors() {
+		// origin := "Inbound"
+		// for _, p := range deps.P2PManager.AllNeighbors() {
 		//	if neighbor.Peer == peer {
 		//		origin = "Outbound"
 		//		break
 		//	}
-		//}
+		// }
 
 		host := neighbor.Peer.IP().String()
 		port := neighbor.Peer.Services().Get(service.P2PKey).Port()
@@ -197,7 +197,7 @@ func neighborMetrics() []neighbormetric {
 			Address:          net.JoinHostPort(host, strconv.Itoa(port)),
 			PacketsRead:      neighbor.PacketsRead(),
 			PacketsWritten:   neighbor.PacketsWritten(),
-			ConnectionOrigin: "Inbound", //origin
+			ConnectionOrigin: "Inbound", // origin
 		})
 	}
 	return stats

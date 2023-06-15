@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
@@ -25,10 +25,10 @@ type TipSelection struct {
 	tipManager *TipManager
 
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
 
 	// memPool holds information about pending transactions.
-	memPool mempool.MemPool[booker.BlockVotePower]
+	memPool mempool.MemPool[ledger.BlockVotePower]
 
 	// events contains all the events that are triggered by the TipManager.
 	events *tipmanager.Events
@@ -65,7 +65,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 	})
 }
 
-func New(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
+func New(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
 		tipManager:                   NewTipManager(blockRetriever),
 		events:                       tipmanager.NewEvents(),
@@ -101,7 +101,7 @@ func (t *TipSelection) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
 // SelectTips selects the references that should be used for block issuance.
 func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
-	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]) error {
+	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]) error {
 		t.collectStrongReferences(references, amount)
 		t.collectWeakReferences(references)
 

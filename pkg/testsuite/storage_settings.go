@@ -78,20 +78,6 @@ func (t *TestSuite) AssertLatestCommitmentCumulativeWeight(cw uint64, nodes ...*
 	}
 }
 
-func (t *TestSuite) AssertLatestStateMutationSlot(slot iotago.SlotIndex, nodes ...*mock.Node) {
-	mustNodes(nodes)
-
-	for _, node := range nodes {
-		t.Eventually(func() error {
-			if slot != node.Protocol.MainEngineInstance().Storage.Settings().LatestStateMutationSlot() {
-				return errors.Errorf("AssertLatestStateMutationSlot: %s: expected %d, got %d", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestStateMutationSlot())
-			}
-
-			return nil
-		})
-	}
-}
-
 func (t *TestSuite) AssertLatestFinalizedSlot(slot iotago.SlotIndex, nodes ...*mock.Node) {
 	mustNodes(nodes)
 

@@ -47,11 +47,13 @@ func (r *RootBlocks) Delete(blockID iotago.BlockID) (err error) {
 
 // Stream streams all root blocks for a slot index.
 func (r *RootBlocks) Stream(consumer func(id iotago.BlockID, commitmentID iotago.CommitmentID) error) error {
+	var innerErr error
 	if storageErr := r.store.Iterate(kvstore.EmptyPrefix, func(blockID iotago.BlockID, commitmentID iotago.CommitmentID) (advance bool) {
-		return consumer(blockID, commitmentID) != nil
+		innerErr = consumer(blockID, commitmentID)
+		return innerErr != nil
 	}); storageErr != nil {
 		return errors.Wrapf(storageErr, "failed to iterate over rootblocks for slot %s", r.slot)
 	}
 
-	return nil
+	return innerErr
 }

@@ -7,11 +7,11 @@ package models;
 message Packet {
   oneof body {
     Block block = 1;
-    BlockRequest blockRequest = 2;
-    SlotCommitment slotCommitment = 3;
-    SlotCommitmentRequest slotCommitmentRequest = 4;
+    BlockRequest block_request = 2;
+    SlotCommitment slot_commitment = 3;
+    SlotCommitmentRequest slot_commitment_request = 4;
     Attestations attestations = 5;
-    AttestationsRequest attestationsRequest = 6;
+    AttestationsRequest attestations_request = 6;
   }
 }
 
@@ -20,7 +20,7 @@ message Block {
 }
 
 message BlockRequest {
-  bytes id = 1;
+  bytes block_id = 1;
 }
 
 message SlotCommitment {
@@ -28,16 +28,15 @@ message SlotCommitment {
 }
 
 message SlotCommitmentRequest {
-  bytes id = 1;
+  bytes commitment_id = 1;
 }
 
 message Attestations {
   bytes commitment = 1;
-  bytes blocks_ids = 2;
-  bytes attestations = 3;
+  bytes attestations = 2;
+  bytes merkle_proof = 3;
 }
 
 message AttestationsRequest {
-  bytes commitment = 1;
-  bytes end_index = 2;
+  bytes commitment_id = 1;
 }
