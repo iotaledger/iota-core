@@ -250,6 +250,13 @@ func (t *TestSuite) Shutdown() {
 	for _, node := range t.nodes {
 		node.Shutdown()
 	}
+
+	fmt.Println("======= ATTACHED BLOCKS =======")
+	for _, node := range t.nodes {
+		for _, block := range node.AttachedBlocks() {
+			fmt.Println(node.Name, ">", block)
+		}
+	}
 }
 
 func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string) *mock.Node {

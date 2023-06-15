@@ -392,12 +392,5 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		wg.Wait()
 	}
 
-	for _, node := range ts.Nodes() {
-		for _, block := range node.AttachedBlocks() {
-			fmt.Println(node.Name, block)
-		}
-
-		fmt.Println("=============================================================================================")
-	}
 	ts.AssertEqualStoredCommitmentAtIndex(13, ts.Nodes()...)
 }
