@@ -1,11 +1,13 @@
 package thresholdblockgadget
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/votes"
 )
 
-func (g *Gadget) trackWitnessWeight(votingBlock *blocks.Block) {
+func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 	witness := votingBlock.Block().IssuerID
 
 	// Only track witness weight for issuers that are part of the committee.
@@ -16,16 +18,27 @@ func (g *Gadget) trackWitnessWeight(votingBlock *blocks.Block) {
 	var preAcceptanceStack []*blocks.Block
 	var preConfirmationStack []*blocks.Block
 
-	process := func(block *blocks.Block) {
+	// TODO: there could be very strange side effects if the online committee and/or committee changes during the vote propagation.
+
+	fmt.Println("======== TrackWitnessWeight =======", votingBlock.ID(), witness)
+
+	process := func(block *blocks.Block) bool {
 		shouldPreAccept, shouldPreConfirm := g.shouldPreAcceptAndPreConfirm(block)
 
+		fmt.Println("\t", block.ID(), "shouldPreAccept", shouldPreAccept, "shouldPreConfirm", shouldPreConfirm)
+
+		var propagateFurther bool
 		if !block.IsPreAccepted() && shouldPreAccept {
 			preAcceptanceStack = append([]*blocks.Block{block}, preAcceptanceStack...)
+			propagateFurther = true
 		}
 
 		if !block.IsPreConfirmed() && shouldPreConfirm {
 			preConfirmationStack = append([]*blocks.Block{block}, preConfirmationStack...)
+			propagateFurther = true
 		}
+
+		return propagateFurther
 	}
 
 	// Add the witness to the voting block itself as each block carries a vote for itself.
@@ -34,14 +47,18 @@ func (g *Gadget) trackWitnessWeight(votingBlock *blocks.Block) {
 	}
 
 	evaluateFunc := func(block *blocks.Block) bool {
-		// Skip further propagation if the witness is not new.
-		if !block.AddWitness(witness) {
-			return false
+		// Propagate further if the witness is new.
+		propagateFurther := block.AddWitness(witness)
+
+		if process(block) {
+			// Even if the witness is not new, we should preAccept or preConfirm this block just now (potentially due to OnlineCommittee changes).
+			// That means, we should check its parents to ensure monotonicity (at least for preAcceptance):
+			//  1. If they are not yet preAccepted, we will add them to the stack and preAccept them.
+			//  2. If they are preAccepted, we will stop the walk.
+			propagateFurther = true
 		}
 
-		process(block)
-
-		return true
+		return propagateFurther
 	}
 
 	g.propagate(votingBlock.Parents(), evaluateFunc)
@@ -49,6 +66,7 @@ func (g *Gadget) trackWitnessWeight(votingBlock *blocks.Block) {
 	var acceptanceRatifierWeights []*blocks.Block
 	for _, block := range preAcceptanceStack {
 		if block.SetPreAccepted() {
+			fmt.Println("\t", block.ID(), "preAccepted")
 			g.events.BlockPreAccepted.Trigger(block)
 			acceptanceRatifierWeights = append(acceptanceRatifierWeights, block)
 		}
@@ -57,6 +75,7 @@ func (g *Gadget) trackWitnessWeight(votingBlock *blocks.Block) {
 	var confirmationRatifierWeights []*blocks.Block
 	for _, block := range preConfirmationStack {
 		if block.SetPreConfirmed() {
+			fmt.Println("\t", block.ID(), "preConfirmed")
 			g.events.BlockPreConfirmed.Trigger(block)
 			confirmationRatifierWeights = append(confirmationRatifierWeights, block)
 		}
