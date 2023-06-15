@@ -255,7 +255,8 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 	// load diffs storage for the slot
 	diffStore := m.slotDiff(slotIndex)
 	for accountID, accountDiff := range accountDiffs {
-		err := diffStore.Store(accountID, *accountDiff, destroyedAccounts.Has(accountID))
+		// we always store destroyed accounts diffs, so we can rollback them if needed
+		err := diffStore.Store(accountID, *accountDiff)
 		if err != nil {
 			return errors.Wrapf(err, "could not store diff to slot %d", slotIndex)
 		}

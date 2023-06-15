@@ -168,12 +168,12 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 		diffStore := m.slotDiff(slotIndex)
 
 		for j := uint64(0); j < accountsInDiffCount; j++ {
-			accountID, accountDiff, destroyed, err := readSlotDiff(reader, m.api)
+			accountID, accountDiff, _, err := readSlotDiff(reader)
 			if err != nil {
 				return errors.Wrapf(err, "unable to read slot diff")
 			}
 
-			if err = diffStore.Store(accountID, *accountDiff, destroyed); err != nil {
+			if err = diffStore.Store(accountID, *accountDiff); err != nil {
 				return errors.Wrapf(err, "unable to store slot diff")
 			}
 		}
@@ -182,7 +182,7 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 	return nil
 }
 
-func readSlotDiff(reader io.ReadSeeker, api iotago.API) (accountID iotago.AccountID, accountDiff *prunable.AccountDiff, destroyed bool, err error) {
+func readSlotDiff(reader io.ReadSeeker) (accountID iotago.AccountID, accountDiff *prunable.AccountDiff, destroyed bool, err error) {
 	accountDiff = prunable.NewAccountDiff()
 
 	accountID, err = readAccountID(reader)

@@ -133,13 +133,7 @@ func NewAccountDiffs(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.AP
 }
 
 // Store stores the given accountID as a root block.
-func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff, destroyed bool) (err error) {
-	if destroyed {
-		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
-			return errors.Wrapf(err, "failed to set destroyed account")
-		}
-	}
-
+func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff) (err error) {
 	return b.diffChangeStore.Set(accountID, accountDiff)
 }
 
