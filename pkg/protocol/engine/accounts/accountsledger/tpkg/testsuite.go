@@ -57,10 +57,10 @@ func (t *TestSuite) PublicKey(alias string) ed25519.PublicKey {
 func (t *TestSuite) updateActions(accountID iotago.AccountID, index iotago.SlotIndex, actions *AccountActions) {
 	alias, exists := t.GetAlias(accountID)
 	if !exists {
-		panic("account does not exist in this scenario, cannot update the metadata")
+		panic("account does not exist in this Scenario, cannot update the metadata")
 	}
 	if _, exists = t.accounts[alias]; !exists {
-		panic("account does not exist in this scenario, cannot update the metadata")
+		panic("account does not exist in this Scenario, cannot update the metadata")
 	}
 
 	// we already commited in the past, so we replace past values with the current ones

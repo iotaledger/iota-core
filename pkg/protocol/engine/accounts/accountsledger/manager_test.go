@@ -43,7 +43,7 @@ func TestManager_TrackBlock(t *testing.T) {
 }
 
 func TestManager_CommitSlot(t *testing.T) {
-	scenarioBuildData, scenarioExpected := tpkg.AccountLedgerScenario1()
+	scenarioBuildData, scenarioExpected := tpkg.InitScenario(tpkg.Scenario1)
 
 	params := tpkg.ProtocolParams()
 	blockFunc, burnedBlocks := tpkg.BlockFuncScenario1(t)
