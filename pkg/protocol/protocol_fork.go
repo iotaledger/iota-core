@@ -157,11 +157,13 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 		ch <- result
 	}
 
+	wp := p.Workers.CreatePool("AttestationsVerifier", 1)
 	unhook := p.Events.Network.AttestationsReceived.Hook(
 		verifyCommitmentFunc,
-		event.WithWorkerPool(p.Workers.CreatePool("AttestationsVerifier", 1)),
+		event.WithWorkerPool(wp),
 	).Unhook
 	defer unhook()
+	defer wp.Shutdown()
 
 	ctx, cancel := context.WithTimeout(p.context, 2*time.Minute)
 	defer cancel()

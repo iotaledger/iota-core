@@ -1,8 +1,6 @@
 package protocol
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ads"
