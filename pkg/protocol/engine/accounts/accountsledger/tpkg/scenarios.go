@@ -77,9 +77,6 @@ var slotDiffFunc = func(iotago.SlotIndex) *prunable.AccountDiffs {
 	return nil
 }
 
-// TODO add previous updsted time to Scenario
-// TODO add outputs to Scenario
-
 // Scenario defines Scenario for accout ledger updates per slots and accounts
 type Scenario map[iotago.SlotIndex]*SlotActions
 
@@ -97,6 +94,38 @@ func (s Scenario) updateTimeAndOutputs(testSuite *TestSuite) {
 			testSuite.updateActions(accID, index, actions)
 		}
 	}
+}
+
+func (s Scenario) populateSlotBuildData() map[iotago.SlotIndex]*AccountsSlotBuildData {
+	slotBuildData := make(map[iotago.SlotIndex]*AccountsSlotBuildData)
+
+	for slotIndex, slotActions := range s {
+		slotBuildData[slotIndex] = &AccountsSlotBuildData{
+			SlotIndex:         slotIndex,
+			DestroyedAccounts: advancedset.New[iotago.AccountID](),
+			Burns:             make(map[iotago.AccountID]uint64),
+			SlotDiff:          make(map[iotago.AccountID]*prunable.AccountDiff),
+		}
+		// populate slot diff data based on Scenario
+		for accountID, actions := range *slotActions {
+			if actions.burns != nil {
+				slotBuildData[slotIndex].Burns[accountID] = sumBurns(actions.burns)
+			}
+			if actions.destroyed {
+				slotBuildData[slotIndex].DestroyedAccounts.Add(accountID)
+			}
+
+			slotBuildData[slotIndex].SlotDiff[accountID] = &prunable.AccountDiff{
+				Change:              int64(actions.totalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
+				NewOutputID:         actions.outputID,
+				PreviousOutputID:    actions.prevOutputID,
+				PreviousUpdatedTime: actions.prevUpdatedTime,
+				PubKeysAdded:        lo.CopySlice(actions.addedKeys),
+				PubKeysRemoved:      lo.CopySlice(actions.removedKeys),
+			}
+		}
+	}
+	return slotBuildData
 }
 
 func (s Scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
@@ -166,10 +195,10 @@ func Scenario1() (Scenario, *TestSuite) {
 				burns:           []uint64{5},
 				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("A1")},
 			},
-			testSuite.AccountID("B"): {
-				totalAllotments: 8,
-				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("B1")},
-			},
+			//testSuite.AccountID("B"): {
+			//	totalAllotments: 8,
+			//	addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("B1")},
+			//},
 		},
 	}
 	return s, testSuite
@@ -287,33 +316,9 @@ func InitScenario(scenarioFunc ScenarioFunc) (
 	s, testSuite := scenarioFunc()
 	s.updateTimeAndOutputs(testSuite)
 
-	slotBuildData := make(map[iotago.SlotIndex]*AccountsSlotBuildData)
-
-	for slotIndex, slotActions := range s {
-		slotBuildData[slotIndex] = &AccountsSlotBuildData{
-			SlotIndex:         slotIndex,
-			DestroyedAccounts: advancedset.New[iotago.AccountID](),
-			Burns:             make(map[iotago.AccountID]uint64),
-			SlotDiff:          make(map[iotago.AccountID]*prunable.AccountDiff),
-		}
-		// populate slot diff data based on Scenario
-		for accountID, actions := range *slotActions {
-			if actions.burns != nil {
-				slotBuildData[slotIndex].Burns[accountID] = sumBurns(actions.burns)
-			}
-			if actions.destroyed {
-				slotBuildData[slotIndex].DestroyedAccounts.Add(accountID)
-			}
-
-			slotBuildData[slotIndex].SlotDiff[accountID] = &prunable.AccountDiff{
-				Change:         int64(actions.totalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
-				PubKeysAdded:   lo.CopySlice(actions.addedKeys),
-				PubKeysRemoved: lo.CopySlice(actions.removedKeys),
-			}
-		}
-	}
-
+	slotBuildData := s.populateSlotBuildData()
 	expectedAccountLedger := s.populateExpectedAccountsLedger()
+
 	return slotBuildData, expectedAccountLedger
 }
 

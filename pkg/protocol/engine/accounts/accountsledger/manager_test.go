@@ -1,7 +1,6 @@
 package accountsledger
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -53,8 +52,7 @@ func TestManager_CommitSlot(t *testing.T) {
 
 	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
 
-	// todo pass info about start/stop index through the scenario
-	for index := iotago.SlotIndex(1); index <= 5; index++ {
+	for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
 		for _, burningBlock := range burnedBlocks[index] {
 			block, exists := blockFunc(burningBlock)
 			assert.True(t, exists)
@@ -74,7 +72,6 @@ func TestManager_CommitSlot(t *testing.T) {
 		}
 		for accID, expectedDiff := range expectedData.AccountsDiffs {
 			// todo waht with destroyed assertion
-			fmt.Print(accID, expectedDiff.Change)
 			actualAccDiff, _, err := manager.LoadSlotDiff(index, accID)
 			require.NoError(t, err)
 			assert.Equal(t, expectedDiff, actualAccDiff)
