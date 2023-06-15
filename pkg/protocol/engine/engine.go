@@ -195,7 +195,6 @@ func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 		return true
 	}
 
-	fmt.Println("IsBootstrapped", time.Since(e.Clock.Accepted().RelativeTime()), e.optsBootstrappedThreshold, e.Clock.Accepted().RelativeTime())
 	if isBootstrapped = time.Since(e.Clock.Accepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsBootstrapped(); isBootstrapped {
 		e.isBootstrapped = true
 	}
