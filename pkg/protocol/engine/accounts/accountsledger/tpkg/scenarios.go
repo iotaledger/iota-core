@@ -1,7 +1,6 @@
 package tpkg
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
@@ -167,7 +166,6 @@ func (s Scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
 			}
 
 			if actions.destroyed {
-				fmt.Println("populateExpectedAccountsLedger destroyed", accountID)
 				delete(expected[slotIndex].AccountsLedger, accountID)
 			}
 		}
@@ -203,7 +201,29 @@ func Scenario1() (Scenario, *TestSuite) {
 	return s, testSuite
 }
 
+// Scenario2 creates and destroys an account in the next slot.
 func Scenario2() (Scenario, *TestSuite) {
+	testSuite := NewTestSuite()
+	s := map[iotago.SlotIndex]*SlotActions{
+		1: {
+			testSuite.AccountID("A"): {
+				totalAllotments: 10,
+				burns:           []uint64{5},
+				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("A1")},
+			},
+		},
+		2: {
+			testSuite.AccountID("A"): {
+				burns:       []uint64{5},
+				removedKeys: []ed25519.PublicKey{testSuite.PublicKey("A1")},
+				destroyed:   true,
+			},
+		},
+	}
+	return s, testSuite
+}
+
+func Scenario3() (Scenario, *TestSuite) {
 	testSuite := NewTestSuite()
 	s := map[iotago.SlotIndex]*SlotActions{
 		1: { // zero balance at the end
@@ -302,28 +322,6 @@ func Scenario2() (Scenario, *TestSuite) {
 			testSuite.AccountID("G"): {
 				burns:     []uint64{5},
 				addedKeys: []ed25519.PublicKey{testSuite.PublicKey("G1")},
-			},
-		},
-	}
-	return s, testSuite
-}
-
-// Scenario3 creates and destroys an account in the next slot.
-func Scenario3() (Scenario, *TestSuite) {
-	testSuite := NewTestSuite()
-	s := map[iotago.SlotIndex]*SlotActions{
-		1: {
-			testSuite.AccountID("A"): {
-				totalAllotments: 10,
-				burns:           []uint64{5},
-				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("A1")},
-			},
-		},
-		2: {
-			testSuite.AccountID("A"): {
-				burns:       []uint64{5},
-				removedKeys: []ed25519.PublicKey{testSuite.PublicKey("A1")},
-				destroyed:   true,
 			},
 		},
 	}

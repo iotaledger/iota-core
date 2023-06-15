@@ -43,52 +43,95 @@ func TestManager_TrackBlock(t *testing.T) {
 }
 
 func TestManager_CommitAccountTree(t *testing.T) {
-	params := tpkg.ProtocolParams()
-	slotDiffFunc, _ := tpkg.InitSlotDiff()
-	blockFunc := func(iotago.BlockID) (*blocks.Block, bool) { return nil, false }
-	accountsStore := mapdb.NewMapDB()
-	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+	tests := []struct {
+		name     string
+		scenario tpkg.ScenarioFunc
+	}{
+		{
+			name:     "Scenario1: Simple allotment and burn",
+			scenario: tpkg.Scenario1,
+		},
+		{
+			name:     "Scenario3: Deletion of an account",
+			scenario: tpkg.Scenario2,
+		},
+		{
+			name:     "Scenario3: Public Keys and allotments",
+			scenario: tpkg.Scenario3,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			params := tpkg.ProtocolParams()
+			slotDiffFunc, _ := tpkg.InitSlotDiff()
+			blockFunc := func(iotago.BlockID) (*blocks.Block, bool) { return nil, false }
+			accountsStore := mapdb.NewMapDB()
+			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
 
-	scenarioBuildData, scenarioExpected, _, _ := tpkg.InitScenario(t, tpkg.Scenario1)
+			scenarioBuildData, scenarioExpected, _, _ := tpkg.InitScenario(t, test.scenario)
 
-	for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
-		// apply burns to the slot diff
-		manager.updateSlotDiffWithBurns(scenarioBuildData[index].Burns, scenarioBuildData[index].SlotDiff)
+			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
+				// apply burns to the slot diff
+				manager.updateSlotDiffWithBurns(scenarioBuildData[index].Burns, scenarioBuildData[index].SlotDiff)
 
-		err := manager.commitAccountTree(index, scenarioBuildData[index].SlotDiff, scenarioBuildData[index].DestroyedAccounts)
-		require.NoError(t, err)
+				err := manager.commitAccountTree(index, scenarioBuildData[index].SlotDiff, scenarioBuildData[index].DestroyedAccounts)
+				require.NoError(t, err)
 
-		for accountID, expectedData := range scenarioExpected[index].AccountsLedger {
-			actualData, exists, err2 := manager.Account(accountID)
-			assert.NoError(t, err2)
-			assert.True(t, exists)
-			assert.Equal(t, expectedData, actualData)
-		}
+				for accountID, expectedData := range scenarioExpected[index].AccountsLedger {
+					actualData, exists, err2 := manager.Account(accountID)
+					assert.NoError(t, err2)
+					assert.True(t, exists)
+					assert.Equal(t, expectedData, actualData)
+				}
+			}
+		})
 	}
 }
 
 func TestManager_CommitSlot(t *testing.T) {
-	scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, tpkg.Scenario1)
-	params := tpkg.ProtocolParams()
-
-	slotDiffFunc, _ := tpkg.InitSlotDiff()
-	accountsStore := mapdb.NewMapDB()
-
-	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
-
-	for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
-		for _, burningBlock := range burnedBlocks[index] {
-			block, exists := blockFunc(burningBlock)
-			assert.True(t, exists)
-			manager.TrackBlock(block)
-		}
-		slotBuildData := scenarioBuildData[index]
-
-		err := manager.ApplyDiff(index, slotBuildData.SlotDiff, slotBuildData.DestroyedAccounts)
-		require.NoError(t, err)
-		expectedData := scenarioExpected[index]
-		AssertAccountManagerSlotState(t, manager, expectedData)
+	tests := []struct {
+		name     string
+		scenario tpkg.ScenarioFunc
+	}{
+		{
+			name:     "Scenario1: Simple allotment and burn",
+			scenario: tpkg.Scenario1,
+		},
+		{
+			name:     "Scenario3: Deletion of an account",
+			scenario: tpkg.Scenario2,
+		},
+		{
+			name:     "Scenario3: Public Keys and allotments",
+			scenario: tpkg.Scenario3,
+		},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, test.scenario)
+			params := tpkg.ProtocolParams()
+
+			slotDiffFunc, _ := tpkg.InitSlotDiff()
+			accountsStore := mapdb.NewMapDB()
+
+			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+
+			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
+				for _, burningBlock := range burnedBlocks[index] {
+					block, exists := blockFunc(burningBlock)
+					assert.True(t, exists)
+					manager.TrackBlock(block)
+				}
+				slotBuildData := scenarioBuildData[index]
+
+				err := manager.ApplyDiff(index, slotBuildData.SlotDiff, slotBuildData.DestroyedAccounts)
+				require.NoError(t, err)
+				expectedData := scenarioExpected[index]
+				AssertAccountManagerSlotState(t, manager, expectedData)
+			}
+		})
+	}
+
 }
 
 func AssertAccountManagerSlotState(t *testing.T, manager *Manager, expectedData tpkg.AccountsLedgerTestScenario) {
