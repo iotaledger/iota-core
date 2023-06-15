@@ -2,7 +2,6 @@ package tipmanager
 
 import (
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -10,10 +9,7 @@ import (
 // TipManager is a component that manages the tips of the Tangle.
 type TipManager interface {
 	// AddBlock adds a block to the TipManager.
-	AddBlock(block *blocks.Block)
-
-	// SelectTips selects the tips that should be used for the next block.
-	SelectTips(count int) (references model.ParentReferences)
+	AddBlock(block *blocks.Block) TipMetadata
 
 	// StrongTips returns the strong tips of the TipManager (with an optional limit).
 	StrongTips(optAmount ...int) []TipMetadata

@@ -3,9 +3,6 @@ package tipmanagerv1
 import (
 	"sync"
 
-	"golang.org/x/xerrors"
-
-	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/randommap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -16,7 +13,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -27,14 +23,8 @@ type TipManager struct {
 	// retrieveBlock is a function that retrieves a Block from the Tangle.
 	retrieveBlock func(blockID iotago.BlockID) (block *blocks.Block, exists bool)
 
-	// retrieveRootBlocks is a function that returns the current root blocks.
-	retrieveRootBlocks func() iotago.BlockIDs
-
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
-
-	// memPool holds information about pending transactions.
-	memPool mempool.MemPool[booker.BlockVotePower]
 
 	// tipMetadataStorage contains the TipMetadata of all Blocks that are managed by the TipManager.
 	tipMetadataStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]
@@ -54,28 +44,15 @@ type TipManager struct {
 	// evictionMutex is used to synchronize the eviction of slots.
 	evictionMutex sync.RWMutex
 
-	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
-	optMaxStrongParents int
-
-	// optMaxLikedInsteadReferences contains the maximum number of liked instead references that are allowed.
-	optMaxLikedInsteadReferences int
-
-	// optMaxLikedInsteadReferencesPerParent contains the maximum number of liked instead references that are allowed
-	// per parent.
-	optMaxLikedInsteadReferencesPerParent int
-
-	// optMaxWeakReferences contains the maximum number of weak references that are allowed.
-	optMaxWeakReferences int
-
 	module.Module
 }
 
 // NewProvider creates a new TipManager provider.
 func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
-		t := NewTipManager(e.Ledger.ConflictDAG(), e.BlockCache.Block, e.EvictionState.LatestRootBlocks, opts...)
+		t := NewTipManager(e.Ledger.ConflictDAG(), e.BlockCache.Block, opts...)
 
-		e.Events.Booker.BlockBooked.Hook(t.AddBlock, event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
+		e.Events.Booker.BlockBooked.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
 		e.BlockCache.Evict.Hook(t.Evict)
 		e.HookStopped(t.Shutdown)
 		e.Events.TipManager.LinkTo(t.events)
@@ -87,30 +64,27 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 }
 
 // NewTipManager creates a new TipManager.
-func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipManager]) *TipManager {
+func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), opts ...options.Option[TipManager]) *TipManager {
 	return options.Apply(&TipManager{
-		retrieveBlock:                blockRetriever,
-		retrieveRootBlocks:           rootBlocksRetriever,
-		conflictDAG:                  conflictDAG,
-		tipMetadataStorage:           shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
-		strongTipSet:                 randommap.New[iotago.BlockID, *TipMetadata](),
-		weakTipSet:                   randommap.New[iotago.BlockID, *TipMetadata](),
-		events:                       tipmanager.NewEvents(),
-		optMaxStrongParents:          8,
-		optMaxLikedInsteadReferences: 8,
-		optMaxWeakReferences:         8,
-	}, opts, func(t *TipManager) {
-		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
-	}, (*TipManager).TriggerConstructed)
+		retrieveBlock:      blockRetriever,
+		conflictDAG:        conflictDAG,
+		tipMetadataStorage: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
+		strongTipSet:       randommap.New[iotago.BlockID, *TipMetadata](),
+		weakTipSet:         randommap.New[iotago.BlockID, *TipMetadata](),
+		events:             tipmanager.NewEvents(),
+	}, opts, (*TipManager).TriggerConstructed)
 }
 
-// AddBlock adds a Block to the TipManager.
-func (t *TipManager) AddBlock(block *blocks.Block) {
-	newBlockMetadata := NewBlockMetadata(block)
-
-	if storage := t.metadataStorage(block.ID().Index()); storage != nil && storage.Set(block.ID(), newBlockMetadata) {
-		t.setupBlockMetadata(newBlockMetadata)
+// AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
+func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
+	tipMetadata := NewBlockMetadata(block)
+	if storage := t.metadataStorage(block.ID().Index()); storage == nil || !storage.Set(block.ID(), tipMetadata) {
+		return nil
 	}
+
+	t.setupBlockMetadata(tipMetadata)
+
+	return tipMetadata
 }
 
 // StrongTips returns the strong tips of the TipManager (with an optional limit).
@@ -121,108 +95,6 @@ func (t *TipManager) StrongTips(optAmount ...int) []tipmanager.TipMetadata {
 // WeakTips returns the weak tips of the TipManager (with an optional limit).
 func (t *TipManager) WeakTips(optAmount ...int) []tipmanager.TipMetadata {
 	return t.tips(t.weakTipSet, optAmount...)
-}
-
-// SelectTips selects the references that should be used for block issuance.
-func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) {
-	references = make(model.ParentReferences)
-
-	createUniqueTipSelector := func(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]) func(amount int) []*TipMetadata {
-		seenTips := advancedset.New[iotago.BlockID]()
-
-		return func(amount int) (uniqueTips []*TipMetadata) {
-			if amount <= 0 {
-				return uniqueTips
-			}
-
-			for _, strongTip := range tipSet.RandomUniqueEntries(amount + seenTips.Size()) {
-				if seenTips.Add(strongTip.Block().ID()) {
-					uniqueTips = append(uniqueTips, strongTip)
-
-					if len(uniqueTips) == amount {
-						return uniqueTips
-					}
-				}
-			}
-
-			return uniqueTips
-		}
-	}
-
-	_ = t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]) error {
-		likedConflicts := advancedset.New[iotago.TransactionID]()
-
-		likedInsteadReferences := func(tipMetadata *TipMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {
-			necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
-			if err = conflictDAG.LikedInstead(tipMetadata.Block().ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
-				transactionMetadata, exists := t.memPool.TransactionMetadata(likedConflictID)
-				if !exists {
-					return xerrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedConflictID)
-				}
-
-				necessaryReferences[likedConflictID] = lo.First(transactionMetadata.Attachments())
-
-				return nil
-			}); err != nil {
-				return nil, nil, err
-			}
-
-			references, updatedLikedConflicts = make([]iotago.BlockID, 0), likedConflicts.Clone()
-			for conflictID, attachmentID := range necessaryReferences {
-				if updatedLikedConflicts.Add(conflictID) {
-					references = append(references, attachmentID)
-				}
-			}
-
-			if len(references) > t.optMaxLikedInsteadReferencesPerParent {
-				return nil, nil, xerrors.Errorf("too many liked instead references (%d) for block %s", len(references), tipMetadata.Block().ID())
-			}
-
-			return references, updatedLikedConflicts, nil
-		}
-
-		selectStrongTips := createUniqueTipSelector(t.strongTipSet)
-		for strongTipCandidates := selectStrongTips(amount); len(strongTipCandidates) != 0; strongTipCandidates = selectStrongTips(amount - len(references[model.StrongParentType])) {
-			for _, strongTip := range strongTipCandidates {
-				if addedLikedInsteadReferences, updatedLikedConflicts, err := likedInsteadReferences(strongTip); err != nil {
-					// TODO: LOG REASON FOR DOWNGRADE?
-
-					strongTip.setTipPool(t.determineTipPool(strongTip, tipmanager.WeakTipPool))
-				} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[model.ShallowLikeParentType]) {
-					references[model.StrongParentType] = append(references[model.StrongParentType], strongTip.Block().ID())
-					references[model.ShallowLikeParentType] = append(references[model.ShallowLikeParentType], addedLikedInsteadReferences...)
-
-					likedConflicts = updatedLikedConflicts
-				}
-			}
-		}
-
-		if len(references[model.StrongParentType]) == 0 {
-			rootBlocks := t.retrieveRootBlocks()
-
-			rootBlockCount := len(rootBlocks)
-			if rootBlockCount > t.optMaxStrongParents {
-				rootBlockCount = t.optMaxStrongParents
-			}
-
-			references[model.StrongParentType] = rootBlocks[:rootBlockCount]
-		}
-
-		selectWeakTips := createUniqueTipSelector(t.weakTipSet)
-		for weakTipCandidates := selectWeakTips(t.optMaxWeakReferences); len(weakTipCandidates) != 0; weakTipCandidates = selectWeakTips(t.optMaxWeakReferences - len(references[model.WeakParentType])) {
-			for _, weakTip := range weakTipCandidates {
-				if tipPool := t.determineTipPool(weakTip, tipmanager.WeakTipPool); tipPool != tipmanager.WeakTipPool {
-					weakTip.setTipPool(tipPool)
-				} else {
-					references[model.WeakParentType] = append(references[model.WeakParentType], weakTip.Block().ID())
-				}
-			}
-		}
-
-		return nil
-	})
-
-	return references
 }
 
 // Evict evicts a slot from the TipManager.
@@ -252,29 +124,20 @@ func (t *TipManager) Shutdown() {
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
-	// TODO: unsubscribe on eviction
-	t.updateParents(tipMetadata, map[model.ParentsType]func(*TipMetadata){
-		model.StrongParentType: func(strongParent *TipMetadata) {
-			strongParent.OnIsOrphanedUpdated(func(isOrphaned bool) {
-				tipMetadata.orphanedStrongParents.Compute(lo.Cond(isOrphaned, increase, decrease))
-			})
-		},
-	})
-
-	unsubscribe := lo.Batch(
+	unhookMethods := []func(){
 		tipMetadata.stronglyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-			t.updateParents(tipMetadata, propagateConnectedChildren(isConnected, true))
+			t.forEachParentByType(tipMetadata, propagateConnectedChildren(isConnected, true))
 		}),
 
 		tipMetadata.weaklyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-			t.updateParents(tipMetadata, propagateConnectedChildren(isConnected, false))
+			t.forEachParentByType(tipMetadata, propagateConnectedChildren(isConnected, false))
 		}),
 
 		tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
 			if isStrongTip {
-				t.strongTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
+				t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
 			} else {
-				t.strongTipSet.Delete(tipMetadata.Block().ID())
+				t.strongTipSet.Delete(tipMetadata.ID())
 			}
 		}),
 
@@ -285,15 +148,25 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 				t.weakTipSet.Delete(tipMetadata.Block().ID())
 			}
 		}),
-	)
+	}
 
-	tipMetadata.OnEvicted(func() {
-		tipMetadata.setTipPool(tipmanager.DroppedTipPool)
-
-		unsubscribe()
+	t.forEachParentByType(tipMetadata, map[model.ParentsType]func(*TipMetadata){
+		model.StrongParentType: func(strongParent *TipMetadata) {
+			unhookMethods = append(unhookMethods,
+				strongParent.OnIsOrphanedUpdated(func(isOrphaned bool) {
+					tipMetadata.orphanedStrongParents.Compute(lo.Cond(isOrphaned, increase, decrease))
+				}),
+			)
+		},
 	})
 
-	tipMetadata.setTipPool(t.determineTipPool(tipMetadata))
+	tipMetadata.OnEvicted(func() {
+		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
+
+		lo.Batch(unhookMethods...)()
+	})
+
+	tipMetadata.SetTipPool(t.determineTipPool(tipMetadata))
 
 	t.events.BlockAdded.Trigger(tipMetadata)
 }
@@ -311,8 +184,8 @@ func (t *TipManager) determineTipPool(tipMetadata *TipMetadata, minPool ...tipma
 	return tipmanager.DroppedTipPool
 }
 
-// updateParents updates the parents of the given Block.
-func (t *TipManager) updateParents(tipMetadata *TipMetadata, updates map[model.ParentsType]func(*TipMetadata)) {
+// forEachParentByType updates the parents of the given Block.
+func (t *TipManager) forEachParentByType(tipMetadata *TipMetadata, updates map[model.ParentsType]func(*TipMetadata)) {
 	if parentBlock := tipMetadata.Block(); parentBlock != nil && parentBlock.Block() != nil {
 		for _, parent := range parentBlock.ParentsWithType() {
 			metadataStorage := t.metadataStorage(parent.ID.Index())
@@ -362,34 +235,11 @@ func (t *TipManager) markSlotAsEvicted(slotIndex iotago.SlotIndex) (success bool
 
 // tips returns the given amount of tips from the given tip set.
 func (t *TipManager) tips(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata], optAmount ...int) []tipmanager.TipMetadata {
-	var selectedTips []*TipMetadata
 	if len(optAmount) != 0 {
-		selectedTips = tipSet.RandomUniqueEntries(optAmount[0])
-	} else {
-		selectedTips = tipSet.Values()
+		return lo.Map(tipSet.RandomUniqueEntries(optAmount[0]), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
 	}
 
-	tips := make([]tipmanager.TipMetadata, len(selectedTips))
-	for i, tip := range selectedTips {
-		tips[i] = tip
-	}
-
-	return tips
-}
-
-// WithMaxLikedInsteadReferences is an option for the TipManager that allows to configure the maximum number of liked
-// instead references.
-func WithMaxLikedInsteadReferences(maxLikedInsteadReferences int) options.Option[TipManager] {
-	return func(tipManager *TipManager) {
-		tipManager.optMaxLikedInsteadReferences = maxLikedInsteadReferences
-	}
-}
-
-// WithMaxWeakReferences is an option for the TipManager that allows to configure the maximum number of weak references.
-func WithMaxWeakReferences(maxWeakReferences int) options.Option[TipManager] {
-	return func(tipManager *TipManager) {
-		tipManager.optMaxWeakReferences = maxWeakReferences
-	}
+	return lo.Map(tipSet.Values(), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
 }
 
 // code contract (make sure the type implements all required methods).

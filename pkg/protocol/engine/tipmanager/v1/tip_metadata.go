@@ -95,6 +95,13 @@ func (t *TipMetadata) TipPool() tipmanager.TipPool {
 	return t.tipPool.Get()
 }
 
+// SetTipPool sets the TipPool of the Block.
+func (t *TipMetadata) SetTipPool(tipPool tipmanager.TipPool) {
+	t.tipPool.Compute(func(prevType tipmanager.TipPool) tipmanager.TipPool {
+		return lo.Cond(tipPool > prevType, tipPool, prevType)
+	})
+}
+
 // OnTipPoolUpdated registers a callback that is triggered when the TipPool the Block is currently in is updated.
 func (t *TipMetadata) OnTipPoolUpdated(handler func(tipPool tipmanager.TipPool)) (unsubscribe func()) {
 	return t.tipPool.OnUpdate(func(_, tipPool tipmanager.TipPool) { handler(tipPool) })
@@ -223,13 +230,6 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 	})
 
 	return t
-}
-
-// setTipPool sets the TipPool of the Block.
-func (t *TipMetadata) setTipPool(newType tipmanager.TipPool) {
-	t.tipPool.Compute(func(prevType tipmanager.TipPool) tipmanager.TipPool {
-		return lo.Cond(newType > prevType, newType, prevType)
-	})
 }
 
 // propagateConnectedChildren returns the rules for the propagation of the internal connected children counters.

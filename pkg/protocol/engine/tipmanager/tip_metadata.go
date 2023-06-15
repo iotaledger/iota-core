@@ -13,8 +13,11 @@ type TipMetadata interface {
 	// Block returns the Block that the TipMetadata belongs to.
 	Block() *blocks.Block
 
-	// TipPool returns the TipPool the block is currently in.
+	// TipPool returns the current TipPool of the Block.
 	TipPool() TipPool
+
+	// SetTipPool sets the TipPool of the Block.
+	SetTipPool(tipPool TipPool)
 
 	// OnTipPoolUpdated registers a callback that is triggered when the TipPool of the block is updated.
 	OnTipPoolUpdated(handler func(tipPool TipPool)) (unsubscribe func())
