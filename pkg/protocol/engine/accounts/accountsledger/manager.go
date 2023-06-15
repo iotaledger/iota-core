@@ -279,11 +279,9 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 			m.accountsTree.Delete(accountID)
 			continue
 		}
-		fmt.Printf("commit account modification at slot %d %s, %+v\n", index, accountID, diffChange)
 
 		accountData, exists := m.accountsTree.Get(accountID)
 		if !exists {
-			fmt.Println("account does not exist", accountID)
 			accountData = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
 		}
 		accountData.Credits.Update(diffChange.Change, index)
