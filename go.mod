@@ -21,7 +21,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230526052236-2f12ddd752ca
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230614165147-2eaff0b87e05
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230505140033-037b26225f31
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230615141449-ea86404db0d3
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230615133219-af623a6eb4a0
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/labstack/gommon v0.4.0
@@ -149,8 +149,8 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53 // indirect
 	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/sync v0.2.0 // indirect
+	golang.org/x/net v0.11.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.9.0 // indirect
 	golang.org/x/text v0.10.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
