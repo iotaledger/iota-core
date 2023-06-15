@@ -2,7 +2,6 @@ package testsuite
 
 import (
 	"context"
-	"crypto/ed25519"
 	"fmt"
 	"os"
 	"strings"
@@ -52,12 +51,14 @@ type TestSuite struct {
 	uniqueCounter        atomic.Int64
 	mutex                sync.RWMutex
 	TransactionFramework *TransactionFramework
+	genesisSeed          [32]byte
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
 	return options.Apply(&TestSuite{
 		Testing:     testingT,
 		fakeTesting: &testing.T{},
+		genesisSeed: tpkg.RandEd25519Seed(),
 		Network:     mock.NewNetwork(),
 		Directory:   utils.NewDirectory(testingT.TempDir()),
 		nodes:       make(map[string]*mock.Node),
@@ -94,9 +95,6 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			}),
 		}
 		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
-		if t.optsAccounts != nil {
-			t.optsSnapshotOptions = append(t.optsSnapshotOptions, snapshotcreator.WithAccounts(t.optsAccounts...))
-		}
 	})
 }
 
@@ -217,30 +215,6 @@ func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {
 	block.ID().RegisterAlias(alias)
 }
 
-func (t *TestSuite) CreateTransactionWithInputsAndOutputs(consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) *iotago.Transaction {
-	if t.TransactionFramework == nil {
-		panic("cannot create a transaction without running the network first")
-	}
-
-	return lo.PanicOnErr(t.TransactionFramework.CreateTransactionWithInputsAndOutputs(consumedInputs, outputs, signingWallets))
-}
-
-func (t *TestSuite) CreateTransaction(alias string, outputCount int, inputAliases ...string) *iotago.Transaction {
-	if t.TransactionFramework == nil {
-		panic("cannot create a transaction without running the network first")
-	}
-
-	return lo.PanicOnErr(t.TransactionFramework.CreateTransaction(alias, outputCount, inputAliases...))
-}
-
-func (t *TestSuite) TransitionAccount(alias string, deposit uint64, keys ...ed25519.PublicKey) *iotago.AccountOutput {
-	if t.TransactionFramework == nil {
-		panic("cannot create an account without running the network first")
-	}
-
-	return t.TransactionFramework.TransitionAccount(alias, deposit, keys...)
-}
-
 func (t *TestSuite) Node(name string) *mock.Node {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
@@ -295,29 +269,36 @@ func (t *TestSuite) Shutdown() {
 	}
 }
 
-func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string) *mock.Node {
+func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, deposit uint64, partition string) *mock.Node {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-
 	if weight > 0 && t.running {
 		panic(fmt.Sprintf("cannot add validator node %s to partition %s with weight %d: framework already running", name, partition, weight))
 	}
 
 	t.nodes[name] = mock.NewNode(t.Testing, t.Network, partition, name, weight)
 
+	if deposit > 0 {
+		t.optsAccounts = append(t.optsAccounts, snapshotcreator.AccountDetails{
+			Address:   iotago.Ed25519AddressFromPubKey(t.nodes[name].PubKey),
+			Amount:    deposit,
+			IssuerKey: t.nodes[name].PubKey,
+		})
+	}
+
 	return t.nodes[name]
 }
 
-func (t *TestSuite) AddValidatorNode(name string, weight int64) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition)
+func (t *TestSuite) AddValidatorNode(name string, weight int64, deposit uint64) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, weight, deposit, mock.NetworkMainPartition)
 }
 
 func (t *TestSuite) AddNodeToPartition(name string, partition string) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, partition)
+	return t.AddValidatorNodeToPartition(name, 0, 0, partition)
 }
 
 func (t *TestSuite) AddNode(name string) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition)
+	return t.AddValidatorNodeToPartition(name, 0, 0, mock.NetworkMainPartition)
 }
 
 func (t *TestSuite) RemoveNode(name string) {
@@ -327,9 +308,20 @@ func (t *TestSuite) RemoveNode(name string) {
 func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	genesisSeed := tpkg.RandEd25519Seed()
 
-	err := snapshotcreator.CreateSnapshot(append([]options.Option[snapshotcreator.Options]{snapshotcreator.WithGenesisSeed(genesisSeed[:])}, t.optsSnapshotOptions...)...)
+	// Create accounts for any block issuer nodes added before starting the network.
+	if t.optsAccounts != nil {
+		wallet := mock.NewHDWallet("genesis", t.genesisSeed[:], 0)
+		t.optsSnapshotOptions = append(t.optsSnapshotOptions, snapshotcreator.WithAccounts(lo.Map(t.optsAccounts, func(accountDetails snapshotcreator.AccountDetails) snapshotcreator.AccountDetails {
+			if accountDetails.Address == nil {
+				accountDetails.Address = wallet.Address()
+			}
+
+			return accountDetails
+		})...))
+	}
+	// TODO: what if someone passes custom GenesisSeed? We set the random one anyway in the transaction framework.
+	err := snapshotcreator.CreateSnapshot(append([]options.Option[snapshotcreator.Options]{snapshotcreator.WithGenesisSeed(t.genesisSeed[:])}, t.optsSnapshotOptions...)...)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
@@ -351,7 +343,7 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		node.Initialize(baseOpts...)
 
 		if t.TransactionFramework == nil {
-			t.TransactionFramework = NewTransactionFramework(node.Protocol, genesisSeed[:], t.optsAccounts...)
+			t.TransactionFramework = NewTransactionFramework(node.Protocol, t.genesisSeed[:], t.optsAccounts...)
 		}
 	}
 
@@ -438,7 +430,7 @@ func WithTick(tick time.Duration) options.Option[TestSuite] {
 
 func WithAccounts(accounts ...snapshotcreator.AccountDetails) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
-		opts.optsAccounts = accounts
+		opts.optsAccounts = append(opts.optsAccounts, accounts...)
 	}
 }
 

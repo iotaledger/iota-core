@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -24,7 +25,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -79,11 +79,14 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
 	}
 
-	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply, opt.GenesisSeed, engineInstance); err != nil {
+	totalAccountDeposit := lo.Reduce(opt.Accounts, func(accumulator uint64, details AccountDetails) uint64 {
+		return accumulator + details.Amount
+	}, uint64(0))
+	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply-totalAccountDeposit, opt.GenesisSeed, engineInstance); err != nil {
 		return errors.Wrap(err, "failed to create genesis outputs")
 	}
 
-	if err := createGenesisAccounts(opt.Accounts, opt.GenesisSeed, engineInstance); err != nil {
+	if err := createGenesisAccounts(opt.Accounts, engineInstance); err != nil {
 		return errors.Wrap(err, "failed to create genesis account outputs")
 	}
 
@@ -96,6 +99,7 @@ func createGenesisOutput(genesisTokenAmount uint64, genesisSeed []byte, engineIn
 		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
 
 		// Genesis output is on Genesis TX index 0
+		// TODO: change genesis outputID from empty transaction id to some hash, to avoid problems when rolling back newly created accounts, whose previousOutputID is also emptyTrasactionID:0 (super edge case, but better have that covered)
 		if err := engineInstance.Ledger.AddUnspentOutput(utxoledger.CreateOutput(engineInstance.API(), iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0), iotago.EmptyBlockID(), 0, 0, output)); err != nil {
 			return err
 		}
@@ -104,17 +108,15 @@ func createGenesisOutput(genesisTokenAmount uint64, genesisSeed []byte, engineIn
 	return nil
 }
 
-func createGenesisAccounts(accounts []AccountDetails, genesisSeed []byte, engineInstance *engine.Engine) error {
-	genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
-
+func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine) (err error) {
 	// Account outputs start from Genesis TX index 1
 	for idx, account := range accounts {
-		output := createAccount(genesisWallet.Address(), account.Amount, account.Key)
+		output := createAccount(account.Address, account.Amount, account.IssuerKey)
 		accountOutput := utxoledger.CreateOutput(engineInstance.API(), iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)
-		if err := engineInstance.Ledger.AddUnspentOutput(accountOutput); err != nil {
+		if err = engineInstance.Ledger.AddUnspentOutput(accountOutput); err != nil {
 			return err
 		}
-		if err := engineInstance.Ledger.AddAccount(accountOutput); err != nil {
+		if err = engineInstance.Ledger.AddAccount(accountOutput); err != nil {
 			return err
 		}
 	}
@@ -140,7 +142,7 @@ func createOutput(address iotago.Address, tokenAmount uint64) (output iotago.Out
 
 func createAccount(address iotago.Address, tokenAmount uint64, pubkey ed25519.PublicKey) (output iotago.Output) {
 	return &iotago.AccountOutput{
-		AccountID: utils.RandAccountID(),
+		AccountID: blake2b.Sum256(lo.PanicOnErr(address.Encode())),
 		Amount:    tokenAmount,
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: address},

@@ -16,7 +16,7 @@ const (
 	destroyedAccountsPrefix
 )
 
-// AccountDiff represent the storable changes for a single account within an slot.
+// AccountDiff represent the storable changes for a single account within a slot.
 type AccountDiff struct {
 	Change              int64
 	PreviousUpdatedTime iotago.SlotIndex

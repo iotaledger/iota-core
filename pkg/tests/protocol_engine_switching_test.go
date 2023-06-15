@@ -25,10 +25,10 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNodeToPartition("node1", 75, "P1")
-	node2 := ts.AddValidatorNodeToPartition("node2", 75, "P1")
-	node3 := ts.AddValidatorNodeToPartition("node3", 25, "P2")
-	node4 := ts.AddValidatorNodeToPartition("node4", 25, "P2")
+	node1 := ts.AddValidatorNodeToPartition("node1", 75, 10000, "P1")
+	node2 := ts.AddValidatorNodeToPartition("node2", 75, 10000, "P1")
+	node3 := ts.AddValidatorNodeToPartition("node3", 25, 10000, "P2")
+	node4 := ts.AddValidatorNodeToPartition("node4", 25, 10000, "P2")
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
