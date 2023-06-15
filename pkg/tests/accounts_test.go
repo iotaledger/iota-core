@@ -20,13 +20,13 @@ import (
 func Test_TransitionAccount(t *testing.T) {
 	oldKey := utils.RandPubKey().ToEd25519()
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
-		Address:   nil, // nil address will be replaced with the address generated from genesis seed
-		Amount:    2,
+		Address:   nil,                               // nil address will be replaced with the address generated from genesis seed
+		Amount:    testsuite.MinIssuerAccountDeposit, // min amount to cover the rent. if it's too little then the snapshot creation will fail
 		IssuerKey: oldKey,
 	}))
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 50, 100)
+	node1 := ts.AddValidatorNode("node1", 50)
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 	ts.HookLogging()
@@ -36,7 +36,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:       genesisAccountOutput.AccountID,
-		Credits:  accounts.NewBlockIssuanceCredits(2, 0),
+		Credits:  accounts.NewBlockIssuanceCredits(int64(testsuite.MinIssuerAccountDeposit), 0),
 		OutputID: genesisAccount.OutputID(),
 		PubKeys:  advancedset.New(ed25519.PublicKey(oldKey)),
 	}, node1)
@@ -69,11 +69,11 @@ func Test_TransitionAccount(t *testing.T) {
 			PreviousOutputID:    genesisAccount.OutputID(),
 			PubKeysRemoved:      []ed25519.PublicKey{},
 			PubKeysAdded:        []ed25519.PublicKey{newKey},
-		}, false, ts.Node("node1"))
+		}, false, node1)
 
 		ts.AssertAccountData(&accounts.AccountData{
 			ID:       genesisAccountOutput.AccountID,
-			Credits:  accounts.NewBlockIssuanceCredits(2, 1),
+			Credits:  accounts.NewBlockIssuanceCredits(int64(testsuite.MinIssuerAccountDeposit), 1),
 			OutputID: iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
 			PubKeys:  advancedset.New(ed25519.PublicKey(oldKey), newKey),
 		}, node1)
@@ -117,6 +117,15 @@ func Test_TransitionAccount(t *testing.T) {
 
 		newAccount := ts.AccountOutput("TX2:0")
 		newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
+
+		ts.AssertAccountDiff(newAccountOutput.AccountID, 13, &prunable.AccountDiff{
+			Change:              0,
+			PreviousUpdatedTime: 0,
+			NewOutputID:         newAccount.OutputID(),
+			PreviousOutputID:    iotago.EmptyOutputID,
+			PubKeysRemoved:      []ed25519.PublicKey{},
+			PubKeysAdded:        []ed25519.PublicKey{newAccountBlockIssuerKey},
+		}, false, node1)
 
 		ts.AssertAccountData(&accounts.AccountData{
 			ID:       newAccountOutput.AccountID,
