@@ -134,7 +134,7 @@ func TestManager_CommitSlot(t *testing.T) {
 
 }
 
-func AssertAccountManagerSlotState(t *testing.T, manager *Manager, expectedData tpkg.AccountsLedgerTestScenario) {
+func AssertAccountManagerSlotState(t *testing.T, manager *Manager, expectedData *tpkg.AccountsLedgerTestScenario) {
 	// assert accounts vector is updated correctly
 	for accID, expectedAccData := range expectedData.AccountsLedger {
 		actualData, exists, err2 := manager.Account(accID)

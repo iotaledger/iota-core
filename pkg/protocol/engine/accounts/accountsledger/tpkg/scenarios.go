@@ -29,7 +29,7 @@ type AccountsSlotBuildData struct {
 
 type SlotActions map[iotago.AccountID]*AccountActions
 
-type ExpectedAccountsLedgers map[iotago.SlotIndex]AccountsLedgerTestScenario
+type ExpectedAccountsLedgers map[iotago.SlotIndex]*AccountsLedgerTestScenario
 
 type AccountActions struct {
 	burns           []uint64
@@ -130,30 +130,21 @@ func (s Scenario) populateSlotBuildData() map[iotago.SlotIndex]*AccountsSlotBuil
 
 func (s Scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
 	expected := make(ExpectedAccountsLedgers)
+	rollingAccountLedger := make(map[iotago.AccountID]*accounts.AccountData)
 	for slotIndex, slotActions := range s {
-		expected[slotIndex] = AccountsLedgerTestScenario{
-			LatestCommittedSlotIndex: slotIndex,
+		expected[slotIndex] = &AccountsLedgerTestScenario{
+			LatestCommittedSlotIndex: 0,
 			AccountsLedger:           make(map[iotago.AccountID]*accounts.AccountData),
 			AccountsDiffs:            make(map[iotago.AccountID]*prunable.AccountDiff),
 		}
 		for accountID, actions := range *slotActions {
-			accData, exists := expected[slotIndex].AccountsLedger[accountID]
 			change := int64(actions.totalAllotments)
 			for _, burn := range actions.burns {
 				change -= int64(burn)
 			}
-			if !exists {
-				accData = accounts.NewAccountData(
-					accountID,
-					accounts.NewBlockIssuanceCredits(int64(0), actions.updatedTime),
-					actions.outputID,
-				)
-			}
-			accData.Credits.Update(change)
-			accData.AddPublicKeys(actions.addedKeys...)
-			accData.RemovePublicKeys(actions.removedKeys...)
-
-			expected[slotIndex].AccountsLedger[accountID] = accData
+			expectedAccountLedger := expected[slotIndex]
+			accData := updateExpectedAccLedger(expectedAccountLedger, rollingAccountLedger, accountID, actions, change)
+			rollingAccountLedger[accountID] = accData.Clone()
 
 			// populate diffs
 			expected[slotIndex].AccountsDiffs[accountID] = &prunable.AccountDiff{
@@ -172,6 +163,29 @@ func (s Scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
 	}
 
 	return expected
+}
+
+func updateExpectedAccLedger(expectedAccountLedger *AccountsLedgerTestScenario, rollingLedger map[iotago.AccountID]*accounts.AccountData, accountID iotago.AccountID, actions *AccountActions, change int64) *accounts.AccountData {
+	accData, exists := expectedAccountLedger.AccountsLedger[accountID]
+	if !exists {
+		// does this acocunt existed in previous slots?
+		prevData, existed := rollingLedger[accountID]
+		if existed {
+			accData = prevData.Clone()
+		} else {
+			accData = accounts.NewAccountData(
+				accountID,
+				accounts.NewBlockIssuanceCredits(int64(0), actions.updatedTime),
+				actions.outputID,
+			)
+			rollingLedger[accountID] = accData.Clone()
+		}
+
+	}
+	accData.Credits.Update(change)
+	accData.AddPublicKeys(actions.addedKeys...)
+	accData.RemovePublicKeys(actions.removedKeys...)
+	return accData
 }
 
 func (s Scenario) blockFunc(t *testing.T) (func(iotago.BlockID) (*blocks.Block, bool), map[iotago.SlotIndex][]iotago.BlockID) {
