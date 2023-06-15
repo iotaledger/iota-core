@@ -3,9 +3,8 @@ package tpkg
 import (
 	"time"
 
-	"github.com/iotaledger/iota-core/pkg/utils"
-
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 

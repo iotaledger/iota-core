@@ -3,11 +3,12 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"github.com/iotaledger/hive.go/crypto/ed25519"
-	iotago "github.com/iotaledger/iota.go/v4"
 	"math"
 	"math/big"
 	"time"
+
+	"github.com/iotaledger/hive.go/crypto/ed25519"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func RandomRead(p []byte) (n int, err error) {

@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"golang.org/x/xerrors"
-
 	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/crypto/ed25519"

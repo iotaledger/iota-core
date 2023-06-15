@@ -6,7 +6,6 @@ import "github.com/iotaledger/hive.go/runtime/event"
 type Events struct {
 	// BlockAdded gets triggered when a new block was added to the TipManager.
 	BlockAdded *event.Event1[TipMetadata]
-
 	// Group makes the Events linkable through the central Events dictionary.
 	event.Group[Events, *Events]
 }
