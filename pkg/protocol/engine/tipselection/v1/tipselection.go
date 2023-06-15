@@ -1,4 +1,4 @@
-package tipmanagerv1
+package tipselectionv1
 
 import (
 	"golang.org/x/xerrors"
@@ -14,7 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -31,7 +31,7 @@ type TipSelection struct {
 	memPool mempool.MemPool[ledger.BlockVotePower]
 
 	// events contains all the events that are triggered by the TipManager.
-	events *tipmanager.Events
+	events *tipselection.Events
 
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int
@@ -50,8 +50,8 @@ type TipSelection struct {
 }
 
 // NewProvider creates a new TipManager provider.
-func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.Engine, tipmanager.TipSelection] {
-	return module.Provide(func(e *engine.Engine) tipmanager.TipSelection {
+func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.Engine, tipselection.TipSelection] {
+	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
 		t := New(e.Ledger.ConflictDAG(), e.BlockCache.Block, e.EvictionState.LatestRootBlocks, opts...)
 
 		e.Events.Booker.BlockBooked.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
@@ -68,7 +68,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 func New(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
 		tipManager:                   NewTipManager(blockRetriever),
-		events:                       tipmanager.NewEvents(),
+		events:                       tipselection.NewEvents(),
 		conflictDAG:                  conflictDAG,
 		rootBlocks:                   rootBlocksRetriever,
 		optMaxStrongParents:          8,
@@ -79,18 +79,18 @@ func New(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.Output
 	}, (*TipSelection).TriggerConstructed)
 }
 
-func (t *TipSelection) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
+func (t *TipSelection) AddBlock(block *blocks.Block) tipselection.TipMetadata {
 	tipMetadata := t.tipManager.addBlock(block)
 	if tipMetadata == nil {
 		return nil
 	}
 
 	if t.isValidStrongTip(block) {
-		tipMetadata.setTipPool(tipmanager.StrongTipPool)
+		tipMetadata.setTipPool(tipselection.StrongTipPool)
 	} else if t.isValidWeakTip(block) {
-		tipMetadata.setTipPool(tipmanager.WeakTipPool)
+		tipMetadata.setTipPool(tipselection.WeakTipPool)
 	} else {
-		tipMetadata.setTipPool(tipmanager.DroppedTipPool)
+		tipMetadata.setTipPool(tipselection.DroppedTipPool)
 	}
 
 	t.events.BlockAdded.Trigger(tipMetadata)
@@ -112,11 +112,11 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 }
 
 // Events returns the events of the TipManager.
-func (t *TipSelection) Events() *tipmanager.Events {
+func (t *TipSelection) Events() *tipselection.Events {
 	return t.events
 }
 
-func (t *TipSelection) TipManager() tipmanager.TipManager {
+func (t *TipSelection) TipManager() tipselection.TipManager {
 	return t.tipManager
 }
 
@@ -130,7 +130,7 @@ func (t *TipSelection) collectStrongReferences(references model.ParentReferences
 	t.collectReferences(references, model.StrongParentType, t.tipManager.StrongTips, func(tip *TipMetadata) {
 		addedLikedInsteadReferences, updatedLikedInsteadConflicts, err := t.likedInsteadReferences(previousLikedInsteadConflicts, tip)
 		if err != nil {
-			tip.setTipPool(tipmanager.WeakTipPool)
+			tip.setTipPool(tipselection.WeakTipPool)
 		} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[model.ShallowLikeParentType]) {
 			references[model.StrongParentType] = append(references[model.StrongParentType], tip.ID())
 			references[model.ShallowLikeParentType] = append(references[model.ShallowLikeParentType], addedLikedInsteadReferences...)
@@ -146,7 +146,7 @@ func (t *TipSelection) collectStrongReferences(references model.ParentReferences
 	}
 }
 
-func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.AdvancedSet[iotago.TransactionID], tipMetadata tipmanager.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {
+func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.AdvancedSet[iotago.TransactionID], tipMetadata tipselection.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {
 	necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
 	if err = t.conflictDAG.LikedInstead(tipMetadata.Block().ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
 		transactionMetadata, exists := t.memPool.TransactionMetadata(likedConflictID)
@@ -178,16 +178,16 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.Advanc
 func (t *TipSelection) collectWeakReferences(references model.ParentReferences) {
 	t.collectReferences(references, model.WeakParentType, t.tipManager.WeakTips, func(tip *TipMetadata) {
 		if !t.isValidWeakTip(tip.Block()) {
-			tip.setTipPool(tipmanager.DroppedTipPool)
+			tip.setTipPool(tipselection.DroppedTipPool)
 		} else {
 			references[model.WeakParentType] = append(references[model.WeakParentType], tip.ID())
 		}
 	}, t.optMaxWeakReferences)
 }
 
-func (t *TipSelection) collectReferences(references model.ParentReferences, parentsType model.ParentsType, tipSelector func(optAmount ...int) []tipmanager.TipMetadata, callback func(*TipMetadata), amount int) {
+func (t *TipSelection) collectReferences(references model.ParentReferences, parentsType model.ParentsType, tipSelector func(optAmount ...int) []tipselection.TipMetadata, callback func(*TipMetadata), amount int) {
 	seenTips := advancedset.New[iotago.BlockID]()
-	selectUniqueTips := func(amount int) (uniqueTips []tipmanager.TipMetadata) {
+	selectUniqueTips := func(amount int) (uniqueTips []tipselection.TipMetadata) {
 		if amount <= 0 {
 			return
 		}

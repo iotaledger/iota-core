@@ -24,7 +24,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -56,7 +56,7 @@ type EngineManager struct {
 	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	attestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
-	tipSelectionProvider    module.Provider[*engine.Engine, tipmanager.TipSelection]
+	tipSelectionProvider    module.Provider[*engine.Engine, tipselection.TipSelection]
 
 	activeInstance *engine.Engine
 }
@@ -78,7 +78,7 @@ func New(
 	notarizationProvider module.Provider[*engine.Engine, notarization.Notarization],
 	attestationProvider module.Provider[*engine.Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
-	tipSelectionProvider module.Provider[*engine.Engine, tipmanager.TipSelection],
+	tipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection],
 ) *EngineManager {
 	return &EngineManager{
 		workers:                 workers,

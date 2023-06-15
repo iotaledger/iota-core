@@ -1,4 +1,4 @@
-package tipmanagerv1
+package tipselectionv1
 
 // increase increases the given value by 1.
 func increase(currentValue int) int {

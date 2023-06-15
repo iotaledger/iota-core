@@ -1,10 +1,10 @@
-package tipmanagerv1
+package tipselectionv1
 
 import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -14,7 +14,7 @@ type TipMetadata struct {
 	block *blocks.Block
 
 	// tipPool holds the TipPool the block is currently in.
-	tipPool *promise.Value[tipmanager.TipPool]
+	tipPool *promise.Value[tipselection.TipPool]
 
 	// stronglyConnectedChildren holds the number of strong children that can be reached from the selectTips using only strong
 	// references.
@@ -63,7 +63,7 @@ type TipMetadata struct {
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	return (&TipMetadata{
 		block:                     block,
-		tipPool:                   promise.NewValue[tipmanager.TipPool](),
+		tipPool:                   promise.NewValue[tipselection.TipPool](),
 		stronglyConnectedChildren: promise.NewValue[int](),
 		weaklyConnectedChildren:   promise.NewValue[int](),
 		stronglyReferencedByTips:  promise.NewValue[bool]().WithTriggerWithInitialZeroValue(true),
@@ -90,13 +90,13 @@ func (t *TipMetadata) Block() *blocks.Block {
 }
 
 // TipPool returns the TipPool the Block is currently in.
-func (t *TipMetadata) TipPool() tipmanager.TipPool {
+func (t *TipMetadata) TipPool() tipselection.TipPool {
 	return t.tipPool.Get()
 }
 
 // OnTipPoolUpdated registers a callback that is triggered when the TipPool the Block is currently in is updated.
-func (t *TipMetadata) OnTipPoolUpdated(handler func(tipPool tipmanager.TipPool)) (unsubscribe func()) {
-	return t.tipPool.OnUpdate(func(_, tipPool tipmanager.TipPool) { handler(tipPool) })
+func (t *TipMetadata) OnTipPoolUpdated(handler func(tipPool tipselection.TipPool)) (unsubscribe func()) {
+	return t.tipPool.OnUpdate(func(_, tipPool tipselection.TipPool) { handler(tipPool) })
 }
 
 // IsStrongTip returns true if the Block is part of the strong tip set.
@@ -167,27 +167,27 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 		}
 	}
 
-	t.OnTipPoolUpdated(func(tipPool tipmanager.TipPool) {
+	t.OnTipPoolUpdated(func(tipPool tipselection.TipPool) {
 		leaveCurrentTipPool()
 
-		if tipPool == tipmanager.StrongTipPool {
+		if tipPool == tipselection.StrongTipPool {
 			joinTipPool(t.stronglyReferencedByTips, t.strongTip)
-		} else if tipPool == tipmanager.WeakTipPool {
+		} else if tipPool == tipselection.WeakTipPool {
 			joinTipPool(t.referencedByTips, t.weakTip)
 		}
 
 		t.stronglyConnectedToTips.Compute(func(_ bool) bool {
-			return tipPool == tipmanager.StrongTipPool || t.stronglyConnectedChildren.Get() > 0
+			return tipPool == tipselection.StrongTipPool || t.stronglyConnectedChildren.Get() > 0
 		})
 
 		t.weaklyConnectedToTips.Compute(func(_ bool) bool {
-			return tipPool == tipmanager.WeakTipPool || t.weaklyConnectedChildren.Get() > 0
+			return tipPool == tipselection.WeakTipPool || t.weaklyConnectedChildren.Get() > 0
 		})
 	})
 
 	t.stronglyConnectedChildren.OnUpdate(func(_, stronglyConnectedChildren int) {
 		t.stronglyConnectedToTips.Compute(func(_ bool) bool {
-			return stronglyConnectedChildren > 0 || t.tipPool.Get() == tipmanager.StrongTipPool
+			return stronglyConnectedChildren > 0 || t.tipPool.Get() == tipselection.StrongTipPool
 		})
 
 		t.referencedByTips.Compute(func(_ bool) bool {
@@ -201,7 +201,7 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 
 	t.weaklyConnectedChildren.OnUpdate(func(_, newCount int) {
 		t.weaklyConnectedToTips.Compute(func(_ bool) bool {
-			return newCount > 0 || t.tipPool.Get() == tipmanager.WeakTipPool
+			return newCount > 0 || t.tipPool.Get() == tipselection.WeakTipPool
 		})
 
 		t.referencedByTips.Compute(func(_ bool) bool {
@@ -225,14 +225,14 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 }
 
 // setTipPool sets the TipPool of the Block.
-func (t *TipMetadata) setTipPool(tipPool tipmanager.TipPool) {
-	t.tipPool.Compute(func(prevType tipmanager.TipPool) tipmanager.TipPool {
+func (t *TipMetadata) setTipPool(tipPool tipselection.TipPool) {
+	t.tipPool.Compute(func(prevType tipselection.TipPool) tipselection.TipPool {
 		return lo.Cond(tipPool > prevType, tipPool, prevType)
 	})
 }
 
 // code contract (make sure the type implements all required methods).
-var _ tipmanager.TipMetadata = new(TipMetadata)
+var _ tipselection.TipMetadata = new(TipMetadata)
 
 // void is a function that does nothing.
 func void() {}

@@ -1,4 +1,4 @@
-package tipmanager
+package tipselection
 
 import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"

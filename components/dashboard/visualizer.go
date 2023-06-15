@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 )
 
 // var (
@@ -67,7 +67,7 @@ func runVisualizer(component *app.Component) {
 			deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 				sendVertex(block, block.IsAccepted())
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipselection.TipMetadata) {
 				sendTipInfo(tipMetadata.Block(), true)
 
 				tipMetadata.OnEvicted(func() {

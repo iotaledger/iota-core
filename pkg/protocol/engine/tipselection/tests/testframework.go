@@ -14,14 +14,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 type TestFramework struct {
-	Instance *tipmanagerv1.TipSelection
+	Instance *tipselectionv1.TipSelection
 
 	blockIDsByAlias map[string]iotago.BlockID
 	blocksByID      map[iotago.BlockID]*blocks.Block
@@ -39,7 +38,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
 
-	t.Instance = tipmanagerv1.New(conflictDAG, func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
+	t.Instance = tipselectionv1.New(conflictDAG, func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]
 		return block, exists
 	}, func() iotago.BlockIDs {
@@ -98,7 +97,7 @@ func (t *TestFramework) BlockID(alias string) iotago.BlockID {
 
 func (t *TestFramework) AssertStrongTips(aliases ...string) {
 	for _, alias := range aliases {
-		require.True(t.test, advancedset.New(lo.Map(t.Instance.TipManager().StrongTips(), tipmanager.TipMetadata.ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
+		require.True(t.test, advancedset.New(lo.Map(t.Instance.TipManager().StrongTips(), tipselection.TipMetadata.ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
 	}
 
 	require.Equal(t.test, len(aliases), len(t.Instance.TipManager().StrongTips()), "strongTips size does not match")

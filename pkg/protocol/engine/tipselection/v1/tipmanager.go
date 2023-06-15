@@ -1,4 +1,4 @@
-package tipmanagerv1
+package tipselectionv1
 
 import (
 	"sync"
@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -45,7 +45,7 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 }
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
-func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
+func (t *TipManager) AddBlock(block *blocks.Block) tipselection.TipMetadata {
 	return t.addBlock(block)
 }
 
@@ -61,12 +61,12 @@ func (t *TipManager) addBlock(block *blocks.Block) *TipMetadata {
 }
 
 // StrongTips returns the strong selectTips of the TipManager (with an optional limit).
-func (t *TipManager) StrongTips(optAmount ...int) []tipmanager.TipMetadata {
+func (t *TipManager) StrongTips(optAmount ...int) []tipselection.TipMetadata {
 	return t.selectTips(t.strongTipSet, optAmount...)
 }
 
 // WeakTips returns the weak selectTips of the TipManager (with an optional limit).
-func (t *TipManager) WeakTips(optAmount ...int) []tipmanager.TipMetadata {
+func (t *TipManager) WeakTips(optAmount ...int) []tipselection.TipMetadata {
 	return t.selectTips(t.weakTipSet, optAmount...)
 }
 
@@ -124,7 +124,7 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	})
 
 	tipMetadata.OnEvicted(func() {
-		tipMetadata.setTipPool(tipmanager.DroppedTipPool)
+		tipMetadata.setTipPool(tipselection.DroppedTipPool)
 
 		lo.Batch(unhookMethods...)()
 	})
@@ -180,12 +180,12 @@ func (t *TipManager) markSlotAsEvicted(slotIndex iotago.SlotIndex) (success bool
 }
 
 // selectTips returns the given amount of selectTips from the given tip set.
-func (t *TipManager) selectTips(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata], optAmount ...int) []tipmanager.TipMetadata {
+func (t *TipManager) selectTips(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata], optAmount ...int) []tipselection.TipMetadata {
 	if len(optAmount) != 0 {
-		return lo.Map(tipSet.RandomUniqueEntries(optAmount[0]), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
+		return lo.Map(tipSet.RandomUniqueEntries(optAmount[0]), func(tip *TipMetadata) tipselection.TipMetadata { return tip })
 	}
 
-	return lo.Map(tipSet.Values(), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
+	return lo.Map(tipSet.Values(), func(tip *TipMetadata) tipselection.TipMetadata { return tip })
 }
 
 // updateConnectedChildren returns the update functions for the connected children counters of the parents of a Block.
@@ -208,4 +208,4 @@ func updateConnectedChildren(isConnected bool, stronglyConnected bool) (propagat
 }
 
 // code contract (make sure the type implements all required methods).
-var _ tipmanager.TipManager = new(TipManager)
+var _ tipselection.TipManager = new(TipManager)
