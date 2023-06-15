@@ -31,7 +31,12 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
-			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID))),
+			protocol.WithSybilProtectionProvider(
+				poa.NewProvider(ts.Validators(),
+					poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID),
+					poa.WithActivityWindow(1*time.Minute),
+				),
+			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
@@ -46,7 +51,12 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			),
 		},
 		"node2": {
-			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID))),
+			protocol.WithSybilProtectionProvider(
+				poa.NewProvider(ts.Validators(),
+					poa.WithOnlineCommitteeStartup(node1.AccountID, node2.AccountID),
+					poa.WithActivityWindow(1*time.Minute),
+				),
+			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
@@ -61,7 +71,12 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			),
 		},
 		"node3": {
-			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID))),
+			protocol.WithSybilProtectionProvider(
+				poa.NewProvider(ts.Validators(),
+					poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID),
+					poa.WithActivityWindow(1*time.Minute),
+				),
+			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
@@ -76,7 +91,12 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			),
 		},
 		"node4": {
-			protocol.WithSybilProtectionProvider(poa.NewProvider(ts.Validators(), poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID))),
+			protocol.WithSybilProtectionProvider(
+				poa.NewProvider(ts.Validators(),
+					poa.WithOnlineCommitteeStartup(node3.AccountID, node4.AccountID),
+					poa.WithActivityWindow(1*time.Minute),
+				),
+			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(1),
 			),
