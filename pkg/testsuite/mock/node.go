@@ -286,18 +286,26 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
 	})
 
-	instance.Events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
+	events.SybilProtection.OnlineCommitteeAccountAdded.Hook(func(accountID iotago.AccountID) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeAccountAdded: %s\n", n.Name, engineName, accountID)
+	})
+
+	events.SybilProtection.OnlineCommitteeAccountRemoved.Hook(func(accountID iotago.AccountID) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeAccountRemoved: %s\n", n.Name, engineName, accountID)
+	})
+
+	events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictCreated: %s\n", n.Name, engineName, conflictID)
 	})
 
-	instance.Events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
+	events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictEvicted: %s\n", n.Name, engineName, conflictID)
 	})
-	instance.Events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
+	events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictRejected: %s\n", n.Name, engineName, conflictID)
 	})
 
-	instance.Events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
+	events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
 	})
 
