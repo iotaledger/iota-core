@@ -68,7 +68,7 @@ func TestManager_CommitAccountTree(t *testing.T) {
 }
 
 func TestManager_CommitSlot(t *testing.T) {
-	scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, tpkg.Scenario2)
+	scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, tpkg.Scenario1)
 	params := tpkg.ProtocolParams()
 
 	slotDiffFunc, _ := tpkg.InitSlotDiff()
@@ -83,21 +83,25 @@ func TestManager_CommitSlot(t *testing.T) {
 			manager.TrackBlock(block)
 		}
 		slotBuildData := scenarioBuildData[index]
+
 		err := manager.ApplyDiff(index, slotBuildData.SlotDiff, slotBuildData.DestroyedAccounts)
 		require.NoError(t, err)
-
-		// assert accounts vector is updated correctly
 		expectedData := scenarioExpected[index]
-		for accID, expectedAccData := range expectedData.AccountsLedger {
-			actualData, exists, err2 := manager.Account(accID)
-			assert.NoError(t, err2)
-			assert.True(t, exists)
-			assert.Equal(t, expectedAccData, actualData)
-		}
-		for accID, expectedDiff := range expectedData.AccountsDiffs {
-			actualAccDiff, _, err2 := manager.LoadSlotDiff(index, accID)
-			require.NoError(t, err2)
-			assert.Equal(t, expectedDiff, actualAccDiff)
-		}
+		AssertAccountManagerSlotState(t, manager, expectedData)
+	}
+}
+
+func AssertAccountManagerSlotState(t *testing.T, manager *Manager, expectedData tpkg.AccountsLedgerTestScenario) {
+	// assert accounts vector is updated correctly
+	for accID, expectedAccData := range expectedData.AccountsLedger {
+		actualData, exists, err2 := manager.Account(accID)
+		assert.NoError(t, err2)
+		assert.True(t, exists)
+		assert.Equal(t, expectedAccData, actualData)
+	}
+	for accID, expectedDiff := range expectedData.AccountsDiffs {
+		actualAccDiff, _, err2 := manager.LoadSlotDiff(expectedData.LatestCommittedSlotIndex, accID)
+		require.NoError(t, err2)
+		assert.Equal(t, expectedDiff, actualAccDiff)
 	}
 }
