@@ -68,7 +68,7 @@ func TestManager_CommitAccountTree(t *testing.T) {
 }
 
 func TestManager_CommitSlot(t *testing.T) {
-	scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, tpkg.Scenario2)
+	scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, tpkg.Scenario3)
 	params := tpkg.ProtocolParams()
 
 	slotDiffFunc, _ := tpkg.InitSlotDiff()
@@ -95,7 +95,6 @@ func TestManager_CommitSlot(t *testing.T) {
 			assert.Equal(t, expectedAccData, actualData)
 		}
 		for accID, expectedDiff := range expectedData.AccountsDiffs {
-			// todo waht with destroyed assertion
 			actualAccDiff, _, err := manager.LoadSlotDiff(index, accID)
 			require.NoError(t, err)
 			assert.Equal(t, expectedDiff, actualAccDiff)
