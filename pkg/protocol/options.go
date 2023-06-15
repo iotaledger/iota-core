@@ -43,9 +43,9 @@ func WithBlockDAGProvider(optsBlockDAGProvider module.Provider[*engine.Engine, b
 	}
 }
 
-func WithTipManagerProvider(optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]) options.Option[Protocol] {
+func WithTipSelectionProvider(optsTipSelectionProvider module.Provider[*engine.Engine, tipmanager.TipSelection]) options.Option[Protocol] {
 	return func(n *Protocol) {
-		n.optsTipManagerProvider = optsTipManagerProvider
+		n.optsTipSelectionProvider = optsTipSelectionProvider
 	}
 }
 

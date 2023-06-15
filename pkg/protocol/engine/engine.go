@@ -52,7 +52,7 @@ type Engine struct {
 	Notarization    notarization.Notarization
 	Attestations    attestation.Attestations
 	Ledger          ledger.Ledger
-	TipManager      tipmanager.TipManager
+	TipSelection    tipmanager.TipSelection
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -87,7 +87,7 @@ func New(
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
-	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
+	tipManagerProvider module.Provider[*Engine, tipmanager.TipSelection],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -115,7 +115,7 @@ func New(
 			e.Notarization = notarizationProvider(e)
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
-			e.TipManager = tipManagerProvider(e)
+			e.TipSelection = tipManagerProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings().TriggerInitialized,

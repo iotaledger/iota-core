@@ -6,25 +6,17 @@ import (
 	"github.com/iotaledger/hive.go/ds/randommap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// TipManager is a component that manages the tips of the Tangle.
+// TipManager is a component that manages the selectTips of the Tangle.
 type TipManager struct {
 	// retrieveBlock is a function that retrieves a Block from the Tangle.
 	retrieveBlock func(blockID iotago.BlockID) (block *blocks.Block, exists bool)
-
-	// conflictDAG is the ConflictDAG that is used to track conflicts.
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
 
 	// tipMetadataStorage contains the TipMetadata of all Blocks that are managed by the TipManager.
 	tipMetadataStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]
@@ -35,48 +27,29 @@ type TipManager struct {
 	// weakTipSet contains the blocks of the weak tip pool that have no referencing children.
 	weakTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
 
-	// events contains all the events that are triggered by the TipManager.
-	events *tipmanager.Events
-
 	// lastEvictedSlot is the last slot index that was evicted from the MemPool.
 	lastEvictedSlot iotago.SlotIndex
 
 	// evictionMutex is used to synchronize the eviction of slots.
 	evictionMutex sync.RWMutex
-
-	module.Module
-}
-
-// NewProvider creates a new TipManager provider.
-func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
-	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
-		t := NewTipManager(e.Ledger.ConflictDAG(), e.BlockCache.Block, opts...)
-
-		e.Events.Booker.BlockBooked.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
-		e.BlockCache.Evict.Hook(t.Evict)
-		e.HookStopped(t.Shutdown)
-		e.Events.TipManager.LinkTo(t.events)
-
-		t.TriggerInitialized()
-
-		return t
-	})
 }
 
 // NewTipManager creates a new TipManager.
-func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), opts ...options.Option[TipManager]) *TipManager {
+func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), opts ...options.Option[TipManager]) *TipManager {
 	return options.Apply(&TipManager{
 		retrieveBlock:      blockRetriever,
-		conflictDAG:        conflictDAG,
 		tipMetadataStorage: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
 		strongTipSet:       randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:         randommap.New[iotago.BlockID, *TipMetadata](),
-		events:             tipmanager.NewEvents(),
-	}, opts, (*TipManager).TriggerConstructed)
+	}, opts)
 }
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
 func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
+	return t.addBlock(block)
+}
+
+func (t *TipManager) addBlock(block *blocks.Block) *TipMetadata {
 	tipMetadata := NewBlockMetadata(block)
 	if storage := t.metadataStorage(block.ID().Index()); storage == nil || !storage.Set(block.ID(), tipMetadata) {
 		return nil
@@ -87,14 +60,14 @@ func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
 	return tipMetadata
 }
 
-// StrongTips returns the strong tips of the TipManager (with an optional limit).
+// StrongTips returns the strong selectTips of the TipManager (with an optional limit).
 func (t *TipManager) StrongTips(optAmount ...int) []tipmanager.TipMetadata {
-	return t.tips(t.strongTipSet, optAmount...)
+	return t.selectTips(t.strongTipSet, optAmount...)
 }
 
-// WeakTips returns the weak tips of the TipManager (with an optional limit).
+// WeakTips returns the weak selectTips of the TipManager (with an optional limit).
 func (t *TipManager) WeakTips(optAmount ...int) []tipmanager.TipMetadata {
-	return t.tips(t.weakTipSet, optAmount...)
+	return t.selectTips(t.weakTipSet, optAmount...)
 }
 
 // Evict evicts a slot from the TipManager.
@@ -112,25 +85,15 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 	}
 }
 
-// Events returns the events of the TipManager.
-func (t *TipManager) Events() *tipmanager.Events {
-	return t.events
-}
-
-// Shutdown marks the TipManager as shutdown.
-func (t *TipManager) Shutdown() {
-	t.TriggerStopped()
-}
-
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	unhookMethods := []func(){
 		tipMetadata.stronglyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-			t.forEachParentByType(tipMetadata, propagateConnectedChildren(isConnected, true))
+			t.forEachParentByType(tipMetadata, updateConnectedChildren(isConnected, true))
 		}),
 
 		tipMetadata.weaklyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-			t.forEachParentByType(tipMetadata, propagateConnectedChildren(isConnected, false))
+			t.forEachParentByType(tipMetadata, updateConnectedChildren(isConnected, false))
 		}),
 
 		tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
@@ -161,27 +124,10 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	})
 
 	tipMetadata.OnEvicted(func() {
-		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
+		tipMetadata.setTipPool(tipmanager.DroppedTipPool)
 
 		lo.Batch(unhookMethods...)()
 	})
-
-	tipMetadata.SetTipPool(t.determineTipPool(tipMetadata))
-
-	t.events.BlockAdded.Trigger(tipMetadata)
-}
-
-// determineTipPool determines the initial TipPool of the given Block.
-func (t *TipManager) determineTipPool(tipMetadata *TipMetadata, minPool ...tipmanager.TipPool) tipmanager.TipPool {
-	if lo.First(minPool) <= tipmanager.StrongTipPool && !t.conflictDAG.AcceptanceState(tipMetadata.Block().ConflictIDs()).IsRejected() {
-		return tipmanager.StrongTipPool
-	}
-
-	if lo.First(minPool) <= tipmanager.WeakTipPool && t.conflictDAG.LikedInstead(tipMetadata.Block().PayloadConflictIDs()).Size() == 0 {
-		return tipmanager.WeakTipPool
-	}
-
-	return tipmanager.DroppedTipPool
 }
 
 // forEachParentByType updates the parents of the given Block.
@@ -233,13 +179,32 @@ func (t *TipManager) markSlotAsEvicted(slotIndex iotago.SlotIndex) (success bool
 	return success
 }
 
-// tips returns the given amount of tips from the given tip set.
-func (t *TipManager) tips(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata], optAmount ...int) []tipmanager.TipMetadata {
+// selectTips returns the given amount of selectTips from the given tip set.
+func (t *TipManager) selectTips(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata], optAmount ...int) []tipmanager.TipMetadata {
 	if len(optAmount) != 0 {
 		return lo.Map(tipSet.RandomUniqueEntries(optAmount[0]), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
 	}
 
 	return lo.Map(tipSet.Values(), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
+}
+
+// updateConnectedChildren returns the update functions for the connected children counters of the parents of a Block.
+func updateConnectedChildren(isConnected bool, stronglyConnected bool) (propagationRules map[model.ParentsType]func(*TipMetadata)) {
+	updateFunc := lo.Cond(isConnected, increase, decrease)
+
+	propagationRules = map[model.ParentsType]func(*TipMetadata){
+		model.WeakParentType: func(parent *TipMetadata) {
+			parent.weaklyConnectedChildren.Compute(updateFunc)
+		},
+	}
+
+	if stronglyConnected {
+		propagationRules[model.StrongParentType] = func(parent *TipMetadata) {
+			parent.stronglyConnectedChildren.Compute(updateFunc)
+		}
+	}
+
+	return propagationRules
 }
 
 // code contract (make sure the type implements all required methods).

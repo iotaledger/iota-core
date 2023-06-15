@@ -3,7 +3,6 @@ package tipmanagerv1
 import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -17,11 +16,11 @@ type TipMetadata struct {
 	// tipPool holds the TipPool the block is currently in.
 	tipPool *promise.Value[tipmanager.TipPool]
 
-	// stronglyConnectedChildren holds the number of strong children that can be reached from the tips using only strong
+	// stronglyConnectedChildren holds the number of strong children that can be reached from the selectTips using only strong
 	// references.
 	stronglyConnectedChildren *promise.Value[int]
 
-	// weaklyConnectedChildren holds the number of weak children that can be reached from the tips.
+	// weaklyConnectedChildren holds the number of weak children that can be reached from the selectTips.
 	weaklyConnectedChildren *promise.Value[int]
 
 	// stronglyReferencedByTips is a derived property that is true if the block has at least one strongly connected
@@ -32,7 +31,7 @@ type TipMetadata struct {
 	// child.
 	referencedByTips *promise.Value[bool]
 
-	// stronglyConnectedToTips is a derived property that is true if the block is either strongly referenced by tips or
+	// stronglyConnectedToTips is a derived property that is true if the block is either strongly referenced by selectTips or
 	// part of the strong TipPool.
 	stronglyConnectedToTips *promise.Value[bool]
 
@@ -93,13 +92,6 @@ func (t *TipMetadata) Block() *blocks.Block {
 // TipPool returns the TipPool the Block is currently in.
 func (t *TipMetadata) TipPool() tipmanager.TipPool {
 	return t.tipPool.Get()
-}
-
-// SetTipPool sets the TipPool of the Block.
-func (t *TipMetadata) SetTipPool(tipPool tipmanager.TipPool) {
-	t.tipPool.Compute(func(prevType tipmanager.TipPool) tipmanager.TipPool {
-		return lo.Cond(tipPool > prevType, tipPool, prevType)
-	})
 }
 
 // OnTipPoolUpdated registers a callback that is triggered when the TipPool the Block is currently in is updated.
@@ -232,27 +224,11 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 	return t
 }
 
-// propagateConnectedChildren returns the rules for the propagation of the internal connected children counters.
-func propagateConnectedChildren(isConnected bool, stronglyConnected bool) (propagationRules map[model.ParentsType]func(*TipMetadata)) {
-	diffToApply := lo.Cond(isConnected, +1, -1)
-
-	updatedValue := func(value int) int {
-		return value + diffToApply
-	}
-
-	propagationRules = map[model.ParentsType]func(*TipMetadata){
-		model.WeakParentType: func(parent *TipMetadata) {
-			parent.weaklyConnectedChildren.Compute(updatedValue)
-		},
-	}
-
-	if stronglyConnected {
-		propagationRules[model.StrongParentType] = func(parent *TipMetadata) {
-			parent.stronglyConnectedChildren.Compute(updatedValue)
-		}
-	}
-
-	return propagationRules
+// setTipPool sets the TipPool of the Block.
+func (t *TipMetadata) setTipPool(tipPool tipmanager.TipPool) {
+	t.tipPool.Compute(func(prevType tipmanager.TipPool) tipmanager.TipPool {
+		return lo.Cond(tipPool > prevType, tipPool, prevType)
+	})
 }
 
 // code contract (make sure the type implements all required methods).

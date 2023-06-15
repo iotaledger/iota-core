@@ -65,7 +65,7 @@ type Protocol struct {
 
 	optsFilterProvider          module.Provider[*engine.Engine, filter.Filter]
 	optsBlockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
-	optsTipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
+	optsTipSelectionProvider    module.Provider[*engine.Engine, tipmanager.TipSelection]
 	optsBookerProvider          module.Provider[*engine.Engine, booker.Booker]
 	optsClockProvider           module.Provider[*engine.Engine, clock.Clock]
 	optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
@@ -84,7 +84,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		dispatcher:                  dispatcher,
 		optsFilterProvider:          blockfilter.NewProvider(),
 		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
-		optsTipManagerProvider:      tipmanagerv1.NewProvider(),
+		optsTipSelectionProvider:    tipmanagerv1.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
 		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),
@@ -130,7 +130,7 @@ func (p *Protocol) Run() {
 		}
 	}
 
-	// p.linkTo(p.mainrEngine) -> CC and TipManager
+	// p.linkTo(p.mainrEngine) -> CC and TipSelection
 	p.runNetworkProtocol()
 }
 
@@ -207,7 +207,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsNotarizationProvider,
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,
-		p.optsTipManagerProvider,
+		p.optsTipSelectionProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
