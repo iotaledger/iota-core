@@ -65,8 +65,8 @@ func Test_DoubleSpend(t *testing.T) {
 		tx1 := ts.CreateTransaction("tx1", 1, "Genesis")
 		tx2 := ts.CreateTransaction("tx2", 1, "Genesis")
 
-		ts.IssueBlock("block1", node1, blockissuer.WithPayload(tx1))
-		ts.IssueBlock("block2", node1, blockissuer.WithPayload(tx2))
+		ts.IssueBlock("block1", node1, blockissuer.WithPayload(tx1), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBlock("block2", node1, blockissuer.WithPayload(tx2), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
