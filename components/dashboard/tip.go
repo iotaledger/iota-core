@@ -21,7 +21,7 @@ func tips() *TipsResponse {
 	t := make([]string, len(allTips))
 
 	for i, tip := range allTips {
-		t[i] = tip.Block().ID().ToHex()
+		t[i] = tip.ID().ToHex()
 	}
 
 	return &TipsResponse{Tips: t}

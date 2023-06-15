@@ -142,7 +142,7 @@ func (t *TipSelection) collectStrongReferences(references model.ParentReferences
 	if len(references[model.StrongParentType]) == 0 {
 		rootBlocks := t.rootBlocks()
 
-		references[model.StrongParentType] = rootBlocks[:lo.Max(len(rootBlocks), t.optMaxStrongParents)]
+		references[model.StrongParentType] = rootBlocks[:lo.Min(len(rootBlocks), t.optMaxStrongParents)]
 	}
 }
 
