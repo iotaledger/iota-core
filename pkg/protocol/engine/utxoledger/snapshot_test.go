@@ -5,8 +5,6 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/iotaledger/iota-core/pkg/utils"
-
 	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
 
@@ -15,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 

@@ -4,20 +4,18 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
-
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ads"
-
+	"github.com/iotaledger/hive.go/crypto/ed25519"
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -174,25 +172,26 @@ func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 	if len(optTargetIndex) > 0 {
 		targetIndex = optTargetIndex[0]
 	}
+
 	// if m.latestCommittedSlot < m.maxCommitableAge we should have all history
 	if m.latestCommittedSlot >= m.maxCommitableAge && targetIndex < m.latestCommittedSlot-m.maxCommitableAge {
 		return nil, false, fmt.Errorf("can't calculate account, target slot index older than accountIndex (%d<%d)", targetIndex, m.latestCommittedSlot-m.maxCommitableAge)
 	}
 	if targetIndex > m.latestCommittedSlot {
-		return nil, false, fmt.Errorf("can't retrieve account, slot %d is not committed yet, lastest committed slot: %d", targetIndex, m.latestCommittedSlot)
+		return nil, false, fmt.Errorf("can't retrieve account, slot %d is not committed yet, latest committed slot: %d", targetIndex, m.latestCommittedSlot)
 	}
 
 	// read initial account data at the latest committed slot
 	loadedAccount, exists := m.accountsTree.Get(accountID)
 	if !exists {
-		loadedAccount = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, targetIndex), iotago.OutputID{})
+		loadedAccount = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, targetIndex), iotago.EmptyOutputID)
 	}
 	wasDestroyed, err := m.rollbackAccountTo(loadedAccount, targetIndex)
 	if err != nil {
 		return nil, false, err
 	}
 
-	// account not present in the account and it was not marked as destroyed in slots between targetIndex and latestCommittedSlot
+	// account not present in the accountsTree and it was not marked as destroyed in slots between targetIndex and latestCommittedSlot
 	if !exists && !wasDestroyed {
 		return nil, false, nil
 	}
