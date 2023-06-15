@@ -274,7 +274,12 @@ func (e *Engine) Import(reader io.ReadSeeker) (err error) {
 }
 
 func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
-	if err = e.Storage.Settings().Export(writer); err != nil {
+	targetCommitment, err := e.Storage.Commitments().Load(targetSlot)
+	if err != nil {
+		return errors.Wrapf(err, "failed to load target commitment at slot %d", targetSlot)
+	}
+
+	if err = e.Storage.Settings().Export(writer, targetCommitment.Commitment()); err != nil {
 		return errors.Wrap(err, "failed to export settings")
 	} else if err = e.Storage.Commitments().Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export commitments")

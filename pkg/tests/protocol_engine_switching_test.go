@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -22,7 +21,7 @@ import (
 )
 
 func TestProtocol_EngineSwitching(t *testing.T) {
-	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
+	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(19*10))
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNodeToPartition("node1", 75, "P1")
@@ -115,7 +114,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
 			testsuite.WithLatestCommitment(iotago.NewEmptyCommitment()),
-			testsuite.WithLatestStateMutationSlot(0),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
@@ -150,7 +148,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 			ts.AssertNodeState(ts.Nodes("node1", "node2"),
 				testsuite.WithLatestCommitmentSlotIndex(7),
-				testsuite.WithLatestStateMutationSlot(0),
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
@@ -188,7 +185,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.AssertNodeState(ts.Nodes("node1", "node2"),
 				testsuite.WithLatestCommitmentCumulativeWeight(150),
 				testsuite.WithLatestCommitmentSlotIndex(9),
-				testsuite.WithLatestStateMutationSlot(0),
 				testsuite.WithLatestFinalizedSlot(7),
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
@@ -219,7 +215,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				// We have the same CW of Slot 9, because we didn't observe any attestation on top of 8 that we could include.
 				testsuite.WithLatestCommitmentCumulativeWeight(150),
 				testsuite.WithLatestCommitmentSlotIndex(10),
-				testsuite.WithLatestStateMutationSlot(0),
 				testsuite.WithLatestFinalizedSlot(7),
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
@@ -261,7 +256,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				// We have the same CW of Slot 9, because we didn't observe any attestation on top of 8 that we could include.
 				testsuite.WithLatestCommitmentCumulativeWeight(150),
 				testsuite.WithLatestCommitmentSlotIndex(11),
-				testsuite.WithLatestStateMutationSlot(0),
+				testsuite.WithEqualStoredCommitmentAtIndex(11),
 				testsuite.WithLatestFinalizedSlot(10),
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
@@ -302,7 +297,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node3", "node4"),
 				testsuite.WithLatestCommitmentSlotIndex(8),
-				testsuite.WithLatestStateMutationSlot(0),
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
@@ -328,8 +322,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.AssertNodeState(ts.Nodes("node3", "node4"),
 				testsuite.WithLatestCommitmentSlotIndex(11),
 				testsuite.WithLatestCommitmentCumulativeWeight(0), // We haven't collected any attestation yet.
-				testsuite.WithLatestStateMutationSlot(0),
-				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
+				testsuite.WithLatestFinalizedSlot(0),              // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
@@ -358,7 +351,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.AssertNodeState(ts.Nodes("node3", "node4"),
 				testsuite.WithLatestCommitmentSlotIndex(13),
 				testsuite.WithLatestCommitmentCumulativeWeight(50),
-				testsuite.WithLatestStateMutationSlot(0),
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
@@ -389,53 +381,46 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertLatestCommitmentSlotIndex(11, node1, node2)
 		ts.AssertLatestCommitmentSlotIndex(13, node3, node4)
 
-		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
-		require.Equal(t, node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node4.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
-		require.NotEqual(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
+		ts.AssertEqualStoredCommitmentAtIndex(11, node1, node2)
+		ts.AssertEqualStoredCommitmentAtIndex(13, node3, node4)
 	}
 
 	// Merge the partitions
 	{
 		ts.Network.MergePartitionsToMain()
 		fmt.Println("\n=========================\nMerged network partitions\n=========================")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+		defer cancel()
+
+		ctxP1, ctxP1Cancel := context.WithCancel(ctx)
+		ctxP2, ctxP2Cancel := context.WithCancel(ctx)
+
+		wg := &sync.WaitGroup{}
+
+		// Issue blocks on both partitions after merging the networks.
+		node1.IssueActivity(ctxP1, wg)
+		node2.IssueActivity(ctxP1, wg)
+		node3.IssueActivity(ctxP2, wg)
+		node4.IssueActivity(ctxP2, wg)
+
+		// node 1 and 2 finalized until slot 10. We do not expect any forks here because our CW is higher than the other partition's
+		ts.AssertForkDetectedCount(0, node1, node2)
+		// P1's chain is heavier, they should not consider switching the chain.
+		ts.AssertCandidateEngineActivatedCount(0, node1, node2)
+		ctxP2Cancel() // we can stop issuing on P2.
+
+		// Nodes from P2 should switch the chain.
+		ts.AssertForkDetectedCount(1, node3, node4)
+		ts.AssertCandidateEngineActivatedCount(1, node3, node4)
+
+		// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
+
+		ts.AssertMainEngineSwitchedCount(1, node3, node4)
+
+		ctxP1Cancel()
+		wg.Wait()
 	}
 
-	var forksDetected atomic.Uint32
-	for _, node := range ts.Nodes() {
-		node.Protocol.Events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
-			forksDetected.Add(1)
-		})
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	forkDetectionTimeout := 30 * time.Second
-	wg := &sync.WaitGroup{}
-	wg.Add(4)
-
-	// Issue blocks on partition 2 after merging the networks.
-	{
-		node3.IssueActivity(ctx, forkDetectionTimeout, wg)
-		node4.IssueActivity(ctx, forkDetectionTimeout, wg)
-
-		// node 1 and 2 finalized until slot 10. However, the rootcommitment is still at slot 0, that's why we expect a fork detection.
-		expectedForksDetected := uint32(2)
-		require.Eventually(t, func() bool {
-			return expectedForksDetected == forksDetected.Load()
-		}, forkDetectionTimeout, 100*time.Millisecond)
-	}
-
-	// Issue blocks on partition 1 after merging the networks.
-	{
-		node1.IssueActivity(ctx, forkDetectionTimeout, wg)
-		node2.IssueActivity(ctx, forkDetectionTimeout, wg)
-
-		expectedForksDetected := uint32(4)
-		require.Eventually(t, func() bool {
-			return expectedForksDetected == forksDetected.Load()
-		}, forkDetectionTimeout, 100*time.Millisecond)
-	}
-
-	// After we detected all forks we can stop issuing activity blocks.
-	cancel()
-	wg.Wait()
+	ts.AssertEqualStoredCommitmentAtIndex(18, ts.Nodes()...)
 }

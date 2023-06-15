@@ -157,7 +157,7 @@ func (t *TestFramework) AssertCommit(slot iotago.SlotIndex, expectedCW uint64, e
 	}
 
 	// Retrieve attestations from storage and compare them with the expected ones.
-	tree, err := t.Instance.Get(slot)
+	tree, err := t.Instance.GetMap(slot)
 
 	attestationFromTree := make([]*iotago.Attestation, 0)
 	attestationBlockIDsFromTree := make([]iotago.BlockID, 0)

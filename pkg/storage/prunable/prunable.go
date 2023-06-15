@@ -11,6 +11,11 @@ const (
 	blocksPrefix byte = iota
 	rootBlocksPrefix
 	attestationsPrefix
+	rootsPrefix
+)
+
+const (
+	RootsKey byte = iota
 )
 
 type Prunable struct {
@@ -56,6 +61,10 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *RootBlocks {
 
 func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
 	return p.manager.Get(slot, kvstore.Realm{attestationsPrefix})
+}
+
+func (p *Prunable) Roots(slot iotago.SlotIndex) kvstore.KVStore {
+	return p.manager.Get(slot, kvstore.Realm{rootsPrefix})
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.

@@ -12,8 +12,8 @@ type Events struct {
 	BlockRequestReceived          *event.Event2[iotago.BlockID, network.PeerID]
 	SlotCommitmentReceived        *event.Event2[*model.Commitment, network.PeerID]
 	SlotCommitmentRequestReceived *event.Event2[iotago.CommitmentID, network.PeerID]
-	AttestationsReceived          *event.Event1[*AttestationsReceivedEvent]
-	AttestationsRequestReceived   *event.Event1[*AttestationsRequestReceivedEvent]
+	AttestationsReceived          *event.Event4[*model.Commitment, []*iotago.Attestation, iotago.Identifier, network.PeerID]
+	AttestationsRequestReceived   *event.Event2[iotago.CommitmentID, network.PeerID]
 	Error                         *event.Event2[error, network.PeerID]
 
 	event.Group[Events, *Events]
@@ -26,21 +26,8 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		BlockRequestReceived:          event.New2[iotago.BlockID, network.PeerID](),
 		SlotCommitmentReceived:        event.New2[*model.Commitment, network.PeerID](),
 		SlotCommitmentRequestReceived: event.New2[iotago.CommitmentID, network.PeerID](),
-		AttestationsReceived:          event.New1[*AttestationsReceivedEvent](),
-		AttestationsRequestReceived:   event.New1[*AttestationsRequestReceivedEvent](),
+		AttestationsReceived:          event.New4[*model.Commitment, []*iotago.Attestation, iotago.Identifier, network.PeerID](),
+		AttestationsRequestReceived:   event.New2[iotago.CommitmentID, network.PeerID](),
 		Error:                         event.New2[error, network.PeerID](),
 	}
 })
-
-type AttestationsReceivedEvent struct {
-	Commitment *iotago.Commitment
-	BlockIDs   iotago.BlockIDs
-	//Attestations *orderedmap.OrderedMap[iotago.SlotIndex, *advancedset.AdvancedSet[*notarization.Attestation]]
-	Source network.PeerID
-}
-
-type AttestationsRequestReceivedEvent struct {
-	Commitment *iotago.Commitment
-	EndIndex   iotago.SlotIndex
-	Source     network.PeerID
-}

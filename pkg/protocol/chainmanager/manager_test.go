@@ -15,25 +15,39 @@ import (
 
 func TestManager(t *testing.T) {
 	tf := NewTestFramework(t, iotago.LatestAPI(&iotago.ProtocolParameters{}))
-	tf.CreateCommitment("1", "Genesis")
-	tf.CreateCommitment("2", "1")
-	tf.CreateCommitment("3", "2")
-	tf.CreateCommitment("4", "3")
-	tf.CreateCommitment("4*", "3")
-	tf.CreateCommitment("1*", "Genesis")
-	tf.CreateCommitment("2*", "1*")
-	tf.CreateCommitment("5*", "4*")
-	tf.CreateCommitment("6*", "5*")
-	tf.CreateCommitment("7*", "6*")
-	tf.CreateCommitment("8*", "7*")
+	tf.CreateCommitment("1", "Genesis", 10)
+	tf.CreateCommitment("2", "1", 20)
+	tf.CreateCommitment("3", "2", 30)
+	tf.CreateCommitment("4", "3", 40)
+	tf.CreateCommitment("5", "4", 50)
+	tf.CreateCommitment("4*", "3", 45)
+	tf.CreateCommitment("5*", "4*", 55)
+	tf.CreateCommitment("6*", "5*", 65)
+	tf.CreateCommitment("7*", "6*", 75)
+	tf.CreateCommitment("8*", "7*", 85)
+	tf.CreateCommitment("1-", "Genesis", 9)
+	tf.CreateCommitment("2-", "1-", 19)
 
-	forkDetected := make(chan struct{}, 1)
+	allForksDetected := make(chan struct{}, 1)
+
+	detectedForksAtCommitments := []iotago.CommitmentID{
+		tf.SlotCommitment("5*"),
+		tf.SlotCommitment("6*"),
+		tf.SlotCommitment("7*"),
+		tf.SlotCommitment("8*"),
+	}
+
 	tf.Instance.Events.ForkDetected.Hook(func(fork *Fork) {
 		// The ForkDetected event should only be triggered once and only if the fork is deep enough
-		require.Equal(t, fork.Commitment.ID(), tf.SlotCommitment("7*"))
+		require.Equal(t, fork.ForkLatestCommitment.ID(), detectedForksAtCommitments[0])
 		require.Equal(t, fork.ForkingPoint.ID(), tf.SlotCommitment("4*"))
-		forkDetected <- struct{}{}
-		close(forkDetected) // closing channel here so that we are sure no second event with the same data is triggered
+
+		detectedForksAtCommitments = detectedForksAtCommitments[1:]
+
+		if len(detectedForksAtCommitments) == 0 {
+			allForksDetected <- struct{}{}
+			close(allForksDetected) // closing channel here so that we are sure no second event with the same data is triggered
+		}
 	})
 
 	expectedChainMappings := map[string]string{
@@ -57,11 +71,11 @@ func TestManager(t *testing.T) {
 	}
 
 	{
-		isSolid, chain := tf.ProcessCommitmentFromOtherSource("1*")
+		isSolid, chain := tf.ProcessCommitmentFromOtherSource("1-")
 		require.True(t, isSolid)
-		tf.AssertChainIsAlias(chain, "1*")
+		tf.AssertChainIsAlias(chain, "1-")
 		tf.AssertChainState(lo.MergeMaps(expectedChainMappings, map[string]string{
-			"1*": "1*",
+			"1-": "1-",
 		}))
 	}
 
@@ -74,6 +88,7 @@ func TestManager(t *testing.T) {
 		}))
 	}
 
+	// Generate a fork with higher CW than our main one
 	{
 		isSolid, chain := tf.ProcessCommitmentFromOtherSource("4*")
 		require.False(t, isSolid)
@@ -92,6 +107,7 @@ func TestManager(t *testing.T) {
 		}))
 	}
 
+	// Solidify our main chain
 	{
 		isSolid, chain := tf.ProcessCommitment("2")
 		require.True(t, isSolid)
@@ -100,6 +116,16 @@ func TestManager(t *testing.T) {
 			"2": "Genesis",
 			"3": "Genesis",
 			"4": "Genesis",
+		}))
+	}
+
+	// Generate a fork with less CW than our main one
+	{
+		isSolid, chain := tf.ProcessCommitmentFromOtherSource("2-")
+		require.True(t, isSolid)
+		tf.AssertChainIsAlias(chain, "1-")
+		tf.AssertChainState(lo.MergeMaps(expectedChainMappings, map[string]string{
+			"2-": "1-",
 		}))
 	}
 
@@ -139,6 +165,16 @@ func TestManager(t *testing.T) {
 		}))
 	}
 
+	// Continue on the main chain
+	{
+		isSolid, chain := tf.ProcessCommitment("5")
+		require.True(t, isSolid)
+		tf.AssertChainIsAlias(chain, "Genesis")
+		tf.AssertChainState(lo.MergeMaps(expectedChainMappings, map[string]string{
+			"5": "Genesis",
+		}))
+	}
+
 	{
 		commitments, err := tf.Instance.Commitments(tf.SlotCommitment("8*"), 9)
 		require.NoError(t, err)
@@ -167,7 +203,7 @@ func TestManager(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		select {
-		case <-forkDetected:
+		case <-allForksDetected:
 			return true
 		default:
 			return false
@@ -177,30 +213,33 @@ func TestManager(t *testing.T) {
 
 func TestManagerForkDetectedAgain(t *testing.T) {
 	tf := NewTestFramework(t, iotago.LatestAPI(&iotago.ProtocolParameters{}))
-	tf.CreateCommitment("1", "Genesis")
-	tf.CreateCommitment("2", "1")
-	tf.CreateCommitment("3", "2")
-	tf.CreateCommitment("4", "3")
-	tf.CreateCommitment("4*", "3")
-	tf.CreateCommitment("1*", "Genesis")
-	tf.CreateCommitment("2*", "1*")
-	tf.CreateCommitment("5*", "4*")
-	tf.CreateCommitment("6*", "5*")
-	tf.CreateCommitment("7*", "6*")
-	tf.CreateCommitment("8*", "7*")
-	tf.CreateCommitment("9*", "8*")
+	tf.CreateCommitment("1", "Genesis", 10)
+	tf.CreateCommitment("2", "1", 20)
+	tf.CreateCommitment("3", "2", 30)
+	tf.CreateCommitment("4", "3", 40)
+	tf.CreateCommitment("5", "4", 80)
+	tf.CreateCommitment("4*", "3", 45)
+	tf.CreateCommitment("1-", "Genesis", 9)
+	tf.CreateCommitment("2-", "1-", 19)
+	tf.CreateCommitment("5*", "4*", 55)
+	tf.CreateCommitment("6*", "5*", 65)
+	tf.CreateCommitment("7*", "6*", 75)
+	tf.CreateCommitment("8*", "7*", 85)
+	tf.CreateCommitment("9*", "8*", 95)
 
 	forkRedetected := make(chan struct{}, 1)
 	expectedForks := map[iotago.CommitmentID]types.Empty{
-		tf.SlotCommitment("7*"): types.Void,
+		tf.SlotCommitment("4*"): types.Void,
+		tf.SlotCommitment("5*"): types.Void,
+		tf.SlotCommitment("8*"): types.Void,
 		tf.SlotCommitment("9*"): types.Void,
 	}
 	tf.Instance.Events.ForkDetected.Hook(func(fork *Fork) {
-		if _, has := expectedForks[fork.Commitment.ID()]; !has {
-			t.Fatalf("unexpected fork at: %s", fork.Commitment.ID())
+		if _, has := expectedForks[fork.ForkLatestCommitment.ID()]; !has {
+			t.Fatalf("unexpected fork at: %s", fork.ForkLatestCommitment.ID())
 		}
-		t.Logf("fork detected at %s", fork.Commitment.ID())
-		delete(expectedForks, fork.Commitment.ID())
+		t.Logf("fork detected at %s", fork.ForkingPoint.ID())
+		delete(expectedForks, fork.ForkLatestCommitment.ID())
 
 		require.Equal(t, fork.ForkingPoint.ID(), tf.SlotCommitment("4*"))
 		if len(expectedForks) == 0 {
@@ -210,14 +249,15 @@ func TestManagerForkDetectedAgain(t *testing.T) {
 
 	{
 		tf.ProcessCommitment("1")
-		tf.ProcessCommitmentFromOtherSource("1*")
+		tf.ProcessCommitmentFromOtherSource("1-")
 		tf.ProcessCommitmentFromOtherSource("4")
 		tf.ProcessCommitmentFromOtherSource("4*")
 		tf.ProcessCommitmentFromOtherSource("3")
 		tf.ProcessCommitment("2")
 		tf.ProcessCommitmentFromOtherSource("5*")
-		tf.ProcessCommitmentFromOtherSource("6*")
-		tf.ProcessCommitmentFromOtherSource("7*")
+		tf.ProcessCommitmentFromOtherSource("5")
+		tf.ProcessCommitmentFromOtherSource("6*") // This does not re-trigger the fork due to lower CW than 5
+		tf.ProcessCommitmentFromOtherSource("7*") // This does not re-trigger the fork due to lower CW than 5
 		tf.ProcessCommitmentFromOtherSource("8*")
 	}
 
@@ -289,8 +329,8 @@ func TestEvaluateAgainstRootCommitment(t *testing.T) {
 
 func TestProcessCommitment(t *testing.T) {
 	tf := NewTestFramework(t, iotago.LatestAPI(&iotago.ProtocolParameters{}))
-	tf.CreateCommitment("1", "Genesis")
-	tf.CreateCommitment("2", "1")
+	tf.CreateCommitment("1", "Genesis", 10)
+	tf.CreateCommitment("2", "1", 20)
 
 	expectedChainMappings := map[string]string{
 		"Genesis": "Genesis",
@@ -322,11 +362,11 @@ func TestProcessCommitment(t *testing.T) {
 	}
 
 	// Should not be processed after 2 becomes rootCommitment
-	tf.CreateCommitment("1*", "Genesis")
-	tf.CreateCommitment("2*", "1*")
-	tf.CreateCommitment("3*", "2*")
-	tf.CreateCommitment("4*", "3*")
-	tf.CreateCommitment("2+", "1")
+	tf.CreateCommitment("1*", "Genesis", 15)
+	tf.CreateCommitment("2*", "1*", 25)
+	tf.CreateCommitment("3*", "2*", 35)
+	tf.CreateCommitment("4*", "3*", 45)
+	tf.CreateCommitment("2+", "1", 26)
 	{
 		{
 			isSolid, chain := tf.ProcessCommitment("1*")
@@ -367,8 +407,8 @@ func TestProcessCommitment(t *testing.T) {
 	}
 
 	// Should be processed after 2 becomes rootCommitment
-	tf.CreateCommitment("3", "2")
-	tf.CreateCommitment("4", "3")
+	tf.CreateCommitment("3", "2", 30)
+	tf.CreateCommitment("4", "3", 40)
 	{
 		{
 			isSolid, chain := tf.ProcessCommitment("2")

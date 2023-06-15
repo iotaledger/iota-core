@@ -3,11 +3,10 @@ package thresholdblockgadget
 import (
 	"fmt"
 
-	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ds/walker"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
@@ -20,13 +19,8 @@ import (
 type Gadget struct {
 	events *blockgadget.Events
 
-	workers *workerpool.Group
-
 	sybilProtection sybilprotection.SybilProtection
 	blockCache      *blocks.Blocks
-
-	preAcceptanceOrder *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
-	acceptanceOrder    *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
 	optsAcceptanceThreshold               float64
 	optsConfirmationThreshold             float64
@@ -37,9 +31,10 @@ type Gadget struct {
 
 func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine, blockgadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
-		g := New(e.Workers.CreateGroup("BlockGadget"), e.BlockCache, e.SybilProtection, opts...)
-		e.Events.Booker.BlockBooked.Hook(g.trackWitnessWeight)
-		e.BlockCache.Evict.Hook(g.evictUntil)
+		g := New(e.BlockCache, e.SybilProtection, opts...)
+
+		wp := e.Workers.CreatePool("ThresholdBlockGadget", 1)
+		e.Events.Booker.BlockBooked.Hook(g.trackWitnessWeight, event.WithWorkerPool(wp))
 
 		e.Events.BlockGadget.LinkTo(g.events)
 
@@ -47,10 +42,9 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, blockCache *blocks.Blocks, sybilProtection sybilprotection.SybilProtection, opts ...options.Option[Gadget]) *Gadget {
+func New(blockCache *blocks.Blocks, sybilProtection sybilprotection.SybilProtection, opts ...options.Option[Gadget]) *Gadget {
 	return options.Apply(&Gadget{
 		events:          blockgadget.NewEvents(),
-		workers:         workers,
 		sybilProtection: sybilProtection,
 		blockCache:      blockCache,
 
@@ -58,10 +52,6 @@ func New(workers *workerpool.Group, blockCache *blocks.Blocks, sybilProtection s
 		optsConfirmationThreshold:             0.67,
 		optsConfirmationRatificationThreshold: 2,
 	}, opts,
-		func(g *Gadget) {
-			g.preAcceptanceOrder = causalorder.New[iotago.SlotIndex, iotago.BlockID, *blocks.Block](g.workers.CreatePool("PreAcceptanceOrder", 2), blockCache.Block, (*blocks.Block).IsPreAccepted, g.markAsPreAccepted, g.preAcceptanceFailed, (*blocks.Block).StrongParents)
-			g.acceptanceOrder = causalorder.New[iotago.SlotIndex, iotago.BlockID, *blocks.Block](g.workers.CreatePool("AcceptanceOrder", 2), blockCache.Block, (*blocks.Block).IsAccepted, g.markAsAccepted, g.acceptanceFailed, (*blocks.Block).StrongParents)
-		},
 		(*Gadget).TriggerConstructed,
 	)
 }
@@ -72,12 +62,6 @@ func (g *Gadget) Events() *blockgadget.Events {
 
 func (g *Gadget) Shutdown() {
 	g.TriggerStopped()
-	g.workers.Shutdown()
-}
-
-func (g *Gadget) evictUntil(index iotago.SlotIndex) {
-	g.preAcceptanceOrder.EvictUntil(index)
-	g.acceptanceOrder.EvictUntil(index)
 }
 
 func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(block *blocks.Block) bool) {
@@ -91,6 +75,10 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 
 		if block.IsRootBlock() {
 			continue
+		}
+
+		if !block.IsBooked() {
+			panic(fmt.Sprintf("block %s is not booked", blockID))
 		}
 
 		if !evaluateFunc(block) {

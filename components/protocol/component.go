@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/pkg/errors"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
@@ -134,6 +135,8 @@ func configure() error {
 		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})
 
+	// TODO: check whether we hooked to all events
+
 	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
 		Component.LogInfof("BlockReceived: %s", block.ID())
 	})
@@ -195,10 +198,11 @@ func configure() error {
 
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
-		//nolint:contextcheck // false positive
-		deps.Protocol.Run()
-		<-ctx.Done()
+		if err := deps.Protocol.Run(ctx); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				Component.LogErrorfAndExit("Error running the Protocol: %s", err.Error())
+			}
+		}
 		Component.LogInfo("Gracefully shutting down the Protocol...")
-		deps.Protocol.Shutdown()
 	}, daemon.PriorityProtocol)
 }

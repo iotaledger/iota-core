@@ -65,8 +65,8 @@ func Test_DoubleSpend(t *testing.T) {
 		tx1 := ts.CreateTransaction("tx1", 1, "Genesis")
 		tx2 := ts.CreateTransaction("tx2", 1, "Genesis")
 
-		ts.IssueBlock("block1", node1, blockissuer.WithPayload(tx1))
-		ts.IssueBlock("block2", node1, blockissuer.WithPayload(tx2))
+		ts.IssueBlock("block1", node1, blockissuer.WithPayload(tx1), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBlock("block2", node1, blockissuer.WithPayload(tx2), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
@@ -163,6 +163,8 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.IssueBlock("A.3", nodeA, blockissuer.WithPayload(tx2), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueBlock("B.3", nodeB, blockissuer.WithStrongParents(ts.BlockID("A.3")))
 		ts.IssueBlock("A.4", nodeA, blockissuer.WithStrongParents(ts.BlockID("B.3")))
+
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.3"), true, ts.Nodes()...)
 
 		ts.IssueBlock("B.4", nodeB, blockissuer.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
 		ts.IssueBlock("A.5", nodeA, blockissuer.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))

@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,6 +35,9 @@ type Node struct {
 	Name   string
 	Weight int64
 
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+
 	blockIssuer *blockissuer.BlockIssuer
 
 	privateKey ed25519.PrivateKey
@@ -45,6 +49,13 @@ type Node struct {
 	Workers  *workerpool.Group
 
 	Protocol *protocol.Protocol
+
+	forkDetectedCount             atomic.Uint32
+	candidateEngineActivatedCount atomic.Uint32
+	mainEngineSwitchedCount       atomic.Uint32
+
+	mutex          sync.RWMutex
+	attachedBlocks []*blocks.Block
 }
 
 func NewNode(t *testing.T, net *Network, partition string, name string, weight int64) *Node {
@@ -71,6 +82,8 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 
 		Endpoint: net.Join(peerID, partition),
 		Workers:  workerpool.NewGroup(name),
+
+		attachedBlocks: make([]*blocks.Block, 0),
 	}
 }
 
@@ -79,9 +92,38 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 		n.Endpoint,
 		opts...,
 	)
+
+	n.hookEvents()
+
 	n.blockIssuer = blockissuer.New(n.Protocol, blockissuer.NewEd25519Account(n.AccountID, n.privateKey), blockissuer.WithTipSelectionTimeout(3*time.Second), blockissuer.WithTipSelectionRetryInterval(time.Millisecond*100))
 
-	n.Protocol.Run()
+	n.ctx, n.ctxCancel = context.WithCancel(context.Background())
+
+	started := make(chan struct{}, 1)
+
+	n.Protocol.Events.Started.Hook(func() {
+		close(started)
+	})
+
+	go func() {
+		defer n.ctxCancel()
+
+		if err := n.Protocol.Run(n.ctx); err != nil {
+			fmt.Printf("%s > Run finished with error: %s\n", n.Name, err.Error())
+		}
+	}()
+
+	<-started
+}
+
+func (n *Node) hookEvents() {
+	events := n.Protocol.Events
+
+	events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) { n.forkDetectedCount.Add(1) })
+
+	events.CandidateEngineActivated.Hook(func(e *engine.Engine) { n.candidateEngineActivatedCount.Add(1) })
+
+	events.MainEngineSwitched.Hook(func(e *engine.Engine) { n.mainEngineSwitchedCount.Add(1) })
 }
 
 func (n *Node) HookLogging() {
@@ -105,14 +147,15 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 
-	// events.Network.AttestationsReceived.Hook(func(event *network.AttestationsReceivedEvent) {
-	// 	fmt.Printf("%s > Network.AttestationsReceived: from %s for %s\n", n.Name, event.Source, event.Commitment.ID())
-	// })
-	//
-	// events.Network.AttestationsRequestReceived.Hook(func(event *network.AttestationsRequestReceivedEvent) {
-	// 	fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s -> %d\n", n.Name, event.Source, event.Commitment.ID(), event.EndIndex)
-	// })
-	//
+	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof iotago.Identifier, source network.PeerID) {
+		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), merkleProof, lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
+			return lo.PanicOnErr(a.BlockID(n.Protocol.MainEngineInstance().API().SlotTimeProvider()))
+		}))
+	})
+
+	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source network.PeerID) {
+		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
+	})
 
 	events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
 		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
@@ -138,6 +181,16 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > TipManager.TipAdded: %s in pool %d\n", n.Name, tipMetadata.Block().ID(), tipMetadata.TipPool())
 	})
 
+	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
+		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+
+		n.attachEngineLogs(e)
+	})
+
+	events.MainEngineSwitched.Hook(func(e *engine.Engine) {
+		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+	})
+
 	events.Network.Error.Hook(func(err error, id identity.ID) {
 		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
 	})
@@ -153,6 +206,10 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] BlockDAG.BlockAttached: %s\n", n.Name, engineName, block.ID())
+
+		n.mutex.Lock()
+		defer n.mutex.Unlock()
+		n.attachedBlocks = append(n.attachedBlocks, block)
 	})
 
 	events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
@@ -176,11 +233,11 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
+		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().SlotTimeProvider().IndexFromTime(newTime))
 	})
 
 	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s\n", n.Name, engineName, newTime)
+		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().SlotTimeProvider().IndexFromTime(newTime))
 	})
 
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
@@ -201,7 +258,12 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment)
+		var acceptedBlocks []iotago.BlockID
+		_ = details.AcceptedBlocks.Stream(func(key iotago.BlockID) bool {
+			acceptedBlocks = append(acceptedBlocks, key)
+			return true
+		})
+		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks)
 	})
 
 	events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
@@ -209,7 +271,7 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Index(), block.Block().SlotCommitment.MustID())
 	})
 
 	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
@@ -224,18 +286,26 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
 	})
 
-	instance.Events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
+	events.SybilProtection.OnlineCommitteeAccountAdded.Hook(func(accountID iotago.AccountID) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeAccountAdded: %s\n", n.Name, engineName, accountID)
+	})
+
+	events.SybilProtection.OnlineCommitteeAccountRemoved.Hook(func(accountID iotago.AccountID) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeAccountRemoved: %s\n", n.Name, engineName, accountID)
+	})
+
+	events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictCreated: %s\n", n.Name, engineName, conflictID)
 	})
 
-	instance.Events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
+	events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictEvicted: %s\n", n.Name, engineName, conflictID)
 	})
-	instance.Events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
+	events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictRejected: %s\n", n.Name, engineName, conflictID)
 	})
 
-	instance.Events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
+	events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
 	})
 
@@ -289,8 +359,16 @@ func (n *Node) Wait() {
 }
 
 func (n *Node) Shutdown() {
-	n.Protocol.Shutdown()
+	stopped := make(chan struct{}, 1)
+
+	n.Protocol.Events.Stopped.Hook(func() {
+		close(stopped)
+	})
+
+	n.ctxCancel()
 	n.Workers.Shutdown()
+
+	<-stopped
 }
 
 func (n *Node) CopyIdentityFromNode(otherNode *Node) {
@@ -313,16 +391,16 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 	return blocks.NewBlock(modelBlock)
 }
 
-func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sync.WaitGroup) {
+func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 
-		start := time.Now()
 		fmt.Println(n.Name, "> Starting activity")
 		var counter int
 		for {
 			if ctx.Err() != nil {
-				fmt.Println(n.Name, "> Stopped activity due to canceled context")
+				fmt.Println(n.Name, "> Stopped activity due to canceled context:", ctx.Err())
 				return
 			}
 
@@ -332,11 +410,26 @@ func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sy
 
 			counter++
 			time.Sleep(1 * time.Second)
-			if duration > 0 && time.Since(start) > duration {
-				fmt.Println(n.Name, "> Stopped activity after", time.Since(start))
-				return
-			}
 		}
 
 	}()
+}
+
+func (n *Node) ForkDetectedCount() int {
+	return int(n.forkDetectedCount.Load())
+}
+
+func (n *Node) CandidateEngineActivatedCount() int {
+	return int(n.candidateEngineActivatedCount.Load())
+}
+
+func (n *Node) MainEngineSwitchedCount() int {
+	return int(n.mainEngineSwitchedCount.Load())
+}
+
+func (n *Node) AttachedBlocks() []*blocks.Block {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+
+	return n.attachedBlocks
 }
