@@ -208,7 +208,9 @@ func (t *TipSelection) collectReferences(references model.ParentReferences, pare
 
 	for tipCandidates := selectUniqueTips(amount); len(tipCandidates) != 0; tipCandidates = selectUniqueTips(amount - len(references[parentsType])) {
 		for _, strongTip := range tipCandidates {
-			callback(strongTip.(*TipMetadata))
+			if internalTip, ok := strongTip.(*TipMetadata); ok {
+				callback(internalTip)
+			}
 		}
 	}
 }
