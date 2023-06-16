@@ -19,8 +19,8 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 	evaluateFunc := func(block *blocks.Block) bool {
 		// Do not propagate further than g.optsConfirmationRatificationThreshold slots.
 		// This means that confirmations need to be achieved within g.optsConfirmationRatificationThreshold slots.
-		// TODO: make sure this does not underflow.
-		if block.ID().Index() <= ratifierBlockIndex-g.optsConfirmationRatificationThreshold {
+		if ratifierBlockIndex >= g.optsConfirmationRatificationThreshold &&
+			block.ID().Index() <= ratifierBlockIndex-g.optsConfirmationRatificationThreshold {
 			return false
 		}
 
