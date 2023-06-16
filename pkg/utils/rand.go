@@ -82,6 +82,7 @@ func RandOutputID(index ...uint16) iotago.OutputID {
 	if err != nil {
 		panic(err)
 	}
+
 	binary.LittleEndian.PutUint16(outputID[iotago.TransactionIDLength:], idx)
 
 	return outputID
@@ -243,5 +244,6 @@ func RandPubKeys() []ed25519.PublicKey {
 	for i := 0; i < length; i++ {
 		pubKeys[i] = RandPubKey()
 	}
+
 	return pubKeys
 }

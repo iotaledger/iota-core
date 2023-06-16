@@ -169,8 +169,8 @@ func (s Scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
 	return expected
 }
 
-// todo make sure that output ID is updated only if an acocunt was transitioned, and not only on allotment
-// when are output ids updated on the slot committment
+// todo make sure that output ID is updated only if an account was transitioned, and not only on allotment
+// when are output ids updated on the slot commitment.
 func updateExpectedAccLedger(expectedAccountLedger *AccountsLedgerTestScenario, rollingLedger map[iotago.AccountID]*accounts.AccountData, accountID iotago.AccountID, actions *AccountActions, change int64) *accounts.AccountData {
 	accData, exists := expectedAccountLedger.AccountsLedger[accountID]
 	if !exists {

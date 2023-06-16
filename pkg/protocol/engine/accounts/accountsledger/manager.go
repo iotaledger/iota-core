@@ -316,14 +316,15 @@ func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]uint64, acc
 	}
 }
 
-func (m *Manager) PreserveDestroyedAccountData(accountID iotago.AccountID) (*prunable.AccountDiff, error) {
-	// if any data is left on the account, we need to store in the diff, to be able to rollback
+func (m *Manager) PreserveDestroyedAccountData(accountID iotago.AccountID) *prunable.AccountDiff {
+	// if any data is left on the account, we need to store in the diff, to be able to roll back
 	accountData, exists := m.accountsTree.Get(accountID)
 	if !exists {
-		return nil, nil
+		return nil
 	}
-	// it doeas not matter if there are any changes in this slot, as the account was destroyed anyway and the data was lost
-	// we store the accountState in form of a diff, so we can rollback to the previous state
+
+	// it does not matter if there are any changes in this slot, as the account was destroyed anyway and the data was lost
+	// we store the accountState in form of a diff, so we can roll back to the previous state
 	slotDiff := prunable.NewAccountDiff()
 	if accountData.Credits.Value != 0 {
 		slotDiff.Change -= accountData.Credits.Value
@@ -335,5 +336,5 @@ func (m *Manager) PreserveDestroyedAccountData(accountID iotago.AccountID) (*pru
 	slotDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
 	slotDiff.PubKeysRemoved = accountData.PubKeys.Slice()
 
-	return slotDiff, nil
+	return slotDiff
 }

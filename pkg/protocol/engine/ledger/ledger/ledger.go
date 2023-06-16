@@ -339,7 +339,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		})
 
 		if innerErr != nil {
-			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, innerErr
 		}
 	}
 
@@ -375,7 +375,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		})
 
 		if innerErr != nil {
-			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, innerErr
 		}
 
 		// input side
@@ -404,7 +404,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		})
 
 		if innerErr != nil {
-			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, innerErr
 		}
 	}
 
