@@ -73,7 +73,6 @@ func TestConfirmationFlags(t *testing.T) {
 		testsuite.WithSnapshotImported(true),
 		testsuite.WithProtocolParameters(ts.ProtocolParameters),
 		testsuite.WithLatestCommitment(iotago.NewEmptyCommitment()),
-		testsuite.WithLatestStateMutationSlot(0),
 		testsuite.WithLatestFinalizedSlot(0),
 		testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),

@@ -122,7 +122,7 @@ func (c *ChainCommitment) setMainChild(commitment *ChainCommitment) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if c.children.Has(commitment.ID()) {
+	if !c.children.Has(commitment.ID()) {
 		return errors.Errorf("trying to set a main child %s before registering it as a child", commitment.ID())
 	}
 	c.mainChildID = commitment.ID()

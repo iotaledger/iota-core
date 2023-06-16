@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/pkg/errors"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
@@ -27,6 +28,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
 func init() {
@@ -88,7 +90,7 @@ func provide(c *dig.Container) error {
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
 		validators := make(map[iotago.AccountID]int64)
 		for _, validator := range ParamsProtocol.SybilProtection.Committee {
-			hex := lo.PanicOnErr(iotago.DecodeHex(validator.Identity))
+			hex := lo.PanicOnErr(hexutil.DecodeHex(validator.Identity))
 			validators[iotago.AccountID(hex[:])] = validator.Weight
 		}
 
@@ -133,6 +135,8 @@ func configure() error {
 	deps.Protocol.Events.Network.Error.Hook(func(err error, id network.PeerID) {
 		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})
+
+	// TODO: check whether we hooked to all events
 
 	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
 		Component.LogInfof("BlockReceived: %s", block.ID())
@@ -195,10 +199,11 @@ func configure() error {
 
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
-		//nolint:contextcheck // false positive
-		deps.Protocol.Run()
-		<-ctx.Done()
+		if err := deps.Protocol.Run(ctx); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				Component.LogErrorfAndExit("Error running the Protocol: %s", err.Error())
+			}
+		}
 		Component.LogInfo("Gracefully shutting down the Protocol...")
-		deps.Protocol.Shutdown()
 	}, daemon.PriorityProtocol)
 }

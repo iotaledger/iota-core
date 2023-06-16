@@ -11,9 +11,13 @@ import (
 )
 
 type Attestations interface {
-	// Get returns the attestations that are included in the commitment of the given slot.
+	// Get returns the attestations that are included in the commitment of the given slot as list.
 	// If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
-	Get(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error)
+	Get(index iotago.SlotIndex) (attestations []*iotago.Attestation, err error)
+
+	// GetMap returns the attestations that are included in the commitment of the given slot as ads.Map.
+	// If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
+	GetMap(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], err error)
 	AddAttestationFromBlock(block *blocks.Block)
 	Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot types.Identifier, err error)
 
@@ -21,6 +25,8 @@ type Attestations interface {
 	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error)
 
 	RestoreFromDisk() (err error)
+
+	AttestationCommitmentOffset() iotago.SlotIndex
 
 	module.Interface
 }
