@@ -1,4 +1,4 @@
-package sybilprotection
+package mock
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-type MockSybilProtection struct {
+type ManualPOA struct {
 	accounts *account.Accounts[iotago.AccountID, *iotago.AccountID]
 	online   *advancedset.AdvancedSet[iotago.AccountID]
 	aliases  *shrinkingmap.ShrinkingMap[string, iotago.AccountID]
@@ -21,15 +21,15 @@ type MockSybilProtection struct {
 	module.Module
 }
 
-func NewMockSybilProtection() *MockSybilProtection {
-	return &MockSybilProtection{
+func NewManualPOA() *ManualPOA {
+	return &ManualPOA{
 		accounts: account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()),
 		online:   advancedset.New[iotago.AccountID](),
 		aliases:  shrinkingmap.New[string, iotago.AccountID](),
 	}
 }
 
-func (m *MockSybilProtection) AddAccount(alias string, weight int64) iotago.AccountID {
+func (m *ManualPOA) AddAccount(alias string, weight int64) iotago.AccountID {
 	id := iotago.AccountID(tpkg.Rand32ByteArray())
 	id.RegisterAlias(alias)
 	m.accounts.Set(id, weight)
@@ -38,7 +38,7 @@ func (m *MockSybilProtection) AddAccount(alias string, weight int64) iotago.Acco
 	return id
 }
 
-func (m *MockSybilProtection) AccountID(alias string) iotago.AccountID {
+func (m *ManualPOA) AccountID(alias string) iotago.AccountID {
 	id, exists := m.aliases.Get(alias)
 	if !exists {
 		panic(fmt.Sprintf("alias %s does not exist", alias))
@@ -47,28 +47,28 @@ func (m *MockSybilProtection) AccountID(alias string) iotago.AccountID {
 	return id
 }
 
-func (m *MockSybilProtection) SetOnline(aliases ...string) {
+func (m *ManualPOA) SetOnline(aliases ...string) {
 	for _, alias := range aliases {
 		m.online.Add(m.AccountID(alias))
 	}
 }
 
-func (m *MockSybilProtection) SetOffline(aliases ...string) {
+func (m *ManualPOA) SetOffline(aliases ...string) {
 	for _, alias := range aliases {
 		m.online.Delete(m.AccountID(alias))
 	}
 }
 
-func (m *MockSybilProtection) Accounts() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
+func (m *ManualPOA) Accounts() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
 	return m.accounts
 }
 
-func (m *MockSybilProtection) Committee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID] {
+func (m *ManualPOA) Committee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID] {
 	return m.accounts.SelectAccounts(lo.Keys(lo.PanicOnErr(m.accounts.Map()))...)
 }
 
-func (m *MockSybilProtection) OnlineCommittee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID] {
+func (m *ManualPOA) OnlineCommittee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID] {
 	return m.accounts.SelectAccounts(m.online.Slice()...)
 }
 
-func (m *MockSybilProtection) Shutdown() {}
+func (m *ManualPOA) Shutdown() {}

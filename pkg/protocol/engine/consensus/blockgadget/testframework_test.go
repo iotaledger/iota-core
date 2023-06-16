@@ -16,7 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/mock"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -30,8 +30,9 @@ type TestFramework struct {
 	blocks     *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 	blockCache *blocks.Blocks
 
-	*sybilprotection.MockSybilProtection
-	Instance blockgadget.Gadget
+	SybilProtection *mock.ManualPOA
+	Instance        blockgadget.Gadget
+	Events          *blockgadget.Events
 }
 
 func NewTestFramework(test *testing.T) *TestFramework {
@@ -54,7 +55,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 			SlotDurationInSeconds: 10,
 		},
 
-		MockSybilProtection: sybilprotection.NewMockSybilProtection(),
+		SybilProtection: mock.NewManualPOA(),
 	}
 
 	t.api = iotago.LatestAPI(t.protocolParameters)
@@ -64,7 +65,9 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	})
 
 	t.blockCache = blocks.New(evictionState, t.api.SlotTimeProvider)
-	t.Instance = thresholdblockgadget.New(t.blockCache, t.MockSybilProtection)
+	instance := thresholdblockgadget.New(t.blockCache, t.SybilProtection)
+	t.Events = instance.Events()
+	t.Instance = instance
 
 	genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.protocolParameters.GenesisUnixTimestamp), 0))
 	t.blocks.Set("Genesis", genesisBlock)
@@ -110,7 +113,7 @@ func (t *TestFramework) CreateBlock(alias string, issuerAlias string, parents ..
 
 	block, err := builder.NewBlockBuilder().
 		StrongParents(t.BlockIDs(parents...)).
-		Sign(t.MockSybilProtection.AccountID(issuerAlias), priv).
+		Sign(t.SybilProtection.AccountID(issuerAlias), priv).
 		Build()
 	require.NoError(t, err)
 
@@ -131,7 +134,7 @@ func (t *TestFramework) registerBlock(alias string, block *blocks.Block) {
 	block.SetBooked()
 }
 
-func (t *TestFramework) TrackWitnessWeight(alias string, issuerAlias string, parents ...string) {
+func (t *TestFramework) CreateBlockAndTrackWitnessWeight(alias string, issuerAlias string, parents ...string) {
 	t.Instance.TrackWitnessWeight(t.CreateBlock(alias, issuerAlias, parents...))
 }
 
