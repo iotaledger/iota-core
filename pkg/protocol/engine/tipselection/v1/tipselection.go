@@ -51,7 +51,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
 		t := New(e.TipManager, e.Ledger.ConflictDAG(), e.EvictionState.LatestRootBlocks, opts...)
 
-		e.TipManager.HookInitialized(func() {
+		e.TipManager.HookConstructed(func() {
 			e.TipManager.Events().BlockAdded.Hook(t.classifyTip)
 
 			t.TriggerInitialized()
