@@ -19,7 +19,7 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 	toAcceptByID := set.New[iotago.BlockID]()
 
 	evaluateFunc := func(block *blocks.Block) bool {
-		// Skip propagation if the block is already toAcceptByID.
+		// Skip propagation if the block is already accepted.
 		if block.IsAccepted() {
 			return false
 		}
