@@ -62,25 +62,16 @@ func BlockFuncGen(t *testing.T, burnsPerSlot map[iotago.SlotIndex]map[iotago.Acc
 	}, blockIDs
 }
 
-func InitSlotDiff() (func(index iotago.SlotIndex) *prunable.AccountDiffs, map[iotago.SlotIndex]*prunable.AccountDiffs) {
-	slotDiffs := make(map[iotago.SlotIndex]*prunable.AccountDiffs)
+func InitSlotDiff() func(index iotago.SlotIndex) *prunable.AccountDiffs {
 	stores := make(map[iotago.SlotIndex]kvstore.KVStore)
-	slotDiffFunc = func(index iotago.SlotIndex) *prunable.AccountDiffs {
+
+	return func(index iotago.SlotIndex) *prunable.AccountDiffs {
 		if _, exists := stores[index]; !exists {
 			stores[index] = mapdb.NewMapDB()
-		}
-		if slotDiff, exists := slotDiffs[index]; exists {
-			return slotDiff
 		}
 
 		return prunable.NewAccountDiffs(index, stores[index], tpkg.API())
 	}
-
-	return slotDiffFunc, slotDiffs
-}
-
-var slotDiffFunc = func(iotago.SlotIndex) *prunable.AccountDiffs {
-	return nil
 }
 
 // Scenario defines Scenario for account ledger updates per slots and accounts.

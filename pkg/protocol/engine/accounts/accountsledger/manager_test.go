@@ -68,7 +68,7 @@ func TestManager_CommitAccountTree(t *testing.T) {
 	for _, test := range testSceanrios {
 		t.Run(test.name, func(t *testing.T) {
 			params := tpkg.ProtocolParams()
-			slotDiffFunc, _ := tpkg.InitSlotDiff()
+			slotDiffFunc := tpkg.InitSlotDiff()
 			blockFunc := func(iotago.BlockID) (*blocks.Block, bool) { return nil, false }
 			accountsStore := mapdb.NewMapDB()
 			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
@@ -127,7 +127,7 @@ func TestManager_CommitSlot(t *testing.T) {
 			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, test.scenario)
 			params := tpkg.ProtocolParams()
 
-			slotDiffFunc, _ := tpkg.InitSlotDiff()
+			slotDiffFunc := tpkg.InitSlotDiff()
 			accountsStore := mapdb.NewMapDB()
 
 			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)

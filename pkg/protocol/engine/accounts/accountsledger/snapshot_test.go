@@ -81,7 +81,7 @@ func TestManager_Import_Export(t *testing.T) {
 
 			err := manager.Export(writer, iotago.SlotIndex(1))
 			require.NoError(t, err)
-			slotDiffFunc, _ := tpkg.InitSlotDiff()
+			slotDiffFunc := tpkg.InitSlotDiff()
 			accountsStore := mapdb.NewMapDB()
 
 			newManager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
@@ -94,7 +94,7 @@ func TestManager_Import_Export(t *testing.T) {
 }
 
 func InitAccountLedger(t *testing.T, blockFunc func(iotago.BlockID) (*blocks.Block, bool), mca uint32, scenarioBuildData map[iotago.SlotIndex]*tpkg.AccountsSlotBuildData, burnedBlocks map[iotago.SlotIndex][]iotago.BlockID) *Manager {
-	slotDiffFunc, _ := tpkg.InitSlotDiff()
+	slotDiffFunc := tpkg.InitSlotDiff()
 	accountsStore := mapdb.NewMapDB()
 
 	// feed the manager with the data
