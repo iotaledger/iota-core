@@ -126,7 +126,7 @@ func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 	destroyedAccounts := make(map[iotago.AccountID]*accounts.AccountData)
 
 	for index := m.latestCommittedSlot; index > targetIndex; index-- {
-		m.slotDiff(index).StreamDestroyed(func(accountID iotago.AccountID) bool {
+		err = m.slotDiff(index).StreamDestroyed(func(accountID iotago.AccountID) bool {
 			// actual data will be filled in by rollbackAccountTo
 			accountData := accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
 
@@ -135,6 +135,9 @@ func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 
 			return true
 		})
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	for accountID, accountData := range destroyedAccounts {
@@ -241,7 +244,7 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 		}
 
 		// The amount of account entries within this slot diff.
-		if err = pWriter.WriteValue("indiff accounts count", accountsInDiffCount, true); err != nil {
+		if err = pWriter.WriteValue("inDiff accounts count", accountsInDiffCount, true); err != nil {
 			return 0, err
 		}
 
@@ -264,7 +267,7 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 		}
 
 		// The amount of diffs contained within this slot.
-		if err = pWriter.WriteValueAtBookmark("indiff accounts count", accountsInDiffCount); err != nil {
+		if err = pWriter.WriteValueAtBookmark("inDiff accounts count", accountsInDiffCount); err != nil {
 			return 0, err
 		}
 
@@ -282,7 +285,7 @@ func writeSlotDiff(writer *utils.PositionedWriter, accountID iotago.AccountID, a
 	return nil
 }
 
-func readAccountData(api iotago.API, reader io.ReadSeeker) (*accounts.AccountData, error) {
+func readAccountData(_ iotago.API, reader io.ReadSeeker) (*accounts.AccountData, error) {
 	accountID, err := readAccountID(reader)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read account ID")
@@ -295,12 +298,12 @@ func readAccountData(api iotago.API, reader io.ReadSeeker) (*accounts.AccountDat
 
 	var updatedTime iotago.SlotIndex
 	if err := binary.Read(reader, binary.LittleEndian, &updatedTime); err != nil {
-		return nil, errors.Wrap(err, "unable to read updatedtime for Account balance")
+		return nil, errors.Wrap(err, "unable to read updatedTime for Account balance")
 	}
 
 	var outputID iotago.OutputID
 	if err := binary.Read(reader, binary.LittleEndian, &outputID); err != nil {
-		return nil, errors.Wrap(err, "unable to read updatedtime for Account balance")
+		return nil, errors.Wrap(err, "unable to read updatedTime for Account balance")
 	}
 
 	var pubKeyCount int64
@@ -379,19 +382,6 @@ func readPubKey(reader io.ReadSeeker) (ed25519.PublicKey, error) {
 	}
 
 	return pubKey, nil
-}
-
-func writeAccountID(writer *utils.PositionedWriter, accountID iotago.AccountID) error {
-	accountIDBytes, err := accountID.Bytes()
-	if err != nil {
-		return err
-	}
-
-	if err = writer.WriteBytes(accountIDBytes); err != nil {
-		return errors.Wrapf(err, "unable to write account id %s", accountID.String())
-	}
-
-	return nil
 }
 
 func readAccountID(reader io.ReadSeeker) (iotago.AccountID, error) {
