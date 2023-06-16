@@ -343,7 +343,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		}
 	}
 
-	// Now we process the collect account changes, for that we consume the "compacted" state diff to get the overall
+	// Now we process the collected account changes, for that we consume the "compacted" state diff to get the overall
 	// account changes at UTXO level without needing to worry about multiple spends of the same account in the same slot,
 	// we only care about the initial account output to be consumed and the final account output to be created.
 	{
@@ -439,7 +439,10 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			// Change and PreviousUpdatedTime are either 0 if we did not have an allotment for this account, or we already
 			// have some values from the allotment, so no need to set them explicitly.
 			{
-				createdOutput := createdAccounts[consumedAccountID]
+				createdOutput, accountTransitioned := createdAccounts[consumedAccountID]
+				if !accountTransitioned {
+					continue
+				}
 				accountDiff.NewOutputID = createdOutput.OutputID()
 				accountDiff.PreviousOutputID = consumedOutput.OutputID()
 
