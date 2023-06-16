@@ -47,11 +47,14 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
 		t := NewTipManager(e.BlockCache.Block, opts...)
 
-		e.Events.Booker.BlockBooked.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
-		e.BlockCache.Evict.Hook(t.Evict)
-		e.Events.TipSelection.LinkTo(t.Events())
+		e.HookConstructed(func() {
+			e.Events.Booker.BlockBooked.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
+			e.BlockCache.Evict.Hook(t.Evict)
+			e.Events.TipSelection.LinkTo(t.Events())
 
-		t.TriggerInitialized()
+			t.TriggerInitialized()
+		})
+
 		e.HookStopped(t.TriggerStopped)
 
 		return t
@@ -71,16 +74,14 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
 func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
-	return t.addBlock(block)
-}
-
-func (t *TipManager) addBlock(block *blocks.Block) *TipMetadata {
 	tipMetadata := NewBlockMetadata(block)
 	if storage := t.metadataStorage(block.ID().Index()); storage == nil || !storage.Set(block.ID(), tipMetadata) {
 		return nil
 	}
 
 	t.setupBlockMetadata(tipMetadata)
+
+	t.events.BlockAdded.Trigger(tipMetadata)
 
 	return tipMetadata
 }

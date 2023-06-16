@@ -1,6 +1,8 @@
 package tipselectionv1
 
 import (
+	"fmt"
+
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
@@ -51,13 +53,19 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
 		t := New(e.TipManager, e.Ledger.ConflictDAG(), e.EvictionState.LatestRootBlocks, opts...)
 
-		e.TipManager.HookConstructed(func() {
-			e.TipManager.Events().BlockAdded.Hook(t.classifyTip)
+		e.HookConstructed(func() {
+			fmt.Println("TipSelection constructed from ENGINE")
 
-			t.TriggerInitialized()
+			e.TipManager.HookInitialized(func() {
+				fmt.Println("TipSelection constructed")
+
+				e.TipManager.Events().BlockAdded.Hook(t.classifyTip)
+
+				t.TriggerInitialized()
+			})
+
+			e.TipManager.HookStopped(t.TriggerStopped)
 		})
-
-		e.HookStopped(t.TriggerStopped)
 
 		return t
 	})
@@ -94,6 +102,8 @@ func (t *TipSelection) Shutdown() {
 }
 
 func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
+	fmt.Println("classifyTip", tipMetadata.ID())
+
 	if t.isValidStrongTip(tipMetadata.Block()) {
 		tipMetadata.SetTipPool(tipmanager.StrongTipPool)
 	} else if t.isValidWeakTip(tipMetadata.Block()) {
