@@ -77,7 +77,7 @@ var slotDiffFunc = func(iotago.SlotIndex) *prunable.AccountDiffs {
 	return nil
 }
 
-// Scenario defines Scenario for accout ledger updates per slots and accounts
+// Scenario defines Scenario for account ledger updates per slots and accounts
 type Scenario map[iotago.SlotIndex]*SlotActions
 
 type ScenarioFunc func() (Scenario, *TestSuite)
@@ -168,7 +168,7 @@ func (s Scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
 func updateExpectedAccLedger(expectedAccountLedger *AccountsLedgerTestScenario, rollingLedger map[iotago.AccountID]*accounts.AccountData, accountID iotago.AccountID, actions *AccountActions, change int64) *accounts.AccountData {
 	accData, exists := expectedAccountLedger.AccountsLedger[accountID]
 	if !exists {
-		// does this acocunt existed in previous slots?
+		// does this account existed in previous slots?
 		prevData, existed := rollingLedger[accountID]
 		if existed {
 			accData = prevData.Clone()
@@ -252,7 +252,7 @@ func Scenario3() (Scenario, *TestSuite) {
 				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("B1")},
 			},
 		},
-		2: { // account A destroyed with pubkeys present
+		2: { // account A destroyed with pubKeys present
 			testSuite.AccountID("A"): {
 				totalAllotments: 10,
 				burns:           []uint64{5, 5},
@@ -275,7 +275,7 @@ func Scenario3() (Scenario, *TestSuite) {
 				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("D1"), testSuite.PublicKey("D2")},
 			},
 		},
-		3: { // Account B removes all data but it's not destroyed yet
+		3: { // Account B removes all data, but it's not destroyed yet
 			testSuite.AccountID("B"): {
 				burns:       []uint64{10},
 				removedKeys: []ed25519.PublicKey{testSuite.PublicKey("B2")},

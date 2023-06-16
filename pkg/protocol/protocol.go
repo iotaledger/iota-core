@@ -130,7 +130,7 @@ func (p *Protocol) Run() {
 		}
 	}
 
-	// p.linkTo(p.mainrEngine) -> CC and TipManager
+	// p.linkTo(p.mainEngine) -> CC and TipManager
 	p.runNetworkProtocol()
 }
 
