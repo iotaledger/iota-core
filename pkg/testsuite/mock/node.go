@@ -392,7 +392,7 @@ func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Op
 	return blocks.NewBlock(modelBlock)
 }
 
-func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	block := n.CreateBlock(ctx, alias, opts...)
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))

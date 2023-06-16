@@ -223,7 +223,7 @@ func (t *TestSuite) registerBlock(alias string, block *blocks.Block) {
 	block.ID().RegisterAlias(alias)
 }
 
-func (t *TestSuite) CreateBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockissuer.BlockParams]) {
+func (t *TestSuite) CreateBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 

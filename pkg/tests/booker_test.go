@@ -65,8 +65,8 @@ func Test_DoubleSpend(t *testing.T) {
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "Genesis:0"))
 
-		ts.IssueBlock("block1", node1, blockfactory.WithPayload(tx1), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssueBlock("block2", node1, blockfactory.WithPayload(tx2), blockissuer.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBlock("block1", node1, blockfactory.WithPayload(tx1), blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBlock("block2", node1, blockfactory.WithPayload(tx2), blockfactory.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
