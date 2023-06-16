@@ -1,6 +1,7 @@
 package evilwallet
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -14,7 +15,7 @@ import (
 // Options is a struct that represents a collection of options that can be set when creating a block.
 type Options struct {
 	aliasInputs            map[string]types.Empty
-	inputs                 []iotago.OutputID
+	inputs                 []*Output
 	aliasOutputs           map[string]iotago.Output
 	outputs                []iotago.Output
 	inputWallet            *Wallet
@@ -30,13 +31,14 @@ type Options struct {
 type OutputOption struct {
 	aliasName string
 	amount    uint64
+	address   *iotago.Ed25519Address
 }
 
 // NewOptions is the constructor for the tx creation.
 func NewOptions(options ...Option) (option *Options, err error) {
 	option = &Options{
 		aliasInputs:  make(map[string]types.Empty),
-		inputs:       make([]iotago.OutputID, 0),
+		inputs:       make([]*Output, 0),
 		aliasOutputs: make(map[string]iotago.Output),
 		outputs:      make([]iotago.Output, 0),
 	}
@@ -126,9 +128,9 @@ func WithInputs(inputs interface{}) Option {
 			for _, input := range in {
 				options.aliasInputs[input] = types.Void
 			}
-		case iotago.OutputID:
+		case *Output:
 			options.inputs = append(options.inputs, in)
-		case iotago.OutputIDs:
+		case []*Output:
 			options.inputs = append(options.inputs, in...)
 		}
 	}
@@ -137,13 +139,25 @@ func WithInputs(inputs interface{}) Option {
 // WithOutput returns an Option that is used to define a non-colored Output for the Transaction in the Block.
 func WithOutput(output *OutputOption) Option {
 	return func(options *Options) {
+		if output.amount == 0 || output.address == nil {
+			fmt.Println("output invalid")
+			return
+		}
+
 		if output.aliasName != "" {
+			fmt.Println(output.aliasName)
 			options.aliasOutputs[output.aliasName] = &iotago.BasicOutput{
 				Amount: output.amount,
+				Conditions: iotago.BasicOutputUnlockConditions{
+					&iotago.AddressUnlockCondition{Address: output.address},
+				},
 			}
 		} else {
 			options.outputs = append(options.outputs, &iotago.BasicOutput{
 				Amount: output.amount,
+				Conditions: iotago.BasicOutputUnlockConditions{
+					&iotago.AddressUnlockCondition{Address: output.address},
+				},
 			})
 		}
 	}
@@ -156,10 +170,16 @@ func WithOutputs(outputs []*OutputOption) Option {
 			if output.aliasName != "" {
 				options.aliasOutputs[output.aliasName] = &iotago.BasicOutput{
 					Amount: output.amount,
+					Conditions: iotago.BasicOutputUnlockConditions{
+						&iotago.AddressUnlockCondition{Address: output.address},
+					},
 				}
 			} else {
 				options.outputs = append(options.outputs, &iotago.BasicOutput{
 					Amount: output.amount,
+					Conditions: iotago.BasicOutputUnlockConditions{
+						&iotago.AddressUnlockCondition{Address: output.address},
+					},
 				})
 			}
 		}

@@ -3,7 +3,6 @@ package evilwallet
 import (
 	"fmt"
 	"log"
-	"math"
 	"sync"
 	"time"
 
@@ -65,19 +64,23 @@ type EvilWallet struct {
 	outputManager *OutputManager
 	aliasManager  *AliasManager
 
-	optFaucetSeed      []byte
-	optsClientURLs     []string
-	optsProtocolParams *iotago.ProtocolParameters
+	optFaucetSeed            []byte
+	optFaucetIndex           uint64
+	optFaucetUnspentOutputID iotago.OutputID
+	optsClientURLs           []string
+	optsProtocolParams       *iotago.ProtocolParameters
 }
 
 // NewEvilWallet creates an EvilWallet instance.
 func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 	return options.Apply(&EvilWallet{
-		wallets:            NewWallets(),
-		aliasManager:       NewAliasManager(),
-		optFaucetSeed:      dockerFaucetSeed(),
-		optsClientURLs:     defaultClientsURLs,
-		optsProtocolParams: dockerProtocolParams(),
+		wallets:                  NewWallets(),
+		aliasManager:             NewAliasManager(),
+		optFaucetSeed:            dockerFaucetSeed(),
+		optFaucetIndex:           0,
+		optFaucetUnspentOutputID: iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0),
+		optsClientURLs:           defaultClientsURLs,
+		optsProtocolParams:       dockerProtocolParams(),
 	}, opts, func(w *EvilWallet) {
 		connector := NewWebClients(w.optsClientURLs)
 		w.connector = connector
@@ -86,16 +89,13 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		w.faucet = NewWallet()
 		w.faucet.seed = [32]byte(w.optFaucetSeed)
 
-		// TODO: need to initialize faucet output with provided seed
 		clt := w.connector.GetClient()
-		faucetOutputID := iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0)
-		faucetOutput := clt.GetOutput(faucetOutputID)
-		fmt.Println(faucetOutput)
+		faucetOutput := clt.GetOutput(w.optFaucetUnspentOutputID)
 		w.faucet.AddUnspentOutput(&Output{
-			Address:      w.faucet.Address(),
-			Index:        0,
-			OutputID:     faucetOutputID,
-			Balance:      faucetBalance,
+			Address:      w.faucet.AddressOnIndex(0),
+			Index:        w.optFaucetIndex,
+			OutputID:     w.optFaucetUnspentOutputID,
+			Balance:      faucetOutput.Deposit(),
 			CreationTime: iotago.SlotIndex(0),
 			OutputStruct: faucetOutput,
 		})
@@ -192,11 +192,16 @@ func (e *EvilWallet) RequestFreshBigFaucetWallets(numberOfWallets int) {
 func (e *EvilWallet) RequestFreshBigFaucetWallet() (err error) {
 	initWallet := NewWallet()
 	fmt.Println("Requesting funds from faucet...")
-	funds, err := e.requestAndSplitFaucetFunds(initWallet, FaucetRequestSplitNumber*FaucetRequestSplitNumber)
+
+	receiveWallet := e.NewWallet(Fresh)
+
+	err = e.requestAndSplitFaucetFunds(initWallet, receiveWallet)
 	if err != nil {
 		return
 	}
-	e.wallets.SetWalletReady(funds)
+
+	e.wallets.SetWalletReady(receiveWallet)
+
 	return
 }
 
@@ -204,31 +209,31 @@ func (e *EvilWallet) RequestFreshBigFaucetWallet() (err error) {
 // requested from the Faucet.
 func (e *EvilWallet) RequestFreshFaucetWallet() (err error) {
 	initWallet := NewWallet()
-	wallet, err := e.requestAndSplitFaucetFunds(initWallet, FaucetRequestSplitNumber)
+	receiveWallet := e.NewWallet(Fresh)
+	err = e.requestAndSplitFaucetFunds(initWallet, receiveWallet)
 	if err != nil {
 		return
 	}
-	e.wallets.SetWalletReady(wallet)
+
+	e.wallets.SetWalletReady(receiveWallet)
+
 	return
 }
 
-func (e *EvilWallet) requestAndSplitFaucetFunds(initWallet *Wallet, splitNum int) (wallet *Wallet, err error) {
+func (e *EvilWallet) requestAndSplitFaucetFunds(initWallet, receiveWallet *Wallet) (err error) {
 	_, err = e.requestFaucetFunds(initWallet)
 	if err != nil {
-		return
+		return err
 	}
 	// first split 1 to FaucetRequestSplitNumber outputs
-	wallet = e.NewWallet(Fresh)
-	err = e.splitOutputs(initWallet, wallet, splitNum)
-
-	return
+	return e.splitOutputs(initWallet, receiveWallet)
 }
 
 func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputID, err error) {
 	receiveAddr := wallet.Address()
 	clt := e.connector.GetClient()
 
-	faucetAddr := e.faucet.AddressOnIndex(0)
+	faucetAddr := e.faucet.AddressOnIndex(e.optFaucetIndex)
 	unspentFaucet := e.faucet.UnspentOutput(faucetAddr.String())
 	remainderAmount := unspentFaucet.Balance - faucetTokensPerRequest
 
@@ -270,6 +275,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 		return iotago.OutputID{}, err
 	}
 	fmt.Println("post faucet request success", blkID)
+	fmt.Println("faucet new outputID:", iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 1).ToHex())
 
 	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 0), tx.Essence.Outputs[0])
 
@@ -292,78 +298,41 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 	return
 }
 
-func (e *EvilWallet) splitOutputs(inputWallet, outputWallet *Wallet, splitNumber int) error {
-	var txIDs iotago.TransactionIDs
-	wg := sync.WaitGroup{}
-
+// splitOutputs splits faucet input to 100 outputs.
+func (e *EvilWallet) splitOutputs(inputWallet, outputWallet *Wallet) error {
 	if inputWallet.IsEmpty() {
 		return errors.New("inputWallet is empty")
 	}
 
-	// we split 100 outputs in each round
-	round := 0
-	for i := splitNumber; i > 1; round++ {
-		i /= FaucetRequestSplitNumber
+	addr := inputWallet.AddressOnIndex(0)
+	input, outputs := e.handleInputOutputDuringSplitOutputs(FaucetRequestSplitNumber, inputWallet, outputWallet, addr.String())
+
+	tx, err := e.CreateTransaction(WithInputs(input), WithOutputs(outputs), WithIssuer(inputWallet), WithOutputWallet(outputWallet))
+	if err != nil {
+		return err
 	}
 
-	var tmpOutWallet, tmpInWallet *Wallet
-	for i := 0; i < round; i++ {
-		// prepare wallet for next round, new tmpOutWallet are not managed by evil wallet
-		if i == 0 {
-			tmpInWallet = inputWallet
-		} else {
-			tmpInWallet = tmpOutWallet
-		}
-
-		if i == round-1 {
-			tmpOutWallet = outputWallet
-		} else {
-			tmpOutWallet = NewWallet(Fresh)
-		}
-
-		txIDs = make(iotago.TransactionIDs, int(math.Pow(FaucetRequestSplitNumber, float64(i))))
-		inputNum := 0
-		for addr := range tmpInWallet.UnspentOutputs() {
-			wg.Add(1)
-			go func(inputNum int, addr string) {
-				defer wg.Done()
-
-				input, outputs := e.handleInputOutputDuringSplitOutputs(FaucetRequestSplitNumber, tmpInWallet, addr)
-
-				tx, err := e.CreateTransaction(WithInputs(input), WithOutputs(outputs),
-					WithIssuer(tmpInWallet), WithOutputWallet(tmpOutWallet))
-				if err != nil {
-					return
-				}
-
-				clt := e.connector.GetClient()
-				_, err = clt.PostTransaction(tx)
-				if err != nil {
-					return
-				}
-
-				txIDs[inputNum] = lo.PanicOnErr(tx.ID())
-			}(inputNum, addr)
-			inputNum++
-		}
-		wg.Wait()
-
-		// wait txs to be confirmed in each round
-		e.outputManager.AwaitTransactionsConfirmation(txIDs, maxGoroutines)
+	_, err = e.connector.GetClient().PostTransaction(tx)
+	if err != nil {
+		fmt.Println(err)
+		return err
 	}
+
+	// wait txs to be confirmed
+	e.outputManager.AwaitTransactionsConfirmation(iotago.TransactionIDs{lo.PanicOnErr(tx.ID())}, maxGoroutines)
 
 	return nil
 }
 
-func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitNumber int, inputWallet *Wallet, inputAddr string) (input iotago.OutputID, outputs []*OutputOption) {
+func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitNumber int, inputWallet, receiveWallet *Wallet, inputAddr string) (input *Output, outputs []*OutputOption) {
 	evilInput := inputWallet.UnspentOutput(inputAddr)
-	input = evilInput.OutputID
+	input = evilInput
 
 	inputBalance := evilInput.Balance
 
 	balances := SplitBalanceEqually(splitNumber, inputBalance)
 	for _, bal := range balances {
-		outputs = append(outputs, &OutputOption{amount: bal})
+		outputs = append(outputs, &OutputOption{amount: bal, address: receiveWallet.Address()})
 	}
 	return
 }
@@ -534,10 +503,8 @@ func (e *EvilWallet) registerOutputAliases(tx *iotago.Transaction, addrAliasMap 
 
 func (e *EvilWallet) prepareInputs(buildOptions *Options) (inputs []*Output, err error) {
 	if buildOptions.areInputsProvidedWithoutAliases() {
-		// TODO: request output metadata, and Create ledgerstate Output from metadata
-		// for _, out := range buildOptions.inputs {
-		// 	inputs = append(inputs, )
-		// }
+		inputs = append(inputs, buildOptions.inputs...)
+
 		return
 	}
 	// append inputs with alias
@@ -651,10 +618,10 @@ func (e *EvilWallet) prepareRemainderOutput(buildOptions *Options, outputs []iot
 
 	for _, input := range buildOptions.inputs {
 		// get balance from output manager
-		in := e.outputManager.GetOutput(input)
+		in := e.outputManager.GetOutput(input.OutputID)
 		inputBalance += in.Balance
 
-		if remainderAddress.Equal(&iotago.Ed25519Address{}) {
+		if remainderAddress == nil {
 			remainderAddress = in.Address
 		}
 	}
@@ -692,7 +659,7 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 		if buildOptions.areInputsProvidedWithoutAliases() {
 			for _, input := range buildOptions.inputs {
 				// get balance from output manager
-				inputDetails := e.outputManager.GetOutput(input)
+				inputDetails := e.outputManager.GetOutput(input.OutputID)
 				totalBalance += inputDetails.Balance
 			}
 		} else {
@@ -836,6 +803,18 @@ func (e *EvilWallet) SetTxOutputsSolid(outputs iotago.OutputIDs, clientID string
 func WithFaucetSeed(seed []byte) options.Option[EvilWallet] {
 	return func(opts *EvilWallet) {
 		copy(opts.optFaucetSeed[:], seed[:])
+	}
+}
+
+func WithFaucetIndex(index uint64) options.Option[EvilWallet] {
+	return func(opts *EvilWallet) {
+		opts.optFaucetIndex = index
+	}
+}
+
+func WithFaucetOutputID(id iotago.OutputID) options.Option[EvilWallet] {
+	return func(opts *EvilWallet) {
+		opts.optFaucetUnspentOutputID = id
 	}
 }
 

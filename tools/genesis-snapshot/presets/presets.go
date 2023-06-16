@@ -39,7 +39,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 		Bech32HRP:   "rms",
 		MinPoWScore: 10,
 		RentStructure: iotago.RentStructure{
-			VByteCost:    100,
+			VByteCost:    1,
 			VBFactorData: 1,
 			VBFactorKey:  10,
 		},
