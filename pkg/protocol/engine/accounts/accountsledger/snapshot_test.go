@@ -22,7 +22,7 @@ func TestSlotDiffSnapshotWriter(t *testing.T) {
 	pWriter := utils.NewPositionedWriter(writer)
 	err := writeSlotDiff(pWriter, accountID, *accountDiff, true)
 
-	accountDiffRead, accountIDRead, destroyedRead, err := readSlotDiff(writer.BytesReader())
+	accountIDRead, accountDiffRead, destroyedRead, err := readSlotDiff(writer.BytesReader())
 	require.NoError(t, err)
 	require.Equal(t, accountDiff, accountDiffRead)
 	require.Equal(t, accountID, accountIDRead)
@@ -57,6 +57,8 @@ func TestManager_Import_Export(t *testing.T) {
 
 	manager := InitAccountLedger(t, blockFunc, params.MaxCommitableAge, scenarioBuildData, burnedBlocks)
 	writer := &writerseeker.WriterSeeker{}
+
+	AssertAccountManagerState(t, manager, expectedData)
 
 	err := manager.Export(writer, iotago.SlotIndex(1))
 	require.NoError(t, err)
