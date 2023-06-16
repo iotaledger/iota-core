@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -96,7 +95,6 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 	}
 
 	previousMsIndex := iotago.SlotIndex(48)
-	previousMsTimestamp := utils.RandTimestamp()
 	previousSpents := utxoledger.Spents{
 		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[1], previousMsIndex),
 	}

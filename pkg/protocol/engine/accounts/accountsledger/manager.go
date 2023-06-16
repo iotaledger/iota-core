@@ -258,11 +258,7 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 	for accountID, accountDiff := range accountDiffs {
 		destroyed := destroyedAccounts.Has(accountID)
 		if destroyed {
-			var err error
-			accountDiff, err = m.PreserveDestroyedAccountData(accountID)
-			if err != nil {
-				return errors.Wrapf(err, "could not preserve destroyed account data for account %s in slot %d", accountID, slotIndex)
-			}
+			accountDiff = m.PreserveDestroyedAccountData(accountID)
 		}
 		err := diffStore.Store(accountID, *accountDiff, destroyed)
 		if err != nil {
