@@ -49,7 +49,7 @@ type TipSelection struct {
 // NewProvider creates a new TipManager provider.
 func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.Engine, tipselection.TipSelection] {
 	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
-		t := New(e.TipManager, e.Ledger.ConflictDAG(), e.BlockCache.Block, e.EvictionState.LatestRootBlocks, opts...)
+		t := New(e.TipManager, e.Ledger.ConflictDAG(), e.EvictionState.LatestRootBlocks, opts...)
 
 		e.TipManager.HookInitialized(func() {
 			e.TipManager.Events().BlockAdded.Hook(t.classifyTip)
@@ -63,7 +63,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 	})
 }
 
-func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
+func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
 		tipManager:                   tipManager,
 		conflictDAG:                  conflictDAG,
