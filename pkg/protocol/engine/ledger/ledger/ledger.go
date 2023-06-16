@@ -339,7 +339,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		})
 
 		if innerErr != nil {
-			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, innerErr
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, errors.Wrapf(innerErr, "failed to commit slot %d", index)
 		}
 	}
 
@@ -375,7 +375,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		})
 
 		if innerErr != nil {
-			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, innerErr
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, errors.Wrapf(innerErr, "failed to commit slot %d", index)
 		}
 
 		// input side
@@ -404,7 +404,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		})
 
 		if innerErr != nil {
-			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, innerErr
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, errors.Wrapf(innerErr, "failed to commit slot %d", index)
 		}
 	}
 
@@ -502,7 +502,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 		// Update the UTXO ledger
 		if err = l.utxoLedger.ApplyDiff(index, outputs, spents); err != nil {
-			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil
+			return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, errors.Wrapf(err, "failed to commit slot %d", index)
 		}
 
 		// Update the Accounts ledger
