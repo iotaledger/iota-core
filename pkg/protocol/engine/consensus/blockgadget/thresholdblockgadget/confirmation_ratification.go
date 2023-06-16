@@ -14,7 +14,7 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 		return
 	}
 
-	var stack []*blocks.Block
+	var toConfirm []*blocks.Block
 
 	evaluateFunc := func(block *blocks.Block) bool {
 		// Do not propagate further than g.optsConfirmationRatificationThreshold slots.
@@ -30,20 +30,19 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 		}
 
 		// Skip further propagation if the witness is not new.
-		if !block.AddConfirmationRatifier(ratifier) {
-			return false
-		}
+		propagateFurther := block.AddConfirmationRatifier(ratifier)
 
 		if g.shouldConfirm(block) {
-			stack = append([]*blocks.Block{block}, stack...)
+			toConfirm = append([]*blocks.Block{block}, toConfirm...)
+			propagateFurther = true
 		}
 
-		return true
+		return propagateFurther
 	}
 
 	g.propagate(votingBlock.Parents(), evaluateFunc)
 
-	for _, block := range stack {
+	for _, block := range toConfirm {
 		if block.SetConfirmed() {
 			g.events.BlockConfirmed.Trigger(block)
 		}

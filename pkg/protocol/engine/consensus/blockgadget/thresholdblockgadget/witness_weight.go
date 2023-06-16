@@ -1,10 +1,10 @@
 package thresholdblockgadget
 
 import (
-	"fmt"
-
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/votes"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
@@ -15,26 +15,25 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 		return
 	}
 
-	var preAcceptanceStack []*blocks.Block
-	var preConfirmationStack []*blocks.Block
+	var toPreAccept []*blocks.Block
+	toPreAcceptByID := set.New[iotago.BlockID]()
 
-	// TODO: there could be very strange side effects if the online committee and/or committee changes during the vote propagation.
-
-	fmt.Println("======== TrackWitnessWeight =======", votingBlock.ID(), witness)
+	var toPreConfirm []*blocks.Block
+	toPreConfirmByID := set.New[iotago.BlockID]()
 
 	process := func(block *blocks.Block) bool {
 		shouldPreAccept, shouldPreConfirm := g.shouldPreAcceptAndPreConfirm(block)
 
-		fmt.Println("\t", block.ID(), "shouldPreAccept", shouldPreAccept, "shouldPreConfirm", shouldPreConfirm)
-
 		var propagateFurther bool
-		if !block.IsPreAccepted() && shouldPreAccept {
-			preAcceptanceStack = append([]*blocks.Block{block}, preAcceptanceStack...)
+		if !block.IsPreAccepted() && (shouldPreAccept || anyChildInSet(block, toPreAcceptByID)) {
+			toPreAccept = append([]*blocks.Block{block}, toPreAccept...)
+			toPreAcceptByID.Add(block.ID())
 			propagateFurther = true
 		}
 
-		if !block.IsPreConfirmed() && shouldPreConfirm {
-			preConfirmationStack = append([]*blocks.Block{block}, preConfirmationStack...)
+		if !block.IsPreConfirmed() && (shouldPreConfirm || anyChildInSet(block, toPreConfirmByID)) {
+			toPreConfirm = append([]*blocks.Block{block}, toPreConfirm...)
+			toPreConfirmByID.Add(block.ID())
 			propagateFurther = true
 		}
 
@@ -64,18 +63,16 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 	g.propagate(votingBlock.Parents(), evaluateFunc)
 
 	var acceptanceRatifierWeights []*blocks.Block
-	for _, block := range preAcceptanceStack {
+	for _, block := range toPreAccept {
 		if block.SetPreAccepted() {
-			fmt.Println("\t", block.ID(), "preAccepted")
 			g.events.BlockPreAccepted.Trigger(block)
 			acceptanceRatifierWeights = append(acceptanceRatifierWeights, block)
 		}
 	}
 
 	var confirmationRatifierWeights []*blocks.Block
-	for _, block := range preConfirmationStack {
+	for _, block := range toPreConfirm {
 		if block.SetPreConfirmed() {
-			fmt.Println("\t", block.ID(), "preConfirmed")
 			g.events.BlockPreConfirmed.Trigger(block)
 			confirmationRatifierWeights = append(confirmationRatifierWeights, block)
 		}

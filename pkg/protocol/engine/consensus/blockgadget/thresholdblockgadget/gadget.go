@@ -3,6 +3,7 @@ package thresholdblockgadget
 import (
 	"fmt"
 
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -89,4 +90,14 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 
 		walk.PushAll(block.Parents()...)
 	}
+}
+
+func anyChildInSet(block *blocks.Block, set set.Set[iotago.BlockID]) bool {
+	for _, child := range block.Children() {
+		if set.Has(child.ID()) {
+			return true
+		}
+	}
+
+	return false
 }

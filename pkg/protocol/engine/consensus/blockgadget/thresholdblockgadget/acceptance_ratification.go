@@ -1,10 +1,10 @@
 package thresholdblockgadget
 
 import (
-	"fmt"
-
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/votes"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
@@ -15,13 +15,11 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 		return
 	}
 
-	fmt.Println("\t======== Acceptance =======", votingBlock.ID(), ratifier)
-
-	var stack []*blocks.Block
+	var toAccept []*blocks.Block
+	toAcceptByID := set.New[iotago.BlockID]()
 
 	evaluateFunc := func(block *blocks.Block) bool {
-		fmt.Println("\t\t", block.ID(), "isAccepted", block.IsAccepted(), block.AcceptanceRatifiers(), "shouldAccept", g.shouldAccept(block))
-		// Skip propagation if the block is already accepted.
+		// Skip propagation if the block is already toAcceptByID.
 		if block.IsAccepted() {
 			return false
 		}
@@ -29,15 +27,17 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 		// Propagate further if the ratifier is new.
 		propagateFurther := block.AddAcceptanceRatifier(ratifier)
 
-		if g.shouldAccept(block) {
-			// We start walking from the future cone into the past in a breadth-first manner. Therefore, we prepend (push onto the stack) here
+		// Once a block is accepted, all its parents are implicitly accepted as well. There's no need to check shouldAccept again.
+		if anyChildInSet(block, toAcceptByID) || g.shouldAccept(block) {
+			// We start walking from the future cone into the past in a breadth-first manner. Therefore, we prepend (push onto the toAccept) here
 			// so that we can accept in order after finishing the walk.
-			stack = append([]*blocks.Block{block}, stack...)
+			toAccept = append([]*blocks.Block{block}, toAccept...)
+			toAcceptByID.Add(block.ID())
 
-			// Even if the ratifier is not new, we should accept this block just now (potentially due to OnlineCommittee changes).
+			// A child of this block has been accepted or this block has just been accepted.
 			// That means, we should check its parents to ensure monotonicity:
-			//  1. If they are not yet accepted, we will add them to the stack and accept them.
-			//  2. If they are accepted, we will stop the walk.
+			//  1. If they are not yet accepted, we will add them to the toAccept and accept them.
+			//  2. If they are accepted, we will simply stop the walk.
 			propagateFurther = true
 		}
 
@@ -46,9 +46,8 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 
 	g.propagate(votingBlock.Parents(), evaluateFunc)
 
-	for _, block := range stack {
+	for _, block := range toAccept {
 		if block.SetAccepted() {
-			fmt.Println("\t\t", block.ID(), "accepted")
 			g.events.BlockAccepted.Trigger(block)
 		}
 	}
