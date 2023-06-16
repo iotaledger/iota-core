@@ -6,21 +6,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 type TestFramework struct {
-	Instance *tipselectionv1.TipSelection
+	Instance *tipmanagerv1.TipManager
 
 	blockIDsByAlias map[string]iotago.BlockID
 	blocksByID      map[iotago.BlockID]*blocks.Block
@@ -36,13 +33,9 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID()
 
-	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
-
-	t.Instance = tipselectionv1.New(conflictDAG, func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
+	t.Instance = tipmanagerv1.NewTipManager(func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]
 		return block, exists
-	}, func() iotago.BlockIDs {
-		return iotago.BlockIDs{iotago.EmptyBlockID()}
 	})
 
 	return t
@@ -97,10 +90,10 @@ func (t *TestFramework) BlockID(alias string) iotago.BlockID {
 
 func (t *TestFramework) AssertStrongTips(aliases ...string) {
 	for _, alias := range aliases {
-		require.True(t.test, advancedset.New(lo.Map(t.Instance.TipManager().StrongTips(), tipmanager.TipMetadata.ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
+		require.True(t.test, advancedset.New(lo.Map(t.Instance.StrongTips(), tipmanager.TipMetadata.ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
 	}
 
-	require.Equal(t.test, len(aliases), len(t.Instance.TipManager().StrongTips()), "strongTips size does not match")
+	require.Equal(t.test, len(aliases), len(t.Instance.StrongTips()), "strongTips size does not match")
 }
 
 var protoParams = iotago.ProtocolParameters{

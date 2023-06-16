@@ -20,6 +20,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -69,6 +70,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
+		tipmanagerv1.NewProvider(),
 		tipselectionv1.NewProvider(),
 	)
 	defer engineInstance.Shutdown()
