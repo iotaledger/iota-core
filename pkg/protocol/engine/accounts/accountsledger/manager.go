@@ -174,13 +174,16 @@ func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 
 	// read initial account data at the latest committed slot
 	loadedAccount, exists := m.accountsTree.Get(accountID)
+
 	if !exists {
 		loadedAccount = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, targetIndex), iotago.EmptyOutputID)
 	}
+	fmt.Printf("loadedAccount %s %d %d\n", loadedAccount.ID.String(), loadedAccount.Credits.UpdateTime, loadedAccount.Credits.Value)
 	wasDestroyed, err := m.rollbackAccountTo(loadedAccount, targetIndex)
 	if err != nil {
 		return nil, false, err
 	}
+	fmt.Printf("after loadedAccount %s %d %d\n", loadedAccount.ID.String(), loadedAccount.Credits.UpdateTime, loadedAccount.Credits.Value)
 
 	// account not present in the accountsTree, and it was not marked as destroyed in slots between targetIndex and latestCommittedSlot
 	if !exists && !wasDestroyed {
@@ -214,8 +217,10 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 }
 
 func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetIndex iotago.SlotIndex) (wasDestroyed bool, err error) {
+	fmt.Println("rollbackAccountTo SlotIndex", targetIndex)
 	// to reach targetIndex, we need to rollback diffs from the current latestCommittedSlot down to targetIndex + 1
 	for diffIndex := m.latestCommittedSlot; diffIndex > targetIndex; diffIndex-- {
+		fmt.Println("roolback diffIndex", diffIndex)
 		diffStore := m.slotDiff(diffIndex)
 		if diffStore == nil {
 			return false, errors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
@@ -228,6 +233,7 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 
 		// no changes for this account in this slot
 		if !found {
+			fmt.Println("no changes for this account in this slot", accountData.ID, diffIndex)
 			continue
 		}
 
@@ -235,6 +241,7 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		if err != nil {
 			return false, errors.Wrapf(err, "can't retrieve account, could not load diff for account (%s) in slot (%d)", accountData.ID, diffIndex)
 		}
+		fmt.Printf("diff change %+v cred\n", diffChange)
 
 		// update the account data with the diff
 		accountData.Credits.Update(-diffChange.Change, diffChange.PreviousUpdatedTime)
@@ -313,7 +320,7 @@ func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]uint64, acc
 }
 
 func (m *Manager) PreserveDestroyedAccountData(accountID iotago.AccountID) *prunable.AccountDiff {
-	// if any data is left on the account, we need to store in the diff, to be able to roll back
+	// if any data is left on the account, we need to store in the diff, to be able to rollback
 	accountData, exists := m.accountsTree.Get(accountID)
 	if !exists {
 		return nil
@@ -322,13 +329,9 @@ func (m *Manager) PreserveDestroyedAccountData(accountID iotago.AccountID) *prun
 	// it does not matter if there are any changes in this slot, as the account was destroyed anyway and the data was lost
 	// we store the accountState in form of a diff, so we can roll back to the previous state
 	slotDiff := prunable.NewAccountDiff()
-	if accountData.Credits.Value != 0 {
-		slotDiff.Change -= accountData.Credits.Value
-	}
-	if accountData.OutputID != iotago.EmptyOutputID {
-		slotDiff.NewOutputID = accountData.OutputID // TODO if account is destroyed should we also get new accountID? that will be updated here
-		slotDiff.PreviousOutputID = accountData.OutputID
-	}
+	slotDiff.Change = -accountData.Credits.Value
+	slotDiff.NewOutputID = iotago.OutputID{}
+	slotDiff.PreviousOutputID = accountData.OutputID
 	slotDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
 	slotDiff.PubKeysRemoved = accountData.PubKeys.Slice()
 

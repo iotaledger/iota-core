@@ -55,7 +55,7 @@ func (t *TestSuite) PublicKey(alias string) ed25519.PublicKey {
 }
 
 // updateActions updated metadata for the account with the given alias.
-func (t *TestSuite) updateActions(accountID iotago.AccountID, index iotago.SlotIndex, actions *AccountActions) {
+func (t *TestSuite) updateActions(accountID iotago.AccountID, index iotago.SlotIndex, actions *AccountActions, prevActions *AccountActions) {
 	alias, exists := t.GetAlias(accountID)
 	if !exists {
 		panic("account does not exist in this Scenario, cannot update the metadata")
@@ -65,10 +65,12 @@ func (t *TestSuite) updateActions(accountID iotago.AccountID, index iotago.SlotI
 	}
 
 	// we already committed in the past, so we replace past values with the current ones
-	if actions.updatedTime != 0 {
-		actions.prevUpdatedTime = actions.updatedTime
-		actions.prevOutputID = actions.outputID
+
+	if prevActions != nil {
+		actions.prevUpdatedTime = prevActions.updatedTime
+		actions.prevOutputID = prevActions.outputID
 	}
+
 	actions.outputID = tpkg2.RandOutputID(1)
 	actions.updatedTime = index
 }

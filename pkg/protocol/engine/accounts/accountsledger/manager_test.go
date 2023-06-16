@@ -57,7 +57,7 @@ func TestManager_CommitAccountTree(t *testing.T) {
 		},
 		{
 			name:     "Scenario3: Public Keys and allotments",
-			scenario: tpkg.Scenario3,
+			scenario: tpkg.Scenario4,
 		},
 	}
 	for _, test := range tests {
@@ -112,7 +112,7 @@ func TestManager_Account(t *testing.T) {
 			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, test.scenario)
 			manager := InitAccountLedger(t, blockFunc, params.MaxCommitableAge, scenarioBuildData, burnedBlocks)
 			// get the value from the past slots, testing the rollback
-			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData))-1; index++ {
+			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
 				for accountID, accData := range scenarioExpected[index].AccountsLedger {
 					actualData, exists, err := manager.Account(accountID, index)
 					assert.NoError(t, err)

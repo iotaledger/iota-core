@@ -433,18 +433,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 				panic(fmt.Errorf("could not find destroyed account %s in slot %d", consumedAccountID, index-1))
 			}
 
-			// case 1. the account was destroyed, the diff is the reverse of all current account's data
-			{
-				if destroyedAccounts.Has(consumedAccountID) {
-					accountDiff.Change = -accountData.Credits.Value
-					accountDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
-					accountDiff.NewOutputID = iotago.OutputID{}
-					accountDiff.PreviousOutputID = accountData.OutputID
-					accountDiff.PubKeysRemoved = accountData.PubKeys.Slice()
-
-					continue
-				}
-			}
+			// case 1. the account was destroyed, the diff will be created inside accountLedger on account deletion
 
 			// case 2. the account was transitioned, fill in the diff with the delta information
 			// Change and PreviousUpdatedTime are either 0 if we did not have an allotment for this account, or we already
