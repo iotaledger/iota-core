@@ -14,10 +14,13 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 		return
 	}
 
+	var toConfirm []*blocks.Block
+
 	evaluateFunc := func(block *blocks.Block) bool {
 		// Do not propagate further than g.optsConfirmationRatificationThreshold slots.
 		// This means that confirmations need to be achieved within g.optsConfirmationRatificationThreshold slots.
-		if block.ID().Index() <= ratifierBlockIndex-g.optsConfirmationRatificationThreshold {
+		if ratifierBlockIndex >= g.optsConfirmationRatificationThreshold &&
+			block.ID().Index() <= ratifierBlockIndex-g.optsConfirmationRatificationThreshold {
 			return false
 		}
 
@@ -27,25 +30,28 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 		}
 
 		// Skip further propagation if the witness is not new.
-		if !block.AddConfirmationRatifier(ratifier) {
-			return false
+		propagateFurther := block.AddConfirmationRatifier(ratifier)
+
+		if g.shouldConfirm(block) {
+			toConfirm = append([]*blocks.Block{block}, toConfirm...)
+			propagateFurther = true
 		}
 
-		g.tryConfirm(block)
-
-		return true
+		return propagateFurther
 	}
 
 	g.propagate(votingBlock.Parents(), evaluateFunc)
-}
 
-func (g *Gadget) tryConfirm(block *blocks.Block) {
-	blockWeight := g.sybilProtection.Committee().SelectAccounts(block.ConfirmationRatifiers()...).TotalWeight()
-	totalCommitteeWeight := g.sybilProtection.Committee().TotalWeight()
-
-	if votes.IsThresholdReached(blockWeight, totalCommitteeWeight, g.optsConfirmationThreshold) {
+	for _, block := range toConfirm {
 		if block.SetConfirmed() {
 			g.events.BlockConfirmed.Trigger(block)
 		}
 	}
+}
+
+func (g *Gadget) shouldConfirm(block *blocks.Block) bool {
+	blockWeight := g.sybilProtection.Committee().SelectAccounts(block.ConfirmationRatifiers()...).TotalWeight()
+	totalCommitteeWeight := g.sybilProtection.Committee().TotalWeight()
+
+	return votes.IsThresholdReached(blockWeight, totalCommitteeWeight, g.optsConfirmationThreshold)
 }

@@ -12,6 +12,11 @@ const (
 	rootBlocksPrefix
 	attestationsPrefix
 	accountDiffsPrefix
+	rootsPrefix
+)
+
+const (
+	RootsKey byte = iota
 )
 
 type Prunable struct {
@@ -66,6 +71,10 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
 	}
 
 	return NewAccountDiffs(slot, store, p.api)
+}
+
+func (p *Prunable) Roots(slot iotago.SlotIndex) kvstore.KVStore {
+	return p.manager.Get(slot, kvstore.Realm{rootsPrefix})
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.

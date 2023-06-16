@@ -26,6 +26,8 @@ const (
 
 // SybilProtection is a sybil protection module for the engine that manages the weights of actors according to their stake.
 type SybilProtection struct {
+	events *sybilprotection.Events
+
 	clock             clock.Clock
 	workers           *workerpool.Group
 	accounts          *account.Accounts[iotago.AccountID, *iotago.AccountID]
@@ -45,6 +47,7 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 	return module.Provide(func(e *engine.Engine) sybilprotection.SybilProtection {
 		return options.Apply(
 			&SybilProtection{
+				events:            sybilprotection.NewEvents(),
 				workers:           e.Workers.CreateGroup("SybilProtection"),
 				accounts:          account.NewAccounts[iotago.AccountID](mapdb.NewMapDB()),
 				inactivityManager: timed.NewTaskExecutor[iotago.AccountID](1),
@@ -53,6 +56,8 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 				optsActivityWindow:         time.Second * 30,
 				optsOnlineCommitteeStartup: lo.Keys(weightVector),
 			}, opts, func(s *SybilProtection) {
+				e.Events.SybilProtection.LinkTo(s.events)
+
 				s.initializeAccounts(weightVector)
 				s.onlineCommittee = s.accounts.SelectAccounts()
 
@@ -69,6 +74,7 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 					// recover if no node was part of the online committee anymore.
 					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
+						s.events.BlockProcessed.Trigger(block)
 					})
 				})
 			})
@@ -90,10 +96,6 @@ func (s *SybilProtection) Committee() *account.SelectedAccounts[iotago.AccountID
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
 func (s *SybilProtection) OnlineCommittee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID] {
 	return s.onlineCommittee
-}
-
-func (s *SybilProtection) LastCommittedSlot() iotago.SlotIndex {
-	return 0
 }
 
 func (s *SybilProtection) Shutdown() {
@@ -129,6 +131,7 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 		return
 	} else if !exists {
 		s.onlineCommittee.Add(id)
+		s.events.OnlineCommitteeAccountAdded.Trigger(id)
 	}
 
 	s.lastActivities.Set(id, activityTime)
@@ -142,4 +145,6 @@ func (s *SybilProtection) markValidatorInactive(id iotago.AccountID) {
 
 	s.lastActivities.Delete(id)
 	s.onlineCommittee.Delete(id)
+
+	s.events.OnlineCommitteeAccountRemoved.Trigger(id)
 }

@@ -86,6 +86,9 @@ func (c *Chain) dropCommitmentsAfter(index iotago.SlotIndex) {
 }
 
 func (c *Chain) String() string {
+	c.RLock()
+	defer c.RUnlock()
+
 	builder := stringify.NewStructBuilder("Chain",
 		stringify.NewStructField("ForkingPoint", c.ForkingPoint.ID()),
 		stringify.NewStructField("LatestCommitmentIndex", c.latestCommitmentIndex),

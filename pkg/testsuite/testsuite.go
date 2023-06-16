@@ -67,10 +67,11 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		nodes:       make(map[string]*mock.Node),
 		blocks:      shrinkingmap.New[string, *blocks.Block](),
 
-		optsWaitFor:                durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
-		optsTick:                   durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
+		optsWaitFor:                DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:                   DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 		optsGenesisTimestampOffset: 0,
 	}, opts, func(t *TestSuite) {
+		fmt.Println("Setup TestSuite -", testingT.Name())
 		t.ProtocolParameters = iotago.ProtocolParameters{
 			Version:     3,
 			NetworkName: testingT.Name(),
@@ -194,8 +195,7 @@ func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIn
 
 	block := node.IssueBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment))...)
 
-	t.blocks.Set(alias, block)
-	block.ID().RegisterAlias(alias)
+	t.registerBlock(alias, block)
 
 	return block
 }
@@ -206,8 +206,7 @@ func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...optio
 
 	block := node.IssueBlock(context.Background(), alias, blockOpts...)
 
-	t.blocks.Set(alias, block)
-	block.ID().RegisterAlias(alias)
+	t.registerBlock(alias, block)
 
 	return block
 }
@@ -216,8 +215,21 @@ func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
+	t.registerBlock(alias, block)
+}
+
+func (t *TestSuite) registerBlock(alias string, block *blocks.Block) {
 	t.blocks.Set(alias, block)
 	block.ID().RegisterAlias(alias)
+}
+
+func (t *TestSuite) CreateBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockissuer.BlockParams]) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	block := node.CreateBlock(context.Background(), alias, blockOpts...)
+
+	t.registerBlock(alias, block)
 }
 
 func (t *TestSuite) Node(name string) *mock.Node {
@@ -271,6 +283,13 @@ func (t *TestSuite) Shutdown() {
 
 	for _, node := range t.nodes {
 		node.Shutdown()
+	}
+
+	fmt.Println("======= ATTACHED BLOCKS =======")
+	for _, node := range t.nodes {
+		for _, block := range node.AttachedBlocks() {
+			fmt.Println(node.Name, ">", block)
+		}
 	}
 }
 
@@ -456,7 +475,7 @@ func WithGenesisTimestampOffset(offset uint32) options.Option[TestSuite] {
 	}
 }
 
-func durationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time.Duration {
+func DurationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time.Duration {
 	waitFor := os.Getenv(envKey)
 	if waitFor == "" {
 		return defaultDuration
