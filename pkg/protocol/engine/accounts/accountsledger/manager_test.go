@@ -15,6 +15,28 @@ import (
 	tpkg2 "github.com/iotaledger/iota.go/v4/tpkg"
 )
 
+var testSceanrios = []struct {
+	name     string
+	scenario tpkg.ScenarioFunc
+}{
+	{
+		name:     "Scenario1: Simple allotment and burn",
+		scenario: tpkg.Scenario1,
+	},
+	{
+		name:     "Scenario2: Deletion of an account",
+		scenario: tpkg.Scenario2,
+	},
+	{
+		name:     "Scenario3: Simple allotment with no changes for a slot",
+		scenario: tpkg.Scenario3,
+	},
+	{
+		name:     "Scenario4: Public Keys and allotments",
+		scenario: tpkg.Scenario4,
+	},
+}
+
 func TestManager_TrackBlock(t *testing.T) {
 	burns := map[iotago.SlotIndex]map[iotago.AccountID]uint64{
 		1: {
@@ -43,24 +65,7 @@ func TestManager_TrackBlock(t *testing.T) {
 }
 
 func TestManager_CommitAccountTree(t *testing.T) {
-	tests := []struct {
-		name     string
-		scenario tpkg.ScenarioFunc
-	}{
-		{
-			name:     "Scenario1: Simple allotment and burn",
-			scenario: tpkg.Scenario1,
-		},
-		{
-			name:     "Scenario2: Deletion of an account",
-			scenario: tpkg.Scenario2,
-		},
-		{
-			name:     "Scenario3: Public Keys and allotments",
-			scenario: tpkg.Scenario4,
-		},
-	}
-	for _, test := range tests {
+	for _, test := range testSceanrios {
 		t.Run(test.name, func(t *testing.T) {
 			params := tpkg.ProtocolParams()
 			slotDiffFunc, _ := tpkg.InitSlotDiff()
@@ -88,24 +93,7 @@ func TestManager_CommitAccountTree(t *testing.T) {
 }
 
 func TestManager_Account(t *testing.T) {
-	tests := []struct {
-		name     string
-		scenario tpkg.ScenarioFunc
-	}{
-		{
-			name:     "Scenario1: Simple allotment and burn",
-			scenario: tpkg.Scenario1,
-		},
-		{
-			name:     "Scenario2: Deletion of an account",
-			scenario: tpkg.Scenario2,
-		},
-		{
-			name:     "Scenario3: Public Keys and allotments",
-			scenario: tpkg.Scenario3,
-		},
-	}
-	for _, test := range tests {
+	for _, test := range testSceanrios {
 		t.Run(test.name, func(t *testing.T) {
 			params := tpkg.ProtocolParams()
 			// account vector is now on the last slot of the scenario
@@ -134,24 +122,7 @@ func TestManager_Account(t *testing.T) {
 }
 
 func TestManager_CommitSlot(t *testing.T) {
-	tests := []struct {
-		name     string
-		scenario tpkg.ScenarioFunc
-	}{
-		{
-			name:     "Scenario1: Simple allotment and burn",
-			scenario: tpkg.Scenario1,
-		},
-		{
-			name:     "Scenario2: Deletion of an account",
-			scenario: tpkg.Scenario2,
-		},
-		{
-			name:     "Scenario3: Public Keys and allotments",
-			scenario: tpkg.Scenario3,
-		},
-	}
-	for _, test := range tests {
+	for _, test := range testSceanrios {
 		t.Run(test.name, func(t *testing.T) {
 			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, test.scenario)
 			params := tpkg.ProtocolParams()

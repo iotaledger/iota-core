@@ -1,11 +1,11 @@
 package tpkg
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -64,12 +64,15 @@ func BlockFuncGen(t *testing.T, burnsPerSlot map[iotago.SlotIndex]map[iotago.Acc
 
 func InitSlotDiff() (func(index iotago.SlotIndex) *prunable.AccountDiffs, map[iotago.SlotIndex]*prunable.AccountDiffs) {
 	slotDiffs := make(map[iotago.SlotIndex]*prunable.AccountDiffs)
-	store := mapdb.NewMapDB()
+	stores := make(map[iotago.SlotIndex]kvstore.KVStore)
 	slotDiffFunc = func(index iotago.SlotIndex) *prunable.AccountDiffs {
+		if _, exists := stores[index]; !exists {
+			stores[index] = mapdb.NewMapDB()
+		}
 		if slotDiff, exists := slotDiffs[index]; exists {
 			return slotDiff
 		}
-		return prunable.NewAccountDiffs(index, store, tpkg.API())
+		return prunable.NewAccountDiffs(index, stores[index], tpkg.API())
 	}
 	return slotDiffFunc, slotDiffs
 }
@@ -119,7 +122,6 @@ func (s Scenario) populateSlotBuildData() map[iotago.SlotIndex]*AccountsSlotBuil
 			if actions.destroyed {
 				slotBuildData[slotIndex].DestroyedAccounts.Add(accountID)
 			}
-			fmt.Println("populateSlotBuildData slotIndex", slotIndex, "accountID", accountID)
 			slotBuildData[slotIndex].SlotDiff[accountID] = &prunable.AccountDiff{
 				Change:              int64(actions.totalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
 				NewOutputID:         actions.outputID,
@@ -261,21 +263,18 @@ func Scenario2() (Scenario, *TestSuite) {
 func Scenario3() (Scenario, *TestSuite) {
 	testSuite := NewTestSuite()
 	s := map[iotago.SlotIndex]*SlotActions{
-		1: { // simple allotment
-			//testSuite.AccountID("A"): {
-			//	totalAllotments: 1,
-			//	addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("A1")},
-			//},
+		1: {
 			testSuite.AccountID("B"): {
 				totalAllotments: 10,
 				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("B1")},
 			},
 		},
-		2: { // zero out A and no action for B
-			//testSuite.AccountID("A"): {
-			//	totalAllotments: 1,
-			//	burns:           []uint64{1, 1},
-			//},
+		2: { // no action
+		},
+		3: { // action again
+			testSuite.AccountID("B"): {
+				totalAllotments: 2,
+			},
 		},
 	}
 	return s, testSuite
@@ -304,85 +303,86 @@ func Scenario4() (Scenario, *TestSuite) {
 				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("A2")},
 				removedKeys:     []ed25519.PublicKey{testSuite.PublicKey("A1"), testSuite.PublicKey("A2")},
 			},
-			//testSuite.AccountID("B"): {
-			//	addedKeys:   []ed25519.PublicKey{testSuite.PublicKey("B2")},
-			//	removedKeys: []ed25519.PublicKey{testSuite.PublicKey("B1")},
-			//},
-			//testSuite.AccountID("C"): {
-			//	totalAllotments: 15,
-			//	burns:           []uint64{15},
-			//	addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("C1"), testSuite.PublicKey("C2")},
-			//},
-			//testSuite.AccountID("D"): {
-			//	totalAllotments: 20,
-			//	burns:           []uint64{10, 10},
-			//	addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("D1"), testSuite.PublicKey("D2")},
+			testSuite.AccountID("B"): {
+				addedKeys:   []ed25519.PublicKey{testSuite.PublicKey("B2")},
+				removedKeys: []ed25519.PublicKey{testSuite.PublicKey("B1")},
+			},
+			testSuite.AccountID("C"): {
+				totalAllotments: 15,
+				burns:           []uint64{15},
+				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("C1"), testSuite.PublicKey("C2")},
+			},
+			testSuite.AccountID("D"): {
+				totalAllotments: 20,
+				burns:           []uint64{10, 10},
+				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("D1"), testSuite.PublicKey("D2")},
+			},
 		},
-		//},
-		//3: { // Account B removes all data, but it's not destroyed yet
-		//	testSuite.AccountID("B"): {
-		//		burns:       []uint64{10},
-		//		removedKeys: []ed25519.PublicKey{testSuite.PublicKey("B2")},
-		//	},
-		//	testSuite.AccountID("C"): {
-		//		totalAllotments: 10,
-		//		burns:           []uint64{15}, // going negative
-		//		addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("C3")},
-		//		removedKeys:     []ed25519.PublicKey{testSuite.PublicKey("C1")},
-		//	},
-		//	testSuite.AccountID("D"): {
-		//		burns:       []uint64{5, 5},
-		//		removedKeys: []ed25519.PublicKey{testSuite.PublicKey("D1")},
-		//	},
-		//	testSuite.AccountID("E"): {
-		//		totalAllotments: 15,
-		//		burns:           []uint64{5, 10},
-		//		addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("E1")},
-		//	},
-		//	testSuite.AccountID("F"): {
-		//		totalAllotments: 10,
-		//		burns:           []uint64{5, 2},
-		//		addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("F1")},
-		//	},
-		//},
-		//4: { // D is destroyed with still existing keys marked in slot diffs
-		//	testSuite.AccountID("D"): {
-		//		removedKeys: []ed25519.PublicKey{testSuite.PublicKey("D2")},
-		//		destroyed:   true,
-		//	},
-		//	testSuite.AccountID("E"): {
-		//		totalAllotments: 50,
-		//		burns:           []uint64{10, 10, 10},
-		//		// removing key added in the same slot
-		//		addedKeys:   []ed25519.PublicKey{testSuite.PublicKey("E2"), testSuite.PublicKey("E3"), testSuite.PublicKey("E4")},
-		//		removedKeys: []ed25519.PublicKey{testSuite.PublicKey("E2")},
-		//	},
-		//	testSuite.AccountID("F"): {
-		//		totalAllotments: 5,
-		//		burns:           []uint64{5},
-		//	},
-		//},
-		//5: {
-		//	testSuite.AccountID("B"): {
-		//		destroyed: true,
-		//	},
-		//	testSuite.AccountID("C"): {
-		//		totalAllotments: 5,
-		//	},
-		//	testSuite.AccountID("E"): {
-		//		burns:       []uint64{5, 5},
-		//		removedKeys: []ed25519.PublicKey{testSuite.PublicKey("E3")},
-		//	},
-		//	testSuite.AccountID("F"): {
-		//		totalAllotments: 10,
-		//		burns:           []uint64{10},
-		//	},
-		//	testSuite.AccountID("G"): {
-		//		burns:     []uint64{5},
-		//		addedKeys: []ed25519.PublicKey{testSuite.PublicKey("G1")},
-		//	},
-		//},
+		3: { // Account B removes all data, but it's not destroyed yet
+			testSuite.AccountID("B"): {
+				burns:       []uint64{10},
+				removedKeys: []ed25519.PublicKey{testSuite.PublicKey("B2")},
+			},
+			testSuite.AccountID("C"): {
+				totalAllotments: 10,
+				burns:           []uint64{15}, // going negative
+				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("C3")},
+				removedKeys:     []ed25519.PublicKey{testSuite.PublicKey("C1")},
+			},
+			testSuite.AccountID("D"): {
+				burns:       []uint64{5, 5},
+				removedKeys: []ed25519.PublicKey{testSuite.PublicKey("D1")},
+			},
+			testSuite.AccountID("E"): {
+				totalAllotments: 15,
+				burns:           []uint64{5, 10},
+				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("E1")},
+			},
+			testSuite.AccountID("F"): {
+				totalAllotments: 10,
+				burns:           []uint64{5, 2},
+				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("F1")},
+			},
+		},
+		4: { // D is destroyed with still existing keys marked in slot diffs
+			testSuite.AccountID("D"): {
+				removedKeys: []ed25519.PublicKey{testSuite.PublicKey("D2")},
+				destroyed:   true,
+			},
+			testSuite.AccountID("E"): {
+				totalAllotments: 50,
+				burns:           []uint64{10, 10, 10},
+				// removing key added in the same slot
+				addedKeys:   []ed25519.PublicKey{testSuite.PublicKey("E2"), testSuite.PublicKey("E3"), testSuite.PublicKey("E4")},
+				removedKeys: []ed25519.PublicKey{testSuite.PublicKey("E2")},
+			},
+			testSuite.AccountID("F"): {
+				totalAllotments: 5,
+				burns:           []uint64{5},
+			},
+		},
+		5: {
+			testSuite.AccountID("B"): {
+				destroyed: true,
+			},
+			testSuite.AccountID("C"): {
+				totalAllotments: 5,
+			},
+			testSuite.AccountID("E"): {
+				burns:       []uint64{5, 5},
+				removedKeys: []ed25519.PublicKey{testSuite.PublicKey("E3")},
+			},
+			testSuite.AccountID("F"): {
+				totalAllotments: 10,
+				burns:           []uint64{10},
+			},
+			testSuite.AccountID("G"): {
+				burns:     []uint64{5},
+				addedKeys: []ed25519.PublicKey{testSuite.PublicKey("G1")},
+			},
+		},
 	}
+
 	return s, testSuite
 }
 
