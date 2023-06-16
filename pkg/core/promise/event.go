@@ -5,33 +5,27 @@ import (
 )
 
 type Event struct {
-	// triggeredCallbacks is nil if the event was already triggered.
-	triggeredCallbacks []func()
+	// callbacks is nil if the event was already triggered.
+	callbacks []func()
 
-	// triggeredCallbacksMutex is used to synchronize access to the triggeredCallbacks slice.
-	triggeredCallbacksMutex sync.RWMutex
-
-	// callbackOrderMutex is used to ensure that updateCallbacks queued before the event was triggered are executed first.
-	callbackOrderMutex sync.RWMutex
+	// mutex is used to synchronize access to the callbacks slice.
+	mutex sync.RWMutex
 }
 
 func NewEvent() *Event {
 	return &Event{
-		triggeredCallbacks: make([]func(), 0),
+		callbacks: make([]func(), 0),
 	}
 }
 
 func (f *Event) Trigger() (wasTriggered bool) {
-	f.callbackOrderMutex.Lock()
-	defer f.callbackOrderMutex.Unlock()
-
 	for _, callback := range func() (callbacks []func()) {
-		f.triggeredCallbacksMutex.Lock()
-		defer f.triggeredCallbacksMutex.Unlock()
+		f.mutex.Lock()
+		defer f.mutex.Unlock()
 
-		callbacks = f.triggeredCallbacks
+		callbacks = f.callbacks
 		if wasTriggered = callbacks != nil; wasTriggered {
-			f.triggeredCallbacks = nil
+			f.callbacks = nil
 		}
 
 		return callbacks
@@ -43,11 +37,11 @@ func (f *Event) Trigger() (wasTriggered bool) {
 }
 
 func (f *Event) queueCallback(callback func()) (callbackQueued bool) {
-	f.triggeredCallbacksMutex.Lock()
-	defer f.triggeredCallbacksMutex.Unlock()
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 
-	if callbackQueued = f.triggeredCallbacks != nil; callbackQueued {
-		f.triggeredCallbacks = append(f.triggeredCallbacks, callback)
+	if callbackQueued = f.callbacks != nil; callbackQueued {
+		f.callbacks = append(f.callbacks, callback)
 	}
 
 	return callbackQueued
@@ -55,18 +49,15 @@ func (f *Event) queueCallback(callback func()) (callbackQueued bool) {
 
 func (f *Event) OnTrigger(callback func()) {
 	if !f.queueCallback(callback) {
-		f.callbackOrderMutex.RLock()
-		defer f.callbackOrderMutex.RUnlock()
-
 		callback()
 	}
 }
 
 func (f *Event) WasTriggered() bool {
-	f.triggeredCallbacksMutex.RLock()
-	defer f.triggeredCallbacksMutex.RUnlock()
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
 
-	return f.triggeredCallbacks == nil
+	return f.callbacks == nil
 }
 
 type Event1[T any] struct {

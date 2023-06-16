@@ -56,7 +56,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 		e.HookConstructed(func() {
 			fmt.Println("TipSelection constructed from ENGINE")
 
-			e.TipManager.HookInitialized(func() {
+			e.TipManager.HookConstructed(func() {
 				fmt.Println("TipSelection constructed")
 
 				e.TipManager.Events().BlockAdded.Hook(t.classifyTip)
