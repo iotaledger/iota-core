@@ -12,7 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -36,7 +36,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID()
 
-	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
+	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
 
 	t.Instance = tipmanagerv1.NewTipManager(conflictDAG, func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]

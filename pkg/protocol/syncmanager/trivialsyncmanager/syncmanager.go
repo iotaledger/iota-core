@@ -43,20 +43,20 @@ func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 		s := New(e.IsBootstrapped)
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("SyncManager", 1))
 
-		e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-			s.updateLastAcceptedBlock(block.Block().MustID(e.API().SlotTimeProvider()), block.IssuingTime())
+		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
+			s.updateLastAcceptedBlock(b.Block().MustID(e.API().SlotTimeProvider()), b.IssuingTime())
 		}, asyncOpt)
 
 		e.Events.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
 			s.updateLastConfirmedBlock(b.Block().MustID(e.API().SlotTimeProvider()), b.IssuingTime())
 		}, asyncOpt)
 
-		e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
-			s.updateLatestCommittedSlot(scd.Commitment.Index())
+		e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+			s.updateLatestCommittedSlot(details.Commitment.Index())
 		}, asyncOpt)
 
-		e.Events.SlotGadget.SlotFinalized.Hook(func(si iotago.SlotIndex) {
-			s.updateFinalizedSlot(si)
+		e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+			s.updateFinalizedSlot(index)
 		})
 
 		s.TriggerInitialized()

@@ -16,9 +16,6 @@ type Clock struct {
 	// acceptedTime contains a notion of time that is anchored to the latest accepted block.
 	acceptedTime *RelativeTime
 
-	// ratifiedAcceptedTime contains a notion of time that is anchored to the latest ratified accepted block.
-	ratifiedAcceptedTime *RelativeTime
-
 	// confirmedTime contains a notion of time that is anchored to the latest confirmed block.
 	confirmedTime *RelativeTime
 
@@ -30,21 +27,18 @@ type Clock struct {
 func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, clock.Clock] {
 	return module.Provide(func(e *engine.Engine) clock.Clock {
 		return options.Apply(&Clock{
-			acceptedTime:         NewRelativeTime(),
-			ratifiedAcceptedTime: NewRelativeTime(),
-			confirmedTime:        NewRelativeTime(),
+			acceptedTime:  NewRelativeTime(),
+			confirmedTime: NewRelativeTime(),
 		}, opts, func(c *Clock) {
 			e.HookConstructed(func() {
 				e.Storage.Settings().HookInitialized(func() {
 					c.acceptedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index()))
-					c.ratifiedAcceptedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index()))
-					c.confirmedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index()))
+					c.confirmedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestFinalizedSlot()))
 
 					c.TriggerInitialized()
 				})
 
 				e.Events.Clock.AcceptedTimeUpdated.LinkTo(c.acceptedTime.OnUpdated)
-				e.Events.Clock.RatifiedAcceptedTimeUpdated.LinkTo(c.ratifiedAcceptedTime.OnUpdated)
 				e.Events.Clock.ConfirmedTimeUpdated.LinkTo(c.confirmedTime.OnUpdated)
 
 				asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("Clock", 1))
@@ -53,20 +47,13 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 						c.acceptedTime.Advance(block.IssuingTime())
 					}, asyncOpt).Unhook,
 
-					e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
-						c.acceptedTime.Advance(block.IssuingTime())
-						c.ratifiedAcceptedTime.Advance(block.IssuingTime())
-					}, asyncOpt).Unhook,
-
 					e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 						c.acceptedTime.Advance(block.IssuingTime())
-						c.ratifiedAcceptedTime.Advance(block.IssuingTime())
 						c.confirmedTime.Advance(block.IssuingTime())
 					}, asyncOpt).Unhook,
 
 					e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 						c.acceptedTime.Advance(e.API().SlotTimeProvider().EndTime(index))
-						c.ratifiedAcceptedTime.Advance(e.API().SlotTimeProvider().EndTime(index))
 						c.confirmedTime.Advance(e.API().SlotTimeProvider().EndTime(index))
 					}, asyncOpt).Unhook,
 				))
@@ -80,11 +67,6 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 // Accepted returns a notion of time that is anchored to the latest accepted block.
 func (c *Clock) Accepted() clock.RelativeTime {
 	return c.acceptedTime
-}
-
-// RatifiedAccepted returns a notion of time that is anchored to the latest ratified accepted block.
-func (c *Clock) RatifiedAccepted() clock.RelativeTime {
-	return c.ratifiedAcceptedTime
 }
 
 // Confirmed returns a notion of time that is anchored to the latest confirmed block.

@@ -45,10 +45,11 @@ type TestSuite struct {
 
 	ProtocolParameters iotago.ProtocolParameters
 
-	optsAccounts        []snapshotcreator.AccountDetails
-	optsSnapshotOptions []options.Option[snapshotcreator.Options]
-	optsWaitFor         time.Duration
-	optsTick            time.Duration
+	optsGenesisTimestampOffset uint32
+	optsAccounts               []snapshotcreator.AccountDetails
+	optsSnapshotOptions        []options.Option[snapshotcreator.Options]
+	optsWaitFor                time.Duration
+	optsTick                   time.Duration
 
 	uniqueCounter        atomic.Int64
 	mutex                sync.RWMutex
@@ -66,7 +67,11 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		nodes:       make(map[string]*mock.Node),
 		blocks:      shrinkingmap.New[string, *blocks.Block](),
 
-		ProtocolParameters: iotago.ProtocolParameters{
+		optsWaitFor:                durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:                   durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
+		optsGenesisTimestampOffset: 0,
+	}, opts, func(t *TestSuite) {
+		t.ProtocolParameters = iotago.ProtocolParameters{
 			Version:     3,
 			NetworkName: testingT.Name(),
 			Bech32HRP:   "rms",
@@ -77,13 +82,11 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 				VBFactorKey:  10,
 			},
 			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix() - 10*100), // start 100 slots in the past at an even number.
+			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix()) - t.optsGenesisTimestampOffset,
 			SlotDurationInSeconds: 10,
 			MaxCommitableAge:      10,
-		},
-		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
-		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
-	}, opts, func(t *TestSuite) {
+		}
+
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
 
@@ -444,6 +447,12 @@ func WithAccounts(accounts ...snapshotcreator.AccountDetails) options.Option[Tes
 func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Options]) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
 		opts.optsSnapshotOptions = snapshotOptions
+	}
+}
+
+func WithGenesisTimestampOffset(offset uint32) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsGenesisTimestampOffset = offset
 	}
 }
 

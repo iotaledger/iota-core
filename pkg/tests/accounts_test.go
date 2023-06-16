@@ -23,7 +23,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Address:   nil,                               // nil address will be replaced with the address generated from genesis seed
 		Amount:    testsuite.MinIssuerAccountDeposit, // min amount to cover the rent. if it's too little then the snapshot creation will fail
 		IssuerKey: oldKey,
-	}))
+	}), testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1", 50)

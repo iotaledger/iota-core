@@ -17,13 +17,13 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/mana"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -44,8 +44,8 @@ type Ledger struct {
 	manaManager      *mana.Manager
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
-	memPool            mempool.MemPool[booker.BlockVotePower]
-	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	memPool            mempool.MemPool[ledger.BlockVotePower]
+	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
 	errorHandler       func(error)
 	protocolParameters *iotago.ProtocolParameters
 
@@ -73,14 +73,15 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 		e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
-		// TODO: should this attach to RatifiedAccepted instead?
+		e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
+
 		e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
 		e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 		// TODO: when should ledgerState be pruned?
 
 		e.HookConstructed(func() {
 			wpAccounts := ledgerWorkers.CreateGroup("Accounts").CreatePool("trackBurnt", 1)
-			e.Events.BlockGadget.BlockRatifiedAccepted.Hook(l.accountsLedger.TrackBlock, event.WithWorkerPool(wpAccounts))
+			e.Events.BlockGadget.BlockAccepted.Hook(l.accountsLedger.TrackBlock, event.WithWorkerPool(wpAccounts))
 		})
 		e.HookInitialized(func() {
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
@@ -107,13 +108,13 @@ func New(
 		utxoLedger:         utxoledger.New(utxoStore, apiProvider),
 		accountsLedger:     accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProvider(), protocolParameters.MaxCommitableAge),
 		commitmentLoader:   commitmentLoader,
-		conflictDAG:        conflictdagv1.New[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower](committee),
+		conflictDAG:        conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](committee),
 		errorHandler:       errorHandler,
 		decayProvider:      protocolParameters.DecayProvider(),
 		protocolParameters: protocolParameters,
 	}
 
-	l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[booker.BlockVotePower](true))
+	l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVotePower](true))
 
 	// TODO: We wanted to avoid having logic in `ProtocolParams` struct, so we created a separate DecayProvider.
 	// DecayProvider is created here once and once during each transaction execution.
@@ -124,7 +125,7 @@ func New(
 	return l
 }
 
-func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower] {
+func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower] {
 	return l.conflictDAG
 }
 
@@ -571,7 +572,17 @@ func (l *Ledger) BlockAccepted(block *blocks.Block) {
 	switch block.Block().Payload.(type) {
 	case *iotago.Transaction:
 		l.memPool.MarkAttachmentIncluded(block.ID())
+
 	default:
 		return
+	}
+}
+
+func (l *Ledger) blockPreAccepted(block *blocks.Block) {
+	votePower := ledger.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
+	if err := l.conflictDAG.CastVotes(vote.NewVote(block.Block().IssuerID, votePower), block.ConflictIDs()); err != nil {
+		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
+		//  Do we track witness weight of invalid blocks?
+		l.errorHandler(errors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/timed"
@@ -66,9 +65,11 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 						}
 					})
 
+					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
+					// recover if no node was part of the online committee anymore.
 					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
-					}, event.WithWorkerPool(s.workers.CreatePool("SybilProtection", 1)))
+					})
 				})
 			})
 	})

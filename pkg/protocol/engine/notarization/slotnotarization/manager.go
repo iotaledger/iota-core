@@ -56,7 +56,7 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 
 		e.HookConstructed(func() {
 			m.storage = e.Storage
-			m.acceptedTimeFunc = e.Clock.RatifiedAccepted().Time
+			m.acceptedTimeFunc = e.Clock.Accepted().Time
 
 			m.ledger = e.Ledger
 			m.attestation = e.Attestations
@@ -64,14 +64,14 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 			wpBlocks := m.workers.CreatePool("Blocks", 1)           // Using just 1 worker to avoid contention
 			wpCommitments := m.workers.CreatePool("Commitments", 1) // Using just 1 worker to avoid contention
 
-			e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
-				if err := m.notarizeRatifiedAcceptedBlock(block); err != nil {
+			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+				if err := m.notarizeAcceptedBlock(block); err != nil {
 					m.errorHandler(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 				}
 			}, event.WithWorkerPool(wpBlocks))
 
-			// Slots are committed whenever RatifiedATT advances, start committing only when bootstrapped.
-			e.Events.Clock.RatifiedAcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
+			// Slots are committed whenever ATT advances, start committing only when bootstrapped.
+			e.Events.Clock.AcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
 
 			e.Events.Notarization.LinkTo(m.events)
 
@@ -120,8 +120,8 @@ func (m *Manager) IsBootstrapped() bool {
 	return m.storage.Settings().LatestCommitment().Index() >= m.slotTimeProviderFunc().IndexFromTime(m.acceptedTimeFunc())-m.minCommittableSlotAge-1
 }
 
-func (m *Manager) notarizeRatifiedAcceptedBlock(block *blocks.Block) (err error) {
-	if err = m.slotMutations.AddRatifiedAcceptedBlock(block); err != nil {
+func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
+	if err = m.slotMutations.AddAcceptedBlock(block); err != nil {
 		return errors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
@@ -167,7 +167,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	// set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
-	ratifiedAcceptedBlocks := m.slotMutations.RatifiedAcceptedBlocks(index, true)
+	acceptedBlocks := m.slotMutations.AcceptedBlocks(index, true)
 
 	cumulativeWeight, attestationsRoot, err := m.attestation.Commit(index)
 	if err != nil {
@@ -185,7 +185,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		index,
 		latestCommitment.ID(),
 		iotago.NewRoots(
-			iotago.Identifier(ratifiedAcceptedBlocks.Root()),
+			iotago.Identifier(acceptedBlocks.Root()),
 			mutationRoot,
 			iotago.Identifier(attestationsRoot),
 			stateRoot,
@@ -210,9 +210,9 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	m.events.SlotCommitted.Trigger(&notarization.SlotCommittedDetails{
-		Commitment:             newModelCommitment,
-		RatifiedAcceptedBlocks: ratifiedAcceptedBlocks,
-		ActiveValidatorsCount:  0,
+		Commitment:            newModelCommitment,
+		AcceptedBlocks:        acceptedBlocks,
+		ActiveValidatorsCount: 0,
 	})
 
 	if err = m.slotMutations.Evict(index); err != nil {

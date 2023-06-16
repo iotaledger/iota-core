@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -24,7 +23,7 @@ type Ledger interface {
 	TransactionMetadata(id iotago.TransactionID) (transactionMetadata mempool.TransactionMetadata, exists bool)
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transactionMetadata mempool.TransactionMetadata, exists bool)
 	CommitSlot(index iotago.SlotIndex) (stateRoot, mutationRoot, accountRoot iotago.Identifier, err error)
-	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, BlockVotePower]
 	StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 	AddUnspentOutput(unspentOutput *utxoledger.Output) error
 	AddAccount(account *utxoledger.Output) error
