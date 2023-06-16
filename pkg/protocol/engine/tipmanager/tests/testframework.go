@@ -41,8 +41,8 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	return t
 }
 
-func (t *TestFramework) AddBlock(alias string) {
-	t.Instance.AddBlock(t.Block(alias))
+func (t *TestFramework) AddBlock(alias string) tipmanager.TipMetadata {
+	return t.Instance.AddBlock(t.Block(alias))
 }
 
 func (t *TestFramework) CreateBlock(alias string, parents map[model.ParentsType][]string) *blocks.Block {
