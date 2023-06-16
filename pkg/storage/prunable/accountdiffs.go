@@ -133,24 +133,30 @@ func NewAccountDiffs(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.AP
 }
 
 // Store stores the given accountID as a root block.
-func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff) (err error) {
+func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff, destroyed bool) (err error) {
+	if destroyed {
+		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
+			return errors.Wrapf(err, "failed to set destroyed account")
+		}
+
+	}
+
 	return b.diffChangeStore.Set(accountID, accountDiff)
 }
 
 // Load loads accountID and commitmentID for the given blockID.
 func (b *AccountDiffs) Load(accountID iotago.AccountID) (accountDiff AccountDiff, destroyed bool, err error) {
-	if destroyed, err = b.destroyedAccounts.Has(accountID); err != nil {
+	destroyed, err = b.destroyedAccounts.Has(accountID)
+	if err != nil {
 		return accountDiff, false, errors.Wrapf(err, "failed to get destroyed account")
-	} else if destroyed {
-		return accountDiff, true, nil
-	}
+	} // load diff for destroyed account to recreate the state
 
 	accountDiff, err = b.diffChangeStore.Get(accountID)
 	if err != nil {
 		return accountDiff, false, errors.Wrapf(err, "failed to get Account diff for account %s", accountID.String())
 	}
 
-	return accountDiff, false, err
+	return accountDiff, destroyed, err
 }
 
 // Has returns true if the given accountID is a root block.

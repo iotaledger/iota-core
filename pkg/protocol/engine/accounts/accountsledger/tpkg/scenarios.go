@@ -131,7 +131,9 @@ func (s Scenario) populateSlotBuildData() map[iotago.SlotIndex]*AccountsSlotBuil
 func (s Scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
 	expected := make(ExpectedAccountsLedgers)
 	rollingAccountLedger := make(map[iotago.AccountID]*accounts.AccountData)
-	for slotIndex, slotActions := range s {
+	// need to go in order to create accountLedger cumulatively
+	for slotIndex := iotago.SlotIndex(1); slotIndex <= iotago.SlotIndex(len(s)); slotIndex++ {
+		slotActions := s[slotIndex]
 		expected[slotIndex] = &AccountsLedgerTestScenario{
 			LatestCommittedSlotIndex: 0,
 			AccountsLedger:           make(map[iotago.AccountID]*accounts.AccountData),
@@ -142,8 +144,7 @@ func (s Scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
 			for _, burn := range actions.burns {
 				change -= int64(burn)
 			}
-			expectedAccountLedger := expected[slotIndex]
-			accData := updateExpectedAccLedger(expectedAccountLedger, rollingAccountLedger, accountID, actions, change)
+			accData := updateExpectedAccLedger(expected[slotIndex], rollingAccountLedger, accountID, actions, change)
 			rollingAccountLedger[accountID] = accData.Clone()
 
 			// populate diffs
@@ -165,6 +166,8 @@ func (s Scenario) populateExpectedAccountsLedger() ExpectedAccountsLedgers {
 	return expected
 }
 
+// todo make sure that output ID is updated only if an acocunt was transitioned, and not only on allotment
+// when are output ids updated on the slot committment
 func updateExpectedAccLedger(expectedAccountLedger *AccountsLedgerTestScenario, rollingLedger map[iotago.AccountID]*accounts.AccountData, accountID iotago.AccountID, actions *AccountActions, change int64) *accounts.AccountData {
 	accData, exists := expectedAccountLedger.AccountsLedger[accountID]
 	if !exists {
@@ -180,9 +183,10 @@ func updateExpectedAccLedger(expectedAccountLedger *AccountsLedgerTestScenario, 
 			)
 			rollingLedger[accountID] = accData.Clone()
 		}
-
+		expectedAccountLedger.AccountsLedger[accountID] = accData
 	}
-	accData.Credits.Update(change)
+	accData.Credits.Update(change, actions.updatedTime)
+	accData.OutputID = actions.outputID
 	accData.AddPublicKeys(actions.addedKeys...)
 	accData.RemovePublicKeys(actions.removedKeys...)
 	return accData
@@ -214,6 +218,9 @@ func Scenario1() (Scenario, *TestSuite) {
 	}
 	return s, testSuite
 }
+
+// TODO example where there are both diff changes in the same slot as acocount destruction, we should not consider any balance changes from the destruction slot,
+// we need to store the state from the prevSlot accountLedger only as those values will be used to rollback
 
 // Scenario2 creates and destroys an account in the next slot.
 func Scenario2() (Scenario, *TestSuite) {
@@ -301,7 +308,7 @@ func Scenario3() (Scenario, *TestSuite) {
 				addedKeys:       []ed25519.PublicKey{testSuite.PublicKey("F1")},
 			},
 		},
-		4: {
+		4: { // D is destroyed with still existing keys marked in slot diffs
 			testSuite.AccountID("D"): {
 				removedKeys: []ed25519.PublicKey{testSuite.PublicKey("D2")},
 				destroyed:   true,

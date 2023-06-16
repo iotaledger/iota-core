@@ -52,7 +52,7 @@ func TestManager_CommitAccountTree(t *testing.T) {
 			scenario: tpkg.Scenario1,
 		},
 		{
-			name:     "Scenario3: Deletion of an account",
+			name:     "Scenario2: Deletion of an account",
 			scenario: tpkg.Scenario2,
 		},
 		{
@@ -98,7 +98,7 @@ func TestManager_Account(t *testing.T) {
 			scenario: tpkg.Scenario1,
 		},
 		{
-			name:     "Scenario3: Deletion of an account",
+			name:     "Scenario2: Deletion of an account",
 			scenario: tpkg.Scenario2,
 		},
 		{
@@ -144,7 +144,7 @@ func TestManager_CommitSlot(t *testing.T) {
 			scenario: tpkg.Scenario1,
 		},
 		{
-			name:     "Scenario3: Deletion of an account",
+			name:     "Scenario2: Deletion of an account",
 			scenario: tpkg.Scenario2,
 		},
 		{

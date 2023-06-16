@@ -52,24 +52,45 @@ func TestAccountDiffSnapshotWriter(t *testing.T) {
 }
 
 func TestManager_Import_Export(t *testing.T) {
-	scenarioBuildData, expectedData, blockFunc, burnedBlocks := tpkg.InitScenario(t, tpkg.Scenario1)
-	params := tpkg.ProtocolParams()
+	tests := []struct {
+		name     string
+		scenario tpkg.ScenarioFunc
+	}{
+		{
+			name:     "Scenario1: Simple allotment and burn",
+			scenario: tpkg.Scenario1,
+		},
+		{
+			name:     "Scenario2: Deletion of an account",
+			scenario: tpkg.Scenario2,
+		},
+		{
+			name:     "Scenario3: Public Keys and allotments",
+			scenario: tpkg.Scenario3,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			scenarioBuildData, expectedData, blockFunc, burnedBlocks := tpkg.InitScenario(t, test.scenario)
+			params := tpkg.ProtocolParams()
 
-	manager := InitAccountLedger(t, blockFunc, params.MaxCommitableAge, scenarioBuildData, burnedBlocks)
-	writer := &writerseeker.WriterSeeker{}
+			manager := InitAccountLedger(t, blockFunc, params.MaxCommitableAge, scenarioBuildData, burnedBlocks)
+			writer := &writerseeker.WriterSeeker{}
 
-	AssertAccountManagerState(t, manager, expectedData)
+			AssertAccountManagerState(t, manager, expectedData)
 
-	err := manager.Export(writer, iotago.SlotIndex(1))
-	require.NoError(t, err)
-	slotDiffFunc, _ := tpkg.InitSlotDiff()
-	accountsStore := mapdb.NewMapDB()
+			err := manager.Export(writer, iotago.SlotIndex(1))
+			require.NoError(t, err)
+			slotDiffFunc, _ := tpkg.InitSlotDiff()
+			accountsStore := mapdb.NewMapDB()
 
-	newManager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
-	err = newManager.Import(writer.BytesReader())
-	require.NoError(t, err)
+			newManager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+			err = newManager.Import(writer.BytesReader())
+			require.NoError(t, err)
 
-	AssertAccountManagerState(t, newManager, expectedData)
+			AssertAccountManagerState(t, newManager, expectedData)
+		})
+	}
 }
 
 func InitAccountLedger(t *testing.T, blockFunc func(iotago.BlockID) (*blocks.Block, bool), mca uint32, scenarioBuildData map[iotago.SlotIndex]*tpkg.AccountsSlotBuildData, burnedBlocks map[iotago.SlotIndex][]iotago.BlockID) *Manager {

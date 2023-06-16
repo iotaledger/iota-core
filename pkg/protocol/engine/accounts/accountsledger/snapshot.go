@@ -171,12 +171,12 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 		diffStore := m.slotDiff(slotIndex)
 
 		for j := uint64(0); j < accountsInDiffCount; j++ {
-			accountID, accountDiff, _, err := readSlotDiff(reader)
+			accountID, accountDiff, destroyed, err := readSlotDiff(reader)
 			if err != nil {
 				return errors.Wrapf(err, "unable to read slot diff")
 			}
 
-			if err = diffStore.Store(accountID, *accountDiff); err != nil {
+			if err = diffStore.Store(accountID, *accountDiff, destroyed); err != nil {
 				return errors.Wrapf(err, "unable to store slot diff")
 			}
 		}
