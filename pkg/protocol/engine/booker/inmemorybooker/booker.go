@@ -42,15 +42,15 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	return module.Provide(func(e *engine.Engine) booker.Booker {
 		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection.Committee(), e.BlockCache, e.ErrorHandler("booker"), opts...)
 
-		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-			if err := b.Queue(block); err != nil {
-				b.errorHandler(err)
-			}
-		})
-
 		e.HookConstructed(func() {
 			b.ledger = e.Ledger
 			b.conflictDAG = b.ledger.ConflictDAG()
+
+			e.Events.SybilProtection.BlockProcessed.Hook(func(block *blocks.Block) {
+				if err := b.Queue(block); err != nil {
+					b.errorHandler(err)
+				}
+			})
 
 			e.Events.Booker.LinkTo(b.events)
 

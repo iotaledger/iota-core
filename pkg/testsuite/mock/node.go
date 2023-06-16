@@ -228,6 +228,10 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] BlockDAG.MissingBlockAttached: %s\n", n.Name, engineName, block.ID())
 	})
 
+	events.SybilProtection.BlockProcessed.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] SybilProtection.BlockProcessed: %s\n", n.Name, engineName, block.ID())
+	})
+
 	events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
 	})
