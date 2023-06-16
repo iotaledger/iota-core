@@ -34,7 +34,7 @@ type Manager struct {
 	// at the latest committed slot, it is updated on the slot commitment.
 	accountsTree *ads.Map[iotago.AccountID, accounts.AccountData, *iotago.AccountID, *accounts.AccountData]
 
-	// slot diffs for the Account between [LatestCommitedSlot - MCA, LatestCommitedSlot].
+	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
 	slotDiff func(iotago.SlotIndex) *prunable.AccountDiffs
 
 	// block is a function that returns a block from the cache or from the database.
@@ -195,12 +195,11 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	// TODO: why is this method only called when loading snapshot? is it supposed to be like that?
 	accountOutput, ok := output.Output().(*iotago.AccountOutput)
 	if !ok {
 		return errors.Errorf("can't add account, output is not an account output")
 	}
-	fmt.Println("add account", accountOutput.AccountID, output.OutputID())
+
 	accountData := accounts.NewAccountData(
 		accountOutput.AccountID,
 		accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), m.latestCommittedSlot),
@@ -208,7 +207,6 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 		ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...,
 	)
 
-	fmt.Println("add new account", accountOutput.AccountID, accountData)
 	m.accountsTree.Set(accountOutput.AccountID, accountData)
 
 	return nil

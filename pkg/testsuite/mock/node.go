@@ -285,7 +285,10 @@ func (n *Node) Wait() {
 }
 
 func (n *Node) Shutdown() {
-	n.Protocol.Shutdown()
+	if n.Protocol != nil {
+		n.Protocol.Shutdown()
+	}
+
 	n.Workers.Shutdown()
 }
 

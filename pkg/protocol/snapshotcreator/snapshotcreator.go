@@ -40,7 +40,8 @@ import (
 func CreateSnapshot(opts ...options.Option[Options]) error {
 	opt := NewOptions(opts...)
 
-	api := iotago.LatestAPI(&opt.ProtocolParameters)
+	protocolParams := &opt.ProtocolParameters
+	api := iotago.LatestAPI(protocolParams)
 
 	errorHandler := func(err error) {
 		panic(err)
@@ -82,21 +83,25 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	totalAccountDeposit := lo.Reduce(opt.Accounts, func(accumulator uint64, details AccountDetails) uint64 {
 		return accumulator + details.Amount
 	}, uint64(0))
-	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply-totalAccountDeposit, opt.GenesisSeed, engineInstance); err != nil {
+	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply-totalAccountDeposit, opt.GenesisSeed, engineInstance, protocolParams); err != nil {
 		return errors.Wrap(err, "failed to create genesis outputs")
 	}
 
-	if err := createGenesisAccounts(opt.Accounts, engineInstance); err != nil {
+	if err := createGenesisAccounts(opt.Accounts, engineInstance, protocolParams); err != nil {
 		return errors.Wrap(err, "failed to create genesis account outputs")
 	}
 
 	return engineInstance.WriteSnapshot(opt.FilePath)
 }
 
-func createGenesisOutput(genesisTokenAmount uint64, genesisSeed []byte, engineInstance *engine.Engine) error {
+func createGenesisOutput(genesisTokenAmount uint64, genesisSeed []byte, engineInstance *engine.Engine, protocolParams *iotago.ProtocolParameters) (err error) {
 	if genesisTokenAmount > 0 {
 		genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
 		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
+
+		if _, err = protocolParams.RentStructure.CoversStateRent(output, genesisTokenAmount); err != nil {
+			return errors.Wrap(err, "min rent not covered by Genesis output with index 0")
+		}
 
 		// Genesis output is on Genesis TX index 0
 		// TODO: change genesis outputID from empty transaction id to some hash, to avoid problems when rolling back newly created accounts, whose previousOutputID is also emptyTrasactionID:0 (super edge case, but better have that covered)
@@ -108,10 +113,15 @@ func createGenesisOutput(genesisTokenAmount uint64, genesisSeed []byte, engineIn
 	return nil
 }
 
-func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine) (err error) {
+func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine, protocolParams *iotago.ProtocolParameters) (err error) {
 	// Account outputs start from Genesis TX index 1
 	for idx, account := range accounts {
 		output := createAccount(account.Address, account.Amount, account.IssuerKey)
+
+		if _, err = protocolParams.RentStructure.CoversStateRent(output, account.Amount); err != nil {
+			return errors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
+		}
+
 		accountOutput := utxoledger.CreateOutput(engineInstance.API(), iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)
 		if err = engineInstance.Ledger.AddUnspentOutput(accountOutput); err != nil {
 			return err

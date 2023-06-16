@@ -27,6 +27,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
+const MinIssuerAccountDeposit = uint64(84400)
+
 type TestSuite struct {
 	Testing     *testing.T
 	fakeTesting *testing.T
@@ -269,7 +271,7 @@ func (t *TestSuite) Shutdown() {
 	}
 }
 
-func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, deposit uint64, partition string) *mock.Node {
+func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string, optDeposit ...uint64) *mock.Node {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	if weight > 0 && t.running {
@@ -277,6 +279,11 @@ func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, depos
 	}
 
 	t.nodes[name] = mock.NewNode(t.Testing, t.Network, partition, name, weight)
+
+	deposit := MinIssuerAccountDeposit
+	if len(optDeposit) > 0 {
+		deposit = optDeposit[0]
+	}
 
 	if deposit > 0 {
 		t.optsAccounts = append(t.optsAccounts, snapshotcreator.AccountDetails{
@@ -289,16 +296,16 @@ func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, depos
 	return t.nodes[name]
 }
 
-func (t *TestSuite) AddValidatorNode(name string, weight int64, deposit uint64) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, weight, deposit, mock.NetworkMainPartition)
+func (t *TestSuite) AddValidatorNode(name string, weight int64, optDeposit ...uint64) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition, optDeposit...)
 }
 
-func (t *TestSuite) AddNodeToPartition(name string, partition string) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, 0, partition)
+func (t *TestSuite) AddNodeToPartition(name string, partition string, optDeposit ...uint64) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, 0, partition, optDeposit...)
 }
 
-func (t *TestSuite) AddNode(name string) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, 0, mock.NetworkMainPartition)
+func (t *TestSuite) AddNode(name string, optDeposit ...uint64) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition, optDeposit...)
 }
 
 func (t *TestSuite) RemoveNode(name string) {

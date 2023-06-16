@@ -17,7 +17,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 1, 10000)
+	node1 := ts.AddValidatorNode("node1", 1)
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 
 	node1.HookLogging()
@@ -53,8 +53,8 @@ func Test_DoubleSpend(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 1, 10000)
-	node2 := ts.AddValidatorNode("node2", 1, 10000)
+	node1 := ts.AddValidatorNode("node1", 1)
+	node2 := ts.AddValidatorNode("node2", 1)
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 
@@ -118,8 +118,8 @@ func Test_MultipleAttachments(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 1, 10000)
-	node2 := ts.AddValidatorNode("node2", 1, 10000)
+	node1 := ts.AddValidatorNode("node1", 1)
+	node2 := ts.AddValidatorNode("node2", 1)
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 

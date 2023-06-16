@@ -23,8 +23,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 50, 10000)
-	node2 := ts.AddValidatorNode("node2", 50, 10000)
+	node1 := ts.AddValidatorNode("node1", 50)
+	node2 := ts.AddValidatorNode("node2", 50)
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
