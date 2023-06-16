@@ -114,8 +114,8 @@ func TestReadSlotDiffToSnapshotReader(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 		},
 		Spents: utxoledger.Spents{
-			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
-			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpent(index),
+			tpkg.RandLedgerStateSpent(index),
 		},
 	}
 
@@ -144,8 +144,8 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 		},
 		Spents: utxoledger.Spents{
-			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
-			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpent(index),
+			tpkg.RandLedgerStateSpent(index),
 		},
 	}
 
@@ -213,7 +213,7 @@ func TestManager_Import(t *testing.T) {
 			output2,
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output1, 1, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output1, 1),
 		}))
 
 	ledgerIndex, err = manager.ReadLedgerIndex()
@@ -229,7 +229,7 @@ func TestManager_Import(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output2, 2, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output2, 2),
 		}))
 
 	ledgerIndex, err = manager.ReadLedgerIndex()
@@ -303,7 +303,7 @@ func TestManager_Export(t *testing.T) {
 			output2,
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output1, 1, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output1, 1),
 		}))
 
 	ledgerIndex, err := manager.ReadLedgerIndex()
@@ -316,7 +316,7 @@ func TestManager_Export(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output2, 2, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output2, 2),
 		}))
 
 	ledgerIndex, err = manager.ReadLedgerIndex()

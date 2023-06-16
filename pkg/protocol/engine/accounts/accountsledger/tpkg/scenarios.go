@@ -68,8 +68,10 @@ func InitSlotDiff() (func(index iotago.SlotIndex) *prunable.AccountDiffs, map[io
 		if slotDiff, exists := slotDiffs[index]; exists {
 			return slotDiff
 		}
+
 		return prunable.NewAccountDiffs(index, store, tpkg.API())
 	}
+
 	return slotDiffFunc, slotDiffs
 }
 
@@ -77,7 +79,7 @@ var slotDiffFunc = func(iotago.SlotIndex) *prunable.AccountDiffs {
 	return nil
 }
 
-// Scenario defines Scenario for account ledger updates per slots and accounts
+// Scenario defines Scenario for account ledger updates per slots and accounts.
 type Scenario map[iotago.SlotIndex]*SlotActions
 
 type ScenarioFunc func() (Scenario, *TestSuite)
@@ -125,6 +127,7 @@ func (s Scenario) populateSlotBuildData() map[iotago.SlotIndex]*AccountsSlotBuil
 			}
 		}
 	}
+
 	return slotBuildData
 }
 
@@ -189,6 +192,7 @@ func updateExpectedAccLedger(expectedAccountLedger *AccountsLedgerTestScenario, 
 	accData.OutputID = actions.outputID
 	accData.AddPublicKeys(actions.addedKeys...)
 	accData.RemovePublicKeys(actions.removedKeys...)
+
 	return accData
 }
 
@@ -202,6 +206,7 @@ func (s Scenario) blockFunc(t *testing.T) (func(iotago.BlockID) (*blocks.Block, 
 			}
 		}
 	}
+
 	return BlockFuncGen(t, burns)
 }
 
@@ -216,6 +221,7 @@ func Scenario1() (Scenario, *TestSuite) {
 			},
 		},
 	}
+
 	return s, testSuite
 }
 
@@ -241,6 +247,7 @@ func Scenario2() (Scenario, *TestSuite) {
 			},
 		},
 	}
+
 	return s, testSuite
 }
 
@@ -346,6 +353,7 @@ func Scenario3() (Scenario, *TestSuite) {
 			},
 		},
 	}
+
 	return s, testSuite
 }
 

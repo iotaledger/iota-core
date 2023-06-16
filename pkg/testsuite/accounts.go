@@ -17,7 +17,7 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, node *m
 			return errors.Wrap(err, "AssertAccountData: failed to load account data")
 		}
 		if !exists {
-			return errors.Errorf("AssertAccountData: %s: account %s does not exist with latest commited slot %d", node.Name, accountData.ID, node.Protocol.SyncManager.LatestCommittedSlot())
+			return errors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.SyncManager.LatestCommittedSlot())
 		}
 
 		if accountData.ID != actualAccountData.ID {

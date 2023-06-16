@@ -105,5 +105,6 @@ func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.
 	if storedCommitmentID != inputCommitmentID {
 		return nil, xerrors.Errorf("commitment ID of input %s different to stored commitment %s", inputCommitmentID, storedCommitmentID)
 	}
+
 	return c.Commitment(), nil
 }

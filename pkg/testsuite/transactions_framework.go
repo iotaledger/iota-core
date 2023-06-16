@@ -64,8 +64,10 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
 		clonedOutput := output.Clone()
 		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
-		if clonedOutput.Type() == iotago.OutputAccount && clonedOutput.(*iotago.AccountOutput).AccountID == iotago.EmptyAccountID() {
-			clonedOutput.(*iotago.AccountOutput).AccountID = iotago.AccountIDFromOutputID(actualOutputID)
+		if clonedOutput.Type() == iotago.OutputAccount {
+			if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID() {
+				accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
+			}
 		}
 
 		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.api, actualOutputID, iotago.EmptyBlockID(), 0, t.api.SlotTimeProvider().IndexFromTime(time.Now()), clonedOutput)
@@ -221,7 +223,12 @@ func (t *TransactionFramework) TransitionAccount(alias string, opts ...options.O
 		panic(fmt.Sprintf("account with alias %s does not exist", alias))
 	}
 
-	accountOutput := options.Apply(output.Output().Clone().(*iotago.AccountOutput), opts)
+	accountOutput, ok := output.Output().Clone().(*iotago.AccountOutput)
+	if !ok {
+		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", alias))
+	}
+
+	accountOutput = options.Apply(accountOutput, opts)
 
 	return output, iotago.Outputs[iotago.Output]{accountOutput}, []*mock.HDWallet{t.wallet}
 }

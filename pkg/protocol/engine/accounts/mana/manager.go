@@ -12,8 +12,9 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// For stored Mana added to account, or stored/potential Mana spent, we will update on commitment
-// For potential Mana updates and decay, we update on demand if the Mana vector is accessed (by the scheduler)
+// Manager is used to access stored and potential mana of an account in order.
+// For stored Mana added to account, or stored/potential Mana spent, we will update on commitment.
+// For potential Mana updates and decay, we update on demand if the Mana vector is accessed (by the scheduler).
 type Manager struct {
 	decayProvider *iotago.DecayProvider
 

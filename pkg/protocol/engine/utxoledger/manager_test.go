@@ -29,8 +29,8 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 	index := iotago.SlotIndex(756)
 
 	spents := utxoledger.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index, utils.RandTimestamp()),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, utils.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index),
 	}
 
 	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
@@ -98,7 +98,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 	previousMsIndex := iotago.SlotIndex(48)
 	previousMsTimestamp := utils.RandTimestamp()
 	previousSpents := utxoledger.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[1], previousMsIndex, previousMsTimestamp),
+		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[1], previousMsIndex),
 	}
 	require.NoError(t, manager.ApplyDiffWithoutLocking(previousMsIndex, previousOutputs, previousSpents))
 
@@ -118,8 +118,8 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 	index := iotago.SlotIndex(49)
 
 	spents := utxoledger.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[2], index, utils.RandTimestamp()),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, utils.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(previousOutputs[2], index),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index),
 	}
 	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
 

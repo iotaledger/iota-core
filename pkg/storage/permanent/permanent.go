@@ -84,6 +84,7 @@ func (p *Permanent) Accounts(optRealm ...byte) kvstore.KVStore {
 	if len(optRealm) == 0 {
 		return p.accounts
 	}
+
 	return lo.PanicOnErr(p.accounts.WithExtendedRealm(optRealm))
 }
 

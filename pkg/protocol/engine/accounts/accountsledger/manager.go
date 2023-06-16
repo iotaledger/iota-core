@@ -92,6 +92,7 @@ func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountI
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to load slot diff for account %s", accountID.String())
 	}
+
 	return &accDiff, destroyed, nil
 }
 
@@ -269,14 +270,12 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 		}
 	}
 
-	if err := m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
-		return errors.Wrapf(err, "could not apply diff to slot %d", slotIndex)
-	}
+	m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts)
 
 	return nil
 }
 
-func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) error {
+func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
 		// remove destroyed account, no need to update with diffs
@@ -299,8 +298,6 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
 		m.accountsTree.Set(accountID, accountData)
 	}
-
-	return nil
 }
 
 func (m *Manager) evict(index iotago.SlotIndex) {

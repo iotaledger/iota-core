@@ -136,11 +136,11 @@ func (l *Ledger) Shutdown() {
 
 func (l *Ledger) Import(reader io.ReadSeeker) error {
 	if err := l.utxoLedger.Import(reader); err != nil {
-		return err
+		return errors.Wrap(err, "failed to import utxoLedger")
 	}
 
 	if err := l.accountsLedger.Import(reader); err != nil {
-		return err
+		return errors.Wrap(err, "failed to import accountsLedger")
 	}
 
 	return nil
@@ -148,11 +148,11 @@ func (l *Ledger) Import(reader io.ReadSeeker) error {
 
 func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error {
 	if err := l.utxoLedger.Export(writer, targetIndex); err != nil {
-		return err
+		return errors.Wrap(err, "failed to export utxoLedger")
 	}
 
 	if err := l.accountsLedger.Export(writer, targetIndex); err != nil {
-		return err
+		return errors.Wrap(err, "failed to export accountsLedger")
 	}
 
 	return nil
@@ -356,7 +356,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			}
 
 			if createdOutput.OutputType() == iotago.OutputAccount {
-				createdAccount := createdOutput.Output().(*iotago.AccountOutput)
+				createdAccount, _ := createdOutput.Output().(*iotago.AccountOutput)
+
 				// Skip if the account doesn't have a BIC feature.
 				if createdAccount.FeatureSet().BlockIssuer() == nil {
 					return true
@@ -386,7 +387,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			}
 
 			if spentOutput.OutputType() == iotago.OutputAccount {
-				consumedAccount := spentOutput.Output().(*iotago.AccountOutput)
+				consumedAccount, _ := spentOutput.Output().(*iotago.AccountOutput)
 				// Skip if the account doesn't have a BIC feature.
 				if consumedAccount.FeatureSet().BlockIssuer() == nil {
 					return true

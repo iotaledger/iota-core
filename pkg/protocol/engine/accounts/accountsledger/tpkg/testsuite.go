@@ -30,10 +30,9 @@ func NewTestSuite() *TestSuite {
 }
 
 func (t *TestSuite) GetAlias(accountID iotago.AccountID) (string, bool) {
-	if alias, exists := t.aliasAcocunts[accountID]; exists {
-		return alias, true
-	}
-	return "", false
+	alias, exists := t.aliasAcocunts[accountID]
+
+	return alias, exists
 }
 
 func (t *TestSuite) AccountID(alias string) iotago.AccountID {
@@ -65,7 +64,7 @@ func (t *TestSuite) updateActions(accountID iotago.AccountID, index iotago.SlotI
 		panic("account does not exist in this Scenario, cannot update the metadata")
 	}
 
-	// we already commited in the past, so we replace past values with the current ones
+	// we already committed in the past, so we replace past values with the current ones
 	if actions.updatedTime != 0 {
 		actions.prevUpdatedTime = actions.updatedTime
 		actions.prevOutputID = actions.outputID

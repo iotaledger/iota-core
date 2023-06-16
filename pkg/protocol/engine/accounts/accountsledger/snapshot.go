@@ -93,7 +93,7 @@ func (m *Manager) importAccountTree(reader io.ReadSeeker, accountCount uint64) e
 	return nil
 }
 
-// exportAccountTree exports the AccountTree at a certain target slot, returning the total amount of exported accounts
+// exportAccountTree exports the AccountTree at a certain target slot, returning the total amount of exported accounts.
 func (m *Manager) exportAccountTree(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64, err error) {
 	var innerErr error
 	if err = m.accountsTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) bool {

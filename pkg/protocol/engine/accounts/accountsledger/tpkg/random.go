@@ -3,6 +3,7 @@ package tpkg
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -17,7 +18,7 @@ import (
 
 func RandomAccountDiff() *prunable.AccountDiff {
 	return &prunable.AccountDiff{
-		Change:              int64(rand.Int()),
+		Change:              int64(rand.New(rand.NewSource(time.Now().UnixNano())).Int()),
 		PreviousUpdatedTime: utils.RandSlotIndex(),
 		PubKeysAdded:        utils.RandPubKeys(),
 		PubKeysRemoved:      utils.RandPubKeys(),

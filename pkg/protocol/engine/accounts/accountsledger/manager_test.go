@@ -74,8 +74,7 @@ func TestManager_CommitAccountTree(t *testing.T) {
 				// apply burns to the slot diff
 				manager.updateSlotDiffWithBurns(scenarioBuildData[index].Burns, scenarioBuildData[index].SlotDiff)
 
-				err := manager.commitAccountTree(index, scenarioBuildData[index].SlotDiff, scenarioBuildData[index].DestroyedAccounts)
-				require.NoError(t, err)
+				manager.commitAccountTree(index, scenarioBuildData[index].SlotDiff, scenarioBuildData[index].DestroyedAccounts)
 
 				for accountID, expectedData := range scenarioExpected[index].AccountsLedger {
 					actualData, exists, err2 := manager.Account(accountID)

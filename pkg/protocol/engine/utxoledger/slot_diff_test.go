@@ -71,8 +71,8 @@ func TestSlotDiffSerialization(t *testing.T) {
 	index := iotago.SlotIndex(756)
 
 	spents := utxoledger.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index, utils.RandTimestamp()),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, utils.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index),
 	}
 
 	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
