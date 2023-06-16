@@ -105,7 +105,7 @@ func TestManager_Account(t *testing.T) {
 					actualData, exists, err := manager.Account(accountID, index)
 					assert.NoError(t, err)
 					assert.True(t, exists)
-					assert.Equal(t, accData, actualData)
+					tpkg.EqualAccountData(t, accData, actualData)
 				}
 				// check if all destroyed accounts are not found
 				err := scenarioBuildData[index].DestroyedAccounts.ForEach(func(accountID iotago.AccountID) error {
@@ -156,7 +156,7 @@ func AssertAccountManagerSlotState(t *testing.T, manager *Manager, expectedData 
 		actualData, exists, err2 := manager.Account(accID)
 		assert.NoError(t, err2)
 		assert.True(t, exists)
-		assert.Equal(t, expectedAccData, actualData)
+		tpkg.EqualAccountData(t, expectedAccData, actualData)
 	}
 	for accID, expectedDiff := range expectedData.AccountsDiffs {
 		actualAccDiff, _, err2 := manager.LoadSlotDiff(expectedData.LatestCommittedSlotIndex, accID)

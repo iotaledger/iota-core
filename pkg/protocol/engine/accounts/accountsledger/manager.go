@@ -1,7 +1,6 @@
 package accountsledger
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -166,10 +165,10 @@ func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 
 	// if m.latestCommittedSlot < m.maxCommittableAge we should have all history
 	if m.latestCommittedSlot >= m.maxCommitableAge && targetIndex < m.latestCommittedSlot-m.maxCommitableAge {
-		return nil, false, fmt.Errorf("can't calculate account, target slot index older than accountIndex (%d<%d)", targetIndex, m.latestCommittedSlot-m.maxCommitableAge)
+		return nil, false, errors.Errorf("can't calculate account, target slot index older than accountIndex (%d<%d)", targetIndex, m.latestCommittedSlot-m.maxCommitableAge)
 	}
 	if targetIndex > m.latestCommittedSlot {
-		return nil, false, fmt.Errorf("can't retrieve account, slot %d is not committed yet, latest committed slot: %d", targetIndex, m.latestCommittedSlot)
+		return nil, false, errors.Errorf("can't retrieve account, slot %d is not committed yet, latest committed slot: %d", targetIndex, m.latestCommittedSlot)
 	}
 
 	// read initial account data at the latest committed slot
@@ -178,12 +177,10 @@ func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 	if !exists {
 		loadedAccount = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, targetIndex), iotago.EmptyOutputID)
 	}
-	fmt.Printf("loadedAccount %s %d %d\n", loadedAccount.ID.String(), loadedAccount.Credits.UpdateTime, loadedAccount.Credits.Value)
 	wasDestroyed, err := m.rollbackAccountTo(loadedAccount, targetIndex)
 	if err != nil {
 		return nil, false, err
 	}
-	fmt.Printf("after loadedAccount %s %d %d\n", loadedAccount.ID.String(), loadedAccount.Credits.UpdateTime, loadedAccount.Credits.Value)
 
 	// account not present in the accountsTree, and it was not marked as destroyed in slots between targetIndex and latestCommittedSlot
 	if !exists && !wasDestroyed {
@@ -217,10 +214,8 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 }
 
 func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetIndex iotago.SlotIndex) (wasDestroyed bool, err error) {
-	fmt.Println("rollbackAccountTo SlotIndex", targetIndex)
 	// to reach targetIndex, we need to rollback diffs from the current latestCommittedSlot down to targetIndex + 1
 	for diffIndex := m.latestCommittedSlot; diffIndex > targetIndex; diffIndex-- {
-		fmt.Println("roolback diffIndex", diffIndex)
 		diffStore := m.slotDiff(diffIndex)
 		if diffStore == nil {
 			return false, errors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
@@ -233,7 +228,6 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 
 		// no changes for this account in this slot
 		if !found {
-			fmt.Println("no changes for this account in this slot", accountData.ID, diffIndex)
 			continue
 		}
 
@@ -241,7 +235,6 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		if err != nil {
 			return false, errors.Wrapf(err, "can't retrieve account, could not load diff for account (%s) in slot (%d)", accountData.ID, diffIndex)
 		}
-		fmt.Printf("diff change %+v cred\n", diffChange)
 
 		// update the account data with the diff
 		accountData.Credits.Update(-diffChange.Change, diffChange.PreviousUpdatedTime)
