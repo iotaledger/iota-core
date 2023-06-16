@@ -74,6 +74,7 @@ func NewProvider(weightVector map[iotago.AccountID]int64, opts ...options.Option
 					// recover if no node was part of the online committee anymore.
 					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
+						s.events.BlockProcessed.Trigger(block)
 					})
 				})
 			})

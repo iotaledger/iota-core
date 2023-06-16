@@ -230,6 +230,10 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] BlockDAG.MissingBlockAttached: %s\n", n.Name, engineName, block.ID())
 	})
 
+	events.SybilProtection.BlockProcessed.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] SybilProtection.BlockProcessed: %s\n", n.Name, engineName, block.ID())
+	})
+
 	events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
 	})
@@ -380,17 +384,23 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.AccountID.RegisterAlias(n.Name)
 }
 
-func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
 	modelBlock, err := n.blockIssuer.CreateBlock(ctx, opts...)
 	require.NoError(n.Testing, err)
 
 	modelBlock.ID().RegisterAlias(alias)
 
-	require.NoError(n.Testing, n.blockIssuer.IssueBlock(modelBlock))
-
-	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.ID().Index(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
-
 	return blocks.NewBlock(modelBlock)
+}
+
+func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+	block := n.CreateBlock(ctx, alias, opts...)
+
+	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
+
+	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.Block().LatestFinalizedSlot)
+
+	return block
 }
 
 func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {

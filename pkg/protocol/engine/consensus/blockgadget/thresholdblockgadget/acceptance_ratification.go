@@ -1,8 +1,10 @@
 package thresholdblockgadget
 
 import (
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/votes"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
@@ -13,7 +15,8 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 		return
 	}
 
-	var stack []*blocks.Block
+	var toAccept []*blocks.Block
+	toAcceptByID := set.New[iotago.BlockID]()
 
 	evaluateFunc := func(block *blocks.Block) bool {
 		// Skip propagation if the block is already accepted.
@@ -21,21 +24,29 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 			return false
 		}
 
-		// Skip further propagation if the witness is not new.
-		if !block.AddAcceptanceRatifier(ratifier) {
-			return false
+		// Propagate further if the ratifier is new.
+		propagateFurther := block.AddAcceptanceRatifier(ratifier)
+
+		// Once a block is accepted, all its parents are implicitly accepted as well. There's no need to check shouldAccept again.
+		if anyChildInSet(block, toAcceptByID) || g.shouldAccept(block) {
+			// We start walking from the future cone into the past in a breadth-first manner. Therefore, we prepend (push onto the toAccept) here
+			// so that we can accept in order after finishing the walk.
+			toAccept = append([]*blocks.Block{block}, toAccept...)
+			toAcceptByID.Add(block.ID())
+
+			// A child of this block has been accepted or this block has just been accepted.
+			// That means, we should check its parents to ensure monotonicity:
+			//  1. If they are not yet accepted, we will add them to the toAccept and accept them.
+			//  2. If they are accepted, we will simply stop the walk.
+			propagateFurther = true
 		}
 
-		if g.shouldAccept(block) {
-			stack = append([]*blocks.Block{block}, stack...)
-		}
-
-		return true
+		return propagateFurther
 	}
 
 	g.propagate(votingBlock.Parents(), evaluateFunc)
 
-	for _, block := range stack {
+	for _, block := range toAccept {
 		if block.SetAccepted() {
 			g.events.BlockAccepted.Trigger(block)
 		}

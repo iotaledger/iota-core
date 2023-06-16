@@ -3,6 +3,7 @@ package thresholdblockgadget
 import (
 	"fmt"
 
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -34,7 +35,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 		g := New(e.BlockCache, e.SybilProtection, opts...)
 
 		wp := e.Workers.CreatePool("ThresholdBlockGadget", 1)
-		e.Events.Booker.BlockBooked.Hook(g.trackWitnessWeight, event.WithWorkerPool(wp))
+		e.Events.Booker.BlockBooked.Hook(g.TrackWitnessWeight, event.WithWorkerPool(wp))
 
 		e.Events.BlockGadget.LinkTo(g.events)
 
@@ -64,6 +65,8 @@ func (g *Gadget) Shutdown() {
 	g.TriggerStopped()
 }
 
+// propagate performs a breadth-first past cone walk starting at initialBlockIDs. evaluateFunc is called for every block visited
+// and needs to return whether to continue the walk further.
 func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(block *blocks.Block) bool) {
 	walk := walker.New[iotago.BlockID](false).PushAll(initialBlockIDs...)
 	for walk.HasNext() {
@@ -87,4 +90,14 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 
 		walk.PushAll(block.Parents()...)
 	}
+}
+
+func anyChildInSet(block *blocks.Block, set set.Set[iotago.BlockID]) bool {
+	for _, child := range block.Children() {
+		if set.Has(child.ID()) {
+			return true
+		}
+	}
+
+	return false
 }
