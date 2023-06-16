@@ -1,4 +1,4 @@
-package tipselectionv1
+package tipmanagerv1
 
 import (
 	"sync"
@@ -6,10 +6,13 @@ import (
 	"github.com/iotaledger/hive.go/ds/randommap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -32,6 +35,27 @@ type TipManager struct {
 
 	// evictionMutex is used to synchronize the eviction of slots.
 	evictionMutex sync.RWMutex
+
+	// events contains all the events that are triggered by the TipManager.
+	events *tipmanager.Events
+
+	module.Module
+}
+
+// NewProvider creates a new TipManager provider.
+func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
+	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
+		t := NewTipManager(e.BlockCache.Block, opts...)
+
+		e.Events.Booker.BlockBooked.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
+		e.BlockCache.Evict.Hook(t.Evict)
+		e.Events.TipSelection.LinkTo(t.Events())
+
+		t.TriggerInitialized()
+		e.HookStopped(t.TriggerStopped)
+
+		return t
+	})
 }
 
 // NewTipManager creates a new TipManager.
@@ -41,11 +65,12 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 		tipMetadataStorage: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
 		strongTipSet:       randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:         randommap.New[iotago.BlockID, *TipMetadata](),
+		events:             tipmanager.NewEvents(),
 	}, opts)
 }
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
-func (t *TipManager) AddBlock(block *blocks.Block) tipselection.TipMetadata {
+func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
 	return t.addBlock(block)
 }
 
@@ -61,12 +86,12 @@ func (t *TipManager) addBlock(block *blocks.Block) *TipMetadata {
 }
 
 // StrongTips returns the strong selectTips of the TipManager (with an optional limit).
-func (t *TipManager) StrongTips(optAmount ...int) []tipselection.TipMetadata {
+func (t *TipManager) StrongTips(optAmount ...int) []tipmanager.TipMetadata {
 	return t.selectTips(t.strongTipSet, optAmount...)
 }
 
 // WeakTips returns the weak selectTips of the TipManager (with an optional limit).
-func (t *TipManager) WeakTips(optAmount ...int) []tipselection.TipMetadata {
+func (t *TipManager) WeakTips(optAmount ...int) []tipmanager.TipMetadata {
 	return t.selectTips(t.weakTipSet, optAmount...)
 }
 
@@ -83,6 +108,15 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 			return true
 		})
 	}
+}
+
+// Events returns the events of the TipManager.
+func (t *TipManager) Events() *tipmanager.Events {
+	return t.events
+}
+
+func (t *TipManager) Shutdown() {
+	// TODO: remove unnecessary shutdown logic
 }
 
 // setupBlockMetadata sets up the behavior of the given Block.
@@ -124,7 +158,7 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	})
 
 	tipMetadata.OnEvicted(func() {
-		tipMetadata.setTipPool(tipselection.DroppedTipPool)
+		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
 
 		lo.Batch(unhookMethods...)()
 	})
@@ -180,12 +214,12 @@ func (t *TipManager) markSlotAsEvicted(slotIndex iotago.SlotIndex) (success bool
 }
 
 // selectTips returns the given amount of selectTips from the given tip set.
-func (t *TipManager) selectTips(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata], optAmount ...int) []tipselection.TipMetadata {
+func (t *TipManager) selectTips(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata], optAmount ...int) []tipmanager.TipMetadata {
 	if len(optAmount) != 0 {
-		return lo.Map(tipSet.RandomUniqueEntries(optAmount[0]), func(tip *TipMetadata) tipselection.TipMetadata { return tip })
+		return lo.Map(tipSet.RandomUniqueEntries(optAmount[0]), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
 	}
 
-	return lo.Map(tipSet.Values(), func(tip *TipMetadata) tipselection.TipMetadata { return tip })
+	return lo.Map(tipSet.Values(), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
 }
 
 // updateConnectedChildren returns the update functions for the connected children counters of the parents of a Block.
@@ -208,4 +242,4 @@ func updateConnectedChildren(isConnected bool, stronglyConnected bool) (propagat
 }
 
 // code contract (make sure the type implements all required methods).
-var _ tipselection.TipManager = new(TipManager)
+var _ tipmanager.TipManager = new(TipManager)

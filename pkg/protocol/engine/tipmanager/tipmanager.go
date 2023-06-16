@@ -1,6 +1,7 @@
-package tipselection
+package tipmanager
 
 import (
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -18,4 +19,9 @@ type TipManager interface {
 
 	// Evict evicts a block from the TipManager.
 	Evict(slotIndex iotago.SlotIndex)
+
+	// Events returns the events of the TipManager.
+	Events() *Events
+
+	module.Interface
 }

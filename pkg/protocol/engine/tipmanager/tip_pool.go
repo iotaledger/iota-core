@@ -1,4 +1,4 @@
-package tipselection
+package tipmanager
 
 // TipPool represents the pool a block is in.
 type TipPool uint8

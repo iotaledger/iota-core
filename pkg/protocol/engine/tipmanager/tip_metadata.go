@@ -1,4 +1,4 @@
-package tipselection
+package tipmanager
 
 import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -12,6 +12,8 @@ type TipMetadata interface {
 
 	// Block returns the Block that the TipMetadata belongs to.
 	Block() *blocks.Block
+
+	SetTipPool(tipPool TipPool)
 
 	// TipPool returns the current TipPool of the Block.
 	TipPool() TipPool

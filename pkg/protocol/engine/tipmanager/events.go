@@ -1,4 +1,4 @@
-package tipselection
+package tipmanager
 
 import "github.com/iotaledger/hive.go/runtime/event"
 

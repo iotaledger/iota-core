@@ -26,7 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -179,7 +179,7 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
 	})
 
-	events.Engine.TipSelection.BlockAdded.Hook(func(tipMetadata tipselection.TipMetadata) {
+	events.Engine.TipSelection.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
 		fmt.Printf("%s > TipSelection.TipAdded: %s in pool %d\n", n.Name, tipMetadata.Block().ID(), tipMetadata.TipPool())
 	})
 
