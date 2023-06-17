@@ -90,6 +90,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 }
 
 func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
+	time.Sleep(1 * time.Second)
 	n.Protocol = protocol.New(n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
@@ -367,11 +368,18 @@ func (n *Node) Wait() {
 func (n *Node) Shutdown() {
 	stopped := make(chan struct{}, 1)
 
-	n.Protocol.Events.Stopped.Hook(func() {
+	if n.Protocol != nil {
+		n.Protocol.Events.Stopped.Hook(func() {
+			close(stopped)
+		})
+	} else {
 		close(stopped)
-	})
+	}
 
-	n.ctxCancel()
+	if n.ctxCancel != nil {
+		n.ctxCancel()
+	}
+
 	n.Workers.Shutdown()
 
 	<-stopped

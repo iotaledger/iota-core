@@ -39,7 +39,7 @@ type Manager struct {
 	// block is a function that returns a block from the cache or from the database.
 	block func(id iotago.BlockID) (*blocks.Block, bool)
 
-	maxCommitableAge iotago.SlotIndex
+	maxCommittableAge iotago.SlotIndex
 
 	mutex sync.RWMutex
 
@@ -51,15 +51,13 @@ func New(
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
 	accountsStore kvstore.KVStore,
 	api iotago.API,
-	maxCommitableAge uint32,
 ) *Manager {
 	return &Manager{
-		api:              api,
-		blockBurns:       shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
-		accountsTree:     ads.NewMap[iotago.AccountID, accounts.AccountData](accountsStore),
-		block:            blockFunc,
-		slotDiff:         slotDiffFunc,
-		maxCommitableAge: iotago.SlotIndex(maxCommitableAge),
+		api:          api,
+		blockBurns:   shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
+		accountsTree: ads.NewMap[iotago.AccountID, accounts.AccountData](accountsStore),
+		block:        blockFunc,
+		slotDiff:     slotDiffFunc,
 	}
 }
 
@@ -72,6 +70,13 @@ func (m *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
 	defer m.mutex.Unlock()
 
 	m.latestCommittedSlot = index
+}
+
+func (m *Manager) SetMaxCommittableAge(maxCommittableAge iotago.SlotIndex) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.maxCommittableAge = maxCommittableAge
 }
 
 // TrackBlock adds the block to the blockBurns set to deduct the burn from credits upon slot commitment.
@@ -112,7 +117,7 @@ func (m *Manager) ApplyDiff(
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	// sanity check if the slotIndex is the next slot to commit
+	// sanity-check if the slotIndex is the next slot to commit
 	if slotIndex != m.latestCommittedSlot+1 {
 		return errors.Errorf("cannot apply the next diff, there is a gap in committed slots, account vector index: %d, slot to commit: %d", m.latestCommittedSlot, slotIndex)
 	}
@@ -132,7 +137,7 @@ func (m *Manager) ApplyDiff(
 	m.latestCommittedSlot = slotIndex
 
 	// TODO: when to exactly evict?
-	m.evict(slotIndex - m.maxCommitableAge - 1)
+	m.evict(slotIndex - m.maxCommittableAge - 1)
 
 	return nil
 }
@@ -164,8 +169,8 @@ func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 	}
 
 	// if m.latestCommittedSlot < m.maxCommittableAge we should have all history
-	if m.latestCommittedSlot >= m.maxCommitableAge && targetIndex < m.latestCommittedSlot-m.maxCommitableAge {
-		return nil, false, errors.Errorf("can't calculate account, target slot index older than accountIndex (%d<%d)", targetIndex, m.latestCommittedSlot-m.maxCommitableAge)
+	if m.latestCommittedSlot >= m.maxCommittableAge && targetIndex < m.latestCommittedSlot-m.maxCommittableAge {
+		return nil, false, errors.Errorf("can't calculate account, target slot index older than accountIndex (%d<%d)", targetIndex, m.latestCommittedSlot-m.maxCommittableAge)
 	}
 	if targetIndex > m.latestCommittedSlot {
 		return nil, false, errors.Errorf("can't retrieve account, slot %d is not committed yet, latest committed slot: %d", targetIndex, m.latestCommittedSlot)

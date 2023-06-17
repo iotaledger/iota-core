@@ -76,6 +76,9 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	)
 	defer engineInstance.Shutdown()
 
+	engineInstance.TriggerConstructed()
+	engineInstance.TriggerInitialized()
+
 	for blockID, commitmentID := range opt.RootBlocks {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
 	}

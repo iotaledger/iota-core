@@ -39,7 +39,7 @@ func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Out
 	require.NoError(t, err)
 	require.True(t, has)
 
-	// Spend it with a milestone
+	// Spent it with a slot.
 	require.NoError(t, manager.ApplyDiff(spent.SlotIndexSpent(), utxoledger.Outputs{}, utxoledger.Spents{spent}))
 
 	// Read Spent from DB and compare
