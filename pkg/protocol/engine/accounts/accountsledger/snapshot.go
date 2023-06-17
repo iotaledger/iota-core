@@ -23,12 +23,12 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	var accountCount uint64
 	var slotDiffCount uint64
 
-	// The amount of accounts contained within this snapshot.
+	// The number of accounts contained within this snapshot.
 	if err := binary.Read(reader, binary.LittleEndian, &accountCount); err != nil {
 		return errors.Wrap(err, "unable to read account count")
 	}
 
-	// The amount of slot diffs contained within this snapshot.
+	// The number of slot diffs contained within this snapshot.
 	if err := binary.Read(reader, binary.LittleEndian, &slotDiffCount); err != nil {
 		return errors.Wrap(err, "unable to read slot diffs count")
 	}
@@ -230,7 +230,7 @@ func readSlotDiff(reader io.ReadSeeker) (accountID iotago.AccountID, accountDiff
 
 func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (slotDiffsCount uint64, err error) {
 	// write slot diffs until being able to reach targetIndex, where the exported tree is at
-	slotIndex := iotago.SlotIndex(0)
+	slotIndex := iotago.SlotIndex(1)
 	if targetIndex > m.maxCommittableAge {
 		slotIndex = targetIndex - m.maxCommittableAge
 	}
@@ -243,13 +243,20 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 			return 0, err
 		}
 
-		// The amount of account entries within this slot diff.
+		// The number of account entries within this slot diff.
 		if err = pWriter.WriteValue("inDiff accounts count", accountsInDiffCount, true); err != nil {
 			return 0, err
 		}
 
+		slotDiffsCount++
+
 		var innerErr error
-		if err = m.slotDiff(slotIndex).Stream(func(accountID iotago.AccountID, accountDiff prunable.AccountDiff, destroyed bool) bool {
+		slotDiffs := m.slotDiff(slotIndex)
+		if slotDiffs == nil {
+			continue
+		}
+
+		if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff prunable.AccountDiff, destroyed bool) bool {
 			if err = writeSlotDiff(pWriter, accountID, accountDiff, destroyed); err != nil {
 				innerErr = errors.Wrapf(err, "unable to write slot diff for account %s", accountID)
 				return false
@@ -266,12 +273,10 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 			return 0, errors.Wrapf(innerErr, "unable to write slot diff for index %d", slotIndex)
 		}
 
-		// The amount of diffs contained within this slot.
+		// The number of diffs contained within this slot.
 		if err = pWriter.WriteValueAtBookmark("inDiff accounts count", accountsInDiffCount); err != nil {
 			return 0, err
 		}
-
-		slotDiffsCount++
 	}
 
 	return slotDiffsCount, nil

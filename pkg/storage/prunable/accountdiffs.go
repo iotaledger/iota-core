@@ -178,7 +178,7 @@ func (b *AccountDiffs) Stream(consumer func(accountID iotago.AccountID, accountD
 		return errors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)
 	}
 
-	// For those accounts that still exist we might have a accountDiff.
+	// For those accounts that still exist, we might have an accountDiff.
 	if storageErr := b.diffChangeStore.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, accountDiff AccountDiff) bool {
 		return consumer(accountID, accountDiff, false)
 	}); storageErr != nil {
