@@ -110,6 +110,10 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 	})
 }
 
+func (t *TipManager) SetConflictDAG(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]) {
+	t.conflictDAG = conflictDAG
+}
+
 // AddBlock adds a Block to the TipManager.
 func (t *TipManager) AddBlock(block *blocks.Block) {
 	newBlockMetadata := NewBlockMetadata(block)

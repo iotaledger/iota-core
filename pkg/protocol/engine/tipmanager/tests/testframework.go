@@ -36,14 +36,13 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID()
 
-	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
-
-	t.Instance = tipmanagerv1.NewTipManager(conflictDAG, func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
+	t.Instance = tipmanagerv1.NewTipManager(func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]
 		return block, exists
 	}, func() iotago.BlockIDs {
 		return iotago.BlockIDs{iotago.EmptyBlockID()}
 	})
+	t.Instance.SetConflictDAG(conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts()))
 
 	return t
 }

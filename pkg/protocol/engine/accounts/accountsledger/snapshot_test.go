@@ -84,7 +84,9 @@ func TestManager_Import_Export(t *testing.T) {
 			slotDiffFunc := tpkg.InitSlotDiff()
 			accountsStore := mapdb.NewMapDB()
 
-			newManager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+			newManager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
+			newManager.SetMaxCommittableAge(iotago.SlotIndex(params.MaxCommitableAge))
+
 			err = newManager.Import(writer.BytesReader())
 			require.NoError(t, err)
 
@@ -98,7 +100,9 @@ func InitAccountLedger(t *testing.T, blockFunc func(iotago.BlockID) (*blocks.Blo
 	accountsStore := mapdb.NewMapDB()
 
 	// feed the manager with the data
-	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), mca)
+	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
+	manager.SetMaxCommittableAge(iotago.SlotIndex(mca))
+
 	for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
 		for _, burningBlock := range burnedBlocks[index] {
 			block, exists := blockFunc(burningBlock)

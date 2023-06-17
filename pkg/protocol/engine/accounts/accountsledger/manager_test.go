@@ -52,7 +52,8 @@ func TestManager_TrackBlock(t *testing.T) {
 	}
 	accountsStore := mapdb.NewMapDB()
 	params := tpkg.ProtocolParams()
-	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
+	manager.SetMaxCommittableAge(iotago.SlotIndex(params.MaxCommitableAge))
 
 	for _, blockID := range blockIDs[1] {
 		block, exist := blockFunc(blockID)
@@ -71,7 +72,8 @@ func TestManager_CommitAccountTree(t *testing.T) {
 			slotDiffFunc := tpkg.InitSlotDiff()
 			blockFunc := func(iotago.BlockID) (*blocks.Block, bool) { return nil, false }
 			accountsStore := mapdb.NewMapDB()
-			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
+			manager.SetMaxCommittableAge(iotago.SlotIndex(params.MaxCommitableAge))
 
 			scenarioBuildData, scenarioExpected, _, _ := tpkg.InitScenario(t, test.scenario)
 
@@ -130,7 +132,8 @@ func TestManager_CommitSlot(t *testing.T) {
 			slotDiffFunc := tpkg.InitSlotDiff()
 			accountsStore := mapdb.NewMapDB()
 
-			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API(), params.MaxCommitableAge)
+			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
+			manager.SetMaxCommittableAge(iotago.SlotIndex(params.MaxCommitableAge))
 
 			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
 				for _, burningBlock := range burnedBlocks[index] {
