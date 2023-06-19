@@ -13,24 +13,25 @@ type TipMetadata interface {
 	// Block returns the Block that the TipMetadata belongs to.
 	Block() *blocks.Block
 
+	// SetTipPool sets the TipPool of the Block (updated by the tip selection strategy).
 	SetTipPool(tipPool TipPool)
 
 	// TipPool returns the current TipPool of the Block.
 	TipPool() TipPool
 
-	// OnTipPoolUpdated registers a callback that is triggered when the TipPool of the block is updated.
+	// OnTipPoolUpdated registers a callback that is triggered when the TipPool of the block changes.
 	OnTipPoolUpdated(handler func(tipPool TipPool)) (unsubscribe func())
 
 	// IsStrongTip returns true if the block is part of the strong tip set.
 	IsStrongTip() bool
 
-	// OnIsStrongTipUpdated registers a callback that is triggered when the IsStrongTip property of the block is updated.
+	// OnIsStrongTipUpdated registers a callback that is triggered when the IsStrongTip property of the block changes.
 	OnIsStrongTipUpdated(handler func(isStrongTip bool)) (unsubscribe func())
 
 	// IsWeakTip returns true if the block is part of the weak tip set.
 	IsWeakTip() bool
 
-	// OnIsWeakTipUpdated registers a callback that is triggered when the IsWeakTip property of the block is updated.
+	// OnIsWeakTipUpdated registers a callback that is triggered when the IsWeakTip property of the block changes.
 	OnIsWeakTipUpdated(handler func(isWeakTip bool)) (unsubscribe func())
 
 	// IsEvicted returns true if the block was evicted from the TipManager.

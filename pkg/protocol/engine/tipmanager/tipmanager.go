@@ -7,6 +7,19 @@ import (
 )
 
 // TipManager is a component that maintains a perception of the unreferenced Blocks of the Tangle.
+//
+// Blocks in the TipManager can be classified to belong to a TipPool which defines how the tip selection strategy
+// will treat them:
+//
+// - StrongTipPool: The block will be referenced via strong parents.
+// - WeakTipPool: The block will be referenced via weak parents.
+// - DroppedTipPool: The block will be ignored by the tip selection strategy.
+//
+// The TipManager itself does not classify the blocks, but rather provides a framework to do so. Blocks initially start
+// out with an UndefinedTipPool, which causes the block to be temporarily ignored by the tip selection strategy.
+//
+// The unreferenced blocks of a TipPool form the actual Tips which are used by the tip selection strategy to construct
+// new Blocks.
 type TipManager interface {
 	// AddBlock adds a block to the TipManager.
 	AddBlock(block *blocks.Block) TipMetadata
