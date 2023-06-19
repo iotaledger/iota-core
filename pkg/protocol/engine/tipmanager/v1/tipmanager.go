@@ -82,8 +82,6 @@ func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
 
 	t.setupBlockMetadata(tipMetadata)
 
-	t.blockAdded.Trigger(tipMetadata)
-
 	return tipMetadata
 }
 
@@ -124,47 +122,33 @@ func (t *TipManager) Shutdown() {
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
-	unhookMethods := []func(){
-		tipMetadata.stronglyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-			t.forEachParentByType(tipMetadata, updateConnectedChildren(isConnected, true))
-		}),
-
-		tipMetadata.weaklyConnectedToTips.OnUpdate(func(_, isConnected bool) {
-			t.forEachParentByType(tipMetadata, updateConnectedChildren(isConnected, false))
-		}),
-
-		tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
-			if isStrongTip {
-				t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
-			} else {
-				t.strongTipSet.Delete(tipMetadata.ID())
-			}
-		}),
-
-		tipMetadata.OnIsWeakTipUpdated(func(isWeakTip bool) {
-			if isWeakTip {
-				t.weakTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
-			} else {
-				t.weakTipSet.Delete(tipMetadata.Block().ID())
-			}
-		}),
-	}
-
 	t.forEachParentByType(tipMetadata, map[model.ParentsType]func(*TipMetadata){
-		model.StrongParentType: func(strongParent *TipMetadata) {
-			unhookMethods = append(unhookMethods,
-				strongParent.OnIsOrphanedUpdated(func(isOrphaned bool) {
-					tipMetadata.orphanedStrongParents.Compute(lo.Cond(isOrphaned, increase, decrease))
-				}),
-			)
-		},
+		model.StrongParentType:      tipMetadata.registerStrongParent,
+		model.WeakParentType:        tipMetadata.registerWeakParent,
+		model.ShallowLikeParentType: tipMetadata.registerWeakParent,
+	})
+
+	tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
+		if isStrongTip {
+			t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
+		} else {
+			t.strongTipSet.Delete(tipMetadata.ID())
+		}
+	})
+
+	tipMetadata.OnIsWeakTipUpdated(func(isWeakTip bool) {
+		if isWeakTip {
+			t.weakTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
+		} else {
+			t.weakTipSet.Delete(tipMetadata.Block().ID())
+		}
 	})
 
 	tipMetadata.OnEvicted(func() {
 		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
-
-		lo.Batch(unhookMethods...)()
 	})
+
+	t.blockAdded.Trigger(tipMetadata)
 }
 
 // forEachParentByType updates the parents of the given Block.
@@ -223,25 +207,6 @@ func (t *TipManager) selectTips(tipSet *randommap.RandomMap[iotago.BlockID, *Tip
 	}
 
 	return lo.Map(tipSet.Values(), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
-}
-
-// updateConnectedChildren returns the update functions for the connected children counters of the parents of a Block.
-func updateConnectedChildren(isConnected bool, stronglyConnected bool) (propagationRules map[model.ParentsType]func(*TipMetadata)) {
-	updateFunc := lo.Cond(isConnected, increase, decrease)
-
-	propagationRules = map[model.ParentsType]func(*TipMetadata){
-		model.WeakParentType: func(parent *TipMetadata) {
-			parent.weaklyConnectedChildren.Compute(updateFunc)
-		},
-	}
-
-	if stronglyConnected {
-		propagationRules[model.StrongParentType] = func(parent *TipMetadata) {
-			parent.stronglyConnectedChildren.Compute(updateFunc)
-		}
-	}
-
-	return propagationRules
 }
 
 // code contract (make sure the type implements all required methods).

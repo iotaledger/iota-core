@@ -28,13 +28,13 @@ type TipMetadata struct {
 	// child.
 	isStronglyReferencedByTips *lpromise.Value[bool]
 
-	// isReferencedByTips is a derived property that is true if the block has at least one strongly or weakly connected
+	// isWeaklyReferencedByTips is a derived property that is true if the block has at least one strongly or weakly connected
 	// child.
-	isReferencedByTips *lpromise.Value[bool]
+	isWeaklyReferencedByTips *lpromise.Value[bool]
 
-	// stronglyConnectedToTips is a derived property that is true if the block is either strongly referenced by tips or
+	// isStronglyConnectedToTips is a derived property that is true if the block is either strongly referenced by tips or
 	// part of the strong TipPool.
-	stronglyConnectedToTips *lpromise.Value[bool]
+	isStronglyConnectedToTips *lpromise.Value[bool]
 
 	// weaklyConnectedToTips is a derived property that is true if the block is either part of the weak TipPool or has
 	// at least one weakly connected child.
@@ -52,7 +52,7 @@ type TipMetadata struct {
 	// isStronglyReferencedByTips.
 	isStrongTip *lpromise.Value[bool]
 
-	// isWeakTip is a derived property that is true if the block is part of the weak TipPool and isReferencedByTips is
+	// isWeakTip is a derived property that is true if the block is part of the weak TipPool and isWeaklyReferencedByTips is
 	// false.
 	isWeakTip *lpromise.Value[bool]
 
@@ -78,8 +78,8 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		stronglyConnectedChildren:  lpromise.NewValue[int](),
 		weaklyConnectedChildren:    lpromise.NewValue[int](),
 		isStronglyReferencedByTips: lpromise.NewValue[bool](),
-		isReferencedByTips:         lpromise.NewValue[bool](),
-		stronglyConnectedToTips:    lpromise.NewValue[bool](),
+		isWeaklyReferencedByTips:   lpromise.NewValue[bool](),
+		isStronglyConnectedToTips:  lpromise.NewValue[bool](),
 		weaklyConnectedToTips:      lpromise.NewValue[bool](),
 		isEligibleStrongTip:        lpromise.NewValue[bool](),
 		isEligibleWeakTip:          lpromise.NewValue[bool](),
@@ -167,7 +167,7 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 	t.setupIsOrphaned()
 	t.setupIsStrongTip()
 	t.setupIsWeakTip()
-	t.setupIsReferencedByTips()
+	t.setupIsWeaklyReferencedByTips()
 	t.setupWeaklyConnectedToTips()
 	t.setupIsStronglyReferencedByTips()
 
@@ -204,13 +204,13 @@ func (t *TipMetadata) setupIsEligibleWeakTip() {
 
 func (t *TipMetadata) setupStronglyConnectedToTips() {
 	t.isStronglyReferencedByTips.OnUpdate(func(_, stronglyReferencedByTips bool) {
-		t.stronglyConnectedToTips.Compute(func(_ bool) bool {
+		t.isStronglyConnectedToTips.Compute(func(_ bool) bool {
 			return stronglyReferencedByTips || t.isEligibleStrongTip.Get()
 		})
 	})
 
 	t.isEligibleStrongTip.OnUpdate(func(_, isEligibleStrongTip bool) {
-		t.stronglyConnectedToTips.Compute(func(_ bool) bool {
+		t.isStronglyConnectedToTips.Compute(func(_ bool) bool {
 			return isEligibleStrongTip || t.isStronglyReferencedByTips.Get()
 		})
 	})
@@ -245,7 +245,7 @@ func (t *TipMetadata) setupIsStrongTip() {
 }
 
 func (t *TipMetadata) setupIsWeakTip() {
-	t.isReferencedByTips.OnUpdate(func(_, isReferencedByTips bool) {
+	t.isWeaklyReferencedByTips.OnUpdate(func(_, isReferencedByTips bool) {
 		t.isWeakTip.Compute(func(_ bool) bool {
 			return !isReferencedByTips && t.isEligibleWeakTip.Get()
 		})
@@ -253,35 +253,27 @@ func (t *TipMetadata) setupIsWeakTip() {
 
 	t.isEligibleWeakTip.OnUpdate(func(_, isEligibleWeakTip bool) {
 		t.isWeakTip.Compute(func(_ bool) bool {
-			return isEligibleWeakTip && !t.isReferencedByTips.Get()
-		})
-	})
-}
-
-func (t *TipMetadata) setupIsReferencedByTips() {
-	t.stronglyConnectedChildren.OnUpdate(func(_, stronglyConnectedChildren int) {
-		t.isReferencedByTips.Compute(func(_ bool) bool {
-			return stronglyConnectedChildren > 0 || t.weaklyConnectedChildren.Get() > 0
-		})
-	})
-
-	t.weaklyConnectedChildren.OnUpdate(func(_, weaklyConnectedChildren int) {
-		t.isReferencedByTips.Compute(func(_ bool) bool {
-			return weaklyConnectedChildren > 0 || t.stronglyConnectedChildren.Get() > 0
+			return isEligibleWeakTip && !t.isWeaklyReferencedByTips.Get()
 		})
 	})
 }
 
 func (t *TipMetadata) setupWeaklyConnectedToTips() {
-	t.weaklyConnectedChildren.OnUpdate(func(_, weaklyConnectedChildren int) {
+	t.isWeaklyReferencedByTips.OnUpdate(func(_, isWeaklyReferencedByTips bool) {
 		t.weaklyConnectedToTips.Compute(func(_ bool) bool {
-			return weaklyConnectedChildren > 0 || t.isEligibleWeakTip.Get()
+			return isWeaklyReferencedByTips || t.isEligibleWeakTip.Get() || t.isStronglyConnectedToTips.Get()
 		})
 	})
 
 	t.isEligibleWeakTip.OnUpdate(func(_, isEligibleWeakTip bool) {
 		t.weaklyConnectedToTips.Compute(func(_ bool) bool {
-			return isEligibleWeakTip || t.weaklyConnectedChildren.Get() > 0
+			return isEligibleWeakTip || t.isWeaklyReferencedByTips.Get() || t.isStronglyConnectedToTips.Get()
+		})
+	})
+
+	t.isStronglyConnectedToTips.OnUpdate(func(_, stronglyConnectedToTips bool) {
+		t.weaklyConnectedToTips.Compute(func(_ bool) bool {
+			return stronglyConnectedToTips || t.isEligibleWeakTip.Get() || t.isWeaklyReferencedByTips.Get()
 		})
 	})
 }
@@ -292,6 +284,36 @@ func (t *TipMetadata) setupIsStronglyReferencedByTips() {
 			return stronglyConnectedChildren > 0
 		})
 	})
+}
+
+func (t *TipMetadata) setupIsWeaklyReferencedByTips() {
+	t.weaklyConnectedChildren.OnUpdate(func(_, weaklyConnectedChildren int) {
+		t.isWeaklyReferencedByTips.Compute(func(_ bool) bool {
+			return weaklyConnectedChildren > 0
+		})
+	})
+}
+
+func (t *TipMetadata) registerStrongParent(strongParent *TipMetadata) {
+	// unsubscribe on eviction of the parent (prevent memory leaks).
+	strongParent.OnEvicted(
+		t.isStronglyConnectedToTips.OnUpdate(func(_, isStronglyConnectedToTips bool) {
+			strongParent.stronglyConnectedChildren.Compute(lo.Cond(isStronglyConnectedToTips, increase, decrease))
+		}),
+	)
+
+	strongParent.OnIsOrphanedUpdated(func(isOrphaned bool) {
+		t.orphanedStrongParents.Compute(lo.Cond(isOrphaned, increase, decrease))
+	})
+}
+
+func (t *TipMetadata) registerWeakParent(weakParent *TipMetadata) {
+	// unsubscribe on eviction of the parent (prevent memory leaks).
+	weakParent.OnEvicted(
+		t.weaklyConnectedToTips.OnUpdate(func(_, isConnected bool) {
+			weakParent.weaklyConnectedChildren.Compute(lo.Cond(isConnected, increase, decrease))
+		}),
+	)
 }
 
 // code contract (make sure the type implements all required methods).
