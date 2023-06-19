@@ -17,11 +17,11 @@ type TipMetadata struct {
 	// tipPool holds the TipPool the block is currently in.
 	tipPool *lpromise.Value[tipmanager.TipPool]
 
-	// stronglyConnectedChildren holds the number of strong children that can be reached from the selectTips using only strong
+	// stronglyConnectedChildren holds the number of strong children that can be reached from the tips using only strong
 	// references.
 	stronglyConnectedChildren *lpromise.Value[int]
 
-	// weaklyConnectedChildren holds the number of weak children that can be reached from the selectTips.
+	// weaklyConnectedChildren holds the number of weak children that can be reached from the tips.
 	weaklyConnectedChildren *lpromise.Value[int]
 
 	// stronglyReferencedByTips is a derived property that is true if the block has at least one strongly connected
@@ -32,7 +32,7 @@ type TipMetadata struct {
 	// child.
 	referencedByTips *lpromise.Value[bool]
 
-	// stronglyConnectedToTips is a derived property that is true if the block is either strongly referenced by selectTips or
+	// stronglyConnectedToTips is a derived property that is true if the block is either strongly referenced by tips or
 	// part of the strong TipPool.
 	stronglyConnectedToTips *lpromise.Value[bool]
 
@@ -40,10 +40,11 @@ type TipMetadata struct {
 	// at least one weakly connected child.
 	weaklyConnectedToTips *lpromise.Value[bool]
 
-	// strongTip is a derived property that is true if the block is part of the strong tip set.
+	// strongTip is a derived property that is true if the block is part of the strong TipPool, and is not
+	// stronglyReferencedByTips.
 	strongTip *lpromise.Value[bool]
 
-	// weakTip is a derived property that is true if the block is part of the weak tip set.
+	// weakTip is a derived property that is true if the block is part of the weak TipPool and is not referencedByTips.
 	weakTip *lpromise.Value[bool]
 
 	// orphanedStrongParents holds the number of parents that are orphaned.
