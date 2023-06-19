@@ -292,6 +292,3 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 
 // code contract (make sure the type implements all required methods).
 var _ tipmanager.TipMetadata = new(TipMetadata)
-
-// void is a function that does nothing.
-func void() {}
