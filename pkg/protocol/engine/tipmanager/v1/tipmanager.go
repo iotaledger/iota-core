@@ -50,7 +50,7 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 		e.HookConstructed(func() {
 			e.Events.Booker.BlockBooked.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
 			e.BlockCache.Evict.Hook(t.Evict)
-			e.Events.TipSelection.LinkTo(t.Events())
+			e.Events.TipManager.LinkTo(t.Events())
 
 			t.TriggerInitialized()
 		})

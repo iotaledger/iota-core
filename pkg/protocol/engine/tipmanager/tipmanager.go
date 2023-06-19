@@ -6,7 +6,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// TipManager is a component that maintains a perception of the tips of the Tangle.
+// TipManager is a component that maintains a perception of the unreferenced Blocks of the Tangle.
 type TipManager interface {
 	// AddBlock adds a block to the TipManager.
 	AddBlock(block *blocks.Block) TipMetadata
@@ -23,5 +23,6 @@ type TipManager interface {
 	// Events returns the events of the TipManager.
 	Events() *Events
 
+	// Interface embeds the required methods of the module.Interface.
 	module.Interface
 }
