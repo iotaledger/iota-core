@@ -180,7 +180,7 @@ func (n *Node) HookLogging() {
 	})
 
 	events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
-		fmt.Printf("%s > TipSelection.TipAdded: %s in pool %d\n", n.Name, tipMetadata.Block().ID(), tipMetadata.TipPool())
+		fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool())
 	})
 
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {

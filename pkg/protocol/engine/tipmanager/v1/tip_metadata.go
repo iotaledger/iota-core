@@ -40,12 +40,20 @@ type TipMetadata struct {
 	// at least one weakly connected child.
 	weaklyConnectedToTips *lpromise.Value[bool]
 
-	// strongTip is a derived property that is true if the block is part of the strong TipPool, and is not
-	// stronglyReferencedByTips.
-	strongTip *lpromise.Value[bool]
+	// isEligibleStrongTip is a derived property that is true if the block is part of the strong TipPool and is not
+	// orphaned.
+	isEligibleStrongTip *lpromise.Value[bool]
 
-	// weakTip is a derived property that is true if the block is part of the weak TipPool and is not referencedByTips.
-	weakTip *lpromise.Value[bool]
+	// isEligibleWeakTip is a derived property that is true if the block is part of the weak TipPool and is not
+	// orphaned.
+	isEligibleWeakTip *lpromise.Value[bool]
+
+	// isStrongTip is a derived property that is true if the block is part of the strong TipPool, and is not
+	// stronglyReferencedByTips.
+	isStrongTip *lpromise.Value[bool]
+
+	// isWeakTip is a derived property that is true if the block is part of the weak TipPool and is not referencedByTips.
+	isWeakTip *lpromise.Value[bool]
 
 	// orphanedStrongParents holds the number of strong parents that are orphaned.
 	orphanedStrongParents *lpromise.Value[int]
@@ -53,9 +61,9 @@ type TipMetadata struct {
 	// markedOrphaned is a property that is true if the block was marked as orphaned.
 	markedOrphaned *lpromise.Value[bool]
 
-	// orphaned is a derived property that is true if the block is either marked as orphaned or has at least one
+	// isOrphaned is a derived property that is true if the block is either marked as orphaned or has at least one
 	// orphaned strong parent.
-	orphaned *lpromise.Value[bool]
+	isOrphaned *lpromise.Value[bool]
 
 	// evicted is triggered when the block is removed from the TipManager.
 	evicted *promise.Event
@@ -72,11 +80,13 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		referencedByTips:          lpromise.NewValue[bool]().WithTriggerWithInitialZeroValue(true),
 		stronglyConnectedToTips:   lpromise.NewValue[bool](),
 		weaklyConnectedToTips:     lpromise.NewValue[bool](),
-		strongTip:                 lpromise.NewValue[bool](),
-		weakTip:                   lpromise.NewValue[bool](),
+		isEligibleStrongTip:       lpromise.NewValue[bool](),
+		isEligibleWeakTip:         lpromise.NewValue[bool](),
+		isStrongTip:               lpromise.NewValue[bool](),
+		isWeakTip:                 lpromise.NewValue[bool](),
 		orphanedStrongParents:     lpromise.NewValue[int](),
 		markedOrphaned:            lpromise.NewValue[bool](),
-		orphaned:                  lpromise.NewValue[bool](),
+		isOrphaned:                lpromise.NewValue[bool](),
 		evicted:                   promise.NewEvent(),
 	}).setup()
 }
@@ -110,32 +120,32 @@ func (t *TipMetadata) OnTipPoolUpdated(handler func(tipPool tipmanager.TipPool))
 
 // IsStrongTip returns true if the Block is part of the strong tip set.
 func (t *TipMetadata) IsStrongTip() bool {
-	return t.strongTip.Get()
+	return t.isStrongTip.Get()
 }
 
 // OnIsStrongTipUpdated registers a callback that is triggered when the IsStrongTip property of the Block is updated.
 func (t *TipMetadata) OnIsStrongTipUpdated(handler func(isStrongTip bool)) (unsubscribe func()) {
-	return t.strongTip.OnUpdate(func(_, isStrongTip bool) { handler(isStrongTip) })
+	return t.isStrongTip.OnUpdate(func(_, isStrongTip bool) { handler(isStrongTip) })
 }
 
 // IsWeakTip returns true if the Block is part of the weak tip set.
 func (t *TipMetadata) IsWeakTip() bool {
-	return t.weakTip.Get()
+	return t.isWeakTip.Get()
 }
 
 // OnIsWeakTipUpdated registers a callback that is triggered when the IsWeakTip property of the Block is updated.
 func (t *TipMetadata) OnIsWeakTipUpdated(handler func(isWeakTip bool)) (unsubscribe func()) {
-	return t.weakTip.OnUpdate(func(_, isWeakTip bool) { handler(isWeakTip) })
+	return t.isWeakTip.OnUpdate(func(_, isWeakTip bool) { handler(isWeakTip) })
 }
 
 // IsOrphaned returns true if the Block is orphaned.
 func (t *TipMetadata) IsOrphaned() bool {
-	return t.orphaned.Get()
+	return t.isOrphaned.Get()
 }
 
 // OnIsOrphanedUpdated registers a callback that is triggered when the IsOrphaned property of the Block is updated.
 func (t *TipMetadata) OnIsOrphanedUpdated(handler func(isOrphaned bool)) (unsubscribe func()) {
-	return t.orphaned.OnUpdate(func(_, isOrphaned bool) { handler(isOrphaned) })
+	return t.isOrphaned.OnUpdate(func(_, isOrphaned bool) { handler(isOrphaned) })
 }
 
 // IsEvicted returns true if the Block was removed from the TipManager.
@@ -150,61 +160,37 @@ func (t *TipMetadata) OnEvicted(handler func()) {
 
 // setup sets up the behavior of the derived properties of the Block.
 func (t *TipMetadata) setup() (self *TipMetadata) {
-	leaveCurrentTipPool := void
-
-	joinTipPool := func(isReferencedByTips *lpromise.Value[bool], isTip *lpromise.Value[bool]) {
-		unsubscribe := lo.Batch(
-			isReferencedByTips.OnUpdate(func(_, isReferenced bool) {
-				isTip.Compute(func(_ bool) bool {
-					return !isReferenced && !t.orphaned.Get()
-				})
-			}),
-
-			t.OnIsOrphanedUpdated(func(isOrphaned bool) {
-				isTip.Compute(func(_ bool) bool {
-					return !isOrphaned && !isReferencedByTips.Get()
-				})
-			}),
-		)
-
-		leaveCurrentTipPool = func() {
-			unsubscribe()
-
-			isTip.Set(false)
-
-			leaveCurrentTipPool = void
-		}
-	}
-
-	t.OnTipPoolUpdated(func(tipPool tipmanager.TipPool) {
-		leaveCurrentTipPool()
-
-		if tipPool == tipmanager.StrongTipPool {
-			joinTipPool(t.stronglyReferencedByTips, t.strongTip)
-		} else if tipPool == tipmanager.WeakTipPool {
-			joinTipPool(t.referencedByTips, t.weakTip)
-		}
-
-		t.stronglyConnectedToTips.Compute(func(_ bool) bool {
-			return tipPool == tipmanager.StrongTipPool || t.stronglyConnectedChildren.Get() > 0
+	t.isOrphaned.OnUpdate(func(_, isOrphaned bool) {
+		t.isEligibleStrongTip.Compute(func(_ bool) bool {
+			return !isOrphaned && t.tipPool.Get() == tipmanager.StrongTipPool
 		})
 
-		t.weaklyConnectedToTips.Compute(func(_ bool) bool {
-			return tipPool == tipmanager.WeakTipPool || t.weaklyConnectedChildren.Get() > 0
+		t.isEligibleWeakTip.Compute(func(_ bool) bool {
+			return !isOrphaned && t.tipPool.Get() == tipmanager.WeakTipPool
+		})
+	})
+
+	t.OnTipPoolUpdated(func(tipPool tipmanager.TipPool) {
+		t.isEligibleStrongTip.Compute(func(_ bool) bool {
+			return tipPool == tipmanager.StrongTipPool && !t.isOrphaned.Get()
+		})
+
+		t.isEligibleWeakTip.Compute(func(_ bool) bool {
+			return tipPool == tipmanager.WeakTipPool && !t.isOrphaned.Get()
 		})
 	})
 
 	t.stronglyConnectedChildren.OnUpdate(func(_, stronglyConnectedChildren int) {
 		t.stronglyConnectedToTips.Compute(func(_ bool) bool {
-			return stronglyConnectedChildren > 0 || t.tipPool.Get() == tipmanager.StrongTipPool
-		})
-
-		t.referencedByTips.Compute(func(_ bool) bool {
-			return stronglyConnectedChildren > 0 || t.weaklyConnectedChildren.Get() > 0
+			return stronglyConnectedChildren > 0 || t.isEligibleStrongTip.Get()
 		})
 
 		t.stronglyReferencedByTips.Compute(func(_ bool) bool {
 			return stronglyConnectedChildren > 0
+		})
+
+		t.referencedByTips.Compute(func(_ bool) bool {
+			return stronglyConnectedChildren > 0 || t.weaklyConnectedChildren.Get() > 0
 		})
 	})
 
@@ -219,14 +205,56 @@ func (t *TipMetadata) setup() (self *TipMetadata) {
 	})
 
 	t.markedOrphaned.OnUpdate(func(_, markedOrphaned bool) {
-		t.orphaned.Compute(func(_ bool) bool {
+		t.isOrphaned.Compute(func(_ bool) bool {
 			return markedOrphaned || t.orphanedStrongParents.Get() > 0
 		})
 	})
 
 	t.orphanedStrongParents.OnUpdate(func(_, orphanedStrongParents int) {
-		t.orphaned.Compute(func(_ bool) bool {
+		t.isOrphaned.Compute(func(_ bool) bool {
 			return orphanedStrongParents > 0 || t.markedOrphaned.Get()
+		})
+	})
+
+	joinTipPool := func(isReferencedByTips *lpromise.Value[bool], isTip *lpromise.Value[bool]) func() {
+		unsubscribe := isReferencedByTips.OnUpdate(func(_, isReferenced bool) {
+			isTip.Compute(func(_ bool) bool {
+				return !isReferenced
+			})
+		})
+
+		return func() {
+			unsubscribe()
+
+			isTip.Set(false)
+		}
+	}
+
+	leaveStrongTipPool := void
+	t.isEligibleStrongTip.OnUpdate(func(_, isEligibleStrongTip bool) {
+		if isEligibleStrongTip {
+			leaveStrongTipPool = joinTipPool(t.stronglyReferencedByTips, t.isStrongTip)
+		} else {
+			leaveStrongTipPool()
+			leaveStrongTipPool = void
+		}
+
+		t.stronglyConnectedToTips.Compute(func(_ bool) bool {
+			return isEligibleStrongTip || t.stronglyConnectedChildren.Get() > 0
+		})
+	})
+
+	leaveWeakTipPool := void
+	t.isEligibleWeakTip.OnUpdate(func(_, isEligibleWeakTip bool) {
+		if isEligibleWeakTip {
+			leaveWeakTipPool = joinTipPool(t.referencedByTips, t.isWeakTip)
+		} else {
+			leaveWeakTipPool()
+			leaveWeakTipPool = void
+		}
+
+		t.weaklyConnectedToTips.Compute(func(_ bool) bool {
+			return isEligibleWeakTip || t.weaklyConnectedChildren.Get() > 0
 		})
 	})
 

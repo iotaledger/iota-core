@@ -39,6 +39,7 @@ type TipManager struct {
 	// evictionMutex is used to synchronize the eviction of slots.
 	evictionMutex sync.RWMutex
 
+	// Module embeds the required module.Module interface.
 	module.Module
 }
 
