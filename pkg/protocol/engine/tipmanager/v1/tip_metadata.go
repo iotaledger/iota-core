@@ -2,7 +2,8 @@ package tipmanagerv1
 
 import (
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/hive.go/runtime/promise"
+	lpromise "github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -14,46 +15,46 @@ type TipMetadata struct {
 	block *blocks.Block
 
 	// tipPool holds the TipPool the block is currently in.
-	tipPool *promise.Value[tipmanager.TipPool]
+	tipPool *lpromise.Value[tipmanager.TipPool]
 
 	// stronglyConnectedChildren holds the number of strong children that can be reached from the selectTips using only strong
 	// references.
-	stronglyConnectedChildren *promise.Value[int]
+	stronglyConnectedChildren *lpromise.Value[int]
 
 	// weaklyConnectedChildren holds the number of weak children that can be reached from the selectTips.
-	weaklyConnectedChildren *promise.Value[int]
+	weaklyConnectedChildren *lpromise.Value[int]
 
 	// stronglyReferencedByTips is a derived property that is true if the block has at least one strongly connected
 	// child.
-	stronglyReferencedByTips *promise.Value[bool]
+	stronglyReferencedByTips *lpromise.Value[bool]
 
 	// referencedByTips is a derived property that is true if the block has at least one strongly or weakly connected
 	// child.
-	referencedByTips *promise.Value[bool]
+	referencedByTips *lpromise.Value[bool]
 
 	// stronglyConnectedToTips is a derived property that is true if the block is either strongly referenced by selectTips or
 	// part of the strong TipPool.
-	stronglyConnectedToTips *promise.Value[bool]
+	stronglyConnectedToTips *lpromise.Value[bool]
 
 	// weaklyConnectedToTips is a derived property that is true if the block is either part of the weak TipPool or has
 	// at least one weakly connected child.
-	weaklyConnectedToTips *promise.Value[bool]
+	weaklyConnectedToTips *lpromise.Value[bool]
 
 	// strongTip is a derived property that is true if the block is part of the strong tip set.
-	strongTip *promise.Value[bool]
+	strongTip *lpromise.Value[bool]
 
 	// weakTip is a derived property that is true if the block is part of the weak tip set.
-	weakTip *promise.Value[bool]
+	weakTip *lpromise.Value[bool]
 
 	// orphanedStrongParents holds the number of parents that are orphaned.
-	orphanedStrongParents *promise.Value[int]
+	orphanedStrongParents *lpromise.Value[int]
 
 	// markedOrphaned is a property that is true if the block was marked as orphaned.
-	markedOrphaned *promise.Value[bool]
+	markedOrphaned *lpromise.Value[bool]
 
 	// orphaned is a derived property that is true if the block is either marked as orphaned or has at least one
 	// orphaned strong parent.
-	orphaned *promise.Value[bool]
+	orphaned *lpromise.Value[bool]
 
 	// evicted is triggered when the block is removed from the TipManager.
 	evicted *promise.Event
@@ -63,18 +64,18 @@ type TipMetadata struct {
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	return (&TipMetadata{
 		block:                     block,
-		tipPool:                   promise.NewValue[tipmanager.TipPool](),
-		stronglyConnectedChildren: promise.NewValue[int](),
-		weaklyConnectedChildren:   promise.NewValue[int](),
-		stronglyReferencedByTips:  promise.NewValue[bool]().WithTriggerWithInitialZeroValue(true),
-		referencedByTips:          promise.NewValue[bool]().WithTriggerWithInitialZeroValue(true),
-		stronglyConnectedToTips:   promise.NewValue[bool](),
-		weaklyConnectedToTips:     promise.NewValue[bool](),
-		strongTip:                 promise.NewValue[bool](),
-		weakTip:                   promise.NewValue[bool](),
-		orphanedStrongParents:     promise.NewValue[int](),
-		markedOrphaned:            promise.NewValue[bool](),
-		orphaned:                  promise.NewValue[bool](),
+		tipPool:                   lpromise.NewValue[tipmanager.TipPool](),
+		stronglyConnectedChildren: lpromise.NewValue[int](),
+		weaklyConnectedChildren:   lpromise.NewValue[int](),
+		stronglyReferencedByTips:  lpromise.NewValue[bool]().WithTriggerWithInitialZeroValue(true),
+		referencedByTips:          lpromise.NewValue[bool]().WithTriggerWithInitialZeroValue(true),
+		stronglyConnectedToTips:   lpromise.NewValue[bool](),
+		weaklyConnectedToTips:     lpromise.NewValue[bool](),
+		strongTip:                 lpromise.NewValue[bool](),
+		weakTip:                   lpromise.NewValue[bool](),
+		orphanedStrongParents:     lpromise.NewValue[int](),
+		markedOrphaned:            lpromise.NewValue[bool](),
+		orphaned:                  lpromise.NewValue[bool](),
 		evicted:                   promise.NewEvent(),
 	}).setup()
 }
@@ -150,7 +151,7 @@ func (t *TipMetadata) OnEvicted(handler func()) {
 func (t *TipMetadata) setup() (self *TipMetadata) {
 	leaveCurrentTipPool := void
 
-	joinTipPool := func(isReferencedByTips *promise.Value[bool], isTip *promise.Value[bool]) {
+	joinTipPool := func(isReferencedByTips *lpromise.Value[bool], isTip *lpromise.Value[bool]) {
 		unsubscribe := lo.Batch(
 			isReferencedByTips.OnUpdate(func(_, isReferenced bool) {
 				isTip.Compute(func(_ bool) bool {
