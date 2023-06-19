@@ -336,7 +336,7 @@ func (m *Mode) prepareFunds() {
 			err = m.evilWallet.RequestFreshFaucetWallet()
 			m.preparingFunds = false
 		}()
-	case "10000":
+	case "1000":
 		go func() {
 			m.preparingFunds = true
 			_ = m.evilWallet.RequestFreshBigFaucetWallet()
@@ -344,16 +344,10 @@ func (m *Mode) prepareFunds() {
 		}()
 	case "cancel":
 		return
-	case "50000":
+	case "5000":
 		go func() {
 			m.preparingFunds = true
 			m.evilWallet.RequestFreshBigFaucetWallets(5)
-			m.preparingFunds = false
-		}()
-	case "100000":
-		go func() {
-			m.preparingFunds = true
-			m.evilWallet.RequestFreshBigFaucetWallets(10)
 			m.preparingFunds = false
 		}()
 	}
