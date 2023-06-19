@@ -313,7 +313,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// Verify nodes' states:
 		// - Slot 10 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 12.
 		// - rootblocks are evicted until slot 8 as RootBlocksEvictionDelay is 3.
-		// - slot 7 is finalized: there is a supermajority of confirmed blocks that commits to it.
+		// - Slot 7 is finalized: there is a supermajority of confirmed blocks that commits to it.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -983,7 +983,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.2")),
-			testsuite.WithStorageRootBlocks(ts.Blocks("5.1", "6.2", "8.1", "9.2", "10.2", "11.2")),
+			testsuite.WithStorageRootBlocks(ts.Blocks("6.2", "8.1", "9.2", "10.2", "11.2")),
 			testsuite.WithPrunedSlot(4, true), // latestFinalizedSlot - PruningDelay
 			testsuite.WithChainManagerIsSolid(),
 		)
@@ -1004,7 +1004,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			ts.IssueBlockAtSlot("16.1", 16, slot10Commitment, node1, ts.BlockID("15.2"))
 			ts.IssueBlockAtSlot("17.2", 17, slot10Commitment, node21, ts.BlockID("16.1"))
 
-			ts.AssertBlocksInCachePreAccepted(ts.Blocks("16.2", "16.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCachePreAccepted(ts.Blocks("15.2", "16.1"), true, ts.Nodes()...)
 			ts.AssertBlocksInCachePreConfirmed(ts.Blocks("15.2", "16.1"), true, ts.Nodes()...)
 
 			ts.AssertBlocksInCachePreAccepted(ts.Blocks("17.2"), false, ts.Nodes()...)

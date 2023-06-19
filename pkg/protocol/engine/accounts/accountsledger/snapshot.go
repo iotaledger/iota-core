@@ -253,6 +253,7 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 		var innerErr error
 		slotDiffs := m.slotDiff(slotIndex)
 		if slotDiffs == nil {
+			// if slotIndex is already pruned, then don't write anything
 			continue
 		}
 
