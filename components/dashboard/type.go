@@ -167,7 +167,8 @@ type ExplorerBlock struct {
 	// PayloadType defines the type of the payload.
 	PayloadType iotago.PayloadType `json:"payloadType"`
 	// Payload is the content of the payload.
-	Payload json.RawMessage `json:"payload"`
+	Payload       json.RawMessage `json:"payload"`
+	TransactionID string          `json:"txId,omitempty"`
 
 	// Structure details
 	Rank          uint64 `json:"rank"`

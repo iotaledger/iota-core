@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -128,7 +129,24 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 			}
 			return iotago.PayloadType(0)
 		}(),
-		Payload:      payloadJSON,
+		Payload: func() json.RawMessage {
+			if iotaBlk.Payload != nil && iotaBlk.Payload.PayloadType() == iotago.PayloadTransaction {
+				tx := NewTransaction(iotaBlk.Payload.(*iotago.Transaction))
+				bytes, _ := json.Marshal(tx)
+
+				return bytes
+			}
+			return payloadJSON
+		}(),
+		TransactionID: func() string {
+			if iotaBlk.Payload != nil && iotaBlk.Payload.PayloadType() == iotago.PayloadTransaction {
+				tx := iotaBlk.Payload.(*iotago.Transaction)
+				id, _ := tx.ID()
+
+				return id.ToHex()
+			}
+			return ""
+		}(),
 		CommitmentID: commitmentID.ToHex(),
 		Commitment: CommitmentResponse{
 			Index:            uint64(iotaBlk.SlotCommitment.Index),

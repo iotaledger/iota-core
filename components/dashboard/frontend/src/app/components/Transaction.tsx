@@ -7,7 +7,7 @@ import {outputToComponent} from "../utils/output";
 import {IconContext} from "react-icons";
 import {FaChevronCircleRight} from "react-icons/fa";
 import {UnlockBlock} from "./UnlockBlock";
-import {Transaction as TransactionJSON} from "../misc/Payload";
+import {TransactionPayload} from "../misc/Payload";
 
 const style = {
     maxHeight: "1000px",
@@ -18,7 +18,7 @@ const style = {
 
 interface Props {
     txID?: string;
-    tx?: TransactionJSON;
+    tx?: TransactionPayload;
 }
 
 export class Transaction extends React.Component<Props, any> {
@@ -50,7 +50,11 @@ export class Transaction extends React.Component<Props, any> {
                                             return (
                                                 <div className={"mb-2"} key={i}>
                                                     <span className="mb-2">Index: <Badge variant={"primary"}>{i}</Badge></span>
-                                                    {outputToComponent(input.output)}
+                                                    <div className={"mb-2"} key={"input"+i}>
+                                                        <ListGroup>
+                                                            <ListGroup.Item>Output ID: {input.referencedOutputID.hex}</ListGroup.Item>
+                                                        </ListGroup>
+                                                    </div>
                                                 </div>
                                             )
                                         })}
@@ -89,7 +93,6 @@ export class Transaction extends React.Component<Props, any> {
                                 tx.unlocks.map((block,index) => (
                                     <UnlockBlock
                                         block={block}
-                                        index={index}
                                         key={index}
                                     />
                                 ))}

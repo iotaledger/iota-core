@@ -30,9 +30,9 @@ import (
 
 // Output represents the JSON model of a ledgerstate.Output.
 type Output struct {
-	OutputID *OutputID       `json:"outputID,omitempty"`
-	Type     string          `json:"type"`
-	Output   json.RawMessage `json:"output"`
+	OutputID *OutputID         `json:"outputID,omitempty"`
+	Type     iotago.OutputType `json:"type"`
+	Output   json.RawMessage   `json:"output"`
 }
 
 // NewOutput returns an Output from the given ledgerstate.Output.
@@ -43,7 +43,7 @@ func NewOutput(output iotago.Output) (result *Output) {
 	}
 
 	return &Output{
-		Type:   output.Type().String(),
+		Type:   output.Type(),
 		Output: outputJSON,
 	}
 }
@@ -57,7 +57,7 @@ func NewOutputFromLedgerstateOutput(output *ledgerstate.Output) (result *Output)
 
 	return &Output{
 		OutputID: NewOutputID(output.OutputID()),
-		Type:     output.OutputType().String(),
+		Type:     output.OutputType(),
 		Output:   outputJSON,
 	}
 }
@@ -116,6 +116,7 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 
 // Transaction represents the JSON model of a ledgerstate.Transaction.
 type Transaction struct {
+	TransactionID    string                  `json:"txId"`
 	NetworkID        iotago.NetworkID        `json:"networkId"`
 	CreationTime     int64                   `json:"creationTime"`
 	Inputs           []*Input                `json:"inputs"`
@@ -141,7 +142,9 @@ func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
 	for i, output := range iotaTx.Essence.Outputs {
 		outputs[i] = NewOutput(output)
 		outputs[i].OutputID = &OutputID{
-			Hex: iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(i)).ToHex(),
+			Hex:           iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(i)).ToHex(),
+			TransactionID: txID.ToHex(),
+			OutputIndex:   uint16(i),
 		}
 	}
 
@@ -156,12 +159,13 @@ func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
 	}
 
 	return &Transaction{
-		NetworkID:    iotaTx.Essence.NetworkID,
-		CreationTime: iotaTx.Essence.CreationTime.Unix(),
-		Inputs:       inputs,
-		Outputs:      outputs,
-		Unlocks:      unlockBlocks,
-		Payload:      dataPayload,
+		TransactionID: txID.ToHex(),
+		NetworkID:     iotaTx.Essence.NetworkID,
+		CreationTime:  iotaTx.Essence.CreationTime.Unix(),
+		Inputs:        inputs,
+		Outputs:       outputs,
+		Unlocks:       unlockBlocks,
+		Payload:       dataPayload,
 	}
 }
 
@@ -196,10 +200,9 @@ func NewInput(input iotago.Input) *Input {
 
 // UnlockBlock represents the JSON model of a ledgerstate.UnlockBlock.
 type UnlockBlock struct {
-	Type            string               `json:"type"`
-	ReferencedIndex uint16               `json:"referencedIndex,omitempty"`
-	SignatureType   iotago.SignatureType `json:"signatureType,omitempty"`
-	Signature       json.RawMessage      `json:"signature,omitempty"`
+	Type          string               `json:"type"`
+	SignatureType iotago.SignatureType `json:"signatureType,omitempty"`
+	Signature     json.RawMessage      `json:"signature,omitempty"`
 }
 
 // NewUnlockBlock returns an UnlockBlock from the given ledgerstate.UnlockBlock.
@@ -217,6 +220,7 @@ func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
 				return nil
 			}
 			result.Signature = sigJSON
+			result.SignatureType = iotago.SignatureEd25519
 		}
 	}
 
