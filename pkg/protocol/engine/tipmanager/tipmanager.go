@@ -24,6 +24,9 @@ type TipManager interface {
 	// AddBlock adds a block to the TipManager.
 	AddBlock(block *blocks.Block) TipMetadata
 
+	// OnBlockAdded registers a callback that is triggered whenever a new Block was added to the TipManager.
+	OnBlockAdded(handler func(block TipMetadata)) (unsubscribe func())
+
 	// StrongTips returns the strong tips of the TipManager (with an optional limit).
 	StrongTips(optAmount ...int) []TipMetadata
 
@@ -32,9 +35,6 @@ type TipManager interface {
 
 	// Evict evicts a block from the TipManager.
 	Evict(slotIndex iotago.SlotIndex)
-
-	// Events returns the events of the TipManager.
-	Events() *Events
 
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface

@@ -52,14 +52,12 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 		t := New(e.TipManager, e.Ledger.ConflictDAG(), e.EvictionState.LatestRootBlocks, opts...)
 
 		e.HookConstructed(func() {
-			e.TipManager.HookConstructed(func() {
-				e.TipManager.Events().BlockAdded.Hook(t.classifyTip)
+			e.TipManager.OnBlockAdded(t.classifyTip)
 
-				t.TriggerInitialized()
-			})
-
-			e.TipManager.HookStopped(t.TriggerStopped)
+			t.TriggerInitialized()
 		})
+
+		e.HookStopped(t.TriggerStopped)
 
 		return t
 	})

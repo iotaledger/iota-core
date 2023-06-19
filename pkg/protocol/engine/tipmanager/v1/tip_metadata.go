@@ -47,7 +47,7 @@ type TipMetadata struct {
 	// weakTip is a derived property that is true if the block is part of the weak TipPool and is not referencedByTips.
 	weakTip *lpromise.Value[bool]
 
-	// orphanedStrongParents holds the number of parents that are orphaned.
+	// orphanedStrongParents holds the number of strong parents that are orphaned.
 	orphanedStrongParents *lpromise.Value[int]
 
 	// markedOrphaned is a property that is true if the block was marked as orphaned.

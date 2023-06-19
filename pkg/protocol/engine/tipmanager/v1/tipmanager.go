@@ -30,14 +30,14 @@ type TipManager struct {
 	// weakTipSet contains the blocks of the weak tip pool that have no referencing children.
 	weakTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
 
+	// blockAdded is triggered when a new Block was added to the TipManager.
+	blockAdded *event.Event1[tipmanager.TipMetadata]
+
 	// lastEvictedSlot is the last slot index that was evicted from the MemPool.
 	lastEvictedSlot iotago.SlotIndex
 
 	// evictionMutex is used to synchronize the eviction of slots.
 	evictionMutex sync.RWMutex
-
-	// events contains all the events that are triggered by the TipManager.
-	events *tipmanager.Events
 
 	module.Module
 }
@@ -50,7 +50,7 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 		e.HookConstructed(func() {
 			e.Events.Booker.BlockBooked.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
 			e.BlockCache.Evict.Hook(t.Evict)
-			e.Events.TipManager.LinkTo(t.Events())
+			e.Events.TipManager.BlockAdded.LinkTo(t.blockAdded)
 
 			t.TriggerInitialized()
 		})
@@ -68,7 +68,7 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 		tipMetadataStorage: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
 		strongTipSet:       randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:         randommap.New[iotago.BlockID, *TipMetadata](),
-		events:             tipmanager.NewEvents(),
+		blockAdded:         event.New1[tipmanager.TipMetadata](),
 	}, opts, (*TipManager).TriggerConstructed)
 }
 
@@ -81,9 +81,14 @@ func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
 
 	t.setupBlockMetadata(tipMetadata)
 
-	t.events.BlockAdded.Trigger(tipMetadata)
+	t.blockAdded.Trigger(tipMetadata)
 
 	return tipMetadata
+}
+
+// OnBlockAdded registers a callback that is triggered whenever a new Block was added to the TipManager.
+func (t *TipManager) OnBlockAdded(handler func(block tipmanager.TipMetadata)) (unsubscribe func()) {
+	return t.blockAdded.Hook(handler).Unhook
 }
 
 // StrongTips returns the strong selectTips of the TipManager (with an optional limit).
@@ -111,13 +116,9 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 	}
 }
 
-// Events returns the events of the TipManager.
-func (t *TipManager) Events() *tipmanager.Events {
-	return t.events
-}
-
+// Shutdown is currently required by the module.Interface.
 func (t *TipManager) Shutdown() {
-	// TODO: remove unnecessary shutdown logic
+	// TODO: remove unnecessary shutdown requirement from interface in hive.go.
 }
 
 // setupBlockMetadata sets up the behavior of the given Block.
