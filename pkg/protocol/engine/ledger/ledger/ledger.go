@@ -293,7 +293,7 @@ func (l *Ledger) Shutdown() {
 // Process the collected account changes. The consumedAccounts and createdAccounts maps only contain outputs with a
 // BIC feature, so allotments made to account without a BIC feature are not tracked here, and they are burned as a result.
 // There are 3 possible cases:
-// 1. The account was only consumed but not created in this slot, therefore, it is marked as destroyed and its latest
+// 1. The account was only consumed but not created in this slot, therefore, it is marked as destroyed, and its latest
 // state is stored as diff to allow a rollback.
 // 2. The account was consumed and created in the same slot, the account was transitioned, and we have to store the
 // changes in the diff.

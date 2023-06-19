@@ -126,6 +126,7 @@ func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 	destroyedAccounts := make(map[iotago.AccountID]*accounts.AccountData)
 
 	for index := m.latestCommittedSlot; index > targetIndex; index-- {
+		// no need to check if `m.slotDiff(index)` is nil, because it is impossible to export a pruned slot
 		err = m.slotDiff(index).StreamDestroyed(func(accountID iotago.AccountID) bool {
 			// actual data will be filled in by rollbackAccountTo
 			accountData := accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
@@ -167,8 +168,14 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 		if err := binary.Read(reader, binary.LittleEndian, &accountsInDiffCount); err != nil {
 			return errors.Wrap(err, "unable to read accounts count")
 		}
+		if accountsInDiffCount == 0 {
+			continue
+		}
 
 		diffStore := m.slotDiff(slotIndex)
+		if diffStore == nil {
+			return errors.Errorf("unable to import account slot diffs for slot %d", slotIndex)
+		}
 
 		for j := uint64(0); j < accountsInDiffCount; j++ {
 			accountID, accountDiff, destroyed, err := readSlotDiff(reader)

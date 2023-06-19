@@ -92,6 +92,10 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 
 func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountID) (*prunable.AccountDiff, bool, error) {
 	s := m.slotDiff(index)
+	if s == nil {
+		return nil, false, errors.Errorf("slot %d already pruned", index)
+	}
+
 	accDiff, destroyed, err := s.Load(accountID)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to load slot diff for account %s", accountID.String())
@@ -250,7 +254,7 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		accountData.AddPublicKeys(diffChange.PubKeysRemoved...)
 		accountData.RemovePublicKeys(diffChange.PubKeysAdded...)
 
-		// collected to see if account was destroyed between slotIndex and b.latestCommittedSlot index.
+		// collected to see if an account was destroyed between slotIndex and b.latestCommittedSlot index.
 		wasDestroyed = wasDestroyed || destroyed
 	}
 
@@ -258,7 +262,7 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 }
 
 func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) error {
-	// load diffs storage for the slot
+	// Load diffs storage for the slot. The storage can never be nil (pruned) because we are just committing the slot.
 	diffStore := m.slotDiff(slotIndex)
 	for accountID, accountDiff := range accountDiffs {
 		destroyed := destroyedAccounts.Has(accountID)
