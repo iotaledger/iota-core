@@ -166,10 +166,11 @@ func (o *OutputManager) AddOutput(w *Wallet, output *Output) *Output {
 		OutputID:     output.OutputID,
 		Balance:      output.Balance,
 		CreationTime: output.CreationTime,
+		OutputStruct: output.OutputStruct,
 	}
 	w.AddUnspentOutput(out)
-	o.setOutputIDWalletMap(output.OutputID.ToHex(), w)
-	o.setOutputIDAddrMap(output.OutputID.ToHex(), output.Address.String())
+	o.setOutputIDWalletMap(out.OutputID.ToHex(), w)
+	o.setOutputIDAddrMap(out.OutputID.ToHex(), output.Address.String())
 
 	return out
 }

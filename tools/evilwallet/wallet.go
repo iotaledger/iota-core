@@ -146,7 +146,7 @@ func (w *Wallet) IsEmpty() (empty bool) {
 	case Reuse:
 		empty = len(w.reuseAddressPool) == 0
 	default:
-		empty = w.lastAddrSpent.Load() == w.lastAddrIdxUsed.Load() || w.UnspentOutputsLength() == 0
+		empty = w.UnspentOutputsLength() == 0
 	}
 	return
 }

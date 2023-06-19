@@ -161,7 +161,7 @@ func (e *EvilWallet) RequestFundsFromFaucet(options ...FaucetRequestOption) (ini
 	return
 }
 
-// RequestFreshBigFaucetWallets creates n new wallets, each wallet is created from one faucet request and contains 10000 outputs.
+// RequestFreshBigFaucetWallets creates n new wallets, each wallet is created from one faucet request and contains 1000 outputs.
 func (e *EvilWallet) RequestFreshBigFaucetWallets(numberOfWallets int) {
 	// channel to block the number of concurrent goroutines
 	semaphore := make(chan bool, maxGoroutines)
@@ -187,7 +187,7 @@ func (e *EvilWallet) RequestFreshBigFaucetWallets(numberOfWallets int) {
 	wg.Wait()
 }
 
-// RequestFreshBigFaucetWallet creates a new wallet and fills the wallet with 10000 outputs created from funds
+// RequestFreshBigFaucetWallet creates a new wallet and fills the wallet with 1000 outputs created from funds
 // requested from the Faucet.
 func (e *EvilWallet) RequestFreshBigFaucetWallet() (err error) {
 	initWallet := NewWallet()
@@ -195,9 +195,11 @@ func (e *EvilWallet) RequestFreshBigFaucetWallet() (err error) {
 
 	receiveWallet := e.NewWallet(Fresh)
 
-	err = e.requestAndSplitFaucetFunds(initWallet, receiveWallet)
-	if err != nil {
-		return
+	for i := 0; i < 10; i++ {
+		err = e.requestAndSplitFaucetFunds(initWallet, receiveWallet)
+		if err != nil {
+			return
+		}
 	}
 
 	e.wallets.SetWalletReady(receiveWallet)
@@ -230,7 +232,7 @@ func (e *EvilWallet) requestAndSplitFaucetFunds(initWallet, receiveWallet *Walle
 }
 
 func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputID, err error) {
-	receiveAddr := wallet.Address()
+	receiveAddr := wallet.AddressOnIndex(0)
 	clt := e.connector.GetClient()
 
 	faucetAddr := e.faucet.AddressOnIndex(e.optFaucetIndex)
@@ -312,11 +314,12 @@ func (e *EvilWallet) splitOutputs(inputWallet, outputWallet *Wallet) error {
 		return err
 	}
 
-	_, err = e.connector.GetClient().PostTransaction(tx)
+	blkID, err := e.connector.GetClient().PostTransaction(tx)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
+	fmt.Println("split 100 outputs, blkID:", blkID)
 
 	// wait txs to be confirmed
 	e.outputManager.AwaitTransactionsConfirmation(iotago.TransactionIDs{lo.PanicOnErr(tx.ID())}, maxGoroutines)
@@ -426,7 +429,7 @@ func (e *EvilWallet) CreateTransaction(options ...Option) (tx *iotago.Transactio
 	if hasRemainder {
 		outputs = append(outputs, remainder)
 		if alias != "" && addrAliasMap != nil {
-			addrAliasMap[*remainderAddr] = alias
+			addrAliasMap[remainderAddr.String()] = alias
 		}
 	}
 
@@ -442,18 +445,20 @@ func (e *EvilWallet) CreateTransaction(options ...Option) (tx *iotago.Transactio
 }
 
 // addOutputsToOutputManager adds output to the OutputManager if.
-func (e *EvilWallet) addOutputsToOutputManager(tx *iotago.Transaction, outWallet, tmpWallet *Wallet, tempAddresses map[iotago.Ed25519Address]types.Empty) {
+func (e *EvilWallet) addOutputsToOutputManager(tx *iotago.Transaction, outWallet, tmpWallet *Wallet, tempAddresses map[string]types.Empty) {
 	for idx, o := range tx.Essence.Outputs {
 		addr := o.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address)
 		out := &Output{
 			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), uint16(idx)),
 			Address:      addr,
 			Balance:      o.Deposit(),
-			OutputStruct: o}
+			OutputStruct: o,
+		}
 
-		if _, ok := tempAddresses[*addr]; ok {
+		if _, ok := tempAddresses[addr.String()]; ok {
 			e.outputManager.AddOutput(tmpWallet, out)
 		} else {
+			out.Index = outWallet.AddrIndexMap(addr.String())
 			e.outputManager.AddOutput(outWallet, out)
 		}
 	}
@@ -479,25 +484,21 @@ func (e *EvilWallet) updateInputWallet(buildOptions *Options) error {
 	return nil
 }
 
-func (e *EvilWallet) registerOutputAliases(tx *iotago.Transaction, addrAliasMap map[iotago.Ed25519Address]string) {
+func (e *EvilWallet) registerOutputAliases(tx *iotago.Transaction, addrAliasMap map[string]string) {
 	if len(addrAliasMap) == 0 {
 		return
 	}
 
-	for idx, output := range tx.Essence.Outputs {
-		addr := output.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address)
+	for idx := range tx.Essence.Outputs {
 		id := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), uint16(idx))
-		out := &Output{
-			OutputID:     id,
-			Address:      addr,
-			Balance:      output.Deposit(),
-			OutputStruct: output,
-		}
+		out := e.outputManager.GetOutput(id)
+		fmt.Println("get output from outputmanager:", out.OutputStruct)
+
 		// register output alias
-		e.aliasManager.AddOutputAlias(out, addrAliasMap[*addr])
+		e.aliasManager.AddOutputAlias(out, addrAliasMap[out.Address.String()])
 
 		// register output as unspent output(input)
-		e.aliasManager.AddInputAlias(out, addrAliasMap[*addr])
+		e.aliasManager.AddInputAlias(out, addrAliasMap[out.Address.String()])
 	}
 }
 
@@ -519,7 +520,7 @@ func (e *EvilWallet) prepareInputs(buildOptions *Options) (inputs []*Output, err
 
 // prepareOutputs creates outputs for different scenarios, if no aliases were provided, new empty outputs are created from buildOptions.outputs balances.
 func (e *EvilWallet) prepareOutputs(buildOptions *Options, tempWallet *Wallet) (outputs []iotago.Output,
-	addrAliasMap map[iotago.Ed25519Address]string, tempAddresses map[iotago.Ed25519Address]types.Empty, err error,
+	addrAliasMap map[string]string, tempAddresses map[string]types.Empty, err error,
 ) {
 	if buildOptions.areOutputsProvidedWithoutAliases() {
 		outputs = append(outputs, buildOptions.outputs...)
@@ -543,8 +544,8 @@ func (e *EvilWallet) matchInputsWithAliases(buildOptions *Options) (inputs []*Ou
 				return
 			}
 			// No output found for given alias, use internal Fresh output if wallets are non-empty.
-			out := e.wallets.GetUnspentOutput(wallet)
-			if out == nil {
+			in = e.wallets.GetUnspentOutput(wallet)
+			if in == nil {
 				return nil, errors.New("could not get unspent output")
 			}
 			e.aliasManager.AddInputAlias(in, inputAlias)
@@ -579,25 +580,30 @@ func (e *EvilWallet) useFreshIfInputWalletNotProvided(buildOptions *Options) (*W
 // that indicates which outputs should be saved to the outputWallet.All other outputs are created with temporary wallet,
 // and their addresses are stored in tempAddresses.
 func (e *EvilWallet) matchOutputsWithAliases(buildOptions *Options, tempWallet *Wallet) (outputs []iotago.Output,
-	addrAliasMap map[iotago.Ed25519Address]string, tempAddresses map[iotago.Ed25519Address]types.Empty, err error) {
+	addrAliasMap map[string]string, tempAddresses map[string]types.Empty, err error) {
 	err = e.updateOutputBalances(buildOptions)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	tempAddresses = make(map[iotago.Ed25519Address]types.Empty)
-	addrAliasMap = make(map[iotago.Ed25519Address]string)
+	tempAddresses = make(map[string]types.Empty)
+	addrAliasMap = make(map[string]string)
 	for alias, output := range buildOptions.aliasOutputs {
-		var addr iotago.Ed25519Address
+		var addr *iotago.Ed25519Address
 		if _, ok := buildOptions.outputBatchAliases[alias]; ok {
-			addr = *buildOptions.outputWallet.Address()
+			addr = buildOptions.outputWallet.Address()
 		} else {
-			addr = *tempWallet.Address()
-			tempAddresses[addr] = types.Void
+			addr = tempWallet.Address()
+			tempAddresses[addr.String()] = types.Void
 		}
 
-		outputs = append(outputs, output)
-		addrAliasMap[addr] = alias
+		outputs = append(outputs, &iotago.BasicOutput{
+			Amount: output.Deposit(),
+			Conditions: iotago.BasicOutputUnlockConditions{
+				&iotago.AddressUnlockCondition{Address: addr},
+			},
+		})
+		addrAliasMap[addr.String()] = alias
 	}
 
 	return
@@ -669,8 +675,7 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 					err = errors.New("could not get input by input alias")
 					return
 				}
-				output := e.outputManager.GetOutput(in.OutputID)
-				totalBalance += output.Balance
+				totalBalance += in.Balance
 			}
 		}
 		balances := SplitBalanceEqually(len(buildOptions.outputs)+len(buildOptions.aliasOutputs), totalBalance)
@@ -711,6 +716,7 @@ func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[io
 		}
 		index := wallet.AddrIndexMap(addr.String())
 		inputPrivateKey, _ := wallet.KeyPair(index)
+		fmt.Println(addr, index, inputPrivateKey)
 		walletKeys[i] = iotago.AddressKeys{Address: addr, Keys: inputPrivateKey}
 	}
 
