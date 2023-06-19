@@ -2,6 +2,7 @@ package tpkg
 
 import (
 	"github.com/iotaledger/hive.go/crypto/ed25519"
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	tpkg2 "github.com/iotaledger/iota.go/v4/tpkg"
@@ -12,13 +13,7 @@ type TestSuite struct {
 	aliasAcocunts map[iotago.AccountID]string
 
 	pubKeys map[string]ed25519.PublicKey
-}
-
-type AccountMetadata struct {
-	LastUpdated      iotago.SlotIndex
-	PrevLastUpdated  iotago.SlotIndex
-	LastOutputID     iotago.OutputID
-	PrevLastOutputID iotago.OutputID
+	outputs map[string]iotago.OutputID
 }
 
 func NewTestSuite() *TestSuite {
@@ -26,6 +21,7 @@ func NewTestSuite() *TestSuite {
 		accounts:      make(map[string]iotago.AccountID),
 		aliasAcocunts: make(map[iotago.AccountID]string),
 		pubKeys:       make(map[string]ed25519.PublicKey),
+		outputs:       make(map[string]iotago.OutputID),
 	}
 }
 
@@ -54,23 +50,29 @@ func (t *TestSuite) PublicKey(alias string) ed25519.PublicKey {
 	return t.pubKeys[alias]
 }
 
-// updateActions updated metadata for the account with the given alias.
-func (t *TestSuite) updateActions(accountID iotago.AccountID, index iotago.SlotIndex, actions *AccountActions, prevActions *AccountActions) {
-	alias, exists := t.GetAlias(accountID)
-	if !exists {
-		panic("account does not exist in this Scenario, cannot update the metadata")
+func (t *TestSuite) OutputID(alias string) iotago.OutputID {
+	if outputID, exists := t.outputs[alias]; exists {
+		return outputID
 	}
-	if _, exists = t.accounts[alias]; !exists {
-		panic("account does not exist in this Scenario, cannot update the metadata")
-	}
+	t.outputs[alias] = tpkg2.RandOutputID(1)
 
-	// we already committed in the past, so we replace past values with the current ones
+	return t.outputs[alias]
+}
 
-	if prevActions != nil {
-		actions.prevUpdatedTime = prevActions.updatedTime
-		actions.prevOutputID = prevActions.outputID
+func (t *TestSuite) PubKeys(pubKeys []string) []ed25519.PublicKey {
+	keys := make([]ed25519.PublicKey, len(pubKeys))
+	for i, pubKey := range pubKeys {
+		keys[i] = t.PublicKey(pubKey)
 	}
 
-	actions.outputID = tpkg2.RandOutputID(1)
-	actions.updatedTime = index
+	return keys
+}
+
+func (t *TestSuite) PubKeysSet(expectedkeys []string) *advancedset.AdvancedSet[ed25519.PublicKey] {
+	pubKeys := advancedset.New[ed25519.PublicKey]()
+	for _, pubKey := range expectedkeys {
+		pubKeys.Add(t.PublicKey(pubKey))
+	}
+
+	return pubKeys
 }

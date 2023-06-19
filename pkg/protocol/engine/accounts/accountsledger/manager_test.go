@@ -15,27 +15,7 @@ import (
 	tpkg2 "github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-var testSceanrios = []struct {
-	name     string
-	scenario tpkg.ScenarioFunc
-}{
-	{
-		name:     "Scenario1: Simple allotment and burn",
-		scenario: tpkg.Scenario1,
-	},
-	{
-		name:     "Scenario2: Deletion of an account",
-		scenario: tpkg.Scenario2,
-	},
-	{
-		name:     "Scenario3: Simple allotment with no changes for a slot",
-		scenario: tpkg.Scenario3,
-	},
-	{
-		name:     "Scenario4: Public Keys and allotments",
-		scenario: tpkg.Scenario4,
-	},
-}
+var testScenarios = []*tpkg.Scenario{tpkg.Scenario1, tpkg.Scenario2, tpkg.Scenario3, tpkg.Scenario4, tpkg.Scenario5}
 
 func TestManager_TrackBlock(t *testing.T) {
 	burns := map[iotago.SlotIndex]map[iotago.AccountID]uint64{
@@ -66,8 +46,8 @@ func TestManager_TrackBlock(t *testing.T) {
 }
 
 func TestManager_CommitAccountTree(t *testing.T) {
-	for _, test := range testSceanrios {
-		t.Run(test.name, func(t *testing.T) {
+	for _, test := range testScenarios {
+		t.Run(test.Name, func(t *testing.T) {
 			params := tpkg.ProtocolParams()
 			slotDiffFunc := tpkg.InitSlotDiff()
 			blockFunc := func(iotago.BlockID) (*blocks.Block, bool) { return nil, false }
@@ -75,7 +55,7 @@ func TestManager_CommitAccountTree(t *testing.T) {
 			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
 			manager.SetMaxCommittableAge(iotago.SlotIndex(params.MaxCommitableAge))
 
-			scenarioBuildData, scenarioExpected, _, _ := tpkg.InitScenario(t, test.scenario)
+			scenarioBuildData, scenarioExpected, _, _ := test.InitScenario(t)
 
 			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
 				// apply burns to the slot diff
@@ -95,11 +75,11 @@ func TestManager_CommitAccountTree(t *testing.T) {
 }
 
 func TestManager_Account(t *testing.T) {
-	for _, test := range testSceanrios {
-		t.Run(test.name, func(t *testing.T) {
+	for _, test := range testScenarios {
+		t.Run(test.Name, func(t *testing.T) {
 			params := tpkg.ProtocolParams()
 			// account vector is now on the last slot of the scenario
-			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, test.scenario)
+			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := test.InitScenario(t)
 			manager := InitAccountLedger(t, blockFunc, params.MaxCommitableAge, scenarioBuildData, burnedBlocks)
 			// get the value from the past slots, testing the rollback
 			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
@@ -124,9 +104,9 @@ func TestManager_Account(t *testing.T) {
 }
 
 func TestManager_CommitSlot(t *testing.T) {
-	for _, test := range testSceanrios {
-		t.Run(test.name, func(t *testing.T) {
-			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := tpkg.InitScenario(t, test.scenario)
+	for _, test := range testScenarios {
+		t.Run(test.Name, func(t *testing.T) {
+			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := test.InitScenario(t)
 			params := tpkg.ProtocolParams()
 
 			slotDiffFunc := tpkg.InitSlotDiff()
@@ -153,7 +133,7 @@ func TestManager_CommitSlot(t *testing.T) {
 
 }
 
-func AssertAccountManagerSlotState(t *testing.T, manager *Manager, expectedData *tpkg.AccountsLedgerTestScenario) {
+func AssertAccountManagerSlotState(t *testing.T, manager *Manager, expectedData *tpkg.AccountsExpectedData) {
 	// assert accounts vector is updated correctly
 	for accID, expectedAccData := range expectedData.AccountsLedger {
 		actualData, exists, err2 := manager.Account(accID)

@@ -52,26 +52,10 @@ func TestAccountDiffSnapshotWriter(t *testing.T) {
 }
 
 func TestManager_Import_Export(t *testing.T) {
-	tests := []struct {
-		name     string
-		scenario tpkg.ScenarioFunc
-	}{
-		{
-			name:     "Scenario1: Simple allotment and burn",
-			scenario: tpkg.Scenario1,
-		},
-		{
-			name:     "Scenario2: Deletion of an account",
-			scenario: tpkg.Scenario2,
-		},
-		{
-			name:     "Scenario3: Public Keys and allotments",
-			scenario: tpkg.Scenario3,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			scenarioBuildData, expectedData, blockFunc, burnedBlocks := tpkg.InitScenario(t, test.scenario)
+
+	for _, test := range testScenarios {
+		t.Run(test.Name, func(t *testing.T) {
+			scenarioBuildData, expectedData, blockFunc, burnedBlocks := test.InitScenario(t)
 			params := tpkg.ProtocolParams()
 
 			manager := InitAccountLedger(t, blockFunc, params.MaxCommitableAge, scenarioBuildData, burnedBlocks)
