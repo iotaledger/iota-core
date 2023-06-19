@@ -105,7 +105,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCachePreConfirmed(ts.Blocks("3.1"), false, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("1.2"), true, ts.Nodes()...)
-		ts.AssertBlocksInCacheConfirmed(ts.Blocks("1.2"), false, ts.Nodes()...) // too old. confirmation ratification threshold = 2
+		ts.AssertBlocksInCacheConfirmed(ts.Blocks("1.2"), true, ts.Nodes()...)
 
 		// Slot 4
 		ts.IssueBlockAtSlot("4.2", 4, iotago.NewEmptyCommitment(), node2, ts.BlockID("3.1"))

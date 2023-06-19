@@ -156,8 +156,7 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 
 	block := node.IssueBlock(context.Background(), alias, blockissuer.WithIssuingTime(issuingTime), blockissuer.WithSlotCommitment(slotCommitment), blockissuer.WithStrongParents(parents...))
 
-	t.blocks.Set(alias, block)
-	block.ID().RegisterAlias(alias)
+	t.registerBlock(alias, block)
 
 	return block
 }
@@ -168,8 +167,7 @@ func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...optio
 
 	block := node.IssueBlock(context.Background(), alias, blockOpts...)
 
-	t.blocks.Set(alias, block)
-	block.ID().RegisterAlias(alias)
+	t.registerBlock(alias, block)
 
 	return block
 }
@@ -178,8 +176,21 @@ func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
+	t.registerBlock(alias, block)
+}
+
+func (t *TestSuite) registerBlock(alias string, block *blocks.Block) {
 	t.blocks.Set(alias, block)
 	block.ID().RegisterAlias(alias)
+}
+
+func (t *TestSuite) CreateBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockissuer.BlockParams]) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	block := node.CreateBlock(context.Background(), alias, blockOpts...)
+
+	t.registerBlock(alias, block)
 }
 
 func (t *TestSuite) CreateTransactionWithInputsAndOutputs(consumedInputs ledgerstate.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) *iotago.Transaction {
