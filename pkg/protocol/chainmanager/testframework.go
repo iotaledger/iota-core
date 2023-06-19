@@ -62,14 +62,14 @@ func NewTestFramework(test *testing.T, api iotago.API, opts ...options.Option[Te
 	})
 }
 
-func (t *TestFramework) CreateCommitment(alias string, prevAlias string) {
+func (t *TestFramework) CreateCommitment(alias string, prevAlias string, cumulativeWeight uint64) {
 	t.Lock()
 	defer t.Unlock()
 
 	prevCommitmentID, previousIndex := t.previousCommitmentID(prevAlias)
 	randomECR := blake2b.Sum256([]byte(alias + prevAlias))
 
-	cm, err := model.CommitmentFromCommitment(iotago.NewCommitment(previousIndex+1, prevCommitmentID, randomECR, 0), t.api)
+	cm, err := model.CommitmentFromCommitment(iotago.NewCommitment(previousIndex+1, prevCommitmentID, randomECR, cumulativeWeight), t.api)
 	require.NoError(t.test, err)
 	t.commitmentsByAlias[alias] = cm
 	t.commitmentsByAlias[alias].ID().RegisterAlias(alias)

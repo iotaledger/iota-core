@@ -8,21 +8,21 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/app v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/autopeering v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/constraints v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/ds v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/lo v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/logger v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230526052236-2f12ddd752ca
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230526052236-2f12ddd752ca
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230505140033-037b26225f31
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230609115008-d88fc07a8dbf
+	github.com/iotaledger/hive.go/ads v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/app v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/autopeering v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/ds v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/lo v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/logger v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230619114856-4d7e932cf2c2
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230619114856-4d7e932cf2c2
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230615141449-ea86404db0d3
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230615133219-af623a6eb4a0
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.27.3
@@ -35,7 +35,7 @@ require (
 	github.com/zyedidia/generic v1.2.1
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.0
-	golang.org/x/crypto v0.9.0
+	golang.org/x/crypto v0.10.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 	google.golang.org/protobuf v1.30.0
 )
@@ -48,9 +48,9 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/celestiaorg/smt v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/cockroachdb/errors v1.9.1 // indirect
+	github.com/cockroachdb/errors v1.10.0 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
-	github.com/cockroachdb/redact v1.1.4 // indirect
+	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -58,14 +58,13 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/eclipse/paho.mqtt.golang v1.4.2 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/getsentry/sentry-go v0.21.0 // indirect
+	github.com/getsentry/sentry-go v0.22.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -123,10 +122,8 @@ require (
 	github.com/multiformats/go-multihash v0.2.1 // indirect
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/natefinch/atomic v1.0.1 // indirect
-	github.com/oasisprotocol/ed25519 v0.0.0-20210505154701-76d8c688d86e // indirect
 	github.com/onsi/ginkgo/v2 v2.9.2 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
-	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/petermattis/goid v0.0.0-20230518223814-80aa455d8761 // indirect
@@ -154,11 +151,10 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53 // indirect
 	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/term v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/net v0.11.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
+	golang.org/x/sys v0.9.0 // indirect
+	golang.org/x/text v0.10.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

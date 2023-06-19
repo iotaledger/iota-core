@@ -15,7 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
@@ -31,10 +31,10 @@ type TipManager struct {
 	retrieveRootBlocks func() iotago.BlockIDs
 
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
 
 	// memPool holds information about pending transactions.
-	memPool mempool.MemPool[booker.BlockVotePower]
+	memPool mempool.MemPool[ledger.BlockVotePower]
 
 	// tipMetadataStorage contains the TipMetadata of all Blocks that are managed by the TipManager.
 	tipMetadataStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]
@@ -87,7 +87,7 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 }
 
 // NewTipManager creates a new TipManager.
-func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipManager]) *TipManager {
+func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipManager]) *TipManager {
 	return options.Apply(&TipManager{
 		retrieveBlock:                blockRetriever,
 		retrieveRootBlocks:           rootBlocksRetriever,
@@ -139,7 +139,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 		}
 	}
 
-	_ = t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]) error {
+	_ = t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]) error {
 		likedConflicts := advancedset.New[iotago.TransactionID]()
 
 		likedInsteadReferences := func(tipMetadata *TipMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {

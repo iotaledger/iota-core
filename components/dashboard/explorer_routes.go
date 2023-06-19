@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
+	"github.com/iotaledger/iota.go/v4/hexutil"
 
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -116,7 +117,7 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 		NetworkID:           iotaBlk.NetworkID,
 		IssuanceTimestamp:   iotaBlk.IssuingTime.Unix(),
 		IssuerID:            iotaBlk.IssuerID.String(),
-		Signature:           iotago.EncodeHex(sigBytes),
+		Signature:           hexutil.EncodeHex(sigBytes),
 		StrongParents:       iotaBlk.StrongParents.ToHex(),
 		WeakParents:         iotaBlk.WeakParents.ToHex(),
 		ShallowLikedParents: iotaBlk.ShallowLikeParents.ToHex(),
