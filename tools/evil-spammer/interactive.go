@@ -135,7 +135,7 @@ var timeUnits = []string{mpm, mps}
 var (
 	scenarios     = []string{"blk", "tx", "ds", "conflict-circle", "guava", "orange", "mango", "pear", "lemon", "banana", "kiwi", "peace"}
 	confirms      = []string{"enable", "disable"}
-	outputNumbers = []string{"100", "10000", "50000", "100000", "cancel"}
+	outputNumbers = []string{"100", "1000", "5000", "cancel"}
 )
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -330,7 +330,6 @@ func (m *Mode) prepareFunds() {
 	}
 	switch numToPrepareStr {
 	case "100":
-
 		go func() {
 			m.preparingFunds = true
 			err = m.evilWallet.RequestFreshFaucetWallet()
