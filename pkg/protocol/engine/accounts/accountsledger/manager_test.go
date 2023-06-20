@@ -1,149 +1,237 @@
-package accountsledger
+package accountsledger_test
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger/tpkg"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
-	"github.com/iotaledger/iota-core/pkg/utils"
-	iotago "github.com/iotaledger/iota.go/v4"
-	tpkg2 "github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-var testScenarios = []*tpkg.Scenario{tpkg.Scenario1, tpkg.Scenario2, tpkg.Scenario3, tpkg.Scenario4, tpkg.Scenario5}
+func TestManager_Scenario1(t *testing.T) {
+	ts := NewTestSuite(t)
 
-func TestManager_TrackBlock(t *testing.T) {
-	burns := map[iotago.SlotIndex]map[iotago.AccountID]uint64{
-		1: {
-			tpkg2.RandAccountID(): utils.RandAmount(),
-			tpkg2.RandAccountID(): utils.RandAmount(),
-			tpkg2.RandAccountID(): utils.RandAmount(),
-			tpkg2.RandAccountID(): utils.RandAmount(),
+	ts.ApplySlotActions(1, map[string]*AccountActions{
+		"A": {
+			TotalAllotments: 10,
+			Burns:           []uint64{5},
+			AddedKeys:       []string{"A.P1"},
+
+			NewOutputID: "A1",
 		},
-	}
-	blockFunc, blockIDs := tpkg.BlockFuncGen(t, burns)
-	slotDiffFunc := func(iotago.SlotIndex) *prunable.AccountDiffs {
-		return nil
-	}
-	accountsStore := mapdb.NewMapDB()
-	params := tpkg.ProtocolParams()
-	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
-	manager.SetMaxCommittableAge(iotago.SlotIndex(params.MaxCommitableAge))
+	})
 
-	for _, blockID := range blockIDs[1] {
-		block, exist := blockFunc(blockID)
-		require.True(t, exist)
-		manager.TrackBlock(block)
-	}
-	managerBurns, err := manager.computeBlockBurnsForSlot(1)
-	require.NoError(t, err)
-	assert.EqualValues(t, burns[1], managerBurns)
+	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
+		"A": {
+			UpdatedTime: 1,
+			Amount:      5,
+			PubKeys:     []string{"A.P1"},
+			OutputID:    "A1",
+		},
+	})
+
+	ts.ApplySlotActions(2, map[string]*AccountActions{
+		"A": {
+			TotalAllotments: 30,
+			Burns:           []uint64{15},
+			AddedKeys:       []string{"A.P2"},
+
+			NewOutputID: "A2",
+		}},
+	)
+
+	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
+		"A": {
+			Amount:      20,
+			PubKeys:     []string{"A.P1", "A.P2"},
+			OutputID:    "A2",
+			UpdatedTime: 2,
+		},
+	})
 }
 
-func TestManager_CommitAccountTree(t *testing.T) {
-	for _, test := range testScenarios {
-		t.Run(test.Name, func(t *testing.T) {
-			params := tpkg.ProtocolParams()
-			slotDiffFunc := tpkg.InitSlotDiff()
-			blockFunc := func(iotago.BlockID) (*blocks.Block, bool) { return nil, false }
-			accountsStore := mapdb.NewMapDB()
-			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
-			manager.SetMaxCommittableAge(iotago.SlotIndex(params.MaxCommitableAge))
+func TestManager_Scenario2(t *testing.T) {
+	ts := NewTestSuite(t)
 
-			scenarioBuildData, scenarioExpected, _, _ := test.InitScenario(t)
+	ts.ApplySlotActions(1, map[string]*AccountActions{
+		"A": {
+			TotalAllotments: 10,
+			Burns:           []uint64{5},
+			AddedKeys:       []string{"A.P1"},
 
-			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
-				// apply burns to the slot diff
-				manager.updateSlotDiffWithBurns(scenarioBuildData[index].Burns, scenarioBuildData[index].SlotDiff)
+			NewOutputID: "A1",
+		},
+	})
 
-				manager.commitAccountTree(index, scenarioBuildData[index].SlotDiff, scenarioBuildData[index].DestroyedAccounts)
+	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
+		"A": {
+			UpdatedTime: 1,
+			Amount:      5,
+			PubKeys:     []string{"A.P1"},
+			OutputID:    "A1",
+		},
+	})
 
-				for accountID, expectedData := range scenarioExpected[index].AccountsLedger {
-					actualData, exists, err2 := manager.Account(accountID)
-					assert.NoError(t, err2)
-					assert.True(t, exists)
-					assert.Equal(t, expectedData, actualData)
-				}
-			}
-		})
-	}
+	ts.ApplySlotActions(2, nil)
+	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
+		"A": {
+			UpdatedTime: 1,
+			Amount:      5,
+			PubKeys:     []string{"A.P1"},
+			OutputID:    "A1",
+		},
+	})
+
+	ts.ApplySlotActions(3, map[string]*AccountActions{
+		"A": {
+			TotalAllotments: 30,
+			Burns:           []uint64{15},
+			AddedKeys:       []string{"A.P2"},
+
+			NewOutputID: "A2",
+		}},
+	)
+
+	ts.AssertAccountLedgerUntil(3, map[string]*AccountState{
+		"A": {
+			Amount:      20,
+			PubKeys:     []string{"A.P1", "A.P2"},
+			OutputID:    "A2",
+			UpdatedTime: 3,
+		},
+	})
 }
 
-func TestManager_Account(t *testing.T) {
-	for _, test := range testScenarios {
-		t.Run(test.Name, func(t *testing.T) {
-			params := tpkg.ProtocolParams()
-			// account vector is now on the last slot of the scenario
-			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := test.InitScenario(t)
-			manager := InitAccountLedger(t, blockFunc, params.MaxCommitableAge, scenarioBuildData, burnedBlocks)
-			// get the value from the past slots, testing the rollback
-			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
-				for accountID, accData := range scenarioExpected[index].AccountsLedger {
-					actualData, exists, err := manager.Account(accountID, index)
-					assert.NoError(t, err)
-					assert.True(t, exists)
-					tpkg.EqualAccountData(t, accData, actualData)
-				}
-				// check if all destroyed accounts are not found
-				err := scenarioBuildData[index].DestroyedAccounts.ForEach(func(accountID iotago.AccountID) error {
-					_, exists, err := manager.Account(accountID, index)
-					assert.NoError(t, err)
-					assert.False(t, exists)
+func TestManager_Scenario3(t *testing.T) {
+	ts := NewTestSuite(t)
+	ts.ApplySlotActions(1, map[string]*AccountActions{
+		"A": {
+			TotalAllotments: 10,
+			Burns:           []uint64{5},
+			AddedKeys:       []string{"A.P1"},
 
-					return nil
-				})
-				require.NoError(t, err)
-			}
-		})
-	}
+			NewOutputID: "A1",
+		},
+	})
+
+	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
+		"A": {
+			UpdatedTime: 1,
+			Amount:      5,
+			PubKeys:     []string{"A.P1"},
+			OutputID:    "A1",
+		},
+	})
+
+	ts.ApplySlotActions(2, map[string]*AccountActions{
+		"A": {
+			Destroyed: true,
+		},
+	})
+
+	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
+		"A": {
+			Destroyed:   true,
+			UpdatedTime: 2,
+		},
+	})
 }
 
-func TestManager_CommitSlot(t *testing.T) {
-	for _, test := range testScenarios {
-		t.Run(test.Name, func(t *testing.T) {
-			scenarioBuildData, scenarioExpected, blockFunc, burnedBlocks := test.InitScenario(t)
-			params := tpkg.ProtocolParams()
+func TestManager_Scenario4(t *testing.T) {
+	ts := NewTestSuite(t)
 
-			slotDiffFunc := tpkg.InitSlotDiff()
-			accountsStore := mapdb.NewMapDB()
+	ts.ApplySlotActions(1, map[string]*AccountActions{
+		"A": {
+			TotalAllotments: 10,
+			Burns:           []uint64{5},
+			AddedKeys:       []string{"A.P1"},
 
-			manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
-			manager.SetMaxCommittableAge(iotago.SlotIndex(params.MaxCommitableAge))
+			NewOutputID: "A1",
+		},
+	})
 
-			for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
-				for _, burningBlock := range burnedBlocks[index] {
-					block, exists := blockFunc(burningBlock)
-					assert.True(t, exists)
-					manager.TrackBlock(block)
-				}
-				slotBuildData := scenarioBuildData[index]
+	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
+		"A": {
+			UpdatedTime: 1,
+			Amount:      5,
+			PubKeys:     []string{"A.P1"},
+			OutputID:    "A1",
+		},
+	})
 
-				err := manager.ApplyDiff(index, slotBuildData.SlotDiff, slotBuildData.DestroyedAccounts)
-				require.NoError(t, err)
-				expectedData := scenarioExpected[index]
-				AssertAccountManagerSlotState(t, manager, expectedData)
-			}
-		})
-	}
+	ts.ApplySlotActions(2, nil)
+	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
+		"A": {
+			UpdatedTime: 1,
+			Amount:      5,
+			PubKeys:     []string{"A.P1"},
+			OutputID:    "A1",
+		},
+	})
 
+	ts.ApplySlotActions(3, map[string]*AccountActions{
+		"A": { // zero out the account data before removal
+			Burns:       []uint64{5},
+			RemovedKeys: []string{"A.P1"},
+
+			NewOutputID: "A2",
+		}},
+	)
+
+	ts.AssertAccountLedgerUntil(3, map[string]*AccountState{
+		"A": {
+			Amount:      0,
+			PubKeys:     []string{},
+			OutputID:    "A2",
+			UpdatedTime: 3,
+		},
+	})
+
+	ts.ApplySlotActions(4, map[string]*AccountActions{
+		"A": {
+			Destroyed: true,
+		},
+	})
+
+	ts.AssertAccountLedgerUntil(4, map[string]*AccountState{
+		"A": {
+			Destroyed: true,
+
+			UpdatedTime: 4,
+		},
+	})
 }
 
-func AssertAccountManagerSlotState(t *testing.T, manager *Manager, expectedData *tpkg.AccountsExpectedData) {
-	// assert accounts vector is updated correctly
-	for accID, expectedAccData := range expectedData.AccountsLedger {
-		actualData, exists, err2 := manager.Account(accID)
-		assert.NoError(t, err2)
-		assert.True(t, exists)
-		tpkg.EqualAccountData(t, expectedAccData, actualData)
-	}
-	for accID, expectedDiff := range expectedData.AccountsDiffs {
-		actualAccDiff, _, err2 := manager.LoadSlotDiff(expectedData.LatestCommittedSlotIndex, accID)
-		require.NoError(t, err2)
-		assert.Equal(t, expectedDiff, actualAccDiff)
-	}
+func TestManager_Scenario5(t *testing.T) {
+	ts := NewTestSuite(t)
+	ts.ApplySlotActions(1, map[string]*AccountActions{
+		"A": {
+			TotalAllotments: 5,
+			Burns:           []uint64{5},
+			AddedKeys:       []string{"A1", "A2"},
+
+			NewOutputID: "A1",
+		},
+	})
+
+	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
+		"A": {
+			UpdatedTime: 1,
+			Amount:      0,
+			PubKeys:     []string{"A1", "A2"},
+			OutputID:    "A1",
+		},
+	})
+
+	ts.ApplySlotActions(2, map[string]*AccountActions{
+		"A": {
+			TotalAllotments: 5,
+			Burns:           []uint64{5},
+			AddedKeys:       []string{"A3", "A4"},
+			Destroyed:       true,
+		},
+	})
+	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
+		"A": {
+			Destroyed: true,
+
+			UpdatedTime: 2,
+		},
+	})
 }

@@ -1,121 +1,91 @@
-package accountsledger
+package accountsledger_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/orcaman/writerseeker"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger/tpkg"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func TestSlotDiffSnapshotWriter(t *testing.T) {
-	accountID := utils.RandAccountID()
-	accountDiff := tpkg.RandomAccountDiff()
-	writer := &writerseeker.WriterSeeker{}
-	pWriter := utils.NewPositionedWriter(writer)
-	err := writeSlotDiff(pWriter, accountID, *accountDiff, true)
-
-	accountIDRead, accountDiffRead, destroyedRead, err := readSlotDiff(writer.BytesReader())
-	require.NoError(t, err)
-	require.Equal(t, accountDiff, accountDiffRead)
-	require.Equal(t, accountID, accountIDRead)
-	require.Equal(t, true, destroyedRead)
-}
-
-func TestAccountDataSnapshotWriter(t *testing.T) {
-	accountData := tpkg.RandomAccountData()
-	accountsDataBytes, _ := accountData.Bytes()
-	buf := bytes.NewReader(accountsDataBytes)
-
-	readAccountsData, err := readAccountData(tpkg.API(), buf)
-	require.NoError(t, err)
-
-	tpkg.EqualAccountData(t, accountData, readAccountsData)
-}
-
-func TestAccountDiffSnapshotWriter(t *testing.T) {
-	accountData := tpkg.RandomAccountData()
-	writer := &writerseeker.WriterSeeker{}
-	pWriter := utils.NewPositionedWriter(writer)
-	err := writeAccountData(pWriter, accountData)
-	require.NoError(t, err)
-	readAccountsData, err := readAccountData(tpkg.API(), writer.BytesReader())
-	require.NoError(t, err)
-	tpkg.EqualAccountData(t, accountData, readAccountsData)
-}
-
 func TestManager_Import_Export(t *testing.T) {
+	ts := NewTestSuite(t)
 
-	for _, test := range testScenarios {
-		t.Run(test.Name, func(t *testing.T) {
-			scenarioBuildData, expectedData, blockFunc, burnedBlocks := test.InitScenario(t)
-			params := tpkg.ProtocolParams()
+	ts.ApplySlotActions(1, map[string]*AccountActions{
+		"A": {
+			TotalAllotments: 10,
+			Burns:           []uint64{5},
+			AddedKeys:       []string{"A.P1"},
 
-			manager := InitAccountLedger(t, blockFunc, params.MaxCommitableAge, scenarioBuildData, burnedBlocks)
-			writer := &writerseeker.WriterSeeker{}
+			NewOutputID: "A1",
+		},
+	})
 
-			AssertAccountManagerState(t, manager, expectedData)
+	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
+		"A": {
+			UpdatedTime: 1,
+			Amount:      5,
+			PubKeys:     []string{"A.P1"},
+			OutputID:    "A1",
+		},
+	})
 
-			err := manager.Export(writer, iotago.SlotIndex(1))
-			require.NoError(t, err)
-			slotDiffFunc := tpkg.InitSlotDiff()
-			accountsStore := mapdb.NewMapDB()
+	ts.ApplySlotActions(2, nil)
+	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
+		"A": {
+			UpdatedTime: 1,
+			Amount:      5,
+			PubKeys:     []string{"A.P1"},
+			OutputID:    "A1",
+		},
+	})
 
-			newManager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
-			newManager.SetMaxCommittableAge(iotago.SlotIndex(params.MaxCommitableAge))
+	ts.ApplySlotActions(3, map[string]*AccountActions{
+		"A": { // zero out the account data before removal
+			Burns:       []uint64{5},
+			RemovedKeys: []string{"A.P1"},
 
-			err = newManager.Import(writer.BytesReader())
-			require.NoError(t, err)
+			NewOutputID: "A2",
+		}},
+	)
 
-			AssertAccountManagerState(t, newManager, expectedData)
-		})
-	}
-}
+	ts.AssertAccountLedgerUntil(3, map[string]*AccountState{
+		"A": {
+			Amount:      0,
+			PubKeys:     []string{},
+			OutputID:    "A2",
+			UpdatedTime: 3,
+		},
+	})
 
-func InitAccountLedger(t *testing.T, blockFunc func(iotago.BlockID) (*blocks.Block, bool), mca uint32, scenarioBuildData map[iotago.SlotIndex]*tpkg.AccountsSlotBuildData, burnedBlocks map[iotago.SlotIndex][]iotago.BlockID) *Manager {
-	slotDiffFunc := tpkg.InitSlotDiff()
-	accountsStore := mapdb.NewMapDB()
+	ts.ApplySlotActions(4, map[string]*AccountActions{
+		"A": {
+			Destroyed: true,
+		},
+	})
 
-	// feed the manager with the data
-	manager := New(blockFunc, slotDiffFunc, accountsStore, tpkg.API())
-	manager.SetMaxCommittableAge(iotago.SlotIndex(mca))
+	ts.AssertAccountLedgerUntil(4, map[string]*AccountState{
+		"A": {
+			Destroyed: true,
 
-	for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioBuildData)); index++ {
-		for _, burningBlock := range burnedBlocks[index] {
-			block, exists := blockFunc(burningBlock)
-			assert.True(t, exists)
-			manager.TrackBlock(block)
-		}
-		slotBuildData := scenarioBuildData[index]
-		err := manager.ApplyDiff(index, slotBuildData.SlotDiff, slotBuildData.DestroyedAccounts)
+			UpdatedTime: 4,
+		},
+	})
+
+	// Export and import the account ledger into new manager.
+	{
+
+		writer := &writerseeker.WriterSeeker{}
+
+		err := ts.Instance.Export(writer, iotago.SlotIndex(4))
 		require.NoError(t, err)
-	}
-	return manager
-}
 
-// AssertAccountManagerState asserts the state of the account manager for diffs per slot, and for accountLedger at the end.
-func AssertAccountManagerState(t *testing.T, manager *Manager, scenarioExpected tpkg.ExpectedAccountsLedgers) {
-	// assert diffs for each slot without asserting the vector
-	for index := iotago.SlotIndex(1); index <= iotago.SlotIndex(len(scenarioExpected)); index++ {
-		expectedData := scenarioExpected[index]
-		for accID, expectedDiff := range expectedData.AccountsDiffs {
-			actualAccDiff, _, err2 := manager.LoadSlotDiff(expectedData.LatestCommittedSlotIndex, accID)
-			require.NoError(t, err2)
-			assert.Equal(t, expectedDiff, actualAccDiff)
-		}
-	}
-	expectedEndData := scenarioExpected[iotago.SlotIndex(len(scenarioExpected))]
-	for accID, expectedAccData := range expectedEndData.AccountsLedger {
-		actualData, exists, err2 := manager.Account(accID)
-		assert.NoError(t, err2)
-		assert.True(t, exists)
-		assert.Equal(t, expectedAccData, actualData)
+		ts.Instance = ts.initAccountLedger()
+		err = ts.Instance.Import(writer.BytesReader())
+		require.NoError(t, err)
+		ts.Instance.SetLatestCommittedSlot(4)
+
+		ts.AssertAccountLedgerUntilWithoutNewState(4)
 	}
 }

@@ -62,6 +62,17 @@ func (b AccountDiff) Bytes() ([]byte, error) {
 	return m.Bytes(), nil
 }
 
+func (b *AccountDiff) Clone() *AccountDiff {
+	return &AccountDiff{
+		Change:              b.Change,
+		PreviousUpdatedTime: b.PreviousUpdatedTime,
+		NewOutputID:         b.NewOutputID,
+		PreviousOutputID:    b.PreviousOutputID,
+		PubKeysAdded:        lo.CopySlice(b.PubKeysAdded),
+		PubKeysRemoved:      lo.CopySlice(b.PubKeysRemoved),
+	}
+}
+
 func (b *AccountDiff) FromBytes(bytes []byte) (int, error) {
 	m := marshalutil.New(bytes)
 
