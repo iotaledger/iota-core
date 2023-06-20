@@ -8,7 +8,11 @@ import (
 )
 
 type Events struct {
-	Error *event.Event1[error]
+	Started                  *event.Event
+	Stopped                  *event.Event
+	CandidateEngineActivated *event.Event1[*engine.Engine]
+	MainEngineSwitched       *event.Event1[*engine.Engine]
+	Error                    *event.Event1[error]
 
 	Network      *core.Events
 	Engine       *engine.Events
@@ -19,7 +23,11 @@ type Events struct {
 
 var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 	return &Events{
-		Error: event.New1[error](),
+		Started:                  event.New(),
+		Stopped:                  event.New(),
+		CandidateEngineActivated: event.New1[*engine.Engine](),
+		MainEngineSwitched:       event.New1[*engine.Engine](),
+		Error:                    event.New1[error](),
 
 		Network:      core.NewEvents(),
 		Engine:       engine.NewEvents(),

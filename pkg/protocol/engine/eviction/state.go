@@ -215,15 +215,22 @@ func (s *State) LatestRootBlocks() iotago.BlockIDs {
 }
 
 // Export exports the root blocks to the given writer.
-func (s *State) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
+// The lowerTarget is usually going to be the last finalized slot because Rootblocks are special when creating a snapshot.
+// They not only are needed as a Tangle root on the slot we're targeting to export (usually last committed slot) but also to derive the rootcommitment.
+// The rootcommitment, however, must not depend on the committed slot but on the finalized slot. Otherwise, we could never switch a chain after committing (as the rootcommitment is our genesis and we don't solidify/switch chains below it).
+func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targetSlot iotago.SlotIndex) (err error) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	start, _ := s.activeIndexRange()
+	start, _ := s.delayedBlockEvictionThreshold(lowerTarget)
 
 	return stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		for currentSlot := start; currentSlot <= targetSlot; currentSlot++ {
-			if err = s.rootBlockStorageFunc(currentSlot).Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
+			storage := s.rootBlockStorageFunc(currentSlot)
+			if storage == nil {
+				continue
+			}
+			if err = storage.Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
 				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
 					return errors.Wrapf(err, "failed to write root block ID %s", rootBlockID)
 				}
@@ -257,7 +264,11 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 			return errors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
 		}
 
-		s.AddRootBlock(rootBlockID, commitmentID)
+		if s.rootBlocks.Get(rootBlockID.Index(), true).Set(rootBlockID, commitmentID) {
+			if err := s.rootBlockStorageFunc(rootBlockID.Index()).Store(rootBlockID, commitmentID); err != nil {
+				panic(errors.Wrapf(err, "failed to store root block %s", rootBlockID))
+			}
+		}
 
 		return nil
 	})
@@ -266,11 +277,13 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 // PopulateFromStorage populates the root blocks from the storage.
 func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 	for index := lo.Return1(s.delayedBlockEvictionThreshold(latestCommitmentIndex)); index <= latestCommitmentIndex; index++ {
-		_ = s.rootBlockStorageFunc(index).Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
-			s.AddRootBlock(id, commitmentID)
+		if storedRootBlocks := s.rootBlockStorageFunc(index); storedRootBlocks != nil {
+			_ = storedRootBlocks.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
+				s.AddRootBlock(id, commitmentID)
 
-			return nil
-		})
+				return nil
+			})
+		}
 	}
 }
 
@@ -298,7 +311,25 @@ func (s *State) withinActiveIndexRange(index iotago.SlotIndex) bool {
 // delayedBlockEvictionThreshold returns the slot index that is the threshold for delayed rootblocks eviction.
 func (s *State) delayedBlockEvictionThreshold(slotIndex iotago.SlotIndex) (threshold iotago.SlotIndex, shouldEvict bool) {
 	if slotIndex >= s.optsRootBlocksEvictionDelay {
-		return slotIndex - s.optsRootBlocksEvictionDelay, true
+		// Check if there are even root blocks at the delayed index (empty slots were committed).
+		// We keep shifting the eviction to the past until we find a slot that has root blocks, or we get to genesis.
+		for ; slotIndex > 0; slotIndex-- {
+			if rb := s.rootBlocks.Get(slotIndex); rb != nil {
+				if rb.Size() > 0 {
+					return slotIndex - s.optsRootBlocksEvictionDelay, true
+				}
+			} else if storedRootBlocks := s.rootBlockStorageFunc(slotIndex); storedRootBlocks != nil {
+				found := false
+				_ = storedRootBlocks.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
+					found = true
+					return errors.New("no error, just stop")
+				})
+
+				if found {
+					return slotIndex - s.optsRootBlocksEvictionDelay, true
+				}
+			}
+		}
 	}
 
 	return 0, false

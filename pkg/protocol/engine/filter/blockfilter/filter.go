@@ -90,6 +90,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	}
 
 	// Check if the block is trying to commit to a slot that is not yet committable.
+	// This check, together with the optsMaxAllowedWallClockDrift makes sure, that no one can issue blocks with commitments in the future.
 	if f.optsMinCommittableSlotAge > 0 &&
 		block.SlotCommitment().Index() > 0 &&
 		(block.SlotCommitment().Index() > block.ID().Index() ||

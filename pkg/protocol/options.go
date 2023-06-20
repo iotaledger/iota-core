@@ -20,80 +20,86 @@ import (
 )
 
 func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsBaseDirectory = baseDirectory
+	return func(p *Protocol) {
+		p.optsBaseDirectory = baseDirectory
 	}
 }
 
 func WithSnapshotPath(snapshot string) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsSnapshotPath = snapshot
+	return func(p *Protocol) {
+		p.optsSnapshotPath = snapshot
+	}
+}
+
+func WithChainSwitchingThreshold(threshold int) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsChainSwitchingThreshold = threshold
 	}
 }
 
 func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, filter.Filter]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsFilterProvider = optsFilterProvider
+	return func(p *Protocol) {
+		p.optsFilterProvider = optsFilterProvider
 	}
 }
 
 func WithBlockDAGProvider(optsBlockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsBlockDAGProvider = optsBlockDAGProvider
+	return func(p *Protocol) {
+		p.optsBlockDAGProvider = optsBlockDAGProvider
 	}
 }
 
 func WithTipManagerProvider(optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsTipManagerProvider = optsTipManagerProvider
+	return func(p *Protocol) {
+		p.optsTipManagerProvider = optsTipManagerProvider
 	}
 }
 
 func WithBookerProvider(optsBookerProvider module.Provider[*engine.Engine, booker.Booker]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsBookerProvider = optsBookerProvider
+	return func(p *Protocol) {
+		p.optsBookerProvider = optsBookerProvider
 	}
 }
 
 func WithClockProvider(optsClockProvider module.Provider[*engine.Engine, clock.Clock]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsClockProvider = optsClockProvider
+	return func(p *Protocol) {
+		p.optsClockProvider = optsClockProvider
 	}
 }
 
 func WithSybilProtectionProvider(optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsSybilProtectionProvider = optsSybilProtectionProvider
+	return func(p *Protocol) {
+		p.optsSybilProtectionProvider = optsSybilProtectionProvider
 	}
 }
 
 func WithBlockGadgetProvider(optsBlockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsBlockGadgetProvider = optsBlockGadgetProvider
+	return func(p *Protocol) {
+		p.optsBlockGadgetProvider = optsBlockGadgetProvider
 	}
 }
 
 func WithSlotGadgetProvider(optsSlotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsSlotGadgetProvider = optsSlotGadgetProvider
+	return func(p *Protocol) {
+		p.optsSlotGadgetProvider = optsSlotGadgetProvider
 	}
 }
 
 func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.Engine, notarization.Notarization]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsNotarizationProvider = optsNotarizationProvider
+	return func(p *Protocol) {
+		p.optsNotarizationProvider = optsNotarizationProvider
 	}
 }
 
 func WithAttestationProvider(optsAttestationProvider module.Provider[*engine.Engine, attestation.Attestations]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsAttestationProvider = optsAttestationProvider
+	return func(p *Protocol) {
+		p.optsAttestationProvider = optsAttestationProvider
 	}
 }
 
 func WithLedgerProvider(optsLedgerProvider module.Provider[*engine.Engine, ledger.Ledger]) options.Option[Protocol] {
-	return func(n *Protocol) {
-		n.optsLedgerProvider = optsLedgerProvider
+	return func(p *Protocol) {
+		p.optsLedgerProvider = optsLedgerProvider
 	}
 }
 

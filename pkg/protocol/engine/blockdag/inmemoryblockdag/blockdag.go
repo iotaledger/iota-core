@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -65,11 +66,17 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.Storage.Commitments().Load, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
+			wp := b.workers.CreatePool("BlockDAG.Attach", 2)
+
 			e.Events.Filter.BlockAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
 					b.errorHandler(errors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.Block().IssuerID))
 				}
-			}, event.WithWorkerPool(b.workers.CreatePool("BlockDAG.Attach", 2)))
+			}, event.WithWorkerPool(wp))
+
+			e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+				b.PromoteFutureBlocksUntil(details.Commitment.Index())
+			}, event.WithWorkerPool(wp))
 
 			e.Events.BlockDAG.LinkTo(b.events)
 
@@ -203,7 +210,7 @@ func (b *BlockDAG) isFutureBlock(block *blocks.Block) (isFutureBlock bool) {
 	defer b.futureBlocksMutex.RUnlock()
 
 	// If we are not able to load the commitment for the block, it means we haven't committed this slot yet.
-	if _, err := b.commitmentFunc(block.Block().SlotCommitment.Index); err != nil {
+	if _, err := b.commitmentFunc(block.SlotCommitmentID().Index()); err != nil {
 		// We set the block as future block so that we can skip some checks when revisiting it later in markSolid via the solidifier.
 		block.SetFuture()
 

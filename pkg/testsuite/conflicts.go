@@ -17,7 +17,7 @@ func (t *TestSuite) AssertConflictsInCacheAcceptanceState(expectedConflictAliase
 				acceptanceState := node.Protocol.MainEngineInstance().Ledger.ConflictDAG().AcceptanceState(advancedset.New(t.TransactionFramework.TransactionID(conflictAlias)))
 
 				if acceptanceState != expectedState {
-					return errors.Errorf("assertTransactionsInCacheWithFunc: %s: conflict %s is %s, but expected %s", node.Name, conflictAlias, expectedState, acceptanceState)
+					return errors.Errorf("assertTransactionsInCacheWithFunc: %s: conflict %s is %s, but expected %s", node.Name, conflictAlias, acceptanceState, expectedState)
 				}
 
 				return nil

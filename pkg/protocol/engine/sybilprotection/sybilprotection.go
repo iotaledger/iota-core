@@ -17,9 +17,6 @@ type SybilProtection interface {
 	// OnlineCommittee returns the set of online validators that is used to track acceptance.
 	OnlineCommittee() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
 
-	// LastCommittedSlot returns the last committed slot.
-	LastCommittedSlot() iotago.SlotIndex
-
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface
 }
