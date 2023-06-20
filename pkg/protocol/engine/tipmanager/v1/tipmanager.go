@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -41,25 +40,6 @@ type TipManager struct {
 
 	// Module embeds the required module.Module interface.
 	module.Module
-}
-
-// NewProvider creates a new TipManager provider.
-func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
-	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
-		t := NewTipManager(e.BlockCache.Block, opts...)
-
-		e.HookConstructed(func() {
-			e.Events.Booker.BlockBooked.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
-			e.BlockCache.Evict.Hook(t.Evict)
-			e.Events.TipManager.BlockAdded.LinkTo(t.blockAdded)
-
-			t.TriggerInitialized()
-		})
-
-		e.HookStopped(t.TriggerStopped)
-
-		return t
-	})
 }
 
 // NewTipManager creates a new TipManager.
@@ -123,12 +103,6 @@ func (t *TipManager) Shutdown() {
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
-	t.forEachParentByType(tipMetadata, map[model.ParentsType]func(*TipMetadata){
-		model.StrongParentType:      tipMetadata.setupStrongParent,
-		model.WeakParentType:        tipMetadata.setupWeakParent,
-		model.ShallowLikeParentType: tipMetadata.setupWeakParent,
-	})
-
 	tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
 		if isStrongTip {
 			t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
@@ -145,29 +119,29 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 		}
 	})
 
+	t.forEachParentByType(tipMetadata.Block(), func(parentType model.ParentsType, parentMetadata *TipMetadata) {
+		if parentType == model.StrongParentType {
+			tipMetadata.setupStrongParent(parentMetadata)
+		} else {
+			tipMetadata.setupWeakParent(parentMetadata)
+		}
+	})
+
 	t.blockAdded.Trigger(tipMetadata)
 }
 
-// forEachParentByType updates the parents of the given Block.
-func (t *TipManager) forEachParentByType(tipMetadata *TipMetadata, updates map[model.ParentsType]func(*TipMetadata)) {
-	if parentBlock := tipMetadata.Block(); parentBlock != nil && parentBlock.Block() != nil {
-		for _, parent := range parentBlock.ParentsWithType() {
-			metadataStorage := t.metadataStorage(parent.ID.Index())
-			if metadataStorage == nil {
-				return
-			}
+// forEachParentByType iterates through the parents of the given block and calls the consumer for each parent.
+func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(parentType model.ParentsType, parentMetadata *TipMetadata)) {
+	if block != nil && block.Block() != nil {
+		for _, parent := range block.ParentsWithType() {
+			if metadataStorage := t.metadataStorage(parent.ID.Index()); metadataStorage != nil {
+				if parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) }); parentMetadata.Block() != nil {
+					consumer(parent.Type, parentMetadata)
 
-			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) })
-			if parentMetadata.Block() == nil {
-				return
-			}
-
-			if created {
-				t.setupBlockMetadata(parentMetadata)
-			}
-
-			if update, exists := updates[parent.Type]; exists {
-				update(parentMetadata)
+					if created {
+						t.setupBlockMetadata(parentMetadata)
+					}
+				}
 			}
 		}
 	}

@@ -325,3 +325,13 @@ func (t *TipMetadata) setupWeakParent(weakParent *TipMetadata) {
 
 // code contract (make sure the type implements all required methods).
 var _ tipmanager.TipMetadata = new(TipMetadata)
+
+// increase increases the given value by 1.
+func increase(currentValue int) int {
+	return currentValue + 1
+}
+
+// decrease decreases the given value by 1.
+func decrease(currentValue int) int {
+	return currentValue - 1
+}
