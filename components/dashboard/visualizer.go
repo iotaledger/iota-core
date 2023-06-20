@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // var (
@@ -44,7 +45,7 @@ func sendVertex(blk *blocks.Block, finalized bool) {
 		StrongParents: blk.Block().StrongParents.ToHex(),
 		WeakParents:   blk.Block().WeakParents.ToHex(),
 		IsFinalized:   finalized,
-		// IsTx:          blk.Payload().Type() == devnetvm.TransactionType,
+		IsTx:          blk.Block().Payload.PayloadType() == iotago.PayloadTransaction,
 	}}, true)
 }
 

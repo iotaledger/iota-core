@@ -313,7 +313,7 @@ func (o *OutputManager) AwaitTransactionToBeAccepted(txID iotago.TransactionID, 
 	var accepted bool
 	for ; time.Since(s) < waitFor; time.Sleep(awaitConfirmationSleep) {
 		// TODO: need to change to pending for now
-		if confirmationState := clt.GetTransactionConfirmationState(txID); confirmationState == "confirmed" {
+		if confirmationState := clt.GetTransactionConfirmationState(txID); confirmationState == "confirmed" || confirmationState == "finalized" {
 			accepted = true
 			break
 		}
