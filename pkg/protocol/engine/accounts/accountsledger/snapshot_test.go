@@ -47,7 +47,8 @@ func TestManager_Import_Export(t *testing.T) {
 			RemovedKeys: []string{"A.P1"},
 
 			NewOutputID: "A2",
-		}},
+		},
+	},
 	)
 
 	ts.AssertAccountLedgerUntil(3, map[string]*AccountState{

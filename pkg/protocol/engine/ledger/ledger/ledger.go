@@ -307,6 +307,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 			accountDiffs[consumedAccountID] = accountDiff
 		}
 
+		// Obtain account state at the current latest committed slot, which is index-1
 		accountData, exists, err := l.accountsLedger.Account(consumedAccountID, index-1)
 		if err != nil {
 			panic(fmt.Errorf("error loading account %s in slot %d: %w", consumedAccountID, index-1, err))
