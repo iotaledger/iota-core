@@ -146,22 +146,6 @@ func (m *Manager) ApplyDiff(
 	return nil
 }
 
-func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
-	burns = make(map[iotago.AccountID]uint64)
-	if set, exists := m.blockBurns.Get(slotIndex); exists {
-		for it := set.Iterator(); it.HasNext(); {
-			blockID := it.Next()
-			block, blockLoaded := m.block(blockID)
-			if !blockLoaded {
-				return nil, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
-			}
-			burns[block.Block().IssuerID] += block.Block().BurnedMana
-		}
-	}
-
-	return burns, nil
-}
-
 // Account loads the account's data at a specific slot index.
 func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
 	m.mutex.RLock()
@@ -261,13 +245,48 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 	return wasDestroyed, nil
 }
 
+func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prunable.AccountDiff {
+	// if any data is left on the account, we need to store in the diff, to be able to rollback
+	accountData, exists := m.accountsTree.Get(accountID)
+	if !exists {
+		return nil
+	}
+
+	// it does not matter if there are any changes in this slot, as the account was destroyed anyway and the data was lost
+	// we store the accountState in form of a diff, so we can roll back to the previous state
+	slotDiff := prunable.NewAccountDiff()
+	slotDiff.Change = -accountData.Credits.Value
+	slotDiff.NewOutputID = iotago.OutputID{}
+	slotDiff.PreviousOutputID = accountData.OutputID
+	slotDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
+	slotDiff.PubKeysRemoved = accountData.PubKeys.Slice()
+
+	return slotDiff
+}
+
+func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
+	burns = make(map[iotago.AccountID]uint64)
+	if set, exists := m.blockBurns.Get(slotIndex); exists {
+		for it := set.Iterator(); it.HasNext(); {
+			blockID := it.Next()
+			block, blockLoaded := m.block(blockID)
+			if !blockLoaded {
+				return nil, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
+			}
+			burns[block.Block().IssuerID] += block.Block().BurnedMana
+		}
+	}
+
+	return burns, nil
+}
+
 func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) error {
 	// Load diffs storage for the slot. The storage can never be nil (pruned) because we are just committing the slot.
 	diffStore := m.slotDiff(slotIndex)
 	for accountID, accountDiff := range accountDiffs {
 		destroyed := destroyedAccounts.Has(accountID)
 		if destroyed {
-			accountDiff = m.PreserveDestroyedAccountData(accountID)
+			accountDiff = m.preserveDestroyedAccountData(accountID)
 		}
 		err := diffStore.Store(accountID, *accountDiff, destroyed)
 		if err != nil {
@@ -319,23 +338,4 @@ func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]uint64, acc
 		accountDiff.Change -= int64(burn)
 		accountDiffs[id] = accountDiff
 	}
-}
-
-func (m *Manager) PreserveDestroyedAccountData(accountID iotago.AccountID) *prunable.AccountDiff {
-	// if any data is left on the account, we need to store in the diff, to be able to rollback
-	accountData, exists := m.accountsTree.Get(accountID)
-	if !exists {
-		return nil
-	}
-
-	// it does not matter if there are any changes in this slot, as the account was destroyed anyway and the data was lost
-	// we store the accountState in form of a diff, so we can roll back to the previous state
-	slotDiff := prunable.NewAccountDiff()
-	slotDiff.Change = -accountData.Credits.Value
-	slotDiff.NewOutputID = iotago.OutputID{}
-	slotDiff.PreviousOutputID = accountData.OutputID
-	slotDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
-	slotDiff.PubKeysRemoved = accountData.PubKeys.Slice()
-
-	return slotDiff
 }
