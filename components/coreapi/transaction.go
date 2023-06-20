@@ -6,6 +6,7 @@ import (
 
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
@@ -49,15 +50,36 @@ func blockMetadataFromTransactionID(c echo.Context) (*nodeclient.BlockMetadataRe
 		return nil, err
 	}
 
-	// TODO: fill in blockReason, TxState, TxReason.
+	txState := txStatePending.String()
+	txMetadata, exist := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadataByAttachment(block.ID())
+	if exist {
+		txState = resolveTxState(txMetadata)
+	}
+
+	// TODO: fill in blockReason, TxReason.
+
 	bmResponse := &nodeclient.BlockMetadataResponse{
 		BlockID:            block.ID().ToHex(),
 		StrongParents:      block.Block().StrongParents.ToHex(),
 		WeakParents:        block.Block().WeakParents.ToHex(),
 		ShallowLikeParents: block.Block().ShallowLikeParents.ToHex(),
 		BlockState:         blockStatePending.String(),
-		TxState:            blockStateConfirmed.String(),
+		TxState:            txState,
 	}
 
 	return bmResponse, nil
+}
+
+func resolveTxState(metadata mempool.TransactionMetadata) string {
+	var state txState
+
+	if metadata.IsAccepted() {
+		state = txStateConfirmed
+	} else if metadata.IsCommitted() {
+		state = txStateFinalized
+	} else {
+		state = txStatePending
+	}
+
+	return state.String()
 }

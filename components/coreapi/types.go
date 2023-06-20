@@ -8,8 +8,6 @@ const (
 	txStatePending txState = iota
 	txStateConfirmed
 	txStateFinalized
-	txStateRejected
-	txStateConflicting
 )
 
 //nolint:unused // transactions are currently unused
@@ -21,10 +19,6 @@ func (t txState) String() string {
 		return "confirmed"
 	case txStateFinalized:
 		return "finalized"
-	case txStateRejected:
-		return "rejected"
-	case txStateConflicting:
-		return "conflicting"
 	default:
 		return "unknown"
 	}
