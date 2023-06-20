@@ -80,8 +80,31 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
 	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]) error {
-		t.collectStrongReferences(references, amount)
-		t.collectWeakReferences(references)
+		previousLikedInsteadConflicts := advancedset.New[iotago.TransactionID]()
+
+		if t.collectReferences(references, model.StrongParentType, t.tipManager.StrongTips, func(tip tipmanager.TipMetadata) {
+			addedLikedInsteadReferences, updatedLikedInsteadConflicts, err := t.likedInsteadReferences(previousLikedInsteadConflicts, tip)
+			if err != nil {
+				tip.SetTipPool(tipmanager.WeakTipPool)
+			} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[model.ShallowLikeParentType]) {
+				references[model.StrongParentType] = append(references[model.StrongParentType], tip.ID())
+				references[model.ShallowLikeParentType] = append(references[model.ShallowLikeParentType], addedLikedInsteadReferences...)
+
+				previousLikedInsteadConflicts = updatedLikedInsteadConflicts
+			}
+		}, amount); len(references[model.StrongParentType]) == 0 {
+			rootBlocks := t.rootBlocks()
+
+			references[model.StrongParentType] = rootBlocks[:lo.Min(len(rootBlocks), t.optMaxStrongParents)]
+		}
+
+		t.collectReferences(references, model.WeakParentType, t.tipManager.WeakTips, func(tip tipmanager.TipMetadata) {
+			if !t.isValidWeakTip(tip.Block()) {
+				tip.SetTipPool(tipmanager.DroppedTipPool)
+			} else {
+				references[model.WeakParentType] = append(references[model.WeakParentType], tip.ID())
+			}
+		}, t.optMaxWeakReferences)
 
 		return nil
 	})
@@ -100,28 +123,6 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 		tipMetadata.SetTipPool(tipmanager.WeakTipPool)
 	} else {
 		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
-	}
-}
-
-func (t *TipSelection) collectStrongReferences(references model.ParentReferences, amount int) {
-	previousLikedInsteadConflicts := advancedset.New[iotago.TransactionID]()
-
-	t.collectReferences(references, model.StrongParentType, t.tipManager.StrongTips, func(tip tipmanager.TipMetadata) {
-		addedLikedInsteadReferences, updatedLikedInsteadConflicts, err := t.likedInsteadReferences(previousLikedInsteadConflicts, tip)
-		if err != nil {
-			tip.SetTipPool(tipmanager.WeakTipPool)
-		} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[model.ShallowLikeParentType]) {
-			references[model.StrongParentType] = append(references[model.StrongParentType], tip.ID())
-			references[model.ShallowLikeParentType] = append(references[model.ShallowLikeParentType], addedLikedInsteadReferences...)
-
-			previousLikedInsteadConflicts = updatedLikedInsteadConflicts
-		}
-	}, amount)
-
-	if len(references[model.StrongParentType]) == 0 {
-		rootBlocks := t.rootBlocks()
-
-		references[model.StrongParentType] = rootBlocks[:lo.Min(len(rootBlocks), t.optMaxStrongParents)]
 	}
 }
 
@@ -154,31 +155,18 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.Advanc
 	return references, updatedLikedConflicts, nil
 }
 
-func (t *TipSelection) collectWeakReferences(references model.ParentReferences) {
-	t.collectReferences(references, model.WeakParentType, t.tipManager.WeakTips, func(tip tipmanager.TipMetadata) {
-		if !t.isValidWeakTip(tip.Block()) {
-			tip.SetTipPool(tipmanager.DroppedTipPool)
-		} else {
-			references[model.WeakParentType] = append(references[model.WeakParentType], tip.ID())
-		}
-	}, t.optMaxWeakReferences)
-}
-
 func (t *TipSelection) collectReferences(references model.ParentReferences, parentsType model.ParentsType, tipSelector func(optAmount ...int) []tipmanager.TipMetadata, callback func(tipmanager.TipMetadata), amount int) {
 	seenTips := advancedset.New[iotago.BlockID]()
 	selectUniqueTips := func(amount int) (uniqueTips []tipmanager.TipMetadata) {
-		if amount <= 0 {
-			return
-		}
+		if amount > 0 {
+			for _, tip := range tipSelector(amount + seenTips.Size()) {
+				if seenTips.Add(tip.ID()) {
+					uniqueTips = append(uniqueTips, tip)
 
-		for _, tip := range tipSelector(amount + seenTips.Size()) {
-			if !seenTips.Add(tip.ID()) {
-				continue
-			}
-
-			uniqueTips = append(uniqueTips, tip)
-			if len(uniqueTips) == amount {
-				break
+					if len(uniqueTips) == amount {
+						break
+					}
+				}
 			}
 		}
 
