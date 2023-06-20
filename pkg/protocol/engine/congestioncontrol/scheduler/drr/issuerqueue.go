@@ -125,19 +125,23 @@ func (q *IssuerQueue) PopFront() *blocks.Block {
 	return blk
 }
 
-func (q IssuerQueue) RemoveTail() {
+func (q *IssuerQueue) RemoveTail() *blocks.Block {
 	tail := q.tail()
-	heap.Remove(&q.inbox, tail)
+	return heap.Remove(&q.inbox, tail).(*blocks.Block)
 }
 
-func (q IssuerQueue) tail() (tail int) {
+func (q IssuerQueue) tail() int {
 	h := q.inbox
+	if h.Len() <= 0 {
+		return -1
+	}
+	tail := 0
 	for i := range h {
 		if !h.Less(i, tail) { // less means older issue time
 			tail = i
 		}
 	}
-	return
+	return tail
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

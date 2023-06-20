@@ -8,7 +8,7 @@ import (
 
 type Scheduler interface {
 	AddBlock(*blocks.Block)
-	IsBlockIssuerReady(iotago.AccountID) bool
+	IsBlockIssuerReady(iotago.AccountID, ...*blocks.Block) bool
 
 	module.Interface
 }

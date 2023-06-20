@@ -61,7 +61,7 @@ func (b *BufferQueue) IssuerQueue(issuerID iotago.AccountID) *IssuerQueue {
 
 // Submit submits a block. Return blocks dropped from the scheduler to make room for the submitted block.
 // The submitted block can also be returned as dropped if the issuer does not have enough access mana.
-func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.AccountID) int64) (elements []*blocks.Block, err error) {
+func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.AccountID) (uint64, error)) (elements []*blocks.Block, err error) {
 	issuerID := blk.Block().IssuerID
 	element, issuerActive := b.activeIssuers.Get(issuerID)
 	var issuerQueue *IssuerQueue
@@ -72,7 +72,7 @@ func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.Accoun
 		b.activeIssuers.Set(issuerID, b.ringInsert(issuerQueue))
 	}
 
-	// first we submit the block, and if it turns out that the issuer doesn't have enough bandwidth to submit, it will be removed by dropHead
+	// first we submit the block, and if it turns out that the issuer doesn't have enough bandwidth to submit, it will be removed by dropTail
 	if !issuerQueue.Submit(blk) {
 		return nil, errors.Errorf("block already submitted %s", blk.String())
 	}
@@ -87,7 +87,7 @@ func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.Accoun
 	return nil, nil
 }
 
-func (b *BufferQueue) dropHead(manaRetriever func(iotago.AccountID) int64) (droppedBlocks []*blocks.Block) {
+func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (uint64, error)) (droppedBlocks []*blocks.Block) {
 	start := b.Current()
 	// remove as many blocks as necessary to stay within max buffer size
 	for b.Size() > b.maxBuffer {
@@ -96,8 +96,8 @@ func (b *BufferQueue) dropHead(manaRetriever func(iotago.AccountID) int64) (drop
 		maxScale := math.Inf(-1)
 		var maxIssuerID iotago.AccountID
 		for q := start; ; {
-			issuerMana := manaRetriever(q.IssuerID())
-			if issuerMana > 0.0 {
+			issuerMana, err := manaRetriever(q.IssuerID())
+			if issuerMana > 0 && err == nil {
 				if scale := float64(q.Work()) / float64(issuerMana); scale > maxScale {
 					maxScale = scale
 					maxIssuerID = q.IssuerID()
@@ -113,30 +113,9 @@ func (b *BufferQueue) dropHead(manaRetriever func(iotago.AccountID) int64) (drop
 		}
 		issuerQueue, _ := b.activeIssuers.Get(maxIssuerID)
 		longestQueue := issuerQueue.Value.(*IssuerQueue)
-
-		// TODO: extract to util func
-		// find oldest submitted and not-ready block in the longest queue
-		var oldestBlock *blocks.Block
-		longestQueue.submitted.ForEach(func(_ iotago.BlockID, v *blocks.Block) bool {
-			if oldestBlock == nil || oldestBlock.IssuingTime().After(v.IssuingTime()) {
-				oldestBlock = v
-			}
-			return true
-		})
-
-		// if the oldest not-ready block is older than the oldest ready block, drop the former otherwise the latter
-		readyQueueFront := longestQueue.Front()
-		if oldestBlock != nil && (readyQueueFront == nil || oldestBlock.IssuingTime().Before(readyQueueFront.IssuingTime())) {
-			droppedBlocks = append(droppedBlocks, oldestBlock)
-
-			b.Unsubmit(oldestBlock)
-		} else if readyQueueFront != nil {
-			blk := longestQueue.PopFront()
-			b.size--
-			droppedBlocks = append(droppedBlocks, blk)
-		} else {
-			panic("scheduler buffer size exceeded and the longest scheduler queue is empty.")
-		}
+		tail := longestQueue.RemoveTail()
+		b.size--
+		droppedBlocks = append(droppedBlocks, tail)
 	}
 	return droppedBlocks
 }
@@ -158,17 +137,6 @@ func (b *BufferQueue) Unsubmit(block *blocks.Block) bool {
 
 	b.size--
 	return true
-}
-
-// Ready marks a previously submitted block as ready to be scheduled.
-func (b *BufferQueue) Ready(block *blocks.Block) bool {
-	element, ok := b.activeIssuers.Get(block.Block().IssuerID)
-	if !ok {
-		return false
-	}
-
-	issuerQueue := element.Value.(*IssuerQueue)
-	return issuerQueue.Ready(block)
 }
 
 // ReadyBlocksCount returns the number of ready blocks in the buffer.

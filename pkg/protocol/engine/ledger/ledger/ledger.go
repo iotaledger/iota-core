@@ -565,3 +565,7 @@ func (l *Ledger) IsBlockIssuerAllowed(block *iotago.Block) bool {
 	}
 	return true
 }
+
+func (l *Ledger) ManaManager() *mana.Manager {
+	return l.manaManager
+}
