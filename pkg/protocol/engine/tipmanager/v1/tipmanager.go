@@ -33,7 +33,7 @@ type TipManager struct {
 	// blockAdded is triggered when a new Block was added to the TipManager.
 	blockAdded *event.Event1[tipmanager.TipMetadata]
 
-	// lastEvictedSlot is the last slot index that was evicted from the MemPool.
+	// lastEvictedSlot is the last slot index that was isEvicted from the MemPool.
 	lastEvictedSlot iotago.SlotIndex
 
 	// evictionMutex is used to synchronize the eviction of slots.
@@ -76,6 +76,7 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
 func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
 	tipMetadata := NewBlockMetadata(block)
+
 	if storage := t.metadataStorage(block.ID().Index()); storage == nil || !storage.Set(block.ID(), tipMetadata) {
 		return nil
 	}
@@ -108,7 +109,7 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 
 	if evictedObjects, deleted := t.tipMetadataStorage.DeleteAndReturn(slotIndex); deleted {
 		evictedObjects.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
-			tipMetadata.evicted.Trigger()
+			tipMetadata.isEvicted.Trigger()
 
 			return true
 		})
@@ -123,9 +124,9 @@ func (t *TipManager) Shutdown() {
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	t.forEachParentByType(tipMetadata, map[model.ParentsType]func(*TipMetadata){
-		model.StrongParentType:      tipMetadata.registerStrongParent,
-		model.WeakParentType:        tipMetadata.registerWeakParent,
-		model.ShallowLikeParentType: tipMetadata.registerWeakParent,
+		model.StrongParentType:      tipMetadata.setupStrongParent,
+		model.WeakParentType:        tipMetadata.setupWeakParent,
+		model.ShallowLikeParentType: tipMetadata.setupWeakParent,
 	})
 
 	tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
@@ -142,10 +143,6 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 		} else {
 			t.weakTipSet.Delete(tipMetadata.Block().ID())
 		}
-	})
-
-	tipMetadata.OnEvicted(func() {
-		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
 	})
 
 	t.blockAdded.Trigger(tipMetadata)
