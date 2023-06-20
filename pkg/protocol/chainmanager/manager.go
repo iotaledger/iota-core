@@ -462,17 +462,6 @@ func (m *Manager) propagateReplaceChainToMainChild(child *ChainCommitment, chain
 	return []*ChainCommitment{mainChild}
 }
 
-func (m *Manager) deleteAllChildrenFromCache(child *ChainCommitment) (childrenToUpdate []*ChainCommitment) {
-	m.commitmentEntityMutex.Lock(child.ID())
-	defer m.commitmentEntityMutex.Unlock(child.ID())
-
-	if storage := m.commitmentsByID.Get(child.ID().Index()); storage != nil {
-		storage.Delete(child.ID())
-	}
-
-	return child.Children()
-}
-
 func (m *Manager) propagateSolidity(child *ChainCommitment) (childrenToUpdate []*ChainCommitment) {
 	m.commitmentEntityMutex.Lock(child.ID())
 	defer m.commitmentEntityMutex.Unlock(child.ID())
