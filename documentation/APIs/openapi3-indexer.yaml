@@ -16,8 +16,8 @@ servers:
 tags:
   - name: basic outputs
     description: Query Basic Outputs.
-  - name: alias outputs
-    description: Query Alias Outputs.
+  - name: account outputs
+    description: Query Account Outputs. - TO BE UPDATED
   - name: foundry outputs
     description: Query Foundry Outputs.
   - name: nft outputs
@@ -183,12 +183,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-  /api/indexer/v2/outputs/alias:
+  /api/indexer/v2/outputs/account:
     get:
       tags:
-        - alias outputs
-      summary: Returns alias outputs filtered based on parameters.
-      description: Returns alias outputs filtered based on parameters.
+        - account outputs
+      summary: Returns account outputs filtered based on parameters.
+      description: Returns account outputs filtered based on parameters.
       parameters:
         - in: query
           name: stateController
@@ -293,19 +293,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-  /api/indexer/v2/outputs/alias/{aliasId}:
+  /api/indexer/v2/outputs/account/{accountId}:
     get:
       tags:
-        - alias outputs
-      summary: Returns the outputId of the current unspent alias output for aliasId.
-      description: Returns the outputId of the current unspent alias output for aliasId.
+        - account outputs
+      summary: Returns the outputId of the current unspent account output for accountId.
+      description: Returns the outputId of the current unspent account output for accountId.
       parameters:
         - in: path
-          name: aliasId
+          name: accountId
           schema:
             type: string
           example: "0x1505ec099896ab05d9e08fbc7101ae4dff0093b3943b28f789ed2ca728bcc8d6"
-          description: Unique identifier of the alias.
+          description: Unique identifier of the account.
           required: true
       responses:
         '200':
@@ -342,6 +342,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
+
 
   /api/indexer/v2/outputs/foundry:
     get:
