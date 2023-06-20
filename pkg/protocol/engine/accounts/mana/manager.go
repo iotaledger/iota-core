@@ -16,7 +16,7 @@ import (
 // For stored Mana added to account, or stored/potential Mana spent, we will update on commitment.
 // For potential Mana updates and decay, we update on demand if the Mana vector is accessed (by the scheduler).
 type Manager struct {
-	decayProvider *iotago.ManaDecayProvider
+	decayProvider *iotago.DecayProvider
 
 	manaVectorCache *cache.Cache[iotago.AccountID, *accounts.Mana]
 
@@ -27,7 +27,7 @@ type Manager struct {
 	module.Module
 }
 
-func NewManager(decayProvider *iotago.ManaDecayProvider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
+func NewManager(decayProvider *iotago.DecayProvider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
 	return &Manager{
 		decayProvider:            decayProvider,
 		accountOutputResolveFunc: accountOutputResolveFunc,
@@ -56,10 +56,10 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	}
 
 	// apply decay to stored Mana and potential that was added on last update
-	updatedValue := m.decayProvider.StoredManaWithDecay(mana.Value(), mana.UpdateTime(), currentSlot)
+	updatedValue := m.decayProvider.StoredManaWithDecay(mana.Value(), currentSlot)
 
 	// get newly generated potential since last update and apply decay
-	updatedValue += m.decayProvider.PotentialManaWithDecay(mana.Deposit(), mana.UpdateTime(), currentSlot)
+	updatedValue += m.decayProvider.PotentialManaWithDecay(mana.Deposit(), currentSlot)
 
 	mana.UpdateValue(updatedValue, currentSlot)
 

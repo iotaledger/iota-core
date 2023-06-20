@@ -47,7 +47,7 @@ type Ledger struct {
 	errorHandler       func(error)
 	protocolParameters *iotago.ProtocolParameters
 
-	decayProvider *iotago.ManaDecayProvider
+	decayProvider *iotago.DecayProvider
 
 	module.Module
 }

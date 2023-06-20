@@ -200,7 +200,6 @@ func (t *TransactionFramework) CreateAccountFromInput(inputAlias string, opts ..
 	}
 
 	return utxoledger.Outputs{input}, outputStates, []*mock.HDWallet{t.wallet}
-
 }
 
 func (t *TransactionFramework) DestroyAccount(alias string) (consumedInputs *utxoledger.Output, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
@@ -375,29 +374,20 @@ func WithInputs(inputs utxoledger.Outputs) options.Option[builder.TransactionBui
 				txBuilder.AddInput(&builder.TxInput{
 					UnlockTarget: input.Output().UnlockConditionSet().ImmutableAccount().Address,
 					InputID:      input.OutputID(),
-					Input: iotago.OutputWithCreationTime{
-						Output:       input.Output(),
-						CreationTime: input.CreationTime(),
-					},
+					Input:        input.Output(),
 				})
 			case iotago.OutputAccount:
 				// For alias we need to unlock the state controller
 				txBuilder.AddInput(&builder.TxInput{
 					UnlockTarget: input.Output().UnlockConditionSet().StateControllerAddress().Address,
 					InputID:      input.OutputID(),
-					Input: iotago.OutputWithCreationTime{
-						Output:       input.Output(),
-						CreationTime: input.CreationTime(),
-					},
+					Input:        input.Output(),
 				})
 			default:
 				txBuilder.AddInput(&builder.TxInput{
 					UnlockTarget: input.Output().UnlockConditionSet().Address().Address,
 					InputID:      input.OutputID(),
-					Input: iotago.OutputWithCreationTime{
-						Output:       input.Output(),
-						CreationTime: input.CreationTime(),
-					},
+					Input:        input.Output(),
 				})
 			}
 		}
@@ -415,10 +405,7 @@ func WithAccountInput(input *utxoledger.Output, governorTransition bool) options
 			txBuilder.AddInput(&builder.TxInput{
 				UnlockTarget: address,
 				InputID:      input.OutputID(),
-				Input: iotago.OutputWithCreationTime{
-					Output:       input.Output(),
-					CreationTime: input.CreationTime(),
-				},
+				Input:        input.Output(),
 			})
 		default:
 			panic("only OutputAccount can be added as account input")
