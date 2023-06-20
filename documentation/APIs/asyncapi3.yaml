@@ -206,10 +206,10 @@ channels:
       message:
         $ref: '#/components/messages/OutputMetadataPayload'
 
-  'outputs/alias/{aliasId}':
+  'outputs/account/{accountId}':
     parameters:
-      aliasId:
-        description: The unique identifier of the alias chain. Hex encoded with 0x prefix.
+      accountId:
+        description: The unique identifier of the account chain. Hex encoded with 0x prefix.
         schema:
           type: string
           examples:
@@ -217,8 +217,8 @@ channels:
     subscribe:
       tags:
         - name: outputs
-      operationId: aliasOutputByAliasId
-      description: Publishes the newly created alias output of an alias chain.
+      operationId: accountOutputByAccountId
+      description: Publishes the newly created account output of an account chain.
       message:
         $ref: '#/components/messages/OutputPayload'
   'outputs/nft/{nftId}':
