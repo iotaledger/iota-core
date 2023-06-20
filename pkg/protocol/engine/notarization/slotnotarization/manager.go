@@ -175,12 +175,19 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
+	protocolParametersHash, err := m.storage.Settings().ProtocolParameters().Hash()
+	if err != nil {
+		m.errorHandler(errors.Wrap(err, "failed to hash protocol parameters"))
+		return false
+	}
+
 	roots := iotago.NewRoots(
 		iotago.Identifier(acceptedBlocks.Root()),
 		mutationRoot,
 		iotago.Identifier(attestationsRoot),
 		stateRoot,
 		accountRoot,
+		protocolParametersHash,
 	)
 
 	newCommitment := iotago.NewCommitment(
