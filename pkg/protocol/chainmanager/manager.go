@@ -413,19 +413,8 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 		fp = fpParent.Chain().ForkingPoint
 	}
 
-	// Delete all commitments after newer than our new head if the chain was longer than the new one
-	snapshotChain := m.rootCommitment.Chain()
-	snapshotChain.dropCommitmentsAfter(commitment.ID().Index())
-
 	// Separate the old main chain by removing it from the parent
 	parentCommitment.deleteChild(oldMainCommitment)
-
-	// Cleanup the old tree hanging from the old main chain from our cache
-	if children := oldMainCommitment.Children(); len(children) != 0 {
-		for childWalker := walker.New[*ChainCommitment]().PushAll(children...); childWalker.HasNext(); {
-			childWalker.PushAll(m.deleteAllChildrenFromCache(childWalker.Next())...)
-		}
-	}
 
 	return nil
 }
@@ -471,17 +460,6 @@ func (m *Manager) propagateReplaceChainToMainChild(child *ChainCommitment, chain
 	}
 
 	return []*ChainCommitment{mainChild}
-}
-
-func (m *Manager) deleteAllChildrenFromCache(child *ChainCommitment) (childrenToUpdate []*ChainCommitment) {
-	m.commitmentEntityMutex.Lock(child.ID())
-	defer m.commitmentEntityMutex.Unlock(child.ID())
-
-	if storage := m.commitmentsByID.Get(child.ID().Index()); storage != nil {
-		storage.Delete(child.ID())
-	}
-
-	return child.Children()
 }
 
 func (m *Manager) propagateSolidity(child *ChainCommitment) (childrenToUpdate []*ChainCommitment) {
