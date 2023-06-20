@@ -38,6 +38,11 @@ type Block struct {
 	ratifiedAccepted bool
 	confirmed        bool
 
+	// Scheduler block
+	scheduled bool
+	enqueued  bool
+	dropped   bool
+
 	mutex sync.RWMutex
 
 	modelBlock *model.Block
@@ -84,6 +89,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		accepted:         true,
 		ratifiedAccepted: true, // TODO: check if this should be true
 		confirmed:        true, // TODO: check if this should be true
+		scheduled:        true, // TODO: check if this should be true
 	}
 }
 
@@ -396,6 +402,68 @@ func (b *Block) SetAccepted() (wasUpdated bool) {
 
 	if wasUpdated = !b.accepted; wasUpdated {
 		b.accepted = true
+	}
+
+	return wasUpdated
+}
+
+// IsScheduled returns true if the Block was scheduled.
+func (b *Block) IsScheduled() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.scheduled
+}
+
+// SetScheduled sets the Block as scheduled.
+func (b *Block) SetScheduled() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.scheduled; wasUpdated {
+		b.scheduled = true
+		b.enqueued = false
+	}
+
+	return wasUpdated
+}
+
+// IsDropped returns true if the Block was dropped.
+func (b *Block) IsDropped() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.dropped
+}
+
+// SetDropped sets the Block as dropped.
+func (b *Block) SetDropped() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.dropped; wasUpdated {
+		b.dropped = true
+		b.enqueued = false
+	}
+
+	return wasUpdated
+}
+
+// IsEnqueued returns true if the Block is currently enqueued in the scheduler.
+func (b *Block) IsEnqueued() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.enqueued
+}
+
+// SetEnqueued sets the Block as enqueued.
+func (b *Block) SetEnqueued() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.enqueued; wasUpdated {
+		b.enqueued = true
 	}
 
 	return wasUpdated

@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
@@ -44,17 +45,22 @@ type Scheduler struct {
 
 	blockChan chan *blocks.Block
 
+	blockCache *blocks.Blocks
+
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engine, scheduler.Scheduler] {
 	return module.Provide(func(e *engine.Engine) scheduler.Scheduler {
-		s := New(opts...)
+		s := New(e.BlockCache, opts...)
 
 		e.Events.Booker.BlockBooked.Hook(s.AddBlock, event.WithWorkerPool(e.Workers.CreatePool("Enqueue")))
 		e.Events.Scheduler.LinkTo(s.events)
 		// hook to block scheduled event to check for another block ready to schedule
-		s.events.BlockScheduled.Hook(func(*blocks.Block) { s.selectBlockToSchedule() })
+		s.events.BlockScheduled.Hook(func(block *blocks.Block) {
+			s.selectBlockToSchedule()
+			s.updateChildren(block)
+		})
 
 		e.Ledger.HookInitialized(func() {
 			s.manaRetrieveFunc = func(accountID iotago.AccountID) (uint64, error) {
@@ -69,9 +75,10 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 	})
 }
 
-func New(opts ...options.Option[Scheduler]) *Scheduler {
+func New(blockCache *blocks.Blocks, opts ...options.Option[Scheduler]) *Scheduler {
 	return options.Apply(
 		&Scheduler{
+			blockCache:       blockCache,
 			lastScheduleTime: time.Now(),
 		}, opts,
 		(*Scheduler).TriggerConstructed,
@@ -138,8 +145,15 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	s.buffer.Submit(block, s.manaRetrieveFunc)
-
+	droppedBlocks, err := s.buffer.Submit(block, s.manaRetrieveFunc)
+	if err != nil {
+	}
+	for _, b := range droppedBlocks {
+		b.SetDropped()
+		s.events.BlockDropped.Trigger(block)
+	}
+	block.SetEnqueued()
+	s.tryReady(block)
 	s.selectBlockToSchedule()
 }
 
@@ -164,7 +178,9 @@ loop:
 				s.tokenBucket+float64(s.optsRate)*float64(time.Since(s.lastScheduleTime).Seconds()),
 			)
 			s.lastScheduleTime = time.Now()
-			s.events.BlockScheduled.Trigger(blockToSchedule)
+			if blockToSchedule.SetScheduled() {
+				s.events.BlockScheduled.Trigger(blockToSchedule)
+			}
 		}
 	}
 }
@@ -223,6 +239,7 @@ func (s *Scheduler) selectBlockToSchedule() {
 	err := s.updateDeficit(issuerID, int64(-block.Work()))
 	if err != nil {
 		// if something goes wrong with deficit update, drop the block instead of scheduling it.
+		block.SetDropped()
 		s.events.BlockDropped.Trigger(block)
 	}
 	s.blockChan <- block
@@ -289,6 +306,53 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error
 	defer s.deficitsMutex.Unlock()
 	s.deficits.Set(accountID, lo.Max(uint64(int64(deficit)+delta), s.optsMaxDeficit))
 	return nil
+}
+
+func (s *Scheduler) isEligible(block *blocks.Block) (eligible bool) {
+	return block.IsScheduled() || block.IsAccepted()
+}
+
+// isReady returns true if the given blockID's parents are eligible.
+func (s *Scheduler) isReady(block *blocks.Block) (ready bool) {
+	ready = true
+	block.ForEachParent(func(parent model.Parent) {
+		if parentBlock, parentExists := s.blockCache.Block(parent.ID); !parentExists || !s.isEligible(parentBlock) {
+			ready = false
+			return
+		}
+	})
+
+	return
+}
+
+// tryReady tries to set the given block as ready.
+func (s *Scheduler) tryReady(block *blocks.Block) {
+	if s.isReady(block) {
+		s.Ready(block)
+	}
+}
+
+// Ready marks a previously submitted block as ready to be scheduled.
+// If Ready is called without a previous Submit, it has no effect.
+func (s *Scheduler) Ready(block *blocks.Block) {
+	s.bufferMutex.Lock()
+	defer s.bufferMutex.Unlock()
+
+	s.ready(block)
+}
+
+func (s *Scheduler) ready(block *blocks.Block) {
+	s.buffer.Ready(block)
+}
+
+// updateChildren iterates over the direct children of the given blockID and
+// tries to mark them as ready.
+func (s *Scheduler) updateChildren(block *blocks.Block) {
+	for _, childBlock := range block.Children() {
+		if childBlock, childBlockExists := s.blockCache.Block(childBlock.ID()); childBlockExists && childBlock.IsEnqueued() {
+			s.tryReady(childBlock)
+		}
+	}
 }
 
 // region Options ////////////////////////////////////////////////////////////////////////////////////////////////////

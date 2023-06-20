@@ -139,6 +139,17 @@ func (b *BufferQueue) Unsubmit(block *blocks.Block) bool {
 	return true
 }
 
+// Ready marks a previously submitted block as ready to be scheduled.
+func (b *BufferQueue) Ready(block *blocks.Block) bool {
+	element, ok := b.activeIssuers.Get(block.Block().IssuerID)
+	if !ok {
+		return false
+	}
+
+	issuerQueue := element.Value.(*IssuerQueue)
+	return issuerQueue.Ready(block)
+}
+
 // ReadyBlocksCount returns the number of ready blocks in the buffer.
 func (b *BufferQueue) ReadyBlocksCount() (readyBlocksCount int) {
 	start := b.Current()
