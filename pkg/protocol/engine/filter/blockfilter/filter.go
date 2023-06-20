@@ -65,6 +65,18 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	// TODO: if TX add check for TX timestamp
 
 	protocolParams := f.protocolParamsFunc()
+
+	protocolVersionForSlot := protocolParams.ProtocolVersions.VersionBySlotIndex(block.ID().Index())
+	if protocolVersionForSlot != block.Block().ProtocolVersion {
+		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.Wrapf(ErrInvalidProofOfWork, "invalid protocol version %d (expected %d) for slot %d", block.Block().ProtocolVersion, protocolVersionForSlot, block.ID().Index()),
+			Source: source,
+		})
+
+		return
+	}
+
 	if protocolParams.MinPoWScore > 0 {
 		// Check if the block has enough PoW score.
 		score, _, err := block.Block().POW()
