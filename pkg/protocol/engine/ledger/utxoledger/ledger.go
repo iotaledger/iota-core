@@ -116,19 +116,22 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*ledgerstate.Out
 
 	switch castState := stateWithMetadata.State().(type) {
 	case *ledgerstate.Output:
+		fmt.Println(">>> it's ledgerstate output", castState)
 		return castState, nil
 	case *ExecutionOutput:
+		fmt.Println(">>>>>> it's execution output")
 		txWithMetadata, exists := l.memPool.TransactionMetadata(stateRef.Ref().TransactionID())
 		if !exists {
 			return nil, err
 		}
-
+		fmt.Println(">>>>>tx metadata in execution output", txWithMetadata)
 		earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
 
 		tx, ok := txWithMetadata.Transaction().(*iotago.Transaction)
 		if !ok {
 			return nil, ErrUnexpectedUnderlyingType
 		}
+		fmt.Println(">>>>>tx", tx)
 
 		return ledgerstate.CreateOutput(l.ledgerState.API(), stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
 	default:
@@ -171,6 +174,9 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 			if outputErr != nil {
 				innerErr = outputErr
 				return false
+			}
+			if inputState == nil {
+				fmt.Println("no input state, it's nil")
 			}
 
 			spent := ledgerstate.NewSpent(inputState, txWithMeta.ID(), txCreationTime, index)

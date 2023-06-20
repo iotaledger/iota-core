@@ -78,6 +78,7 @@ func New[VotePower conflictdag.VotePowerType[VotePower]](vm mempool.VM, inputRes
 func (m *MemPool[VotePower]) AttachTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (metadata mempool.TransactionMetadata, err error) {
 	storedTransaction, isNew, err := m.storeTransaction(transaction, blockID)
 	if err != nil {
+		fmt.Println(">>>>>>>>>>>>failed to store transaction:", err)
 		return nil, xerrors.Errorf("failed to store transaction: %w", err)
 	}
 
@@ -194,6 +195,7 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 
 		request.OnSuccess(func(input *StateMetadata) {
 			if transaction.publishInputAndCheckSolidity(index, input) {
+				fmt.Println(">>>>>>>>>>>all inputs solid")
 				m.executeTransaction(transaction)
 			}
 
@@ -209,6 +211,7 @@ func (m *MemPool[VotePower]) solidifyInputs(transaction *TransactionMetadata) {
 func (m *MemPool[VotePower]) executeTransaction(transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
 		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction(), lo.Map(transaction.inputs, (*StateMetadata).State)); err != nil {
+			fmt.Println(">>>>>>>>tx invalid!!!", err)
 			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)
@@ -230,6 +233,7 @@ func (m *MemPool[VotePower]) bookTransaction(transaction *TransactionMetadata) {
 	}
 
 	if !transaction.IsOrphaned() && transaction.setBooked() {
+		fmt.Println(">>>>>tx booked, publish outputs!")
 		m.publishOutputs(transaction)
 	}
 }

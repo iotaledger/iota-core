@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/dig"
@@ -13,15 +12,11 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -136,63 +131,70 @@ func configure() error {
 		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})
 
-	// TODO: check whether we hooked to all events
+	// TODO: uncomment here.
+	// deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
+	// 	Component.LogInfof("BlockReceived: %s", block.ID())
+	// })
 
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
-		Component.LogInfof("BlockReceived: %s", block.ID())
-	})
+	// deps.Protocol.Events.Engine.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+	// 	Component.LogInfof("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
+	// })
 
-	deps.Protocol.Events.Engine.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
-		Component.LogInfof("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
-	})
+	// deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+	// 	Component.LogInfof("BlockSolid: %s", block.ID())
+	// })
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockSolid: %s", block.ID())
-	})
+	// deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+	// 	Component.LogInfof("BlockBooked: %s", block.ID())
+	// })
 
-	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockBooked: %s", block.ID())
-	})
+	// deps.Protocol.Events.Engine.Booker.WitnessAdded.Hook(func(block *blocks.Block) {
+	// 	Component.LogInfof("WitnessAdded: %s", block.ID())
+	// })
 
-	deps.Protocol.Events.Engine.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockPreAccepted: %s", block.ID())
-	})
+	// deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+	// 	Component.LogInfof("BlockAccepted: %s", block.ID())
+	// })
 
-	deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockAccepted: %s", block.ID())
-	})
+	// deps.Protocol.Events.Engine.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
+	// 	Component.LogInfof("BlockRatifiedAccepted: %s", block.ID())
+	// })
 
-	deps.Protocol.Events.Engine.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockPreConfirmed: %s", block.ID())
-	})
+	// deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+	// 	Component.LogInfof("BlockConfirmed: %s", block.ID())
+	// })
 
-	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
-	})
+	// deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
+	// 	Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
+	// })
 
-	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
-	})
+	// deps.Protocol.Events.Engine.Clock.RatifiedAcceptedTimeUpdated.Hook(func(time time.Time) {
+	// 	Component.LogInfof("RatifiedAcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
+	// })
 
-	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		Component.LogInfof("SlotCommitted: %s - %d", details.Commitment.ID(), details.Commitment.Index())
-	})
+	// deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
+	// 	Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
+	// })
 
-	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		Component.LogInfof("SlotConfirmed: %d", index)
-	})
+	// deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+	// 	Component.LogInfof("SlotCommitted: %s - %d", details.Commitment.ID(), details.Commitment.Index())
+	// })
 
-	deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {
-		Component.LogInfof("RequestCommitment: %s", id)
-	})
+	// deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+	// 	Component.LogInfof("SlotConfirmed: %d", index)
+	// })
 
-	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id network.PeerID) {
-		Component.LogInfof("SlotCommitmentRequestReceived: %s", commitmentID)
-	})
+	// deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {
+	// 	Component.LogInfof("RequestCommitment: %s", id)
+	// })
 
-	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id network.PeerID) {
-		Component.LogInfof("SlotCommitmentReceived: %s", commitment.ID())
-	})
+	// deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id network.PeerID) {
+	// 	Component.LogInfof("SlotCommitmentRequestReceived: %s", commitmentID)
+	// })
+
+	// deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id network.PeerID) {
+	// 	Component.LogInfof("SlotCommitmentReceived: %s", commitment.ID())
+	// })
 
 	return nil
 }

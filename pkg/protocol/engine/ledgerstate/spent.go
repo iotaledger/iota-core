@@ -2,6 +2,7 @@ package ledgerstate
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 
 	"github.com/iotaledger/hive.go/kvstore"
@@ -83,6 +84,9 @@ func (s *Spent) TimestampSpent() time.Time {
 type Spents []*Spent
 
 func NewSpent(output *Output, transactionIDSpent iotago.TransactionID, timestampSpent time.Time, slotIndexSpent iotago.SlotIndex) *Spent {
+	if output == nil {
+		fmt.Println(">>>>>>>>>output is nil in new spent")
+	}
 	return &Spent{
 		outputID:           output.outputID,
 		output:             output,
