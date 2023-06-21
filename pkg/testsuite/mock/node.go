@@ -417,9 +417,14 @@ func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {
 				return
 			}
 
-			n.IssueBlock(ctx, fmt.Sprintf("activity %s.%d", n.Name, counter), blockissuer.WithPayload(&iotago.TaggedData{
-				Tag: []byte(fmt.Sprintf("activity %s.%d", n.Name, counter)),
-			}))
+			blockAlias := fmt.Sprintf("%s-activity.%d", n.Name, counter)
+			n.IssueBlock(ctx, blockAlias,
+				blockissuer.WithPayload(
+					&iotago.TaggedData{
+						Tag: []byte(blockAlias),
+					},
+				),
+			)
 
 			counter++
 			time.Sleep(1 * time.Second)

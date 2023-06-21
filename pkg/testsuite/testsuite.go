@@ -290,6 +290,10 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	return node
 }
 
+func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string) *mock.Node {
+	return t.addNodeToPartition(name, partition, true)
+}
+
 func (t *TestSuite) AddValidatorNode(name string) *mock.Node {
 	return t.addNodeToPartition(name, mock.NetworkMainPartition, true)
 }
