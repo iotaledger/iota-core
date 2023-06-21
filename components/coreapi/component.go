@@ -12,7 +12,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/restapi"
-	"github.com/iotaledger/iota-core/pkg/blockissuer"
+	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -136,7 +136,7 @@ type dependencies struct {
 	Protocol         *protocol.Protocol
 	AppInfo          *app.Info
 	RestRouteManager *restapi.RestRouteManager
-	BlockIssuer      *blockissuer.BlockIssuer
+	BlockIssuer      *blockfactory.BlockIssuer
 	MetricsTracker   *metricstracker.MetricsTracker
 }
 

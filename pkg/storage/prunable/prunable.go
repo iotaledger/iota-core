@@ -11,6 +11,7 @@ const (
 	blocksPrefix byte = iota
 	rootBlocksPrefix
 	attestationsPrefix
+	accountDiffsPrefix
 	rootsPrefix
 )
 
@@ -61,6 +62,15 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *RootBlocks {
 
 func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
 	return p.manager.Get(slot, kvstore.Realm{attestationsPrefix})
+}
+
+func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
+	store := p.manager.Get(slot, kvstore.Realm{accountDiffsPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewAccountDiffs(slot, store, p.api)
 }
 
 func (p *Prunable) Roots(slot iotago.SlotIndex) kvstore.KVStore {

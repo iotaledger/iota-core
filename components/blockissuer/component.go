@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/crypto"
 	"github.com/iotaledger/iota-core/components/restapi"
-	"github.com/iotaledger/iota-core/pkg/blockissuer"
+	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -36,10 +36,10 @@ var (
 type dependencies struct {
 	dig.In
 
-	BlockIssuer *blockissuer.BlockIssuer
+	BlockIssuer *blockfactory.BlockIssuer
 }
 
-func accountFromParam(accountHex, privateKey string) blockissuer.Account {
+func accountFromParam(accountHex, privateKey string) blockfactory.Account {
 	accountID, err := iotago.IdentifierFromHexString(accountHex)
 	if err != nil {
 		panic(fmt.Sprintln("invalid account ID hex string", err))
@@ -49,7 +49,7 @@ func accountFromParam(accountHex, privateKey string) blockissuer.Account {
 		panic(fmt.Sprintln("invalid ed25519 private key string", err))
 	}
 
-	return blockissuer.NewEd25519Account(accountID, privKey)
+	return blockfactory.NewEd25519Account(accountID, privKey)
 }
 
 func provide(c *dig.Container) error {
@@ -59,12 +59,12 @@ func provide(c *dig.Container) error {
 		Protocol *protocol.Protocol
 	}
 
-	return c.Provide(func(deps innerDependencies) *blockissuer.BlockIssuer {
-		return blockissuer.New(deps.Protocol, accountFromParam(ParamsBlockIssuer.IssuerAccount, ParamsBlockIssuer.PrivateKey),
-			blockissuer.WithTipSelectionTimeout(ParamsBlockIssuer.TipSelectionTimeout),
-			blockissuer.WithTipSelectionRetryInterval(ParamsBlockIssuer.TipSelectionRetryInterval),
-			blockissuer.WithPoWEnabled(restapi.ParamsRestAPI.PoW.Enabled),
-			blockissuer.WithIncompleteBlockAccepted(restapi.ParamsRestAPI.AllowIncompleteBlock),
+	return c.Provide(func(deps innerDependencies) *blockfactory.BlockIssuer {
+		return blockfactory.New(deps.Protocol, accountFromParam(ParamsBlockIssuer.IssuerAccount, ParamsBlockIssuer.PrivateKey),
+			blockfactory.WithTipSelectionTimeout(ParamsBlockIssuer.TipSelectionTimeout),
+			blockfactory.WithTipSelectionRetryInterval(ParamsBlockIssuer.TipSelectionRetryInterval),
+			blockfactory.WithPoWEnabled(restapi.ParamsRestAPI.PoW.Enabled),
+			blockfactory.WithIncompleteBlockAccepted(restapi.ParamsRestAPI.AllowIncompleteBlock),
 		)
 	})
 }

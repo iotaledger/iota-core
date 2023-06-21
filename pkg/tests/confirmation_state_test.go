@@ -105,6 +105,7 @@ func TestConfirmationFlags(t *testing.T) {
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
 		)
 	}
 
@@ -123,6 +124,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(2),
+			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(lo.MergeMaps(expectedOnlineCommittee, map[iotago.AccountID]int64{
 				nodeB.AccountID: 25,
@@ -158,6 +160,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(2),
+			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(lo.MergeMaps(expectedOnlineCommittee, map[iotago.AccountID]int64{
 				nodeC.AccountID: 25,
@@ -186,6 +189,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(3),
+			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithEvictedSlot(3),
 		)
 	}
@@ -210,6 +214,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(1),
 			testsuite.WithLatestCommitmentSlotIndex(3),
+			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithSybilProtectionCommittee(expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee),
 			testsuite.WithEvictedSlot(3),

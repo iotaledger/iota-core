@@ -168,6 +168,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 			ts.AssertNodeState(ts.Nodes("node1", "node2"),
 				testsuite.WithLatestCommitmentSlotIndex(7),
+				testsuite.WithEqualStoredCommitmentAtIndex(7),
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
@@ -205,6 +206,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.AssertNodeState(ts.Nodes("node1", "node2"),
 				testsuite.WithLatestCommitmentCumulativeWeight(150),
 				testsuite.WithLatestCommitmentSlotIndex(9),
+				testsuite.WithEqualStoredCommitmentAtIndex(9),
 				testsuite.WithLatestFinalizedSlot(7),
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
@@ -235,6 +237,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				// We have the same CW of Slot 9, because we didn't observe any attestation on top of 8 that we could include.
 				testsuite.WithLatestCommitmentCumulativeWeight(150),
 				testsuite.WithLatestCommitmentSlotIndex(10),
+				testsuite.WithEqualStoredCommitmentAtIndex(10),
 				testsuite.WithLatestFinalizedSlot(7),
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
@@ -317,6 +320,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node3", "node4"),
 				testsuite.WithLatestCommitmentSlotIndex(8),
+				testsuite.WithEqualStoredCommitmentAtIndex(8),
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
@@ -341,6 +345,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node3", "node4"),
 				testsuite.WithLatestCommitmentSlotIndex(11),
+				testsuite.WithEqualStoredCommitmentAtIndex(11),
 				testsuite.WithLatestCommitmentCumulativeWeight(0), // We haven't collected any attestation yet.
 				testsuite.WithLatestFinalizedSlot(0),              // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
@@ -370,6 +375,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node3", "node4"),
 				testsuite.WithLatestCommitmentSlotIndex(13),
+				testsuite.WithEqualStoredCommitmentAtIndex(13),
 				testsuite.WithLatestCommitmentCumulativeWeight(50),
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
