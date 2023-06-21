@@ -30,6 +30,18 @@ type TipMetadata struct {
 	// weaklyConnectedChildren holds the number of weak children that can be reached from the tips.
 	weaklyConnectedChildren *lpromise.Value[int]
 
+	// isOrphaned is a derived property that is true if the block is either marked as orphaned or has at least one
+	// orphaned strong parent.
+	isOrphaned *lpromise.Value[bool]
+
+	// isStrongTipPoolMember is a derived property that is true if the block is part of the strong TipPool and is not
+	// orphaned.
+	isStrongTipPoolMember *lpromise.Value[bool]
+
+	// isWeakTipPoolMember is a derived property that is true if the block is part of the weak TipPool and is not
+	// orphaned.
+	isWeakTipPoolMember *lpromise.Value[bool]
+
 	// isStronglyReferencedByTips is a derived property that is true if the block has at least one strongly connected
 	// child.
 	isStronglyReferencedByTips *lpromise.Value[bool]
@@ -46,14 +58,6 @@ type TipMetadata struct {
 	// at least one weakly connected child.
 	isWeaklyConnectedToTips *lpromise.Value[bool]
 
-	// isStrongTipPoolMember is a derived property that is true if the block is part of the strong TipPool and is not
-	// orphaned.
-	isStrongTipPoolMember *lpromise.Value[bool]
-
-	// isWeakTipPoolMember is a derived property that is true if the block is part of the weak TipPool and is not
-	// orphaned.
-	isWeakTipPoolMember *lpromise.Value[bool]
-
 	// isStrongTip is a derived property that is true if the block is part of the strong TipPool, and is not
 	// isStronglyReferencedByTips.
 	isStrongTip *lpromise.Value[bool]
@@ -61,10 +65,6 @@ type TipMetadata struct {
 	// isWeakTip is a derived property that is true if the block is part of the weak TipPool and isWeaklyReferencedByTips is
 	// false.
 	isWeakTip *lpromise.Value[bool]
-
-	// isOrphaned is a derived property that is true if the block is either marked as orphaned or has at least one
-	// orphaned strong parent.
-	isOrphaned *lpromise.Value[bool]
 
 	// isEvicted is triggered when the block is removed from the TipManager.
 	isEvicted *promise.Event

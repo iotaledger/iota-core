@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 )
 
-// NewProvider creates a new TipManager provider for the given engine.
+// NewProvider creates a new TipManager provider for an engine.
 func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
 		t := NewTipManager(e.BlockCache.Block, opts...)

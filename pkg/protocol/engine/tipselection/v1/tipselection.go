@@ -8,20 +8,23 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// TipSelection is an implementation of the TipSelection interface that implements the following tip selection
+// algorithm:
+//
+// All blocks that are not voting for something rejected by the time of arrival are classified as strong tips.
 type TipSelection struct {
 	// rootBlocks is a function that returns the current root blocks.
 	rootBlocks func() iotago.BlockIDs
 
+	// tipManager is the TipManager that is used to access the tip related metadata.
 	tipManager tipmanager.TipManager
 
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
@@ -43,24 +46,8 @@ type TipSelection struct {
 	// optMaxWeakReferences contains the maximum number of weak references that are allowed.
 	optMaxWeakReferences int
 
+	// Module embeds the required methods of the module.Interface.
 	module.Module
-}
-
-// NewProvider creates a new TipManager provider.
-func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.Engine, tipselection.TipSelection] {
-	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
-		t := New(e.TipManager, e.Ledger.ConflictDAG(), e.EvictionState.LatestRootBlocks, opts...)
-
-		e.HookConstructed(func() {
-			e.TipManager.OnBlockAdded(t.classifyTip)
-
-			t.TriggerInitialized()
-		})
-
-		e.HookStopped(t.TriggerStopped)
-
-		return t
-	})
 }
 
 func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
