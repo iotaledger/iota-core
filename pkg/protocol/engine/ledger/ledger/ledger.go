@@ -47,7 +47,7 @@ type Ledger struct {
 	errorHandler       func(error)
 	protocolParameters *iotago.ProtocolParameters
 
-	decayProvider *iotago.DecayProvider
+	manaDecayProvider *iotago.ManaDecayProvider
 
 	module.Module
 }
@@ -80,8 +80,8 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 		})
 		e.HookInitialized(func() {
 			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
-			l.decayProvider = l.protocolParameters.DecayProvider()
-			l.manaManager = mana.NewManager(l.decayProvider, l.resolveAccountOutput)
+			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
+			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
 			l.TriggerConstructed()
 
 			l.accountsLedger.SetMaxCommittableAge(iotago.SlotIndex(l.protocolParameters.MaxCommitableAge))
