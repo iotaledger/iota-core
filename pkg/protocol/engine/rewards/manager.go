@@ -44,6 +44,7 @@ func New(
 		performanceFactorsCache: shrinkingmap.New[iotago.SlotIndex, *prunable.PerformanceFactors](),
 		performanceFactorsFunc:  performanceFactorsFunc,
 		timeProvider:            timeProvider,
+		decayProvider:           decayProvider,
 	}
 }
 
@@ -101,14 +102,17 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 		totalValidatorStake += pool.ValidatorStake
 	}
 
-	profitMargin := profitMargin(totalValidatorStake, totalStake)
+	profitMargin := calculateProfitMargin(totalValidatorStake, totalStake)
 	poolsStats := PoolsStats{
 		TotalStake:          totalStake,
 		TotalValidatorStake: totalValidatorStake,
 		ProfitMargin:        profitMargin,
 	}
 
-	m.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolsStats.Bytes()))
+	err := m.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolsStats.Bytes()))
+	if err != nil {
+		return errors.Wrapf(err, "failed to store pool stats for epoch %d", epochIndex)
+	}
 
 	for accountID, pool := range poolStakes {
 		intermediateFactors := make([]uint64, 0)
@@ -118,8 +122,8 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 				intermediateFactors = append(intermediateFactors, 0)
 			}
 
-			pf, err := performanceFactorStorage.Load(accountID)
-			if err != nil {
+			pf, err2 := performanceFactorStorage.Load(accountID)
+			if err2 != nil {
 				return errors.Wrapf(err, "failed to load performance factor for account %s", accountID)
 			}
 
@@ -210,7 +214,7 @@ func aggregatePerformanceFactors(pfs []uint64) uint64 {
 	return sum / uint64(len(pfs))
 }
 
-func profitMargin(totalValidatorsStake, totalPoolStake uint64) uint64 {
+func calculateProfitMargin(totalValidatorsStake, totalPoolStake uint64) uint64 {
 	return (1 << 8) * totalValidatorsStake / (totalValidatorsStake + totalPoolStake)
 }
 

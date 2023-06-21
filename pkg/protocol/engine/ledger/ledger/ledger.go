@@ -92,7 +92,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
 			l.TriggerConstructed()
 
-			l.accountsLedger.SetMaxCommittableAge(iotago.SlotIndex(l.protocolParameters.MaxCommittableAge))
+			l.accountsLedger.SetMaxCommittableAge(l.protocolParameters.MaxCommittableAge)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			l.TriggerInitialized()
@@ -283,6 +283,10 @@ func (l *Ledger) Import(reader io.ReadSeeker) error {
 		return errors.Wrap(err, "failed to import accountsLedger")
 	}
 
+	if err := l.rewardsManager.Import(reader); err != nil {
+		return errors.Wrap(err, "failed to import rewardsManager")
+	}
+
 	return nil
 }
 
@@ -293,6 +297,10 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 
 	if err := l.accountsLedger.Export(writer, targetIndex); err != nil {
 		return errors.Wrap(err, "failed to export accountsLedger")
+	}
+
+	if err := l.rewardsManager.Export(writer, targetIndex); err != nil {
+		return errors.Wrap(err, "failed to export rewardsManager")
 	}
 
 	return nil
