@@ -8,6 +8,7 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/xerrors"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -18,7 +19,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/core/weight"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Conflict is a conflict that is part of a Conflict DAG.
@@ -42,7 +42,7 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.V
 	Weight *weight.Weight
 
 	// LatestVotes is the set of the latest votes of the Conflict.
-	LatestVotes *shrinkingmap.ShrinkingMap[iotago.AccountID, *vote.Vote[VotePower]]
+	LatestVotes *shrinkingmap.ShrinkingMap[account.SeatIndex, *vote.Vote[VotePower]]
 
 	// AcceptanceStateUpdated is triggered when the AcceptanceState of the Conflict is updated.
 	AcceptanceStateUpdated *event.Event2[acceptance.State, acceptance.State]
@@ -95,7 +95,7 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictda
 		Children:                advancedset.New[*Conflict[ConflictID, ResourceID, VotePower]](),
 		ConflictSets:            advancedset.New[*ConflictSet[ConflictID, ResourceID, VotePower]](),
 		Weight:                  initialWeight,
-		LatestVotes:             shrinkingmap.New[iotago.AccountID, *vote.Vote[VotePower]](),
+		LatestVotes:             shrinkingmap.New[account.SeatIndex, *vote.Vote[VotePower]](),
 		AcceptanceStateUpdated:  event.New2[acceptance.State, acceptance.State](),
 		PreferredInsteadUpdated: event.New1[*Conflict[ConflictID, ResourceID, VotePower]](),
 		LikedInsteadAdded:       event.New1[*Conflict[ConflictID, ResourceID, VotePower]](),

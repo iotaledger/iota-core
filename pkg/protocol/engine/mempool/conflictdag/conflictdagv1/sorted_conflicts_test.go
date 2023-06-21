@@ -23,18 +23,22 @@ type SortedConflictSet = *SortedConflicts[iotago.TransactionID, iotago.OutputID,
 var NewSortedConflictSet = NewSortedConflicts[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
 
 func TestSortedConflict(t *testing.T) {
-	weights := account.NewSelectedAccounts(account.NewAccounts[iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID](mapdb.NewMapDB()))
 	pendingTasks := syncutils.NewCounter()
 
-	conflict1 := NewTestConflict(transactionID("conflict1"), nil, nil, weight.New(weights).AddCumulativeWeight(12), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
+	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
+		return int64(weights.SeatCount())
+	})
+
+	conflict1 := NewTestConflict(transactionID("conflict1"), nil, nil, weight.New().AddCumulativeWeight(12), pendingTasks, thresholdProvider)
 	conflict1.setAcceptanceState(acceptance.Rejected)
-	conflict2 := NewTestConflict(transactionID("conflict2"), nil, nil, weight.New(weights).AddCumulativeWeight(10), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
-	conflict3 := NewTestConflict(transactionID("conflict3"), nil, nil, weight.New(weights).AddCumulativeWeight(1), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
+	conflict2 := NewTestConflict(transactionID("conflict2"), nil, nil, weight.New().AddCumulativeWeight(10), pendingTasks, thresholdProvider)
+	conflict3 := NewTestConflict(transactionID("conflict3"), nil, nil, weight.New().AddCumulativeWeight(1), pendingTasks, thresholdProvider)
 	conflict3.setAcceptanceState(acceptance.Accepted)
-	conflict4 := NewTestConflict(transactionID("conflict4"), nil, nil, weight.New(weights).AddCumulativeWeight(11), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
+	conflict4 := NewTestConflict(transactionID("conflict4"), nil, nil, weight.New().AddCumulativeWeight(11), pendingTasks, thresholdProvider)
 	conflict4.setAcceptanceState(acceptance.Rejected)
-	conflict5 := NewTestConflict(transactionID("conflict5"), nil, nil, weight.New(weights).AddCumulativeWeight(11), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
-	conflict6 := NewTestConflict(transactionID("conflict6"), nil, nil, weight.New(weights).AddCumulativeWeight(2), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
+	conflict5 := NewTestConflict(transactionID("conflict5"), nil, nil, weight.New().AddCumulativeWeight(11), pendingTasks, thresholdProvider)
+	conflict6 := NewTestConflict(transactionID("conflict6"), nil, nil, weight.New().AddCumulativeWeight(2), pendingTasks, thresholdProvider)
 	conflict6.setAcceptanceState(acceptance.Accepted)
 
 	sortedConflicts := NewSortedConflictSet(conflict1, pendingTasks)
@@ -77,12 +81,16 @@ func TestSortedConflict(t *testing.T) {
 }
 
 func TestSortedDecreaseHeaviest(t *testing.T) {
-	weights := account.NewSelectedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
 	pendingTasks := syncutils.NewCounter()
 
-	conflict1 := NewTestConflict(transactionID("conflict1"), nil, nil, weight.New(weights).AddCumulativeWeight(1), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
+	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
+		return int64(weights.SeatCount())
+	})
+
+	conflict1 := NewTestConflict(transactionID("conflict1"), nil, nil, weight.New().AddCumulativeWeight(1), pendingTasks, thresholdProvider)
 	conflict1.setAcceptanceState(acceptance.Accepted)
-	conflict2 := NewTestConflict(transactionID("conflict2"), nil, nil, weight.New(weights).AddCumulativeWeight(2), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
+	conflict2 := NewTestConflict(transactionID("conflict2"), nil, nil, weight.New().AddCumulativeWeight(2), pendingTasks, thresholdProvider)
 
 	sortedConflicts := NewSortedConflictSet(conflict1, pendingTasks)
 
@@ -100,8 +108,12 @@ func TestSortedDecreaseHeaviest(t *testing.T) {
 }
 
 func TestSortedConflictParallel(t *testing.T) {
-	weights := account.NewSelectedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
 	pendingTasks := syncutils.NewCounter()
+
+	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
+		return int64(weights.SeatCount())
+	})
 
 	const conflictCount = 1000
 	const updateCount = 100000
@@ -111,8 +123,8 @@ func TestSortedConflictParallel(t *testing.T) {
 	for i := 0; i < conflictCount; i++ {
 		alias := "conflict" + strconv.Itoa(i)
 
-		conflicts[alias] = NewTestConflict(transactionID(alias), nil, nil, weight.New(weights), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
-		parallelConflicts[alias] = NewTestConflict(transactionID(alias), nil, nil, weight.New(weights), pendingTasks, acceptance.ThresholdProvider(weights.TotalWeight))
+		conflicts[alias] = NewTestConflict(transactionID(alias), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+		parallelConflicts[alias] = NewTestConflict(transactionID(alias), nil, nil, weight.New(), pendingTasks, thresholdProvider)
 	}
 
 	sortedConflicts := NewSortedConflictSet(conflicts["conflict0"], pendingTasks)

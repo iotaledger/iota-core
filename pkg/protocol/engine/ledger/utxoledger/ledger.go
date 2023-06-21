@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -22,23 +21,25 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
 
 type Ledger struct {
-	ledgerState  *ledgerstate.Manager
-	memPool      mempool.MemPool[ledger.BlockVotePower]
-	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
-	errorHandler func(error)
+	ledgerState     *ledgerstate.Manager
+	sybylProtection sybilprotection.SybilProtection
+	memPool         mempool.MemPool[ledger.BlockVotePower]
+	conflictDAG     conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
+	errorHandler    func(error)
 
 	module.Module
 }
 
 func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) ledger.Ledger {
-		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), executeStardustVM, e.API, e.SybilProtection.OnlineCommittee(), e.ErrorHandler("ledger"))
+		l := New(e.Workers.CreateGroup("Ledger"), e.Storage.Ledger(), executeStardustVM, e.API, e.SybilProtection, e.ErrorHandler("ledger"))
 
 		e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
@@ -52,11 +53,12 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	})
 }
 
-func New(workers *workerpool.Group, store kvstore.KVStore, vm mempool.VM, apiProviderFunc func() iotago.API, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], errorHandler func(error)) *Ledger {
+func New(workers *workerpool.Group, store kvstore.KVStore, vm mempool.VM, apiProviderFunc func() iotago.API, sybylProtection sybilprotection.SybilProtection, errorHandler func(error)) *Ledger {
 	l := &Ledger{
-		ledgerState:  ledgerstate.New(store, apiProviderFunc),
-		conflictDAG:  conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](committee),
-		errorHandler: errorHandler,
+		sybylProtection: sybylProtection,
+		ledgerState:     ledgerstate.New(store, apiProviderFunc),
+		conflictDAG:     conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](sybylProtection.OnlineCommittee().Size),
+		errorHandler:    errorHandler,
 	}
 
 	l.memPool = mempoolv1.New(vm, l.resolveState, workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVotePower](true))
@@ -263,7 +265,13 @@ func (l *Ledger) BlockAccepted(block *blocks.Block) {
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 	votePower := ledger.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
-	if err := l.conflictDAG.CastVotes(vote.NewVote(block.Block().IssuerID, votePower), block.ConflictIDs()); err != nil {
+
+	seat, exists := l.sybylProtection.Committee(block.ID().Index()).GetSeat(block.Block().IssuerID)
+	if !exists {
+		return
+	}
+
+	if err := l.conflictDAG.CastVotes(vote.NewVote(seat, votePower), block.ConflictIDs()); err != nil {
 		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
 		//  Do we track witness weight of invalid blocks?
 		l.errorHandler(errors.Wrapf(err, "failed to cast votes for block %s", block.ID()))

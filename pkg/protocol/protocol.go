@@ -92,7 +92,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsTipManagerProvider:      tipmanagerv1.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
-		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),
+		optsSybilProtectionProvider: poa.NewProvider([]iotago.AccountID{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),

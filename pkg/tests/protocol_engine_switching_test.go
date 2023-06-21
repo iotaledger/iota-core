@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -24,10 +25,10 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(19*10))
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNodeToPartition("node1", 75, "P1")
-	node2 := ts.AddValidatorNodeToPartition("node2", 75, "P1")
-	node3 := ts.AddValidatorNodeToPartition("node3", 25, "P2")
-	node4 := ts.AddValidatorNodeToPartition("node4", 25, "P2")
+	node1 := ts.AddNodeToPartition("node1", "P1") //75
+	node2 := ts.AddNodeToPartition("node2", "P1") //75
+	node3 := ts.AddNodeToPartition("node3", "P2") //25
+	node4 := ts.AddNodeToPartition("node4", "P2") //25
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
@@ -113,19 +114,19 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	})
 	ts.HookLogging()
 
-	expectedCommittee := map[iotago.AccountID]int64{
-		node1.AccountID: 75,
-		node2.AccountID: 75,
-		node3.AccountID: 25,
-		node4.AccountID: 25,
+	expectedCommittee := []iotago.AccountID{
+		node1.AccountID, // 75
+		node2.AccountID, // 75
+		node3.AccountID, // 25
+		node4.AccountID, // 25
 	}
-	expectedP1Committee := map[iotago.AccountID]int64{
-		node1.AccountID: 75,
-		node2.AccountID: 75,
+	expectedP1Committee := []account.SeatIndex{
+		0, //node1
+		1, //node2
 	}
-	expectedP2Committee := map[iotago.AccountID]int64{
-		node3.AccountID: 25,
-		node4.AccountID: 25,
+	expectedP2Committee := []account.SeatIndex{
+		2, //node3
+		3, //node4
 	}
 
 	// Verify that nodes have the expected states.
@@ -138,7 +139,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
 
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 			testsuite.WithEvictedSlot(0),
 			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -172,7 +173,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee),
-				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
 				testsuite.WithEvictedSlot(7),
 			)
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
@@ -209,7 +210,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee),
-				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
 				testsuite.WithEvictedSlot(9),
 			)
 
@@ -239,7 +240,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee),
-				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
 				testsuite.WithEvictedSlot(10),
 			)
 
@@ -281,7 +282,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee),
-				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
 				testsuite.WithEvictedSlot(11),
 			)
 
@@ -321,7 +322,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
-				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
 				testsuite.WithEvictedSlot(8),
 			)
 		}
@@ -346,7 +347,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
-				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
 				testsuite.WithEvictedSlot(11),
 			)
 
@@ -375,7 +376,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
-				testsuite.WithSybilProtectionCommittee(expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(18, expectedCommittee),
 				testsuite.WithEvictedSlot(13),
 			)
 

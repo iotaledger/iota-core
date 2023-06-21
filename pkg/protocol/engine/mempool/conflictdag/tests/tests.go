@@ -92,10 +92,10 @@ func CreateConflict(t *testing.T, tf *Framework) {
 }
 
 func CreateConflictWithoutMembers(t *testing.T, tf *Framework) {
-	tf.Accounts.CreateID("nodeID1", 10)
-	tf.Accounts.CreateID("nodeID2", 10)
-	tf.Accounts.CreateID("nodeID3", 10)
-	tf.Accounts.CreateID("nodeID4", 0)
+	tf.Accounts.CreateID("nodeID1")
+	tf.Accounts.CreateID("nodeID2")
+	tf.Accounts.CreateID("nodeID3")
+	tf.Accounts.CreateID("nodeID4")
 
 	// Non-conflicting conflicts
 	{
@@ -152,10 +152,10 @@ func LikedInstead(t *testing.T, tf *Framework) {
 }
 
 func ConflictAcceptance(t *testing.T, tf *Framework) {
-	tf.Accounts.CreateID("nodeID1", 10)
-	tf.Accounts.CreateID("nodeID2", 10)
-	tf.Accounts.CreateID("nodeID3", 10)
-	tf.Accounts.CreateID("nodeID4", 10)
+	tf.Accounts.CreateID("nodeID1")
+	tf.Accounts.CreateID("nodeID2")
+	tf.Accounts.CreateID("nodeID3")
+	tf.Accounts.CreateID("nodeID4")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}))
@@ -187,10 +187,10 @@ func ConflictAcceptance(t *testing.T, tf *Framework) {
 }
 
 func CastVotes(t *testing.T, tf *Framework) {
-	tf.Accounts.CreateID("nodeID1", 10)
-	tf.Accounts.CreateID("nodeID2", 10)
-	tf.Accounts.CreateID("nodeID3", 10)
-	tf.Accounts.CreateID("nodeID4", 10)
+	tf.Accounts.CreateID("nodeID1")
+	tf.Accounts.CreateID("nodeID2")
+	tf.Accounts.CreateID("nodeID3")
+	tf.Accounts.CreateID("nodeID4")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}))
@@ -223,10 +223,9 @@ func CastVotes(t *testing.T, tf *Framework) {
 }
 
 func CastVotesVotePower(t *testing.T, tf *Framework) {
-	tf.Accounts.CreateID("nodeID1", 10)
-	tf.Accounts.CreateID("nodeID2", 10)
-	tf.Accounts.CreateID("nodeID3", 10)
-	tf.Accounts.CreateID("nodeID4", 0)
+	tf.Accounts.CreateID("nodeID1")
+	tf.Accounts.CreateID("nodeID2")
+	tf.Accounts.CreateID("nodeID3")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}))
@@ -246,21 +245,6 @@ func CastVotesVotePower(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("conflict3", "conflict1")
 	tf.Assert.Parents("conflict4", "conflict1")
 
-	// casting a vote from non-relevant validator before any relevant validators increases validator weight
-	// require.NoError(t, tf.CastVotes("nodeID4", 2, "conflict3"))
-	// tf.Assert.LikedInstead([]string{"conflict1"})
-	// tf.Assert.LikedInstead([]string{"conflict2"}, "conflict1")
-	// tf.Assert.LikedInstead([]string{"conflict3"})
-	// tf.Assert.LikedInstead([]string{"conflict4"}, "conflict3")
-
-	// casting a vote from non-relevant validator before any relevant validators increases validator weight
-	// require.NoError(t, tf.CastVotes("nodeID4", 2, "conflict2"))
-	// require.NoError(t, tf.CastVotes("nodeID4", 2, "conflict2"))
-	// tf.Assert.LikedInstead([]string{"conflict1"}, "conflict2")
-	// tf.Assert.LikedInstead([]string{"conflict2"})
-	// tf.Assert.LikedInstead([]string{"conflict3"}, "conflict2")
-	// tf.Assert.LikedInstead([]string{"conflict4"}, "conflict2")
-
 	// casting a vote from a validator updates the validator weight
 	require.NoError(t, tf.CastVotes("nodeID1", 2, "conflict4"))
 	tf.Assert.LikedInstead([]string{"conflict1"})
@@ -268,28 +252,16 @@ func CastVotesVotePower(t *testing.T, tf *Framework) {
 	tf.Assert.LikedInstead([]string{"conflict3"}, "conflict4")
 	tf.Assert.LikedInstead([]string{"conflict4"})
 
-	// casting a vote from non-relevant validator after processing a vote from relevant validator doesn't change weights
-	require.NoError(t, tf.CastVotes("nodeID4", 2, "conflict2"))
-	require.NoError(t, tf.CastVotes("nodeID4", 2, "conflict2"))
-	tf.Assert.LikedInstead([]string{"conflict1"})
-	tf.Assert.LikedInstead([]string{"conflict2"}, "conflict1")
-	tf.Assert.LikedInstead([]string{"conflict3"}, "conflict4")
-	tf.Assert.LikedInstead([]string{"conflict4"})
-	tf.Assert.ValidatorWeight("conflict1", 10)
-	tf.Assert.ValidatorWeight("conflict2", 0)
-	tf.Assert.ValidatorWeight("conflict3", 0)
-	tf.Assert.ValidatorWeight("conflict4", 10)
-
 	// casting vote with lower vote power doesn't change the weights of conflicts
 	require.NoError(t, tf.CastVotes("nodeID1", 1), "conflict3")
 	tf.Assert.LikedInstead([]string{"conflict1"})
 	tf.Assert.LikedInstead([]string{"conflict2"}, "conflict1")
 	tf.Assert.LikedInstead([]string{"conflict3"}, "conflict4")
 	tf.Assert.LikedInstead([]string{"conflict4"})
-	tf.Assert.ValidatorWeight("conflict1", 10)
+	tf.Assert.ValidatorWeight("conflict1", 1)
 	tf.Assert.ValidatorWeight("conflict2", 0)
 	tf.Assert.ValidatorWeight("conflict3", 0)
-	tf.Assert.ValidatorWeight("conflict4", 10)
+	tf.Assert.ValidatorWeight("conflict4", 1)
 
 	// casting vote with higher vote power changes the weights of conflicts
 	require.NoError(t, tf.CastVotes("nodeID1", 3, "conflict3"))
@@ -297,17 +269,17 @@ func CastVotesVotePower(t *testing.T, tf *Framework) {
 	tf.Assert.LikedInstead([]string{"conflict2"}, "conflict1")
 	tf.Assert.LikedInstead([]string{"conflict3"})
 	tf.Assert.LikedInstead([]string{"conflict4"}, "conflict3")
-	tf.Assert.ValidatorWeight("conflict1", 10)
+	tf.Assert.ValidatorWeight("conflict1", 1)
 	tf.Assert.ValidatorWeight("conflict2", 0)
-	tf.Assert.ValidatorWeight("conflict3", 10)
+	tf.Assert.ValidatorWeight("conflict3", 1)
 	tf.Assert.ValidatorWeight("conflict4", 0)
 }
 
 func CastVotesAcceptance(t *testing.T, tf *Framework) {
-	tf.Accounts.CreateID("nodeID1", 10)
-	tf.Accounts.CreateID("nodeID2", 10)
-	tf.Accounts.CreateID("nodeID3", 10)
-	tf.Accounts.CreateID("nodeID4", 10)
+	tf.Accounts.CreateID("nodeID1")
+	tf.Accounts.CreateID("nodeID2")
+	tf.Accounts.CreateID("nodeID3")
+	tf.Accounts.CreateID("nodeID4")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}))
@@ -379,10 +351,10 @@ func JoinConflictSetTwice(t *testing.T, tf *Framework) {
 }
 
 func EvictAcceptedConflict(t *testing.T, tf *Framework) {
-	tf.Accounts.CreateID("nodeID1", 10)
-	tf.Accounts.CreateID("nodeID2", 10)
-	tf.Accounts.CreateID("nodeID3", 10)
-	tf.Accounts.CreateID("nodeID4", 10)
+	tf.Accounts.CreateID("nodeID1")
+	tf.Accounts.CreateID("nodeID2")
+	tf.Accounts.CreateID("nodeID3")
+	tf.Accounts.CreateID("nodeID4")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}))
@@ -445,10 +417,10 @@ func EvictRejectedConflict(t *testing.T, tf *Framework) {
 		conflictEvictedEventCount++
 	})
 
-	tf.Accounts.CreateID("nodeID1", 10)
-	tf.Accounts.CreateID("nodeID2", 10)
-	tf.Accounts.CreateID("nodeID3", 10)
-	tf.Accounts.CreateID("nodeID4", 10)
+	tf.Accounts.CreateID("nodeID1")
+	tf.Accounts.CreateID("nodeID2")
+	tf.Accounts.CreateID("nodeID3")
+	tf.Accounts.CreateID("nodeID4")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}))

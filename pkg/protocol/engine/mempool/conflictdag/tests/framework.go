@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
@@ -77,7 +78,11 @@ func (f *Framework) LikedInstead(conflictAliases ...string) *advancedset.Advance
 
 // CastVotes casts the given votes for the given conflicts.
 func (f *Framework) CastVotes(nodeAlias string, votePower int, conflictAliases ...string) error {
-	return f.Instance.CastVotes(vote.NewVote[vote.MockedPower](f.Accounts.ID(nodeAlias), vote.MockedPower(votePower)), f.ConflictIDs(conflictAliases...))
+	seat, exists := f.Accounts.Get(nodeAlias)
+	if !exists {
+		return fmt.Errorf("node with alias '%s' does not have a seat in the committee", nodeAlias)
+	}
+	return f.Instance.CastVotes(vote.NewVote[vote.MockedPower](seat, vote.MockedPower(votePower)), f.ConflictIDs(conflictAliases...))
 }
 
 // EvictConflict evicts given conflict from the ConflictDAG.
