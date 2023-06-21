@@ -40,7 +40,7 @@ export class Transaction extends React.Component<Props, any> {
                         <ListGroup>
                             <ListGroup.Item>ID: <a href={`/explorer/transaction/${txID}`}> {txID}</a></ListGroup.Item>
                             <ListGroup.Item>Network ID: {tx.networkId}</ListGroup.Item>
-                            <ListGroup.Item>Creation Time: {new Date(tx.creationTime * 1000).toLocaleString()}</ListGroup.Item>
+                            <ListGroup.Item>Creation Time: {tx.creationTime}</ListGroup.Item>
                             <ListGroup.Item>
                                 <div className="d-flex justify-content-between align-items-center">
                                     <div className="align-self-start input-output-list" style={style}>
