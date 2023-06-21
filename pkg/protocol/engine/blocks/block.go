@@ -40,6 +40,7 @@ type Block struct {
 
 	// Scheduler block
 	scheduled bool
+	skipped   bool
 	enqueued  bool
 	dropped   bool
 
@@ -422,6 +423,27 @@ func (b *Block) SetScheduled() (wasUpdated bool) {
 
 	if wasUpdated = !b.scheduled; wasUpdated {
 		b.scheduled = true
+		b.enqueued = false
+	}
+
+	return wasUpdated
+}
+
+// IsSkipped returns true if the Block was skipped.
+func (b *Block) IsSkipped() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.skipped
+}
+
+// SetSkipped sets the Block as skipped.
+func (b *Block) SetSkipped() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.skipped; wasUpdated {
+		b.skipped = true
 		b.enqueued = false
 	}
 

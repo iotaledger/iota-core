@@ -146,7 +146,9 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	defer s.bufferMutex.Unlock()
 
 	droppedBlocks, err := s.buffer.Submit(block, s.manaRetrieveFunc)
+	// error submitting indicates that the block was already submitted so we do nothing else.
 	if err != nil {
+		return
 	}
 	for _, b := range droppedBlocks {
 		b.SetDropped()
@@ -185,12 +187,10 @@ loop:
 	}
 }
 
-func (s *Scheduler) quantum(accountID iotago.AccountID) uint64 {
+func (s *Scheduler) quantum(accountID iotago.AccountID) (uint64, error) {
 	mana, err := s.manaRetrieveFunc(accountID)
-	if err != nil {
 
-	}
-	return mana / s.optsMinMana
+	return mana / s.optsMinMana, err
 }
 
 func (s *Scheduler) selectBlockToSchedule() {
@@ -217,7 +217,10 @@ func (s *Scheduler) selectBlockToSchedule() {
 	if rounds > 0 {
 		// increment every issuer's deficit for the required number of rounds
 		for q := start; ; {
-			err := s.updateDeficit(q.IssuerID(), int64(s.quantum(q.IssuerID()))*rounds)
+			quantum, err := s.quantum(q.IssuerID())
+			if err == nil {
+				err = s.updateDeficit(q.IssuerID(), int64(quantum)*rounds)
+			}
 			if err != nil {
 				s.buffer.RemoveIssuer(q.IssuerID())
 				q = s.buffer.Current()
@@ -251,10 +254,12 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 
 	for q := start; ; {
 		block := q.Front()
+		var issuerRemoved bool
 
 		for block != nil && time.Now().After(block.IssuingTime()) {
 			if s.isBlockAcceptedFunc(block.ID()) && time.Since(block.IssuingTime()) > s.optsAcceptedBlockScheduleThreshold {
 				s.events.BlockSkipped.Trigger(block)
+				block.SetSkipped()
 				s.buffer.PopFront()
 
 				block = q.Front()
@@ -262,19 +267,25 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 				continue
 			}
 
-			// TODO: do we need to check for dropped and orphaned blocks?
-
 			// compute how often the deficit needs to be incremented until the block can be scheduled
 			deficit, err := s.getDeficit(block.Block().IssuerID)
 			if err != nil {
 				// no deficit exists for this issuer queue, so remove it
 				s.buffer.RemoveIssuer(block.Block().IssuerID)
-				continue
+				issuerRemoved = true
+				break
 			}
 			remainingDeficit := int64(block.Work()) - int64(deficit)
 			// calculate how many rounds we need to skip to accumulate enough deficit.
-			quantum := int64(s.quantum(block.Block().IssuerID))
-			r := (remainingDeficit + quantum - 1) / quantum // round up division result
+			quantum, err := s.quantum(block.Block().IssuerID)
+			if err != nil {
+				// if quantum, can't be retrieved, we need to remove this issuer.
+				s.buffer.RemoveIssuer(block.Block().IssuerID)
+				issuerRemoved = true
+				break
+			}
+
+			r := (remainingDeficit + int64(quantum) - 1) / int64(quantum) // round up division result
 			// find the first issuer that will be allowed to schedule a block
 			if r < rounds {
 				rounds = r
@@ -284,8 +295,13 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 			break
 		}
 
-		q = s.buffer.Next()
-		if q == start {
+		if issuerRemoved {
+			q = s.buffer.Current()
+		} else {
+			q = s.buffer.Next()
+			issuerRemoved = false
+		}
+		if q == start || q == nil {
 			break
 		}
 	}
@@ -317,6 +333,8 @@ func (s *Scheduler) isReady(block *blocks.Block) (ready bool) {
 	ready = true
 	block.ForEachParent(func(parent model.Parent) {
 		if parentBlock, parentExists := s.blockCache.Block(parent.ID); !parentExists || !s.isEligible(parentBlock) {
+			// if parents are evicted and orphaned (not root blocks), or have not been received yet they will not exist.
+			// if parents are evicted, they will be returned as root blocks with scheduled==true here.
 			ready = false
 			return
 		}
