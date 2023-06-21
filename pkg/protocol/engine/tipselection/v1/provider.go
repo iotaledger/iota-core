@@ -10,12 +10,16 @@ import (
 // NewProvider creates a new TipManager provider for an engine.
 func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.Engine, tipselection.TipSelection] {
 	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
-		t := New(e.TipManager, e.Ledger.ConflictDAG(), e.EvictionState.LatestRootBlocks, opts...)
+		t := New(e.TipManager, nil, e.EvictionState.LatestRootBlocks, opts...)
 
 		e.HookConstructed(func() {
-			e.TipManager.OnBlockAdded(t.classifyTip)
+			e.Ledger.HookInitialized(func() {
+				t.conflictDAG = e.Ledger.ConflictDAG()
 
-			t.TriggerInitialized()
+				t.TriggerInitialized()
+			})
+
+			e.TipManager.OnBlockAdded(t.classifyTip)
 		})
 
 		e.HookStopped(t.TriggerStopped)
