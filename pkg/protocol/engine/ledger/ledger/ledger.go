@@ -66,7 +66,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.AccountDiffs,
 			e.Storage.PerformanceFactors,
 			e.API,
-			e.Storage.Settings().ProtocolParameters.DecayProvider(),
+			e.Storage.Settings().ProtocolParameters().ManaDecayProvider(),
 			e.ErrorHandler("ledger"),
 		)
 
@@ -112,7 +112,7 @@ func New(
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
 	apiProvider func() iotago.API,
-	decayProvider *iotago.DecayProvider,
+	decayProvider *iotago.ManaDecayProvider,
 	errorHandler func(error),
 ) *Ledger {
 	return &Ledger{

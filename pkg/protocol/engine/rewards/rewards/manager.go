@@ -26,7 +26,7 @@ type Manager struct {
 
 	timeProvider *iotago.TimeProvider
 
-	decayProvider *iotago.DecayProvider
+	decayProvider *iotago.ManaDecayProvider
 
 	mutex sync.RWMutex
 }
@@ -36,7 +36,7 @@ func New(
 	poolStatsStore kvstore.KVStore,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
 	timeProvider *iotago.TimeProvider,
-	decayProvider *iotago.DecayProvider,
+	decayProvider *iotago.ManaDecayProvider,
 ) *Manager {
 	return &Manager{
 		rewardBaseStore:         rewardsBaseStore,
@@ -154,7 +154,7 @@ func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount int6
 				uint64(stakeAmount)/
 				rewardsForAccountInEpoch.PoolStake
 
-		decayedEpochRewards := m.decayProvider.Decay(unDecayedEpochRewards, epochIndex, epochEnd)
+		decayedEpochRewards := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
 		validatorReward += decayedEpochRewards
 	}
 
@@ -177,7 +177,7 @@ func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			uint64(delegatedAmount) /
 			rewardsForAccountInEpoch.PoolStake
 
-		decayedEpochRewards := m.decayProvider.Decay(unDecayedEpochRewards, epochIndex, epochEnd)
+		decayedEpochRewards := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
 		delegatorsReward += decayedEpochRewards
 	}
 

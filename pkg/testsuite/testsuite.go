@@ -171,7 +171,7 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
+	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
 	issuingTime := slotTimeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
 	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.SlotIndexFromTime(time.Now()))
@@ -188,7 +188,7 @@ func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIn
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
+	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
 	issuingTime := slotTimeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
 	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.SlotIndexFromTime(time.Now()))
