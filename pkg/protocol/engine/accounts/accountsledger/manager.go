@@ -21,7 +21,7 @@ import (
 // Manager is a Block Issuer Credits module responsible for tracking block issuance credit balances.
 type Manager struct {
 	api iotago.API
-	// blockBurns keep tracks of the blocks issues up to the LatestCommittedSlot. They are used to deduct the burned
+	// blockBurns keep tracks of the block issues up to the LatestCommittedSlot. They are used to deduct the burned
 	// amount from the account's credits upon slot commitment.
 	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]]
 	// TODO: add in memory shrink version of the slot diffs
@@ -104,7 +104,7 @@ func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountI
 	return &accDiff, destroyed, nil
 }
 
-// AccountsTreeRoot returns the root of the Account tree with all the accounts ledger data.
+// AccountsTreeRoot returns the root of the Account tree with all the account ledger data.
 func (m *Manager) AccountsTreeRoot() iotago.Identifier {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -168,7 +168,7 @@ func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.S
 	loadedAccount, exists := m.accountsTree.Get(accountID)
 
 	if !exists {
-		loadedAccount = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, targetIndex), iotago.EmptyOutputID)
+		loadedAccount = accounts.NewAccountData(accountID, accounts.WithCredits(accounts.NewBlockIssuanceCredits(0, targetIndex)))
 	}
 	wasDestroyed, err := m.rollbackAccountTo(loadedAccount, targetIndex)
 	if err != nil {
@@ -196,9 +196,9 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 
 	accountData := accounts.NewAccountData(
 		accountOutput.AccountID,
-		accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), m.latestCommittedSlot),
-		output.OutputID(),
-		ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...,
+		accounts.WithCredits(accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), m.latestCommittedSlot)),
+		accounts.WithOutputID(output.OutputID()),
+		accounts.WithPubKeys(ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...),
 	)
 
 	m.accountsTree.Set(accountOutput.AccountID, accountData)
@@ -230,13 +230,17 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		}
 
 		// update the account data with the diff
-		accountData.Credits.Update(-diffChange.Change, diffChange.PreviousUpdatedTime)
+		accountData.Credits.Update(-diffChange.BICChange, diffChange.PreviousUpdatedTime)
 		// update the outputID only if the account got actually transitioned, not if it was only an allotment target
 		if diffChange.PreviousOutputID != iotago.EmptyOutputID {
 			accountData.OutputID = diffChange.PreviousOutputID
 		}
 		accountData.AddPublicKeys(diffChange.PubKeysRemoved...)
 		accountData.RemovePublicKeys(diffChange.PubKeysAdded...)
+
+		accountData.StakeEndEpoch = diffChange.PreviousStakeEndEpoch
+		accountData.ValidatorStake = uint64(int64(accountData.ValidatorStake) - diffChange.ValidatorStakeChange)
+		accountData.DelegationStake = uint64(int64(accountData.DelegationStake) - diffChange.DelegationStakeChange)
 
 		// collected to see if an account was destroyed between slotIndex and b.latestCommittedSlot index.
 		wasDestroyed = wasDestroyed || destroyed
@@ -253,13 +257,17 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prun
 	}
 
 	// it does not matter if there are any changes in this slot, as the account was destroyed anyway and the data was lost
-	// we store the accountState in form of a diff, so we can roll back to the previous state
+	// we store the accountState in the form of a diff, so we can roll back to the previous state
 	slotDiff := prunable.NewAccountDiff()
-	slotDiff.Change = -accountData.Credits.Value
+	slotDiff.BICChange = -accountData.Credits.Value
 	slotDiff.NewOutputID = iotago.OutputID{}
 	slotDiff.PreviousOutputID = accountData.OutputID
 	slotDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
 	slotDiff.PubKeysRemoved = accountData.PubKeys.Slice()
+
+	slotDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
+	slotDiff.DelegationStakeChange = -int64(accountData.DelegationStake)
+	slotDiff.PreviousStakeEndEpoch = accountData.StakeEndEpoch
 
 	return slotDiff
 }
@@ -310,9 +318,9 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 
 		accountData, exists := m.accountsTree.Get(accountID)
 		if !exists {
-			accountData = accounts.NewAccountData(accountID, accounts.NewBlockIssuanceCredits(0, 0), iotago.OutputID{})
+			accountData = accounts.NewAccountData(accountID)
 		}
-		accountData.Credits.Update(diffChange.Change, index)
+		accountData.Credits.Update(diffChange.BICChange, index)
 		// update the outputID only if the account got actually transitioned, not if it was only an allotment target
 		if diffChange.NewOutputID != iotago.EmptyOutputID {
 			accountData.OutputID = diffChange.NewOutputID
@@ -335,7 +343,7 @@ func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]uint64, acc
 			accountDiff = prunable.NewAccountDiff()
 			accountDiffs[id] = accountDiff
 		}
-		accountDiff.Change -= int64(burn)
+		accountDiff.BICChange -= int64(burn)
 		accountDiffs[id] = accountDiff
 	}
 }

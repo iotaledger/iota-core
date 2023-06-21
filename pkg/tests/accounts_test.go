@@ -17,6 +17,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// TODO: implement tests for staking and delegation transitions
 func Test_TransitionAccount(t *testing.T) {
 	oldKey := utils.RandPubKey().ToEd25519()
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
@@ -63,7 +64,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ts.AssertLatestCommitmentSlotIndex(3, node1)
 
 		ts.AssertAccountDiff(genesisAccountOutput.AccountID, 1, &prunable.AccountDiff{
-			Change:              0,
+			BICChange:           0,
 			PreviousUpdatedTime: 0,
 			NewOutputID:         iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
 			PreviousOutputID:    genesisAccount.OutputID(),
@@ -119,7 +120,7 @@ func Test_TransitionAccount(t *testing.T) {
 		newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
 
 		ts.AssertAccountDiff(newAccountOutput.AccountID, 13, &prunable.AccountDiff{
-			Change:              0,
+			BICChange:           0,
 			PreviousUpdatedTime: 0,
 			NewOutputID:         newAccount.OutputID(),
 			PreviousOutputID:    iotago.EmptyOutputID,
