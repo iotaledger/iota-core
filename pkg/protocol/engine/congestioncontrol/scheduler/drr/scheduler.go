@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/xerrors"
+
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -14,8 +16,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
-	"golang.org/x/xerrors"
-
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -97,7 +97,7 @@ func (s *Scheduler) Start() {
 	s.TriggerInitialized()
 }
 
-// Rate gets the rate of the scheduler in units of work per second
+// Rate gets the rate of the scheduler in units of work per second.
 func (s *Scheduler) Rate() int {
 	return s.optsRate
 }
@@ -120,6 +120,7 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 	if err != nil {
 		return false
 	}
+
 	return deficit >= uint64(work+s.buffer.IssuerQueue(accountID).Work())
 }
 
@@ -136,6 +137,7 @@ func (s *Scheduler) getDeficit(accountID iotago.AccountID) (uint64, error) {
 		// laod with max deficit if the issuer has Mana but has been removed from the deficits map
 		return s.optsMaxDeficit, nil
 	}
+
 	return d, nil
 }
 
@@ -167,7 +169,7 @@ loop:
 			break loop
 		// when a block is pushed by the buffer
 		case blockToSchedule = <-s.blockChan:
-			tokensRequired := float64(blockToSchedule.Work()) - (s.tokenBucket + float64(s.optsRate)*float64(time.Since(s.lastScheduleTime).Seconds()))
+			tokensRequired := float64(blockToSchedule.Work()) - (s.tokenBucket + float64(s.optsRate)*time.Since(s.lastScheduleTime).Seconds())
 			if tokensRequired > 0 {
 				// wait until sufficient tokens in token bucket
 				timer := time.NewTimer(time.Duration(tokensRequired/float64(s.optsRate)) * time.Second)
@@ -175,7 +177,7 @@ loop:
 			}
 			s.tokenBucket = lo.Min(
 				s.optsTokenBucketSize,
-				s.tokenBucket+float64(s.optsRate)*float64(time.Since(s.lastScheduleTime).Seconds()),
+				s.tokenBucket+float64(s.optsRate)*time.Since(s.lastScheduleTime).Seconds(),
 			)
 			s.lastScheduleTime = time.Now()
 			if blockToSchedule.SetScheduled() {
@@ -271,6 +273,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 				// no deficit exists for this issuer queue, so remove it
 				s.buffer.RemoveIssuer(block.Block().IssuerID)
 				issuerRemoved = true
+
 				break
 			}
 			remainingDeficit := int64(block.Work()) - int64(deficit)
@@ -280,6 +283,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 				// if quantum, can't be retrieved, we need to remove this issuer.
 				s.buffer.RemoveIssuer(block.Block().IssuerID)
 				issuerRemoved = true
+
 				break
 			}
 
@@ -319,6 +323,7 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error
 	s.deficitsMutex.Lock()
 	defer s.deficitsMutex.Unlock()
 	s.deficits.Set(accountID, lo.Max(uint64(int64(deficit)+delta), s.optsMaxDeficit))
+
 	return nil
 }
 

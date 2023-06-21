@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -44,7 +43,7 @@ type Filter struct {
 
 func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
 	return module.Provide(func(e *engine.Engine) filter.Filter {
-		blockIssuerCheck := e.Ledger.(*ledger.Ledger).IsBlockIssuerAllowed
+		blockIssuerCheck := e.Ledger.IsBlockIssuerAllowed
 		f := New(e.Storage.Settings().ProtocolParameters, blockIssuerCheck, opts...)
 
 		e.HookConstructed(func() {
@@ -114,7 +113,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	if !f.blockIssuerCheck(block.Block()) {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrNegativeBIC, "block issuer account is locked due to negative or non-existant BIC"),
+			Reason: errors.WithMessagef(ErrNegativeBIC, "block issuer account is locked due to negative or non-existent BIC"),
 			Source: source,
 		})
 

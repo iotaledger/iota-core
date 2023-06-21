@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -56,20 +57,37 @@ func (b *BufferQueue) IssuerQueue(issuerID iotago.AccountID) *IssuerQueue {
 	if !ok {
 		return nil
 	}
-	return element.Value.(*IssuerQueue)
+	issuerQueue, isIQ := element.Value.(*IssuerQueue)
+	if !isIQ {
+		return nil
+	}
+
+	return issuerQueue
+}
+
+func (b *BufferQueue) GetOrCreateIssuerQueue(issuerID iotago.AccountID) (*IssuerQueue, error) {
+	element, issuerActive := b.activeIssuers.Get(issuerID)
+	if issuerActive {
+		issuerQueue, isIQ := element.Value.(*IssuerQueue)
+		if !isIQ {
+			return nil, errors.Errorf("buffer contains elements that are not issuer queues")
+		}
+
+		return issuerQueue, nil
+	}
+	issuerQueue := NewIssuerQueue(issuerID)
+	b.activeIssuers.Set(issuerID, b.ringInsert(issuerQueue))
+
+	return issuerQueue, nil
 }
 
 // Submit submits a block. Return blocks dropped from the scheduler to make room for the submitted block.
 // The submitted block can also be returned as dropped if the issuer does not have enough access mana.
 func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.AccountID) (uint64, error)) (elements []*blocks.Block, err error) {
 	issuerID := blk.Block().IssuerID
-	element, issuerActive := b.activeIssuers.Get(issuerID)
-	var issuerQueue *IssuerQueue
-	if issuerActive {
-		issuerQueue = element.Value.(*IssuerQueue)
-	} else {
-		issuerQueue = NewIssuerQueue(issuerID)
-		b.activeIssuers.Set(issuerID, b.ringInsert(issuerQueue))
+	issuerQueue, err := b.GetOrCreateIssuerQueue(issuerID)
+	if err != nil {
+		return nil, xerrors.Errorf("%w: could not get or create issuer queue for issuer %s", err, issuerID)
 	}
 
 	// first we submit the block, and if it turns out that the issuer doesn't have enough bandwidth to submit, it will be removed by dropTail
@@ -111,12 +129,12 @@ func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (uint64, err
 				break
 			}
 		}
-		issuerQueue, _ := b.activeIssuers.Get(maxIssuerID)
-		longestQueue := issuerQueue.Value.(*IssuerQueue)
+		longestQueue := b.IssuerQueue(maxIssuerID)
 		tail := longestQueue.RemoveTail()
 		b.size--
 		droppedBlocks = append(droppedBlocks, tail)
 	}
+
 	return droppedBlocks
 }
 
@@ -125,28 +143,26 @@ func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (uint64, err
 func (b *BufferQueue) Unsubmit(block *blocks.Block) bool {
 	issuerID := block.Block().IssuerID
 
-	element, ok := b.activeIssuers.Get(issuerID)
-	if !ok {
+	issuerQueue := b.IssuerQueue(issuerID)
+	if issuerQueue == nil {
 		return false
 	}
-
-	issuerQueue := element.Value.(*IssuerQueue)
 	if !issuerQueue.Unsubmit(block) {
 		return false
 	}
 
 	b.size--
+
 	return true
 }
 
 // Ready marks a previously submitted block as ready to be scheduled.
 func (b *BufferQueue) Ready(block *blocks.Block) bool {
-	element, ok := b.activeIssuers.Get(block.Block().IssuerID)
-	if !ok {
+	issuerQueue := b.IssuerQueue(block.Block().IssuerID)
+	if issuerQueue == nil {
 		return false
 	}
 
-	issuerQueue := element.Value.(*IssuerQueue)
 	return issuerQueue.Ready(block)
 }
 
@@ -163,6 +179,7 @@ func (b *BufferQueue) ReadyBlocksCount() (readyBlocksCount int) {
 			break
 		}
 	}
+
 	return
 }
 
@@ -180,6 +197,7 @@ func (b *BufferQueue) TotalBlocksCount() (blocksCount int) {
 			break
 		}
 	}
+
 	return
 }
 
@@ -201,7 +219,10 @@ func (b *BufferQueue) RemoveIssuer(issuerID iotago.AccountID) {
 		return
 	}
 
-	issuerQueue := element.Value.(*IssuerQueue)
+	issuerQueue, isIQ := element.Value.(*IssuerQueue)
+	if !isIQ {
+		return
+	}
 	b.size -= issuerQueue.Size()
 
 	b.ringRemove(element)
@@ -212,8 +233,11 @@ func (b *BufferQueue) RemoveIssuer(issuerID iotago.AccountID) {
 func (b *BufferQueue) Next() *IssuerQueue {
 	if b.ring != nil {
 		b.ring = b.ring.Next()
-		return b.ring.Value.(*IssuerQueue)
+		if issuerQueue, isIQ := b.ring.Value.(*IssuerQueue); isIQ {
+			return issuerQueue
+		}
 	}
+
 	return nil
 }
 
@@ -222,7 +246,11 @@ func (b *BufferQueue) Current() *IssuerQueue {
 	if b.ring == nil {
 		return nil
 	}
-	return b.ring.Value.(*IssuerQueue)
+	if issuerQueue, isIQ := b.ring.Value.(*IssuerQueue); isIQ {
+		return issuerQueue
+	}
+
+	return nil
 }
 
 // PopFront removes the first ready block from the queue of the current issuer.
@@ -230,6 +258,7 @@ func (b *BufferQueue) PopFront() (block *blocks.Block) {
 	q := b.Current()
 	block = q.PopFront()
 	b.size--
+
 	return block
 }
 
@@ -246,6 +275,7 @@ func (b *BufferQueue) IDs() (ids []iotago.BlockID) {
 			break
 		}
 	}
+
 	return ids
 }
 
@@ -263,6 +293,7 @@ func (b *BufferQueue) IssuerIDs() []iotago.AccountID {
 			break
 		}
 	}
+
 	return issuerIDs
 }
 
@@ -285,6 +316,7 @@ func (b *BufferQueue) ringInsert(v interface{}) *ring.Ring {
 		b.ring = p
 		return p
 	}
+
 	return p.Link(b.ring)
 }
 

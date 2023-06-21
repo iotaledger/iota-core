@@ -39,6 +39,7 @@ func (q *IssuerQueue) Size() int {
 	if q == nil {
 		return 0
 	}
+
 	return int(q.size.Load())
 }
 
@@ -48,6 +49,7 @@ func (q *IssuerQueue) Work() int {
 	if q == nil {
 		return 0
 	}
+
 	return int(q.work.Load())
 }
 
@@ -70,6 +72,7 @@ func (q *IssuerQueue) Submit(element *blocks.Block) bool {
 	q.submitted.Set(element.ID(), element)
 	q.size.Inc()
 	q.work.Add(int64(element.Work()))
+
 	return true
 }
 
@@ -82,6 +85,7 @@ func (q *IssuerQueue) Unsubmit(block *blocks.Block) bool {
 	q.submitted.Delete(block.ID())
 	q.size.Dec()
 	q.work.Sub(int64(block.Work()))
+
 	return true
 }
 
@@ -93,6 +97,7 @@ func (q *IssuerQueue) Ready(block *blocks.Block) bool {
 
 	q.submitted.Delete(block.ID())
 	heap.Push(&q.inbox, &generalheap.HeapElement[timed.HeapKey, *blocks.Block]{Value: block, Key: timed.HeapKey(block.IssuingTime())})
+
 	return true
 }
 
@@ -106,6 +111,7 @@ func (q *IssuerQueue) IDs() (ids []iotago.BlockID) {
 	for _, block := range q.inbox {
 		ids = append(ids, block.Value.ID())
 	}
+
 	return ids
 }
 
@@ -114,20 +120,35 @@ func (q *IssuerQueue) Front() *blocks.Block {
 	if q == nil || q.inbox.Len() == 0 {
 		return nil
 	}
+
 	return q.inbox[0].Value
 }
 
 // PopFront removes the first ready block from the queue.
 func (q *IssuerQueue) PopFront() *blocks.Block {
-	blk := heap.Pop(&q.inbox).(*generalheap.HeapElement[timed.HeapKey, *blocks.Block]).Value
+	heapElement, isHeapElement := heap.Pop(&q.inbox).(*generalheap.HeapElement[timed.HeapKey, *blocks.Block])
+	if !isHeapElement {
+		return nil
+	}
+	blk := heapElement.Value
 	q.size.Dec()
 	q.work.Sub(int64(blk.Work()))
+
 	return blk
 }
 
 func (q *IssuerQueue) RemoveTail() *blocks.Block {
 	tail := q.tail()
-	return heap.Remove(&q.inbox, tail).(*blocks.Block)
+
+	heapElement, isHeapElement := heap.Remove(&q.inbox, tail).(*generalheap.HeapElement[timed.HeapKey, *blocks.Block])
+	if !isHeapElement {
+		return nil
+	}
+	blk := heapElement.Value
+	q.size.Dec()
+	q.work.Sub(int64(blk.Work()))
+
+	return blk
 }
 
 func (q IssuerQueue) tail() int {
@@ -141,6 +162,7 @@ func (q IssuerQueue) tail() int {
 			tail = i
 		}
 	}
+
 	return tail
 }
 

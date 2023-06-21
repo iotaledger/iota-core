@@ -84,7 +84,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.manaManager = mana.NewManager(l.decayProvider, l.resolveAccountOutput)
 			l.TriggerConstructed()
 
-			l.accountsLedger.SetMaxCommittableAge(iotago.SlotIndex(l.protocolParameters.MaxCommittableAge))
+			l.accountsLedger.SetMaxCommittableAge(l.protocolParameters.MaxCommittableAge)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			l.TriggerInitialized()
@@ -567,7 +567,7 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 
 func (l *Ledger) IsBlockIssuerAllowed(block *iotago.Block) bool {
 	blockSlotIndex := l.protocolParameters.SlotTimeProvider().IndexFromTime(block.IssuingTime)
-	bicSlot := blockSlotIndex - iotago.SlotIndex(l.protocolParameters.MaxCommittableAge)
+	bicSlot := blockSlotIndex - l.protocolParameters.MaxCommittableAge
 	account, exists, err := l.accountsLedger.Account(block.IssuerID, bicSlot)
 	if err != nil {
 		return false
@@ -578,6 +578,7 @@ func (l *Ledger) IsBlockIssuerAllowed(block *iotago.Block) bool {
 	if account.Credits.Value < 0 {
 		return false
 	}
+
 	return true
 }
 
