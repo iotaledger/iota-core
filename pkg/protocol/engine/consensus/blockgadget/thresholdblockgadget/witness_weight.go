@@ -11,7 +11,8 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 	witness := votingBlock.Block().IssuerID
 
 	// Only track witness weight for issuers that are part of the committee.
-	if !g.sybilProtection.Committee().Has(witness) {
+	seat, exists := g.sybilProtection.Committee().GetSeat(witness)
+	if !exists {
 		return
 	}
 
@@ -41,13 +42,13 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 	}
 
 	// Add the witness to the voting block itself as each block carries a vote for itself.
-	if votingBlock.AddWitness(witness) {
+	if votingBlock.AddWitness(seat) {
 		process(votingBlock)
 	}
 
 	evaluateFunc := func(block *blocks.Block) bool {
 		// Propagate further if the witness is new.
-		propagateFurther := block.AddWitness(witness)
+		propagateFurther := block.AddWitness(seat)
 
 		if process(block) {
 			// Even if the witness is not new, we should preAccept or preConfirm this block just now (potentially due to OnlineCommittee changes).
@@ -89,16 +90,16 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 
 func (g *Gadget) shouldPreAcceptAndPreConfirm(block *blocks.Block) (preAccept bool, preConfirm bool) {
 	committee := g.sybilProtection.Committee()
-	committeeTotalWeight := committee.TotalWeight()
-	blockWeight := committee.SelectAccounts(block.Witnesses()...).TotalWeight()
+	committeeTotalSeats := committee.SeatCount()
+	blockSeats := len(block.Witnesses())
 
 	onlineCommittee := g.sybilProtection.OnlineCommittee()
-	onlineCommitteeTotalWeight := onlineCommittee.TotalWeight()
-	blockWeightOnline := onlineCommittee.SelectAccounts(block.Witnesses()...).TotalWeight()
+	onlineCommitteeTotalSeats := onlineCommittee.SeatCount()
+	blockSeatsOnline := len(block.Witnesses())
 
-	if votes.IsThresholdReached(blockWeight, committeeTotalWeight, g.optsConfirmationThreshold) {
+	if votes.IsThresholdReached(blockSeats, committeeTotalSeats, g.optsConfirmationThreshold) {
 		return true, true
-	} else if votes.IsThresholdReached(blockWeightOnline, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold) {
+	} else if votes.IsThresholdReached(blockSeatsOnline, onlineCommitteeTotalSeats, g.optsAcceptanceThreshold) {
 		return true, false
 	}
 

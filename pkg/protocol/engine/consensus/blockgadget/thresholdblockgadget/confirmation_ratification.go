@@ -10,7 +10,8 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 	ratifierBlockIndex := votingBlock.ID().Index()
 
 	// Only track ratifier weight for issuers that are part of the committee.
-	if !g.sybilProtection.Committee().Has(ratifier) {
+	seat, exists := g.sybilProtection.Committee().GetSeat(ratifier)
+	if !exists {
 		return
 	}
 
@@ -30,7 +31,7 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 		}
 
 		// Skip further propagation if the witness is not new.
-		propagateFurther := block.AddConfirmationRatifier(ratifier)
+		propagateFurther := block.AddConfirmationRatifier(seat)
 
 		if g.shouldConfirm(block) {
 			toConfirm = append([]*blocks.Block{block}, toConfirm...)
@@ -50,8 +51,8 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 }
 
 func (g *Gadget) shouldConfirm(block *blocks.Block) bool {
-	blockWeight := g.sybilProtection.Committee().SelectAccounts(block.ConfirmationRatifiers()...).TotalWeight()
-	totalCommitteeWeight := g.sybilProtection.Committee().TotalWeight()
+	blockSeats := len(block.ConfirmationRatifiers())
+	totalCommitteeSeats := g.sybilProtection.Committee().SeatCount()
 
-	return votes.IsThresholdReached(blockWeight, totalCommitteeWeight, g.optsConfirmationThreshold)
+	return votes.IsThresholdReached(blockSeats, totalCommitteeSeats, g.optsConfirmationThreshold)
 }

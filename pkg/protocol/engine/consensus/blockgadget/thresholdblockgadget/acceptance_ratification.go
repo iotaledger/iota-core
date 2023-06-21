@@ -11,7 +11,8 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 	ratifier := votingBlock.Block().IssuerID
 
 	// Only track ratifier weight for issuers that are part of the committee.
-	if !g.sybilProtection.Committee().Has(ratifier) {
+	seat, exists := g.sybilProtection.Committee().GetSeat(ratifier)
+	if !exists {
 		return
 	}
 
@@ -25,7 +26,7 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 		}
 
 		// Propagate further if the ratifier is new.
-		propagateFurther := block.AddAcceptanceRatifier(ratifier)
+		propagateFurther := block.AddAcceptanceRatifier(seat)
 
 		// Once a block is accepted, all its parents are implicitly accepted as well. There's no need to check shouldAccept again.
 		if anyChildInSet(block, toAcceptByID) || g.shouldAccept(block) {
@@ -54,8 +55,8 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 }
 
 func (g *Gadget) shouldAccept(block *blocks.Block) bool {
-	blockWeight := g.sybilProtection.OnlineCommittee().SelectAccounts(block.AcceptanceRatifiers()...).TotalWeight()
-	onlineCommitteeTotalWeight := g.sybilProtection.OnlineCommittee().TotalWeight()
+	blockSeats := len(block.AcceptanceRatifiers())
+	onlineCommitteeTotalSeats := g.sybilProtection.OnlineCommittee().SeatCount()
 
-	return votes.IsThresholdReached(blockWeight, onlineCommitteeTotalWeight, g.optsAcceptanceThreshold)
+	return votes.IsThresholdReached(blockSeats, onlineCommitteeTotalSeats, g.optsAcceptanceThreshold)
 }

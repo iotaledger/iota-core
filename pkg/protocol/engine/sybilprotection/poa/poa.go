@@ -122,7 +122,8 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if !s.Committee().Has(id) {
+	seat, exists := s.Committee().GetSeat(id)
+	if !exists {
 		// Only track identities that are part of the committee
 		return
 	}
@@ -130,7 +131,7 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 	if lastActivity, exists := s.lastActivities.Get(id); exists && lastActivity.After(activityTime) {
 		return
 	} else if !exists {
-		s.onlineCommittee.Add(id)
+		s.onlineCommittee.Set(seat, id)
 		s.events.OnlineCommitteeAccountAdded.Trigger(id)
 	}
 
