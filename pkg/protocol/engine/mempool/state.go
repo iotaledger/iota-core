@@ -8,4 +8,6 @@ type State interface {
 
 	//Output returns the underlying Output of the State.
 	Output() iotago.Output
+
+	CreationTime() iotago.SlotIndex
 }

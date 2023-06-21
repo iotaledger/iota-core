@@ -3,7 +3,7 @@ package activity
 import (
 	"context"
 
-	"github.com/iotaledger/iota-core/pkg/blockissuer"
+	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -13,7 +13,7 @@ func issueActivityBlock(ctx context.Context) {
 		return
 	}
 
-	block, err := deps.BlockIssuer.CreateBlock(ctx, blockissuer.WithPayload(&iotago.TaggedData{
+	block, err := deps.BlockIssuer.CreateBlock(ctx, blockfactory.WithPayload(&iotago.TaggedData{
 		Tag: []byte("ACTIVITY"),
 	}))
 	if err != nil {

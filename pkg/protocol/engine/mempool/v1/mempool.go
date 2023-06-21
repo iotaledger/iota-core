@@ -165,6 +165,7 @@ func (m *MemPool[VotePower]) Evict(slotIndex iotago.SlotIndex) {
 func (m *MemPool[VotePower]) storeTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (storedTransaction *TransactionMetadata, isNew bool, err error) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
+
 	if m.lastEvictedSlot >= blockID.Index() {
 		return nil, false, xerrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
 	}

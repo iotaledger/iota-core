@@ -7,7 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
-	"github.com/iotaledger/iota-core/pkg/blockissuer"
+	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 )
@@ -33,7 +33,7 @@ type dependencies struct {
 	dig.In
 
 	Protocol    *protocol.Protocol
-	BlockIssuer *blockissuer.BlockIssuer
+	BlockIssuer *blockfactory.BlockIssuer
 }
 
 func run() error {

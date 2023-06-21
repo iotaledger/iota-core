@@ -14,4 +14,6 @@ do
 	go get -u github.com/iotaledger/hive.go/$i@$COMMIT
 done
 
+pushd $(dirname $0)
 ./go_mod_tidy.sh
+popd

@@ -9,7 +9,7 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/contextutils"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/pkg/blockissuer"
+	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -115,13 +115,13 @@ func sendBlock(c echo.Context) (*submitBlockResponse, error) {
 	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, iotaBlock)
 	if err != nil {
 		switch {
-		case errors.Is(err, blockissuer.ErrBlockAttacherInvalidBlock):
+		case errors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
 			return nil, errors.WithMessagef(httpserver.ErrInvalidParameter, "failed to attach block: %s", err.Error())
 
-		case errors.Is(err, blockissuer.ErrBlockAttacherAttachingNotPossible):
+		case errors.Is(err, blockfactory.ErrBlockAttacherAttachingNotPossible):
 			return nil, errors.WithMessagef(echo.ErrInternalServerError, "failed to attach block: %s", err.Error())
 
-		case errors.Is(err, blockissuer.ErrBlockAttacherPoWNotAvailable):
+		case errors.Is(err, blockfactory.ErrBlockAttacherPoWNotAvailable):
 			return nil, errors.WithMessagef(echo.ErrServiceUnavailable, "failed to attach block: %s", err.Error())
 
 		default:
