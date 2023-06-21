@@ -34,7 +34,7 @@ type TestFramework struct {
 	bucketedStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, kvstore.KVStore]
 
 	api                 iotago.API
-	slotTimeProvider    *iotago.SlotTimeProvider
+	slotTimeProvider    *iotago.TimeProvider
 	attestationsByAlias *shrinkingmap.ShrinkingMap[string, *iotago.Attestation]
 	issuerByAlias       *shrinkingmap.ShrinkingMap[string, *issuer]
 
@@ -110,7 +110,7 @@ func (t *TestFramework) AddFutureAttestation(issuerAlias string, attestationAlia
 	defer t.mutex.Unlock()
 
 	issuer := t.issuer(issuerAlias)
-	issuingTime := t.slotTimeProvider.StartTime(blockSlot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	issuingTime := t.slotTimeProvider.SlotStartTime(blockSlot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
 	block, err := builder.NewBlockBuilder().
 		IssuingTime(issuingTime).
