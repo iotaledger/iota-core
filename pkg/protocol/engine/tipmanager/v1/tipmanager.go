@@ -15,7 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
@@ -31,10 +31,10 @@ type TipManager struct {
 	retrieveRootBlocks func() iotago.BlockIDs
 
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
 
 	// memPool holds information about pending transactions.
-	memPool mempool.MemPool[booker.BlockVotePower]
+	memPool mempool.MemPool[ledger.BlockVotePower]
 
 	// tipMetadataStorage contains the TipMetadata of all Blocks that are managed by the TipManager.
 	tipMetadataStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]
@@ -73,25 +73,31 @@ type TipManager struct {
 // NewProvider creates a new TipManager provider.
 func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Engine, tipmanager.TipManager] {
 	return module.Provide(func(e *engine.Engine) tipmanager.TipManager {
-		t := NewTipManager(e.Ledger.ConflictDAG(), e.BlockCache.Block, e.EvictionState.LatestRootBlocks, opts...)
+		t := NewTipManager(e.BlockCache.Block, e.EvictionState.LatestRootBlocks, opts...)
+
+		e.HookConstructed(func() {
+			e.Ledger.HookConstructed(func() {
+				t.conflictDAG = e.Ledger.ConflictDAG()
+
+				t.TriggerConstructed()
+				t.TriggerInitialized()
+			})
+		})
 
 		e.Events.Scheduler.BlockScheduled.Hook(t.AddBlock, event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
 		e.BlockCache.Evict.Hook(t.Evict)
 		e.HookStopped(t.Shutdown)
 		e.Events.TipManager.LinkTo(t.events)
 
-		t.TriggerInitialized()
-
 		return t
 	})
 }
 
 // NewTipManager creates a new TipManager.
-func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower], blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipManager]) *TipManager {
+func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipManager]) *TipManager {
 	return options.Apply(&TipManager{
 		retrieveBlock:                blockRetriever,
 		retrieveRootBlocks:           rootBlocksRetriever,
-		conflictDAG:                  conflictDAG,
 		tipMetadataStorage:           shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
 		strongTipSet:                 randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:                   randommap.New[iotago.BlockID, *TipMetadata](),
@@ -101,7 +107,11 @@ func NewTipManager(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iot
 		optMaxWeakReferences:         8,
 	}, opts, func(t *TipManager) {
 		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
-	}, (*TipManager).TriggerConstructed)
+	})
+}
+
+func (t *TipManager) SetConflictDAG(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]) {
+	t.conflictDAG = conflictDAG
 }
 
 // AddBlock adds a Block to the TipManager.
@@ -139,7 +149,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 		}
 	}
 
-	_ = t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]) error {
+	_ = t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]) error {
 		likedConflicts := advancedset.New[iotago.TransactionID]()
 
 		likedInsteadReferences := func(tipMetadata *TipMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {

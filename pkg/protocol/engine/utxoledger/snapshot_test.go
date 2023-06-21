@@ -5,8 +5,6 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/iotaledger/iota-core/pkg/utils"
-
 	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
 
@@ -15,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -33,8 +32,8 @@ func TestOutput_SnapshotBytes(t *testing.T) {
 
 	require.Equal(t, outputID[:], snapshotBytes[:iotago.OutputIDLength], "outputID not equal")
 	require.Equal(t, blockID[:], snapshotBytes[iotago.OutputIDLength:iotago.OutputIDLength+iotago.BlockIDLength], "blockID not equal")
-	require.Equal(t, uint64(indexBooked), binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength:iotago.OutputIDLength+iotago.BlockIDLength+8]), "slotIndexBooked not equal")
-	require.Equal(t, uint64(slotCreated), int64(binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8:iotago.OutputIDLength+iotago.BlockIDLength+8+8])), "slotIndexBooked not equal")
+	require.Equal(t, uint64(indexBooked), binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength:iotago.OutputIDLength+iotago.BlockIDLength+8]), "indexBooked not equal")
+	require.Equal(t, uint64(slotCreated), binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8:iotago.OutputIDLength+iotago.BlockIDLength+8+8]), "slotCreated not equal")
 	require.Equal(t, uint32(len(iotaOutputBytes)), binary.LittleEndian.Uint32(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8+8:iotago.OutputIDLength+iotago.BlockIDLength+8+8+4]), "output bytes length")
 	require.Equal(t, iotaOutputBytes, snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8+8+4:], "output bytes not equal")
 }
@@ -71,7 +70,6 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 	outputSnapshotBytes := output.SnapshotBytes()
 
 	transactionID := utils.RandTransactionID()
-	tsSpent := utils.RandTimestamp()
 	indexSpent := utils.RandSlotIndex()
 	spent := utxoledger.NewSpent(output, transactionID, indexSpent)
 
@@ -79,7 +77,7 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 
 	require.Equal(t, outputSnapshotBytes, snapshotBytes[:len(outputSnapshotBytes)], "output bytes not equal")
 	require.Equal(t, transactionID[:], snapshotBytes[len(outputSnapshotBytes):len(outputSnapshotBytes)+iotago.TransactionIDLength], "transactionID not equal")
-	require.Equal(t, tsSpent.UnixNano(), int64(binary.LittleEndian.Uint64(snapshotBytes[len(outputSnapshotBytes)+iotago.TransactionIDLength:])), "timestamp spent not equal")
+	require.Equal(t, indexSpent, iotago.SlotIndex(binary.LittleEndian.Uint64(snapshotBytes[len(outputSnapshotBytes)+iotago.TransactionIDLength:])), "timestamp spent not equal")
 }
 
 func TestSpentFromSnapshotReader(t *testing.T) {
@@ -116,8 +114,8 @@ func TestReadSlotDiffToSnapshotReader(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 		},
 		Spents: utxoledger.Spents{
-			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
-			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpent(index),
+			tpkg.RandLedgerStateSpent(index),
 		},
 	}
 
@@ -146,8 +144,8 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 		},
 		Spents: utxoledger.Spents{
-			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
-			tpkg.RandLedgerStateSpent(index, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpent(index),
+			tpkg.RandLedgerStateSpent(index),
 		},
 	}
 
@@ -215,7 +213,7 @@ func TestManager_Import(t *testing.T) {
 			output2,
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output1, 1, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output1, 1),
 		}))
 
 	ledgerIndex, err = manager.ReadLedgerIndex()
@@ -231,7 +229,7 @@ func TestManager_Import(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output2, 2, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output2, 2),
 		}))
 
 	ledgerIndex, err = manager.ReadLedgerIndex()
@@ -305,7 +303,7 @@ func TestManager_Export(t *testing.T) {
 			output2,
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output1, 1, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output1, 1),
 		}))
 
 	ledgerIndex, err := manager.ReadLedgerIndex()
@@ -318,7 +316,7 @@ func TestManager_Export(t *testing.T) {
 			tpkg.RandLedgerStateOutput(),
 			tpkg.RandLedgerStateOutput(),
 		}, utxoledger.Spents{
-			tpkg.RandLedgerStateSpentWithOutput(output2, 2, utils.RandTimestamp()),
+			tpkg.RandLedgerStateSpentWithOutput(output2, 2),
 		}))
 
 	ledgerIndex, err = manager.ReadLedgerIndex()

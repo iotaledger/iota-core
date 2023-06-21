@@ -3,9 +3,8 @@ package tpkg
 import (
 	"time"
 
-	"github.com/iotaledger/iota-core/pkg/utils"
-
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -52,10 +51,10 @@ func RandLedgerStateOutputOnAddressWithAmount(outputType iotago.OutputType, addr
 	return utxoledger.CreateOutput(api, utils.RandOutputID(), utils.RandBlockID(), utils.RandSlotIndex(), utils.RandSlotIndex(), utils.RandOutputOnAddressWithAmount(outputType, address, amount))
 }
 
-func RandLedgerStateSpent(indexSpent iotago.SlotIndex, timestampSpent time.Time) *utxoledger.Spent {
+func RandLedgerStateSpent(indexSpent iotago.SlotIndex) *utxoledger.Spent {
 	return utxoledger.NewSpent(RandLedgerStateOutput(), utils.RandTransactionID(), indexSpent)
 }
 
-func RandLedgerStateSpentWithOutput(output *utxoledger.Output, indexSpent iotago.SlotIndex, timestampSpent time.Time) *utxoledger.Spent {
+func RandLedgerStateSpentWithOutput(output *utxoledger.Output, indexSpent iotago.SlotIndex) *utxoledger.Spent {
 	return utxoledger.NewSpent(output, utils.RandTransactionID(), indexSpent)
 }

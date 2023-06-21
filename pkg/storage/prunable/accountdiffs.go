@@ -5,31 +5,35 @@ import (
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/types"
-
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// AccountDiff represent the storable changes for a single account within an slot.
+const (
+	diffChangePrefix byte = iota
+	destroyedAccountsPrefix
+)
+
+// AccountDiff represent the storable changes for a single account within a slot.
 type AccountDiff struct {
-	api                 iotago.API
-	Change              int64            `serix:"0"`
-	PreviousUpdatedTime iotago.SlotIndex `serix:"1"`
+	Change              int64
+	PreviousUpdatedTime iotago.SlotIndex
 
 	// OutputID to which the Account has been transitioned to.
-	NewOutputID iotago.OutputID `serix:"2"`
+	NewOutputID iotago.OutputID
 
 	// OutputID from which the Account has been transitioned from.
-	PreviousOutputID iotago.OutputID `serix:"3"`
+	PreviousOutputID iotago.OutputID
 
-	PubKeysAdded   []ed25519.PublicKey `serix:"4"`
-	PubKeysRemoved []ed25519.PublicKey `serix:"5"`
+	PubKeysAdded   []ed25519.PublicKey
+	PubKeysRemoved []ed25519.PublicKey
 }
 
 // NewAccountDiff creates a new AccountDiff instance.
-func NewAccountDiff(api iotago.API) *AccountDiff {
+func NewAccountDiff() *AccountDiff {
 	return &AccountDiff{
-		api:                 api,
 		Change:              0,
 		PreviousUpdatedTime: 0,
 		NewOutputID:         iotago.EmptyOutputID,
@@ -40,11 +44,85 @@ func NewAccountDiff(api iotago.API) *AccountDiff {
 }
 
 func (b AccountDiff) Bytes() ([]byte, error) {
-	return b.api.Encode(b)
+	m := marshalutil.New()
+
+	m.WriteInt64(b.Change)
+	m.WriteUint64(uint64(b.PreviousUpdatedTime))
+	m.WriteBytes(lo.PanicOnErr(b.NewOutputID.Bytes()))
+	m.WriteBytes(lo.PanicOnErr(b.PreviousOutputID.Bytes()))
+	m.WriteUint64(uint64(len(b.PubKeysAdded)))
+	for _, pubKey := range b.PubKeysAdded {
+		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
+	}
+	m.WriteUint64(uint64(len(b.PubKeysRemoved)))
+	for _, pubKey := range b.PubKeysRemoved {
+		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
+	}
+
+	return m.Bytes(), nil
+}
+
+func (b *AccountDiff) Clone() *AccountDiff {
+	return &AccountDiff{
+		Change:              b.Change,
+		PreviousUpdatedTime: b.PreviousUpdatedTime,
+		NewOutputID:         b.NewOutputID,
+		PreviousOutputID:    b.PreviousOutputID,
+		PubKeysAdded:        lo.CopySlice(b.PubKeysAdded),
+		PubKeysRemoved:      lo.CopySlice(b.PubKeysRemoved),
+	}
 }
 
 func (b *AccountDiff) FromBytes(bytes []byte) (int, error) {
-	return b.api.Decode(bytes, b)
+	m := marshalutil.New(bytes)
+
+	change, err := m.ReadInt64()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to unmarshal change")
+	}
+
+	b.Change = change
+
+	previousUpdatedTime, err := m.ReadUint64()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to unmarshal previous updated time")
+	}
+
+	b.PreviousUpdatedTime = iotago.SlotIndex(previousUpdatedTime)
+
+	if _, err = b.NewOutputID.FromBytes(lo.PanicOnErr(m.ReadBytes(iotago.OutputIDLength))); err != nil {
+		return 0, errors.Wrap(err, "failed to unmarshal new output id")
+	}
+
+	if _, err = b.PreviousOutputID.FromBytes(lo.PanicOnErr(m.ReadBytes(iotago.OutputIDLength))); err != nil {
+		return 0, errors.Wrap(err, "failed to unmarshal previous output id")
+	}
+
+	addedPubKeysLen := lo.PanicOnErr(m.ReadUint64())
+	b.PubKeysAdded = make([]ed25519.PublicKey, addedPubKeysLen)
+
+	for i := uint64(0); i < addedPubKeysLen; i++ {
+		pubKey := ed25519.PublicKey{}
+		if _, err = pubKey.FromBytes(lo.PanicOnErr(m.ReadBytes(ed25519.PublicKeySize))); err != nil {
+			return 0, errors.Wrap(err, "failed to unmarshal public key")
+		}
+
+		b.PubKeysAdded[i] = pubKey
+	}
+
+	removedPubKeysLen := lo.PanicOnErr(m.ReadUint64())
+	b.PubKeysRemoved = make([]ed25519.PublicKey, removedPubKeysLen)
+
+	for i := uint64(0); i < removedPubKeysLen; i++ {
+		pubKey := ed25519.PublicKey{}
+		if _, err = pubKey.FromBytes(lo.PanicOnErr(m.ReadBytes(ed25519.PublicKeySize))); err != nil {
+			return 0, errors.Wrap(err, "failed to unmarshal public key")
+		}
+
+		b.PubKeysRemoved[i] = pubKey
+	}
+
+	return m.ReadOffset(), nil
 }
 
 // AccountDiffs is the storable unit of Account changes for all account in a slot.
@@ -60,8 +138,8 @@ func NewAccountDiffs(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.AP
 	return &AccountDiffs{
 		api:               api,
 		slot:              slot,
-		diffChangeStore:   kvstore.NewTypedStore[iotago.AccountID, AccountDiff](store),
-		destroyedAccounts: kvstore.NewTypedStore[iotago.AccountID, types.Empty](store),
+		diffChangeStore:   kvstore.NewTypedStore[iotago.AccountID, AccountDiff](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{diffChangePrefix}))),
+		destroyedAccounts: kvstore.NewTypedStore[iotago.AccountID, types.Empty](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{destroyedAccountsPrefix}))),
 	}
 }
 
@@ -71,6 +149,7 @@ func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff
 		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
 			return errors.Wrapf(err, "failed to set destroyed account")
 		}
+
 	}
 
 	return b.diffChangeStore.Set(accountID, accountDiff)
@@ -78,18 +157,17 @@ func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff
 
 // Load loads accountID and commitmentID for the given blockID.
 func (b *AccountDiffs) Load(accountID iotago.AccountID) (accountDiff AccountDiff, destroyed bool, err error) {
-	if destroyed, err = b.destroyedAccounts.Has(accountID); err != nil {
+	destroyed, err = b.destroyedAccounts.Has(accountID)
+	if err != nil {
 		return accountDiff, false, errors.Wrapf(err, "failed to get destroyed account")
-	} else if destroyed {
-		return accountDiff, true, nil
-	}
+	} // load diff for destroyed account to recreate the state
 
 	accountDiff, err = b.diffChangeStore.Get(accountID)
 	if err != nil {
 		return accountDiff, false, errors.Wrapf(err, "failed to get Account diff for account %s", accountID.String())
 	}
 
-	return accountDiff, false, err
+	return accountDiff, destroyed, err
 }
 
 // Has returns true if the given accountID is a root block.
@@ -111,7 +189,7 @@ func (b *AccountDiffs) Stream(consumer func(accountID iotago.AccountID, accountD
 		return errors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)
 	}
 
-	// For those accounts that still exist we might have a accountDiff.
+	// For those accounts that still exist, we might have an accountDiff.
 	if storageErr := b.diffChangeStore.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, accountDiff AccountDiff) bool {
 		return consumer(accountID, accountDiff, false)
 	}); storageErr != nil {

@@ -2,7 +2,6 @@
 package utxoledger_test
 
 import (
-	"github.com/iotaledger/iota-core/pkg/utils"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -30,7 +30,7 @@ func TestUTXOComputeBalance(t *testing.T) {
 	}
 
 	spents := utxoledger.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(initialOutput, index, utils.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(initialOutput, index),
 	}
 
 	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
@@ -73,9 +73,9 @@ func TestUTXOIteration(t *testing.T) {
 	index := iotago.SlotIndex(756)
 
 	spents := utxoledger.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index, utils.RandTimestamp()),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index, utils.RandTimestamp()),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[9], index, utils.RandTimestamp()),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[9], index),
 	}
 
 	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))

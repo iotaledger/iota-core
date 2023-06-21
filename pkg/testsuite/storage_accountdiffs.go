@@ -23,6 +23,7 @@ func (t *TestSuite) AssertStorageAccountDiffs(slotIndex iotago.SlotIndex, accoun
 				if !cmp.Equal(diffChange, storedDiffChange) {
 					return errors.Errorf("AssertStorageAccountDiffs: %s: expected %v, got %v", node.Name, diffChange, storedDiffChange)
 				}
+
 				return nil
 			})
 		}

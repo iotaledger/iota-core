@@ -6,8 +6,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/iotaledger/iota-core/pkg/utils"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/kvstore"
@@ -16,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -40,7 +39,7 @@ func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Out
 	require.NoError(t, err)
 	require.True(t, has)
 
-	// Spend it with a milestone
+	// Spent it with a slot.
 	require.NoError(t, manager.ApplyDiff(spent.SlotIndexSpent(), utxoledger.Outputs{}, utxoledger.Spents{spent}))
 
 	// Read Spent from DB and compare
@@ -155,6 +154,7 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 	amount := utils.RandAmount()
 	index := utils.RandSlotIndex()
 	slotCreated := utils.RandSlotIndex()
+	timeLockUnlockSlot := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.BasicOutput{
 		Amount: amount,
@@ -168,7 +168,7 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 				Address: address,
 			},
 			&iotago.TimelockUnlockCondition{
-				SlotIndex: slotCreated + 1,
+				SlotIndex: timeLockUnlockSlot,
 			},
 		},
 	}
@@ -222,6 +222,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 	amount := utils.RandAmount()
 	index := utils.RandSlotIndex()
 	slotCreated := utils.RandSlotIndex()
+	expirationUnlockSlot := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.NFTOutput{
 		Amount: amount,
@@ -239,7 +240,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 				Address: address.ToAddress(),
 			},
 			&iotago.ExpirationUnlockCondition{
-				SlotIndex:     slotCreated + 1,
+				SlotIndex:     expirationUnlockSlot,
 				ReturnAddress: issuerAddress,
 			},
 		},

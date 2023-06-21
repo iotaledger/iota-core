@@ -3,11 +3,12 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"github.com/iotaledger/hive.go/crypto/ed25519"
-	iotago "github.com/iotaledger/iota.go/v4"
 	"math"
 	"math/big"
 	"time"
+
+	"github.com/iotaledger/hive.go/crypto/ed25519"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func RandomRead(p []byte) (n int, err error) {
@@ -81,6 +82,7 @@ func RandOutputID(index ...uint16) iotago.OutputID {
 	if err != nil {
 		panic(err)
 	}
+
 	binary.LittleEndian.PutUint16(outputID[iotago.TransactionIDLength:], idx)
 
 	return outputID
@@ -242,5 +244,6 @@ func RandPubKeys() []ed25519.PublicKey {
 	for i := 0; i < length; i++ {
 		pubKeys[i] = RandPubKey()
 	}
+
 	return pubKeys
 }

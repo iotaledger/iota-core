@@ -2,6 +2,7 @@ package utxoledger
 
 import (
 	"bytes"
+
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"

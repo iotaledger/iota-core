@@ -19,11 +19,8 @@ import (
 type SlotMutations struct {
 	weights *account.Accounts[iotago.AccountID, *iotago.AccountID]
 
-	// ratifiedAcceptedBlocksBySlot stores the accepted blocks per slot.
-	ratifiedAcceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[iotago.BlockID, *iotago.BlockID]]
-
-	// acceptedTransactionsBySlot stores the accepted transactions per slot.
-	//acceptedTransactionsBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[utxo.TransactionID, *utxo.TransactionID]]
+	// acceptedBlocksBySlot stores the accepted blocks per slot.
+	acceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[iotago.BlockID, *iotago.BlockID]]
 
 	// latestCommittedIndex stores the index of the latest committed slot.
 	latestCommittedIndex iotago.SlotIndex
@@ -34,14 +31,14 @@ type SlotMutations struct {
 // NewSlotMutations creates a new SlotMutations instance.
 func NewSlotMutations(weights *account.Accounts[iotago.AccountID, *iotago.AccountID], lastCommittedSlot iotago.SlotIndex) (newMutationFactory *SlotMutations) {
 	return &SlotMutations{
-		weights:                      weights,
-		ratifiedAcceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, *ads.Set[iotago.BlockID, *iotago.BlockID]](),
-		latestCommittedIndex:         lastCommittedSlot,
+		weights:              weights,
+		acceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, *ads.Set[iotago.BlockID, *iotago.BlockID]](),
+		latestCommittedIndex: lastCommittedSlot,
 	}
 }
 
-// AddRatifiedAcceptedBlock adds the given block to the set of accepted blocks.
-func (m *SlotMutations) AddRatifiedAcceptedBlock(block *blocks.Block) (err error) {
+// AddAcceptedBlock adds the given block to the set of accepted blocks.
+func (m *SlotMutations) AddAcceptedBlock(block *blocks.Block) (err error) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
@@ -50,7 +47,7 @@ func (m *SlotMutations) AddRatifiedAcceptedBlock(block *blocks.Block) (err error
 		return errors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
 	}
 
-	m.RatifiedAcceptedBlocks(blockID.Index(), true).Add(blockID)
+	m.AcceptedBlocks(blockID.Index(), true).Add(blockID)
 
 	return
 }
@@ -74,25 +71,25 @@ func (m *SlotMutations) Reset(index iotago.SlotIndex) {
 	defer m.evictionMutex.Unlock()
 
 	for i := m.latestCommittedIndex; i > index; i-- {
-		m.ratifiedAcceptedBlocksBySlot.Delete(i)
+		m.acceptedBlocksBySlot.Delete(i)
 	}
 
 	m.latestCommittedIndex = index
 }
 
-// RatifiedAcceptedBlocks returns the set of ratified accepted blocks for the given slot.
-func (m *SlotMutations) RatifiedAcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) *ads.Set[iotago.BlockID, *iotago.BlockID] {
+// AcceptedBlocks returns the set of accepted blocks for the given slot.
+func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) *ads.Set[iotago.BlockID, *iotago.BlockID] {
 	if len(createIfMissing) > 0 && createIfMissing[0] {
-		return lo.Return1(m.ratifiedAcceptedBlocksBySlot.GetOrCreate(index, newSet[iotago.BlockID, *iotago.BlockID]))
+		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, newSet[iotago.BlockID, *iotago.BlockID]))
 	}
 
-	return lo.Return1(m.ratifiedAcceptedBlocksBySlot.Get(index))
+	return lo.Return1(m.acceptedBlocksBySlot.Get(index))
 }
 
 // evictUntil removes all data for slots that are older than the given slot.
 func (m *SlotMutations) evictUntil(index iotago.SlotIndex) {
 	for i := m.latestCommittedIndex + 1; i <= index; i++ {
-		m.ratifiedAcceptedBlocksBySlot.Delete(i)
+		m.acceptedBlocksBySlot.Delete(i)
 	}
 
 	m.latestCommittedIndex = index

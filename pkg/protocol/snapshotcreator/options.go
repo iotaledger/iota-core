@@ -1,6 +1,8 @@
 package snapshotcreator
 
 import (
+	"crypto/ed25519"
+
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -22,6 +24,9 @@ type Options struct {
 
 	// GenesisSeed defines the seed used to generate keypair that can spend Genesis outputs.
 	GenesisSeed []byte
+
+	// Accounts defines the accounts that are created in the ledger as part of the Genesis.
+	Accounts []AccountDetails
 
 	DataBaseVersion byte
 	LedgerProvider  func() module.Provider[*engine.Engine, ledger.Ledger]
@@ -72,5 +77,17 @@ func WithRootBlocks(rootBlocks map[iotago.BlockID]iotago.CommitmentID) options.O
 func WithGenesisSeed(genesisSeed []byte) options.Option[Options] {
 	return func(m *Options) {
 		m.GenesisSeed = genesisSeed
+	}
+}
+
+type AccountDetails struct {
+	Address   iotago.Address
+	Amount    uint64
+	IssuerKey ed25519.PublicKey
+}
+
+func WithAccounts(accounts ...AccountDetails) options.Option[Options] {
+	return func(m *Options) {
+		m.Accounts = accounts
 	}
 }

@@ -72,20 +72,10 @@ func (c *Chain) addCommitment(commitment *ChainCommitment) {
 	c.commitmentsByIndex.Set(commitmentIndex, commitment)
 }
 
-func (c *Chain) dropCommitmentsAfter(index iotago.SlotIndex) {
-	c.Lock()
-	defer c.Unlock()
-
-	for i := index + 1; i <= c.latestCommitmentIndex; i++ {
-		c.commitmentsByIndex.Delete(i)
-	}
-
-	if index < c.latestCommitmentIndex {
-		c.latestCommitmentIndex = index
-	}
-}
-
 func (c *Chain) String() string {
+	c.RLock()
+	defer c.RUnlock()
+
 	builder := stringify.NewStructBuilder("Chain",
 		stringify.NewStructField("ForkingPoint", c.ForkingPoint.ID()),
 		stringify.NewStructField("LatestCommitmentIndex", c.latestCommitmentIndex),

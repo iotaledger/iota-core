@@ -27,6 +27,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
+const MinIssuerAccountDeposit = uint64(84400)
+
 type TestSuite struct {
 	Testing     *testing.T
 	fakeTesting *testing.T
@@ -43,25 +45,34 @@ type TestSuite struct {
 
 	ProtocolParameters iotago.ProtocolParameters
 
-	optsSnapshotOptions []options.Option[snapshotcreator.Options]
-	optsWaitFor         time.Duration
-	optsTick            time.Duration
+	optsGenesisTimestampOffset uint32
+	optsAccounts               []snapshotcreator.AccountDetails
+	optsSnapshotOptions        []options.Option[snapshotcreator.Options]
+	optsWaitFor                time.Duration
+	optsTick                   time.Duration
 
 	uniqueCounter        atomic.Int64
 	mutex                sync.RWMutex
 	TransactionFramework *TransactionFramework
+	genesisSeed          [32]byte
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
 	return options.Apply(&TestSuite{
 		Testing:     testingT,
 		fakeTesting: &testing.T{},
+		genesisSeed: tpkg.RandEd25519Seed(),
 		Network:     mock.NewNetwork(),
 		Directory:   utils.NewDirectory(testingT.TempDir()),
 		nodes:       make(map[string]*mock.Node),
 		blocks:      shrinkingmap.New[string, *blocks.Block](),
 
-		ProtocolParameters: iotago.ProtocolParameters{
+		optsWaitFor:                DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:                   DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
+		optsGenesisTimestampOffset: 0,
+	}, opts, func(t *TestSuite) {
+		fmt.Println("Setup TestSuite -", testingT.Name())
+		t.ProtocolParameters = iotago.ProtocolParameters{
 			Version:     3,
 			NetworkName: testingT.Name(),
 			Bech32HRP:   "rms",
@@ -72,13 +83,11 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 				VBFactorKey:  10,
 			},
 			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix() - 10*100), // start 100 slots in the past at an even number.
+			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix()) - t.optsGenesisTimestampOffset,
 			SlotDurationInSeconds: 10,
 			MaxCommitableAge:      10,
-		},
-		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
-		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
-	}, opts, func(t *TestSuite) {
+		}
+
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
 
@@ -107,6 +116,22 @@ func (t *TestSuite) Block(alias string) *blocks.Block {
 	}
 
 	return block
+}
+
+func (t *TestSuite) AccountOutput(alias string) *utxoledger.Output {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	output, exist := t.TransactionFramework.states[alias]
+	if !exist {
+		panic(fmt.Sprintf("account %s not registered", alias))
+	}
+
+	if _, ok := output.Output().(*iotago.AccountOutput); !ok {
+		panic(fmt.Sprintf("output %s is not an account", alias))
+	}
+
+	return output
 }
 
 func (t *TestSuite) BlockID(alias string) iotago.BlockID {
@@ -159,14 +184,29 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	return block
 }
 
+func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
+	issuingTime := slotTimeProvider.StartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
+
+	block := node.IssueBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment))...)
+
+	t.registerBlock(alias, block)
+
+	return block
+}
+
 func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
 	block := node.IssueBlock(context.Background(), alias, blockOpts...)
 
-	t.blocks.Set(alias, block)
-	block.ID().RegisterAlias(alias)
+	t.registerBlock(alias, block)
 
 	return block
 }
@@ -175,24 +215,21 @@ func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
+	t.registerBlock(alias, block)
+}
+
+func (t *TestSuite) registerBlock(alias string, block *blocks.Block) {
 	t.blocks.Set(alias, block)
 	block.ID().RegisterAlias(alias)
 }
 
-func (t *TestSuite) CreateTransactionWithInputsAndOutputs(consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) *iotago.Transaction {
-	if t.TransactionFramework == nil {
-		panic("cannot create a transaction without running the network first")
-	}
+func (t *TestSuite) CreateBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
-	return lo.PanicOnErr(t.TransactionFramework.CreateTransactionWithInputsAndOutputs(consumedInputs, outputs, signingWallets))
-}
+	block := node.CreateBlock(context.Background(), alias, blockOpts...)
 
-func (t *TestSuite) CreateTransaction(alias string, outputCount int, inputAliases ...string) *iotago.Transaction {
-	if t.TransactionFramework == nil {
-		panic("cannot create a transaction without running the network first")
-	}
-
-	return lo.PanicOnErr(t.TransactionFramework.CreateTransaction(alias, outputCount, inputAliases...))
+	t.registerBlock(alias, block)
 }
 
 func (t *TestSuite) Node(name string) *mock.Node {
@@ -247,31 +284,50 @@ func (t *TestSuite) Shutdown() {
 	for _, node := range t.nodes {
 		node.Shutdown()
 	}
+
+	fmt.Println("======= ATTACHED BLOCKS =======")
+	for _, node := range t.nodes {
+		for _, block := range node.AttachedBlocks() {
+			fmt.Println(node.Name, ">", block)
+		}
+	}
 }
 
-func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string) *mock.Node {
+func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string, optDeposit ...uint64) *mock.Node {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-
 	if weight > 0 && t.running {
 		panic(fmt.Sprintf("cannot add validator node %s to partition %s with weight %d: framework already running", name, partition, weight))
 	}
 
 	t.nodes[name] = mock.NewNode(t.Testing, t.Network, partition, name, weight)
 
+	deposit := MinIssuerAccountDeposit
+	if len(optDeposit) > 0 {
+		deposit = optDeposit[0]
+	}
+
+	if deposit > 0 {
+		t.optsAccounts = append(t.optsAccounts, snapshotcreator.AccountDetails{
+			Address:   iotago.Ed25519AddressFromPubKey(t.nodes[name].PubKey),
+			Amount:    deposit,
+			IssuerKey: t.nodes[name].PubKey,
+		})
+	}
+
 	return t.nodes[name]
 }
 
-func (t *TestSuite) AddValidatorNode(name string, weight int64) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition)
+func (t *TestSuite) AddValidatorNode(name string, weight int64, optDeposit ...uint64) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition, optDeposit...)
 }
 
-func (t *TestSuite) AddNodeToPartition(name string, partition string) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, partition)
+func (t *TestSuite) AddNodeToPartition(name string, partition string, optDeposit ...uint64) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, 0, partition, optDeposit...)
 }
 
-func (t *TestSuite) AddNode(name string) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition)
+func (t *TestSuite) AddNode(name string, optDeposit ...uint64) *mock.Node {
+	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition, optDeposit...)
 }
 
 func (t *TestSuite) RemoveNode(name string) {
@@ -281,9 +337,20 @@ func (t *TestSuite) RemoveNode(name string) {
 func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	genesisSeed := tpkg.RandEd25519Seed()
 
-	err := snapshotcreator.CreateSnapshot(append([]options.Option[snapshotcreator.Options]{snapshotcreator.WithGenesisSeed(genesisSeed[:])}, t.optsSnapshotOptions...)...)
+	// Create accounts for any block issuer nodes added before starting the network.
+	if t.optsAccounts != nil {
+		wallet := mock.NewHDWallet("genesis", t.genesisSeed[:], 0)
+		t.optsSnapshotOptions = append(t.optsSnapshotOptions, snapshotcreator.WithAccounts(lo.Map(t.optsAccounts, func(accountDetails snapshotcreator.AccountDetails) snapshotcreator.AccountDetails {
+			if accountDetails.Address == nil {
+				accountDetails.Address = wallet.Address()
+			}
+
+			return accountDetails
+		})...))
+	}
+	// TODO: what if someone passes custom GenesisSeed? We set the random one anyway in the transaction framework.
+	err := snapshotcreator.CreateSnapshot(append([]options.Option[snapshotcreator.Options]{snapshotcreator.WithGenesisSeed(t.genesisSeed[:])}, t.optsSnapshotOptions...)...)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
@@ -305,7 +372,7 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		node.Initialize(baseOpts...)
 
 		if t.TransactionFramework == nil {
-			t.TransactionFramework = NewTransactionFramework(node.Protocol, genesisSeed[:])
+			t.TransactionFramework = NewTransactionFramework(node.Protocol, t.genesisSeed[:], t.optsAccounts...)
 		}
 	}
 
@@ -390,13 +457,25 @@ func WithTick(tick time.Duration) options.Option[TestSuite] {
 	}
 }
 
+func WithAccounts(accounts ...snapshotcreator.AccountDetails) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsAccounts = append(opts.optsAccounts, accounts...)
+	}
+}
+
 func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Options]) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
 		opts.optsSnapshotOptions = snapshotOptions
 	}
 }
 
-func durationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time.Duration {
+func WithGenesisTimestampOffset(offset uint32) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsGenesisTimestampOffset = offset
+	}
+}
+
+func DurationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time.Duration {
 	waitFor := os.Getenv(envKey)
 	if waitFor == "" {
 		return defaultDuration

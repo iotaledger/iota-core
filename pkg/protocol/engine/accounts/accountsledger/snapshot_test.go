@@ -1,54 +1,141 @@
-package accountsledger
+package accountsledger_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger/tpkg"
-	"github.com/iotaledger/iota-core/pkg/utils"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func TestSlotDiffSnapshotWriter(t *testing.T) {
-	accountID := utils.RandAccountID()
-	accountDiff := tpkg.RandomAccountDiff()
-	writer := &writerseeker.WriterSeeker{}
-	pWriter := utils.NewPositionedWriter(writer)
-	err := writeSlotDiff(pWriter, accountID, *accountDiff, true)
+func TestManager_Import_Export(t *testing.T) {
+	ts := NewTestSuite(t)
 
-	accountDiffRead, accountIDRead, destroyedRead, err := readSlotDiff(writer.BytesReader())
-	require.NoError(t, err)
-	require.Equal(t, accountDiff, accountDiffRead)
-	require.Equal(t, accountID, accountIDRead)
-	require.Equal(t, true, destroyedRead)
-}
+	ts.ApplySlotActions(1, map[string]*AccountActions{
+		"A": {
+			TotalAllotments: 10,
+			Burns:           []uint64{5},
+			AddedKeys:       []string{"A.P1"},
 
-func TestAccountDataSnapshotWriter(t *testing.T) {
-	accountData := tpkg.RandomAccountData()
-	accountsDataBytes, _ := accountData.SnapshotBytes()
-	buf := bytes.NewReader(accountsDataBytes)
+			NewOutputID: "A1",
+		},
+		"B": {
+			TotalAllotments: 20,
+			Burns:           []uint64{10},
+			AddedKeys:       []string{"B.P1", "B.P2"},
 
-	readAccountsData, err := readAccountData(tpkg.API(), buf)
-	require.NoError(t, err)
+			NewOutputID: "B1",
+		},
+	})
 
-	tpkg.EqualAccountData(t, accountData, readAccountsData)
-}
+	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
+		"A": {
+			UpdatedTime: 1,
+			Amount:      5,
+			PubKeys:     []string{"A.P1"},
+			OutputID:    "A1",
+		},
+		"B": {
+			UpdatedTime: 1,
+			Amount:      10,
+			PubKeys:     []string{"B.P1", "B.P2"},
+			OutputID:    "B1",
+		},
+	})
 
-func TestAccountDiffSnapshotWriter(t *testing.T) {
-	accountData := tpkg.RandomAccountData()
-	writer := &writerseeker.WriterSeeker{}
-	pWriter := utils.NewPositionedWriter(writer)
-	err := writeAccountData(pWriter, accountData)
-	require.NoError(t, err)
-	readAccountsData, err := readAccountData(tpkg.API(), writer.BytesReader())
-	require.NoError(t, err)
-	tpkg.EqualAccountData(t, accountData, readAccountsData)
-}
+	ts.ApplySlotActions(2, map[string]*AccountActions{
+		"A": { // zero out the account data before removal
+			Burns:       []uint64{5},
+			RemovedKeys: []string{"A.P1"},
 
-func TestManager_Import(t *testing.T) {
-}
+			NewOutputID: "A2",
+		},
+		"B": {
+			TotalAllotments: 5,
+			Burns:           []uint64{2},
+			RemovedKeys:     []string{"B.P1"},
 
-func TestManager_Export(t *testing.T) {
+			NewOutputID: "B2",
+		},
+	})
+
+	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
+		"A": {
+			Amount:      0,
+			PubKeys:     []string{},
+			OutputID:    "A2",
+			UpdatedTime: 2,
+		},
+		"B": {
+			UpdatedTime: 2,
+			Amount:      13,
+			PubKeys:     []string{"B.P2"},
+			OutputID:    "B2",
+		},
+	})
+
+	ts.ApplySlotActions(3, map[string]*AccountActions{
+		"A": {
+			Destroyed: true,
+		},
+		"B": {
+			TotalAllotments: 10,
+			Burns:           []uint64{5},
+			AddedKeys:       []string{"B.P3"},
+
+			NewOutputID: "B3",
+		},
+		"C": {
+			TotalAllotments: 10,
+			Burns:           []uint64{10},
+			AddedKeys:       []string{"C.P1"},
+
+			NewOutputID: "C1",
+		},
+	})
+
+	ts.AssertAccountLedgerUntil(3, map[string]*AccountState{
+		"A": {
+			Destroyed: true,
+
+			UpdatedTime: 3,
+		},
+		"B": {
+			Amount:      18,
+			PubKeys:     []string{"B.P2", "B.P3"},
+			OutputID:    "B3",
+			UpdatedTime: 3,
+		},
+	})
+
+	//// Export and import the account ledger into new manager for the latest slot.
+	{
+		writer := &writerseeker.WriterSeeker{}
+
+		err := ts.Instance.Export(writer, iotago.SlotIndex(3))
+		require.NoError(t, err)
+
+		ts.Instance = ts.initAccountLedger()
+		err = ts.Instance.Import(writer.BytesReader())
+		require.NoError(t, err)
+		ts.Instance.SetLatestCommittedSlot(3)
+
+		ts.AssertAccountLedgerUntilWithoutNewState(3)
+	}
+
+	// Export and import for pre-latest slot.
+	{
+		writer := &writerseeker.WriterSeeker{}
+
+		err := ts.Instance.Export(writer, iotago.SlotIndex(2))
+		require.NoError(t, err)
+
+		ts.Instance = ts.initAccountLedger()
+		err = ts.Instance.Import(writer.BytesReader())
+		require.NoError(t, err)
+		ts.Instance.SetLatestCommittedSlot(2)
+
+		ts.AssertAccountLedgerUntilWithoutNewState(2)
+	}
 }

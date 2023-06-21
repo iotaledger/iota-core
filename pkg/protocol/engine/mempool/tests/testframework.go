@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
+	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"

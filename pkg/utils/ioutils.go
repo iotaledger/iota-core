@@ -50,14 +50,12 @@ func NewPositionedWriter(writer io.WriteSeeker) *PositionedWriter {
 		bookmarks: make(map[string]int64),
 		writer:    writer,
 	}
+
 	return p
 }
 
 func (p *PositionedWriter) WriteBytes(bytes []byte) error {
-	if err := WriteBytesFunc(p.writer, bytes); err != nil {
-		return err
-	}
-	return nil
+	return WriteBytesFunc(p.writer, bytes)
 }
 
 func (p *PositionedWriter) WriteValue(name string, value interface{}, saveBookmark ...bool) error {
@@ -71,6 +69,7 @@ func (p *PositionedWriter) WriteValue(name string, value interface{}, saveBookma
 	if err := WriteValueFunc(p.writer, value); err != nil {
 		return errors.Wrapf(err, "unable to write value %s", name)
 	}
+
 	return nil
 }
 
@@ -95,5 +94,6 @@ func (p *PositionedWriter) WriteValueAtBookmark(name string, value interface{}) 
 	if _, err := p.writer.Seek(originalPosition, io.SeekStart); err != nil {
 		return errors.Wrap(err, "unable to seek to original position: %w")
 	}
+
 	return nil
 }

@@ -6,11 +6,9 @@ import (
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -31,7 +29,7 @@ type Booker struct {
 
 	blockCache *blocks.Blocks
 
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, booker.BlockVotePower]
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
 
 	ledger ledger.Ledger
 
@@ -44,15 +42,17 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	return module.Provide(func(e *engine.Engine) booker.Booker {
 		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection.Committee(), e.BlockCache, e.ErrorHandler("booker"), opts...)
 
-		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-			if err := b.Queue(block); err != nil {
-				b.errorHandler(err)
-			}
-		})
-
 		e.HookConstructed(func() {
 			b.ledger = e.Ledger
-			b.conflictDAG = b.ledger.ConflictDAG()
+			b.ledger.HookConstructed(func() {
+				b.conflictDAG = b.ledger.ConflictDAG()
+			})
+
+			e.Events.SybilProtection.BlockProcessed.Hook(func(block *blocks.Block) {
+				if err := b.Queue(block); err != nil {
+					b.errorHandler(err)
+				}
+			})
 
 			e.Events.Booker.LinkTo(b.events)
 
@@ -119,84 +119,14 @@ func (b *Booker) evict(slotIndex iotago.SlotIndex) {
 }
 
 func (b *Booker) book(block *blocks.Block) error {
-	if err := b.trackWitnessWeight(block); err != nil {
-		return errors.Wrapf(err, "failed to track witness weight for block %s", block.ID())
-	}
-
 	conflictsToInherit, err := b.inheritConflicts(block)
 	if err != nil {
 		return errors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
 	}
+
 	block.SetConflictIDs(conflictsToInherit)
-
-	votePower := booker.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
-	if err := b.conflictDAG.CastVotes(vote.NewVote(block.Block().IssuerID, votePower), conflictsToInherit); err != nil {
-		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
-		//  Do we track witness weight of invalid blocks?
-		return errors.Wrapf(err, "failed to cast votes for conflicts of block %s", block.ID())
-	}
-
 	block.SetBooked()
 	b.events.BlockBooked.Trigger(block)
-
-	return nil
-}
-
-func (b *Booker) trackWitnessWeight(votingBlock *blocks.Block) error {
-	witness := votingBlock.Block().IssuerID
-
-	// Only track witness weight for issuers that are part of the committee.
-	if !b.committee.Has(witness) {
-		return nil
-	}
-
-	// Add the witness to the voting block itself as each block carries a vote for itself.
-	if votingBlock.AddWitness(witness) {
-		b.events.WitnessAdded.Trigger(votingBlock)
-	}
-
-	// Walk the block's past cone until we reach an accepted or already supported (by this witness) block.
-	walk := walker.New[iotago.BlockID]().PushAll(votingBlock.Parents()...)
-	for walk.HasNext() {
-		blockID := walk.Next()
-		block, exists := b.blockCache.Block(blockID)
-		if !exists {
-			return errors.Errorf("parent %s does not exist", blockID)
-		}
-
-		if block.IsRootBlock() {
-			continue
-		}
-
-		// Skip propagation if the block is already accepted.
-		if block.IsAccepted() {
-			continue
-		}
-
-		// Skip further propagation if the witness is not new.
-		if !block.AddWitness(witness) {
-			continue
-		}
-
-		block.ForEachParent(func(parent model.Parent) {
-			switch parent.Type {
-			case model.StrongParentType:
-				walk.Push(parent.ID)
-			case model.ShallowLikeParentType, model.WeakParentType:
-				if weakParent, exists := b.blockCache.Block(parent.ID); exists {
-					if weakParent.AddWitness(witness) {
-						b.events.WitnessAdded.Trigger(weakParent)
-					}
-				}
-			}
-		})
-
-		// TODO: here we might need to trigger an event WitnessAdded or something. However, doing this for each block might
-		//  be a bit expensive. Instead, we could keep track of the lowest rank of blocks and only trigger for those and
-		//  have a modified causal order in the acceptance gadget (with all booked blocks) that checks whether the acceptance threshold
-		//  is reached for these lowest rank blocks and accordingly propagates acceptance to their children.
-		b.events.WitnessAdded.Trigger(block)
-	}
 
 	return nil
 }

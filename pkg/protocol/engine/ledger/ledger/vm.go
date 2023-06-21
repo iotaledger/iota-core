@@ -17,16 +17,16 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		return nil, ErrUnexpectedUnderlyingType
 	}
 
-	inputSet := iotago.InputSet{}
+	inputSet := iotagovm.InputSet{}
 	for _, inputState := range inputStates {
-		inputSet[inputState.OutputID()] = iotago.OutputWithCreationTime{
+		inputSet[inputState.OutputID()] = iotagovm.OutputWithCreationTime{
 			Output:       inputState.Output(),
 			CreationTime: inputState.CreationTime(),
 		}
 	}
 
 	// resolve the BIC inputs from the BIC Manager
-	bicInputSet := iotago.BICInputSet{}
+	bicInputSet := iotagovm.BICInputSet{}
 	bicInputs, err := tx.BICInputs()
 	if err != nil {
 		return nil, xerrors.Errorf("could not get BIC inputs: %w", err)
@@ -40,15 +40,15 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		if err != nil {
 			return nil, xerrors.Errorf("could not get BIC inputs: %w", err)
 		}
-		bicInputSet[inp.AccountID] = iotago.BlockIssuanceCredit{
+		bicInputSet[inp.AccountID] = iotagovm.BlockIssuanceCredit{
 			AccountID:    inp.AccountID,
 			CommitmentID: inp.CommitmentID,
-			Value:        b.BlockIssuanceCredits().Value,
+			Value:        b.Credits.Value,
 		}
 	}
 
 	// resolve the commitment inputs from storage
-	commitmentInputSet := iotago.CommitmentInputSet{}
+	commitmentInputSet := iotagovm.CommitmentInputSet{}
 	commitmentInputs, err := tx.CommitmentInputs()
 	if err != nil {
 		return nil, xerrors.Errorf("could not get Commitment inputs: %w", err)
@@ -61,13 +61,14 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		commitmentInputSet[inp.CommitmentID] = c
 	}
 
-	resolvedInputs := iotago.ResolvedInputs{
+	resolvedInputs := iotagovm.ResolvedInputs{
 		InputSet:           inputSet,
 		BICInputSet:        bicInputSet,
 		CommitmentInputSet: commitmentInputSet,
 	}
 
 	vmParams := &iotagovm.Params{External: &iotago.ExternalUnlockParameters{
+		DecayProvider:      l.decayProvider,
 		ProtocolParameters: l.protocolParameters,
 	}}
 	if err := stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
@@ -104,5 +105,6 @@ func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.
 	if storedCommitmentID != inputCommitmentID {
 		return nil, xerrors.Errorf("commitment ID of input %s different to stored commitment %s", inputCommitmentID, storedCommitmentID)
 	}
+
 	return c.Commitment(), nil
 }

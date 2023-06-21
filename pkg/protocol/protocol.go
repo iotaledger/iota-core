@@ -1,7 +1,9 @@
 package protocol
 
 import (
+	"context"
 	"fmt"
+	"sync"
 
 	"github.com/pkg/errors"
 
@@ -18,7 +20,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
@@ -47,6 +48,7 @@ import (
 )
 
 type Protocol struct {
+	context       context.Context
 	Events        *Events
 	SyncManager   syncmanager.SyncManager
 	engineManager *enginemanager.EngineManager
@@ -56,10 +58,13 @@ type Protocol struct {
 	dispatcher      network.Endpoint
 	networkProtocol *core.Protocol
 
-	mainEngine *engine.Engine
+	activeEngineMutex sync.RWMutex
+	mainEngine        *engine.Engine
+	candidateEngine   *engine.Engine
 
-	optsBaseDirectory string
-	optsSnapshotPath  string
+	optsBaseDirectory           string
+	optsSnapshotPath            string
+	optsChainSwitchingThreshold int
 
 	optsEngineOptions       []options.Option[engine.Engine]
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
@@ -99,7 +104,8 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsLedgerProvider:          ledger1.NewProvider(),
 		optsSchedulerProvider:       drr.NewProvider(),
 
-		optsBaseDirectory: "",
+		optsBaseDirectory:           "",
+		optsChainSwitchingThreshold: 3,
 	}, opts,
 		(*Protocol).initEngineManager,
 		(*Protocol).initChainManager,
@@ -107,12 +113,17 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 }
 
 // Run runs the protocol.
-func (p *Protocol) Run() {
-	p.Events.Engine.LinkTo(p.mainEngine.Events)
-	p.SyncManager = p.optsSyncManagerProvider(p.mainEngine)
+func (p *Protocol) Run(ctx context.Context) error {
+	var innerCtxCancel func()
 
+	p.context, innerCtxCancel = context.WithCancel(ctx)
+	defer innerCtxCancel()
+
+	p.linkToEngine(p.mainEngine)
+
+	//nolint:contextcheck // false positive
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
-		panic(err)
+		return errors.Wrapf(err, "mainEngine initialize failed")
 	}
 
 	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
@@ -134,63 +145,45 @@ func (p *Protocol) Run() {
 		}
 	}
 
-	// p.linkTo(p.mainrEngine) -> CC and TipManager
 	p.runNetworkProtocol()
+
+	p.Events.Started.Trigger()
+
+	<-p.context.Done()
+
+	p.shutdown()
+
+	p.Events.Stopped.Trigger()
+
+	return p.context.Err()
 }
 
-func (p *Protocol) Shutdown() {
+func (p *Protocol) linkToEngine(engineInstance *engine.Engine) {
+	if p.SyncManager != nil {
+		p.SyncManager.Shutdown()
+		p.SyncManager = nil
+	}
+	p.SyncManager = p.optsSyncManagerProvider(engineInstance)
+
+	p.Events.Engine.LinkTo(engineInstance.Events)
+}
+
+func (p *Protocol) shutdown() {
 	if p.networkProtocol != nil {
 		p.networkProtocol.Shutdown()
 	}
 
 	p.Workers.Shutdown()
+
+	p.activeEngineMutex.RLock()
 	p.mainEngine.Shutdown()
+	if p.candidateEngine != nil {
+		p.candidateEngine.Shutdown()
+	}
+	p.activeEngineMutex.RUnlock()
+
 	p.ChainManager.Shutdown()
 	p.SyncManager.Shutdown()
-}
-
-func (p *Protocol) runNetworkProtocol() {
-	p.networkProtocol = core.NewProtocol(p.dispatcher, p.Workers.CreatePool("NetworkProtocol"), p.API()) // Use max amount of workers for networking
-	p.Events.Network.LinkTo(p.networkProtocol.Events)
-
-	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks
-
-	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {
-		if err := p.ProcessBlock(block, id); err != nil {
-			p.ErrorHandler()(err)
-		}
-	}, event.WithWorkerPool(wpBlocks))
-
-	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id network.PeerID) {
-		if block, exists := p.MainEngineInstance().Block(blockID); exists {
-			p.networkProtocol.SendBlock(block, id)
-		}
-	}, event.WithWorkerPool(wpBlocks))
-
-	p.Events.Engine.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
-		p.networkProtocol.RequestBlock(blockID)
-	}, event.WithWorkerPool(wpBlocks))
-
-	p.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-		p.networkProtocol.SendBlock(block.ModelBlock())
-	}, event.WithWorkerPool(wpBlocks))
-
-	wpCommitments := p.Workers.CreatePool("NetworkEvents.SlotCommitments")
-
-	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source network.PeerID) {
-		// when we receive a commitment request, do not look it up in the ChainManager but in the storage, else we might answer with commitments we did not issue ourselves and for which we cannot provide attestations
-		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); err == nil && requestedCommitment.ID() == commitmentID {
-			p.networkProtocol.SendSlotCommitment(requestedCommitment, source)
-		}
-	}, event.WithWorkerPool(wpCommitments))
-
-	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source network.PeerID) {
-		p.ChainManager.ProcessCommitmentFromSource(commitment, source)
-	}, event.WithWorkerPool(wpCommitments))
-
-	p.Events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
-		p.networkProtocol.RequestCommitment(commitmentID)
-	}, event.WithWorkerPool(wpCommitments))
 }
 
 func (p *Protocol) initEngineManager() {
@@ -225,11 +218,11 @@ func (p *Protocol) initChainManager() {
 	p.ChainManager = chainmanager.NewManager(p.optsChainManagerOptions...)
 	p.Events.ChainManager.LinkTo(p.ChainManager.Events)
 
-	wp := p.Workers.CreatePool("ChainManager", 1) // Using just 1 worker to avoid contention
-
+	// This needs to be hooked so that the ChainManager always knows the commitments we issued.
+	// Else our own BlockIssuer might use a commitment that the ChainManager does not know yet.
 	p.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 		p.ChainManager.ProcessCommitment(details.Commitment)
-	}, event.WithWorkerPool(wp))
+	})
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		rootCommitment, valid := p.MainEngineInstance().EarliestRootCommitment(index)
@@ -249,9 +242,10 @@ func (p *Protocol) initChainManager() {
 		if rootCommitment.ID().Index() > 0 {
 			p.ChainManager.EvictUntil(rootCommitment.ID().Index() - 1)
 		}
-	}, event.WithWorkerPool(wp))
+	})
 
-	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wp))
+	wpForking := p.Workers.CreatePool("Protocol.Forking", 1) // Using just 1 worker to avoid contention
+	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wpForking))
 }
 
 func (p *Protocol) ProcessOwnBlock(block *model.Block) error {
@@ -281,17 +275,16 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 		processed = true
 	}
 
-	// if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
-	//	if candidateChain := candidateEngine.Storage.Settings.ChainID(); chain.ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
-	//		candidateEngine.ProcessBlockFromPeer(block, src)
-	//		if candidateEngine.IsBootstrapped() &&
-	//			candidateEngine.Storage.Settings.LatestCommitment().Index() >= mainEngine.Storage.Settings.LatestCommitment().Index() &&
-	//			candidateEngine.Storage.Settings.LatestCommitment().CumulativeWeight() > mainEngine.Storage.Settings.LatestCommitment().CumulativeWeight() {
-	//			p.switchEngines()
-	//		}
-	//		processed = true
-	//	}
-	// }
+	if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
+		if candidateChain := candidateEngine.ChainID(); chain.ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
+			candidateEngine.ProcessBlockFromPeer(block, src)
+			if candidateEngine.IsBootstrapped() &&
+				candidateEngine.Storage.Settings().LatestCommitment().CumulativeWeight() > mainEngine.Storage.Settings().LatestCommitment().CumulativeWeight() {
+				p.switchEngines()
+			}
+			processed = true
+		}
+	}
 
 	if !processed {
 		return errors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.Block().SlotCommitment.MustID())
@@ -301,7 +294,17 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 }
 
 func (p *Protocol) MainEngineInstance() *engine.Engine {
+	p.activeEngineMutex.RLock()
+	defer p.activeEngineMutex.RUnlock()
+
 	return p.mainEngine
+}
+
+func (p *Protocol) CandidateEngineInstance() *engine.Engine {
+	p.activeEngineMutex.RLock()
+	defer p.activeEngineMutex.RUnlock()
+
+	return p.candidateEngine
 }
 
 func (p *Protocol) Network() *core.Protocol {
@@ -320,8 +323,4 @@ func (p *Protocol) ErrorHandler() func(error) {
 	return func(err error) {
 		p.Events.Error.Trigger(err)
 	}
-}
-
-func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
-	fmt.Printf("================================================================\nFork detected: %s\n================================================================\n", fork)
 }

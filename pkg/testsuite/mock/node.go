@@ -3,12 +3,15 @@ package mock
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
@@ -26,6 +29,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
 type Node struct {
@@ -34,10 +38,13 @@ type Node struct {
 	Name   string
 	Weight int64
 
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+
 	blockIssuer *blockfactory.BlockIssuer
 
 	privateKey ed25519.PrivateKey
-	pubKey     ed25519.PublicKey
+	PubKey     ed25519.PublicKey
 	AccountID  iotago.AccountID
 	PeerID     network.PeerID
 
@@ -45,6 +52,13 @@ type Node struct {
 	Workers  *workerpool.Group
 
 	Protocol *protocol.Protocol
+
+	forkDetectedCount             atomic.Uint32
+	candidateEngineActivatedCount atomic.Uint32
+	mainEngineSwitchedCount       atomic.Uint32
+
+	mutex          sync.RWMutex
+	attachedBlocks []*blocks.Block
 }
 
 func NewNode(t *testing.T, net *Network, partition string, name string, weight int64) *Node {
@@ -53,8 +67,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 		panic(err)
 	}
 
-	accountID := iotago.AccountID(*iotago.Ed25519AddressFromPubKey(pub))
-	accountID.RegisterAlias(name)
+	accountID := iotago.AccountID(blake2b.Sum256(iotago.Ed25519AddressFromPubKey(pub)[:]))
 
 	peerID := network.PeerID(pub)
 	identity.RegisterIDAlias(peerID, name)
@@ -64,24 +77,56 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 
 		Name:       name,
 		Weight:     weight,
-		pubKey:     pub,
+		PubKey:     pub,
 		privateKey: priv,
 		AccountID:  accountID,
 		PeerID:     peerID,
 
 		Endpoint: net.Join(peerID, partition),
 		Workers:  workerpool.NewGroup(name),
+
+		attachedBlocks: make([]*blocks.Block, 0),
 	}
 }
 
 func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
+	time.Sleep(1 * time.Second)
 	n.Protocol = protocol.New(n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
 	)
+
+	n.hookEvents()
+
 	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
-	n.Protocol.Run()
+	n.ctx, n.ctxCancel = context.WithCancel(context.Background())
+
+	started := make(chan struct{}, 1)
+
+	n.Protocol.Events.Started.Hook(func() {
+		close(started)
+	})
+
+	go func() {
+		defer n.ctxCancel()
+
+		if err := n.Protocol.Run(n.ctx); err != nil {
+			fmt.Printf("%s > Run finished with error: %s\n", n.Name, err.Error())
+		}
+	}()
+
+	<-started
+}
+
+func (n *Node) hookEvents() {
+	events := n.Protocol.Events
+
+	events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) { n.forkDetectedCount.Add(1) })
+
+	events.CandidateEngineActivated.Hook(func(e *engine.Engine) { n.candidateEngineActivatedCount.Add(1) })
+
+	events.MainEngineSwitched.Hook(func(e *engine.Engine) { n.mainEngineSwitchedCount.Add(1) })
 }
 
 func (n *Node) HookLogging() {
@@ -105,14 +150,15 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 
-	// events.Network.AttestationsReceived.Hook(func(event *network.AttestationsReceivedEvent) {
-	// 	fmt.Printf("%s > Network.AttestationsReceived: from %s for %s\n", n.Name, event.Source, event.Commitment.ID())
-	// })
-	//
-	// events.Network.AttestationsRequestReceived.Hook(func(event *network.AttestationsRequestReceivedEvent) {
-	// 	fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s -> %d\n", n.Name, event.Source, event.Commitment.ID(), event.EndIndex)
-	// })
-	//
+	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
+		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
+			return lo.PanicOnErr(a.BlockID(n.Protocol.MainEngineInstance().API().SlotTimeProvider()))
+		}))
+	})
+
+	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source network.PeerID) {
+		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
+	})
 
 	events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
 		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
@@ -138,6 +184,16 @@ func (n *Node) HookLogging() {
 		fmt.Printf("%s > TipManager.TipAdded: %s in pool %d\n", n.Name, tipMetadata.Block().ID(), tipMetadata.TipPool())
 	})
 
+	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
+		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+
+		n.attachEngineLogs(e)
+	})
+
+	events.MainEngineSwitched.Hook(func(e *engine.Engine) {
+		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+	})
+
 	events.Network.Error.Hook(func(err error, id identity.ID) {
 		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
 	})
@@ -153,6 +209,10 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] BlockDAG.BlockAttached: %s\n", n.Name, engineName, block.ID())
+
+		n.mutex.Lock()
+		defer n.mutex.Unlock()
+		n.attachedBlocks = append(n.attachedBlocks, block)
 	})
 
 	events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
@@ -171,16 +231,20 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] BlockDAG.MissingBlockAttached: %s\n", n.Name, engineName, block.ID())
 	})
 
+	events.SybilProtection.BlockProcessed.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] SybilProtection.BlockProcessed: %s\n", n.Name, engineName, block.ID())
+	})
+
 	events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
+		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().SlotTimeProvider().IndexFromTime(newTime))
 	})
 
-	events.Clock.RatifiedAcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.RatifiedAcceptedTimeUpdated: %s\n", n.Name, engineName, newTime)
+	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
+		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().SlotTimeProvider().IndexFromTime(newTime))
 	})
 
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
@@ -201,15 +265,24 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment)
+		var acceptedBlocks []iotago.BlockID
+		_ = details.AcceptedBlocks.Stream(func(key iotago.BlockID) bool {
+			acceptedBlocks = append(acceptedBlocks, key)
+			return true
+		})
+		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks)
+	})
+
+	events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
 
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Index(), block.Block().SlotCommitment.MustID())
 	})
 
-	events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockRatifiedAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
 	})
 
 	events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
@@ -217,21 +290,29 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
-		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotConfirmed: %s\n", n.Name, engineName, slotIndex)
+		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
 	})
 
-	instance.Events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
+	events.SybilProtection.OnlineCommitteeAccountAdded.Hook(func(accountID iotago.AccountID) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeAccountAdded: %s\n", n.Name, engineName, accountID)
+	})
+
+	events.SybilProtection.OnlineCommitteeAccountRemoved.Hook(func(accountID iotago.AccountID) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeAccountRemoved: %s\n", n.Name, engineName, accountID)
+	})
+
+	events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictCreated: %s\n", n.Name, engineName, conflictID)
 	})
 
-	instance.Events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
+	events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictEvicted: %s\n", n.Name, engineName, conflictID)
 	})
-	instance.Events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
+	events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictRejected: %s\n", n.Name, engineName, conflictID)
 	})
 
-	instance.Events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
+	events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
 	})
 
@@ -285,40 +366,60 @@ func (n *Node) Wait() {
 }
 
 func (n *Node) Shutdown() {
-	n.Protocol.Shutdown()
+	stopped := make(chan struct{}, 1)
+
+	if n.Protocol != nil {
+		n.Protocol.Events.Stopped.Hook(func() {
+			close(stopped)
+		})
+	} else {
+		close(stopped)
+	}
+
+	if n.ctxCancel != nil {
+		n.ctxCancel()
+	}
+
 	n.Workers.Shutdown()
+
+	<-stopped
 }
 
 func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.AccountID = otherNode.AccountID
-	n.pubKey = otherNode.pubKey
+	n.PubKey = otherNode.PubKey
 	n.privateKey = otherNode.privateKey
-	n.AccountID.RegisterAlias(n.Name)
 }
 
-func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	modelBlock, err := n.blockIssuer.CreateBlock(ctx, opts...)
 	require.NoError(n.Testing, err)
 
 	modelBlock.ID().RegisterAlias(alias)
 
-	require.NoError(n.Testing, n.blockIssuer.IssueBlock(modelBlock))
-
-	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", modelBlock.ID(), modelBlock.ID().Index(), modelBlock.Block().SlotCommitment.MustID(), modelBlock.Block().SlotCommitment.Index, modelBlock.Block().LatestFinalizedSlot)
-
 	return blocks.NewBlock(modelBlock)
 }
 
-func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sync.WaitGroup) {
+func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+	block := n.CreateBlock(ctx, alias, opts...)
+
+	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
+
+	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.Block().LatestFinalizedSlot)
+
+	return block
+}
+
+func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 
-		start := time.Now()
 		fmt.Println(n.Name, "> Starting activity")
 		var counter int
 		for {
 			if ctx.Err() != nil {
-				fmt.Println(n.Name, "> Stopped activity due to canceled context")
+				fmt.Println(n.Name, "> Stopped activity due to canceled context:", ctx.Err())
 				return
 			}
 
@@ -328,11 +429,26 @@ func (n *Node) IssueActivity(ctx context.Context, duration time.Duration, wg *sy
 
 			counter++
 			time.Sleep(1 * time.Second)
-			if duration > 0 && time.Since(start) > duration {
-				fmt.Println(n.Name, "> Stopped activity after", time.Since(start))
-				return
-			}
 		}
 
 	}()
+}
+
+func (n *Node) ForkDetectedCount() int {
+	return int(n.forkDetectedCount.Load())
+}
+
+func (n *Node) CandidateEngineActivatedCount() int {
+	return int(n.candidateEngineActivatedCount.Load())
+}
+
+func (n *Node) MainEngineSwitchedCount() int {
+	return int(n.mainEngineSwitchedCount.Load())
+}
+
+func (n *Node) AttachedBlocks() []*blocks.Block {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+
+	return n.attachedBlocks
 }

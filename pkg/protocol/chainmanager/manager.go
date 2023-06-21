@@ -8,7 +8,6 @@ import (
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -29,15 +28,11 @@ type Manager struct {
 	commitmentsByID *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ChainCommitment]
 	rootCommitment  *ChainCommitment
 
-	// This tracks the forkingPoints by the commitment that triggered the detection so we can clean up after eviction
-	forkingPointsByCommitments *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, iotago.CommitmentID]
-	forksByForkingPoint        *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *Fork]
+	forksByForkingPoint *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *Fork]
 
 	evictionMutex sync.RWMutex
 
 	optsCommitmentRequester []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]
-
-	optsMinimumForkDepth int64
 
 	commitmentEntityMutex *syncutils.DAGMutex[iotago.CommitmentID]
 	lastEvictedSlot       *model.EvictionIndex
@@ -45,14 +40,12 @@ type Manager struct {
 
 func NewManager(opts ...options.Option[Manager]) (manager *Manager) {
 	return options.Apply(&Manager{
-		Events:               NewEvents(),
-		optsMinimumForkDepth: 3,
+		Events: NewEvents(),
 
-		commitmentsByID:            memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ChainCommitment](),
-		commitmentEntityMutex:      syncutils.NewDAGMutex[iotago.CommitmentID](),
-		forkingPointsByCommitments: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, iotago.CommitmentID](),
-		forksByForkingPoint:        shrinkingmap.New[iotago.CommitmentID, *Fork](),
-		lastEvictedSlot:            model.NewEvictionIndex(),
+		commitmentsByID:       memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ChainCommitment](),
+		commitmentEntityMutex: syncutils.NewDAGMutex[iotago.CommitmentID](),
+		forksByForkingPoint:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *Fork](),
+		lastEvictedSlot:       model.NewEvictionIndex(),
 	}, opts, func(m *Manager) {
 		m.commitmentRequester = eventticker.New(m.optsCommitmentRequester...)
 		m.Events.CommitmentMissing.Hook(m.commitmentRequester.StartTicker)
@@ -200,7 +193,15 @@ func (m *Manager) ForkByForkingPoint(forkingPoint iotago.CommitmentID) (fork *Fo
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	return m.forksByForkingPoint.Get(forkingPoint)
+	return m.forkByForkingPoint(forkingPoint)
+}
+
+func (m *Manager) forkByForkingPoint(forkingPoint iotago.CommitmentID) (fork *Fork, exists bool) {
+	if indexStore := m.forksByForkingPoint.Get(forkingPoint.Index()); indexStore != nil {
+		return indexStore.Get(forkingPoint)
+	}
+
+	return nil, false
 }
 
 func (m *Manager) SwitchMainChain(head iotago.CommitmentID) error {
@@ -258,15 +259,7 @@ func (m *Manager) processCommitment(commitment *model.Commitment) (isNew bool, i
 }
 
 func (m *Manager) evict(index iotago.SlotIndex) {
-	// Forget about the forks that we detected at that slot so that we can detect them again if they happen
-	evictedForkDetections := m.forkingPointsByCommitments.Evict(index)
-	if evictedForkDetections != nil {
-		evictedForkDetections.ForEach(func(_, forkingPoint iotago.CommitmentID) bool {
-			m.forksByForkingPoint.Delete(forkingPoint)
-			return true
-		})
-	}
-
+	m.forksByForkingPoint.Evict(index)
 	m.commitmentsByID.Evict(index)
 }
 
@@ -302,28 +295,42 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 		return
 	}
 
-	// Do not trigger another event for the same forking point.
-	if m.forksByForkingPoint.Has(forkingPoint.ID()) {
+	// Note: we rely on the fact that the block filter will not let (not yet committable) commitments through.
+
+	forkedChainLatestCommitment := forkingPoint.Chain().LatestCommitment().Commitment()
+	mainChainLatestCommitment := m.RootCommitment().Chain().LatestCommitment().Commitment()
+
+	// Check whether the chain is claiming to be heavier than the current main chain.
+	if forkedChainLatestCommitment.CumulativeWeight() <= mainChainLatestCommitment.CumulativeWeight() {
 		return
 	}
 
-	// The forking point should be at least optsMinimumForkDepth slots in the past w.r.t this commitment index.
-	latestChainCommitment := commitment.Chain().LatestCommitment()
-	if int64(latestChainCommitment.ID().Index()-forkingPoint.ID().Index()) < m.optsMinimumForkDepth {
-		return
+	var doNotTrigger bool
+	fork := m.forksByForkingPoint.Get(forkingPoint.ID().Index(), true).Compute(forkingPoint.ID(), func(currentValue *Fork, exists bool) *Fork {
+		if exists {
+			if forkedChainLatestCommitment.Index() <= currentValue.ForkLatestCommitment.Index() {
+				// Do not trigger another event for the same forking point if the latest fork commitment did not change
+				doNotTrigger = true
+				return currentValue
+			}
+
+			currentValue.ForkLatestCommitment = forkedChainLatestCommitment
+
+			return currentValue
+		}
+
+		return &Fork{
+			Source:               source,
+			MainChain:            m.RootCommitment().Chain(),
+			ForkedChain:          forkingPoint.Chain(),
+			ForkingPoint:         forkingPoint.Commitment(),
+			ForkLatestCommitment: forkedChainLatestCommitment,
+		}
+	})
+
+	if !doNotTrigger {
+		m.Events.ForkDetected.Trigger(fork)
 	}
-
-	// commitment.Index is the index you request attestations for.
-	fork := &Fork{
-		Source:       source,
-		Commitment:   latestChainCommitment.Commitment(),
-		ForkingPoint: forkingPoint.Commitment(),
-	}
-	m.forksByForkingPoint.Set(forkingPoint.ID(), fork)
-
-	m.forkingPointsByCommitments.Get(commitment.ID().Index(), true).Set(commitment.ID(), forkingPoint.ID())
-
-	m.Events.ForkDetected.Trigger(fork)
 }
 
 func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*ChainCommitment, error) {
@@ -406,19 +413,8 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 		fp = fpParent.Chain().ForkingPoint
 	}
 
-	// Delete all commitments after newer than our new head if the chain was longer than the new one
-	snapshotChain := m.rootCommitment.Chain()
-	snapshotChain.dropCommitmentsAfter(commitment.ID().Index())
-
 	// Separate the old main chain by removing it from the parent
 	parentCommitment.deleteChild(oldMainCommitment)
-
-	// Cleanup the old tree hanging from the old main chain from our cache
-	if children := oldMainCommitment.Children(); len(children) != 0 {
-		for childWalker := walker.New[*ChainCommitment]().PushAll(children...); childWalker.HasNext(); {
-			childWalker.PushAll(m.deleteAllChildrenFromCache(childWalker.Next())...)
-		}
-	}
 
 	return nil
 }
@@ -466,17 +462,6 @@ func (m *Manager) propagateReplaceChainToMainChild(child *ChainCommitment, chain
 	return []*ChainCommitment{mainChild}
 }
 
-func (m *Manager) deleteAllChildrenFromCache(child *ChainCommitment) (childrenToUpdate []*ChainCommitment) {
-	m.commitmentEntityMutex.Lock(child.ID())
-	defer m.commitmentEntityMutex.Unlock(child.ID())
-
-	if storage := m.commitmentsByID.Get(child.ID().Index()); storage != nil {
-		storage.Delete(child.ID())
-	}
-
-	return child.Children()
-}
-
 func (m *Manager) propagateSolidity(child *ChainCommitment) (childrenToUpdate []*ChainCommitment) {
 	m.commitmentEntityMutex.Lock(child.ID())
 	defer m.commitmentEntityMutex.Unlock(child.ID())
@@ -486,12 +471,6 @@ func (m *Manager) propagateSolidity(child *ChainCommitment) (childrenToUpdate []
 	}
 
 	return
-}
-
-func WithForkDetectionMinimumDepth(depth int64) options.Option[Manager] {
-	return func(m *Manager) {
-		m.optsMinimumForkDepth = depth
-	}
 }
 
 func WithCommitmentRequesterOptions(opts ...options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]) options.Option[Manager] {

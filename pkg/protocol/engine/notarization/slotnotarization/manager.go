@@ -1,11 +1,12 @@
 package slotnotarization
 
 import (
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -17,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -37,8 +39,6 @@ type Manager struct {
 
 	storage *storage.Storage
 
-	commitmentMutex sync.RWMutex
-
 	acceptedTimeFunc      func() time.Time
 	slotTimeProviderFunc  func() *iotago.SlotTimeProvider
 	minCommittableSlotAge iotago.SlotIndex
@@ -56,22 +56,19 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 
 		e.HookConstructed(func() {
 			m.storage = e.Storage
-			m.acceptedTimeFunc = e.Clock.RatifiedAccepted().Time
+			m.acceptedTimeFunc = e.Clock.Accepted().Time
 
 			m.ledger = e.Ledger
 			m.attestation = e.Attestations
 
-			wpBlocks := m.workers.CreatePool("Blocks", 1)           // Using just 1 worker to avoid contention
-			wpCommitments := m.workers.CreatePool("Commitments", 1) // Using just 1 worker to avoid contention
+			wpBlocks := m.workers.CreatePool("Blocks", 1) // Using just 1 worker to avoid contention
 
-			e.Events.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
-				if err := m.notarizeRatifiedAcceptedBlock(block); err != nil {
+			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+				if err := m.notarizeAcceptedBlock(block); err != nil {
 					m.errorHandler(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 				}
+				m.tryCommitUntil(block)
 			}, event.WithWorkerPool(wpBlocks))
-
-			// Slots are committed whenever RatifiedATT advances, start committing only when bootstrapped.
-			e.Events.Clock.RatifiedAcceptedTimeUpdated.Hook(m.tryCommitUntil, event.WithWorkerPool(wpCommitments))
 
 			e.Events.Notarization.LinkTo(m.events)
 
@@ -82,7 +79,6 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 			m.slotMutations = NewSlotMutations(e.SybilProtection.Accounts(), e.Storage.Settings().LatestCommitment().Index())
 			m.TriggerConstructed()
 			m.TriggerInitialized()
-
 		})
 
 		return m
@@ -104,11 +100,8 @@ func (m *Manager) Shutdown() {
 }
 
 // tryCommitUntil tries to create slot commitments until the new provided acceptance time.
-func (m *Manager) tryCommitUntil(acceptanceTime time.Time) {
-	m.commitmentMutex.Lock()
-	defer m.commitmentMutex.Unlock()
-
-	if index := m.slotTimeProviderFunc().IndexFromTime(acceptanceTime); index > m.storage.Settings().LatestCommitment().Index() {
+func (m *Manager) tryCommitUntil(block *blocks.Block) {
+	if index := block.ID().Index(); index > m.storage.Settings().LatestCommitment().Index() {
 		m.tryCommitSlotUntil(index)
 	}
 }
@@ -121,8 +114,8 @@ func (m *Manager) IsBootstrapped() bool {
 	return m.storage.Settings().LatestCommitment().Index() >= m.slotTimeProviderFunc().IndexFromTime(m.acceptedTimeFunc())-m.minCommittableSlotAge-1
 }
 
-func (m *Manager) notarizeRatifiedAcceptedBlock(block *blocks.Block) (err error) {
-	if err = m.slotMutations.AddRatifiedAcceptedBlock(block); err != nil {
+func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
+	if err = m.slotMutations.AddAcceptedBlock(block); err != nil {
 		return errors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
@@ -168,7 +161,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	// set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
-	ratifiedAcceptedBlocks := m.slotMutations.RatifiedAcceptedBlocks(index, true)
+	acceptedBlocks := m.slotMutations.AcceptedBlocks(index, true)
 
 	cumulativeWeight, attestationsRoot, err := m.attestation.Commit(index)
 	if err != nil {
@@ -182,16 +175,18 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
+	roots := iotago.NewRoots(
+		iotago.Identifier(acceptedBlocks.Root()),
+		mutationRoot,
+		iotago.Identifier(attestationsRoot),
+		stateRoot,
+		accountRoot,
+	)
+
 	newCommitment := iotago.NewCommitment(
 		index,
 		latestCommitment.ID(),
-		iotago.NewRoots(
-			iotago.Identifier(ratifiedAcceptedBlocks.Root()),
-			mutationRoot,
-			iotago.Identifier(attestationsRoot),
-			stateRoot,
-			accountRoot,
-		).ID(),
+		roots.ID(),
 		cumulativeWeight,
 	)
 
@@ -206,14 +201,24 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	if err = m.storage.Commitments().Store(newModelCommitment); err != nil {
-		m.errorHandler(errors.Wrap(err, "failed to store latest commitment"))
+		m.errorHandler(errors.Wrapf(err, "failed to store latest commitment %s", newModelCommitment.ID()))
+		return false
+	}
+
+	rootsStorage := m.storage.Roots(index)
+	if rootsStorage == nil {
+		m.errorHandler(errors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
+		return false
+	}
+	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(m.storage.Settings().API().Encode(roots))); err != nil {
+		m.errorHandler(errors.Wrapf(err, "failed to store latest roots for commitment %s", newModelCommitment.ID()))
 		return false
 	}
 
 	m.events.SlotCommitted.Trigger(&notarization.SlotCommittedDetails{
-		Commitment:             newModelCommitment,
-		RatifiedAcceptedBlocks: ratifiedAcceptedBlocks,
-		ActiveValidatorsCount:  0,
+		Commitment:            newModelCommitment,
+		AcceptedBlocks:        acceptedBlocks,
+		ActiveValidatorsCount: 0,
 	})
 
 	if err = m.slotMutations.Evict(index); err != nil {
@@ -221,12 +226,6 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	return true
-}
-
-func (m *Manager) PerformLocked(perform func(m notarization.Notarization)) {
-	m.commitmentMutex.Lock()
-	defer m.commitmentMutex.Unlock()
-	perform(m)
 }
 
 var _ notarization.Notarization = new(Manager)
