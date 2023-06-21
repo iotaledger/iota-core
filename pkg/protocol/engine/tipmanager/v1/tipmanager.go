@@ -15,7 +15,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// TipManager is a component that manages the selectTips of the Tangle.
+// TipManager is a component that manages the tips of the Tangle.
 type TipManager struct {
 	// retrieveBlock is a function that retrieves a Block from the Tangle.
 	retrieveBlock func(blockID iotago.BlockID) (block *blocks.Block, exists bool)
@@ -32,7 +32,7 @@ type TipManager struct {
 	// blockAdded is triggered when a new Block was added to the TipManager.
 	blockAdded *event.Event1[tipmanager.TipMetadata]
 
-	// lastEvictedSlot is the last slot index that was isEvicted from the MemPool.
+	// lastEvictedSlot contains the last slot index that was evicted from the MemPool.
 	lastEvictedSlot iotago.SlotIndex
 
 	// evictionMutex is used to synchronize the eviction of slots.
@@ -71,12 +71,12 @@ func (t *TipManager) OnBlockAdded(handler func(block tipmanager.TipMetadata)) (u
 	return t.blockAdded.Hook(handler).Unhook
 }
 
-// StrongTips returns the strong selectTips of the TipManager (with an optional limit).
+// StrongTips returns the strong tips of the TipManager (with an optional limit).
 func (t *TipManager) StrongTips(optAmount ...int) []tipmanager.TipMetadata {
 	return t.selectTips(t.strongTipSet, optAmount...)
 }
 
-// WeakTips returns the weak selectTips of the TipManager (with an optional limit).
+// WeakTips returns the weak tips of the TipManager (with an optional limit).
 func (t *TipManager) WeakTips(optAmount ...int) []tipmanager.TipMetadata {
 	return t.selectTips(t.weakTipSet, optAmount...)
 }
@@ -96,10 +96,8 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 	}
 }
 
-// Shutdown is currently required by the module.Interface.
-func (t *TipManager) Shutdown() {
-	// TODO: remove unnecessary shutdown requirement from interface in hive.go.
-}
+// Shutdown does nothing but is required by the module.Interface.
+func (t *TipManager) Shutdown() {}
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
@@ -171,7 +169,7 @@ func (t *TipManager) markSlotAsEvicted(slotIndex iotago.SlotIndex) (success bool
 	return success
 }
 
-// selectTips returns the given amount of selectTips from the given tip set.
+// selectTips returns the given amount of tips from the given tip set.
 func (t *TipManager) selectTips(tipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata], optAmount ...int) []tipmanager.TipMetadata {
 	if len(optAmount) != 0 {
 		return lo.Map(tipSet.RandomUniqueEntries(optAmount[0]), func(tip *TipMetadata) tipmanager.TipMetadata { return tip })
