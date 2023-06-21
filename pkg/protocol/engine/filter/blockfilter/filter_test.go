@@ -140,7 +140,7 @@ var protoParams = iotago.ProtocolParameters{
 	TokenSupply:           5000,
 	GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 	SlotDurationInSeconds: 10,
-	MaxCommitableAge:      10,
+	MaxCommittableAge:     10,
 }
 
 func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {

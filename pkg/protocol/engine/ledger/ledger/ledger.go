@@ -567,7 +567,7 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 
 func (l *Ledger) IsBlockIssuerAllowed(block *iotago.Block) bool {
 	blockSlotIndex := l.protocolParameters.SlotTimeProvider().IndexFromTime(block.IssuingTime)
-	bicSlot := blockSlotIndex - iotago.SlotIndex(l.protocolParameters.MaxCommitableAge)
+	bicSlot := blockSlotIndex - iotago.SlotIndex(l.protocolParameters.MaxCommittableAge)
 	account, exists, err := l.accountsLedger.Account(block.IssuerID, bicSlot)
 	if err != nil {
 		return false
@@ -575,7 +575,7 @@ func (l *Ledger) IsBlockIssuerAllowed(block *iotago.Block) bool {
 	if !exists {
 		return false
 	}
-	if account.BlockIssuanceCredits().Value < 0 {
+	if account.Credits.Value < 0 {
 		return false
 	}
 	return true

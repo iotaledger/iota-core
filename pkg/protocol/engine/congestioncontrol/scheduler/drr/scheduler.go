@@ -29,8 +29,7 @@ type Scheduler struct {
 	optsMinMana                        uint64
 	optsTokenBucketSize                float64
 
-	manaRetrieveFunc    func(iotago.AccountID) (uint64, error)
-	isBlockAcceptedFunc func(blockID iotago.BlockID) bool
+	manaRetrieveFunc func(iotago.AccountID) (uint64, error)
 
 	buffer      *BufferQueue
 	bufferMutex sync.RWMutex
@@ -66,7 +65,6 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			s.manaRetrieveFunc = func(accountID iotago.AccountID) (uint64, error) {
 				return e.Ledger.ManaManager().GetManaOnAccount(accountID, e.API().SlotTimeProvider().IndexFromTime(time.Now()))
 			}
-			s.isBlockAcceptedFunc = e.BlockGadget.IsBlockAccepted
 		})
 		e.HookInitialized(s.Start)
 		e.HookStopped(s.Shutdown)
@@ -257,7 +255,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 		var issuerRemoved bool
 
 		for block != nil && time.Now().After(block.IssuingTime()) {
-			if s.isBlockAcceptedFunc(block.ID()) && time.Since(block.IssuingTime()) > s.optsAcceptedBlockScheduleThreshold {
+			if block.IsAccepted() && time.Since(block.IssuingTime()) > s.optsAcceptedBlockScheduleThreshold {
 				s.events.BlockSkipped.Trigger(block)
 				block.SetSkipped()
 				s.buffer.PopFront()
