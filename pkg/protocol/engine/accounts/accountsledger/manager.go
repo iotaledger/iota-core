@@ -52,7 +52,7 @@ func New(
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
 	accountsStore kvstore.KVStore,
 	api iotago.API,
-	maxCommitableAge uint32,
+	maxCommitableAge iotago.SlotIndex,
 ) *Manager {
 	return &Manager{
 		api:              api,
@@ -60,7 +60,7 @@ func New(
 		accountsTree:     ads.NewMap[iotago.AccountID, accounts.AccountData](accountsStore),
 		block:            blockFunc,
 		slotDiff:         slotDiffFunc,
-		maxCommitableAge: iotago.SlotIndex(maxCommitableAge),
+		maxCommitableAge: maxCommitableAge,
 	}
 }
 
