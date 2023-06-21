@@ -16,6 +16,8 @@ const (
 	attestationsPrefix
 	ledgerPrefix
 	accountsPrefix
+	rewardsPrefix
+	poolStatsPrefix
 )
 
 type Permanent struct {
@@ -31,6 +33,8 @@ type Permanent struct {
 	attestations    kvstore.KVStore
 	ledger          kvstore.KVStore
 	accounts        kvstore.KVStore
+	rewards         kvstore.KVStore
+	poolStats       kvstore.KVStore
 }
 
 // New returns a new permanent storage instance.
@@ -59,6 +63,8 @@ func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(e
 		p.attestations = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{attestationsPrefix}))
 		p.ledger = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{ledgerPrefix}))
 		p.accounts = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{accountsPrefix}))
+		p.rewards = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{rewardsPrefix}))
+		p.poolStats = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{poolStatsPrefix}))
 	})
 }
 
@@ -86,6 +92,25 @@ func (p *Permanent) Accounts(optRealm ...byte) kvstore.KVStore {
 	}
 
 	return lo.PanicOnErr(p.accounts.WithExtendedRealm(optRealm))
+}
+
+// TODO: Rewards and PoolStats should be pruned after one year, so they are not really permanent.
+// Rewards returns the Rewards storage (or a specialized sub-storage if a realm is provided).
+func (p *Permanent) Rewards(optRealm ...byte) kvstore.KVStore {
+	if len(optRealm) == 0 {
+		return p.rewards
+	}
+
+	return lo.PanicOnErr(p.rewards.WithExtendedRealm(optRealm))
+}
+
+// PoolStats returns the PoolStats storage
+func (p *Permanent) PoolStats(optRealm ...byte) kvstore.KVStore {
+	if len(optRealm) == 0 {
+		return p.poolStats
+	}
+
+	return lo.PanicOnErr(p.poolStats.WithExtendedRealm(optRealm))
 }
 
 // Attestations returns the "attestations" storage (or a specialized sub-storage if a realm is provided).

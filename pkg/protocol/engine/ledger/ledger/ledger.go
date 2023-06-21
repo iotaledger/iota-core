@@ -27,6 +27,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/rewards/rewards"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -40,6 +41,7 @@ type Ledger struct {
 	utxoLedger       *utxoledger.Manager
 	accountsLedger   *accountsledger.Manager
 	manaManager      *mana.Manager
+	rewardsManager   *rewards.Manager
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
 	memPool            mempool.MemPool[ledger.BlockVotePower]
@@ -57,6 +59,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 		l := New(
 			e.Storage.Ledger(),
 			e.Storage.Accounts(),
+			e.Storage.Rewards(),
 			e.Storage.Commitments().Load,
 			e.BlockCache.Block,
 			e.Storage.AccountDiffs,
@@ -72,10 +75,12 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVotePower](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
+			e.EvictionState.Events.SlotEvicted.Hook(l.rewardsManager.Evict)
 
 			wpAccounts := e.Workers.CreateGroup("Accounts").CreatePool("trackBurnt", 1)
 			e.Events.BlockGadget.BlockAccepted.Hook(l.accountsLedger.TrackBlock, event.WithWorkerPool(wpAccounts))
 			e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
+			e.Events.BlockGadget.BlockAccepted.Hook(l.rewardsManager.BlockAccepted)
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 		})
 		e.HookInitialized(func() {
@@ -97,6 +102,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 func New(
 	utxoStore kvstore.KVStore,
 	accountsStore kvstore.KVStore,
+	rewardsStore kvstore.KVStore,
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
@@ -106,6 +112,7 @@ func New(
 	return &Ledger{
 		apiProvider:      apiProvider,
 		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProvider()),
+		rewardsManager:   rewards.New(rewardsStore),
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
 		errorHandler:     errorHandler,
