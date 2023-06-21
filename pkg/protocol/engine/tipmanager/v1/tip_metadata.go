@@ -14,25 +14,18 @@ type TipMetadata struct {
 	// Block holds the actual block.
 	block *blocks.Block
 
-	// tipPool holds the TipPool the block is currently in.
-	tipPool *lpromise.Value[tipmanager.TipPool]
-
-	// isMarkedOrphaned is a property that is true if the block was marked as orphaned.
+	// isMarkedOrphaned is a property that indicates if the block was individually marked as orphaned.
 	isMarkedOrphaned *lpromise.Value[bool]
-
-	// orphanedStrongParents holds the number of strong parents that are orphaned.
-	orphanedStrongParents *lpromise.Value[int]
-
-	// stronglyConnectedChildren holds the number of strong children that can be reached from the tips using only strong
-	// references.
-	stronglyConnectedChildren *lpromise.Value[int]
-
-	// weaklyConnectedChildren holds the number of weak children that can be reached from the tips.
-	weaklyConnectedChildren *lpromise.Value[int]
 
 	// isOrphaned is a derived property that is true if the block is either marked as orphaned or has at least one
 	// orphaned strong parent.
 	isOrphaned *lpromise.Value[bool]
+
+	// orphanedStrongParents holds the number of strong parents that are orphaned.
+	orphanedStrongParents *lpromise.Value[int]
+
+	// tipPool holds the TipPool the block is currently in.
+	tipPool *lpromise.Value[tipmanager.TipPool]
 
 	// isStrongTipPoolMember is a derived property that is true if the block is part of the strong TipPool and is not
 	// orphaned.
@@ -57,6 +50,12 @@ type TipMetadata struct {
 	// isWeaklyConnectedToTips is a derived property that is true if the block is either part of the weak TipPool or has
 	// at least one weakly connected child.
 	isWeaklyConnectedToTips *lpromise.Value[bool]
+
+	// stronglyConnectedChildren holds the number of strong children that are strongly connected to tips.
+	stronglyConnectedChildren *lpromise.Value[int]
+
+	// weaklyConnectedChildren holds the number of weak children that are weakly connected to tips.
+	weaklyConnectedChildren *lpromise.Value[int]
 
 	// isStrongTip is a derived property that is true if the block is part of the strong TipPool, and is not
 	// isStronglyReferencedByTips.
