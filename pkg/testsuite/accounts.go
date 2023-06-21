@@ -63,8 +63,8 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 			return errors.Errorf("AssertAccountDiff: %s: expected destroyed %t but actual %t for account %s at slot %d", node.Name, destroyed, actualDestroyed, accountID, index)
 		}
 
-		if accountDiff.Change != actualAccountDiff.Change {
-			return errors.Errorf("AssertAccountDiff: %s: expected change %d but actual %d for account %s at slot %d", node.Name, accountDiff.Change, actualAccountDiff.Change, accountID, index)
+		if accountDiff.BICChange != actualAccountDiff.BICChange {
+			return errors.Errorf("AssertAccountDiff: %s: expected change %d but actual %d for account %s at slot %d", node.Name, accountDiff.BICChange, actualAccountDiff.BICChange, accountID, index)
 		}
 
 		if accountDiff.PreviousUpdatedTime != actualAccountDiff.PreviousUpdatedTime {
@@ -85,6 +85,22 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 
 		if !cmp.Equal(accountDiff.PubKeysRemoved, actualAccountDiff.PubKeysRemoved) {
 			return errors.Errorf("AssertAccountDiff: %s: expected pub keys removed %s but actual %s for account %s at slot %d", node.Name, accountDiff.PubKeysRemoved, actualAccountDiff.PubKeysRemoved, accountID, index)
+		}
+
+		if !cmp.Equal(accountDiff.NewStakeEndEpoch, actualAccountDiff.NewStakeEndEpoch) {
+			return errors.Errorf("AssertAccountDiff: %s: expected new stake end epoch %s but actual %s for account %s at slot %d", node.Name, accountDiff.NewStakeEndEpoch, actualAccountDiff.NewStakeEndEpoch, accountID, index)
+		}
+
+		if !cmp.Equal(accountDiff.PreviousStakeEndEpoch, actualAccountDiff.PreviousStakeEndEpoch) {
+			return errors.Errorf("AssertAccountDiff: %s: expected previous stake end epoch %s but actual %s for account %s at slot %d", node.Name, accountDiff.PreviousStakeEndEpoch, actualAccountDiff.PreviousStakeEndEpoch, accountID, index)
+		}
+
+		if !cmp.Equal(accountDiff.ValidatorStakeChange, actualAccountDiff.ValidatorStakeChange) {
+			return errors.Errorf("AssertAccountDiff: %s: expected validator stake change epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.ValidatorStakeChange, actualAccountDiff.ValidatorStakeChange, accountID, index)
+		}
+
+		if !cmp.Equal(accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange) {
+			return errors.Errorf("AssertAccountDiff: %s: expected delegation stake change epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange, accountID, index)
 		}
 
 		return nil

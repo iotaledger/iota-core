@@ -349,11 +349,23 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.PubKeysRemoved = oldPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
 			return !newPubKeysSet.Has(key)
 		}).Slice()
+
+		if createdOutput.Output().FeatureSet().Staking() != nil {
+			//staking feature is created or updated - create the diff between the account data and new account
+			accountDiff.ValidatorStakeChange = int64(accountData.ValidatorStake) - int64(createdOutput.Output().FeatureSet().Staking().StakedAmount)
+			accountDiff.PreviousStakeEndEpoch = accountData.StakeEndEpoch
+			accountDiff.NewStakeEndEpoch = iotago.EpochIndex(createdOutput.Output().FeatureSet().Staking().EndEpoch)
+		} else if consumedOutput.Output().FeatureSet().Staking() != nil {
+			// staking feature was removed from an account
+			accountDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
+			accountDiff.PreviousStakeEndEpoch = accountData.StakeEndEpoch
+			accountDiff.NewStakeEndEpoch = 0
+		}
 	}
 
 	// case 3. the account was created, fill in the diff with the information of the created output.
 	for createdAccountID, createdOutput := range createdAccounts {
-		// If it is also consumed we are in case 2 that was handled above.
+		// If it is also consumed, we are in case 2 that was handled above.
 		if _, exists := consumedAccounts[createdAccountID]; exists {
 			continue
 		}
@@ -369,6 +381,12 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.NewOutputID = createdOutput.OutputID()
 		accountDiff.PreviousOutputID = iotago.OutputID{}
 		accountDiff.PubKeysAdded = lo.Map(createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
+
+		if createdOutput.Output().FeatureSet().Staking() != nil {
+			accountDiff.PreviousStakeEndEpoch = 0
+			accountDiff.NewStakeEndEpoch = iotago.EpochIndex(createdOutput.Output().FeatureSet().Staking().EndEpoch)
+			accountDiff.ValidatorStakeChange = int64(createdOutput.Output().FeatureSet().Staking().StakedAmount)
+		}
 	}
 }
 
@@ -388,7 +406,8 @@ func (l *Ledger) getCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff
 			createdAccount, _ := createdOutput.Output().(*iotago.AccountOutput)
 
 			// Skip if the account doesn't have a BIC feature.
-			if createdAccount.FeatureSet().BlockIssuer() == nil {
+			// TODO: do we even need to check for staking feature here if we require BlockIssuer with staking?
+			if createdAccount.FeatureSet().BlockIssuer() == nil && createdAccount.FeatureSet().Staking() == nil {
 				return true
 			}
 
@@ -399,6 +418,8 @@ func (l *Ledger) getCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff
 
 			createdAccounts[accountID] = createdOutput
 		}
+
+		// TODO: collect DelegationOutputs
 
 		return true
 	})
@@ -418,7 +439,8 @@ func (l *Ledger) getCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff
 		if spentOutput.OutputType() == iotago.OutputAccount {
 			consumedAccount, _ := spentOutput.Output().(*iotago.AccountOutput)
 			// Skip if the account doesn't have a BIC feature.
-			if consumedAccount.FeatureSet().BlockIssuer() == nil {
+			// TODO: do we even need to check for staking feature here if we require BlockIssuer with staking?
+			if consumedAccount.FeatureSet().BlockIssuer() == nil && consumedAccount.FeatureSet().Staking() == nil {
 				return true
 			}
 			consumedAccounts[consumedAccount.AccountID] = spentOutput
@@ -428,6 +450,8 @@ func (l *Ledger) getCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff
 				destroyedAccounts.Add(consumedAccount.AccountID)
 			}
 		}
+
+		// TODO: collect DelegationOutputs
 
 		return true
 	})
@@ -496,7 +520,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 					continue
 				}
 
-				accountDiff.Change += int64(allotment.Value)
+				accountDiff.BICChange += int64(allotment.Value)
 				accountDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
 
 				// we are not transitioning the allotted account, so the new and previous outputIDs are the same

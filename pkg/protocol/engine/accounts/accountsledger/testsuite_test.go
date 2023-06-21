@@ -143,7 +143,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 
 		// Put everything together in the format that the manager expects.
 		slotDetails.SlotDiff[accountID] = &prunable.AccountDiff{
-			Change:         int64(action.TotalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
+			BICChange:      int64(action.TotalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
 			PubKeysAdded:   t.PublicKeys(action.AddedKeys, true),
 			PubKeysRemoved: t.PublicKeys(action.RemovedKeys, true),
 
@@ -254,7 +254,7 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 			require.True(t.T, exists)
 
 			require.Equal(t.T, t.PublicKeys(previousAccountState[accountID].PubKeys, false), actualDiff.PubKeysRemoved)
-			require.Equal(t.T, -int64(previousAccountState[accountID].Amount), actualDiff.Change)
+			require.Equal(t.T, -int64(previousAccountState[accountID].Amount), actualDiff.BICChange)
 			require.Equal(t.T, iotago.EmptyOutputID, actualDiff.NewOutputID)
 
 			return
@@ -262,7 +262,7 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 	}
 
 	require.Equal(t.T, expectedAccountDiff.NewOutputID, actualDiff.NewOutputID)
-	require.Equal(t.T, expectedAccountDiff.Change-int64(accountsSlotBuildData.Burns[accountID]), actualDiff.Change)
+	require.Equal(t.T, expectedAccountDiff.BICChange-int64(accountsSlotBuildData.Burns[accountID]), actualDiff.BICChange)
 	require.Equal(t.T, expectedAccountDiff.PubKeysAdded, actualDiff.PubKeysAdded)
 	require.Equal(t.T, expectedAccountDiff.PubKeysRemoved, actualDiff.PubKeysRemoved)
 }
