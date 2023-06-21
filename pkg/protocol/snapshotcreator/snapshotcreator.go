@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/drr"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
@@ -73,6 +74,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
 		tipmanagerv1.NewProvider(),
+		drr.NewProvider(),
 	)
 	defer engineInstance.Shutdown()
 
@@ -119,7 +121,7 @@ func createGenesisOutput(genesisTokenAmount uint64, genesisSeed []byte, engineIn
 func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine, protocolParams *iotago.ProtocolParameters) (err error) {
 	// Account outputs start from Genesis TX index 1
 	for idx, account := range accounts {
-		output := createAccount(account.Address, account.Amount, account.IssuerKey)
+		output := createAccountOutput(account.Address, account.Amount, account.Mana, account.IssuerKey)
 
 		if _, err = protocolParams.RentStructure.CoversStateRent(output, account.Amount); err != nil {
 			return errors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
@@ -153,10 +155,11 @@ func createOutput(address iotago.Address, tokenAmount uint64) (output iotago.Out
 	}
 }
 
-func createAccount(address iotago.Address, tokenAmount uint64, pubkey ed25519.PublicKey) (output iotago.Output) {
+func createAccountOutput(address iotago.Address, tokenAmount uint64, mana uint64, pubkey ed25519.PublicKey) (output iotago.Output) {
 	return &iotago.AccountOutput{
 		AccountID: blake2b.Sum256(lo.PanicOnErr(address.Encode())),
 		Amount:    tokenAmount,
+		Mana:      mana,
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: address},
 			&iotago.GovernorAddressUnlockCondition{Address: address},

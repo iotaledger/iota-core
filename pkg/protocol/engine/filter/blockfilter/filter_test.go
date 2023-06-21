@@ -25,13 +25,16 @@ type TestFramework struct {
 }
 
 func NewTestFramework(t *testing.T, protocolParams *iotago.ProtocolParameters, blockIssuerCheck func(*iotago.Block) bool, optsFilter ...options.Option[Filter]) *TestFramework {
-	tf := &TestFramework{
-		Test: t,
-		api:  iotago.V3API(protocolParams),
 
-		Filter: New(func() *iotago.ProtocolParameters {
-			return protocolParams
-		}, blockIssuerCheck, optsFilter...),
+	f := New(func() *iotago.ProtocolParameters {
+		return protocolParams
+	}, optsFilter...)
+	f.blockIssuerCheck = blockIssuerCheck
+
+	tf := &TestFramework{
+		Test:   t,
+		api:    iotago.V3API(protocolParams),
+		Filter: f,
 	}
 
 	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {

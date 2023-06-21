@@ -311,6 +311,7 @@ func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, parti
 		t.optsAccounts = append(t.optsAccounts, snapshotcreator.AccountDetails{
 			Address:   iotago.Ed25519AddressFromPubKey(t.nodes[name].PubKey),
 			Amount:    deposit,
+			Mana:      deposit,
 			IssuerKey: t.nodes[name].PubKey,
 		})
 	}

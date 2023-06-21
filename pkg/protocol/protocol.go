@@ -205,6 +205,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,
 		p.optsTipManagerProvider,
+		p.optsSchedulerProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()

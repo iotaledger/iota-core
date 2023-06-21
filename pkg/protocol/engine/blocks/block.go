@@ -630,5 +630,11 @@ func (b *Block) ModelBlock() *model.Block {
 func (b *Block) Work() int {
 	// TODO: define a work function which takes more than just payload size into account
 	// e.g. number of parents, payload type etc.
-	return b.Block().Payload.Size()
+	work := 1
+	payload := b.Block().Payload
+	if payload != nil {
+		work += payload.Size()
+	}
+
+	return work
 }

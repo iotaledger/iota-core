@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -57,6 +58,7 @@ type EngineManager struct {
 	attestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
 	tipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
+	schedulerProvider       module.Provider[*engine.Engine, scheduler.Scheduler]
 
 	activeInstance *engine.Engine
 }
@@ -79,6 +81,7 @@ func New(
 	attestationProvider module.Provider[*engine.Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
 	tipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager],
+	schedulerProvider module.Provider[*engine.Engine, scheduler.Scheduler],
 ) *EngineManager {
 	return &EngineManager{
 		workers:                 workers,
@@ -98,6 +101,7 @@ func New(
 		attestationProvider:     attestationProvider,
 		ledgerProvider:          ledgerProvider,
 		tipManagerProvider:      tipManagerProvider,
+		schedulerProvider:       schedulerProvider,
 	}
 }
 
@@ -184,6 +188,7 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.attestationProvider,
 		e.ledgerProvider,
 		e.tipManagerProvider,
+		e.schedulerProvider,
 		e.engineOptions...,
 	)
 }

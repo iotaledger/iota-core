@@ -111,7 +111,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			),
 		},
 	})
-	ts.HookLogging()
+	//ts.HookLogging()
 
 	expectedCommittee := map[iotago.AccountID]int64{
 		node1.AccountID: 75,
@@ -273,6 +273,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P1.L1", "P1.L1", "P1.L2", "P1.M", "P1.N", "P1.O"), true, node1, node2)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.L1", "P1.L2", "P1.M"), true, node1, node2)
 			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P1.L1", "P1.L2", "P1.M"), true, node1, node2)
+			ts.AssertBlocksInCacheScheduled(ts.Blocks("P1.L1", "P1.L2", "P1.M"), true, node1, node2)
 
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(ts.Nodes("node1", "node2"),

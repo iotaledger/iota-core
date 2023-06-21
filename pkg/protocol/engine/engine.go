@@ -23,6 +23,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
@@ -53,6 +54,7 @@ type Engine struct {
 	Attestations    attestation.Attestations
 	Ledger          ledger.Ledger
 	TipManager      tipmanager.TipManager
+	Scheduler       scheduler.Scheduler
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -88,6 +90,7 @@ func New(
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
 	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
+	schedulerProvider module.Provider[*Engine, scheduler.Scheduler],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -116,6 +119,7 @@ func New(
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
 			e.TipManager = tipManagerProvider(e)
+			e.Scheduler = schedulerProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings().TriggerInitialized,
@@ -151,6 +155,7 @@ func (e *Engine) Shutdown() {
 		e.Filter.Shutdown()
 		e.Storage.Shutdown()
 		e.Workers.Shutdown()
+		e.Scheduler.Shutdown()
 	}
 }
 

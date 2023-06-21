@@ -43,11 +43,12 @@ type Filter struct {
 
 func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
 	return module.Provide(func(e *engine.Engine) filter.Filter {
-		blockIssuerCheck := e.Ledger.IsBlockIssuerAllowed
-		f := New(e.Storage.Settings().ProtocolParameters, blockIssuerCheck, opts...)
+		f := New(e.Storage.Settings().ProtocolParameters, opts...)
 
 		e.HookConstructed(func() {
 			e.Events.Filter.LinkTo(f.events)
+			f.blockIssuerCheck = e.Ledger.IsBlockIssuerAllowed
+			f.TriggerConstructed()
 		})
 
 		return f
@@ -57,12 +58,11 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 var _ filter.Filter = new(Filter)
 
 // New creates a new Filter.
-func New(protocolParamsFunc func() *iotago.ProtocolParameters, blockIssuerCheck func(*iotago.Block) bool, opts ...options.Option[Filter]) *Filter {
+func New(protocolParamsFunc func() *iotago.ProtocolParameters, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
 		events:                  filter.NewEvents(),
 		protocolParamsFunc:      protocolParamsFunc,
 		optsSignatureValidation: true,
-		blockIssuerCheck:        blockIssuerCheck,
 	}, opts,
 		(*Filter).TriggerConstructed,
 		(*Filter).TriggerInitialized,
@@ -113,7 +113,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	if !f.blockIssuerCheck(block.Block()) {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrNegativeBIC, "block issuer account is locked due to negative or non-existent BIC"),
+			Reason: errors.Wrapf(ErrNegativeBIC, "block issuer account %s is locked due to negative or non-existent BIC", block.Block().IssuerID),
 			Source: source,
 		})
 

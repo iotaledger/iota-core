@@ -22,6 +22,7 @@ func Test_TransitionAccount(t *testing.T) {
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
 		Address:   nil,                               // nil address will be replaced with the address generated from genesis seed
 		Amount:    testsuite.MinIssuerAccountDeposit, // min amount to cover the rent. if it's too little then the snapshot creation will fail
+		Mana:      0,
 		IssuerKey: oldKey,
 	}), testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
@@ -108,8 +109,20 @@ func Test_TransitionAccount(t *testing.T) {
 		))
 
 		ts.IssueBlockAtSlotWithOptions("block4", 11, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, blockfactory.WithStrongParents(ts.BlockID("block3")), blockfactory.WithPayload(tx2))
-		ts.IssueBlockAtSlot("block5", 20, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block4")...)
-		ts.IssueBlockAtSlot("block6", 20, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block5")...)
+		ts.IssueBlockAtSlot("block4.1", 13, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block4")...)
+		ts.IssueBlockAtSlot("block4.2", 13, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block4.1")...)
+		ts.AssertLatestCommitmentSlotIndex(6, node1)
+
+		ts.IssueBlockAtSlot("block4.3", 16, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block4.2")...)
+		ts.IssueBlockAtSlot("block4.4", 16, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block4.3")...)
+		ts.AssertLatestCommitmentSlotIndex(9, node1)
+
+		ts.IssueBlockAtSlot("block4.5", 19, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block4.4")...)
+		ts.IssueBlockAtSlot("block4.6", 19, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block4.5")...)
+		ts.AssertLatestCommitmentSlotIndex(12, node1)
+
+		ts.IssueBlockAtSlot("block4.7", 20, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block4.6")...)
+		ts.IssueBlockAtSlot("block4.8", 20, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block4.7")...)
 
 		ts.AssertLatestCommitmentSlotIndex(13, node1)
 

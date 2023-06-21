@@ -1,6 +1,7 @@
 package drr
 
 import (
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -51,35 +51,48 @@ type Scheduler struct {
 
 func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engine, scheduler.Scheduler] {
 	return module.Provide(func(e *engine.Engine) scheduler.Scheduler {
-		s := New(e.BlockCache, opts...)
+		s := New(opts...)
+		s.buffer = NewBufferQueue(s.optsMaxBufferSize)
+		e.HookConstructed(func() {
+			s.blockCache = e.BlockCache
+			e.Events.Scheduler.LinkTo(s.events)
+			// hook to block scheduled event to check for another block ready to schedule
+			s.events.BlockScheduled.Hook(func(block *blocks.Block) {
+				s.selectBlockToSchedule()
+				s.updateChildren(block)
+			})
+			e.Ledger.HookInitialized(func() {
+				s.manaRetrieveFunc = func(accountID iotago.AccountID) (uint64, error) {
+					return e.Ledger.ManaManager().GetManaOnAccount(accountID, e.API().SlotTimeProvider().IndexFromTime(time.Now()))
+				}
+			})
+			s.TriggerConstructed()
+			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+				s.AddBlock(block)
+				s.selectBlockToSchedule()
+			})
 
-		e.Events.Booker.BlockBooked.Hook(s.AddBlock, event.WithWorkerPool(e.Workers.CreatePool("Enqueue")))
-		e.Events.Scheduler.LinkTo(s.events)
-		// hook to block scheduled event to check for another block ready to schedule
-		s.events.BlockScheduled.Hook(func(block *blocks.Block) {
-			s.selectBlockToSchedule()
-			s.updateChildren(block)
+			e.HookInitialized(s.Start)
 		})
-
-		e.Ledger.HookInitialized(func() {
-			s.manaRetrieveFunc = func(accountID iotago.AccountID) (uint64, error) {
-				return e.Ledger.ManaManager().GetManaOnAccount(accountID, e.API().SlotTimeProvider().IndexFromTime(time.Now()))
-			}
-		})
-		e.HookInitialized(s.Start)
-		e.HookStopped(s.Shutdown)
 
 		return s
 	})
 }
 
-func New(blockCache *blocks.Blocks, opts ...options.Option[Scheduler]) *Scheduler {
+func New(opts ...options.Option[Scheduler]) *Scheduler {
 	return options.Apply(
 		&Scheduler{
-			blockCache:       blockCache,
+			events:           scheduler.NewEvents(),
 			lastScheduleTime: time.Now(),
+			deficits:         shrinkingmap.New[iotago.AccountID, uint64](),
+			// TODO: provide options properly rather than defaults here
+			optsRate:                           100,
+			optsMaxBufferSize:                  100,
+			optsAcceptedBlockScheduleThreshold: 10 * time.Second,
+			optsMaxDeficit:                     100,
+			optsMinMana:                        1,
+			optsTokenBucketSize:                1000,
 		}, opts,
-		(*Scheduler).TriggerConstructed,
 	)
 }
 
@@ -155,8 +168,11 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 		s.events.BlockDropped.Trigger(block)
 	}
 	block.SetEnqueued()
+	fmt.Printf("block enqueued: %s", block.ID())
 	s.tryReady(block)
-	s.selectBlockToSchedule()
+	if s.isReady(block) {
+		fmt.Printf("block ready to schedule: %s", block.ID())
+	}
 }
 
 func (s *Scheduler) mainLoop() {
@@ -246,6 +262,7 @@ func (s *Scheduler) selectBlockToSchedule() {
 		s.events.BlockDropped.Trigger(block)
 	}
 	s.blockChan <- block
+	fmt.Printf("block ready to schedule: %s", block.ID())
 }
 
 func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
@@ -332,8 +349,8 @@ func (s *Scheduler) isEligible(block *blocks.Block) (eligible bool) {
 }
 
 // isReady returns true if the given blockID's parents are eligible.
-func (s *Scheduler) isReady(block *blocks.Block) (ready bool) {
-	ready = true
+func (s *Scheduler) isReady(block *blocks.Block) bool {
+	ready := true
 	block.ForEachParent(func(parent model.Parent) {
 		if parentBlock, parentExists := s.blockCache.Block(parent.ID); !parentExists || !s.isEligible(parentBlock) {
 			// if parents are evicted and orphaned (not root blocks), or have not been received yet they will not exist.
@@ -343,23 +360,14 @@ func (s *Scheduler) isReady(block *blocks.Block) (ready bool) {
 		}
 	})
 
-	return
+	return ready
 }
 
 // tryReady tries to set the given block as ready.
 func (s *Scheduler) tryReady(block *blocks.Block) {
 	if s.isReady(block) {
-		s.Ready(block)
+		s.ready(block)
 	}
-}
-
-// Ready marks a previously submitted block as ready to be scheduled.
-// If Ready is called without a previous Submit, it has no effect.
-func (s *Scheduler) Ready(block *blocks.Block) {
-	s.bufferMutex.Lock()
-	defer s.bufferMutex.Unlock()
-
-	s.ready(block)
 }
 
 func (s *Scheduler) ready(block *blocks.Block) {
