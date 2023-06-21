@@ -5,10 +5,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 )
 
-// TipSelection is a module that is responsible for implementing the tip selection algorithm, that determines which
-// blocks to reference when issuing a new block.
+// TipSelection is a component that is used to abstract away the tip selection strategy, used to issuing new blocks.
 type TipSelection interface {
-	// SelectTips selects the tips that should be used for issuing the next block.
+	// SelectTips selects the tips that should be used as references for a new block.
 	SelectTips(count int) (references model.ParentReferences)
 
 	// Interface embeds the required methods of the module.Interface.

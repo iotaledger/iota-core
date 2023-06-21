@@ -16,10 +16,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// TipSelection is an implementation of the TipSelection interface that implements the following tip selection
-// algorithm:
-//
-// All blocks that are not voting for something rejected by the time of arrival are classified as strong tips.
+// TipSelection is a component that is used to abstract away the tip selection strategy, used to issuing new blocks.
 type TipSelection struct {
 	// rootBlocks is a function that returns the current root blocks.
 	rootBlocks func() iotago.BlockIDs
@@ -50,6 +47,7 @@ type TipSelection struct {
 	module.Module
 }
 
+// New is the constructor for the TipSelection.
 func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
 		tipManager:                   tipManager,
@@ -63,7 +61,7 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 	}, (*TipSelection).TriggerConstructed)
 }
 
-// SelectTips selects the references that should be used for block issuance.
+// SelectTips selects the tips that should be used as references for a new block.
 func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
 	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]) error {
@@ -99,10 +97,10 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 	return references
 }
 
-func (t *TipSelection) Shutdown() {
-	// TODO: remove Shutdown from module.Interface
-}
+// Shutdown does nothing but is required by the module.Interface.
+func (t *TipSelection) Shutdown() {}
 
+// classifyTip determines the initial tip pool of the given tip.
 func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 	if t.isValidStrongTip(tipMetadata.Block()) {
 		tipMetadata.SetTipPool(tipmanager.StrongTipPool)
@@ -113,6 +111,7 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 	}
 }
 
+// likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
 func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.AdvancedSet[iotago.TransactionID], tipMetadata tipmanager.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {
 	necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
 	if err = t.conflictDAG.LikedInstead(tipMetadata.Block().ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
@@ -142,6 +141,8 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.Advanc
 	return references, updatedLikedConflicts, nil
 }
 
+// collectReferences collects tips from a tip selector (and calls the callback for each tip) until the amount of
+// references of the given type is reached.
 func (t *TipSelection) collectReferences(references model.ParentReferences, parentsType model.ParentsType, tipSelector func(optAmount ...int) []tipmanager.TipMetadata, callback func(tipmanager.TipMetadata), amount int) {
 	seenTips := advancedset.New[iotago.BlockID]()
 	selectUniqueTips := func(amount int) (uniqueTips []tipmanager.TipMetadata) {
@@ -167,10 +168,12 @@ func (t *TipSelection) collectReferences(references model.ParentReferences, pare
 	}
 }
 
+// isValidStrongTip checks if the given block is a valid strong tip.
 func (t *TipSelection) isValidStrongTip(block *blocks.Block) bool {
 	return !t.conflictDAG.AcceptanceState(block.ConflictIDs()).IsRejected()
 }
 
+// isValidWeakTip checks if the given block is a valid weak tip.
 func (t *TipSelection) isValidWeakTip(block *blocks.Block) bool {
 	return t.conflictDAG.LikedInstead(block.PayloadConflictIDs()).Size() == 0
 }
