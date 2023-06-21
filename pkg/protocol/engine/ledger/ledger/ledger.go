@@ -92,7 +92,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
 			l.TriggerConstructed()
 
-			l.accountsLedger.SetMaxCommittableAge(iotago.SlotIndex(l.protocolParameters.MaxCommitableAge))
+			l.accountsLedger.SetMaxCommittableAge(iotago.SlotIndex(l.protocolParameters.MaxCommittableAge))
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			l.TriggerInitialized()
