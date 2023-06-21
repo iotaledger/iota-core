@@ -11,48 +11,43 @@ import (
 
 // TipMetadata represents the metadata for a block in the TipManager.
 type TipMetadata struct {
-	// Block holds the actual block.
+	// block holds the block that the metadata belongs to.
 	block *blocks.Block
 
-	// isMarkedOrphaned is a property that indicates if the block was individually marked as orphaned.
+	// isMarkedOrphaned is true if the block was marked as orphaned individually.
 	isMarkedOrphaned *lpromise.Value[bool]
 
-	// isOrphaned is a derived property that is true if the block is either marked as orphaned or has at least one
-	// orphaned strong parent.
+	// isOrphaned is true if the block is either marked as orphaned or has at least one orphaned strong parent.
 	isOrphaned *lpromise.Value[bool]
 
 	// orphanedStrongParents holds the number of strong parents that are orphaned.
 	orphanedStrongParents *lpromise.Value[int]
 
-	// tipPool holds the TipPool the block is currently in.
+	// tipPool holds the tip pool the block is currently assigned to.
 	tipPool *lpromise.Value[tipmanager.TipPool]
 
-	// isStrongTipPoolMember is a derived property that is true if the block is part of the strong TipPool and is not
-	// orphaned.
+	// isStrongTipPoolMember is true if the block is part of the strong tip pool and not orphaned.
 	isStrongTipPoolMember *lpromise.Value[bool]
 
-	// isWeakTipPoolMember is a derived property that is true if the block is part of the weak TipPool and is not
-	// orphaned.
+	// isWeakTipPoolMember is true if the block is part of the weak tip pool and not orphaned.
 	isWeakTipPoolMember *lpromise.Value[bool]
 
-	// isStronglyReferencedByTips is a derived property that is true if the block has at least one strongly connected
-	// child.
-	isStronglyReferencedByTips *lpromise.Value[bool]
-
-	// isWeaklyReferencedByTips is a derived property that is true if the block has at least one strongly or weakly connected
-	// child.
-	isWeaklyReferencedByTips *lpromise.Value[bool]
-
-	// isStronglyConnectedToTips is a derived property that is true if the block is either strongly referenced by tips or
-	// part of the strong TipPool.
+	// isStronglyConnectedToTips is true if the block is either strongly referenced by tips or a strong tip pool member.
 	isStronglyConnectedToTips *lpromise.Value[bool]
+
+	// stronglyConnectedChildren holds the number of strong children that are strongly connected to tips.
+	stronglyConnectedChildren *lpromise.Value[int]
+
+	// isStronglyReferencedByTips is true if the block has at least one strongly connected child.
+	isStronglyReferencedByTips *lpromise.Value[bool]
 
 	// isWeaklyConnectedToTips is a derived property that is true if the block is either part of the weak TipPool or has
 	// at least one weakly connected child.
 	isWeaklyConnectedToTips *lpromise.Value[bool]
 
-	// stronglyConnectedChildren holds the number of strong children that are strongly connected to tips.
-	stronglyConnectedChildren *lpromise.Value[int]
+	// isWeaklyReferencedByTips is a derived property that is true if the block has at least one strongly or weakly connected
+	// child.
+	isWeaklyReferencedByTips *lpromise.Value[bool]
 
 	// weaklyConnectedChildren holds the number of weak children that are weakly connected to tips.
 	weaklyConnectedChildren *lpromise.Value[int]
@@ -152,6 +147,23 @@ func (t *TipMetadata) IsWeakTip() bool {
 // OnIsWeakTipUpdated registers a callback that is triggered when the IsWeakTip property of the Block is updated.
 func (t *TipMetadata) OnIsWeakTipUpdated(handler func(isWeakTip bool)) (unsubscribe func()) {
 	return t.isWeakTip.OnUpdate(func(_, isWeakTip bool) { handler(isWeakTip) })
+}
+
+// SetMarkedOrphaned marks the Block as orphaned (updated by the tip selection strategy).
+func (t *TipMetadata) SetMarkedOrphaned(orphaned bool) {
+	t.isMarkedOrphaned.Set(orphaned)
+}
+
+// IsMarkedOrphaned returns true if the block is marked as orphaned.
+func (t *TipMetadata) IsMarkedOrphaned() bool {
+	return t.isMarkedOrphaned.Get()
+}
+
+// OnMarkedOrphanedUpdated registers a callback that is triggered when the IsMarkedOrphaned property changes.
+func (t *TipMetadata) OnMarkedOrphanedUpdated(handler func(orphaned bool)) (unsubscribe func()) {
+	return t.isMarkedOrphaned.OnUpdate(func(_, isMarkedOrphaned bool) {
+		handler(isMarkedOrphaned)
+	})
 }
 
 // IsOrphaned returns true if the Block is orphaned.
