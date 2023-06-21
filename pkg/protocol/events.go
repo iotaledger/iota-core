@@ -17,6 +17,7 @@ type Events struct {
 	Network      *core.Events
 	Engine       *engine.Events
 	ChainManager *chainmanager.Events
+	//Mempool      *mempool.Events
 
 	event.Group[Events, *Events]
 }
@@ -32,5 +33,6 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		Network:      core.NewEvents(),
 		Engine:       engine.NewEvents(),
 		ChainManager: chainmanager.NewEvents(),
+		//Mempool:      mempool.NewEvents(),
 	}
 })

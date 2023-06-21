@@ -169,7 +169,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	stateRoot, mutationRoot, err := m.ledger.CommitSlot(index)
+	stateRoot, mutationRoot, accountRoot, err := m.ledger.CommitSlot(index)
 	if err != nil {
 		m.errorHandler(errors.Wrap(err, "failed to commit ledger"))
 		return false
@@ -180,7 +180,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		mutationRoot,
 		iotago.Identifier(attestationsRoot),
 		stateRoot,
-		iotago.Identifier(m.slotMutations.weights.Root()),
+		accountRoot,
 	)
 
 	newCommitment := iotago.NewCommitment(
