@@ -60,10 +60,13 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.Ledger(),
 			e.Storage.Accounts(),
 			e.Storage.Rewards(),
+			e.Storage.PoolStats(),
 			e.Storage.Commitments().Load,
 			e.BlockCache.Block,
 			e.Storage.AccountDiffs,
+			e.Storage.PerformanceFactors,
 			e.API,
+			e.Storage.Settings().ProtocolParameters.DecayProvider(),
 			e.ErrorHandler("ledger"),
 		)
 
@@ -100,19 +103,22 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 }
 
 func New(
-	utxoStore kvstore.KVStore,
-	accountsStore kvstore.KVStore,
-	rewardsStore kvstore.KVStore,
+	utxoStore,
+	accountsStore,
+	rewardsStore,
+	poolStatsStore kvstore.KVStore,
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
+	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
 	apiProvider func() iotago.API,
+	decayProvider *iotago.DecayProvider,
 	errorHandler func(error),
 ) *Ledger {
 	return &Ledger{
 		apiProvider:      apiProvider,
 		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProvider()),
-		rewardsManager:   rewards.New(rewardsStore),
+		rewardsManager:   rewards.New(rewardsStore, poolStatsStore, performanceFactorsFunc, apiProvider().TimeProvider(), decayProvider),
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
 		errorHandler:     errorHandler,
@@ -351,7 +357,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		}).Slice()
 
 		if createdOutput.Output().FeatureSet().Staking() != nil {
-			//staking feature is created or updated - create the diff between the account data and new account
+			// staking feature is created or updated - create the diff between the account data and new account
 			accountDiff.ValidatorStakeChange = int64(accountData.ValidatorStake) - int64(createdOutput.Output().FeatureSet().Staking().StakedAmount)
 			accountDiff.PreviousStakeEndEpoch = accountData.StakeEndEpoch
 			accountDiff.NewStakeEndEpoch = iotago.EpochIndex(createdOutput.Output().FeatureSet().Staking().EndEpoch)

@@ -26,10 +26,18 @@ type Manager struct {
 
 	timeProvider *iotago.TimeProvider
 
+	decayProvider *iotago.DecayProvider
+
 	mutex sync.RWMutex
 }
 
-func New(rewardsBaseStore, poolStatsStore kvstore.KVStore, performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors, timeProvider *iotago.TimeProvider) *Manager {
+func New(
+	rewardsBaseStore,
+	poolStatsStore kvstore.KVStore,
+	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
+	timeProvider *iotago.TimeProvider,
+	decayProvider *iotago.DecayProvider,
+) *Manager {
 	return &Manager{
 		rewardBaseStore:         rewardsBaseStore,
 		poolStatsStore:          poolStatsStore,
@@ -59,6 +67,7 @@ func (m *Manager) BlockAccepted(block *blocks.Block) {
 	if err != nil {
 		panic(err)
 	}
+
 	performanceFactors.Store(block.Block().IssuerID, pf+1)
 }
 
@@ -125,6 +134,72 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 	}
 
 	return nil
+}
+
+func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount int64, epochStart, epochEnd iotago.EpochIndex) (validatorReward uint64, err error) {
+	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
+		rewardsForAccountInEpoch, exists := m.rewardsForAccount(validatorID, epochIndex)
+		if !exists {
+			continue
+		}
+
+		poolStats, err := m.poolStats(epochIndex)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
+		}
+
+		unDecayedEpochRewards := rewardsForAccountInEpoch.FixedCost +
+			((poolStats.ProfitMargin * rewardsForAccountInEpoch.PoolRewards) >> 8) +
+			((((1<<8)-poolStats.ProfitMargin)*rewardsForAccountInEpoch.PoolRewards)>>8)*
+				uint64(stakeAmount)/
+				rewardsForAccountInEpoch.PoolStake
+
+		decayedEpochRewards := m.decayProvider.Decay(unDecayedEpochRewards, epochIndex, epochEnd)
+		validatorReward += decayedEpochRewards
+	}
+
+	return validatorReward, nil
+}
+
+func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount int64, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward uint64, err error) {
+	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
+		rewardsForAccountInEpoch, exists := m.rewardsForAccount(validatorID, epochIndex)
+		if !exists {
+			continue
+		}
+
+		poolStats, err := m.poolStats(epochIndex)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
+		}
+
+		unDecayedEpochRewards := ((((1 << 8) - poolStats.ProfitMargin) * rewardsForAccountInEpoch.PoolRewards) >> 8) *
+			uint64(delegatedAmount) /
+			rewardsForAccountInEpoch.PoolStake
+
+		decayedEpochRewards := m.decayProvider.Decay(unDecayedEpochRewards, epochIndex, epochEnd)
+		delegatorsReward += decayedEpochRewards
+	}
+
+	return delegatorsReward, nil
+}
+
+func (m *Manager) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *RewardsForAccount, exists bool) {
+	return ads.NewMap[iotago.AccountID, RewardsForAccount](m.rewardsStorage(epochIndex)).Get(accountID)
+}
+
+func (m *Manager) poolStats(epochIndex iotago.EpochIndex) (poolStats *PoolsStats, err error) {
+	poolStats = new(PoolsStats)
+	poolStatsBytes, err := m.poolStatsStore.Get(epochIndex.Bytes())
+	if err != nil {
+		return poolStats, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
+	}
+
+	if _, err := poolStats.FromBytes(poolStatsBytes); err != nil {
+		return poolStats, errors.Wrapf(err, "failed to parse pool stats for epoch %d", epochIndex)
+	}
+
+	return poolStats, nil
 }
 
 func aggregatePerformanceFactors(pfs []uint64) uint64 {

@@ -64,7 +64,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t := &TestFramework{
 		test:                test,
 		api:                 api,
-		slotTimeProvider:    api.SlotTimeProvider(),
+		slotTimeProvider:    api.TimeProvider(),
 		bucketedStorage:     shrinkingmap.New[iotago.SlotIndex, kvstore.KVStore](),
 		attestationsByAlias: shrinkingmap.New[string, *iotago.Attestation](),
 		issuerByAlias:       shrinkingmap.New[string, *issuer](),

@@ -100,7 +100,7 @@ func (s *Settings) LatestCommitment() *model.Commitment {
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 
-		if s.api.SlotTimeProvider().SlotDuration() == 0 {
+		if s.api.TimeProvider().SlotDuration() == 0 {
 			panic("accessing the LatestCommitment before the settings are initialized")
 		}
 		s.latestCommitment = lo.PanicOnErr(model.CommitmentFromCommitment(s.settingsModel.LatestCommitment, s.api))

@@ -64,7 +64,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		return prunable.NewRootBlocks(index, mapdb.NewMapDB())
 	})
 
-	t.blockCache = blocks.New(evictionState, t.api.SlotTimeProvider)
+	t.blockCache = blocks.New(evictionState, t.api.TimeProvider)
 	instance := thresholdblockgadget.New(t.blockCache, t.SybilProtection)
 	t.Events = instance.Events()
 	t.Instance = instance

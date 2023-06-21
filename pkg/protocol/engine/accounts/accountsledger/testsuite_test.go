@@ -174,7 +174,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 
 func (t *TestSuite) createBlockWithBurn(accountID iotago.AccountID, index iotago.SlotIndex, burn uint64) *blocks.Block {
 	innerBlock := tpkg.RandBlockWithIssuerAndBurnedMana(accountID, burn)
-	innerBlock.IssuingTime = t.API().SlotTimeProvider().SlotStartTime(index)
+	innerBlock.IssuingTime = t.API().TimeProvider().SlotStartTime(index)
 	modelBlock, err := model.BlockFromBlock(innerBlock, t.API())
 
 	require.NoError(t.T, err)
