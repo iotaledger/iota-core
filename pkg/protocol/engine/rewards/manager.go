@@ -75,11 +75,11 @@ func (m *Manager) BlockAccepted(block *blocks.Block) {
 	}
 }
 
-func (m *Manager) EvictPerformanceFactorUntil(startSlot, endSlot iotago.SlotIndex) {
+func (m *Manager) evictPerformanceFactors(startSlot, endSlot iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	for index := startSlot; index < endSlot; index++ {
+	for index := startSlot; index <= endSlot; index++ {
 		m.performanceFactorsCache.Delete(index)
 	}
 }
@@ -142,7 +142,7 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 			FixedCost:   pool.FixedCost,
 		})
 	}
-	m.EvictPerformanceFactorUntil(epochSlotStart, epochSlotEnd)
+	m.evictPerformanceFactors(epochSlotStart, epochSlotEnd)
 
 	return nil
 }
