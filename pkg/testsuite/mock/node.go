@@ -11,13 +11,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/blockissuer"
+	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -41,10 +42,10 @@ type Node struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	blockIssuer *blockissuer.BlockIssuer
+	blockIssuer *blockfactory.BlockIssuer
 
 	privateKey ed25519.PrivateKey
-	pubKey     ed25519.PublicKey
+	PubKey     ed25519.PublicKey
 	AccountID  iotago.AccountID
 	PeerID     network.PeerID
 
@@ -67,8 +68,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		panic(err)
 	}
 
-	accountID := iotago.AccountID(*iotago.Ed25519AddressFromPubKey(pub))
-	accountID.RegisterAlias(name)
+	accountID := iotago.AccountID(blake2b.Sum256(iotago.Ed25519AddressFromPubKey(pub)[:]))
 
 	peerID := network.PeerID(pub)
 	identity.RegisterIDAlias(peerID, name)
@@ -78,7 +78,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 		Name:       name,
 		Validator:  validator,
-		pubKey:     pub,
+		PubKey:     pub,
 		privateKey: priv,
 		AccountID:  accountID,
 		PeerID:     peerID,
@@ -91,6 +91,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 }
 
 func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
+	time.Sleep(1 * time.Second)
 	n.Protocol = protocol.New(n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
@@ -98,7 +99,7 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 
 	n.hookEvents()
 
-	n.blockIssuer = blockissuer.New(n.Protocol, blockissuer.NewEd25519Account(n.AccountID, n.privateKey), blockissuer.WithTipSelectionTimeout(3*time.Second), blockissuer.WithTipSelectionRetryInterval(time.Millisecond*100))
+	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
 	n.ctx, n.ctxCancel = context.WithCancel(context.Background())
 
@@ -368,11 +369,18 @@ func (n *Node) Wait() {
 func (n *Node) Shutdown() {
 	stopped := make(chan struct{}, 1)
 
-	n.Protocol.Events.Stopped.Hook(func() {
+	if n.Protocol != nil {
+		n.Protocol.Events.Stopped.Hook(func() {
+			close(stopped)
+		})
+	} else {
 		close(stopped)
-	})
+	}
 
-	n.ctxCancel()
+	if n.ctxCancel != nil {
+		n.ctxCancel()
+	}
+
 	n.Workers.Shutdown()
 
 	<-stopped
@@ -380,12 +388,11 @@ func (n *Node) Shutdown() {
 
 func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.AccountID = otherNode.AccountID
-	n.pubKey = otherNode.pubKey
+	n.PubKey = otherNode.PubKey
 	n.privateKey = otherNode.privateKey
-	n.AccountID.RegisterAlias(n.Name)
 }
 
-func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	modelBlock, err := n.blockIssuer.CreateBlock(ctx, opts...)
 	require.NoError(n.Testing, err)
 
@@ -394,7 +401,7 @@ func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Op
 	return blocks.NewBlock(modelBlock)
 }
 
-func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	block := n.CreateBlock(ctx, alias, opts...)
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
@@ -419,7 +426,7 @@ func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {
 
 			blockAlias := fmt.Sprintf("%s-activity.%d", n.Name, counter)
 			n.IssueBlock(ctx, blockAlias,
-				blockissuer.WithPayload(
+				blockfactory.WithPayload(
 					&iotago.TaggedData{
 						Tag: []byte(blockAlias),
 					},

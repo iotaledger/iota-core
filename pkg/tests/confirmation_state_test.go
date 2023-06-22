@@ -104,6 +104,7 @@ func TestConfirmationFlags(t *testing.T) {
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
 		)
 	}
 
@@ -122,6 +123,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(2),
+			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(4, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{
 				0, //nodeA
@@ -158,6 +160,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(2),
+			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(5, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{
 				0, //nodeA
@@ -188,6 +191,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(3),
+			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithEvictedSlot(3),
 		)
 	}
@@ -212,6 +216,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(1),
 			testsuite.WithLatestCommitmentSlotIndex(3),
+			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithSybilProtectionCommittee(6, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{
 				0, //nodeA,

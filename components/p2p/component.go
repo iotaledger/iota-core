@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/libp2p/go-libp2p"
+	golibp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/pkg/errors"
@@ -83,10 +83,10 @@ func provide(c *dig.Container) error {
 		if err != nil {
 			Component.LogFatalfAndExit("Could not build libp2p identity from local peer: %s", err)
 		}
-		libp2pHost, err := libp2p.New(
-			libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/%s/tcp/%d", localAddr.IP, localAddr.Port)),
+		libp2pHost, err := golibp2p.New(
+			golibp2p.ListenAddrStrings(fmt.Sprintf("/ip4/%s/tcp/%d", localAddr.IP, localAddr.Port)),
 			libp2pIdentity,
-			libp2p.NATPortMap(),
+			golibp2p.NATPortMap(),
 		)
 		if err != nil {
 			Component.LogFatalfAndExit("Couldn't create libp2p host: %s", err)
