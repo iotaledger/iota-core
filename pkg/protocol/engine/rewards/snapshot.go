@@ -29,7 +29,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 		if targetEpoch == 1 {
 			targetEpoch = 0
 		} else {
-			targetEpoch -= 1
+			targetEpoch--
 		}
 	}
 	positionedWriter := utils.NewPositionedWriter(writer)
@@ -48,6 +48,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 	if err != nil {
 		return errors.Wrap(err, "unable to export pool stats")
 	}
+
 	return nil
 }
 
@@ -83,6 +84,7 @@ func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, targe
 				return errors.Wrap(err, "unable to write performance factor")
 			}
 			accountsCount++
+
 			return nil
 		})
 		if innerErr != nil {
@@ -94,6 +96,7 @@ func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, targe
 		}
 
 		slotCount++
+
 		return true
 	})
 	if innerErr != nil {
@@ -102,6 +105,7 @@ func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, targe
 	if err := pWriter.WriteValueAtBookmark("pf slot count", slotCount); err != nil {
 		return errors.Wrap(err, "unable to write accounts count")
 	}
+
 	return nil
 }
 

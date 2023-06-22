@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 )
 
-// Pool represents all the data we need for a given validator and epoch to calculate its rewards data
+// Pool represents all the data we need for a given validator and epoch to calculate its rewards data.
 type Pool struct {
 	// Total stake of the pool, including delegators
 	PoolStake uint64
@@ -15,7 +15,7 @@ type Pool struct {
 	FixedCost      uint64
 }
 
-// PoolsStats contains stats about the pools from all the validators for an epoch
+// PoolsStats contains stats about the pools from all the validators for an epoch.
 type PoolsStats struct {
 	TotalStake          uint64
 	TotalValidatorStake uint64

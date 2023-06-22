@@ -69,7 +69,10 @@ func (m *Manager) BlockAccepted(block *blocks.Block) {
 		panic(err)
 	}
 
-	performanceFactors.Store(block.Block().IssuerID, pf+1)
+	err = performanceFactors.Store(block.Block().IssuerID, pf+1)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (m *Manager) EvictPerformanceFactorUntil(startSlot, endSlot iotago.SlotIndex) {
@@ -215,6 +218,7 @@ func aggregatePerformanceFactors(pfs []uint64) uint64 {
 	for _, pf := range pfs {
 		sum += pf
 	}
+
 	return sum / uint64(len(pfs))
 }
 
