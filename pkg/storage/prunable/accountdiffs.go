@@ -36,10 +36,10 @@ type AccountDiff struct {
 	PubKeysAdded   []ed25519.PublicKey
 	PubKeysRemoved []ed25519.PublicKey
 
-	ValidatorStakeChange  int64
+	ValidatorStakeChange int64
+	StakeEndEpochChange  int64
+
 	DelegationStakeChange int64
-	NewStakeEndEpoch      iotago.EpochIndex
-	PreviousStakeEndEpoch iotago.EpochIndex
 }
 
 // NewAccountDiff creates a new AccountDiff instance.
@@ -53,8 +53,7 @@ func NewAccountDiff() *AccountDiff {
 		PubKeysRemoved:        make([]ed25519.PublicKey, 0),
 		ValidatorStakeChange:  0,
 		DelegationStakeChange: 0,
-		NewStakeEndEpoch:      0,
-		PreviousStakeEndEpoch: 0,
+		StakeEndEpochChange:   0,
 	}
 }
 
@@ -76,8 +75,7 @@ func (d AccountDiff) Bytes() ([]byte, error) {
 
 	m.WriteInt64(d.ValidatorStakeChange)
 	m.WriteInt64(d.DelegationStakeChange)
-	m.WriteUint64(uint64(d.NewStakeEndEpoch))
-	m.WriteUint64(uint64(d.PreviousStakeEndEpoch))
+	m.WriteUint64(uint64(d.StakeEndEpochChange))
 
 	return m.Bytes(), nil
 }
@@ -92,8 +90,7 @@ func (d *AccountDiff) Clone() *AccountDiff {
 		PubKeysRemoved:        lo.CopySlice(d.PubKeysRemoved),
 		ValidatorStakeChange:  d.ValidatorStakeChange,
 		DelegationStakeChange: d.DelegationStakeChange,
-		NewStakeEndEpoch:      d.NewStakeEndEpoch,
-		PreviousStakeEndEpoch: d.PreviousStakeEndEpoch,
+		StakeEndEpochChange:   d.StakeEndEpochChange,
 	}
 }
 
@@ -150,13 +147,8 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 	}
 	offset += 8
 
-	if err = binary.Read(reader, binary.LittleEndian, &d.NewStakeEndEpoch); err != nil {
+	if err = binary.Read(reader, binary.LittleEndian, &d.StakeEndEpochChange); err != nil {
 		return offset, errors.Wrapf(err, "unable to read new stake end epoch in the diff")
-	}
-	offset += 8
-
-	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousStakeEndEpoch); err != nil {
-		return offset, errors.Wrapf(err, "unable to read previous stake end epoch in the diff")
 	}
 	offset += 8
 

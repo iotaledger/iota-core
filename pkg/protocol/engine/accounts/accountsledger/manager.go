@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -127,11 +128,13 @@ func (m *Manager) ApplyDiff(
 	}
 
 	// load blocks burned in this slot
+	/// MOVE THIS TO UPDATE SLOT DIFF
 	burns, err := m.computeBlockBurnsForSlot(slotIndex)
 	if err != nil {
 		return errors.Wrap(err, "could not create block burns for slot")
 	}
 	m.updateSlotDiffWithBurns(burns, accountDiffs)
+
 	// store the diff and apply it to the account vector tree, obtaining the new root
 	if err = m.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
 		return errors.Wrap(err, "could not apply diff to account tree")
@@ -194,11 +197,22 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 		return errors.Errorf("can't add account, output is not an account output")
 	}
 
+	var stakingOpts []options.Option[accounts.AccountData]
+	if stakingFeature := accountOutput.FeatureSet().Staking(); stakingFeature != nil {
+		stakingOpts = append(stakingOpts,
+			accounts.WithValidatorStake(stakingFeature.StakedAmount),
+			accounts.WithStakeEndEpoch(iotago.EpochIndex(stakingFeature.EndEpoch)),
+		)
+	}
+
 	accountData := accounts.NewAccountData(
 		accountOutput.AccountID,
-		accounts.WithCredits(accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), m.latestCommittedSlot)),
-		accounts.WithOutputID(output.OutputID()),
-		accounts.WithPubKeys(ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...),
+		append(
+			stakingOpts,
+			accounts.WithCredits(accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), m.latestCommittedSlot)),
+			accounts.WithOutputID(output.OutputID()),
+			accounts.WithPubKeys(ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...),
+		)...,
 	)
 
 	m.accountsTree.Set(accountOutput.AccountID, accountData)
@@ -238,8 +252,9 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		accountData.AddPublicKeys(diffChange.PubKeysRemoved...)
 		accountData.RemovePublicKeys(diffChange.PubKeysAdded...)
 
-		accountData.StakeEndEpoch = diffChange.PreviousStakeEndEpoch
+		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) - diffChange.StakeEndEpochChange)
 		accountData.ValidatorStake = uint64(int64(accountData.ValidatorStake) - diffChange.ValidatorStakeChange)
+
 		accountData.DelegationStake = uint64(int64(accountData.DelegationStake) - diffChange.DelegationStakeChange)
 
 		// collected to see if an account was destroyed between slotIndex and b.latestCommittedSlot index.
@@ -267,7 +282,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prun
 
 	slotDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
 	slotDiff.DelegationStakeChange = -int64(accountData.DelegationStake)
-	slotDiff.PreviousStakeEndEpoch = accountData.StakeEndEpoch
+	slotDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
 
 	return slotDiff
 }
@@ -294,6 +309,7 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 	for accountID, accountDiff := range accountDiffs {
 		destroyed := destroyedAccounts.Has(accountID)
 		if destroyed {
+			// TODO: should this diff be done in the same place as other diffs? it feels kind of out of place here
 			accountDiff = m.preserveDestroyedAccountData(accountID)
 		}
 		err := diffStore.Store(accountID, *accountDiff, destroyed)
@@ -310,7 +326,7 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]) {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
-		// remove destroyed account, no need to update with diffs
+		// remove a destroyed account, no need to update with diffs
 		if destroyedAccounts.Has(accountID) {
 			m.accountsTree.Delete(accountID)
 			continue
@@ -320,7 +336,13 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		if !exists {
 			accountData = accounts.NewAccountData(accountID)
 		}
-		accountData.Credits.Update(diffChange.BICChange, index)
+
+		if diffChange.BICChange != 0 || !exists {
+			//TODO: this needs to be decayed for (index - prevIndex) because update index is changed so it's impossible to use new decay
+			////
+			accountData.Credits.Update(diffChange.BICChange, index)
+		}
+
 		// update the outputID only if the account got actually transitioned, not if it was only an allotment target
 		if diffChange.NewOutputID != iotago.EmptyOutputID {
 			accountData.OutputID = diffChange.NewOutputID
@@ -328,6 +350,11 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 
 		accountData.AddPublicKeys(diffChange.PubKeysAdded...)
 		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
+
+		accountData.ValidatorStake = uint64(int64(accountData.ValidatorStake) + diffChange.ValidatorStakeChange)
+		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) + diffChange.StakeEndEpochChange)
+		accountData.DelegationStake = uint64(int64(accountData.DelegationStake) + diffChange.DelegationStakeChange)
+
 		m.accountsTree.Set(accountID, accountData)
 	}
 }

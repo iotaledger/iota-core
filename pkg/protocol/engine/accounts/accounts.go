@@ -130,17 +130,17 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	}
 	a.PubKeys = advancedset.New(pubKeys...)
 
-	if err := binary.Read(reader, binary.LittleEndian, &a.ValidatorStake); err != nil {
+	if err := binary.Read(reader, binary.LittleEndian, &(a.ValidatorStake)); err != nil {
 		return bytesConsumed, errors.Wrap(err, "unable to read updatedTime for Account balance")
 	}
 	bytesConsumed += 8
 
-	if err := binary.Read(reader, binary.LittleEndian, &a.DelegationStake); err != nil {
+	if err := binary.Read(reader, binary.LittleEndian, &(a.DelegationStake)); err != nil {
 		return bytesConsumed, errors.Wrap(err, "unable to read delegationStake")
 	}
 	bytesConsumed += 8
 
-	if err := binary.Read(reader, binary.LittleEndian, &a.StakeEndEpoch); err != nil {
+	if err := binary.Read(reader, binary.LittleEndian, &(a.StakeEndEpoch)); err != nil {
 		return bytesConsumed, errors.Wrap(err, "unable to read stake end epoch")
 	}
 	bytesConsumed += 8
