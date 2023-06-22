@@ -19,6 +19,7 @@ var (
 	ErrBlockTimeTooFarAheadInFuture = errors.New("a block cannot be too far ahead in the future")
 	ErrInvalidSignature             = errors.New("block has invalid signature")
 	ErrInvalidProofOfWork           = errors.New("error validating PoW")
+	ErrInvalidBlockVersion          = errors.New("block has invalid protocol version")
 )
 
 // Filter filters blocks.
@@ -66,11 +67,12 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 	protocolParams := f.protocolParamsFunc()
 
-	protocolVersionForSlot := protocolParams.ProtocolVersions.VersionBySlotIndex(block.ID().Index())
-	if protocolVersionForSlot != block.Block().ProtocolVersion {
+	blockEpoch := protocolParams.TimeProvider().EpochsFromSlot(block.ID().Index())
+	protocolVersionForEpoch := protocolParams.ProtocolVersions.VersionByEpoch(blockEpoch)
+	if protocolVersionForEpoch != block.Block().ProtocolVersion {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(ErrInvalidProofOfWork, "invalid protocol version %d (expected %d) for slot %d", block.Block().ProtocolVersion, protocolVersionForSlot, block.ID().Index()),
+			Reason: errors.Wrapf(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.Block().ProtocolVersion, protocolVersionForEpoch, blockEpoch),
 			Source: source,
 		})
 
