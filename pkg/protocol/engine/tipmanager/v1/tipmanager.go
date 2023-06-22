@@ -130,15 +130,17 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 
 // forEachParentByType iterates through the parents of the given block and calls the consumer for each parent.
 func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(parentType model.ParentsType, parentMetadata *TipMetadata)) {
-	if block != nil && block.Block() != nil {
-		for _, parent := range block.ParentsWithType() {
-			if metadataStorage := t.metadataStorage(parent.ID.Index()); metadataStorage != nil {
-				if parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) }); parentMetadata.Block() != nil {
-					consumer(parent.Type, parentMetadata)
+	if block == nil || block.Block() == nil {
+		return
+	}
 
-					if created {
-						t.setupBlockMetadata(parentMetadata)
-					}
+	for _, parent := range block.ParentsWithType() {
+		if metadataStorage := t.metadataStorage(parent.ID.Index()); metadataStorage != nil {
+			if parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) }); parentMetadata.Block() != nil {
+				consumer(parent.Type, parentMetadata)
+
+				if created {
+					t.setupBlockMetadata(parentMetadata)
 				}
 			}
 		}

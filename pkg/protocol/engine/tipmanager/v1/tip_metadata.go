@@ -37,10 +37,12 @@ type TipMetadata struct {
 	// connectedWeakChildren holds the number of weak children that are connected to the tips.
 	connectedWeakChildren *lpromise.Value[int]
 
-	// isStronglyReferencedByOtherTips is true if the block has at least one strongly connected child.
+	// isStronglyReferencedByOtherTips is true if the block has at least one strong child that is strongly connected
+	// to the tips.
 	isStronglyReferencedByOtherTips *lpromise.Value[bool]
 
-	// isReferencedByOtherTips is true if the block has at least one strongly or weakly connected child.
+	// isReferencedByOtherTips is true if the block is strongly referenced by other tips or has at least one weak child
+	// that is connected to the tips.
 	isReferencedByOtherTips *lpromise.Value[bool]
 
 	// isStrongTip is true if the block is a strong tip pool member and is not strongly referenced by other tips.

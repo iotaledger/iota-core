@@ -16,7 +16,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// TipSelection is a component that is used to abstract away the tip selection strategy, used to issuing new blocks.
+// TipSelection is a component that is used to abstract away the tip selection strategy, used to issue new blocks.
 type TipSelection struct {
 	// rootBlocks is a function that returns the current root blocks.
 	rootBlocks func() iotago.BlockIDs
