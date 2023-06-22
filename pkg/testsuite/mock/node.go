@@ -91,7 +91,6 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 }
 
 func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
-	time.Sleep(1 * time.Second)
 	n.Protocol = protocol.New(n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
