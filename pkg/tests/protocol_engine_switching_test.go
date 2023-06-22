@@ -213,7 +213,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.AssertBlocksInCachePreConfirmed(ts.Blocks("P1.G8"), false, nodesP1...)
 
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.G1"), true, nodesP1...)
-			ts.AssertBlocksInCacheConfirmed(ts.Blocks("P1.E5"), true, nodesP1...)
+			ts.AssertBlocksInCacheConfirmed(ts.BlocksWithPrefix("P1.F"), true, nodesP1...)
 
 			// Verify that nodes have the expected states.
 			ts.AssertNodeState(nodesP1,
