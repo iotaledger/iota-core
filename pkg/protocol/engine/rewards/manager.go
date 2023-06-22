@@ -72,11 +72,13 @@ func (m *Manager) BlockAccepted(block *blocks.Block) {
 	performanceFactors.Store(block.Block().IssuerID, pf+1)
 }
 
-func (m *Manager) Evict(slot iotago.SlotIndex) {
+func (m *Manager) EvictPerformanceFactorUntil(startSlot, endSlot iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	m.performanceFactorsCache.Delete(slot)
+	for index := startSlot; index < endSlot; index++ {
+		m.performanceFactorsCache.Delete(index)
+	}
 }
 
 func (m *Manager) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
@@ -128,6 +130,7 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 			}
 
 			intermediateFactors = append(intermediateFactors, pf)
+
 		}
 
 		rewardsTree.Set(accountID, &RewardsForAccount{
@@ -136,6 +139,7 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 			FixedCost:   pool.FixedCost,
 		})
 	}
+	m.EvictPerformanceFactorUntil(epochSlotStart, epochSlotEnd)
 
 	return nil
 }

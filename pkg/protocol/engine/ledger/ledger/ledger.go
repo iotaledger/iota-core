@@ -78,7 +78,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVotePower](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
-			e.EvictionState.Events.SlotEvicted.Hook(l.rewardsManager.Evict)
 
 			wpAccounts := e.Workers.CreateGroup("Accounts").CreatePool("trackBurnt", 1)
 			e.Events.BlockGadget.BlockAccepted.Hook(l.accountsLedger.TrackBlock, event.WithWorkerPool(wpAccounts))
