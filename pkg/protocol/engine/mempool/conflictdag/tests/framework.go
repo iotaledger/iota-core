@@ -82,6 +82,7 @@ func (f *Framework) CastVotes(nodeAlias string, votePower int, conflictAliases .
 	if !exists {
 		return fmt.Errorf("node with alias '%s' does not have a seat in the committee", nodeAlias)
 	}
+
 	return f.Instance.CastVotes(vote.NewVote[vote.MockedPower](seat, vote.MockedPower(votePower)), f.ConflictIDs(conflictAliases...))
 }
 

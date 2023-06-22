@@ -90,7 +90,7 @@ func (s *SybilProtection) Accounts() *account.Accounts[iotago.AccountID, *iotago
 }
 
 // Committee returns the set of validators selected to be part of the committee.
-func (s *SybilProtection) Committee(index iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID] {
+func (s *SybilProtection) Committee(_ iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID] {
 	//Note: we have PoA so our committee do not rotate right now
 	return s.committee
 }

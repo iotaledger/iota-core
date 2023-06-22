@@ -29,6 +29,7 @@ func NewManualPOA() *ManualPOA {
 		aliases:  shrinkingmap.New[string, iotago.AccountID](),
 	}
 	m.committee = m.accounts.SelectAccounts()
+
 	return m
 }
 

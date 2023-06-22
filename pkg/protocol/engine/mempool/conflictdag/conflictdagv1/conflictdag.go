@@ -246,7 +246,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) AllConflictsSupported(s
 	return lo.Return1(c.conflicts(conflictIDs, true)).ForEach(func(conflict *Conflict[ConflictID, ResourceID, VotePower]) (err error) {
 		lastVote, exists := conflict.LatestVotes.Get(seat)
 
-		return lo.Cond(exists && lastVote.IsLiked(), nil, xerrors.Errorf("conflict with %s is not supported by %s", conflict.ID, seat))
+		return lo.Cond(exists && lastVote.IsLiked(), nil, xerrors.Errorf("conflict with %s is not supported by seat %d", conflict.ID, seat))
 	}) == nil
 }
 
