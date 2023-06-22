@@ -393,7 +393,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		// Change and PreviousUpdatedTime are either 0 if we did not have an allotment for this account, or we already
 		// have some values from the allotment, so no need to set them explicitly.
 		accountDiff.NewOutputID = createdOutput.OutputID()
-		accountDiff.PreviousOutputID = iotago.OutputID{}
+		accountDiff.PreviousOutputID = iotago.EmptyOutputID
 		accountDiff.PubKeysAdded = lo.Map(createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
 
 		if createdOutput.Output().FeatureSet().Staking() != nil {

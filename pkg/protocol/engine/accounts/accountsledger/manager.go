@@ -260,7 +260,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prun
 	// we store the accountState in the form of a diff, so we can roll back to the previous state
 	slotDiff := prunable.NewAccountDiff()
 	slotDiff.BICChange = -accountData.Credits.Value
-	slotDiff.NewOutputID = iotago.OutputID{}
+	slotDiff.NewOutputID = iotago.EmptyOutputID
 	slotDiff.PreviousOutputID = accountData.OutputID
 	slotDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
 	slotDiff.PubKeysRemoved = accountData.PubKeys.Slice()
