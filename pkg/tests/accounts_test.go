@@ -74,7 +74,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 		ts.AssertAccountData(&accounts.AccountData{
 			ID:       genesisAccountOutput.AccountID,
-			Credits:  accounts.NewBlockIssuanceCredits(int64(testsuite.MinIssuerAccountDeposit), 1),
+			Credits:  accounts.NewBlockIssuanceCredits(int64(testsuite.MinIssuerAccountDeposit), 0),
 			OutputID: iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
 			PubKeys:  advancedset.New(ed25519.PublicKey(oldKey), newKey),
 		}, node1)

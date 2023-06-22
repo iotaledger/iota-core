@@ -78,7 +78,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVotePower](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
-			e.EvictionState.Events.SlotEvicted.Hook(l.rewardsManager.Evict)
 
 			wpAccounts := e.Workers.CreateGroup("Accounts").CreatePool("trackBurnt", 1)
 			e.Events.BlockGadget.BlockAccepted.Hook(l.accountsLedger.TrackBlock, event.WithWorkerPool(wpAccounts))
@@ -343,6 +342,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		// have some values from the allotment, so no need to set them explicitly.
 		createdOutput, accountTransitioned := createdAccounts[consumedAccountID]
 		if !accountTransitioned {
+			// case 1.
 			continue
 		}
 		accountDiff.NewOutputID = createdOutput.OutputID()
@@ -366,14 +366,12 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 
 		if createdOutput.Output().FeatureSet().Staking() != nil {
 			// staking feature is created or updated - create the diff between the account data and new account
-			accountDiff.ValidatorStakeChange = int64(accountData.ValidatorStake) - int64(createdOutput.Output().FeatureSet().Staking().StakedAmount)
-			accountDiff.PreviousStakeEndEpoch = accountData.StakeEndEpoch
-			accountDiff.NewStakeEndEpoch = iotago.EpochIndex(createdOutput.Output().FeatureSet().Staking().EndEpoch)
+			accountDiff.ValidatorStakeChange = int64(createdOutput.Output().FeatureSet().Staking().StakedAmount) - int64(accountData.ValidatorStake)
+			accountDiff.StakeEndEpochChange = int64(createdOutput.Output().FeatureSet().Staking().EndEpoch) - int64(accountData.StakeEndEpoch)
 		} else if consumedOutput.Output().FeatureSet().Staking() != nil {
 			// staking feature was removed from an account
 			accountDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
-			accountDiff.PreviousStakeEndEpoch = accountData.StakeEndEpoch
-			accountDiff.NewStakeEndEpoch = 0
+			accountDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
 		}
 	}
 
@@ -397,8 +395,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.PubKeysAdded = lo.Map(createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
 
 		if createdOutput.Output().FeatureSet().Staking() != nil {
-			accountDiff.PreviousStakeEndEpoch = 0
-			accountDiff.NewStakeEndEpoch = iotago.EpochIndex(createdOutput.Output().FeatureSet().Staking().EndEpoch)
+			accountDiff.StakeEndEpochChange = int64(createdOutput.Output().FeatureSet().Staking().EndEpoch)
 			accountDiff.ValidatorStakeChange = int64(createdOutput.Output().FeatureSet().Staking().StakedAmount)
 		}
 	}

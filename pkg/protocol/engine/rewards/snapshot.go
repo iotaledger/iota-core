@@ -6,6 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -13,10 +16,115 @@ import (
 func (m *Manager) Import(reader io.ReadSeeker) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	// TODO: implement this
+
+	err := m.importPerformanceFactor(reader)
+	if err != nil {
+		return errors.Wrap(err, "unable to import performance factor")
+	}
+
+	err = m.importPoolRewards(reader)
+	if err != nil {
+		return errors.Wrap(err, "unable to import pool rewards")
+	}
+
+	err = m.importPoolsStats(reader)
+	if err != nil {
+		return errors.Wrap(err, "unable to import pool stats")
+	}
 
 	return nil
 
+}
+
+func (m *Manager) importPerformanceFactor(reader io.ReadSeeker) error {
+	var slotCount uint64
+	if err := binary.Read(reader, binary.LittleEndian, &slotCount); err != nil {
+		return errors.Wrap(err, "unable to read slot count")
+	}
+	for i := uint64(0); i < slotCount; i++ {
+		var slotIndex iotago.SlotIndex
+		if err := binary.Read(reader, binary.LittleEndian, &slotIndex); err != nil {
+			return errors.Wrap(err, "unable to read slot index")
+		}
+		var accountsCount uint64
+		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
+			return errors.Wrap(err, "unable to read accounts count")
+		}
+		performanceFactors, _ := m.performanceFactorsCache.GetOrCreate(slotIndex, func() *prunable.PerformanceFactors {
+			return m.performanceFactorsFunc(slotIndex)
+		})
+		for j := uint64(0); j < accountsCount; j++ {
+			var accountID iotago.AccountID
+			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
+				return errors.Wrap(err, "unable to read account id")
+			}
+			var performanceFactor uint64
+			if err := binary.Read(reader, binary.LittleEndian, &performanceFactor); err != nil {
+				return errors.Wrap(err, "unable to read performance factor")
+			}
+			err := performanceFactors.Store(accountID, performanceFactor)
+			if err != nil {
+				return errors.Wrap(err, "unable to store performance factor")
+			}
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) importPoolRewards(reader io.ReadSeeker) error {
+	var epochCount uint64
+	if err := binary.Read(reader, binary.LittleEndian, &epochCount); err != nil {
+		return errors.Wrap(err, "unable to read epoch count")
+	}
+	for i := uint64(0); i < epochCount; i++ {
+		var epochIndex iotago.EpochIndex
+		if err := binary.Read(reader, binary.LittleEndian, &epochIndex); err != nil {
+			return errors.Wrap(err, "unable to read epoch index")
+		}
+		rewardsTree := ads.NewMap[iotago.AccountID, RewardsForAccount](m.rewardsStorage(epochIndex))
+		var accountsCount uint64
+		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
+			return errors.Wrap(err, "unable to read accounts count")
+		}
+		for j := uint64(0); j < accountsCount; j++ {
+			var accountID iotago.AccountID
+			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
+				return errors.Wrap(err, "unable to read account id")
+			}
+			var reward RewardsForAccount
+			if err := binary.Read(reader, binary.LittleEndian, &reward); err != nil {
+				return errors.Wrap(err, "unable to read reward")
+			}
+			rewardsTree.Set(accountID, &reward)
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) importPoolsStats(reader io.ReadSeeker) error {
+	var epochCount uint64
+	if err := binary.Read(reader, binary.LittleEndian, &epochCount); err != nil {
+		return errors.Wrap(err, "unable to read epoch count")
+	}
+	for i := uint64(0); i < epochCount; i++ {
+		var epochIndex iotago.EpochIndex
+		if err := binary.Read(reader, binary.LittleEndian, &epochIndex); err != nil {
+			return errors.Wrap(err, "unable to read epoch index")
+		}
+
+		var poolStats PoolsStats
+		if err := binary.Read(reader, binary.LittleEndian, &poolStats); err != nil {
+			return errors.Wrap(err, "unable to read pool stats")
+		}
+		err := m.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolStats.Bytes()))
+		if err != nil {
+			return errors.Wrap(err, "unable to store pool stats")
+		}
+	}
+
+	return nil
 }
 
 func (m *Manager) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex) error {
@@ -29,13 +137,17 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 		if targetEpoch == 1 {
 			targetEpoch = 0
 		} else {
-			targetEpoch -= 1
+			targetEpoch--
 		}
 	}
 	positionedWriter := utils.NewPositionedWriter(writer)
-	// TODO export performance factor up to the epoch start
 
-	err := m.exportPoolRewards(positionedWriter, targetEpoch)
+	err := m.exportPerformanceFactor(positionedWriter, targetSlotIndex)
+	if err != nil {
+		return errors.Wrap(err, "unable to export performance factor")
+	}
+
+	err = m.exportPoolRewards(positionedWriter, targetEpoch)
 	if err != nil {
 		return errors.Wrap(err, "unable to export pool rewards")
 	}
@@ -44,6 +156,64 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 	if err != nil {
 		return errors.Wrap(err, "unable to export pool stats")
 	}
+
+	return nil
+}
+
+func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, targetSlot iotago.SlotIndex) error {
+	m.performanceFactorsMutex.RLock()
+	defer m.performanceFactorsMutex.RUnlock()
+
+	var slotCount uint64
+	if err := pWriter.WriteValue("pf slot count", slotCount, true); err != nil {
+		return errors.Wrap(err, "unable to write pf slot count")
+	}
+	var innerErr error
+	m.performanceFactorsCache.ForEach(func(slotIndex iotago.SlotIndex, pf *prunable.PerformanceFactors) bool {
+		if slotIndex > targetSlot {
+			// continue
+			return true
+		}
+		var accountsCount uint64
+		if err := pWriter.WriteValue("slot index", slotIndex); err != nil {
+			innerErr = errors.Wrap(err, "unable to write slot index")
+			return false
+		}
+		if err := pWriter.WriteValue("pf account count", accountsCount, true); err != nil {
+			innerErr = errors.Wrap(err, "unable to write pf accounts count")
+			return false
+		}
+		innerErr = pf.ForEachPerformanceFactor(func(accountID iotago.AccountID, pf uint64) error {
+			if err := pWriter.WriteValue("account id", accountID); err != nil {
+				return errors.Wrap(err, "unable to write account id")
+
+			}
+			if err := pWriter.WriteValue("performance factor", pf); err != nil {
+				return errors.Wrap(err, "unable to write performance factor")
+			}
+			accountsCount++
+
+			return nil
+		})
+		if innerErr != nil {
+			return false
+		}
+		if err := pWriter.WriteValueAtBookmark("pf account count", accountsCount); err != nil {
+			innerErr = errors.Wrap(err, "unable to write pf accounts count")
+			return false
+		}
+
+		slotCount++
+
+		return true
+	})
+	if innerErr != nil {
+		return errors.Wrap(innerErr, "unable to write performance factors")
+	}
+	if err := pWriter.WriteValueAtBookmark("pf slot count", slotCount); err != nil {
+		return errors.Wrap(err, "unable to write pf slot count")
+	}
+
 	return nil
 }
 
@@ -51,11 +221,10 @@ func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotag
 	// export all stored pools
 	// intheory we could save the epoch count only once, because stats and rewards should be the same length
 	var epochCount uint64
-	if err := pWriter.WriteValue("accounts count", epochCount, true); err != nil {
-		return errors.Wrap(err, "unable to write accounts count")
+	if err := pWriter.WriteValue("pool rewards epoch count", epochCount, true); err != nil {
+		return errors.Wrap(err, "unable to write epoch count")
 	}
 	var innerErr error
-	// TODO can I iterete over the undeneath db directly?
 	err := m.rewardBaseStore.Iterate([]byte{}, func(key []byte, value []byte) bool {
 		epochIndex := iotago.EpochIndex(binary.LittleEndian.Uint64(key))
 		if epochIndex > epoch {
@@ -67,7 +236,7 @@ func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotag
 			return false
 		}
 		if err := pWriter.WriteBytes(value); err != nil {
-			innerErr = errors.Wrap(err, "unable to write epoch index")
+			innerErr = errors.Wrap(err, "unable to write epoch pools rewards")
 			return false
 		}
 		epochCount++
@@ -76,8 +245,8 @@ func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotag
 	if err != nil {
 		return errors.Wrapf(err, "unable to iterate over reward base store: %s", innerErr)
 	}
-	if err := pWriter.WriteValueAtBookmark("accounts count", epochCount); err != nil {
-		return errors.Wrap(err, "unable to write accounts count")
+	if err = pWriter.WriteValueAtBookmark("pool rewards epoch count", epochCount); err != nil {
+		return errors.Wrap(err, "unable to write epoch count")
 	}
 	return nil
 
@@ -85,8 +254,8 @@ func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotag
 
 func (m *Manager) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
 	var epochCount uint64
-	if err := pWriter.WriteValue("accounts count", epochCount, true); err != nil {
-		return errors.Wrap(err, "unable to write accounts count")
+	if err := pWriter.WriteValue("pools stats epoch count", epochCount, true); err != nil {
+		return errors.Wrap(err, "unable to write epoch count")
 	}
 	// export all stored pools
 	var innerErr error
@@ -101,16 +270,16 @@ func (m *Manager) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 			return false
 		}
 		if err := pWriter.WriteBytes(value); err != nil {
-			err = errors.Wrap(err, "unable to write slot diffs count")
+			err = errors.Wrap(err, "unable to write pools stats")
 			return false
 		}
 		epochCount++
 		return true
 	}); err != nil {
-		return errors.Wrapf(err, "unable to iterate over slot diffs: %v", innerErr)
+		return errors.Wrapf(err, "unable to iterate over pools stats: %v", innerErr)
 	}
-	if err := pWriter.WriteValueAtBookmark("accounts count", epochCount); err != nil {
-		return errors.Wrap(err, "unable to write accounts count")
+	if err := pWriter.WriteValueAtBookmark("pools stats epoch count", epochCount); err != nil {
+		return errors.Wrap(err, "unable to write epoch count")
 	}
 	return nil
 }
