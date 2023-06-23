@@ -25,7 +25,11 @@ var Base = []options.Option[snapshotcreator.Options]{
 		TokenSupply:           1_000_0000,
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
+		EpochDurationInSlots:  8192,
 		MaxCommittableAge:     10,
+		ProtocolVersions: []iotago.ProtocolVersion{
+			{Version: 3, StartEpoch: 0},
+		},
 	}),
 	snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
 		iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
@@ -47,7 +51,11 @@ var Docker = []options.Option[snapshotcreator.Options]{
 		TokenSupply:           1_000_0000,
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
+		EpochDurationInSlots:  8192,
 		MaxCommittableAge:     10,
+		ProtocolVersions: []iotago.ProtocolVersion{
+			{Version: 3, StartEpoch: 0},
+		},
 	}),
 }
 
@@ -66,6 +74,10 @@ var Feature = []options.Option[snapshotcreator.Options]{
 		TokenSupply:           1_000_0000,
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
+		EpochDurationInSlots:  8192,
 		MaxCommittableAge:     10,
+		ProtocolVersions: []iotago.ProtocolVersion{
+			{Version: 3, StartEpoch: 0},
+		},
 	}),
 }

@@ -53,6 +53,12 @@ then
 else
   pushd ../genesis-snapshot; go run -tags=rocksdb . --config docker --seed 7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih
 fi
+
+if [ $? -ne 0 ]; then
+  echo "Creating snapshot failed. Please fix and try again!"
+  exit 1
+fi
+
 popd
 mv ../genesis-snapshot/*.snapshot .
 chmod o+r *.snapshot
