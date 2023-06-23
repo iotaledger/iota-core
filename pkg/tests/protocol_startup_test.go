@@ -20,7 +20,7 @@ import (
 )
 
 // TODO: implement a similar test, but in which one slot is skipped
-// (no committment - no account diffs, no root blocks etc. to make sure that this scenario is handled properly).
+// (no commitment - no account diffs, no root blocks etc. to make sure that this scenario is handled properly).
 func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
