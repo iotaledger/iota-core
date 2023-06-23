@@ -7,7 +7,7 @@ import (
 )
 
 // heaviestConflict returns the largest Conflict from the given Conflicts.
-func heaviestConflict[ConflictID, ResourceID conflictdag.IDType, VoterPower conflictdag.VotePowerType[VoterPower]](conflicts *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoterPower]]) *Conflict[ConflictID, ResourceID, VoterPower] {
+func heaviestConflict[ConflictID, ResourceID conflictdag.IDType, VoterPower conflictdag.VoteRankType[VoterPower]](conflicts *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoterPower]]) *Conflict[ConflictID, ResourceID, VoterPower] {
 	var result *Conflict[ConflictID, ResourceID, VoterPower]
 	conflicts.Range(func(conflict *Conflict[ConflictID, ResourceID, VoterPower]) {
 		if conflict.Compare(result) == weight.Heavier {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -25,8 +26,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 50)
-	node2 := ts.AddValidatorNode("node2", 50)
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddValidatorNode("node2")
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
@@ -58,9 +59,14 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	ts.Wait()
 
-	expectedCommittee := map[iotago.AccountID]int64{
-		node1.AccountID: 50,
-		node2.AccountID: 50,
+	expectedCommittee := []iotago.AccountID{
+		node1.AccountID,
+		node2.AccountID,
+	}
+
+	expectedOnlineCommittee := []account.SeatIndex{
+		node1.ValidatorSeat,
+		node2.ValidatorSeat,
 	}
 
 	// Verify that nodes have the expected states.
@@ -71,8 +77,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		testsuite.WithLatestFinalizedSlot(0),
 		testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
-		testsuite.WithSybilProtectionCommittee(expectedCommittee),
-		testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
+		testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -154,8 +160,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(1),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(6, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(1),
 			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*")),
@@ -193,15 +199,15 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(8, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(3),
 			testsuite.WithActiveRootBlocks(ts.Blocks("1.1", "1.1*", "2.2", "2.2*", "3.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
-		ts.AssertLatestCommitmentCumulativeWeight(100, ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(2, ts.Nodes()...)
 		ts.AssertAttestationsForSlot(3, ts.Blocks("3.1", "2.2*"), ts.Nodes()...)
 	}
 
@@ -233,8 +239,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(7),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(7),
 			testsuite.WithActiveRootBlocks(ts.Blocks("5.1", "6.2", "7.1")),
 		)
@@ -276,8 +282,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(7),
 			testsuite.WithLatestFinalizedSlot(3),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(12, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(7),
 			testsuite.WithActiveRootBlocks(ts.Blocks("5.1", "6.2", "7.1")),
 		)
@@ -321,8 +327,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(10),
 			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
 			testsuite.WithActiveRootBlocks(ts.Blocks("8.2", "9.2", "10.2")),
 		)
@@ -361,15 +367,15 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(10),
 			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(14, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
 			testsuite.WithActiveRootBlocks(ts.Blocks("8.2", "9.2", "10.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// We have committed to slot 9 where we referenced slot 7 with commitments -> there should be cumulative weight and attestations for slot 9.
-		ts.AssertLatestCommitmentCumulativeWeight(300, ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(6, ts.Nodes()...)
 		ts.AssertAttestationsForSlot(9, ts.Blocks("9.1", "9.2"), ts.Nodes()...)
 		ts.AssertAttestationsForSlot(10, ts.Blocks("9.1", "10.2"), ts.Nodes()...)
 
@@ -416,8 +422,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(10),
 			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(10, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
 			testsuite.WithActiveRootBlocks(ts.Blocks("8.2", "9.2", "10.2")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("4.2", "5.1", "6.2", "7.1", "8.2", "9.2")),
@@ -427,7 +433,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// Verify attestations state.
-		ts.AssertLatestCommitmentCumulativeWeight(300, ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(6, ts.Nodes()...)
 		ts.AssertAttestationsForSlot(9, ts.Blocks("9.1", "9.2"), ts.Nodes()...)
 		ts.AssertAttestationsForSlot(10, ts.Blocks("9.1", "10.2"), ts.Nodes()...)
 	}
@@ -471,8 +477,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestCommitment(latestCommitment),
 			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(10, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
 			testsuite.WithActiveRootBlocks(ts.Blocks("8.2", "9.2", "10.2")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("5.1", "6.2", "7.1", "8.2", "9.2", "10.2")),
@@ -483,7 +489,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// Verify attestations state.
-		ts.AssertLatestCommitmentCumulativeWeight(300, ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(6, ts.Nodes()...)
 	}
 
 	{
@@ -511,8 +517,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				testsuite.WithProtocolParameters(ts.ProtocolParameters),
 				testsuite.WithLatestCommitmentSlotIndex(11),
 				testsuite.WithLatestFinalizedSlot(7),
-				testsuite.WithSybilProtectionCommittee(expectedCommittee),
-				testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(16, expectedCommittee),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 				testsuite.WithEvictedSlot(11),
 				testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.1")),
 				testsuite.WithChainManagerIsSolid(),
@@ -520,7 +526,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
-			ts.AssertLatestCommitmentCumulativeWeight(300, ts.Nodes()...)
+			ts.AssertLatestCommitmentCumulativeWeight(6, ts.Nodes()...)
 			// TODO: for node3: we are not actually exporting already created attestations. Do we need to?
 			ts.AssertAttestationsForSlot(10, ts.Blocks("9.1", "10.2"), ts.Nodes("node1", "node2.1")...)
 			ts.AssertAttestationsForSlot(11, ts.Blocks(), ts.Nodes()...)
@@ -532,8 +538,8 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 50)
-	node2 := ts.AddValidatorNode("node2", 50)
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddValidatorNode("node2")
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"node1": {
@@ -565,9 +571,14 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 
 	ts.Wait()
 
-	expectedCommittee := map[iotago.AccountID]int64{
-		node1.AccountID: 50,
-		node2.AccountID: 50,
+	expectedCommittee := []iotago.AccountID{
+		node1.AccountID,
+		node2.AccountID,
+	}
+
+	expectedOnlineCommittee := []account.SeatIndex{
+		node1.ValidatorSeat,
+		node2.ValidatorSeat,
 	}
 
 	// Verify that nodes have the expected states.
@@ -578,8 +589,8 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		testsuite.WithLatestFinalizedSlot(0),
 		testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
-		testsuite.WithSybilProtectionCommittee(expectedCommittee),
-		testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
+		testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -661,8 +672,8 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(1),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(6, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(1),
 			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*")),
@@ -701,15 +712,15 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(3),
 			testsuite.WithActiveRootBlocks(ts.Blocks("1.1", "1.1*", "2.2", "2.2*", "3.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
-		ts.AssertLatestCommitmentCumulativeWeight(100, ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(2, ts.Nodes()...)
 		ts.AssertAttestationsForSlot(3, ts.Blocks("3.1", "2.2*"), ts.Nodes()...)
 	}
 
@@ -741,8 +752,8 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(8),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(10, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(8),
 			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "8.1")),
 		)
@@ -784,8 +795,8 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(8),
 			testsuite.WithLatestFinalizedSlot(3),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(8),
 			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "8.1")),
 		)
@@ -829,8 +840,8 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(11),
 			testsuite.WithLatestFinalizedSlot(8),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(14, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.2")),
 		)
@@ -869,15 +880,15 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(11),
 			testsuite.WithLatestFinalizedSlot(8),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(15, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.2")),
 		)
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node2.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// We have committed to slot 10 where we referenced slot 8 with commitments -> there should be cumulative weight and attestations for slot 9.
-		ts.AssertLatestCommitmentCumulativeWeight(300, ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(6, ts.Nodes()...)
 		ts.AssertAttestationsForSlot(10, ts.Blocks("10.1", "10.2"), ts.Nodes()...)
 		ts.AssertAttestationsForSlot(11, ts.Blocks("10.1", "11.2"), ts.Nodes()...)
 
@@ -924,8 +935,8 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(11),
 			testsuite.WithLatestFinalizedSlot(8),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.2")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("5.1", "6.2", "8.1", "9.2", "10.2")),
@@ -935,7 +946,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// Verify attestations state.
-		ts.AssertLatestCommitmentCumulativeWeight(300, ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(6, ts.Nodes()...)
 		ts.AssertAttestationsForSlot(10, ts.Blocks("10.1", "10.2"), ts.Nodes()...)
 		ts.AssertAttestationsForSlot(11, ts.Blocks("10.1", "11.2"), ts.Nodes()...)
 	}
@@ -979,8 +990,8 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithLatestCommitment(latestCommitment),
 			testsuite.WithLatestFinalizedSlot(8),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.2")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("6.2", "8.1", "9.2", "10.2", "11.2")),
@@ -991,7 +1002,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
 		// Verify attestations state.
-		ts.AssertLatestCommitmentCumulativeWeight(300, ts.Nodes()...)
+		ts.AssertLatestCommitmentCumulativeWeight(6, ts.Nodes()...)
 	}
 
 	{
@@ -1019,8 +1030,8 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 				testsuite.WithProtocolParameters(ts.ProtocolParameters),
 				testsuite.WithLatestCommitmentSlotIndex(12),
 				testsuite.WithLatestFinalizedSlot(8),
-				testsuite.WithSybilProtectionCommittee(expectedCommittee),
-				testsuite.WithSybilProtectionOnlineCommittee(expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(17, expectedCommittee),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 				testsuite.WithEvictedSlot(12),
 				testsuite.WithActiveRootBlocks(ts.Blocks("10.2", "11.2", "12.1")),
 				testsuite.WithChainManagerIsSolid(),
@@ -1028,7 +1039,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node21.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 			require.Equal(t, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node3.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment())
 
-			ts.AssertLatestCommitmentCumulativeWeight(300, ts.Nodes()...)
+			ts.AssertLatestCommitmentCumulativeWeight(6, ts.Nodes()...)
 			// TODO: for node3: we are not actually exporting already created attestations. Do we need to?
 			ts.AssertAttestationsForSlot(11, ts.Blocks("10.1", "11.2"), ts.Nodes("node1", "node2.1")...)
 			ts.AssertAttestationsForSlot(12, ts.Blocks(), ts.Nodes()...)

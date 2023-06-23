@@ -53,7 +53,7 @@ func (t *TestSuite) AssertBlocksExist(blocks []*blocks.Block, expectedExist bool
 	}
 }
 
-func (t *TestSuite) assertBlocksInCacheWithFunc(expectedBlocks []*blocks.Block, expectedPropertyState bool, propertyFunc func(*blocks.Block) bool, nodes ...*mock.Node) {
+func (t *TestSuite) assertBlocksInCacheWithFunc(expectedBlocks []*blocks.Block, propertyName string, expectedPropertyState bool, propertyFunc func(*blocks.Block) bool, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -61,15 +61,15 @@ func (t *TestSuite) assertBlocksInCacheWithFunc(expectedBlocks []*blocks.Block, 
 			t.Eventually(func() error {
 				blockFromCache, exists := node.Protocol.MainEngineInstance().BlockFromCache(block.ID())
 				if !exists {
-					return errors.Errorf("assertBlocksInCacheWithFunc: %s: block %s does not exist", node.Name, block.ID())
+					return errors.Errorf("assertBlocksInCacheWithFunc[%s]: %s: block %s does not exist", propertyName, node.Name, block.ID())
 				}
 
 				if blockFromCache.IsRootBlock() {
-					return errors.Errorf("assertBlocksInCacheWithFunc: %s: block %s is root block", node.Name, blockFromCache.ID())
+					return errors.Errorf("assertBlocksInCacheWithFunc[%s]: %s: block %s is root block", propertyName, node.Name, blockFromCache.ID())
 				}
 
 				if expectedPropertyState != propertyFunc(blockFromCache) {
-					return errors.Errorf("assertBlocksInCacheWithFunc: %s: block %s: expected %v, got %v", node.Name, blockFromCache.ID(), expectedPropertyState, propertyFunc(blockFromCache))
+					return errors.Errorf("assertBlocksInCacheWithFunc[%s]: %s: block %s: expected %v, got %v", propertyName, node.Name, blockFromCache.ID(), expectedPropertyState, propertyFunc(blockFromCache))
 				}
 
 				return nil
@@ -81,23 +81,23 @@ func (t *TestSuite) assertBlocksInCacheWithFunc(expectedBlocks []*blocks.Block, 
 }
 
 func (t *TestSuite) AssertBlocksInCachePreAccepted(expectedBlocks []*blocks.Block, expectedPreAccepted bool, nodes ...*mock.Node) {
-	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedPreAccepted, (*blocks.Block).IsPreAccepted, nodes...)
+	t.assertBlocksInCacheWithFunc(expectedBlocks, "pre-accepted", expectedPreAccepted, (*blocks.Block).IsPreAccepted, nodes...)
 }
 
 func (t *TestSuite) AssertBlocksInCacheAccepted(expectedBlocks []*blocks.Block, expectedAccepted bool, nodes ...*mock.Node) {
-	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedAccepted, (*blocks.Block).IsAccepted, nodes...)
+	t.assertBlocksInCacheWithFunc(expectedBlocks, "accepted", expectedAccepted, (*blocks.Block).IsAccepted, nodes...)
 }
 
 func (t *TestSuite) AssertBlocksInCachePreConfirmed(expectedBlocks []*blocks.Block, expectedPreConfirmed bool, nodes ...*mock.Node) {
-	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedPreConfirmed, (*blocks.Block).IsPreConfirmed, nodes...)
+	t.assertBlocksInCacheWithFunc(expectedBlocks, "pre-confirmed", expectedPreConfirmed, (*blocks.Block).IsPreConfirmed, nodes...)
 }
 
 func (t *TestSuite) AssertBlocksInCacheConfirmed(expectedBlocks []*blocks.Block, expectedConfirmed bool, nodes ...*mock.Node) {
-	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedConfirmed, (*blocks.Block).IsConfirmed, nodes...)
+	t.assertBlocksInCacheWithFunc(expectedBlocks, "confirmed", expectedConfirmed, (*blocks.Block).IsConfirmed, nodes...)
 }
 
 func (t *TestSuite) AssertBlocksInCacheRootBlock(expectedBlocks []*blocks.Block, expectedRootBlock bool, nodes ...*mock.Node) {
-	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedRootBlock, (*blocks.Block).IsRootBlock, nodes...)
+	t.assertBlocksInCacheWithFunc(expectedBlocks, "root-block", expectedRootBlock, (*blocks.Block).IsRootBlock, nodes...)
 }
 
 func (t *TestSuite) AssertBlocksInCacheConflicts(blockConflicts map[*blocks.Block][]string, nodes ...*mock.Node) {

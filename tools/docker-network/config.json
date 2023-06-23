@@ -2,18 +2,9 @@
   "protocol": {
     "sybilProtection": {
       "committee": [
-        {
-          "identity": "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c",
-          "weight": 100
-        },
-        {
-          "identity": "0xb562e31344f3056982db1331592946f4df92481208a7ca16014ede54ccbfa6d1",
-          "weight": 100
-        },
-        {
-          "identity": "0xe20f6f0982a184f07fed9e069e218d51f9678c8b49fd1311033e822e1b5901ed",
-          "weight": 100
-        }
+          "0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c",
+          "0xb562e31344f3056982db1331592946f4df92481208a7ca16014ede54ccbfa6d1",
+          "0xe20f6f0982a184f07fed9e069e218d51f9678c8b49fd1311033e822e1b5901ed"
       ]
     }
   }

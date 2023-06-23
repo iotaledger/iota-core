@@ -28,11 +28,6 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 			return errors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransaction.ID())
 		}
 
-		if len(transaction.Essence.ContextInputs) == 0 {
-			// set ContextInputs to nil explicitly, because cmp.Equal does not consider empty slice and nil slice equal.
-			transaction.Essence.ContextInputs = nil
-		}
-
 		if !cmp.Equal(transaction, loadedTransaction.Transaction()) {
 			return errors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, transaction, loadedTransaction.Transaction())
 		}
