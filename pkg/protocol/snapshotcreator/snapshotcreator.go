@@ -16,7 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/mockedscheduler"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/passthrough"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
@@ -74,7 +74,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
 		tipmanagerv1.NewProvider(),
-		mockedscheduler.NewProvider(),
+		passthrough.NewProvider(),
 	)
 	defer engineInstance.Shutdown()
 

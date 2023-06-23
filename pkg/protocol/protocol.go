@@ -25,7 +25,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/mockedscheduler"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/passthrough"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -102,7 +102,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          ledger1.NewProvider(),
-		optsSchedulerProvider:       mockedscheduler.NewProvider(),
+		optsSchedulerProvider:       passthrough.NewProvider(),
 
 		optsBaseDirectory:           "",
 		optsChainSwitchingThreshold: 3,

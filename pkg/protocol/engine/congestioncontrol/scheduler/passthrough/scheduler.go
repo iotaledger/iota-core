@@ -1,4 +1,4 @@
-package mockedscheduler
+package passthrough
 
 import (
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -8,7 +8,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type MockedScheduler struct {
+type PassThroughScheduler struct {
 	events *scheduler.Events
 
 	module.Module
@@ -29,20 +29,20 @@ func NewProvider() module.Provider[*engine.Engine, scheduler.Scheduler] {
 	})
 }
 
-func New() *MockedScheduler {
-	return &MockedScheduler{
+func New() *PassThroughScheduler {
+	return &PassThroughScheduler{
 		events: scheduler.NewEvents(),
 	}
 }
 
-func (s *MockedScheduler) Shutdown() {
+func (s *PassThroughScheduler) Shutdown() {
 }
 
-func (s *MockedScheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...*blocks.Block) bool {
+func (s *PassThroughScheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...*blocks.Block) bool {
 	return true
 }
 
-func (s *MockedScheduler) AddBlock(block *blocks.Block) {
+func (s *PassThroughScheduler) AddBlock(block *blocks.Block) {
 	if block.SetScheduled() {
 		s.events.BlockScheduled.Trigger(block)
 	}
