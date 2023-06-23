@@ -24,7 +24,7 @@ type SybilProtection struct {
 	events *sybilprotection.Events
 
 	clock                clock.Clock
-	slotTimeProviderFunc func() *iotago.SlotTimeProvider
+	slotTimeProviderFunc func() *iotago.TimeProvider
 	workers              *workerpool.Group
 	accounts             *account.Accounts[iotago.AccountID, *iotago.AccountID]
 	committee            *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
@@ -62,7 +62,7 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 					s.clock = e.Clock
 
 					e.Storage.Settings().HookInitialized(func() {
-						s.slotTimeProviderFunc = e.API().SlotTimeProvider
+						s.slotTimeProviderFunc = e.API().TimeProvider
 
 						e.Clock.HookInitialized(func() {
 							for _, v := range s.optsOnlineCommitteeStartup {
@@ -91,7 +91,7 @@ func (s *SybilProtection) Accounts() *account.Accounts[iotago.AccountID, *iotago
 
 // Committee returns the set of validators selected to be part of the committee.
 func (s *SybilProtection) Committee(_ iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID] {
-	//Note: we have PoA so our committee do not rotate right now
+	// Note: we have PoA so our committee do not rotate right now
 	return s.committee
 }
 
@@ -129,7 +129,7 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	slotIndex := s.slotTimeProviderFunc().IndexFromTime(activityTime)
+	slotIndex := s.slotTimeProviderFunc().SlotIndexFromTime(activityTime)
 	seat, exists := s.Committee(slotIndex).GetSeat(id)
 	if !exists {
 		// Only track identities that are part of the committee
