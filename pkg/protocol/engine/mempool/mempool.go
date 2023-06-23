@@ -6,7 +6,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type MemPool[VotePower conflictdag.VotePowerType[VotePower]] interface {
+type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] interface {
 	AttachTransaction(transaction Transaction, blockID iotago.BlockID) (storedTransaction TransactionMetadata, err error)
 
 	OnTransactionAttached(callback func(metadata TransactionMetadata), opts ...event.Option)
