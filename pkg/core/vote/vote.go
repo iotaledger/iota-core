@@ -6,36 +6,36 @@ import (
 )
 
 // Vote represents a vote that is cast by a voter.
-type Vote[Power constraints.Comparable[Power]] struct {
+type Vote[Rank constraints.Comparable[Rank]] struct {
 	// Voter is the identity of the voter.
 	Voter account.SeatIndex
 
-	// Power is the power of the voter.
-	Power Power
+	// Rank is the rank of the voter.
+	Rank Rank
 
 	// liked is true if the vote is "positive" (voting "for something").
 	liked bool
 }
 
 // NewVote creates a new vote.
-func NewVote[Power constraints.Comparable[Power]](voter account.SeatIndex, power Power) *Vote[Power] {
-	return &Vote[Power]{
+func NewVote[Rank constraints.Comparable[Rank]](voter account.SeatIndex, rank Rank) *Vote[Rank] {
+	return &Vote[Rank]{
 		Voter: voter,
-		Power: power,
+		Rank:  rank,
 		liked: true,
 	}
 }
 
 // IsLiked returns true if the vote is "positive" (voting "for something").
-func (v *Vote[Power]) IsLiked() bool {
+func (v *Vote[Rank]) IsLiked() bool {
 	return v.liked
 }
 
 // WithLiked returns a copy of the vote with the given liked value.
-func (v *Vote[Power]) WithLiked(liked bool) *Vote[Power] {
-	updatedVote := new(Vote[Power])
+func (v *Vote[Rank]) WithLiked(liked bool) *Vote[Rank] {
+	updatedVote := new(Vote[Rank])
 	updatedVote.Voter = v.Voter
-	updatedVote.Power = v.Power
+	updatedVote.Rank = v.Rank
 	updatedVote.liked = liked
 
 	return updatedVote

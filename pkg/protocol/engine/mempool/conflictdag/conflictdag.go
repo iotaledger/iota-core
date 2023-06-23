@@ -7,18 +7,18 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 )
 
-type ConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePower]] interface {
+type ConflictDAG[ConflictID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] interface {
 	Shutdown()
 	Events() *Events[ConflictID, ResourceID]
 
 	CreateConflict(id ConflictID)
 	UpdateConflictingResources(id ConflictID, resourceIDs *advancedset.AdvancedSet[ResourceID]) error
 
-	ReadConsistent(callback func(conflictDAG ReadLockedConflictDAG[ConflictID, ResourceID, VotePower]) error) error
+	ReadConsistent(callback func(conflictDAG ReadLockedConflictDAG[ConflictID, ResourceID, VoteRank]) error) error
 	UpdateConflictParents(conflictID ConflictID, addedParentIDs, removedParentIDs *advancedset.AdvancedSet[ConflictID]) error
 	FutureCone(conflictIDs *advancedset.AdvancedSet[ConflictID]) (futureCone *advancedset.AdvancedSet[ConflictID])
 	ConflictingConflicts(conflictID ConflictID) (conflictingConflicts *advancedset.AdvancedSet[ConflictID], exists bool)
-	CastVotes(vote *vote.Vote[VotePower], conflictIDs *advancedset.AdvancedSet[ConflictID]) error
+	CastVotes(vote *vote.Vote[VoteRank], conflictIDs *advancedset.AdvancedSet[ConflictID]) error
 	AcceptanceState(conflictIDs *advancedset.AdvancedSet[ConflictID]) acceptance.State
 	UnacceptedConflicts(conflictIDs *advancedset.AdvancedSet[ConflictID]) *advancedset.AdvancedSet[ConflictID]
 	AllConflictsSupported(seat account.SeatIndex, conflictIDs *advancedset.AdvancedSet[ConflictID]) bool
@@ -33,7 +33,7 @@ type ConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePowe
 	LikedInstead(conflictIDs *advancedset.AdvancedSet[ConflictID]) *advancedset.AdvancedSet[ConflictID]
 }
 
-type ReadLockedConflictDAG[ConflictID, ResourceID IDType, VotePower VotePowerType[VotePower]] interface {
+type ReadLockedConflictDAG[ConflictID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] interface {
 	LikedInstead(conflictIDs *advancedset.AdvancedSet[ConflictID]) *advancedset.AdvancedSet[ConflictID]
 	FutureCone(conflictIDs *advancedset.AdvancedSet[ConflictID]) (futureCone *advancedset.AdvancedSet[ConflictID])
 	ConflictingConflicts(conflictID ConflictID) (conflictingConflicts *advancedset.AdvancedSet[ConflictID], exists bool)

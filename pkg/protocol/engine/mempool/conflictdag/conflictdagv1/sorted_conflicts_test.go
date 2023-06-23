@@ -18,9 +18,9 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type SortedConflictSet = *SortedConflicts[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+type SortedConflictSet = *SortedConflicts[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-var NewSortedConflictSet = NewSortedConflicts[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+var NewSortedConflictSet = NewSortedConflicts[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
 func TestSortedConflict(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID](mapdb.NewMapDB()))

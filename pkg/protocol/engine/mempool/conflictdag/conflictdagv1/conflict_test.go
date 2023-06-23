@@ -21,18 +21,18 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type TestConflict = *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+type TestConflict = *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-//var NewTestConflict = NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+//var NewTestConflict = NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-func NewTestConflict(id iotago.TransactionID, parentConflicts *advancedset.AdvancedSet[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower]], conflictSets *advancedset.AdvancedSet[*ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedPower]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower] {
-	conflict := NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower](id, initialWeight, pendingTasksCounter, acceptanceThresholdProvider)
+func NewTestConflict(id iotago.TransactionID, parentConflicts *advancedset.AdvancedSet[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], conflictSets *advancedset.AdvancedSet[*ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank] {
+	conflict := NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank](id, initialWeight, pendingTasksCounter, acceptanceThresholdProvider)
 	_, err := conflict.JoinConflictSets(conflictSets)
 	if err != nil {
 		// TODO: change this
 		panic(err)
 	}
-	conflict.UpdateParents(parentConflicts, advancedset.New[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower]]())
+	conflict.UpdateParents(parentConflicts, advancedset.New[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]]())
 
 	return conflict
 }
@@ -470,7 +470,7 @@ func TestConflictSet_AllMembersEvicted(t *testing.T) {
 	require.Len(t, evictedConflicts, 0)
 
 	// conflict tries to join conflictset who's all members were evicted
-	conflict2 := NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower](transactionID("conflict1"), weight.New(), pendingTasks, thresholdProvider)
+	conflict2 := NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank](transactionID("conflict1"), weight.New(), pendingTasks, thresholdProvider)
 	_, err := conflict2.JoinConflictSets(advancedset.New(yellow))
 	require.Error(t, err)
 
@@ -545,7 +545,7 @@ func assertCorrectOrder(t *testing.T, conflicts ...TestConflict) {
 	for _, conflict := range conflicts {
 		if !unPreferredConflicts.Has(conflict) {
 			preferredConflicts.Add(conflict)
-			conflict.ConflictingConflicts.Range(func(conflictingConflict *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedPower]) {
+			conflict.ConflictingConflicts.Range(func(conflictingConflict *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]) {
 				if conflict != conflictingConflict {
 					unPreferredConflicts.Add(conflictingConflict)
 				}

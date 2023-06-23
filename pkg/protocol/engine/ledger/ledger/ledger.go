@@ -47,8 +47,8 @@ type Ledger struct {
 
 	sybilProtection sybilprotection.SybilProtection
 
-	memPool            mempool.MemPool[ledger.BlockVotePower]
-	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
+	memPool            mempool.MemPool[ledger.BlockVoteRank]
+	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
 	errorHandler       func(error)
 	protocolParameters *iotago.ProtocolParameters
 
@@ -77,7 +77,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Events.Ledger.LinkTo(l.events)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
-			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVotePower](true))
+			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			wpAccounts := e.Workers.CreateGroup("Accounts").CreatePool("trackBurnt", 1)
@@ -122,7 +122,7 @@ func New(
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
 		errorHandler:     errorHandler,
-		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](sybilProtection.OnlineCommittee().Size),
+		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](sybilProtection.OnlineCommittee().Size),
 	}
 }
 
@@ -271,7 +271,7 @@ func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempoo
 	return l.memPool.TransactionMetadataByAttachment(blockID)
 }
 
-func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower] {
+func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank] {
 	return l.conflictDAG
 }
 
@@ -571,14 +571,14 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
-	votePower := ledger.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
+	voteRank := ledger.NewBlockVoteRank(block.ID(), block.Block().IssuingTime)
 
 	seat, exists := l.sybilProtection.Committee(block.ID().Index()).GetSeat(block.Block().IssuerID)
 	if !exists {
 		return
 	}
 
-	if err := l.conflictDAG.CastVotes(vote.NewVote(seat, votePower), block.ConflictIDs()); err != nil {
+	if err := l.conflictDAG.CastVotes(vote.NewVote(seat, voteRank), block.ConflictIDs()); err != nil {
 		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
 		//  Do we track witness weight of invalid blocks?
 		l.errorHandler(errors.Wrapf(err, "failed to cast votes for block %s", block.ID()))

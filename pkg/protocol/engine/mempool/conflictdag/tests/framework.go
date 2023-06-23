@@ -14,7 +14,7 @@ import (
 // validators using human-readable aliases instead of actual IDs.
 type Framework struct {
 	// Instance is the ConflictDAG instance that is used in the tests.
-	Instance conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+	Instance conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
 	// Accounts is the AccountsTestFramework that is used in the tests.
 	Accounts *AccountsTestFramework
@@ -35,7 +35,7 @@ type Framework struct {
 // NewFramework creates a new instance of the Framework.
 func NewFramework(
 	t *testing.T,
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower],
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank],
 	validators *AccountsTestFramework,
 	conflictID func(string) iotago.TransactionID,
 	resourceID func(string) iotago.OutputID,
@@ -67,7 +67,7 @@ func (f *Framework) UpdateConflictParents(conflictAlias string, addedParentIDs, 
 // LikedInstead returns the set of conflicts that are liked instead of the given conflicts.
 func (f *Framework) LikedInstead(conflictAliases ...string) *advancedset.AdvancedSet[iotago.TransactionID] {
 	var result *advancedset.AdvancedSet[iotago.TransactionID]
-	_ = f.Instance.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]) error {
+	_ = f.Instance.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]) error {
 		result = conflictDAG.LikedInstead(f.ConflictIDs(conflictAliases...))
 
 		return nil
@@ -77,13 +77,13 @@ func (f *Framework) LikedInstead(conflictAliases ...string) *advancedset.Advance
 }
 
 // CastVotes casts the given votes for the given conflicts.
-func (f *Framework) CastVotes(nodeAlias string, votePower int, conflictAliases ...string) error {
+func (f *Framework) CastVotes(nodeAlias string, voteRank int, conflictAliases ...string) error {
 	seat, exists := f.Accounts.Get(nodeAlias)
 	if !exists {
 		return fmt.Errorf("node with alias '%s' does not have a seat in the committee", nodeAlias)
 	}
 
-	return f.Instance.CastVotes(vote.NewVote[vote.MockedPower](seat, vote.MockedPower(votePower)), f.ConflictIDs(conflictAliases...))
+	return f.Instance.CastVotes(vote.NewVote[vote.MockedRank](seat, vote.MockedRank(voteRank)), f.ConflictIDs(conflictAliases...))
 }
 
 // EvictConflict evicts given conflict from the ConflictDAG.

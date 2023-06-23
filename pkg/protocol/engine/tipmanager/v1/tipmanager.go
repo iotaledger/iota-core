@@ -31,10 +31,10 @@ type TipManager struct {
 	retrieveRootBlocks func() iotago.BlockIDs
 
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
 
 	// memPool holds information about pending transactions.
-	memPool mempool.MemPool[ledger.BlockVotePower]
+	memPool mempool.MemPool[ledger.BlockVoteRank]
 
 	// tipMetadataStorage contains the TipMetadata of all Blocks that are managed by the TipManager.
 	tipMetadataStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]
@@ -110,7 +110,7 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 	})
 }
 
-func (t *TipManager) SetConflictDAG(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]) {
+func (t *TipManager) SetConflictDAG(conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]) {
 	t.conflictDAG = conflictDAG
 }
 
@@ -149,7 +149,7 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 		}
 	}
 
-	_ = t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]) error {
+	_ = t.conflictDAG.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]) error {
 		likedConflicts := advancedset.New[iotago.TransactionID]()
 
 		likedInsteadReferences := func(tipMetadata *TipMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {

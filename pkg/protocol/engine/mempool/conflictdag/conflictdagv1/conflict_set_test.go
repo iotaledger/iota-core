@@ -5,6 +5,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type TestConflictSet = *ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+type TestConflictSet = *ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-var NewTestConflictSet = NewConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+var NewTestConflictSet = NewConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]

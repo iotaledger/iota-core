@@ -42,7 +42,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	}, func() iotago.BlockIDs {
 		return iotago.BlockIDs{iotago.EmptyBlockID()}
 	})
-	t.Instance.SetConflictDAG(conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts().SeatCount))
+	t.Instance.SetConflictDAG(conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts().SeatCount))
 
 	return t
 }

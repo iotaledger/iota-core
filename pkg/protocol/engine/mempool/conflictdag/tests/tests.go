@@ -22,7 +22,7 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *Framework) {
 		"CreateConflictWithoutMembers":      CreateConflictWithoutMembers,
 		"ConflictAcceptance":                ConflictAcceptance,
 		"CastVotes":                         CastVotes,
-		"CastVotes_VotePower":               CastVotesVotePower,
+		"CastVotes_VoteRank":                CastVotesVoteRank,
 		"CastVotesAcceptance":               CastVotesAcceptance,
 		"EvictAcceptedConflict":             EvictAcceptedConflict,
 		"EvictRejectedConflict":             EvictRejectedConflict,
@@ -222,7 +222,7 @@ func CastVotes(t *testing.T, tf *Framework) {
 	require.Error(t, tf.CastVotes("nodeID3", 1, "conflict1", "conflict2"))
 }
 
-func CastVotesVotePower(t *testing.T, tf *Framework) {
+func CastVotesVoteRank(t *testing.T, tf *Framework) {
 	tf.Accounts.CreateID("nodeID1")
 	tf.Accounts.CreateID("nodeID2")
 	tf.Accounts.CreateID("nodeID3")
