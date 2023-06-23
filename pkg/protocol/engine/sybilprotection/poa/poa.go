@@ -23,15 +23,15 @@ import (
 type SybilProtection struct {
 	events *sybilprotection.Events
 
-	clock                clock.Clock
-	slotTimeProviderFunc func() *iotago.TimeProvider
-	workers              *workerpool.Group
-	accounts             *account.Accounts[iotago.AccountID, *iotago.AccountID]
-	committee            *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
-	onlineCommittee      *advancedset.AdvancedSet[account.SeatIndex]
-	inactivityManager    *timed.TaskExecutor[iotago.AccountID]
-	lastActivities       *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
-	mutex                sync.RWMutex
+	clock             clock.Clock
+	timeProviderFunc  func() *iotago.TimeProvider
+	workers           *workerpool.Group
+	accounts          *account.Accounts[iotago.AccountID, *iotago.AccountID]
+	committee         *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
+	onlineCommittee   *advancedset.AdvancedSet[account.SeatIndex]
+	inactivityManager *timed.TaskExecutor[iotago.AccountID]
+	lastActivities    *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
+	mutex             sync.RWMutex
 
 	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID
@@ -62,7 +62,7 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 					s.clock = e.Clock
 
 					e.Storage.Settings().HookInitialized(func() {
-						s.slotTimeProviderFunc = e.API().TimeProvider
+						s.timeProviderFunc = e.API().TimeProvider
 
 						e.Clock.HookInitialized(func() {
 							for _, v := range s.optsOnlineCommitteeStartup {
@@ -129,7 +129,7 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	slotIndex := s.slotTimeProviderFunc().SlotIndexFromTime(activityTime)
+	slotIndex := s.timeProviderFunc().SlotIndexFromTime(activityTime)
 	seat, exists := s.Committee(slotIndex).GetSeat(id)
 	if !exists {
 		// Only track identities that are part of the committee
