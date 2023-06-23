@@ -32,8 +32,8 @@ func TestBlockGadget(t *testing.T) {
 	tf.Events.BlockPreConfirmed.Hook(checkOrder(&expectedPreConfirmationOrder, "pre-confirmation"))
 	tf.Events.BlockConfirmed.Hook(checkOrder(&expectedConfirmationOrder, "confirmation"))
 
-	tf.SybilProtection.AddAccount("A", 50)
-	tf.SybilProtection.AddAccount("B", 50)
+	tf.SybilProtection.AddAccount("A")
+	tf.SybilProtection.AddAccount("B")
 
 	tf.SybilProtection.SetOnline("A")
 	tf.SybilProtection.SetOnline("B")

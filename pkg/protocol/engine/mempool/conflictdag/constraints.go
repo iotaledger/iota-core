@@ -16,8 +16,8 @@ type IDType interface {
 	String() string
 }
 
-// VotePowerType is the constraint for the vote power of a voter.
-type VotePowerType[T any] interface {
+// VoteRankType is the constraint for the vote rank of a voter.
+type VoteRankType[T any] interface {
 	// Comparable imports the constraints.Comparable[T] interface to ensure that the type can be compared.
 	constraints.Comparable[T]
 }
