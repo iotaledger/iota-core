@@ -60,7 +60,7 @@ func NewTestSuite(test *testing.T) *TestSuite {
 			TokenSupply:           utils.RandAmount(),
 			GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 			SlotDurationInSeconds: 10,
-			EpochDurationInSlots:  1000,
+			EpochDurationInSlots:  5,
 			MaxCommittableAge:     10,
 		},
 
