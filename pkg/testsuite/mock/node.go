@@ -152,7 +152,7 @@ func (n *Node) HookLogging() {
 
 	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
 		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
-			return lo.PanicOnErr(a.BlockID(n.Protocol.MainEngineInstance().API().SlotTimeProvider()))
+			return lo.PanicOnErr(a.BlockID(n.Protocol.MainEngineInstance().API().TimeProvider()))
 		}))
 	})
 
@@ -240,11 +240,11 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().SlotTimeProvider().SlotIndexFromTime(newTime))
+		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().TimeProvider().SlotIndexFromTime(newTime))
 	})
 
 	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().SlotTimeProvider().SlotIndexFromTime(newTime))
+		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().TimeProvider().SlotIndexFromTime(newTime))
 	})
 
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {

@@ -60,7 +60,7 @@ func NewTestSuite(test *testing.T) *TestSuite {
 			TokenSupply:           utils.RandAmount(),
 			GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 			SlotDurationInSeconds: 10,
-			MaxCommitableAge:      10,
+			MaxCommittableAge:     10,
 		},
 
 		blocks:                   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block](),
@@ -96,7 +96,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	}
 
 	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB(), t.API())
-	manager.SetMaxCommittableAge(iotago.SlotIndex(t.ProtocolParameters.MaxCommitableAge))
+	manager.SetMaxCommittableAge(iotago.SlotIndex(t.ProtocolParameters.MaxCommittableAge))
 
 	return manager
 }
@@ -174,7 +174,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 
 func (t *TestSuite) createBlockWithBurn(accountID iotago.AccountID, index iotago.SlotIndex, burn uint64) *blocks.Block {
 	innerBlock := tpkg.RandBlockWithIssuerAndBurnedMana(accountID, burn)
-	innerBlock.IssuingTime = t.API().SlotTimeProvider().SlotStartTime(index)
+	innerBlock.IssuingTime = t.API().TimeProvider().SlotStartTime(index)
 	modelBlock, err := model.BlockFromBlock(innerBlock, t.API())
 
 	require.NoError(t.T, err)

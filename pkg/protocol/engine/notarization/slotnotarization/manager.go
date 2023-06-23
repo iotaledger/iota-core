@@ -51,7 +51,7 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 		m := NewManager(minCommittableSlotAge, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
 
 		m.slotTimeProviderFunc = func() *iotago.TimeProvider {
-			return e.API().SlotTimeProvider()
+			return e.API().TimeProvider()
 		}
 
 		e.HookConstructed(func() {
