@@ -371,14 +371,16 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 			return !newPubKeysSet.Has(key)
 		}).Slice()
 
-		if createdOutput.Output().FeatureSet().Staking() != nil {
+		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
 			// staking feature is created or updated - create the diff between the account data and new account
-			accountDiff.ValidatorStakeChange = int64(createdOutput.Output().FeatureSet().Staking().StakedAmount) - int64(accountData.ValidatorStake)
-			accountDiff.StakeEndEpochChange = int64(createdOutput.Output().FeatureSet().Staking().EndEpoch) - int64(accountData.StakeEndEpoch)
+			accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount) - int64(accountData.ValidatorStake)
+			accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch) - int64(accountData.StakeEndEpoch)
+			accountDiff.FixedCostChange = int64(stakingFeature.FixedCost) - int64(accountData.FixedCost)
 		} else if consumedOutput.Output().FeatureSet().Staking() != nil {
 			// staking feature was removed from an account
 			accountDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
 			accountDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
+			accountDiff.FixedCostChange = -int64(accountData.FixedCost)
 		}
 	}
 
@@ -401,9 +403,10 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.PreviousOutputID = iotago.EmptyOutputID
 		accountDiff.PubKeysAdded = lo.Map(createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
 
-		if createdOutput.Output().FeatureSet().Staking() != nil {
-			accountDiff.StakeEndEpochChange = int64(createdOutput.Output().FeatureSet().Staking().EndEpoch)
-			accountDiff.ValidatorStakeChange = int64(createdOutput.Output().FeatureSet().Staking().StakedAmount)
+		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
+			accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch)
+			accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
+			accountDiff.FixedCostChange = int64(stakingFeature.FixedCost)
 		}
 	}
 }

@@ -198,7 +198,8 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 	if stakingFeature := accountOutput.FeatureSet().Staking(); stakingFeature != nil {
 		stakingOpts = append(stakingOpts,
 			accounts.WithValidatorStake(stakingFeature.StakedAmount),
-			accounts.WithStakeEndEpoch(iotago.EpochIndex(stakingFeature.EndEpoch)),
+			accounts.WithStakeEndEpoch(stakingFeature.EndEpoch),
+			accounts.WithFixedCost(stakingFeature.FixedCost),
 		)
 	}
 
@@ -251,6 +252,7 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 
 		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) - diffChange.StakeEndEpochChange)
 		accountData.ValidatorStake = uint64(int64(accountData.ValidatorStake) - diffChange.ValidatorStakeChange)
+		accountData.FixedCost = uint64(int64(accountData.FixedCost) - diffChange.FixedCostChange)
 
 		accountData.DelegationStake = uint64(int64(accountData.DelegationStake) - diffChange.DelegationStakeChange)
 
@@ -279,6 +281,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prun
 
 	slotDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
 	slotDiff.DelegationStakeChange = -int64(accountData.DelegationStake)
+	slotDiff.FixedCostChange = -int64(accountData.FixedCost)
 	slotDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
 
 	return slotDiff
@@ -350,6 +353,8 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 
 		accountData.ValidatorStake = uint64(int64(accountData.ValidatorStake) + diffChange.ValidatorStakeChange)
 		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) + diffChange.StakeEndEpochChange)
+		accountData.FixedCost = uint64(int64(accountData.FixedCost) + diffChange.FixedCostChange)
+
 		accountData.DelegationStake = uint64(int64(accountData.DelegationStake) + diffChange.DelegationStakeChange)
 
 		m.accountsTree.Set(accountID, accountData)

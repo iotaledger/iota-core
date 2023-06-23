@@ -23,6 +23,7 @@ type AccountData struct {
 
 	ValidatorStake  uint64
 	DelegationStake uint64
+	FixedCost       uint64
 	StakeEndEpoch   iotago.EpochIndex
 }
 
@@ -34,6 +35,7 @@ func NewAccountData(id iotago.AccountID, opts ...options.Option[AccountData]) *A
 		PubKeys:         advancedset.New[ed25519.PublicKey](),
 		ValidatorStake:  0,
 		DelegationStake: 0,
+		FixedCost:       0,
 		StakeEndEpoch:   0,
 	}, opts)
 }
@@ -71,6 +73,7 @@ func (a *AccountData) Clone() *AccountData {
 
 		ValidatorStake:  a.ValidatorStake,
 		DelegationStake: a.DelegationStake,
+		FixedCost:       a.FixedCost,
 		StakeEndEpoch:   a.StakeEndEpoch,
 	}
 }
@@ -131,12 +134,17 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	a.PubKeys = advancedset.New(pubKeys...)
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.ValidatorStake)); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read updatedTime for Account balance")
+		return bytesConsumed, errors.Wrap(err, "unable to read validator stake")
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.DelegationStake)); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read delegationStake")
+		return bytesConsumed, errors.Wrap(err, "unable to read delegation stake")
+	}
+	bytesConsumed += 8
+
+	if err := binary.Read(reader, binary.LittleEndian, &(a.FixedCost)); err != nil {
+		return bytesConsumed, errors.Wrap(err, "unable to read fixed cost")
 	}
 	bytesConsumed += 8
 
@@ -164,6 +172,7 @@ func (a AccountData) Bytes() ([]byte, error) {
 
 	m.WriteUint64(a.ValidatorStake)
 	m.WriteUint64(a.DelegationStake)
+	m.WriteUint64(a.FixedCost)
 	m.WriteUint64(uint64(a.StakeEndEpoch))
 
 	return m.Bytes(), nil
@@ -194,9 +203,16 @@ func WithValidatorStake(validatorStake uint64) options.Option[AccountData] {
 		a.ValidatorStake = validatorStake
 	}
 }
+
 func WithDelegationStake(delegationStake uint64) options.Option[AccountData] {
 	return func(a *AccountData) {
 		a.DelegationStake = delegationStake
+	}
+}
+
+func WithFixedCost(fixedCost uint64) options.Option[AccountData] {
+	return func(a *AccountData) {
+		a.FixedCost = fixedCost
 	}
 }
 

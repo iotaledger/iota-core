@@ -34,6 +34,7 @@ func TestManager_Import_Export(t *testing.T) {
 
 			ValidatorStakeChange:  20,
 			DelegationStakeChange: 20,
+			FixedCostChange:       10,
 			StakeEndEpochChange:   10,
 
 			NewOutputID: "D1",
@@ -60,6 +61,7 @@ func TestManager_Import_Export(t *testing.T) {
 			OutputID:        "D1",
 			ValidatorStake:  20,
 			DelegationStake: 20,
+			FixedCost:       10,
 			StakeEndEpoch:   10,
 		},
 	})
@@ -103,6 +105,7 @@ func TestManager_Import_Export(t *testing.T) {
 			OutputID:        "D1",
 			ValidatorStake:  20,
 			DelegationStake: 15,
+			FixedCost:       10,
 			StakeEndEpoch:   10,
 		},
 	})
@@ -129,6 +132,7 @@ func TestManager_Import_Export(t *testing.T) {
 			ValidatorStakeChange:  40,
 			DelegationStakeChange: -10,
 			StakeEndEpochChange:   8,
+			FixedCostChange:       -2,
 
 			NewOutputID: "D2",
 		},
@@ -159,6 +163,7 @@ func TestManager_Import_Export(t *testing.T) {
 			OutputID:        "D2",
 			ValidatorStake:  60,
 			DelegationStake: 5,
+			FixedCost:       8,
 			StakeEndEpoch:   18,
 		},
 	})
