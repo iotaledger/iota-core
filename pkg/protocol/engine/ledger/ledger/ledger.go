@@ -36,6 +36,8 @@ import (
 var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
 
 type Ledger struct {
+	events *ledger.Events
+
 	apiProvider func() iotago.API
 
 	utxoLedger       *utxoledger.Manager
@@ -58,6 +60,7 @@ type Ledger struct {
 func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) ledger.Ledger {
 		l := New(
+
 			e.Storage.Ledger(),
 			e.Storage.Accounts(),
 			e.Storage.Commitments().Load,
@@ -71,14 +74,18 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 		// TODO: when should ledgerState be pruned?
 
 		e.HookConstructed(func() {
+			e.Events.Ledger.LinkTo(l.events)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
 			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVotePower](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			wpAccounts := e.Workers.CreateGroup("Accounts").CreatePool("trackBurnt", 1)
-			e.Events.BlockGadget.BlockAccepted.Hook(l.accountsLedger.TrackBlock, event.WithWorkerPool(wpAccounts))
-			e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
+			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+				l.accountsLedger.TrackBlock(block)
+				l.BlockAccepted(block)
+				l.events.BlockProcessed.Trigger(block)
+			}, event.WithWorkerPool(wpAccounts))
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 		})
 		e.HookInitialized(func() {
@@ -108,6 +115,7 @@ func New(
 	errorHandler func(error),
 ) *Ledger {
 	return &Ledger{
+		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
 		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProvider()),
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
