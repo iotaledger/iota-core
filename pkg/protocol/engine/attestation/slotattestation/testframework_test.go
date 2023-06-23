@@ -76,13 +76,15 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		}))
 	}
 
-	committeeFunc := func() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
-		committee := account.NewAccounts[iotago.AccountID](mapdb.NewMapDB())
+	committeeFunc := func(index iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID] {
+		accounts := account.NewAccounts[iotago.AccountID](mapdb.NewMapDB())
+		var members []iotago.AccountID
 		t.issuerByAlias.ForEach(func(alias string, issuer *issuer) bool {
-			committee.Set(issuer.accountID, 1)
+			accounts.Set(issuer.accountID, 0) // we don't care about weights with PoA
+			members = append(members, issuer.accountID)
 			return true
 		})
-		return committee
+		return accounts.SelectAccounts(members...)
 	}
 
 	t.Instance = slotattestation.NewManager(2, bucketedStorage, committeeFunc)

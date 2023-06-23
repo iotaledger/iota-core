@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
@@ -30,6 +31,7 @@ type Events struct {
 	Clock           *clock.Events
 	BlockGadget     *blockgadget.Events
 	SlotGadget      *slotgadget.Events
+	Ledger          *ledger.Events
 	Notarization    *notarization.Events
 	ConflictDAG     *conflictdag.Events[iotago.TransactionID, iotago.OutputID]
 	Scheduler       *scheduler.Events
@@ -51,6 +53,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		Clock:           clock.NewEvents(),
 		BlockGadget:     blockgadget.NewEvents(),
 		SlotGadget:      slotgadget.NewEvents(),
+		Ledger:          ledger.NewEvents(),
 		Notarization:    notarization.NewEvents(),
 		ConflictDAG:     conflictdag.NewEvents[iotago.TransactionID, iotago.OutputID](),
 		Scheduler:       scheduler.NewEvents(),

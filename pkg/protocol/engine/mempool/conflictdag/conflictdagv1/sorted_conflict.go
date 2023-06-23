@@ -12,15 +12,15 @@ import (
 )
 
 // sortedConflict is a wrapped Conflict that contains additional information for the SortedConflicts.
-type sortedConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.VotePowerType[VotePower]] struct {
+type sortedConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	// sortedSet is the SortedConflicts that contains this sortedConflict.
-	sortedSet *SortedConflicts[ConflictID, ResourceID, VotePower]
+	sortedSet *SortedConflicts[ConflictID, ResourceID, VoteRank]
 
 	// lighterMember is the sortedConflict that is lighter than this one.
-	lighterMember *sortedConflict[ConflictID, ResourceID, VotePower]
+	lighterMember *sortedConflict[ConflictID, ResourceID, VoteRank]
 
 	// heavierMember is the sortedConflict that is heavierMember than this one.
-	heavierMember *sortedConflict[ConflictID, ResourceID, VotePower]
+	heavierMember *sortedConflict[ConflictID, ResourceID, VoteRank]
 
 	// currentWeight is the current weight of the Conflict.
 	currentWeight weight.Value
@@ -32,10 +32,10 @@ type sortedConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflic
 	weightMutex sync.RWMutex
 
 	// currentPreferredInstead is the current PreferredInstead value of the Conflict.
-	currentPreferredInstead *Conflict[ConflictID, ResourceID, VotePower]
+	currentPreferredInstead *Conflict[ConflictID, ResourceID, VoteRank]
 
 	// queuedPreferredInstead is the PreferredInstead value that is queued to be applied to the Conflict.
-	queuedPreferredInstead *Conflict[ConflictID, ResourceID, VotePower]
+	queuedPreferredInstead *Conflict[ConflictID, ResourceID, VoteRank]
 
 	// preferredMutex is used to protect the currentPreferredInstead and queuedPreferredInstead.
 	preferredInsteadMutex sync.RWMutex
@@ -46,15 +46,15 @@ type sortedConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflic
 	onWeightUpdatedHook *event.Hook[func(weight.Value)]
 
 	// onPreferredUpdatedHook is the hook that is triggered when the PreferredInstead value of the Conflict is updated.
-	onPreferredUpdatedHook *event.Hook[func(*Conflict[ConflictID, ResourceID, VotePower])]
+	onPreferredUpdatedHook *event.Hook[func(*Conflict[ConflictID, ResourceID, VoteRank])]
 
 	// Conflict is the wrapped Conflict.
-	*Conflict[ConflictID, ResourceID, VotePower]
+	*Conflict[ConflictID, ResourceID, VoteRank]
 }
 
 // newSortedConflict creates a new sortedConflict.
-func newSortedConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.VotePowerType[VotePower]](set *SortedConflicts[ConflictID, ResourceID, VotePower], conflict *Conflict[ConflictID, ResourceID, VotePower]) *sortedConflict[ConflictID, ResourceID, VotePower] {
-	s := &sortedConflict[ConflictID, ResourceID, VotePower]{
+func newSortedConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.VoteRankType[VoteRank]](set *SortedConflicts[ConflictID, ResourceID, VoteRank], conflict *Conflict[ConflictID, ResourceID, VoteRank]) *sortedConflict[ConflictID, ResourceID, VoteRank] {
+	s := &sortedConflict[ConflictID, ResourceID, VoteRank]{
 		sortedSet:               set,
 		currentWeight:           conflict.Weight.Value(),
 		currentPreferredInstead: conflict.PreferredInstead(),
@@ -72,7 +72,7 @@ func newSortedConflict[ConflictID, ResourceID conflictdag.IDType, VotePower conf
 }
 
 // Weight returns the current weight of the sortedConflict.
-func (s *sortedConflict[ConflictID, ResourceID, VotePower]) Weight() weight.Value {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) Weight() weight.Value {
 	s.weightMutex.RLock()
 	defer s.weightMutex.RUnlock()
 
@@ -80,7 +80,7 @@ func (s *sortedConflict[ConflictID, ResourceID, VotePower]) Weight() weight.Valu
 }
 
 // Compare compares the sortedConflict to another sortedConflict.
-func (s *sortedConflict[ConflictID, ResourceID, VotePower]) Compare(other *sortedConflict[ConflictID, ResourceID, VotePower]) int {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) Compare(other *sortedConflict[ConflictID, ResourceID, VoteRank]) int {
 	if result := s.Weight().Compare(other.Weight()); result != weight.Equal {
 		return result
 	}
@@ -89,7 +89,7 @@ func (s *sortedConflict[ConflictID, ResourceID, VotePower]) Compare(other *sorte
 }
 
 // PreferredInstead returns the current preferred instead value of the sortedConflict.
-func (s *sortedConflict[ConflictID, ResourceID, VotePower]) PreferredInstead() *Conflict[ConflictID, ResourceID, VotePower] {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) PreferredInstead() *Conflict[ConflictID, ResourceID, VoteRank] {
 	s.preferredInsteadMutex.RLock()
 	defer s.preferredInsteadMutex.RUnlock()
 
@@ -97,12 +97,12 @@ func (s *sortedConflict[ConflictID, ResourceID, VotePower]) PreferredInstead() *
 }
 
 // IsPreferred returns true if the sortedConflict is preferred instead of its Conflicts.
-func (s *sortedConflict[ConflictID, ResourceID, VotePower]) IsPreferred() bool {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) IsPreferred() bool {
 	return s.PreferredInstead() == s.Conflict
 }
 
 // Unhook cleans up the sortedConflict.
-func (s *sortedConflict[ConflictID, ResourceID, VotePower]) Unhook() {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) Unhook() {
 	if s.onAcceptanceStateUpdatedHook != nil {
 		s.onAcceptanceStateUpdatedHook.Unhook()
 		s.onAcceptanceStateUpdatedHook = nil
@@ -119,14 +119,14 @@ func (s *sortedConflict[ConflictID, ResourceID, VotePower]) Unhook() {
 	}
 }
 
-func (s *sortedConflict[ConflictID, ResourceID, VotePower]) onAcceptanceStateUpdated(_, newState acceptance.State) {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) onAcceptanceStateUpdated(_, newState acceptance.State) {
 	if newState.IsAccepted() {
 		s.sortedSet.owner.setAcceptanceState(acceptance.Rejected)
 	}
 }
 
 // queueWeightUpdate queues a weight update for the sortedConflict.
-func (s *sortedConflict[ConflictID, ResourceID, VotePower]) queueWeightUpdate(newWeight weight.Value) {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) queueWeightUpdate(newWeight weight.Value) {
 	s.weightMutex.Lock()
 	defer s.weightMutex.Unlock()
 
@@ -139,7 +139,7 @@ func (s *sortedConflict[ConflictID, ResourceID, VotePower]) queueWeightUpdate(ne
 }
 
 // weightUpdateApplied tries to apply a queued weight update to the sortedConflict and returns true if successful.
-func (s *sortedConflict[ConflictID, ResourceID, VotePower]) weightUpdateApplied() bool {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) weightUpdateApplied() bool {
 	s.weightMutex.Lock()
 	defer s.weightMutex.Unlock()
 
@@ -160,7 +160,7 @@ func (s *sortedConflict[ConflictID, ResourceID, VotePower]) weightUpdateApplied(
 }
 
 // queuePreferredInsteadUpdate notifies the sortedSet that the preferred instead flag of the Conflict was updated.
-func (s *sortedConflict[ConflictID, ResourceID, VotePower]) queuePreferredInsteadUpdate(conflict *Conflict[ConflictID, ResourceID, VotePower]) {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) queuePreferredInsteadUpdate(conflict *Conflict[ConflictID, ResourceID, VoteRank]) {
 	s.preferredInsteadMutex.Lock()
 	defer s.preferredInsteadMutex.Unlock()
 
@@ -176,7 +176,7 @@ func (s *sortedConflict[ConflictID, ResourceID, VotePower]) queuePreferredInstea
 
 // preferredInsteadUpdateApplied tries to apply a queued preferred instead update to the sortedConflict and returns
 // true if successful.
-func (s *sortedConflict[ConflictID, ResourceID, VotePower]) preferredInsteadUpdateApplied() bool {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) preferredInsteadUpdateApplied() bool {
 	s.preferredInsteadMutex.Lock()
 	defer s.preferredInsteadMutex.Unlock()
 

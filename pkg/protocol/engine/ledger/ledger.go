@@ -24,7 +24,7 @@ type Ledger interface {
 	TransactionMetadata(id iotago.TransactionID) (transactionMetadata mempool.TransactionMetadata, exists bool)
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transactionMetadata mempool.TransactionMetadata, exists bool)
 	CommitSlot(index iotago.SlotIndex) (stateRoot, mutationRoot, accountRoot iotago.Identifier, err error)
-	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, BlockVotePower]
+	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, BlockVoteRank]
 	StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 	AddUnspentOutput(unspentOutput *utxoledger.Output) error
 	ManaManager() *mana.Manager

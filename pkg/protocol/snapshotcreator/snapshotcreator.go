@@ -67,7 +67,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		inmemoryblockdag.NewProvider(),
 		inmemorybooker.NewProvider(),
 		blocktime.NewProvider(),
-		poa.NewProvider(map[iotago.AccountID]int64{}),
+		poa.NewProvider([]iotago.AccountID{}),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
 		slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),

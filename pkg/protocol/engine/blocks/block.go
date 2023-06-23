@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
@@ -26,7 +27,7 @@ type Block struct {
 
 	// Booker block
 	booked    bool
-	witnesses *advancedset.AdvancedSet[iotago.AccountID]
+	witnesses *advancedset.AdvancedSet[account.SeatIndex]
 	// conflictIDs are the all conflictIDs of the block inherited from the parents + payloadConflictIDs.
 	conflictIDs *advancedset.AdvancedSet[iotago.TransactionID]
 	// payloadConflictIDs are the conflictIDs of the block's payload (in case it is a transaction, otherwise empty).
@@ -34,10 +35,10 @@ type Block struct {
 
 	// BlockGadget block
 	preAccepted           bool
-	acceptanceRatifiers   *advancedset.AdvancedSet[iotago.AccountID]
+	acceptanceRatifiers   *advancedset.AdvancedSet[account.SeatIndex]
 	accepted              bool
 	preConfirmed          bool
-	confirmationRatifiers *advancedset.AdvancedSet[iotago.AccountID]
+	confirmationRatifiers *advancedset.AdvancedSet[account.SeatIndex]
 	confirmed             bool
 
 	// Scheduler block
@@ -70,22 +71,22 @@ func (r *rootBlock) String() string {
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
 	return &Block{
-		witnesses:             advancedset.New[iotago.AccountID](),
+		witnesses:             advancedset.New[account.SeatIndex](),
 		conflictIDs:           advancedset.New[iotago.TransactionID](),
 		payloadConflictIDs:    advancedset.New[iotago.TransactionID](),
-		acceptanceRatifiers:   advancedset.New[iotago.AccountID](),
-		confirmationRatifiers: advancedset.New[iotago.AccountID](),
+		acceptanceRatifiers:   advancedset.New[account.SeatIndex](),
+		confirmationRatifiers: advancedset.New[account.SeatIndex](),
 		modelBlock:            data,
 	}
 }
 
 func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
 	return &Block{
-		witnesses:             advancedset.New[iotago.AccountID](),
+		witnesses:             advancedset.New[account.SeatIndex](),
 		conflictIDs:           advancedset.New[iotago.TransactionID](),
 		payloadConflictIDs:    advancedset.New[iotago.TransactionID](),
-		acceptanceRatifiers:   advancedset.New[iotago.AccountID](),
-		confirmationRatifiers: advancedset.New[iotago.AccountID](),
+		acceptanceRatifiers:   advancedset.New[account.SeatIndex](),
+		confirmationRatifiers: advancedset.New[account.SeatIndex](),
 
 		rootBlock: &rootBlock{
 			blockID:      blockID,
@@ -104,11 +105,11 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 	return &Block{
 		missing:               true,
 		missingBlockID:        blockID,
-		witnesses:             advancedset.New[iotago.AccountID](),
+		witnesses:             advancedset.New[account.SeatIndex](),
 		conflictIDs:           advancedset.New[iotago.TransactionID](),
 		payloadConflictIDs:    advancedset.New[iotago.TransactionID](),
-		acceptanceRatifiers:   advancedset.New[iotago.AccountID](),
-		confirmationRatifiers: advancedset.New[iotago.AccountID](),
+		acceptanceRatifiers:   advancedset.New[account.SeatIndex](),
+		confirmationRatifiers: advancedset.New[account.SeatIndex](),
 	}
 }
 
@@ -355,14 +356,14 @@ func (b *Block) SetBooked() (wasUpdated bool) {
 	return
 }
 
-func (b *Block) AddWitness(id iotago.AccountID) (added bool) {
+func (b *Block) AddWitness(seat account.SeatIndex) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	return b.witnesses.Add(id)
+	return b.witnesses.Add(seat)
 }
 
-func (b *Block) Witnesses() []iotago.AccountID {
+func (b *Block) Witnesses() []account.SeatIndex {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
@@ -417,14 +418,14 @@ func (b *Block) SetPreAccepted() (wasUpdated bool) {
 	return wasUpdated
 }
 
-func (b *Block) AddAcceptanceRatifier(id iotago.AccountID) (added bool) {
+func (b *Block) AddAcceptanceRatifier(seat account.SeatIndex) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	return b.acceptanceRatifiers.Add(id)
+	return b.acceptanceRatifiers.Add(seat)
 }
 
-func (b *Block) AcceptanceRatifiers() []iotago.AccountID {
+func (b *Block) AcceptanceRatifiers() []account.SeatIndex {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
@@ -538,10 +539,10 @@ func (b *Block) AddConfirmationRatifier(id iotago.AccountID) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	return b.confirmationRatifiers.Add(id)
+	return b.confirmationRatifiers.Add(seat)
 }
 
-func (b *Block) ConfirmationRatifiers() []iotago.AccountID {
+func (b *Block) ConfirmationRatifiers() []account.SeatIndex {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 

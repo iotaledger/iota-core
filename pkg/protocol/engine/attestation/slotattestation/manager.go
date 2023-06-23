@@ -54,7 +54,7 @@ const (
 //		- obtain and evict from it attestations that *commit to* lastCommittedSlot-attestationCommitmentOffset
 //	- committed attestations: retrieved at slot that we are committing, stored at slot lastCommittedSlot-attestationCommitmentOffset
 type Manager struct {
-	committeeFunc               func() *account.Accounts[iotago.AccountID, *iotago.AccountID]
+	committeeFunc               func(index iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
 	attestationCommitmentOffset iotago.SlotIndex
 
 	futureAttestations  *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
@@ -71,7 +71,7 @@ type Manager struct {
 
 func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*engine.Engine, attestation.Attestations] {
 	return module.Provide(func(e *engine.Engine) attestation.Attestations {
-		m := NewManager(attestationCommitmentOffset, e.Storage.Prunable.Attestations, e.SybilProtection.Accounts)
+		m := NewManager(attestationCommitmentOffset, e.Storage.Prunable.Attestations, e.SybilProtection.Committee)
 
 		e.Storage.Settings().HookInitialized(func() {
 			m.commitmentMutex.Lock()
@@ -84,7 +84,7 @@ func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*
 	})
 }
 
-func NewManager(attestationCommitmentOffset iotago.SlotIndex, bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore, committeeFunc func() *account.Accounts[iotago.AccountID, *iotago.AccountID]) *Manager {
+func NewManager(attestationCommitmentOffset iotago.SlotIndex, bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore, committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]) *Manager {
 	m := &Manager{
 		attestationCommitmentOffset: attestationCommitmentOffset,
 		committeeFunc:               committeeFunc,
@@ -148,7 +148,7 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iot
 // AddAttestationFromBlock adds an attestation from a block to the future attestations (beyond the attestation window).
 func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
 	// Only track attestations of active committee members.
-	if _, exists := m.committeeFunc().Get(block.Block().IssuerID); !exists {
+	if _, exists := m.committeeFunc(block.ID().Index()).GetSeat(block.Block().IssuerID); !exists {
 		return
 	}
 
@@ -252,10 +252,10 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	// Add all attestations to the tree and calculate the new cumulative weight.
 	for _, a := range attestations {
 		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
-		if attestorWeight, exists := m.committeeFunc().Get(a.IssuerID); exists {
+		if _, exists := m.committeeFunc(index).GetSeat(a.IssuerID); exists {
 			tree.Set(a.IssuerID, a)
 
-			m.lastCumulativeWeight += uint64(attestorWeight)
+			m.lastCumulativeWeight++
 		}
 	}
 

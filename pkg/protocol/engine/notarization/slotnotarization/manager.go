@@ -63,7 +63,7 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 
 			wpBlocks := m.workers.CreatePool("Blocks", 1) // Using just 1 worker to avoid contention
 
-			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+			e.Events.Ledger.BlockProcessed.Hook(func(block *blocks.Block) {
 				if err := m.notarizeAcceptedBlock(block); err != nil {
 					m.errorHandler(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 				}

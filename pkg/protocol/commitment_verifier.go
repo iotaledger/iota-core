@@ -33,13 +33,13 @@ func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.
 	}
 
 	// 2. Verify attestations.
-	blockIDs, weight, err := c.verifyAttestations(attestations)
+	blockIDs, seatCount, err := c.verifyAttestations(attestations)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error validating attestations for commitment %s", commitment.ID())
 	}
 
 	// 3. Verify cumulative weight of commitment matches with calculated weight from attestations.
-	if prevCommitment.CumulativeWeight()+weight != commitment.CumulativeWeight() {
+	if prevCommitment.CumulativeWeight()+seatCount != commitment.CumulativeWeight() {
 		return nil, errors.Errorf("invalid cumulative weight for commitment %s", commitment.ID())
 	}
 
@@ -49,7 +49,7 @@ func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.
 func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestation) (iotago.BlockIDs, uint64, error) {
 	visitedIdentities := set.New[iotago.AccountID]()
 	var blockIDs iotago.BlockIDs
-	var weight uint64
+	var seatCount uint64
 
 	for _, att := range attestations {
 		// TODO: 1. Make sure the public key used to sign is valid for the given issuerID.
@@ -71,8 +71,12 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		}
 
 		// TODO: this might differ if we have a Accounts with changing weights depending on the SlotIndex/epoch
-		if issuerWeight, weightExists := c.engine.SybilProtection.Committee().Get(att.IssuerID); weightExists {
-			weight += uint64(issuerWeight)
+		attestationBlockID, err := att.BlockID(c.engine.API().SlotTimeProvider())
+		if err != nil {
+			return nil, 0, errors.Wrapf(err, "error calculating blockID from attestation")
+		}
+		if _, seatExists := c.engine.SybilProtection.Committee(attestationBlockID.Index()).GetSeat(att.IssuerID); seatExists {
+			seatCount++
 		}
 
 		visitedIdentities.Add(att.IssuerID)
@@ -85,5 +89,5 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		blockIDs = append(blockIDs, blockID)
 	}
 
-	return blockIDs, weight, nil
+	return blockIDs, seatCount, nil
 }
