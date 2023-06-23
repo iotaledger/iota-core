@@ -91,6 +91,10 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 			return errors.Errorf("AssertAccountDiff: %s: expected new stake end epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.StakeEndEpochChange, actualAccountDiff.StakeEndEpochChange, accountID, index)
 		}
 
+		if !cmp.Equal(accountDiff.FixedCostChange, actualAccountDiff.FixedCostChange) {
+			return errors.Errorf("AssertAccountDiff: %s: expected fixed cost change %d but actual %d for account %s at slot %d", node.Name, accountDiff.FixedCostChange, actualAccountDiff.FixedCostChange, accountID, index)
+		}
+
 		if !cmp.Equal(accountDiff.ValidatorStakeChange, actualAccountDiff.ValidatorStakeChange) {
 			return errors.Errorf("AssertAccountDiff: %s: expected validator stake change epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.ValidatorStakeChange, actualAccountDiff.ValidatorStakeChange, accountID, index)
 		}

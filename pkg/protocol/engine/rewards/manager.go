@@ -99,8 +99,7 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 		ProfitMargin:        profitMargin,
 	}
 
-	err := m.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolsStats.Bytes()))
-	if err != nil {
+	if err := m.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolsStats.Bytes())); err != nil {
 		return errors.Wrapf(err, "failed to store pool stats for epoch %d", epochIndex)
 	}
 
@@ -112,8 +111,8 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 				intermediateFactors = append(intermediateFactors, 0)
 			}
 
-			pf, err2 := performanceFactorStorage.Load(accountID)
-			if err2 != nil {
+			pf, err := performanceFactorStorage.Load(accountID)
+			if err != nil {
 				return errors.Wrapf(err, "failed to load performance factor for account %s", accountID)
 			}
 

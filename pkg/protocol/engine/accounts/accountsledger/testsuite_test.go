@@ -154,6 +154,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 			DelegationStakeChange: action.DelegationStakeChange,
 			ValidatorStakeChange:  action.ValidatorStakeChange,
 			StakeEndEpochChange:   action.StakeEndEpochChange,
+			FixedCostChange:       action.FixedCostChange,
 		}
 
 		if action.TotalAllotments+lo.Sum(action.Burns...) != 0 || !exists {
@@ -171,7 +172,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 
 			prevAccountFields.OutputID = outputID
 
-		} else if action.StakeEndEpochChange != 0 || action.ValidatorStakeChange != 0 {
+		} else if action.StakeEndEpochChange != 0 || action.ValidatorStakeChange != 0 || action.FixedCostChange != 0 {
 			panic("need to update outputID when updating stake end epoch or staking change")
 		}
 
@@ -257,8 +258,8 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 
 	require.Equal(t.T, expectedState.StakeEndEpoch, actualState.StakeEndEpoch, "slotIndex: %d, accountID %s: expected StakeEndEpoch: %d, actual: %d", slotIndex, accountID, expectedState.StakeEndEpoch, actualState.StakeEndEpoch)
 	require.Equal(t.T, expectedState.ValidatorStake, actualState.ValidatorStake, "slotIndex: %d, accountID %s: expected ValidatorStake: %d, actual: %d", slotIndex, accountID, expectedState.ValidatorStake, actualState.ValidatorStake)
+	require.Equal(t.T, expectedState.FixedCost, actualState.FixedCost, "slotIndex: %d, accountID %s: expected FixedCost: %d, actual: %d", slotIndex, accountID, expectedState.FixedCost, actualState.FixedCost)
 	require.Equal(t.T, expectedState.DelegationStake, actualState.DelegationStake, "slotIndex: %d, accountID %s: expected DelegationStake: %d, actual: %d", slotIndex, accountID, expectedState.DelegationStake, actualState.DelegationStake)
-
 }
 
 func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
@@ -352,6 +353,7 @@ type AccountActions struct {
 
 	ValidatorStakeChange int64
 	StakeEndEpochChange  int64
+	FixedCostChange      int64
 
 	DelegationStakeChange int64
 
@@ -367,6 +369,7 @@ type AccountState struct {
 
 	ValidatorStake  uint64
 	DelegationStake uint64
+	FixedCost       uint64
 	StakeEndEpoch   iotago.EpochIndex
 
 	Destroyed bool

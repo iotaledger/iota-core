@@ -38,6 +38,7 @@ type AccountDiff struct {
 
 	ValidatorStakeChange int64
 	StakeEndEpochChange  int64
+	FixedCostChange      int64
 
 	DelegationStakeChange int64
 }
@@ -54,6 +55,7 @@ func NewAccountDiff() *AccountDiff {
 		ValidatorStakeChange:  0,
 		DelegationStakeChange: 0,
 		StakeEndEpochChange:   0,
+		FixedCostChange:       0,
 	}
 }
 
@@ -75,6 +77,7 @@ func (d AccountDiff) Bytes() ([]byte, error) {
 
 	m.WriteInt64(d.ValidatorStakeChange)
 	m.WriteInt64(d.DelegationStakeChange)
+	m.WriteInt64(d.FixedCostChange)
 	m.WriteUint64(uint64(d.StakeEndEpochChange))
 
 	return m.Bytes(), nil
@@ -90,6 +93,7 @@ func (d *AccountDiff) Clone() *AccountDiff {
 		PubKeysRemoved:        lo.CopySlice(d.PubKeysRemoved),
 		ValidatorStakeChange:  d.ValidatorStakeChange,
 		DelegationStakeChange: d.DelegationStakeChange,
+		FixedCostChange:       d.FixedCostChange,
 		StakeEndEpochChange:   d.StakeEndEpochChange,
 	}
 }
@@ -144,6 +148,11 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.DelegationStakeChange); err != nil {
 		return offset, errors.Wrapf(err, "unable to read delegation stake change in the diff")
+	}
+	offset += 8
+
+	if err = binary.Read(reader, binary.LittleEndian, &d.FixedCostChange); err != nil {
+		return offset, errors.Wrapf(err, "unable to read fixed cost change in the diff")
 	}
 	offset += 8
 
