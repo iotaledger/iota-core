@@ -95,7 +95,7 @@ func (t *TestFramework) IssueUnsignedBlockWithPoWScore(alias string, minPowScore
 func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index iotago.SlotIndex, committing iotago.SlotIndex) {
 	block, err := builder.NewBlockBuilder().
 		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
-		IssuingTime(t.api.SlotTimeProvider().StartTime(index)).
+		IssuingTime(t.api.TimeProvider().SlotStartTime(index)).
 		SlotCommitment(iotago.NewCommitment(committing, iotago.CommitmentID{}, iotago.Identifier{}, 0)).
 		Build()
 	require.NoError(t.Test, err)

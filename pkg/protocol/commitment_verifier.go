@@ -71,7 +71,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		}
 
 		// TODO: this might differ if we have a Accounts with changing weights depending on the SlotIndex/epoch
-		attestationBlockID, err := att.BlockID(c.engine.API().SlotTimeProvider())
+		attestationBlockID, err := att.BlockID(c.engine.API().TimeProvider())
 		if err != nil {
 			return nil, 0, errors.Wrapf(err, "error calculating blockID from attestation")
 		}
@@ -81,7 +81,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 
 		visitedIdentities.Add(att.IssuerID)
 
-		blockID, err := att.BlockID(c.engine.API().SlotTimeProvider())
+		blockID, err := att.BlockID(c.engine.API().TimeProvider())
 		if err != nil {
 			return nil, 0, errors.Wrapf(err, "error calculating blockID from attestation")
 		}
