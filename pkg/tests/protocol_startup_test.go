@@ -64,6 +64,11 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		node2.AccountID,
 	}
 
+	expectedOnlineCommittee := []account.SeatIndex{
+		node1.ValidatorSeat,
+		node2.ValidatorSeat,
+	}
+
 	// Verify that nodes have the expected states.
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),
@@ -73,7 +78,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
-		testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+		testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -156,7 +161,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(6, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(1),
 			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*")),
@@ -195,7 +200,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(8, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(3),
 			testsuite.WithActiveRootBlocks(ts.Blocks("1.1", "1.1*", "2.2", "2.2*", "3.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2")),
@@ -235,7 +240,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(7),
 			testsuite.WithActiveRootBlocks(ts.Blocks("5.1", "6.2", "7.1")),
 		)
@@ -278,7 +283,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(3),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(12, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(7),
 			testsuite.WithActiveRootBlocks(ts.Blocks("5.1", "6.2", "7.1")),
 		)
@@ -323,7 +328,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
 			testsuite.WithActiveRootBlocks(ts.Blocks("8.2", "9.2", "10.2")),
 		)
@@ -363,7 +368,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(14, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
 			testsuite.WithActiveRootBlocks(ts.Blocks("8.2", "9.2", "10.2")),
 		)
@@ -418,7 +423,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(10, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
 			testsuite.WithActiveRootBlocks(ts.Blocks("8.2", "9.2", "10.2")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("4.2", "5.1", "6.2", "7.1", "8.2", "9.2")),
@@ -473,7 +478,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(7),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(10, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
 			testsuite.WithActiveRootBlocks(ts.Blocks("8.2", "9.2", "10.2")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("5.1", "6.2", "7.1", "8.2", "9.2", "10.2")),
@@ -513,7 +518,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				testsuite.WithLatestCommitmentSlotIndex(11),
 				testsuite.WithLatestFinalizedSlot(7),
 				testsuite.WithSybilProtectionCommittee(16, expectedCommittee),
-				testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 				testsuite.WithEvictedSlot(11),
 				testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.1")),
 				testsuite.WithChainManagerIsSolid(),
@@ -571,6 +576,11 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		node2.AccountID,
 	}
 
+	expectedOnlineCommittee := []account.SeatIndex{
+		node1.ValidatorSeat,
+		node2.ValidatorSeat,
+	}
+
 	// Verify that nodes have the expected states.
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),
@@ -580,7 +590,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
-		testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+		testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -663,7 +673,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(6, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(1),
 			testsuite.WithActiveRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*")),
@@ -703,7 +713,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(3),
 			testsuite.WithActiveRootBlocks(ts.Blocks("1.1", "1.1*", "2.2", "2.2*", "3.1")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis", "1.1", "1.1*", "2.2", "2.2*", "3.1", "4.2")),
@@ -743,7 +753,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(10, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(8),
 			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "8.1")),
 		)
@@ -786,7 +796,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(3),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(8),
 			testsuite.WithActiveRootBlocks(ts.Blocks("6.2", "8.1")),
 		)
@@ -831,7 +841,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(8),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(14, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.2")),
 		)
@@ -871,7 +881,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(8),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(15, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.2")),
 		)
@@ -926,7 +936,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(8),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.2")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("5.1", "6.2", "8.1", "9.2", "10.2")),
@@ -981,7 +991,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(8),
 			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 			testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(ts.Blocks("9.2", "10.2", "11.2")),
 			testsuite.WithStorageRootBlocks(ts.Blocks("6.2", "8.1", "9.2", "10.2", "11.2")),
@@ -1021,7 +1031,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 				testsuite.WithLatestCommitmentSlotIndex(12),
 				testsuite.WithLatestFinalizedSlot(8),
 				testsuite.WithSybilProtectionCommittee(17, expectedCommittee),
-				testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{0, 1}),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 				testsuite.WithEvictedSlot(12),
 				testsuite.WithActiveRootBlocks(ts.Blocks("10.2", "11.2", "12.1")),
 				testsuite.WithChainManagerIsSolid(),

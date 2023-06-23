@@ -36,8 +36,9 @@ import (
 type Node struct {
 	Testing *testing.T
 
-	Name      string
-	Validator bool
+	Name          string
+	Validator     bool
+	ValidatorSeat account.SeatIndex
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc

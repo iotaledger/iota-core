@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -74,9 +73,7 @@ func TestConfirmationFlags(t *testing.T) {
 		testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
-		testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{
-			0, //nodeA
-		}),
+		testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat),
 		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -125,10 +122,7 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(2),
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(4, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{
-				0, //nodeA
-				1, //nodeB
-			}),
+			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat),
 			testsuite.WithEvictedSlot(2),
 		)
 	}
@@ -162,11 +156,7 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(2),
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(5, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{
-				0, //nodeA
-				1, //nodeB
-				2, //nodeC
-			}),
+			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat, nodeC.ValidatorSeat),
 			testsuite.WithEvictedSlot(2),
 		)
 	}
@@ -218,11 +208,7 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(3),
 			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithSybilProtectionCommittee(6, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee([]account.SeatIndex{
-				0, //nodeA,
-				1, //nodeB,
-				2, //nodeC,
-			}),
+			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat, nodeC.ValidatorSeat),
 			testsuite.WithEvictedSlot(3),
 		)
 	}

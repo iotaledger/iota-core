@@ -95,15 +95,15 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		node6.AccountID,
 	}
 	expectedP1Committee := []account.SeatIndex{
-		0, //node0
-		1, //node1
-		2, //node2
-		3, //node3
-		4, //node4
+		node0.ValidatorSeat,
+		node1.ValidatorSeat,
+		node2.ValidatorSeat,
+		node3.ValidatorSeat,
+		node4.ValidatorSeat,
 	}
 	expectedP2Committee := []account.SeatIndex{
-		5, //node5
-		6, //node6
+		node5.ValidatorSeat,
+		node6.ValidatorSeat,
 	}
 
 	// Verify that nodes have the expected states.
@@ -176,7 +176,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
-				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee...),
 				testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
 				testsuite.WithEvictedSlot(7),
 			)
@@ -223,7 +223,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestFinalizedSlot(7),
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
-				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee...),
 				testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
 				testsuite.WithEvictedSlot(9),
 			)
@@ -261,7 +261,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestFinalizedSlot(7),
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
-				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee...),
 				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
 				testsuite.WithEvictedSlot(10),
 			)
@@ -310,7 +310,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestFinalizedSlot(9),
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
-				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee...),
 				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
 				testsuite.WithEvictedSlot(11),
 			)
@@ -351,7 +351,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
-				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee...),
 				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
 				testsuite.WithEvictedSlot(8),
 			)
@@ -377,7 +377,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestFinalizedSlot(0),              // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
-				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee...),
 				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
 				testsuite.WithEvictedSlot(11),
 			)
@@ -407,7 +407,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
 				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 
-				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee),
+				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee...),
 				testsuite.WithSybilProtectionCommittee(18, expectedCommittee),
 				testsuite.WithEvictedSlot(13),
 			)

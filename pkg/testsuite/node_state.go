@@ -142,7 +142,7 @@ func WithSybilProtectionCommittee(index iotago.SlotIndex, committee []iotago.Acc
 	}
 }
 
-func WithSybilProtectionOnlineCommittee(committee []account.SeatIndex) options.Option[NodeState] {
+func WithSybilProtectionOnlineCommittee(committee ...account.SeatIndex) options.Option[NodeState] {
 	return func(state *NodeState) {
 		state.sybilProtectionOnlineCommittee = &committee
 	}

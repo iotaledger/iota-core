@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -400,9 +401,12 @@ func (t *TestSuite) Validators() []iotago.AccountID {
 		}
 
 		var validators = []iotago.AccountID{}
+		var seat account.SeatIndex
 		t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 			if node.Validator {
+				node.ValidatorSeat = seat
 				validators = append(validators, node.AccountID)
+				seat++
 			}
 
 			return true
