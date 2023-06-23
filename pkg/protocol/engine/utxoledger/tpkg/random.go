@@ -23,6 +23,7 @@ var (
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
 		MaxCommittableAge:     10,
+		OrphanageThreshold:    3,
 	}
 	api = iotago.LatestAPI(protocolParams)
 )

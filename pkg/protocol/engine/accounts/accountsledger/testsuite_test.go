@@ -62,6 +62,7 @@ func NewTestSuite(test *testing.T) *TestSuite {
 			SlotDurationInSeconds: 10,
 			EpochDurationInSlots:  5,
 			MaxCommittableAge:     10,
+			OrphanageThreshold:    3,
 		},
 
 		blocks:                 memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block](),
@@ -97,7 +98,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	}
 
 	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB())
-	manager.SetMaxCommittableAge(iotago.SlotIndex(t.ProtocolParameters.MaxCommittableAge))
+	manager.SetMaxCommittableAge(t.ProtocolParameters.MaxCommittableAge)
 
 	return manager
 }

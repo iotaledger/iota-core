@@ -26,6 +26,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
 		MaxCommittableAge:     10,
+		OrphanageThreshold:    3,
 	}),
 	snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
 		iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
@@ -48,6 +49,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
 		MaxCommittableAge:     10,
+		OrphanageThreshold:    3,
 	}),
 }
 
@@ -67,5 +69,6 @@ var Feature = []options.Option[snapshotcreator.Options]{
 		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 		SlotDurationInSeconds: 10,
 		MaxCommittableAge:     10,
+		OrphanageThreshold:    3,
 	}),
 }

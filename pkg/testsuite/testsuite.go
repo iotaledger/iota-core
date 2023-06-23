@@ -89,6 +89,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			SlotDurationInSeconds: 10,
 			EpochDurationInSlots:  5,
 			MaxCommittableAge:     10,
+			OrphanageThreshold:    3,
 		}
 
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
