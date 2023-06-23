@@ -59,20 +59,17 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 		l := New(
 			e.Storage.Ledger(),
 			e.Storage.Accounts(),
-			e.Storage.Rewards(),
-			e.Storage.PoolStats(),
 			e.Storage.Commitments().Load,
 			e.BlockCache.Block,
 			e.Storage.AccountDiffs,
-			e.Storage.PerformanceFactors,
 			e.API,
-			e.Storage.Settings().ProtocolParameters().ManaDecayProvider(),
 			e.ErrorHandler("ledger"),
 		)
 
 		// TODO: when should ledgerState be pruned?
 
 		e.HookConstructed(func() {
+			// TODO: create an Init method that is called with all additional dependencies on e.HookInitialized()
 			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](e.SybilProtection.OnlineCommittee())
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
@@ -82,18 +79,19 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			wpAccounts := e.Workers.CreateGroup("Accounts").CreatePool("trackBurnt", 1)
 			e.Events.BlockGadget.BlockAccepted.Hook(l.accountsLedger.TrackBlock, event.WithWorkerPool(wpAccounts))
 			e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
-			e.Events.BlockGadget.BlockAccepted.Hook(l.rewardsManager.BlockAccepted)
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 		})
-		e.HookInitialized(func() {
+		e.Storage.Settings().HookInitialized(func() {
 			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
 			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
 			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
-			l.TriggerConstructed()
-
+			l.rewardsManager = rewards.New(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
 			l.accountsLedger.SetMaxCommittableAge(l.protocolParameters.MaxCommittableAge)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
+			e.Events.BlockGadget.BlockAccepted.Hook(l.rewardsManager.BlockAccepted)
+
+			l.TriggerConstructed()
 			l.TriggerInitialized()
 		})
 
@@ -103,21 +101,15 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 func New(
 	utxoStore,
-	accountsStore,
-	rewardsStore,
-	poolStatsStore kvstore.KVStore,
+	accountsStore kvstore.KVStore,
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
-	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
 	apiProvider func() iotago.API,
-	decayProvider *iotago.ManaDecayProvider,
 	errorHandler func(error),
 ) *Ledger {
 	return &Ledger{
-		apiProvider:      apiProvider,
-		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProvider()),
-		rewardsManager:   rewards.New(rewardsStore, poolStatsStore, performanceFactorsFunc, apiProvider().TimeProvider(), decayProvider),
+		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore),
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
 		errorHandler:     errorHandler,

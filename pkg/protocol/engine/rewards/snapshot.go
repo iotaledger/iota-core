@@ -46,10 +46,12 @@ func (m *Manager) importPerformanceFactor(reader io.ReadSeeker) error {
 		if err := binary.Read(reader, binary.LittleEndian, &slotIndex); err != nil {
 			return errors.Wrap(err, "unable to read slot index")
 		}
+
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
 			return errors.Wrap(err, "unable to read accounts count")
 		}
+
 		performanceFactors, _ := m.performanceFactorsCache.GetOrCreate(slotIndex, func() *prunable.PerformanceFactors {
 			return m.performanceFactorsFunc(slotIndex)
 		})

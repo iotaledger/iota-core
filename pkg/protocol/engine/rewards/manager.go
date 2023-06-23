@@ -96,6 +96,7 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 	defer m.mutex.RUnlock()
 
 	rewardsTree := ads.NewMap[iotago.AccountID, RewardsForAccount](m.rewardsStorage(epochIndex))
+
 	epochSlotStart := m.timeProvider.EpochStart(epochIndex)
 	epochSlotEnd := m.timeProvider.EpochEnd(epochIndex)
 
@@ -147,7 +148,7 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 	return nil
 }
 
-func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount int64, epochStart, epochEnd iotago.EpochIndex) (validatorReward uint64, err error) {
+func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint64, epochStart, epochEnd iotago.EpochIndex) (validatorReward uint64, err error) {
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
 		rewardsForAccountInEpoch, exists := m.rewardsForAccount(validatorID, epochIndex)
 		if !exists {
@@ -162,7 +163,7 @@ func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount int6
 		unDecayedEpochRewards := rewardsForAccountInEpoch.FixedCost +
 			((poolStats.ProfitMargin * rewardsForAccountInEpoch.PoolRewards) >> 8) +
 			((((1<<8)-poolStats.ProfitMargin)*rewardsForAccountInEpoch.PoolRewards)>>8)*
-				uint64(stakeAmount)/
+				stakeAmount/
 				rewardsForAccountInEpoch.PoolStake
 
 		decayedEpochRewards := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
@@ -172,7 +173,7 @@ func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount int6
 	return validatorReward, nil
 }
 
-func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount int64, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward uint64, err error) {
+func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount uint64, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward uint64, err error) {
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
 		rewardsForAccountInEpoch, exists := m.rewardsForAccount(validatorID, epochIndex)
 		if !exists {
@@ -185,7 +186,7 @@ func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 		}
 
 		unDecayedEpochRewards := ((((1 << 8) - poolStats.ProfitMargin) * rewardsForAccountInEpoch.PoolRewards) >> 8) *
-			uint64(delegatedAmount) /
+			delegatedAmount /
 			rewardsForAccountInEpoch.PoolStake
 
 		decayedEpochRewards := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)

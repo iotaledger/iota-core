@@ -60,6 +60,7 @@ func NewTestSuite(test *testing.T) *TestSuite {
 			TokenSupply:           utils.RandAmount(),
 			GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 			SlotDurationInSeconds: 10,
+			EpochDurationInSlots:  1000,
 			MaxCommittableAge:     10,
 		},
 
@@ -95,7 +96,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 		return storage.Get(id)
 	}
 
-	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB(), t.API())
+	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB())
 	manager.SetMaxCommittableAge(iotago.SlotIndex(t.ProtocolParameters.MaxCommittableAge))
 
 	return manager
@@ -238,7 +239,6 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 	expectedCredits := accounts.NewBlockIssuanceCredits(int64(expectedState.BICAmount), expectedState.BICUpdatedTime)
 
 	actualState, exists, err := t.Instance.Account(accountID, slotIndex)
-	fmt.Printf("account state at slot %d %+v\n", slotIndex, actualState)
 	require.NoError(t.T, err)
 
 	if expectedState.Destroyed {
