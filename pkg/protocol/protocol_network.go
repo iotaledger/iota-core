@@ -34,7 +34,7 @@ func (p *Protocol) runNetworkProtocol() {
 		p.networkProtocol.RequestBlock(blockID)
 	}, event.WithWorkerPool(wpBlocks))
 
-	p.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+	p.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
 		p.networkProtocol.SendBlock(block.ModelBlock())
 	}, event.WithWorkerPool(wpBlocks))
 
