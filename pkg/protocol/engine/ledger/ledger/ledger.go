@@ -28,6 +28,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/rewards"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -36,6 +37,8 @@ import (
 var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
 
 type Ledger struct {
+	events *ledger.Events
+
 	apiProvider func() iotago.API
 
 	utxoLedger       *utxoledger.Manager
@@ -44,8 +47,10 @@ type Ledger struct {
 	rewardsManager   *rewards.Manager
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
-	memPool            mempool.MemPool[ledger.BlockVotePower]
-	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
+	sybilProtection sybilprotection.SybilProtection
+
+	memPool            mempool.MemPool[ledger.BlockVoteRank]
+	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
 	errorHandler       func(error)
 	protocolParameters *iotago.ProtocolParameters
 
@@ -59,41 +64,44 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 		l := New(
 			e.Storage.Ledger(),
 			e.Storage.Accounts(),
-			e.Storage.Rewards(),
-			e.Storage.PoolStats(),
 			e.Storage.Commitments().Load,
 			e.BlockCache.Block,
 			e.Storage.AccountDiffs,
-			e.Storage.PerformanceFactors,
 			e.API,
-			e.Storage.Settings().ProtocolParameters().ManaDecayProvider(),
+			e.SybilProtection,
 			e.ErrorHandler("ledger"),
 		)
 
 		// TODO: when should ledgerState be pruned?
 
 		e.HookConstructed(func() {
-			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](e.SybilProtection.OnlineCommittee())
+			// TODO: create an Init method that is called with all additional dependencies on e.HookInitialized()
+			e.Events.Ledger.LinkTo(l.events)
+			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
-			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVotePower](true))
+			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
-
-			wpAccounts := e.Workers.CreateGroup("Accounts").CreatePool("trackBurnt", 1)
-			e.Events.BlockGadget.BlockAccepted.Hook(l.accountsLedger.TrackBlock, event.WithWorkerPool(wpAccounts))
-			e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
-			e.Events.BlockGadget.BlockAccepted.Hook(l.rewardsManager.BlockAccepted)
-			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 		})
-		e.HookInitialized(func() {
+		e.Storage.Settings().HookInitialized(func() {
 			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
 			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
 			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
-			l.TriggerConstructed()
-
+			l.rewardsManager = rewards.New(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
 			l.accountsLedger.SetMaxCommittableAge(l.protocolParameters.MaxCommittableAge)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
+			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)
+			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+				l.accountsLedger.TrackBlock(block)
+				l.BlockAccepted(block)
+				l.rewardsManager.BlockAccepted(block)
+				l.events.BlockProcessed.Trigger(block)
+			}, event.WithWorkerPool(wp))
+
+			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
+
+			l.TriggerConstructed()
 			l.TriggerInitialized()
 		})
 
@@ -103,24 +111,23 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 func New(
 	utxoStore,
-	accountsStore,
-	rewardsStore,
-	poolStatsStore kvstore.KVStore,
+	accountsStore kvstore.KVStore,
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
-	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
 	apiProvider func() iotago.API,
-	decayProvider *iotago.ManaDecayProvider,
+	sybilProtection sybilprotection.SybilProtection,
 	errorHandler func(error),
 ) *Ledger {
 	return &Ledger{
+		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
-		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProvider()),
-		rewardsManager:   rewards.New(rewardsStore, poolStatsStore, performanceFactorsFunc, apiProvider().TimeProvider(), decayProvider),
+		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore),
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
+		sybilProtection:  sybilProtection,
 		errorHandler:     errorHandler,
+		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](sybilProtection.OnlineCommittee().Size),
 	}
 }
 
@@ -169,7 +176,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	// account changes at UTXO level without needing to worry about multiple spends of the same account in the same slot,
 	// we only care about the initial account output to be consumed and the final account output to be created.
 	// output side
-	createdAccounts, consumedAccounts, destroyedAccounts, err := l.getCreatedAndConsumedAccountOutputs(stateDiff)
+	createdAccounts, consumedAccounts, destroyedAccounts, err := l.processCreatedAndConsumedAccountOutputs(stateDiff, accountDiffs)
 	if err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, xerrors.Errorf("failed to process outputs consumed and created in slot %d: %w", index, err)
 	}
@@ -269,7 +276,7 @@ func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempoo
 	return l.memPool.TransactionMetadataByAttachment(blockID)
 }
 
-func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower] {
+func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank] {
 	return l.conflictDAG
 }
 
@@ -401,10 +408,12 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 	}
 }
 
-func (l *Ledger) getCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], err error) {
+func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], err error) {
 	createdAccounts = make(map[iotago.AccountID]*utxoledger.Output)
 	consumedAccounts = make(map[iotago.AccountID]*utxoledger.Output)
 	destroyedAccounts = advancedset.New[iotago.AccountID]()
+
+	createdAccountDelegation := make(map[iotago.ChainID]*iotago.DelegationOutput)
 
 	stateDiff.CreatedStates().ForEachKey(func(outputID iotago.OutputID) bool {
 		createdOutput, errOutput := l.Output(outputID.UTXOInput())
@@ -430,7 +439,10 @@ func (l *Ledger) getCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff
 			createdAccounts[accountID] = createdOutput
 		}
 
-		// TODO: collect DelegationOutputs
+		if createdOutput.OutputType() == iotago.OutputDelegation {
+			delegation, _ := createdOutput.Output().(*iotago.DelegationOutput)
+			createdAccountDelegation[delegation.DelegationID] = delegation
+		}
 
 		return true
 	})
@@ -462,10 +474,33 @@ func (l *Ledger) getCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff
 			}
 		}
 
-		// TODO: collect DelegationOutputs
+		if spentOutput.OutputType() == iotago.OutputDelegation {
+			delegationOutput, _ := spentOutput.Output().(*iotago.DelegationOutput)
+			if _, createdDelegationExists := createdAccountDelegation[delegationOutput.DelegationID]; createdDelegationExists {
+				delete(createdAccountDelegation, delegationOutput.DelegationID)
+			} else {
+				accountDiff, exists := accountDiffs[delegationOutput.ValidatorID]
+				if !exists {
+					accountDiff = prunable.NewAccountDiff()
+					accountDiffs[delegationOutput.ValidatorID] = accountDiff
+				}
+
+				accountDiff.DelegationStakeChange -= int64(delegationOutput.DelegatedAmount)
+			}
+		}
 
 		return true
 	})
+
+	for _, delegationOutput := range createdAccountDelegation {
+		accountDiff, exists := accountDiffs[delegationOutput.ValidatorID]
+		if !exists {
+			accountDiff = prunable.NewAccountDiff()
+			accountDiffs[delegationOutput.ValidatorID] = accountDiff
+		}
+
+		accountDiff.DelegationStakeChange += int64(delegationOutput.DelegatedAmount)
+	}
 
 	if err != nil {
 		return nil, nil, nil, xerrors.Errorf("error while processing created states: %w", err)
@@ -599,8 +634,14 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
-	votePower := ledger.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
-	if err := l.conflictDAG.CastVotes(vote.NewVote(block.Block().IssuerID, votePower), block.ConflictIDs()); err != nil {
+	voteRank := ledger.NewBlockVoteRank(block.ID(), block.Block().IssuingTime)
+
+	seat, exists := l.sybilProtection.Committee(block.ID().Index()).GetSeat(block.Block().IssuerID)
+	if !exists {
+		return
+	}
+
+	if err := l.conflictDAG.CastVotes(vote.NewVote(seat, voteRank), block.ConflictIDs()); err != nil {
 		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
 		//  Do we track witness weight of invalid blocks?
 		l.errorHandler(errors.Wrapf(err, "failed to cast votes for block %s", block.ID()))

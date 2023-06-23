@@ -8,7 +8,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -46,13 +45,13 @@ func (m *Manager) importPerformanceFactor(reader io.ReadSeeker) error {
 		if err := binary.Read(reader, binary.LittleEndian, &slotIndex); err != nil {
 			return errors.Wrap(err, "unable to read slot index")
 		}
+
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
 			return errors.Wrap(err, "unable to read accounts count")
 		}
-		performanceFactors, _ := m.performanceFactorsCache.GetOrCreate(slotIndex, func() *prunable.PerformanceFactors {
-			return m.performanceFactorsFunc(slotIndex)
-		})
+
+		performanceFactors := m.performanceFactorsFunc(slotIndex)
 		for j := uint64(0); j < accountsCount; j++ {
 			var accountID iotago.AccountID
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
@@ -132,17 +131,14 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 	defer m.mutex.Unlock()
 
 	targetEpoch := m.timeProvider.EpochsFromSlot(targetSlotIndex)
-	// if target index is the last slot of the epoch, the epoch was committed
-	if m.timeProvider.EpochEnd(targetEpoch) != targetSlotIndex {
-		if targetEpoch == 1 {
-			targetEpoch = 0
-		} else {
-			targetEpoch--
-		}
-	}
 	positionedWriter := utils.NewPositionedWriter(writer)
 
-	err := m.exportPerformanceFactor(positionedWriter, targetSlotIndex)
+	// if target index is the last slot of the epoch, the epoch was committed
+	if m.timeProvider.EpochEnd(targetEpoch) != targetSlotIndex {
+		targetEpoch--
+	}
+
+	err := m.exportPerformanceFactor(positionedWriter, m.timeProvider.EpochStart(targetEpoch+1), targetSlotIndex)
 	if err != nil {
 		return errors.Wrap(err, "unable to export performance factor")
 	}
@@ -160,7 +156,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 	return nil
 }
 
-func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, targetSlot iotago.SlotIndex) error {
+func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, startSlot, targetSlot iotago.SlotIndex) error {
 	m.performanceFactorsMutex.RLock()
 	defer m.performanceFactorsMutex.RUnlock()
 
@@ -168,22 +164,18 @@ func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, targe
 	if err := pWriter.WriteValue("pf slot count", slotCount, true); err != nil {
 		return errors.Wrap(err, "unable to write pf slot count")
 	}
-	var innerErr error
-	m.performanceFactorsCache.ForEach(func(slotIndex iotago.SlotIndex, pf *prunable.PerformanceFactors) bool {
-		if slotIndex > targetSlot {
-			// continue
-			return true
+
+	for currentSlot := startSlot; currentSlot <= targetSlot; currentSlot++ {
+		if err := pWriter.WriteValue("slot index", currentSlot); err != nil {
+			return errors.Wrap(err, "unable to write slot index")
 		}
+
 		var accountsCount uint64
-		if err := pWriter.WriteValue("slot index", slotIndex); err != nil {
-			innerErr = errors.Wrap(err, "unable to write slot index")
-			return false
-		}
 		if err := pWriter.WriteValue("pf account count", accountsCount, true); err != nil {
-			innerErr = errors.Wrap(err, "unable to write pf accounts count")
-			return false
+			return errors.Wrap(err, "unable to write pf accounts count")
 		}
-		innerErr = pf.ForEachPerformanceFactor(func(accountID iotago.AccountID, pf uint64) error {
+
+		if err := m.performanceFactorsFunc(currentSlot).ForEachPerformanceFactor(func(accountID iotago.AccountID, pf uint64) error {
 			if err := pWriter.WriteValue("account id", accountID); err != nil {
 				return errors.Wrap(err, "unable to write account id")
 
@@ -194,22 +186,17 @@ func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, targe
 			accountsCount++
 
 			return nil
-		})
-		if innerErr != nil {
-			return false
+		}); err != nil {
+			return errors.Wrap(err, "unable to write performance factors")
 		}
+
 		if err := pWriter.WriteValueAtBookmark("pf account count", accountsCount); err != nil {
-			innerErr = errors.Wrap(err, "unable to write pf accounts count")
-			return false
+			return errors.Wrap(err, "unable to write pf accounts count")
 		}
 
 		slotCount++
-
-		return true
-	})
-	if innerErr != nil {
-		return errors.Wrap(innerErr, "unable to write performance factors")
 	}
+
 	if err := pWriter.WriteValueAtBookmark("pf slot count", slotCount); err != nil {
 		return errors.Wrap(err, "unable to write pf slot count")
 	}
@@ -219,7 +206,7 @@ func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, targe
 
 func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotago.EpochIndex) error {
 	// export all stored pools
-	// intheory we could save the epoch count only once, because stats and rewards should be the same length
+	// in theory we could save the epoch count only once, because stats and rewards should be the same length
 	var epochCount uint64
 	if err := pWriter.WriteValue("pool rewards epoch count", epochCount, true); err != nil {
 		return errors.Wrap(err, "unable to write epoch count")

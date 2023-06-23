@@ -27,16 +27,9 @@ type ParametersProtocol struct {
 	}
 
 	SybilProtection struct {
-		Committee Validators `noflag:"true"`
+		Committee []string `usage:"the identities of the validator"`
 	}
 }
-
-type Validator struct {
-	Identity string `usage:"the identity of the validator"`
-	Weight   int64  `usage:"the weight of the validator"`
-}
-
-type Validators []*Validator
 
 // ParametersDatabase contains the definition of configuration parameters used by the storage layer.
 type ParametersDatabase struct {

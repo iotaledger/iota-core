@@ -12,6 +12,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/core/account"
+	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -35,10 +37,10 @@ type TestSuite struct {
 	Network     *mock.Network
 
 	Directory *utils.Directory
-	nodes     map[string]*mock.Node
+	nodes     *orderedmap.OrderedMap[string, *mock.Node]
 	running   bool
 
-	validators     map[iotago.AccountID]int64
+	validators     []iotago.AccountID
 	validatorsOnce sync.Once
 	snapshotPath   string
 	blocks         *shrinkingmap.ShrinkingMap[string, *blocks.Block]
@@ -64,7 +66,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		genesisSeed: tpkg.RandEd25519Seed(),
 		Network:     mock.NewNetwork(),
 		Directory:   utils.NewDirectory(testingT.TempDir()),
-		nodes:       make(map[string]*mock.Node),
+		nodes:       orderedmap.New[string, *mock.Node](),
 		blocks:      shrinkingmap.New[string, *blocks.Block](),
 
 		optsWaitFor:                DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
@@ -85,6 +87,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			TokenSupply:           1_000_0000,
 			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix()) - t.optsGenesisTimestampOffset,
 			SlotDurationInSeconds: 10,
+			EpochDurationInSlots:  8192,
 			MaxCommittableAge:     10,
 		}
 
@@ -236,7 +239,7 @@ func (t *TestSuite) Node(name string) *mock.Node {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	node, exist := t.nodes[name]
+	node, exist := t.nodes.Get(name)
 	if !exist {
 		panic(fmt.Sprintf("node %s does not exist", name))
 	}
@@ -249,10 +252,12 @@ func (t *TestSuite) Nodes(names ...string) []*mock.Node {
 		t.mutex.RLock()
 		defer t.mutex.RUnlock()
 
-		nodes := make([]*mock.Node, 0, len(t.nodes))
-		for _, node := range t.nodes {
+		nodes := make([]*mock.Node, 0, t.nodes.Size())
+		t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 			nodes = append(nodes, node)
-		}
+
+			return true
+		})
 
 		return nodes
 	}
@@ -281,57 +286,65 @@ func (t *TestSuite) Shutdown() {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	for _, node := range t.nodes {
+	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 		node.Shutdown()
-	}
+		return true
+	})
 
 	fmt.Println("======= ATTACHED BLOCKS =======")
-	for _, node := range t.nodes {
+	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 		for _, block := range node.AttachedBlocks() {
 			fmt.Println(node.Name, ">", block)
 		}
-	}
+
+		return true
+	})
 }
 
-func (t *TestSuite) AddValidatorNodeToPartition(name string, weight int64, partition string, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, optDeposit ...uint64) *mock.Node {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	if weight > 0 && t.running {
-		panic(fmt.Sprintf("cannot add validator node %s to partition %s with weight %d: framework already running", name, partition, weight))
+
+	if validator && t.running {
+		panic(fmt.Sprintf("cannot add validator node %s to partition %s: framework already running", name, partition))
 	}
 
-	t.nodes[name] = mock.NewNode(t.Testing, t.Network, partition, name, weight)
+	node := mock.NewNode(t.Testing, t.Network, partition, name, validator)
+	t.nodes.Set(name, node)
 
 	deposit := MinIssuerAccountDeposit
 	if len(optDeposit) > 0 {
 		deposit = optDeposit[0]
 	}
-
 	if deposit > 0 {
 		t.optsAccounts = append(t.optsAccounts, snapshotcreator.AccountDetails{
-			Address:   iotago.Ed25519AddressFromPubKey(t.nodes[name].PubKey),
+			Address:   iotago.Ed25519AddressFromPubKey(node.PubKey),
 			Amount:    deposit,
-			IssuerKey: t.nodes[name].PubKey,
+			IssuerKey: node.PubKey,
 		})
 	}
 
-	return t.nodes[name]
+	return node
 }
 
-func (t *TestSuite) AddValidatorNode(name string, weight int64, optDeposit ...uint64) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, weight, mock.NetworkMainPartition, optDeposit...)
+func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, optDeposit ...uint64) *mock.Node {
+	return t.addNodeToPartition(name, partition, true, optDeposit...)
+}
+
+func (t *TestSuite) AddValidatorNode(name string, optDeposit ...uint64) *mock.Node {
+	return t.addNodeToPartition(name, mock.NetworkMainPartition, true, optDeposit...)
 }
 
 func (t *TestSuite) AddNodeToPartition(name string, partition string, optDeposit ...uint64) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, partition, optDeposit...)
+	return t.addNodeToPartition(name, partition, false, optDeposit...)
 }
 
 func (t *TestSuite) AddNode(name string, optDeposit ...uint64) *mock.Node {
-	return t.AddValidatorNodeToPartition(name, 0, mock.NetworkMainPartition, optDeposit...)
+	return t.addNodeToPartition(name, mock.NetworkMainPartition, false, optDeposit...)
 }
 
 func (t *TestSuite) RemoveNode(name string) {
-	delete(t.nodes, name)
+	t.nodes.Delete(name)
 }
 
 func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
@@ -355,12 +368,13 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
 
-	for _, node := range t.nodes {
+	validators := t.Validators()
+	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 		baseOpts := []options.Option[protocol.Protocol]{
 			protocol.WithSnapshotPath(t.snapshotPath),
 			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(t.Validators()),
+				poa.NewProvider(validators),
 			),
 		}
 		if len(nodesOptions) == 1 {
@@ -374,24 +388,30 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		if t.TransactionFramework == nil {
 			t.TransactionFramework = NewTransactionFramework(node.Protocol, t.genesisSeed[:], t.optsAccounts...)
 		}
-	}
+
+		return true
+	})
 
 	t.running = true
 }
 
-func (t *TestSuite) Validators() map[iotago.AccountID]int64 {
+func (t *TestSuite) Validators() []iotago.AccountID {
 	t.validatorsOnce.Do(func() {
 		if t.running {
 			panic("cannot create validators from nodes: framework already running")
 		}
 
-		validators := make(map[iotago.AccountID]int64)
-		for _, node := range t.nodes {
-			if node.Weight == 0 {
-				continue
+		var validators = []iotago.AccountID{}
+		var seat account.SeatIndex
+		t.nodes.ForEach(func(_ string, node *mock.Node) bool {
+			if node.Validator {
+				node.ValidatorSeat = seat
+				validators = append(validators, node.AccountID)
+				seat++
 			}
-			validators[node.AccountID] = node.Weight
-		}
+
+			return true
+		})
 
 		t.validators = validators
 	})
@@ -403,9 +423,10 @@ func (t *TestSuite) HookLogging() {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	for _, node := range t.nodes {
+	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 		node.HookLogging()
-	}
+		return true
+	})
 }
 
 // Eventually asserts that given condition will be met in opts.waitFor time,

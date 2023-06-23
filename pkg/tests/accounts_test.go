@@ -27,7 +27,7 @@ func Test_TransitionAccount(t *testing.T) {
 	}), testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 50)
+	node1 := ts.AddValidatorNode("node1")
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 	ts.HookLogging()
@@ -98,7 +98,9 @@ func Test_TransitionAccount(t *testing.T) {
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX2", append(newAccountWallets, destroyWallets...),
 			testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 				&iotago.BICInput{
-					AccountID:    genesisAccountOutput.AccountID,
+					AccountID: genesisAccountOutput.AccountID,
+				},
+				&iotago.CommitmentInput{
 					CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
 				},
 			}),

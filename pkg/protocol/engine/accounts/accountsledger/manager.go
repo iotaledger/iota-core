@@ -21,7 +21,6 @@ import (
 
 // Manager is a Block Issuer Credits module responsible for tracking block issuance credit balances.
 type Manager struct {
-	api iotago.API
 	// blockBurns keep tracks of the block issues up to the LatestCommittedSlot. They are used to deduct the burned
 	// amount from the account's credits upon slot commitment.
 	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]]
@@ -51,10 +50,8 @@ func New(
 	blockFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
 	accountsStore kvstore.KVStore,
-	api iotago.API,
 ) *Manager {
 	return &Manager{
-		api:          api,
 		blockBurns:   shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
 		accountsTree: ads.NewMap[iotago.AccountID, accounts.AccountData](accountsStore),
 		block:        blockFunc,

@@ -6,7 +6,6 @@ import (
 	"github.com/cockroachdb/errors"
 
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -20,15 +19,12 @@ type Manager struct {
 
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
 
-	// Cache to allow atomic increase operations protected by a lock
-	performanceFactorsCache *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *prunable.PerformanceFactors]
-	performanceFactorsMutex sync.RWMutex
-
 	timeProvider *iotago.TimeProvider
 
 	decayProvider *iotago.ManaDecayProvider
 
-	mutex sync.RWMutex
+	performanceFactorsMutex sync.RWMutex
+	mutex                   sync.RWMutex
 }
 
 func New(
@@ -39,12 +35,11 @@ func New(
 	decayProvider *iotago.ManaDecayProvider,
 ) *Manager {
 	return &Manager{
-		rewardBaseStore:         rewardsBaseStore,
-		poolStatsStore:          poolStatsStore,
-		performanceFactorsCache: shrinkingmap.New[iotago.SlotIndex, *prunable.PerformanceFactors](),
-		performanceFactorsFunc:  performanceFactorsFunc,
-		timeProvider:            timeProvider,
-		decayProvider:           decayProvider,
+		rewardBaseStore:        rewardsBaseStore,
+		poolStatsStore:         poolStatsStore,
+		performanceFactorsFunc: performanceFactorsFunc,
+		timeProvider:           timeProvider,
+		decayProvider:          decayProvider,
 	}
 }
 
@@ -61,9 +56,7 @@ func (m *Manager) BlockAccepted(block *blocks.Block) {
 
 	// TODO: check if this block is a validator block
 
-	performanceFactors, _ := m.performanceFactorsCache.GetOrCreate(block.ID().Index(), func() *prunable.PerformanceFactors {
-		return m.performanceFactorsFunc(block.ID().Index())
-	})
+	performanceFactors := m.performanceFactorsFunc(block.ID().Index())
 	pf, err := performanceFactors.Load(block.Block().IssuerID)
 	if err != nil {
 		panic(err)
@@ -75,15 +68,6 @@ func (m *Manager) BlockAccepted(block *blocks.Block) {
 	}
 }
 
-func (m *Manager) evictPerformanceFactors(startSlot, endSlot iotago.SlotIndex) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	for index := startSlot; index <= endSlot; index++ {
-		m.performanceFactorsCache.Delete(index)
-	}
-}
-
 func (m *Manager) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -92,10 +76,11 @@ func (m *Manager) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 }
 
 func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago.AccountID]*Pool) error {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	rewardsTree := ads.NewMap[iotago.AccountID, RewardsForAccount](m.rewardsStorage(epochIndex))
+
 	epochSlotStart := m.timeProvider.EpochStart(epochIndex)
 	epochSlotEnd := m.timeProvider.EpochEnd(epochIndex)
 
@@ -121,7 +106,7 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 	for accountID, pool := range poolStakes {
 		intermediateFactors := make([]uint64, 0)
 		for slot := epochSlotStart; slot <= epochSlotEnd; slot++ {
-			performanceFactorStorage, _ := m.performanceFactorsCache.Get(slot)
+			performanceFactorStorage := m.performanceFactorsFunc(slot)
 			if performanceFactorStorage == nil {
 				intermediateFactors = append(intermediateFactors, 0)
 			}
@@ -141,12 +126,14 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 			FixedCost:   pool.FixedCost,
 		})
 	}
-	m.evictPerformanceFactors(epochSlotStart, epochSlotEnd)
 
 	return nil
 }
 
-func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount int64, epochStart, epochEnd iotago.EpochIndex) (validatorReward uint64, err error) {
+func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint64, epochStart, epochEnd iotago.EpochIndex) (validatorReward uint64, err error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
 		rewardsForAccountInEpoch, exists := m.rewardsForAccount(validatorID, epochIndex)
 		if !exists {
@@ -161,7 +148,7 @@ func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount int6
 		unDecayedEpochRewards := rewardsForAccountInEpoch.FixedCost +
 			((poolStats.ProfitMargin * rewardsForAccountInEpoch.PoolRewards) >> 8) +
 			((((1<<8)-poolStats.ProfitMargin)*rewardsForAccountInEpoch.PoolRewards)>>8)*
-				uint64(stakeAmount)/
+				stakeAmount/
 				rewardsForAccountInEpoch.PoolStake
 
 		decayedEpochRewards := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
@@ -171,7 +158,10 @@ func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount int6
 	return validatorReward, nil
 }
 
-func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount int64, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward uint64, err error) {
+func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount uint64, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward uint64, err error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
 		rewardsForAccountInEpoch, exists := m.rewardsForAccount(validatorID, epochIndex)
 		if !exists {
@@ -184,7 +174,7 @@ func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 		}
 
 		unDecayedEpochRewards := ((((1 << 8) - poolStats.ProfitMargin) * rewardsForAccountInEpoch.PoolRewards) >> 8) *
-			uint64(delegatedAmount) /
+			delegatedAmount /
 			rewardsForAccountInEpoch.PoolStake
 
 		decayedEpochRewards := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
