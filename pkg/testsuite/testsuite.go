@@ -91,7 +91,6 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			MaxCommittableAge:     10,
 			ProtocolVersions: []iotago.ProtocolVersion{
 				{Version: 3, StartEpoch: 0},
-				{Version: 4, StartEpoch: 1},
 			},
 		}
 

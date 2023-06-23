@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
@@ -92,7 +93,19 @@ func (t *TestFramework) IssueUnsignedBlockWithPoWScore(alias string, minPowScore
 	return score
 }
 
-func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index iotago.SlotIndex, committing iotago.SlotIndex) {
+func (t *TestFramework) IssueBlockAtSlotWithVersion(alias string, index iotago.SlotIndex, version iotago.Version) *iotago.Block {
+	block, err := builder.NewBlockBuilder().
+		ProtocolVersion(version).
+		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
+		IssuingTime(t.api.TimeProvider().SlotStartTime(index)).
+		Build()
+	require.NoError(t.Test, err)
+
+	t.processBlock(alias, block)
+	return block
+}
+
+func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index iotago.SlotIndex, committing iotago.SlotIndex) *iotago.Block {
 	block, err := builder.NewBlockBuilder().
 		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
 		IssuingTime(t.api.TimeProvider().SlotStartTime(index)).
@@ -101,6 +114,7 @@ func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index iotago.Slot
 	require.NoError(t.Test, err)
 
 	t.processBlock(alias, block)
+	return block
 }
 
 func (t *TestFramework) IssueSigned(alias string) {
@@ -130,7 +144,68 @@ var protoParams = iotago.ProtocolParameters{
 	TokenSupply:           5000,
 	GenesisUnixTimestamp:  uint32(time.Now().Unix()),
 	SlotDurationInSeconds: 10,
+	EpochDurationInSlots:  8,
 	MaxCommittableAge:     10,
+	ProtocolVersions: []iotago.ProtocolVersion{
+		{Version: 3, StartEpoch: 0},
+		{Version: 4, StartEpoch: 3},
+	},
+}
+
+func TestFilter_ProtocolVersion(t *testing.T) {
+	timeProvider := protoParams.TimeProvider()
+
+	tf := NewTestFramework(t,
+		&protoParams,
+		WithSignatureValidation(false),
+		WithMaxAllowedWallClockDrift(time.Duration(uint64(timeProvider.EpochEnd(50))*uint64(protoParams.SlotDurationInSeconds))*time.Second),
+	)
+
+	valid := set.New[string](true)
+	invalid := set.New[string](true)
+
+	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
+		require.True(t, valid.Has(block.ID().Alias()))
+		require.False(t, invalid.Has(block.ID().Alias()))
+	})
+
+	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+		block := event.Block
+		require.False(t, valid.Has(block.ID().Alias()))
+		require.True(t, invalid.Has(block.ID().Alias()))
+		require.True(t, errors.Is(event.Reason, ErrInvalidBlockVersion))
+	})
+
+	invalid.Add("A")
+	tf.IssueBlockAtSlotWithVersion("A", protoParams.TimeProvider().EpochStart(1), 2)
+
+	valid.Add("B")
+	tf.IssueBlockAtSlotWithVersion("B", protoParams.TimeProvider().EpochEnd(1), 3)
+
+	valid.Add("C")
+	tf.IssueBlockAtSlotWithVersion("C", protoParams.TimeProvider().EpochEnd(2), 3)
+
+	invalid.Add("D")
+	tf.IssueBlockAtSlotWithVersion("D", protoParams.TimeProvider().EpochStart(3), 3)
+
+	valid.Add("E")
+	tf.IssueBlockAtSlotWithVersion("E", protoParams.TimeProvider().EpochStart(3), 4)
+	valid.Add("F")
+	tf.IssueBlockAtSlotWithVersion("F", protoParams.TimeProvider().EpochEnd(3), 4)
+
+	valid.Add("G")
+	tf.IssueBlockAtSlotWithVersion("G", protoParams.TimeProvider().EpochStart(5), 4)
+
+	protoParams.ProtocolVersions = append(protoParams.ProtocolVersions, iotago.ProtocolVersion{Version: 5, StartEpoch: 10})
+
+	valid.Add("H")
+	tf.IssueBlockAtSlotWithVersion("H", protoParams.TimeProvider().EpochEnd(9), 4)
+
+	invalid.Add("I")
+	tf.IssueBlockAtSlotWithVersion("I", protoParams.TimeProvider().EpochStart(10), 4)
+
+	valid.Add("J")
+	tf.IssueBlockAtSlotWithVersion("J", protoParams.TimeProvider().EpochStart(10), 5)
 }
 
 func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
