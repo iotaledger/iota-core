@@ -151,8 +151,11 @@ func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint
 				stakeAmount/
 				rewardsForAccountInEpoch.PoolStake
 
-		decayedEpochRewards := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
-		validatorReward += decayedEpochRewards
+		decayedEpochRewards, err := m.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
+		}
+		validatorReward += uint64(decayedEpochRewards)
 	}
 
 	return validatorReward, nil
@@ -177,8 +180,12 @@ func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			delegatedAmount /
 			rewardsForAccountInEpoch.PoolStake
 
-		decayedEpochRewards := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
-		delegatorsReward += decayedEpochRewards
+		decayedEpochRewards, err := m.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
+		}
+
+		delegatorsReward += uint64(decayedEpochRewards)
 	}
 
 	return delegatorsReward, nil
