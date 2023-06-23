@@ -2,13 +2,13 @@ package vote
 
 import (
 	"github.com/iotaledger/hive.go/constraints"
-	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/hive.go/core/account"
 )
 
 // Vote represents a vote that is cast by a voter.
 type Vote[Power constraints.Comparable[Power]] struct {
 	// Voter is the identity of the voter.
-	Voter iotago.AccountID
+	Voter account.SeatIndex
 
 	// Power is the power of the voter.
 	Power Power
@@ -18,7 +18,7 @@ type Vote[Power constraints.Comparable[Power]] struct {
 }
 
 // NewVote creates a new vote.
-func NewVote[Power constraints.Comparable[Power]](voter iotago.AccountID, power Power) *Vote[Power] {
+func NewVote[Power constraints.Comparable[Power]](voter account.SeatIndex, power Power) *Vote[Power] {
 	return &Vote[Power]{
 		Voter: voter,
 		Power: power,

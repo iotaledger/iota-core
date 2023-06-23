@@ -30,7 +30,7 @@ func newTestFramework(t *testing.T) *tests.Framework {
 
 	return tests.NewFramework(
 		t,
-		New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](accountsTestFramework.Committee),
+		New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](accountsTestFramework.Committee.SeatCount),
 		accountsTestFramework,
 		transactionID,
 		outputID,

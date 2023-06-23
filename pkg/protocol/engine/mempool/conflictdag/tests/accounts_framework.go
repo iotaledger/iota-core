@@ -7,13 +7,12 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/core/account"
-	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type AccountsTestFramework struct {
 	Instance  *account.Accounts[iotago.AccountID, *iotago.AccountID]
-	Committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
+	Committee *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
 
 	test              *testing.T
 	identitiesByAlias map[string]iotago.AccountID
@@ -29,13 +28,13 @@ func NewAccountsTestFramework(test *testing.T, instance *account.Accounts[iotago
 	}
 }
 
-func (f *AccountsTestFramework) Add(alias string) bool {
+func (f *AccountsTestFramework) Add(alias string) {
 	validatorID, exists := f.identitiesByAlias[alias]
 	if !exists {
 		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
-	return f.Committee.Add(validatorID)
+	f.Committee.Set(account.SeatIndex(f.Committee.SeatCount()), validatorID)
 }
 
 func (f *AccountsTestFramework) Delete(alias string) bool {
@@ -47,13 +46,13 @@ func (f *AccountsTestFramework) Delete(alias string) bool {
 	return f.Committee.Delete(validatorID)
 }
 
-func (f *AccountsTestFramework) Get(alias string) (weight int64, exists bool) {
+func (f *AccountsTestFramework) Get(alias string) (seat account.SeatIndex, exists bool) {
 	validatorID, exists := f.identitiesByAlias[alias]
 	if !exists {
 		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
-	return f.Committee.Get(validatorID)
+	return f.Committee.GetSeat(validatorID)
 }
 
 func (f *AccountsTestFramework) Has(alias string) bool {
@@ -62,7 +61,7 @@ func (f *AccountsTestFramework) Has(alias string) bool {
 		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
-	return f.Committee.Has(validatorID)
+	return f.Committee.HasAccount(validatorID)
 }
 
 func (f *AccountsTestFramework) ForEachWeighted(callback func(id iotago.AccountID, weight int64) bool) error {
@@ -73,7 +72,7 @@ func (f *AccountsTestFramework) TotalWeight() int64 {
 	return f.Instance.TotalWeight()
 }
 
-func (f *AccountsTestFramework) CreateID(alias string, optWeight ...int64) iotago.AccountID {
+func (f *AccountsTestFramework) CreateID(alias string) iotago.AccountID {
 	_, exists := f.identitiesByAlias[alias]
 	if exists {
 		f.test.Fatal(xerrors.Errorf("identity with alias '%s' already exists", alias))
@@ -83,8 +82,8 @@ func (f *AccountsTestFramework) CreateID(alias string, optWeight ...int64) iotag
 	validatorID := iotago.IdentifierFromData(hashedAlias[:])
 	validatorID.RegisterAlias(alias)
 
-	f.Instance.Set(validatorID, lo.First(optWeight))
-	f.Committee.Add(validatorID)
+	f.Instance.Set(validatorID, 0) // we don't care about weights when doing PoA
+	f.Committee.Set(account.SeatIndex(f.Committee.SeatCount()), validatorID)
 
 	f.identitiesByAlias[alias] = validatorID
 

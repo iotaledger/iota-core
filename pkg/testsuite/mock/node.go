@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -35,8 +36,9 @@ import (
 type Node struct {
 	Testing *testing.T
 
-	Name   string
-	Weight int64
+	Name          string
+	Validator     bool
+	ValidatorSeat account.SeatIndex
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -61,7 +63,7 @@ type Node struct {
 	attachedBlocks []*blocks.Block
 }
 
-func NewNode(t *testing.T, net *Network, partition string, name string, weight int64) *Node {
+func NewNode(t *testing.T, net *Network, partition string, name string, validator bool) *Node {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		panic(err)
@@ -76,7 +78,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 		Testing: t,
 
 		Name:       name,
-		Weight:     weight,
+		Validator:  validator,
 		PubKey:     pub,
 		privateKey: priv,
 		AccountID:  accountID,
@@ -90,7 +92,6 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 }
 
 func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
-	time.Sleep(1 * time.Second)
 	n.Protocol = protocol.New(n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
@@ -293,12 +294,12 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
 	})
 
-	events.SybilProtection.OnlineCommitteeAccountAdded.Hook(func(accountID iotago.AccountID) {
-		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeAccountAdded: %s\n", n.Name, engineName, accountID)
+	events.SybilProtection.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatAdded: %d - %s\n", n.Name, engineName, seat, accountID)
 	})
 
-	events.SybilProtection.OnlineCommitteeAccountRemoved.Hook(func(accountID iotago.AccountID) {
-		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeAccountRemoved: %s\n", n.Name, engineName, accountID)
+	events.SybilProtection.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatRemoved: %d\n", n.Name, engineName, seat)
 	})
 
 	events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
@@ -423,9 +424,14 @@ func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {
 				return
 			}
 
-			n.IssueBlock(ctx, fmt.Sprintf("activity %s.%d", n.Name, counter), blockfactory.WithPayload(&iotago.TaggedData{
-				Tag: []byte(fmt.Sprintf("activity %s.%d", n.Name, counter)),
-			}))
+			blockAlias := fmt.Sprintf("%s-activity.%d", n.Name, counter)
+			n.IssueBlock(ctx, blockAlias,
+				blockfactory.WithPayload(
+					&iotago.TaggedData{
+						Tag: []byte(blockAlias),
+					},
+				),
+			)
 
 			counter++
 			time.Sleep(1 * time.Second)

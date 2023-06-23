@@ -3,7 +3,6 @@ package inmemorybooker
 import (
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -20,8 +19,6 @@ import (
 
 type Booker struct {
 	events *booker.Events
-
-	committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
 
 	bookingOrder *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
@@ -40,7 +37,7 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.SybilProtection.Committee(), e.BlockCache, e.ErrorHandler("booker"), opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e.BlockCache, e.ErrorHandler("booker"), opts...)
 
 		e.HookConstructed(func() {
 			b.ledger = e.Ledger
@@ -63,10 +60,9 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, committee *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:       booker.NewEvents(),
-		committee:    committee,
 		blockCache:   blockCache,
 		workers:      workers,
 		errorHandler: errorHandler,

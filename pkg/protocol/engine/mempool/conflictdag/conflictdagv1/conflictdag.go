@@ -25,8 +25,8 @@ type ConflictDAG[ConflictID, ResourceID conflictdag.IDType, VotePower conflictda
 	// events contains the events of the ConflictDAG.
 	events *conflictdag.Events[ConflictID, ResourceID]
 
-	// committeeSet is the set of validators that are allowed to vote on Conflicts.
-	committeeSet *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
+	//seatCount is a function that returns the number of seats.
+	seatCount func() int
 
 	// conflictsByID is a mapping of ConflictIDs to Conflicts.
 	conflictsByID *shrinkingmap.ShrinkingMap[ConflictID, *Conflict[ConflictID, ResourceID, VotePower]]
@@ -43,20 +43,20 @@ type ConflictDAG[ConflictID, ResourceID conflictdag.IDType, VotePower conflictda
 	mutex sync.RWMutex
 
 	// votingMutex is used to synchronize voting for different identities.
-	votingMutex *syncutils.DAGMutex[iotago.AccountID]
+	votingMutex *syncutils.DAGMutex[account.SeatIndex]
 }
 
 // New creates a new ConflictDAG.
-func New[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.VotePowerType[VotePower]](committeeSet *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]) *ConflictDAG[ConflictID, ResourceID, VotePower] {
+func New[ConflictID, ResourceID conflictdag.IDType, VotePower conflictdag.VotePowerType[VotePower]](seatCount func() int) *ConflictDAG[ConflictID, ResourceID, VotePower] {
 	return &ConflictDAG[ConflictID, ResourceID, VotePower]{
 		events: conflictdag.NewEvents[ConflictID, ResourceID](),
 
-		committeeSet:     committeeSet,
+		seatCount:        seatCount,
 		conflictsByID:    shrinkingmap.New[ConflictID, *Conflict[ConflictID, ResourceID, VotePower]](),
 		conflictUnhooks:  shrinkingmap.New[ConflictID, func()](),
 		conflictSetsByID: shrinkingmap.New[ResourceID, *ConflictSet[ConflictID, ResourceID, VotePower]](),
 		pendingTasks:     syncutils.NewCounter(),
-		votingMutex:      syncutils.NewDAGMutex[iotago.AccountID](),
+		votingMutex:      syncutils.NewDAGMutex[account.SeatIndex](),
 	}
 }
 
@@ -86,7 +86,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CreateConflict(id Confl
 		defer c.mutex.RUnlock()
 
 		_, isNewConflict := c.conflictsByID.GetOrCreate(id, func() *Conflict[ConflictID, ResourceID, VotePower] {
-			newConflict := NewConflict[ConflictID, ResourceID, VotePower](id, weight.New(c.committeeSet), c.pendingTasks, acceptance.ThresholdProvider(c.committeeSet.TotalWeight))
+			newConflict := NewConflict[ConflictID, ResourceID, VotePower](id, weight.New(), c.pendingTasks, acceptance.ThresholdProvider(func() int64 { return int64(c.seatCount()) }))
 
 			// attach to the acceptance state updated event and propagate that event to the outside.
 			// also need to remember the unhook method to properly evict the conflict.
@@ -242,26 +242,20 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) ConflictingConflicts(co
 	return conflictingConflicts, true
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) AllConflictsSupported(issuerID iotago.AccountID, conflictIDs *advancedset.AdvancedSet[ConflictID]) bool {
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) AllConflictsSupported(seat account.SeatIndex, conflictIDs *advancedset.AdvancedSet[ConflictID]) bool {
 	return lo.Return1(c.conflicts(conflictIDs, true)).ForEach(func(conflict *Conflict[ConflictID, ResourceID, VotePower]) (err error) {
-		lastVote, exists := conflict.LatestVotes.Get(issuerID)
+		lastVote, exists := conflict.LatestVotes.Get(seat)
 
-		return lo.Cond(exists && lastVote.IsLiked(), nil, xerrors.Errorf("conflict with %s is not supported by %s", conflict.ID, issuerID))
+		return lo.Cond(exists && lastVote.IsLiked(), nil, xerrors.Errorf("conflict with %s is not supported by seat %d", conflict.ID, seat))
 	}) == nil
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) ConflictVoters(conflictID ConflictID) (conflictVoters map[iotago.AccountID]int64) {
-	conflictVoters = make(map[iotago.AccountID]int64)
-
-	conflict, exists := c.conflictsByID.Get(conflictID)
-	if exists {
-		_ = conflict.Weight.Voters.ForEach(func(id iotago.AccountID, weight int64) error {
-			conflictVoters[id] = weight
-			return nil
-		})
+func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) ConflictVoters(conflictID ConflictID) (conflictVoters *advancedset.AdvancedSet[account.SeatIndex]) {
+	if conflict, exists := c.conflictsByID.Get(conflictID); exists {
+		return conflict.Weight.Voters.Clone()
 	}
 
-	return conflictVoters
+	return advancedset.New[account.SeatIndex]()
 }
 
 func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) ConflictSets(conflictID ConflictID) (conflictSets *advancedset.AdvancedSet[ResourceID], exists bool) {
@@ -344,14 +338,12 @@ func (c *ConflictDAG[ConflictID, ResourceID, VotePower]) CastVotes(vote *vote.Vo
 		return xerrors.Errorf("failed to determine votes: %w", err)
 	}
 
-	if c.committeeSet.Has(vote.Voter) {
-		for supportedConflict := supportedConflicts.Iterator(); supportedConflict.HasNext(); {
-			supportedConflict.Next().ApplyVote(vote.WithLiked(true))
-		}
+	for supportedConflict := supportedConflicts.Iterator(); supportedConflict.HasNext(); {
+		supportedConflict.Next().ApplyVote(vote.WithLiked(true))
+	}
 
-		for revokedConflict := revokedConflicts.Iterator(); revokedConflict.HasNext(); {
-			revokedConflict.Next().ApplyVote(vote.WithLiked(false))
-		}
+	for revokedConflict := revokedConflicts.Iterator(); revokedConflict.HasNext(); {
+		revokedConflict.Next().ApplyVote(vote.WithLiked(false))
 	}
 
 	return nil

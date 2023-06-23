@@ -26,7 +26,7 @@ func Test_TransitionAccount(t *testing.T) {
 	}), testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 50)
+	node1 := ts.AddValidatorNode("node1")
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 	ts.HookLogging()
