@@ -169,7 +169,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	// account changes at UTXO level without needing to worry about multiple spends of the same account in the same slot,
 	// we only care about the initial account output to be consumed and the final account output to be created.
 	// output side
-	createdAccounts, consumedAccounts, destroyedAccounts, err := l.getCreatedAndConsumedAccountOutputs(stateDiff)
+	createdAccounts, consumedAccounts, destroyedAccounts, err := l.processCreatedAndConsumedAccountOutputs(stateDiff, accountDiffs)
 	if err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, xerrors.Errorf("failed to process outputs consumed and created in slot %d: %w", index, err)
 	}
@@ -401,10 +401,12 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 	}
 }
 
-func (l *Ledger) getCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], err error) {
+func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], err error) {
 	createdAccounts = make(map[iotago.AccountID]*utxoledger.Output)
 	consumedAccounts = make(map[iotago.AccountID]*utxoledger.Output)
 	destroyedAccounts = advancedset.New[iotago.AccountID]()
+
+	createdAccountDelegation := make(map[iotago.ChainID]*iotago.DelegationOutput)
 
 	stateDiff.CreatedStates().ForEachKey(func(outputID iotago.OutputID) bool {
 		createdOutput, errOutput := l.Output(outputID.UTXOInput())
@@ -430,7 +432,10 @@ func (l *Ledger) getCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff
 			createdAccounts[accountID] = createdOutput
 		}
 
-		// TODO: collect DelegationOutputs
+		if createdOutput.OutputType() == iotago.OutputDelegation {
+			delegation, _ := createdOutput.Output().(*iotago.DelegationOutput)
+			createdAccountDelegation[delegation.DelegationID] = delegation
+		}
 
 		return true
 	})
@@ -462,10 +467,33 @@ func (l *Ledger) getCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff
 			}
 		}
 
-		// TODO: collect DelegationOutputs
+		if spentOutput.OutputType() == iotago.OutputDelegation {
+			delegationOutput, _ := spentOutput.Output().(*iotago.DelegationOutput)
+			if _, createdDelegationExists := createdAccountDelegation[delegationOutput.DelegationID]; createdDelegationExists {
+				delete(createdAccountDelegation, delegationOutput.DelegationID)
+			} else {
+				accountDiff, exists := accountDiffs[delegationOutput.ValidatorID]
+				if !exists {
+					accountDiff = prunable.NewAccountDiff()
+					accountDiffs[delegationOutput.ValidatorID] = accountDiff
+				}
+
+				accountDiff.DelegationStakeChange -= int64(delegationOutput.DelegatedAmount)
+			}
+		}
 
 		return true
 	})
+
+	for _, delegationOutput := range createdAccountDelegation {
+		accountDiff, exists := accountDiffs[delegationOutput.ValidatorID]
+		if !exists {
+			accountDiff = prunable.NewAccountDiff()
+			accountDiffs[delegationOutput.ValidatorID] = accountDiff
+		}
+
+		accountDiff.DelegationStakeChange += int64(delegationOutput.DelegatedAmount)
+	}
 
 	if err != nil {
 		return nil, nil, nil, xerrors.Errorf("error while processing created states: %w", err)
