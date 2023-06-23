@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
@@ -17,8 +16,6 @@ import (
 
 // SlotMutations is an in-memory data structure that enables the collection of mutations for uncommitted slots.
 type SlotMutations struct {
-	weights *account.Accounts[iotago.AccountID, *iotago.AccountID]
-
 	// acceptedBlocksBySlot stores the accepted blocks per slot.
 	acceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[iotago.BlockID, *iotago.BlockID]]
 
@@ -29,9 +26,8 @@ type SlotMutations struct {
 }
 
 // NewSlotMutations creates a new SlotMutations instance.
-func NewSlotMutations(weights *account.Accounts[iotago.AccountID, *iotago.AccountID], lastCommittedSlot iotago.SlotIndex) (newMutationFactory *SlotMutations) {
+func NewSlotMutations(lastCommittedSlot iotago.SlotIndex) (newMutationFactory *SlotMutations) {
 	return &SlotMutations{
-		weights:              weights,
 		acceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, *ads.Set[iotago.BlockID, *iotago.BlockID]](),
 		latestCommittedIndex: lastCommittedSlot,
 	}
