@@ -10,12 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/core/weight"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -38,7 +37,7 @@ func NewTestConflict(id iotago.TransactionID, parentConflicts *advancedset.Advan
 }
 
 func TestConflict_SetRejected(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -59,7 +58,7 @@ func TestConflict_SetRejected(t *testing.T) {
 }
 
 func TestConflict_UpdateParents(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -75,7 +74,7 @@ func TestConflict_UpdateParents(t *testing.T) {
 }
 
 func TestConflict_SetAccepted(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -119,7 +118,7 @@ func TestConflict_SetAccepted(t *testing.T) {
 }
 
 func TestConflict_ConflictSets(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -258,7 +257,7 @@ func TestConflictParallel(t *testing.T) {
 }
 
 func TestLikedInstead1(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -285,7 +284,7 @@ func TestLikedInstead1(t *testing.T) {
 }
 
 func TestLikedInsteadFromPreferredInstead(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -362,7 +361,7 @@ func TestLikedInsteadFromPreferredInstead(t *testing.T) {
 }
 
 func TestLikedInstead21(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -450,7 +449,7 @@ func TestLikedInstead21(t *testing.T) {
 }
 
 func TestConflictSet_AllMembersEvicted(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 
 	pendingTasks := syncutils.NewCounter()
 	yellow := NewTestConflictSet(id("yellow"))
@@ -480,7 +479,7 @@ func TestConflictSet_AllMembersEvicted(t *testing.T) {
 }
 
 func TestConflict_Compare(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -497,7 +496,7 @@ func TestConflict_Compare(t *testing.T) {
 }
 
 func TestConflict_Inheritance(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 
 	pendingTasks := syncutils.NewCounter()
 	yellow := NewTestConflictSet(id("yellow"))
@@ -590,7 +589,7 @@ func generateRandomConflictPermutation() func(conflict TestConflict) {
 }
 
 func createConflicts(pendingTasks *syncutils.Counter) map[string]TestConflict {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
 		return int64(weights.SeatCount())

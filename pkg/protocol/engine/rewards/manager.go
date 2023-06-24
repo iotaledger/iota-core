@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -16,6 +17,7 @@ import (
 type Manager struct {
 	rewardBaseStore kvstore.KVStore
 	poolStatsStore  kvstore.KVStore
+	committeeStore  kvstore.KVStore
 
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
 
@@ -28,8 +30,9 @@ type Manager struct {
 }
 
 func New(
-	rewardsBaseStore,
+	rewardsBaseStore kvstore.KVStore,
 	poolStatsStore kvstore.KVStore,
+	committeeStore kvstore.KVStore,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
 	timeProvider *iotago.TimeProvider,
 	decayProvider *iotago.ManaDecayProvider,
@@ -37,6 +40,7 @@ func New(
 	return &Manager{
 		rewardBaseStore:        rewardsBaseStore,
 		poolStatsStore:         poolStatsStore,
+		committeeStore:         committeeStore,
 		performanceFactorsFunc: performanceFactorsFunc,
 		timeProvider:           timeProvider,
 		decayProvider:          decayProvider,
@@ -75,35 +79,32 @@ func (m *Manager) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	return iotago.Identifier(ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epochIndex)).Root())
 }
 
-func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago.AccountID]*Pool) error {
+func (m *Manager) RegisterCommittee(epochIndex iotago.EpochIndex, committee *account.Accounts) error {
+	return m.storeCommitteeForEpoch(epochIndex, committee)
+}
+
+func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	accounts := m.loadCommitteeForEpoch(epochIndex)
 	rewardsTree := ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epochIndex))
 
 	epochSlotStart := m.timeProvider.EpochStart(epochIndex)
 	epochSlotEnd := m.timeProvider.EpochEnd(epochIndex)
 
-	var totalStake iotago.BaseToken
-	var totalValidatorStake iotago.BaseToken
-
-	for _, pool := range poolStakes {
-		totalStake += pool.PoolStake
-		totalValidatorStake += pool.ValidatorStake
-	}
-
-	profitMargin := calculateProfitMargin(totalValidatorStake, totalStake)
+	profitMargin := calculateProfitMargin(accounts.TotalValidatorStake(), accounts.TotalStake())
 	poolsStats := PoolsStats{
-		TotalStake:          totalStake,
-		TotalValidatorStake: totalValidatorStake,
+		TotalStake:          accounts.TotalStake(),
+		TotalValidatorStake: accounts.TotalValidatorStake(),
 		ProfitMargin:        profitMargin,
 	}
 
 	if err := m.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolsStats.Bytes())); err != nil {
-		return errors.Wrapf(err, "failed to store pool stats for epoch %d", epochIndex)
+		panic(errors.Wrapf(err, "failed to store pool stats for epoch %d", epochIndex))
 	}
 
-	for accountID, pool := range poolStakes {
+	accounts.ForEach(func(id iotago.AccountID, pool *account.Pool) bool {
 		intermediateFactors := make([]uint64, 0)
 		for slot := epochSlotStart; slot <= epochSlotEnd; slot++ {
 			performanceFactorStorage := m.performanceFactorsFunc(slot)
@@ -111,23 +112,24 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 				intermediateFactors = append(intermediateFactors, 0)
 			}
 
-			pf, err := performanceFactorStorage.Load(accountID)
+			pf, err := performanceFactorStorage.Load(id)
 			if err != nil {
-				return errors.Wrapf(err, "failed to load performance factor for account %s", accountID)
+				panic(errors.Wrapf(err, "failed to load performance factor for account %s", id))
+				return false
 			}
 
 			intermediateFactors = append(intermediateFactors, pf)
 
 		}
 
-		rewardsTree.Set(accountID, &AccountRewards{
+		rewardsTree.Set(id, &RewardsForAccount{
 			PoolStake:   pool.PoolStake,
-			PoolRewards: poolReward(epochSlotEnd, totalValidatorStake, totalStake, pool.PoolStake, pool.ValidatorStake, pool.FixedCost, aggregatePerformanceFactors(intermediateFactors)),
+			PoolRewards: poolReward(accounts.TotalValidatorStake(), accounts.TotalStake(), profitMargin, pool.FixedCost, aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
 		})
-	}
 
-	return nil
+		return true
+	})
 }
 
 func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
@@ -239,4 +241,30 @@ func poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, totalStake, po
 	reward := (aux2 >> 40) - fixedCost
 
 	return reward
+}
+
+func (m *Manager) loadCommitteeForEpoch(epochIndex iotago.EpochIndex) *account.Accounts {
+	accountsBytes, err := m.committeeStore.Get(epochIndex.Bytes())
+	if err != nil {
+		panic(errors.Wrapf(err, "failed to load committee for epoch %d", epochIndex))
+	}
+
+	accounts, err := account.AccountsFromBytes(accountsBytes)
+	if err != nil {
+		panic(errors.Wrapf(err, "failed to parse committee for epoch %d", epochIndex))
+	}
+	return accounts
+}
+
+func (m *Manager) storeCommitteeForEpoch(epochIndex iotago.EpochIndex, committee *account.Accounts) error {
+	committeeBytes, err := committee.Bytes()
+	if err != nil {
+		return err
+	}
+
+	if err := m.committeeStore.Set(epochIndex.Bytes(), committeeBytes); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -76,15 +76,15 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		}))
 	}
 
-	committeeFunc := func(index iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID] {
-		accounts := account.NewAccounts[iotago.AccountID](mapdb.NewMapDB())
+	committeeFunc := func(index iotago.SlotIndex) *account.SeatedAccounts {
+		accounts := account.NewAccounts()
 		var members []iotago.AccountID
 		t.issuerByAlias.ForEach(func(alias string, issuer *issuer) bool {
-			accounts.Set(issuer.accountID, 0) // we don't care about weights with PoA
+			accounts.Set(issuer.accountID, &account.Pool{}) // we don't care about pools with PoA
 			members = append(members, issuer.accountID)
 			return true
 		})
-		return accounts.SelectAccounts(members...)
+		return accounts.SelectCommittee(members...)
 	}
 
 	t.Instance = slotattestation.NewManager(2, bucketedStorage, committeeFunc)
