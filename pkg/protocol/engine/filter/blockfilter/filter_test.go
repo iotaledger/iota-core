@@ -128,10 +128,10 @@ var protoParams = iotago.ProtocolParameters{
 		VBFactorData: 1,
 	},
 	TokenSupply:           5000,
-	GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+	GenesisUnixTimestamp:  time.Now().Unix(),
 	SlotDurationInSeconds: 10,
-	MaxCommittableAge:     10,
-	OrphanageThreshold:    3,
+	EvictionAge:           10,
+	LivenessThreshold:     3,
 }
 
 func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
@@ -179,7 +179,7 @@ func TestFilter_WithSignatureValidation(t *testing.T) {
 
 func TestFilter_MinCommittableSlotAge(t *testing.T) {
 	params := protoParams
-	params.GenesisUnixTimestamp = uint32(time.Now().Add(-5 * time.Minute).Unix())
+	params.GenesisUnixTimestamp = time.Now().Add(-5 * time.Minute).Unix()
 
 	tf := NewTestFramework(t,
 		&params,

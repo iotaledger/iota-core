@@ -88,7 +88,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
 			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
 			l.rewardsManager = rewards.New(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
-			l.accountsLedger.SetMaxCommittableAge(l.protocolParameters.MaxCommittableAge)
+			l.accountsLedger.SetLivenessThreshold(l.protocolParameters.LivenessThreshold)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)
@@ -224,8 +224,8 @@ func (l *Ledger) BlockAccepted(block *blocks.Block) {
 	}
 }
 
-func (l *Ledger) Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
-	return l.accountsLedger.Account(accountID, optTargetIndex...)
+func (l *Ledger) Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
+	return l.accountsLedger.Account(accountID, targetIndex)
 }
 
 func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Output, error) {
@@ -559,7 +559,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 					accountDiff = prunable.NewAccountDiff()
 					accountDiffs[allotment.AccountID] = accountDiff
 				}
-				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID)
+				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID, stateDiff.Index()-1)
 				if accountErr != nil {
 					panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, stateDiff.Index()-1, accountErr))
 				}
