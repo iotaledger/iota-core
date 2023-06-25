@@ -87,7 +87,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			TokenSupply:           1_000_0000,
 			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix()) - t.optsGenesisTimestampOffset,
 			SlotDurationInSeconds: 10,
-			EpochDurationInSlots:  5,
+			SlotsPerEpochExponent: 13,
 			MaxCommittableAge:     10,
 			OrphanageThreshold:    3,
 		}
