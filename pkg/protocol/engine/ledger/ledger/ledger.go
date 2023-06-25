@@ -27,7 +27,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/rewards"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -44,7 +43,6 @@ type Ledger struct {
 	utxoLedger       *utxoledger.Manager
 	accountsLedger   *accountsledger.Manager
 	manaManager      *mana.Manager
-	rewardsManager   *rewards.Manager
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
 	sybilProtection sybilprotection.SybilProtection
@@ -87,9 +85,10 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
 			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
 			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
-			l.rewardsManager = rewards.New(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
-			l.accountsLedger.SetCommitmentEvictionAge(l.protocolParameters.EvictionAge * 2)
+			l.accountsLedger.SetMaxCommittableAge(l.protocolParameters.AllowedCommitmentsWindowSize)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
+
+			l.TriggerConstructed()
 
 			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)
 			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
