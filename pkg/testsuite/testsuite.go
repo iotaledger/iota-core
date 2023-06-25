@@ -92,7 +92,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			LivenessThreshold:     3,
 		}
 
-		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
+		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(t.ProtocolParameters.GenesisUnixTimestamp, 0))
 		t.RegisterBlock("Genesis", genesisBlock)
 
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")

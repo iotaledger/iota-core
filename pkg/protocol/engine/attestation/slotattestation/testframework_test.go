@@ -151,7 +151,7 @@ func (t *TestFramework) AssertCommit(slot iotago.SlotIndex, expectedCW uint64, e
 
 	require.EqualValues(t.test, expectedCW, cw)
 
-	expectedTree := *ads.NewMap[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation](mapdb.NewMapDB())
+	expectedTree := *ads.NewMap[iotago.AccountID, iotago.Attestation](mapdb.NewMapDB())
 	expectedAttestations := make([]*iotago.Attestation, 0)
 	for issuerAlias, attestationAlias := range expectedAttestationsAliases {
 		expectedTree.Set(t.issuer(issuerAlias).accountID, t.attestation(attestationAlias))

@@ -101,7 +101,7 @@ func Test_TransitionAccount(t *testing.T) {
 					CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
 				},
 			}),
-			testsuite.WithInputs(append(inputForNewAccount)),
+			testsuite.WithInputs(inputForNewAccount),
 			testsuite.WithAccountInput(destroyedAccountInput, true),
 			testsuite.WithOutputs(append(newAccountOutputs, destroyAccountOutputs...)),
 			testsuite.WithCreationTime(11),
