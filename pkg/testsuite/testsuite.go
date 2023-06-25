@@ -47,7 +47,7 @@ type TestSuite struct {
 
 	ProtocolParameters iotago.ProtocolParameters
 
-	optsGenesisTimestampOffset uint32
+	optsGenesisTimestampOffset int64
 	optsAccounts               []snapshotcreator.AccountDetails
 	optsSnapshotOptions        []options.Option[snapshotcreator.Options]
 	optsWaitFor                time.Duration
@@ -85,12 +85,14 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 				VBFactorKey:  10,
 			},
 			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix()) - t.optsGenesisTimestampOffset,
+			GenesisUnixTimestamp:  time.Now().Truncate(10*time.Second).Unix() - t.optsGenesisTimestampOffset,
 			SlotDurationInSeconds: 10,
-			MaxCommittableAge:     10,
+			EpochDurationInSlots:  8192,
+			EvictionAge:           10,
+			LivenessThreshold:     3,
 		}
 
-		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
+		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(t.ProtocolParameters.GenesisUnixTimestamp, 0))
 		t.RegisterBlock("Genesis", genesisBlock)
 
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
@@ -173,10 +175,10 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
-	issuingTime := slotTimeProvider.StartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
+	issuingTime := slotTimeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.SlotIndexFromTime(time.Now()))
 
 	block := node.IssueBlock(context.Background(), alias, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...))
 
@@ -190,10 +192,10 @@ func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIn
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().SlotTimeProvider()
-	issuingTime := slotTimeProvider.StartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
+	issuingTime := slotTimeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.IndexFromTime(time.Now()))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.SlotIndexFromTime(time.Now()))
 
 	block := node.IssueBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment))...)
 
@@ -401,7 +403,7 @@ func (t *TestSuite) Validators() []iotago.AccountID {
 			panic("cannot create validators from nodes: framework already running")
 		}
 
-		var validators = []iotago.AccountID{}
+		validators := []iotago.AccountID{}
 		var seat account.SeatIndex
 		t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 			if node.Validator {
@@ -490,7 +492,7 @@ func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Optio
 	}
 }
 
-func WithGenesisTimestampOffset(offset uint32) options.Option[TestSuite] {
+func WithGenesisTimestampOffset(offset int64) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
 		opts.optsGenesisTimestampOffset = offset
 	}

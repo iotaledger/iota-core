@@ -14,11 +14,11 @@ type Blocks struct {
 	Evict                *event.Event1[iotago.SlotIndex]
 	blocks               *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *Block]
 	evictionState        *eviction.State
-	slotTimeProviderFunc func() *iotago.SlotTimeProvider
+	slotTimeProviderFunc func() *iotago.TimeProvider
 	evictionMutex        sync.RWMutex
 }
 
-func New(evictionState *eviction.State, slotTimeProviderFunc func() *iotago.SlotTimeProvider) *Blocks {
+func New(evictionState *eviction.State, slotTimeProviderFunc func() *iotago.TimeProvider) *Blocks {
 	return &Blocks{
 		Evict:                event.New1[iotago.SlotIndex](),
 		blocks:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *Block](),
@@ -41,7 +41,7 @@ func (b *Blocks) Block(id iotago.BlockID) (block *Block, exists bool) {
 	defer b.evictionMutex.RUnlock()
 
 	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
-		return NewRootBlock(id, commitmentID, b.slotTimeProviderFunc().EndTime(id.Index())), true
+		return NewRootBlock(id, commitmentID, b.slotTimeProviderFunc().SlotEndTime(id.Index())), true
 	}
 
 	storage := b.blocks.Get(id.Index(), false)
