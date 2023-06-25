@@ -54,7 +54,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 			VBFactorKey:  10,
 		},
 		TokenSupply:           1_000_0000,
-		GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix() - 10*100), // start 100 slots in the past at an even number.
+		GenesisUnixTimestamp:  time.Now().Truncate(10*time.Second).Unix() - 10*100, // start 100 slots in the past at an even number.
 		SlotDurationInSeconds: 10,
 	}
 
@@ -151,7 +151,7 @@ func (t *TestFramework) AssertCommit(slot iotago.SlotIndex, expectedCW uint64, e
 
 	require.EqualValues(t.test, expectedCW, cw)
 
-	expectedTree := *ads.NewMap[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation](mapdb.NewMapDB())
+	expectedTree := *ads.NewMap[iotago.AccountID, iotago.Attestation](mapdb.NewMapDB())
 	expectedAttestations := make([]*iotago.Attestation, 0)
 	for issuerAlias, attestationAlias := range expectedAttestationsAliases {
 		expectedTree.Set(t.issuer(issuerAlias).accountID, t.attestation(attestationAlias))

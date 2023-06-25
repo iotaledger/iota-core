@@ -58,9 +58,10 @@ func NewTestSuite(test *testing.T) *TestSuite {
 				VBFactorKey:  10,
 			},
 			TokenSupply:           utils.RandAmount(),
-			GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+			GenesisUnixTimestamp:  time.Now().Unix(),
 			SlotDurationInSeconds: 10,
-			MaxCommittableAge:     10,
+			EvictionAge:           10,
+			LivenessThreshold:     3,
 		},
 
 		blocks:                   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block](),
@@ -96,7 +97,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	}
 
 	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB(), t.API())
-	manager.SetMaxCommittableAge(iotago.SlotIndex(t.ProtocolParameters.MaxCommittableAge))
+	manager.SetLivenessThreshold(t.ProtocolParameters.LivenessThreshold)
 
 	return manager
 }
@@ -110,7 +111,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 	t.slotData.Set(slotIndex, slotDetails)
 
 	// Commit an empty diff if no actions specified.
-	if actions == nil || len(actions) == 0 {
+	if len(actions) == 0 {
 		err := t.Instance.ApplyDiff(slotIndex, make(map[iotago.AccountID]*prunable.AccountDiff), advancedset.New[iotago.AccountID]())
 		require.NoError(t.T, err)
 		return
@@ -121,7 +122,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 		accountID := t.AccountID(alias, true)
 
 		// Apply the burns to the manager.
-		slotDetails.Burns[accountID] = lo.Sum[uint64](action.Burns...)
+		slotDetails.Burns[accountID] = lo.Sum(action.Burns...)
 		for _, burn := range action.Burns {
 			block := t.createBlockWithBurn(accountID, slotIndex, burn)
 			t.blocks.Get(slotIndex, true).Set(block.ID(), block)
@@ -209,7 +210,7 @@ func (t *TestSuite) AssertAccountLedgerUntil(slotIndex iotago.SlotIndex, account
 }
 
 func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
-	expectedPubKeys := advancedset.New[ed25519.PublicKey](t.PublicKeys(expectedState.PubKeys, false)...)
+	expectedPubKeys := advancedset.New(t.PublicKeys(expectedState.PubKeys, false)...)
 	expectedCredits := accounts.NewBlockIssuanceCredits(int64(expectedState.Amount), expectedState.UpdatedTime)
 
 	actualState, exists, err := t.Instance.Account(accountID, slotIndex)

@@ -17,7 +17,7 @@ type Ledger interface {
 	AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool)
 	OnTransactionAttached(callback func(transactionMetadata mempool.TransactionMetadata), opts ...event.Option)
 	Output(id iotago.IndexedUTXOReferencer) (*utxoledger.Output, error)
-	Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error)
+	Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error)
 	IsOutputUnspent(outputID iotago.OutputID) (bool, error)
 	Spent(outputID iotago.OutputID) (*utxoledger.Spent, error)
 	TransactionMetadata(id iotago.TransactionID) (transactionMetadata mempool.TransactionMetadata, exists bool)
