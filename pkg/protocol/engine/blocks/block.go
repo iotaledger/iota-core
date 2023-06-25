@@ -535,7 +535,7 @@ func (b *Block) SetEnqueued() (wasUpdated bool) {
 	return wasUpdated
 }
 
-func (b *Block) AddConfirmationRatifier(id iotago.AccountID) (added bool) {
+func (b *Block) AddConfirmationRatifier(seat account.SeatIndex) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 

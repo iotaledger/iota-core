@@ -97,7 +97,7 @@ func (t *TestSuite) AssertBlocksInCacheConfirmed(expectedBlocks []*blocks.Block,
 }
 
 func (t *TestSuite) AssertBlocksInCacheScheduled(expectedBlocks []*blocks.Block, expectedConfirmed bool, nodes ...*mock.Node) {
-	t.assertBlocksInCacheWithFunc(expectedBlocks, expectedConfirmed, (*blocks.Block).IsScheduled, nodes...)
+	t.assertBlocksInCacheWithFunc(expectedBlocks, "scheduled", expectedConfirmed, (*blocks.Block).IsScheduled, nodes...)
 }
 
 func (t *TestSuite) AssertBlocksInCacheRootBlock(expectedBlocks []*blocks.Block, expectedRootBlock bool, nodes ...*mock.Node) {
