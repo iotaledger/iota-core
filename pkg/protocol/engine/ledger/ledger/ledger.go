@@ -493,7 +493,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 					accountDiff = prunable.NewAccountDiff()
 					accountDiffs[allotment.AccountID] = accountDiff
 				}
-				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID, stateDiff.Index())
+				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID, stateDiff.Index() - 1)
 				if accountErr != nil {
 					panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, stateDiff.Index()-1, accountErr))
 				}
