@@ -57,11 +57,11 @@ func NewTestSuite(test *testing.T) *TestSuite {
 				VBFactorData: 1,
 				VBFactorKey:  10,
 			},
-			TokenSupply:                  utils.RandAmount(),
-			GenesisUnixTimestamp:         time.Now().Unix(),
-			SlotDurationInSeconds:        10,
-			AllowedCommitmentsWindowSize: 10,
-			OrphanageThreshold:           3,
+			TokenSupply:           utils.RandAmount(),
+			GenesisUnixTimestamp:  time.Now().Unix(),
+			SlotDurationInSeconds: 10,
+			EvictionAge:           10,
+			LivenessThreshold:     3,
 		},
 
 		blocks:                   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block](),
@@ -97,7 +97,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	}
 
 	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB(), t.API())
-	manager.SetAllowedCommitmentsWindowSize(t.ProtocolParameters.AllowedCommitmentsWindowSize)
+	manager.SetAllowedCommitmentsWindowSize(t.ProtocolParameters.LivenessThreshold)
 
 	return manager
 }

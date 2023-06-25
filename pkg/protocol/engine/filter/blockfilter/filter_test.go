@@ -127,11 +127,11 @@ var protoParams = iotago.ProtocolParameters{
 		VBFactorKey:  10,
 		VBFactorData: 1,
 	},
-	TokenSupply:                  5000,
-	GenesisUnixTimestamp:         time.Now().Unix(),
-	SlotDurationInSeconds:        10,
-	AllowedCommitmentsWindowSize: 10,
-	OrphanageThreshold:           3,
+	TokenSupply:           5000,
+	GenesisUnixTimestamp:  time.Now().Unix(),
+	SlotDurationInSeconds: 10,
+	EvictionAge:           10,
+	LivenessThreshold:     3,
 }
 
 func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
