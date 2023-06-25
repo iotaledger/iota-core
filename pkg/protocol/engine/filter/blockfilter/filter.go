@@ -37,16 +37,13 @@ type Filter struct {
 func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
 	return module.Provide(func(e *engine.Engine) filter.Filter {
 
-		f := New(opts...)
+		f := New(e.Storage.Settings().ProtocolParameters, opts...)
+		f.TriggerConstructed()
 
 		e.HookConstructed(func() {
-			e.Storage.Settings().HookConstructed(func() {
-				f.protocolParamsFunc = e.Storage.Settings().ProtocolParameters
-				f.TriggerConstructed()
-				f.TriggerInitialized()
-			})
-
 			e.Events.Filter.LinkTo(f.events)
+
+			f.TriggerInitialized()
 		})
 
 		return f
@@ -56,10 +53,11 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 var _ filter.Filter = new(Filter)
 
 // New creates a new Filter.
-func New(opts ...options.Option[Filter]) *Filter {
+func New(parameters func() *iotago.ProtocolParameters, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
 		events:                  filter.NewEvents(),
 		optsSignatureValidation: true,
+		protocolParamsFunc:      parameters,
 	}, opts,
 		(*Filter).TriggerConstructed,
 		(*Filter).TriggerInitialized,
@@ -95,7 +93,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 	// Check if the block is trying to commit to a slot that is not yet committable.
 	// This check, together with the optsMaxAllowedWallClockDrift makes sure that no one can issue blocks with commitments in the future.
-	if block.SlotCommitment().Index() > 0 && block.SlotCommitment().Index()+protocolParams.LivenessThreshold > block.ID().Index() {
+	if block.SlotCommitment().Index() > 0 && block.SlotCommitment().Index()+protocolParams.EvictionAge > block.ID().Index() {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
 			Reason: errors.WithMessagef(ErrCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.Block().SlotCommitment.Index),
@@ -129,7 +127,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 			// and the slot that block is committing to.
 
 			// Parameters moved to the other side of inequality to avoid underflow errors with subtraction from an uint64 type.
-			if commitmentInput.CommitmentID.Index()+protocolParams.LivenessThreshold+protocolParams.EvictionAge < block.ID().Index() {
+			if commitmentInput.CommitmentID.Index()+protocolParams.EvictionAge+protocolParams.EvictionAge < block.ID().Index() {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,
 					Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while min allowed is %d", commitmentInput.CommitmentID.Index(), block.ID().Index()-protocolParams.LivenessThreshold-protocolParams.EvictionAge),
