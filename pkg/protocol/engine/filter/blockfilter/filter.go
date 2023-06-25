@@ -33,7 +33,7 @@ type Filter struct {
 	optsMinCommittableSlotAge    iotago.SlotIndex
 	optsSignatureValidation      bool
 
-	blockIssuerCheck func(*iotago.Block) bool
+	blockIssuerCheck func(*iotago.Block) error
 
 	// TODO: replace this placeholder for RMC with a link to the accounts manager with RMC provider.
 	optsReferenceManaCost uint64
@@ -110,10 +110,10 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	}
 
 	// Check that the issuer of this block has non-negative block issuance credit
-	if !f.blockIssuerCheck(block.Block()) {
+	if err := f.blockIssuerCheck(block.Block()); err != nil {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(ErrNegativeBIC, "block issuer account %s is locked due to negative or non-existent BIC", block.Block().IssuerID),
+			Reason: errors.Wrapf(err, "block issuer account %s is locked due to negative or non-existent BIC", block.Block().IssuerID),
 			Source: source,
 		})
 

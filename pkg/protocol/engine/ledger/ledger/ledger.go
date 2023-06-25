@@ -585,21 +585,21 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 	}
 }
 
-func (l *Ledger) IsBlockIssuerAllowed(block *iotago.Block) bool {
+func (l *Ledger) IsBlockIssuerAllowed(block *iotago.Block) error {
 	bicSlot := block.SlotCommitment.Index
 
 	account, exists, err := l.accountsLedger.Account(block.IssuerID, bicSlot)
 	if err != nil {
-		return false
+		return err
 	}
 	if !exists {
-		return false
+		return errors.Errorf("block issuer %s does not exist", block.IssuerID)
 	}
 	if account.Credits.Value < 0 {
-		return false
+		return errors.Errorf("block issuer %s has negative BIC. BIC = %d", block.IssuerID, account.Credits.Value)
 	}
 
-	return true
+	return nil
 }
 
 func (l *Ledger) ManaManager() *mana.Manager {

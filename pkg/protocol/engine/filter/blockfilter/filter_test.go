@@ -24,7 +24,7 @@ type TestFramework struct {
 	api    iotago.API
 }
 
-func NewTestFramework(t *testing.T, protocolParams *iotago.ProtocolParameters, blockIssuerCheck func(*iotago.Block) bool, optsFilter ...options.Option[Filter]) *TestFramework {
+func NewTestFramework(t *testing.T, protocolParams *iotago.ProtocolParameters, blockIssuerCheck func(*iotago.Block) error, optsFilter ...options.Option[Filter]) *TestFramework {
 
 	f := New(func() *iotago.ProtocolParameters {
 		return protocolParams
@@ -152,7 +152,7 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 
 	tf := NewTestFramework(t,
 		&protoParams,
-		func(*iotago.Block) bool { return true },
+		func(*iotago.Block) error { return nil },
 		WithMaxAllowedWallClockDrift(allowedDrift),
 		WithSignatureValidation(false),
 	)
@@ -175,7 +175,7 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 func TestFilter_WithSignatureValidation(t *testing.T) {
 	tf := NewTestFramework(t,
 		&protoParams,
-		func(*iotago.Block) bool { return true },
+		func(*iotago.Block) error { return nil },
 		WithSignatureValidation(true),
 	)
 
@@ -198,7 +198,7 @@ func TestFilter_MinCommittableSlotAge(t *testing.T) {
 
 	tf := NewTestFramework(t,
 		&params,
-		func(*iotago.Block) bool { return true },
+		func(*iotago.Block) error { return nil },
 		WithMinCommittableSlotAge(3),
 		WithSignatureValidation(false),
 	)
@@ -238,7 +238,7 @@ func TestFilter_MinPoW(t *testing.T) {
 
 	tf := NewTestFramework(t,
 		&params,
-		func(*iotago.Block) bool { return true },
+		func(*iotago.Block) error { return nil },
 		WithSignatureValidation(false),
 	)
 
@@ -261,7 +261,7 @@ func TestFilter_BurnedMana(t *testing.T) {
 
 	tf := NewTestFramework(t,
 		&params,
-		func(*iotago.Block) bool { return true },
+		func(*iotago.Block) error { return nil },
 		WithSignatureValidation(false),
 		WithReferenceManaCost(5),
 	)
@@ -287,8 +287,11 @@ func TestFilter_BICCheck(t *testing.T) {
 	params := protoParams
 
 	// use a check that burned Mana is even number as a proxy for account BIC
-	bicCheckFunc := func(b *iotago.Block) bool {
-		return b.BurnedMana%2 == 0
+	bicCheckFunc := func(b *iotago.Block) error {
+		if b.BurnedMana%2 == 0 {
+			return nil
+		}
+		return ErrNegativeBIC
 	}
 
 	tf := NewTestFramework(t,
