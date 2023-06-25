@@ -27,6 +27,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -35,6 +36,8 @@ import (
 var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
 
 type Ledger struct {
+	events *ledger.Events
+
 	apiProvider func() iotago.API
 
 	utxoLedger       *utxoledger.Manager
@@ -42,12 +45,14 @@ type Ledger struct {
 	manaManager      *mana.Manager
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
-	memPool            mempool.MemPool[ledger.BlockVotePower]
-	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower]
+	sybilProtection sybilprotection.SybilProtection
+
+	memPool            mempool.MemPool[ledger.BlockVoteRank]
+	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
 	errorHandler       func(error)
 	protocolParameters *iotago.ProtocolParameters
 
-	decayProvider *iotago.DecayProvider
+	manaDecayProvider *iotago.ManaDecayProvider
 
 	module.Module
 }
@@ -55,36 +60,41 @@ type Ledger struct {
 func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 	return module.Provide(func(e *engine.Engine) ledger.Ledger {
 		l := New(
+
 			e.Storage.Ledger(),
 			e.Storage.Accounts(),
 			e.Storage.Commitments().Load,
 			e.BlockCache.Block,
 			e.Storage.AccountDiffs,
 			e.API,
+			e.SybilProtection,
 			e.ErrorHandler("ledger"),
 		)
 
 		// TODO: when should ledgerState be pruned?
 
 		e.HookConstructed(func() {
-			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](e.SybilProtection.OnlineCommittee())
+			e.Events.Ledger.LinkTo(l.events)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
-			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVotePower](true))
+			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			wpAccounts := e.Workers.CreateGroup("Accounts").CreatePool("trackBurnt", 1)
-			e.Events.BlockGadget.BlockAccepted.Hook(l.accountsLedger.TrackBlock, event.WithWorkerPool(wpAccounts))
-			e.Events.BlockGadget.BlockAccepted.Hook(l.BlockAccepted)
+			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+				l.accountsLedger.TrackBlock(block)
+				l.BlockAccepted(block)
+				l.events.BlockProcessed.Trigger(block)
+			}, event.WithWorkerPool(wpAccounts))
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 		})
 		e.HookInitialized(func() {
 			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
-			l.decayProvider = l.protocolParameters.DecayProvider()
-			l.manaManager = mana.NewManager(l.decayProvider, l.resolveAccountOutput)
+			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
+			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
 			l.TriggerConstructed()
 
-			l.accountsLedger.SetMaxCommittableAge(iotago.SlotIndex(l.protocolParameters.MaxCommittableAge))
+			l.accountsLedger.SetLivenessThreshold(l.protocolParameters.LivenessThreshold)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			l.TriggerInitialized()
@@ -101,14 +111,18 @@ func New(
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
 	apiProvider func() iotago.API,
+	sybilProtection sybilprotection.SybilProtection,
 	errorHandler func(error),
 ) *Ledger {
 	return &Ledger{
+		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
 		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore, apiProvider()),
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
+		sybilProtection:  sybilProtection,
 		errorHandler:     errorHandler,
+		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](sybilProtection.OnlineCommittee().Size),
 	}
 }
 
@@ -205,8 +219,8 @@ func (l *Ledger) BlockAccepted(block *blocks.Block) {
 	}
 }
 
-func (l *Ledger) Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
-	return l.accountsLedger.Account(accountID, optTargetIndex...)
+func (l *Ledger) Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
+	return l.accountsLedger.Account(accountID, targetIndex)
 }
 
 func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Output, error) {
@@ -257,7 +271,7 @@ func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempoo
 	return l.memPool.TransactionMetadataByAttachment(blockID)
 }
 
-func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower] {
+func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank] {
 	return l.conflictDAG
 }
 
@@ -479,7 +493,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 					accountDiff = prunable.NewAccountDiff()
 					accountDiffs[allotment.AccountID] = accountDiff
 				}
-				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID)
+				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID, stateDiff.Index()-1)
 				if accountErr != nil {
 					panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, stateDiff.Index()-1, accountErr))
 				}
@@ -557,8 +571,14 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
-	votePower := ledger.NewBlockVotePower(block.ID(), block.Block().IssuingTime)
-	if err := l.conflictDAG.CastVotes(vote.NewVote(block.Block().IssuerID, votePower), block.ConflictIDs()); err != nil {
+	voteRank := ledger.NewBlockVoteRank(block.ID(), block.Block().IssuingTime)
+
+	seat, exists := l.sybilProtection.Committee(block.ID().Index()).GetSeat(block.Block().IssuerID)
+	if !exists {
+		return
+	}
+
+	if err := l.conflictDAG.CastVotes(vote.NewVote(seat, voteRank), block.ConflictIDs()); err != nil {
 		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
 		//  Do we track witness weight of invalid blocks?
 		l.errorHandler(errors.Wrapf(err, "failed to cast votes for block %s", block.ID()))

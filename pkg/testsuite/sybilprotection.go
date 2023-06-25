@@ -5,48 +5,40 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/iotaledger/hive.go/core/account"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertSybilProtectionCommittee(weightVector map[iotago.AccountID]int64, nodes ...*mock.Node) {
+func (t *TestSuite) AssertSybilProtectionCommittee(slotIndex iotago.SlotIndex, expectedAccounts []iotago.AccountID, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
-		t.assertSybilProtectionCustomCommittee("Committee", weightVector, node.Protocol.MainEngineInstance().SybilProtection.Committee, node)
-	}
-}
+		t.Eventually(func() error {
+			accounts := node.Protocol.MainEngineInstance().SybilProtection.Committee(slotIndex).Accounts().Slice()
+			if !assert.ElementsMatch(t.fakeTesting, expectedAccounts, accounts) {
+				return errors.Errorf("AssertSybilProtectionCommittee: %s: expected %s, got %s", node.Name, expectedAccounts, accounts)
+			}
 
-func (t *TestSuite) AssertSybilProtectionOnlineCommittee(weightVector map[iotago.AccountID]int64, nodes ...*mock.Node) {
-	mustNodes(nodes)
-
-	for _, node := range nodes {
-		t.assertSybilProtectionCustomCommittee("Online", weightVector, node.Protocol.MainEngineInstance().SybilProtection.OnlineCommittee, node)
-	}
-}
-
-func (t *TestSuite) assertSybilProtectionCustomCommittee(customCommitteeType string, weightVector map[iotago.AccountID]int64, committeeFunc func() *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID], node *mock.Node) {
-	t.Eventually(func() error {
-		if !assert.ElementsMatch(t.fakeTesting, lo.Keys(weightVector), committeeFunc().Members().Slice()) {
-			return errors.Errorf("AssertSybilProtectionCommittee(%s): %s: expected %s, got %s", customCommitteeType, node.Name, lo.Keys(weightVector), committeeFunc().Members().Slice())
-		}
-
-		if lo.Sum(lo.Values(weightVector)...) != committeeFunc().TotalWeight() {
-			return errors.Errorf("AssertSybilProtectionCommittee(%s): %s: expected %v, got %v", customCommitteeType, node.Name, lo.Sum(lo.Values(weightVector)...), committeeFunc().TotalWeight())
-		}
-
-		err := committeeFunc().ForEach(func(accountID iotago.AccountID, weight int64) error {
-			if weightVector[accountID] != weight {
-				return errors.Errorf("AssertSybilProtectionCommittee(%s): %s: expected %d, got %d for %s", customCommitteeType, node.Name, weightVector[accountID], weight, accountID)
+			if len(expectedAccounts) != len(accounts) {
+				return errors.Errorf("AssertSybilProtectionCommittee: %s: expected %v, got %v", node.Name, len(expectedAccounts), len(accounts))
 			}
 
 			return nil
 		})
-		if err != nil {
-			return err
-		}
+	}
+}
 
-		return nil
-	})
+func (t *TestSuite) AssertSybilProtectionOnlineCommittee(expectedSeats []account.SeatIndex, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			seats := node.Protocol.MainEngineInstance().SybilProtection.OnlineCommittee().Slice()
+			if !assert.ElementsMatch(t.fakeTesting, expectedSeats, seats) {
+				return errors.Errorf("AssertSybilProtectionOnlineCommittee: %s: expected %v, got %v", node.Name, expectedSeats, seats)
+			}
+
+			return nil
+		})
+	}
 }

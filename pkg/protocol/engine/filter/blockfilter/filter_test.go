@@ -95,7 +95,7 @@ func (t *TestFramework) IssueUnsignedBlockWithPoWScore(alias string, minPowScore
 func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index iotago.SlotIndex, committing iotago.SlotIndex) {
 	block, err := builder.NewBlockBuilder().
 		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
-		IssuingTime(t.api.SlotTimeProvider().StartTime(index)).
+		IssuingTime(t.api.TimeProvider().SlotStartTime(index)).
 		SlotCommitment(iotago.NewCommitment(committing, iotago.CommitmentID{}, iotago.Identifier{}, 0)).
 		Build()
 	require.NoError(t.Test, err)
@@ -128,9 +128,10 @@ var protoParams = iotago.ProtocolParameters{
 		VBFactorData: 1,
 	},
 	TokenSupply:           5000,
-	GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+	GenesisUnixTimestamp:  time.Now().Unix(),
 	SlotDurationInSeconds: 10,
-	MaxCommittableAge:     10,
+	EvictionAge:           10,
+	LivenessThreshold:     3,
 }
 
 func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
@@ -178,7 +179,7 @@ func TestFilter_WithSignatureValidation(t *testing.T) {
 
 func TestFilter_MinCommittableSlotAge(t *testing.T) {
 	params := protoParams
-	params.GenesisUnixTimestamp = uint32(time.Now().Add(-5 * time.Minute).Unix())
+	params.GenesisUnixTimestamp = time.Now().Add(-5 * time.Minute).Unix()
 
 	tf := NewTestFramework(t,
 		&params,

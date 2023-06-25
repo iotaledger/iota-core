@@ -17,7 +17,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 1)
+	node1 := ts.AddValidatorNode("node1")
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 
 	node1.HookLogging()
@@ -53,10 +53,15 @@ func Test_DoubleSpend(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 1)
-	node2 := ts.AddValidatorNode("node2", 1)
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddValidatorNode("node2")
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
+
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		node1.AccountID,
+		node2.AccountID,
+	}, ts.Nodes()...)
 
 	node1.HookLogging()
 
@@ -101,7 +106,7 @@ func Test_DoubleSpend(t *testing.T) {
 		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
-	// Issue a valid blocks that resolves the conflict.
+	// Issue valid blocks that resolve the conflict.
 	{
 		ts.IssueBlock("block6", node2, blockfactory.WithStrongParents(ts.BlockIDs("block3", "block4")...), blockfactory.WithShallowLikeParents(ts.BlockID("block2")))
 		ts.IssueBlock("block7", node1, blockfactory.WithStrongParents(ts.BlockIDs("block6")...))
@@ -119,8 +124,8 @@ func Test_MultipleAttachments(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
-	nodeA := ts.AddValidatorNode("nodeA", 1)
-	nodeB := ts.AddValidatorNode("nodeB", 1)
+	nodeA := ts.AddValidatorNode("nodeA")
+	nodeB := ts.AddValidatorNode("nodeB")
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 

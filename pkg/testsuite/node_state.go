@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -31,8 +32,8 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.chainID != nil {
 		t.AssertChainID(*state.chainID, nodes...)
 	}
-	if state.sybilProtectionCommittee != nil {
-		t.AssertSybilProtectionCommittee(*state.sybilProtectionCommittee, nodes...)
+	if state.sybilProtectionCommitteeSlotIndex != nil && state.sybilProtectionCommittee != nil {
+		t.AssertSybilProtectionCommittee(*state.sybilProtectionCommitteeSlotIndex, *state.sybilProtectionCommittee, nodes...)
 	}
 	if state.sybilProtectionOnlineCommittee != nil {
 		t.AssertSybilProtectionOnlineCommittee(*state.sybilProtectionOnlineCommittee, nodes...)
@@ -69,8 +70,9 @@ type NodeState struct {
 	latestFinalizedSlot              *iotago.SlotIndex
 	chainID                          *iotago.CommitmentID
 
-	sybilProtectionCommittee       *map[iotago.AccountID]int64
-	sybilProtectionOnlineCommittee *map[iotago.AccountID]int64
+	sybilProtectionCommitteeSlotIndex *iotago.SlotIndex
+	sybilProtectionCommittee          *[]iotago.AccountID
+	sybilProtectionOnlineCommittee    *[]account.SeatIndex
 
 	storageCommitments       *[]*iotago.Commitment
 	storageCommitmentAtIndex *iotago.SlotIndex
@@ -133,13 +135,14 @@ func WithChainID(chainID iotago.CommitmentID) options.Option[NodeState] {
 	}
 }
 
-func WithSybilProtectionCommittee(committee map[iotago.AccountID]int64) options.Option[NodeState] {
+func WithSybilProtectionCommittee(index iotago.SlotIndex, committee []iotago.AccountID) options.Option[NodeState] {
 	return func(state *NodeState) {
+		state.sybilProtectionCommitteeSlotIndex = &index
 		state.sybilProtectionCommittee = &committee
 	}
 }
 
-func WithSybilProtectionOnlineCommittee(committee map[iotago.AccountID]int64) options.Option[NodeState] {
+func WithSybilProtectionOnlineCommittee(committee ...account.SeatIndex) options.Option[NodeState] {
 	return func(state *NodeState) {
 		state.sybilProtectionOnlineCommittee = &committee
 	}

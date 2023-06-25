@@ -34,6 +34,9 @@ type BlockDAG struct {
 	// solidifier contains the solidifier instance used to determine the solidity of Blocks.
 	solidifier *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
+	// shouldParkFutureBlocksFunc is a function that returns whether the BlockDAG should park future Blocks.
+	shouldParkFutureBlocksFunc func() bool
+
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
 	commitmentFunc func(index iotago.SlotIndex) (*model.Commitment, error)
 
@@ -63,7 +66,7 @@ type BlockDAG struct {
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.Storage.Commitments().Load, e.ErrorHandler("blockdag"), opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.IsBootstrapped, e.Storage.Commitments().Load, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
 			wp := b.workers.CreatePool("BlockDAG.Attach", 2)
@@ -88,16 +91,17 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, latestCommitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, shouldParkBlocksFunc func() bool, latestCommitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
-		events:         blockdag.NewEvents(),
-		evictionState:  evictionState,
-		commitmentFunc: latestCommitmentFunc,
-		blockCache:     blockCache,
-		futureBlocks:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*blocks.Block]](),
-		workers:        workers,
-		workerPool:     workers.CreatePool("Solidifier", 2),
-		errorHandler:   errorHandler,
+		events:                     blockdag.NewEvents(),
+		evictionState:              evictionState,
+		shouldParkFutureBlocksFunc: shouldParkBlocksFunc,
+		commitmentFunc:             latestCommitmentFunc,
+		blockCache:                 blockCache,
+		futureBlocks:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*blocks.Block]](),
+		workers:                    workers,
+		workerPool:                 workers.CreatePool("Solidifier", 2),
+		errorHandler:               errorHandler,
 	}, opts,
 		func(b *BlockDAG) {
 			b.solidifier = causalorder.New(
@@ -191,7 +195,7 @@ func (b *BlockDAG) markSolid(block *blocks.Block) (err error) {
 			return err
 		}
 
-		if b.isFutureBlock(block) {
+		if b.shouldParkFutureBlocksFunc() && b.isFutureBlock(block) {
 			return
 		}
 	}

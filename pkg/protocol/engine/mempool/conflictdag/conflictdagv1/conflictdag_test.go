@@ -30,7 +30,7 @@ func newTestFramework(t *testing.T) *tests.Framework {
 
 	return tests.NewFramework(
 		t,
-		New[iotago.TransactionID, iotago.OutputID, vote.MockedPower](accountsTestFramework.Committee),
+		New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](accountsTestFramework.Committee.SeatCount),
 		accountsTestFramework,
 		transactionID,
 		outputID,
@@ -104,9 +104,9 @@ func TestMemoryRelease(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]).conflictSetsByID.Size())
-	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]).conflictsByID.Size())
-	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]).conflictUnhooks.Size())
+	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictSetsByID.Size())
+	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictsByID.Size())
+	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictUnhooks.Size())
 	memStatsEnd := memStats()
 
 	fmt.Println("\n\nMemory report after:")

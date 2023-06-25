@@ -72,11 +72,11 @@ func (m *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
 	m.latestCommittedSlot = index
 }
 
-func (m *Manager) SetMaxCommittableAge(maxCommittableAge iotago.SlotIndex) {
+func (m *Manager) SetLivenessThreshold(livenessThreshold iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	m.maxCommittableAge = maxCommittableAge
+	m.maxCommittableAge = livenessThreshold
 }
 
 // TrackBlock adds the block to the blockBurns set to deduct the burn from credits upon slot commitment.
@@ -147,14 +147,9 @@ func (m *Manager) ApplyDiff(
 }
 
 // Account loads the account's data at a specific slot index.
-func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
+func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
-
-	targetIndex := m.latestCommittedSlot
-	if len(optTargetIndex) > 0 {
-		targetIndex = optTargetIndex[0]
-	}
 
 	// if m.latestCommittedSlot < m.maxCommittableAge we should have all history
 	if m.latestCommittedSlot >= m.maxCommittableAge && targetIndex < m.latestCommittedSlot-m.maxCommittableAge {
