@@ -95,6 +95,7 @@ func (p *Permanent) Accounts(optRealm ...byte) kvstore.KVStore {
 }
 
 // TODO: Rewards and PoolStats should be pruned after one year, so they are not really permanent.
+
 // Rewards returns the Rewards storage (or a specialized sub-storage if a realm is provided).
 func (p *Permanent) Rewards(optRealm ...byte) kvstore.KVStore {
 	if len(optRealm) == 0 {
@@ -104,7 +105,7 @@ func (p *Permanent) Rewards(optRealm ...byte) kvstore.KVStore {
 	return lo.PanicOnErr(p.rewards.WithExtendedRealm(optRealm))
 }
 
-// PoolStats returns the PoolStats storage
+// PoolStats returns the PoolStats storage.
 func (p *Permanent) PoolStats(optRealm ...byte) kvstore.KVStore {
 	if len(optRealm) == 0 {
 		return p.poolStats

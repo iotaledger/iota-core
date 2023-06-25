@@ -72,14 +72,14 @@ func (m *Manager) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	return iotago.Identifier(ads.NewMap[iotago.AccountID, RewardsForAccount](m.rewardsStorage(epochIndex)).Root())
+	return iotago.Identifier(ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epochIndex)).Root())
 }
 
 func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago.AccountID]*Pool) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	rewardsTree := ads.NewMap[iotago.AccountID, RewardsForAccount](m.rewardsStorage(epochIndex))
+	rewardsTree := ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epochIndex))
 
 	epochSlotStart := m.timeProvider.EpochStart(epochIndex)
 	epochSlotEnd := m.timeProvider.EpochEnd(epochIndex)
@@ -120,7 +120,7 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 
 		}
 
-		rewardsTree.Set(accountID, &RewardsForAccount{
+		rewardsTree.Set(accountID, &AccountRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: poolReward(totalValidatorStake, totalStake, profitMargin, pool.FixedCost, aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
@@ -191,8 +191,8 @@ func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 	return delegatorsReward, nil
 }
 
-func (m *Manager) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *RewardsForAccount, exists bool) {
-	return ads.NewMap[iotago.AccountID, RewardsForAccount](m.rewardsStorage(epochIndex)).Get(accountID)
+func (m *Manager) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *AccountRewards, exists bool) {
+	return ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epochIndex)).Get(accountID)
 }
 
 func (m *Manager) poolStats(epochIndex iotago.EpochIndex) (poolStats *PoolsStats, err error) {

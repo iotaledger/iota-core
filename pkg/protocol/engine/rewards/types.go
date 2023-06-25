@@ -51,7 +51,7 @@ func (p PoolsStats) Bytes() (bytes []byte, err error) {
 	return m.Bytes(), nil
 }
 
-type RewardsForAccount struct {
+type AccountRewards struct {
 	// Total stake of the validator including delegations
 	PoolStake uint64
 	// Rewards normalized by performance factor
@@ -60,7 +60,7 @@ type RewardsForAccount struct {
 	FixedCost uint64
 }
 
-func (r *RewardsForAccount) FromBytes(bytes []byte) (n int, err error) {
+func (r *AccountRewards) FromBytes(bytes []byte) (n int, err error) {
 	m := marshalutil.New(bytes)
 
 	r.PoolStake, err = m.ReadUint64()
@@ -81,7 +81,7 @@ func (r *RewardsForAccount) FromBytes(bytes []byte) (n int, err error) {
 	return m.ReadOffset(), nil
 }
 
-func (r RewardsForAccount) Bytes() (bytes []byte, err error) {
+func (r AccountRewards) Bytes() (bytes []byte, err error) {
 	m := marshalutil.New()
 	m.WriteUint64(r.PoolStake)
 	m.WriteUint64(r.PoolRewards)

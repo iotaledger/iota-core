@@ -81,7 +81,7 @@ func (m *Manager) importPoolRewards(reader io.ReadSeeker) error {
 		if err := binary.Read(reader, binary.LittleEndian, &epochIndex); err != nil {
 			return errors.Wrap(err, "unable to read epoch index")
 		}
-		rewardsTree := ads.NewMap[iotago.AccountID, RewardsForAccount](m.rewardsStorage(epochIndex))
+		rewardsTree := ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epochIndex))
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
 			return errors.Wrap(err, "unable to read accounts count")
@@ -91,7 +91,7 @@ func (m *Manager) importPoolRewards(reader io.ReadSeeker) error {
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
 				return errors.Wrap(err, "unable to read account id")
 			}
-			var reward RewardsForAccount
+			var reward AccountRewards
 			if err := binary.Read(reader, binary.LittleEndian, &reward); err != nil {
 				return errors.Wrap(err, "unable to read reward")
 			}
@@ -227,6 +227,7 @@ func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotag
 			return false
 		}
 		epochCount++
+
 		return true
 	})
 	if err != nil {
@@ -235,8 +236,8 @@ func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotag
 	if err = pWriter.WriteValueAtBookmark("pool rewards epoch count", epochCount); err != nil {
 		return errors.Wrap(err, "unable to write epoch count")
 	}
-	return nil
 
+	return nil
 }
 
 func (m *Manager) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
@@ -257,16 +258,21 @@ func (m *Manager) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 			return false
 		}
 		if err := pWriter.WriteBytes(value); err != nil {
-			err = errors.Wrap(err, "unable to write pools stats")
+			innerErr = errors.Wrap(err, "unable to write pools stats")
 			return false
 		}
 		epochCount++
+
 		return true
 	}); err != nil {
-		return errors.Wrapf(err, "unable to iterate over pools stats: %v", innerErr)
+		return errors.Wrapf(err, "unable to iterate over pools stats")
+	} else if innerErr != nil {
+		return errors.Wrapf(innerErr, "error while iterating over pools stats")
+
 	}
 	if err := pWriter.WriteValueAtBookmark("pools stats epoch count", epochCount); err != nil {
 		return errors.Wrap(err, "unable to write epoch count")
 	}
+
 	return nil
 }
