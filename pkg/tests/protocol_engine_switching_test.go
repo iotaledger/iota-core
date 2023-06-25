@@ -83,7 +83,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		"node5": nodeP2Options,
 		"node6": nodeP2Options,
 	})
-	//ts.HookLogging()
+	ts.HookLogging()
 
 	expectedCommittee := []iotago.AccountID{
 		node0.AccountID,
