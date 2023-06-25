@@ -19,10 +19,11 @@ var (
 			VBFactorData: 1,
 			VBFactorKey:  10,
 		},
-		TokenSupply:                  utils.RandAmount(),
-		GenesisUnixTimestamp:         uint32(time.Now().Unix()),
-		SlotDurationInSeconds:        10,
-		AllowedCommitmentsWindowSize: 10,
+		TokenSupply:           utils.RandAmount(),
+		GenesisUnixTimestamp:  time.Now().Unix(),
+		SlotDurationInSeconds: 10,
+		EvictionAge:           10,
+		LivenessThreshold:     3,
 	}
 	api = iotago.LatestAPI(protocolParams)
 )

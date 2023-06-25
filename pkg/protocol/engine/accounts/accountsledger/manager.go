@@ -72,11 +72,11 @@ func (m *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
 	m.latestCommittedSlot = index
 }
 
-func (m *Manager) SetMaxCommittableAge(maxCommittableAge iotago.SlotIndex) {
+func (m *Manager) SetAllowedCommitmentsWindowSize(allowedCommitmentsWindowSize iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	m.maxCommittableAge = maxCommittableAge
+	m.maxCommittableAge = allowedCommitmentsWindowSize
 }
 
 // TrackBlock adds the block to the blockBurns set to deduct the burn from credits upon slot commitment.

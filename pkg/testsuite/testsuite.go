@@ -47,7 +47,7 @@ type TestSuite struct {
 
 	ProtocolParameters iotago.ProtocolParameters
 
-	optsGenesisTimestampOffset uint32
+	optsGenesisTimestampOffset int64
 	optsAccounts               []snapshotcreator.AccountDetails
 	optsSnapshotOptions        []options.Option[snapshotcreator.Options]
 	optsWaitFor                time.Duration
@@ -84,11 +84,12 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 				VBFactorData: 1,
 				VBFactorKey:  10,
 			},
-			TokenSupply:                  1_000_0000,
-			GenesisUnixTimestamp:         uint32(time.Now().Truncate(10*time.Second).Unix()) - t.optsGenesisTimestampOffset,
-			SlotDurationInSeconds:        10,
-			EpochDurationInSlots:         8192,
-			AllowedCommitmentsWindowSize: 10,
+			TokenSupply:           1_000_0000,
+			GenesisUnixTimestamp:  time.Now().Truncate(10*time.Second).Unix() - t.optsGenesisTimestampOffset,
+			SlotDurationInSeconds: 10,
+			EpochDurationInSlots:  8192,
+			EvictionAge:           10,
+			LivenessThreshold:     3,
 		}
 
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
@@ -490,7 +491,7 @@ func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Optio
 	}
 }
 
-func WithGenesisTimestampOffset(offset uint32) options.Option[TestSuite] {
+func WithGenesisTimestampOffset(offset int64) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
 		opts.optsGenesisTimestampOffset = offset
 	}
