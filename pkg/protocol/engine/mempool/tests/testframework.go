@@ -18,8 +18,8 @@ import (
 )
 
 type TestFramework struct {
-	Instance    mempool.MemPool[vote.MockedPower]
-	ConflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+	Instance    mempool.MemPool[vote.MockedRank]
+	ConflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
 	stateIDByAlias     map[string]iotago.OutputID
 	transactionByAlias map[string]mempool.Transaction
@@ -32,7 +32,7 @@ type TestFramework struct {
 	mutex sync.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower], conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank], conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
 	t := &TestFramework{
 		Instance:           instance,
 		ConflictDAG:        conflictDAG,

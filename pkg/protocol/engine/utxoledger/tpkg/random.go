@@ -20,9 +20,10 @@ var (
 			VBFactorKey:  10,
 		},
 		TokenSupply:           utils.RandAmount(),
-		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+		GenesisUnixTimestamp:  time.Now().Unix(),
 		SlotDurationInSeconds: 10,
-		MaxCommitableAge:      10,
+		EvictionAge:           10,
+		LivenessThreshold:     3,
 	}
 	api = iotago.LatestAPI(protocolParams)
 )

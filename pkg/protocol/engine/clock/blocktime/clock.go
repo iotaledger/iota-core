@@ -32,8 +32,8 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 		}, opts, func(c *Clock) {
 			e.HookConstructed(func() {
 				e.Storage.Settings().HookInitialized(func() {
-					c.acceptedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestCommitment().Index()))
-					c.confirmedTime.Set(e.API().SlotTimeProvider().EndTime(e.Storage.Settings().LatestFinalizedSlot()))
+					c.acceptedTime.Set(e.API().TimeProvider().SlotEndTime(e.Storage.Settings().LatestCommitment().Index()))
+					c.confirmedTime.Set(e.API().TimeProvider().SlotEndTime(e.Storage.Settings().LatestFinalizedSlot()))
 
 					c.TriggerInitialized()
 				})
@@ -52,8 +52,8 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 					}, asyncOpt).Unhook,
 
 					e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-						c.acceptedTime.Advance(e.API().SlotTimeProvider().EndTime(index))
-						c.confirmedTime.Advance(e.API().SlotTimeProvider().EndTime(index))
+						c.acceptedTime.Advance(e.API().TimeProvider().SlotEndTime(index))
+						c.confirmedTime.Advance(e.API().TimeProvider().SlotEndTime(index))
 					}, asyncOpt).Unhook,
 				))
 			})

@@ -107,6 +107,6 @@ var protoParams = iotago.ProtocolParameters{
 		VBFactorData: 1,
 	},
 	TokenSupply:           5000,
-	GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+	GenesisUnixTimestamp:  time.Now().Unix(),
 	SlotDurationInSeconds: 10,
 }
