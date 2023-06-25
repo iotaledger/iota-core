@@ -129,7 +129,7 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	slotIndex := s.timeProviderFunc().SlotIndexFromTime(activityTime)
+	slotIndex := s.timeProviderFunc().SlotFromTime(activityTime)
 	seat, exists := s.Committee(slotIndex).GetSeat(id)
 	if !exists {
 		// Only track identities that are part of the committee

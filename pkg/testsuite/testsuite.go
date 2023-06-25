@@ -178,7 +178,7 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	timeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
 	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotIndexFromTime(time.Now()))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
 	block := node.IssueBlock(context.Background(), alias, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...))
 
@@ -195,7 +195,7 @@ func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIn
 	timeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
 	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotIndexFromTime(time.Now()))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
 	block := node.IssueBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment))...)
 

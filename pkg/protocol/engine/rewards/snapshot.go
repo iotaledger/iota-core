@@ -130,7 +130,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	targetEpoch := m.timeProvider.EpochsFromSlot(targetSlotIndex)
+	targetEpoch := m.timeProvider.EpochFromSlot(targetSlotIndex)
 	positionedWriter := utils.NewPositionedWriter(writer)
 
 	// if target index is the last slot of the epoch, the epoch was committed
