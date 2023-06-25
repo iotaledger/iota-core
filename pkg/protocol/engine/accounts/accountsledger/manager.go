@@ -147,14 +147,9 @@ func (m *Manager) ApplyDiff(
 }
 
 // Account loads the account's data at a specific slot index.
-func (m *Manager) Account(accountID iotago.AccountID, optTargetIndex ...iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
+func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
-
-	targetIndex := m.latestCommittedSlot
-	if len(optTargetIndex) > 0 {
-		targetIndex = optTargetIndex[0]
-	}
 
 	// if m.latestCommittedSlot < m.maxCommittableAge we should have all history
 	if m.latestCommittedSlot >= m.maxCommittableAge && targetIndex < m.latestCommittedSlot-m.maxCommittableAge {

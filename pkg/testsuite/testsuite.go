@@ -84,11 +84,11 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 				VBFactorData: 1,
 				VBFactorKey:  10,
 			},
-			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10*time.Second).Unix()) - t.optsGenesisTimestampOffset,
-			SlotDurationInSeconds: 10,
-			EpochDurationInSlots:  8192,
-			MaxCommittableAge:     10,
+			TokenSupply:                  1_000_0000,
+			GenesisUnixTimestamp:         uint32(time.Now().Truncate(10*time.Second).Unix()) - t.optsGenesisTimestampOffset,
+			SlotDurationInSeconds:        10,
+			EpochDurationInSlots:         8192,
+			AllowedCommitmentsWindowSize: 10,
 		}
 
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.ProtocolParameters.GenesisUnixTimestamp), 0))
@@ -401,7 +401,7 @@ func (t *TestSuite) Validators() []iotago.AccountID {
 			panic("cannot create validators from nodes: framework already running")
 		}
 
-		var validators = []iotago.AccountID{}
+		validators := []iotago.AccountID{}
 		var seat account.SeatIndex
 		t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 			if node.Validator {
