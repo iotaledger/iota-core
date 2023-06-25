@@ -24,14 +24,14 @@ type PerformanceManager interface {
 }
 
 func (o *Orchestrator) CheckEpochEndNearing(index iotago.SlotIndex) {
-	currentEpoch := o.timeProvider().EpochsFromSlot(index)
+	currentEpoch := o.timeProvider().EpochFromSlot(index)
 	nextEpoch := currentEpoch + 1
 	if o.timeProvider().EpochEnd(currentEpoch)-o.optsEpochEndNearingThreshold == index { //epoch
 		candidates := o.performanceManager.EligibleValidatorCandidates(nextEpoch) // epoch
 
 		weightedCandidates := account.NewAccounts()
 		if err := candidates.ForEach(func(candidate iotago.AccountID) error {
-			a, exists, err := o.ledger.Account(candidate)
+			a, exists, err := o.ledger.Account(candidate, index)
 			if err != nil {
 				return err
 			}
@@ -57,7 +57,7 @@ func (o *Orchestrator) CheckEpochEndNearing(index iotago.SlotIndex) {
 }
 
 func (o *Orchestrator) CheckEpochEnd(index iotago.SlotIndex) {
-	currentEpoch := o.timeProvider().EpochsFromSlot(index)
+	currentEpoch := o.timeProvider().EpochFromSlot(index)
 	if o.timeProvider().EpochEnd(currentEpoch) == index {
 		o.performanceManager.ApplyEpoch(currentEpoch)
 	}

@@ -38,6 +38,25 @@ func (w *Accounts) initialize() {
 	w.accountPools = shrinkingmap.New[iotago.AccountID, *Pool]()
 }
 
+func (w *Accounts) Has(id iotago.AccountID) bool {
+	_, has := w.accountPools.Get(id)
+	return has
+}
+
+func (w *Accounts) Size() int {
+	return w.accountPools.Size()
+}
+
+func (w *Accounts) IDs() []iotago.AccountID {
+	ids := make([]iotago.AccountID, 0, w.accountPools.Size())
+	w.ForEach(func(id iotago.AccountID, pool *Pool) bool {
+		ids = append(ids, id)
+		return true
+	})
+
+	return ids
+}
+
 // Get returns the weight of the given identity.
 func (w *Accounts) Get(id iotago.AccountID) (pool *Pool, exists bool) {
 	return w.accountPools.Get(id)
