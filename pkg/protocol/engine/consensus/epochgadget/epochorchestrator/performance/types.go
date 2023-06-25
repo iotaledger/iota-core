@@ -1,4 +1,4 @@
-package rewards
+package performance
 
 import (
 	"github.com/pkg/errors"
@@ -7,6 +7,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+<<<<<<< HEAD:pkg/protocol/engine/rewards/types.go
 // Pool represents all the data we need for a given validator and epoch to calculate its rewards data.
 type Pool struct {
 	// Total stake of the pool, including delegators
@@ -14,6 +15,45 @@ type Pool struct {
 	// Validator's stake
 	ValidatorStake iotago.BaseToken
 	FixedCost      iotago.Mana
+=======
+type RewardsForAccount struct {
+	// Total stake of the validator including delegations
+	PoolStake uint64
+	// Rewards normalized by performance factor
+	PoolRewards uint64
+	// What the validator charges for its staking duties
+	FixedCost uint64
+}
+
+func (r RewardsForAccount) Bytes() (bytes []byte, err error) {
+	m := marshalutil.New()
+	m.WriteUint64(r.PoolStake)
+	m.WriteUint64(r.PoolRewards)
+	m.WriteUint64(r.FixedCost)
+
+	return m.Bytes(), nil
+}
+
+func (r *RewardsForAccount) FromBytes(bytes []byte) (n int, err error) {
+	m := marshalutil.New(bytes)
+
+	r.PoolStake, err = m.ReadUint64()
+	if err != nil {
+		return m.ReadOffset(), errors.Wrap(err, "failed to parse pool stake")
+	}
+
+	r.PoolRewards, err = m.ReadUint64()
+	if err != nil {
+		return m.ReadOffset(), errors.Wrap(err, "failed to parse pool rewards")
+	}
+
+	r.FixedCost, err = m.ReadUint64()
+	if err != nil {
+		return m.ReadOffset(), errors.Wrap(err, "failed to parse fixed cost")
+	}
+
+	return m.ReadOffset(), nil
+>>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget):pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance/types.go
 }
 
 // PoolsStats contains stats about the pools from all the validators for an epoch.
@@ -53,6 +93,7 @@ func (p PoolsStats) Bytes() (bytes []byte, err error) {
 
 	return m.Bytes(), nil
 }
+<<<<<<< HEAD:pkg/protocol/engine/rewards/types.go
 
 type AccountRewards struct {
 	// Total stake of the validator including delegations
@@ -95,3 +136,5 @@ func (r AccountRewards) Bytes() (bytes []byte, err error) {
 
 	return m.Bytes(), nil
 }
+=======
+>>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget):pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance/types.go

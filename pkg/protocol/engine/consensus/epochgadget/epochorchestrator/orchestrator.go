@@ -1,64 +1,114 @@
 package epochorchestrator
 
 import (
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"io"
+
+	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Orchestrator struct {
-	sybilProtection    sybilprotection.SybilProtection
-	performanceManager PerformanceManager
-	timeProvider       func() *iotago.TimeProvider
-	ledger             ledger.Ledger
+	events          *epochgadget.Events
+	sybilProtection sybilprotection.SybilProtection
+	ledger          ledger.Ledger
+	timeProvider    *iotago.TimeProvider
+
+	performanceManager *performance.Tracker
 
 	optsEpochEndNearingThreshold iotago.SlotIndex
+
+	module.Module
 }
 
-type PerformanceManager interface {
-	EligibleValidatorCandidates(epochIndex iotago.EpochIndex) *advancedset.AdvancedSet[iotago.AccountID]
-	RegisterCommittee(epochIndex iotago.EpochIndex, committee *account.Accounts)
-	ApplyEpoch(epochIndex iotago.EpochIndex)
+func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.Engine, epochgadget.Gadget] {
+	return module.Provide(func(e *engine.Engine) epochgadget.Gadget {
+		return options.Apply(&Orchestrator{
+			sybilProtection:    e.SybilProtection,
+			ledger:             e.Ledger,
+			timeProvider:       e.API().TimeProvider(),
+			performanceManager: performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider()),
+		}, opts,
+			(*Orchestrator).TriggerConstructed,
+		)
+	})
 }
 
-func (o *Orchestrator) CheckEpochEndNearing(index iotago.SlotIndex) {
-	currentEpoch := o.timeProvider().EpochFromSlot(index)
-	nextEpoch := currentEpoch + 1
-	if o.timeProvider().EpochEnd(currentEpoch)-o.optsEpochEndNearingThreshold == index { //epoch
-		candidates := o.performanceManager.EligibleValidatorCandidates(nextEpoch) // epoch
+func (o *Orchestrator) Shutdown() {
+	o.TriggerStopped()
+}
 
-		weightedCandidates := account.NewAccounts()
-		if err := candidates.ForEach(func(candidate iotago.AccountID) error {
-			a, exists, err := o.ledger.Account(candidate, index)
-			if err != nil {
-				return err
-			}
-			if !exists {
-				panic("account does not exist")
-			}
+func (o *Orchestrator) BlockAccepted(block *blocks.Block) {
+	o.performanceManager.BlockAccepted(block)
+}
 
-			weightedCandidates.Set(candidate, &account.Pool{
-				PoolStake:      a.ValidatorStake + a.DelegationStake,
-				ValidatorStake: a.ValidatorStake,
-				FixedCost:      a.FixedCost,
-			})
+func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
+	currentEpoch := o.timeProvider.EpochFromSlot(slot)
+	if o.timeProvider.EpochEnd(currentEpoch)-o.optsEpochEndNearingThreshold == slot {
+		o.selectNewCommittee(slot)
+	}
 
-			return nil
-		}); err != nil {
-			panic(err)
-		}
-
-		newCommittee := o.sybilProtection.RotateCommittee(nextEpoch, weightedCandidates)
-		weightedCommittee := newCommittee.Accounts()
-		o.performanceManager.RegisterCommittee(nextEpoch, weightedCommittee)
+	if o.timeProvider.EpochEnd(currentEpoch) == slot {
+		o.performanceManager.ApplyEpoch(currentEpoch)
 	}
 }
 
-func (o *Orchestrator) CheckEpochEnd(index iotago.SlotIndex) {
-	currentEpoch := o.timeProvider().EpochFromSlot(index)
-	if o.timeProvider().EpochEnd(currentEpoch) == index {
-		o.performanceManager.ApplyEpoch(currentEpoch)
+func (o *Orchestrator) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint64, epochStart, epochEnd iotago.EpochIndex) (validatorReward uint64, err error) {
+	return o.performanceManager.ValidatorReward(validatorID, stakeAmount, epochStart, epochEnd)
+}
+
+func (o *Orchestrator) DelegatorReward(validatorID iotago.AccountID, delegatedAmount uint64, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward uint64, err error) {
+	return o.performanceManager.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd)
+}
+
+func (o *Orchestrator) Import(reader io.ReadSeeker) error {
+	return o.performanceManager.Import(reader)
+}
+
+func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error {
+	return o.performanceManager.Export(writer, targetSlot)
+}
+
+func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) {
+	currentEpoch := o.timeProvider.EpochFromSlot(slot)
+	nextEpoch := currentEpoch + 1
+	candidates := o.performanceManager.EligibleValidatorCandidates(nextEpoch)
+
+	weightedCandidates := account.NewAccounts()
+	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
+		a, exists, err := o.ledger.Account(candidate, slot)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			panic("account does not exist")
+		}
+
+		weightedCandidates.Set(candidate, &account.Pool{
+			PoolStake:      a.ValidatorStake + a.DelegationStake,
+			ValidatorStake: a.ValidatorStake,
+			FixedCost:      a.FixedCost,
+		})
+
+		return nil
+	}); err != nil {
+		panic(err)
+	}
+
+	newCommittee := o.sybilProtection.RotateCommittee(nextEpoch, weightedCandidates)
+	weightedCommittee := newCommittee.Accounts()
+	o.performanceManager.RegisterCommittee(nextEpoch, weightedCommittee)
+}
+
+func WithEpochEndNearingThreshold(threshold iotago.SlotIndex) options.Option[Orchestrator] {
+	return func(o *Orchestrator) {
+		o.optsEpochEndNearingThreshold = threshold
 	}
 }

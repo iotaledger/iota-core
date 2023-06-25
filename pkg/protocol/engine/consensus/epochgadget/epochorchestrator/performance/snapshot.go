@@ -1,4 +1,4 @@
-package rewards
+package performance
 
 import (
 	"encoding/binary"
@@ -12,7 +12,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (m *Manager) Import(reader io.ReadSeeker) error {
+func (m *Tracker) Import(reader io.ReadSeeker) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -34,7 +34,37 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	return nil
 }
 
-func (m *Manager) importPerformanceFactor(reader io.ReadSeeker) error {
+func (m *Tracker) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	targetEpoch := m.timeProvider.EpochFromSlot(targetSlotIndex)
+	positionedWriter := utils.NewPositionedWriter(writer)
+
+	// if target index is the last slot of the epoch, the epoch was committed
+	if m.timeProvider.EpochEnd(targetEpoch) != targetSlotIndex {
+		targetEpoch--
+	}
+
+	err := m.exportPerformanceFactor(positionedWriter, m.timeProvider.EpochStart(targetEpoch+1), targetSlotIndex)
+	if err != nil {
+		return errors.Wrap(err, "unable to export performance factor")
+	}
+
+	err = m.exportPoolRewards(positionedWriter, targetEpoch)
+	if err != nil {
+		return errors.Wrap(err, "unable to export pool rewards")
+	}
+
+	err = m.exportPoolsStats(positionedWriter, targetEpoch)
+	if err != nil {
+		return errors.Wrap(err, "unable to export pool stats")
+	}
+
+	return nil
+}
+
+func (m *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 	var slotCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &slotCount); err != nil {
 		return errors.Wrap(err, "unable to read slot count")
@@ -70,7 +100,7 @@ func (m *Manager) importPerformanceFactor(reader io.ReadSeeker) error {
 	return nil
 }
 
-func (m *Manager) importPoolRewards(reader io.ReadSeeker) error {
+func (m *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 	var epochCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &epochCount); err != nil {
 		return errors.Wrap(err, "unable to read epoch count")
@@ -101,7 +131,7 @@ func (m *Manager) importPoolRewards(reader io.ReadSeeker) error {
 	return nil
 }
 
-func (m *Manager) importPoolsStats(reader io.ReadSeeker) error {
+func (m *Tracker) importPoolsStats(reader io.ReadSeeker) error {
 	var epochCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &epochCount); err != nil {
 		return errors.Wrap(err, "unable to read epoch count")
@@ -125,37 +155,7 @@ func (m *Manager) importPoolsStats(reader io.ReadSeeker) error {
 	return nil
 }
 
-func (m *Manager) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	targetEpoch := m.timeProvider.EpochFromSlot(targetSlotIndex)
-	positionedWriter := utils.NewPositionedWriter(writer)
-
-	// if target index is the last slot of the epoch, the epoch was committed
-	if m.timeProvider.EpochEnd(targetEpoch) != targetSlotIndex {
-		targetEpoch--
-	}
-
-	err := m.exportPerformanceFactor(positionedWriter, m.timeProvider.EpochStart(targetEpoch+1), targetSlotIndex)
-	if err != nil {
-		return errors.Wrap(err, "unable to export performance factor")
-	}
-
-	err = m.exportPoolRewards(positionedWriter, targetEpoch)
-	if err != nil {
-		return errors.Wrap(err, "unable to export pool rewards")
-	}
-
-	err = m.exportPoolsStats(positionedWriter, targetEpoch)
-	if err != nil {
-		return errors.Wrap(err, "unable to export pool stats")
-	}
-
-	return nil
-}
-
-func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, startSlot, targetSlot iotago.SlotIndex) error {
+func (m *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, startSlot, targetSlot iotago.SlotIndex) error {
 	m.performanceFactorsMutex.RLock()
 	defer m.performanceFactorsMutex.RUnlock()
 
@@ -202,7 +202,11 @@ func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 	return nil
 }
 
+<<<<<<< HEAD:pkg/protocol/engine/rewards/snapshot.go
 func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
+=======
+func (m *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotago.EpochIndex) error {
+>>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget):pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance/snapshot.go
 	// export all stored pools
 	// in theory we could save the epoch count only once, because stats and rewards should be the same length
 	var epochCount uint64
@@ -255,11 +259,14 @@ func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 	if err := pWriter.WriteValueAtBookmark("pool rewards epoch count", epochCount); err != nil {
 		return errors.Wrap(err, "unable to write epoch count")
 	}
+<<<<<<< HEAD:pkg/protocol/engine/rewards/snapshot.go
 
+=======
+>>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget):pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance/snapshot.go
 	return nil
 }
 
-func (m *Manager) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
+func (m *Tracker) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
 	var epochCount uint64
 	if err := pWriter.WriteValue("pools stats epoch count", epochCount, true); err != nil {
 		return errors.Wrap(err, "unable to write epoch count")

@@ -22,6 +22,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/mana"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -67,6 +68,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.AccountDiffs,
 			e.API,
 			e.SybilProtection,
+			e.EpochGadget,
 			e.ErrorHandler("ledger"),
 		)
 
@@ -85,7 +87,11 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
 			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
 			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
+<<<<<<< HEAD
 			l.accountsLedger.SetCommitmentEvictionAge(l.protocolParameters.EvictionAge)
+=======
+			l.accountsLedger.SetLivenessThreshold(l.protocolParameters.LivenessThreshold)
+>>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			l.TriggerConstructed()
@@ -94,7 +100,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 				l.accountsLedger.TrackBlock(block)
 				l.BlockAccepted(block)
-				l.rewardsManager.BlockAccepted(block)
+				l.epochGadget.BlockAccepted(block)
 				l.events.BlockProcessed.Trigger(block)
 			}, event.WithWorkerPool(wp))
 
@@ -116,6 +122,7 @@ func New(
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
 	apiProvider func() iotago.API,
 	sybilProtection sybilprotection.SybilProtection,
+	epochGadget epochgadget.Gadget,
 	errorHandler func(error),
 ) *Ledger {
 	return &Ledger{
@@ -125,6 +132,7 @@ func New(
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
+		epochGadget:      epochGadget,
 		errorHandler:     errorHandler,
 		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](sybilProtection.OnlineCommittee().Size),
 	}
@@ -288,7 +296,7 @@ func (l *Ledger) Import(reader io.ReadSeeker) error {
 		return errors.Wrap(err, "failed to import accountsLedger")
 	}
 
-	if err := l.rewardsManager.Import(reader); err != nil {
+	if err := l.epochGadget.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import rewardsManager")
 	}
 
@@ -304,7 +312,7 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 		return errors.Wrap(err, "failed to export accountsLedger")
 	}
 
-	if err := l.rewardsManager.Export(writer, targetIndex); err != nil {
+	if err := l.epochGadget.Export(writer, targetIndex); err != nil {
 		return errors.Wrap(err, "failed to export rewardsManager")
 	}
 
