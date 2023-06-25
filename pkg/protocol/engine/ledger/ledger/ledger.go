@@ -85,7 +85,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
 			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
 			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
-			l.accountsLedger.SetMaxCommittableAge(l.protocolParameters.AllowedCommitmentsWindowSize)
+			l.accountsLedger.SetCommitmentEvictionAge(l.protocolParameters.EvictionAge)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			l.TriggerConstructed()
