@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TestFramework struct {
@@ -29,9 +30,11 @@ func NewTestFramework(t *testing.T, protocolParams *iotago.ProtocolParameters, o
 		Test: t,
 		api:  iotago.V3API(protocolParams),
 
-		Filter: New(func() *iotago.ProtocolParameters {
-			return protocolParams
-		}, optsFilter...),
+		Filter: New(optsFilter...),
+	}
+
+	tf.Filter.protocolParamsFunc = func() *iotago.ProtocolParameters {
+		return protocolParams
 	}
 
 	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
@@ -57,6 +60,18 @@ func (t *TestFramework) IssueUnsignedBlockAtTime(alias string, issuingTime time.
 	block, err := builder.NewBlockBuilder().
 		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
 		IssuingTime(issuingTime).
+		Build()
+	require.NoError(t.Test, err)
+
+	t.processBlock(alias, block)
+}
+
+func (t *TestFramework) IssueUnsignedBlockAtSlotWithPayload(alias string, slot iotago.SlotIndex, committing iotago.SlotIndex, payload iotago.Payload) {
+	block, err := builder.NewBlockBuilder().
+		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
+		IssuingTime(t.api.TimeProvider().SlotStartTime(slot)).
+		SlotCommitment(iotago.NewCommitment(committing, iotago.CommitmentID{}, iotago.Identifier{}, 0)).
+		Payload(payload).
 		Build()
 	require.NoError(t.Test, err)
 
@@ -169,12 +184,22 @@ func TestFilter_WithSignatureValidation(t *testing.T) {
 	})
 
 	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
-		require.Equal(t, "invalid", event.Block.ID().Alias())
+		require.Contains(t, []string{"incorrectSignature", "pubkeysMissing"}, event.Block.ID().Alias())
 		require.True(t, errors.Is(event.Reason, ErrInvalidSignature))
 	})
 
-	tf.IssueUnsignedBlockAtTime("invalid", time.Now())
+	tf.IssueUnsignedBlockAtTime("pubkeysMissing", time.Now())
 	tf.IssueSigned("valid")
+
+	block, err := builder.NewBlockBuilder().
+		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
+		Build()
+	require.NoError(tf.Test, err)
+
+	block.Signature.(*iotago.Ed25519Signature).Signature = tpkg.Rand64ByteArray()
+	block.Signature.(*iotago.Ed25519Signature).PublicKey = tpkg.Rand32ByteArray()
+
+	tf.processBlock("incorrectSignature", block)
 }
 
 func TestFilter_MinCommittableSlotAge(t *testing.T) {
@@ -183,7 +208,6 @@ func TestFilter_MinCommittableSlotAge(t *testing.T) {
 
 	tf := NewTestFramework(t,
 		&params,
-		WithMinCommittableSlotAge(3),
 		WithSignatureValidation(false),
 	)
 
@@ -237,4 +261,76 @@ func TestFilter_MinPoW(t *testing.T) {
 	require.GreaterOrEqual(t, tf.IssueUnsignedBlockWithPoWScore("valid", 1000), float64(params.MinPoWScore))
 	require.Less(t, tf.IssueUnsignedBlockWithoutPoW("invalid"), float64(params.MinPoWScore))
 	require.GreaterOrEqual(t, tf.IssueUnsignedBlockWithPoWScore("valid", 1000), float64(params.MinPoWScore))
+}
+
+func TestFilter_TransactionCommitmentInput(t *testing.T) {
+	params := protoParams
+	params.GenesisUnixTimestamp = time.Now().Add(-20 * time.Minute).Unix()
+	// with the following parameters, block issued in slot 100 can contain a transaction with commitment input referencing
+	// commitments between 87 and slot that the block commits to (97 at most)
+	params.LivenessThreshold = 3
+	params.EvictionAge = 10
+
+	tf := NewTestFramework(t,
+		&params,
+		WithSignatureValidation(false),
+	)
+
+	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
+		require.NotContains(t, []string{"commitmentInputTooOld", "commitmentInputNewerThanBlockCommitment"}, block.ID().Alias())
+	})
+
+	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+		require.Contains(t, []string{"commitmentInputTooOld", "commitmentInputNewerThanBlockCommitment"}, event.Block.ID().Alias())
+		require.True(t, errors.Is(event.Reason, ErrTransactionCommitmentInputTooFarInThePast))
+	})
+
+	commitmentInputTooOld, err := builder.NewTransactionBuilder(protoParams.NetworkID()).
+		AddContextInput(&iotago.CommitmentInput{CommitmentID: iotago.NewSlotIdentifier(86, tpkg.Rand32ByteArray())}).
+		Build(&protoParams, iotago.NewInMemoryAddressSigner())
+
+	require.NoError(tf.Test, err)
+
+	tf.IssueUnsignedBlockAtSlotWithPayload("commitmentInputTooOld", 100, 97, commitmentInputTooOld)
+
+	commitmentInputNewerThanBlockCommitment, err := builder.NewTransactionBuilder(protoParams.NetworkID()).
+		AddContextInput(&iotago.CommitmentInput{CommitmentID: iotago.NewSlotIdentifier(95, tpkg.Rand32ByteArray())}).
+		Build(&protoParams, iotago.NewInMemoryAddressSigner())
+
+	require.NoError(tf.Test, err)
+
+	tf.IssueUnsignedBlockAtSlotWithPayload("commitmentInputNewerThanBlockCommitment", 100, 94, commitmentInputNewerThanBlockCommitment)
+
+	commitmentCorrect, err := builder.NewTransactionBuilder(protoParams.NetworkID()).
+		AddContextInput(&iotago.CommitmentInput{CommitmentID: iotago.NewSlotIdentifier(97, tpkg.Rand32ByteArray())}).
+		Build(&protoParams, iotago.NewInMemoryAddressSigner())
+
+	require.NoError(tf.Test, err)
+
+	tf.IssueUnsignedBlockAtSlotWithPayload("commitmentCorrectNewest", 100, 97, commitmentCorrect)
+
+	commitmentCorrectOldest, err := builder.NewTransactionBuilder(protoParams.NetworkID()).
+		AddContextInput(&iotago.CommitmentInput{CommitmentID: iotago.NewSlotIdentifier(87, tpkg.Rand32ByteArray())}).
+		Build(&protoParams, iotago.NewInMemoryAddressSigner())
+
+	require.NoError(tf.Test, err)
+
+	tf.IssueUnsignedBlockAtSlotWithPayload("commitmentCorrectOldest", 100, 87, commitmentCorrectOldest)
+
+	commitmentCorrectNewest, err := builder.NewTransactionBuilder(protoParams.NetworkID()).
+		AddContextInput(&iotago.CommitmentInput{CommitmentID: iotago.NewSlotIdentifier(97, tpkg.Rand32ByteArray())}).
+		Build(&protoParams, iotago.NewInMemoryAddressSigner())
+
+	require.NoError(tf.Test, err)
+
+	tf.IssueUnsignedBlockAtSlotWithPayload("commitmentCorrectNewest", 100, 97, commitmentCorrectNewest)
+
+	commitmentCorrectMiddle, err := builder.NewTransactionBuilder(protoParams.NetworkID()).
+		AddContextInput(&iotago.CommitmentInput{CommitmentID: iotago.NewSlotIdentifier(90, tpkg.Rand32ByteArray())}).
+		Build(&protoParams, iotago.NewInMemoryAddressSigner())
+
+	require.NoError(tf.Test, err)
+
+	tf.IssueUnsignedBlockAtSlotWithPayload("commitmentCorrectMiddle", 100, 97, commitmentCorrectMiddle)
+
 }
