@@ -36,6 +36,13 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 			timeProvider:       e.API().TimeProvider(),
 			performanceManager: performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider()),
 		}, opts,
+			func(o *Orchestrator) {
+				e.Events.BlockGadget.BlockAccepted.Hook(o.BlockAccepted)
+				e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) { o.CommitSlot(scd.Commitment.Index()) })
+				e.Events.SlotGadget.SlotFinalized.Hook(o.slotFinalized)
+
+				e.Events.EpochGadget.LinkTo(o.events)
+			},
 			(*Orchestrator).TriggerConstructed,
 		)
 	})

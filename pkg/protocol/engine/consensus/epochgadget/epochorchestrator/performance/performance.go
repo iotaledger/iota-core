@@ -73,7 +73,6 @@ func (m *Tracker) BlockAccepted(block *blocks.Block) {
 	}
 }
 
-<<<<<<< HEAD:pkg/protocol/engine/rewards/manager.go
 func (m *Manager) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -86,22 +85,18 @@ func (m *Manager) RegisterCommittee(epochIndex iotago.EpochIndex, committee *acc
 }
 
 func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex) {
-=======
-func (m *Tracker) ApplyEpoch(epochIndex iotago.EpochIndex) {
->>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget):pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance/performance.go
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	accounts := m.loadCommitteeForEpoch(epochIndex)
-	rewardsTree := ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epochIndex))
+	accounts := m.loadCommitteeForEpoch(epoch)
 
 	epochSlotStart := m.timeProvider.EpochStart(epochIndex)
 	epochSlotEnd := m.timeProvider.EpochEnd(epochIndex)
 
-	profitMargin := calculateProfitMargin(accounts.TotalValidatorStake(), accounts.TotalStake())
+	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
 	poolsStats := PoolsStats{
-		TotalStake:          accounts.TotalStake(),
-		TotalValidatorStake: accounts.TotalValidatorStake(),
+		TotalStake:          committee.TotalStake(),
+		TotalValidatorStake: committee.TotalValidatorStake(),
 		ProfitMargin:        profitMargin,
 	}
 
@@ -109,7 +104,7 @@ func (m *Tracker) ApplyEpoch(epochIndex iotago.EpochIndex) {
 		panic(errors.Wrapf(err, "failed to store pool stats for epoch %d", epochIndex))
 	}
 
-	accounts.ForEach(func(id iotago.AccountID, pool *account.Pool) bool {
+	committee.ForEach(func(id iotago.AccountID, pool *account.Pool) bool {
 		intermediateFactors := make([]uint64, 0)
 		for slot := epochSlotStart; slot <= epochSlotEnd; slot++ {
 			performanceFactorStorage := m.performanceFactorsFunc(slot)
@@ -129,7 +124,7 @@ func (m *Tracker) ApplyEpoch(epochIndex iotago.EpochIndex) {
 
 		rewardsTree.Set(id, &RewardsForAccount{
 			PoolStake:   pool.PoolStake,
-			PoolRewards: poolReward(accounts.TotalValidatorStake(), accounts.TotalStake(), profitMargin, pool.FixedCost, aggregatePerformanceFactors(intermediateFactors)),
+			PoolRewards: poolReward(committee.TotalValidatorStake(), committee.TotalStake(), profitMargin, pool.FixedCost, aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
 		})
 
@@ -137,77 +132,7 @@ func (m *Tracker) ApplyEpoch(epochIndex iotago.EpochIndex) {
 	})
 }
 
-<<<<<<< HEAD:pkg/protocol/engine/rewards/manager.go
-func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
-		rewardsForAccountInEpoch, exists := m.rewardsForAccount(validatorID, epochIndex)
-		if !exists {
-			continue
-		}
-
-		poolStats, err := m.poolStats(epochIndex)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
-		}
-
-		// TODO: check for overflows
-		unDecayedEpochRewards := rewardsForAccountInEpoch.FixedCost +
-			((iotago.Mana(poolStats.ProfitMargin) * rewardsForAccountInEpoch.PoolRewards) >> 8) +
-			(((iotago.Mana(1<<8)-iotago.Mana(poolStats.ProfitMargin))*rewardsForAccountInEpoch.PoolRewards)>>8)*
-				iotago.Mana(stakeAmount)/
-				iotago.Mana(rewardsForAccountInEpoch.PoolStake)
-
-		decayedEpochRewards, err := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
-		}
-		validatorReward += decayedEpochRewards
-	}
-
-	return validatorReward, nil
-}
-
-func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
-		rewardsForAccountInEpoch, exists := m.rewardsForAccount(validatorID, epochIndex)
-		if !exists {
-			continue
-		}
-
-		poolStats, err := m.poolStats(epochIndex)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
-		}
-
-		unDecayedEpochRewards := ((iotago.Mana((1<<8)-poolStats.ProfitMargin) * rewardsForAccountInEpoch.PoolRewards) >> 8) *
-			iotago.Mana(delegatedAmount) /
-			iotago.Mana(rewardsForAccountInEpoch.PoolStake)
-
-		decayedEpochRewards, err := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
-		}
-
-		delegatorsReward += decayedEpochRewards
-	}
-
-	return delegatorsReward, nil
-}
-
-func (m *Manager) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *AccountRewards, exists bool) {
-	return ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epochIndex)).Get(accountID)
-}
-
-func (m *Manager) poolStats(epochIndex iotago.EpochIndex) (poolStats *PoolsStats, err error) {
-=======
-func (m *Tracker) poolStats(epochIndex iotago.EpochIndex) (poolStats *PoolsStats, err error) {
->>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget):pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance/performance.go
+func (m *Tracker) poolStats(epoch iotago.EpochIndex) (poolStats *PoolsStats, err error) {
 	poolStats = new(PoolsStats)
 	poolStatsBytes, err := m.poolStatsStore.Get(epochIndex.Bytes())
 	if err != nil {
@@ -221,52 +146,18 @@ func (m *Tracker) poolStats(epochIndex iotago.EpochIndex) (poolStats *PoolsStats
 	return poolStats, nil
 }
 
-<<<<<<< HEAD:pkg/protocol/engine/rewards/manager.go
-func aggregatePerformanceFactors(pfs []uint64) uint64 {
-	var sum uint64
-	for _, pf := range pfs {
-		sum += pf
-	}
-
-	return sum / uint64(len(pfs))
-}
-
-func calculateProfitMargin(totalValidatorsStake iotago.BaseToken, totalPoolStake iotago.BaseToken) uint64 {
-	// TODO: take care of overflows here.
-	return (1 << 8) * uint64(totalValidatorsStake) / uint64(totalValidatorsStake+totalPoolStake)
-}
-
-func poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, fixedCost iotago.Mana, performanceFactor uint64) iotago.Mana {
-	initialReward := 233373068869021000
-	if slotIndex > 9460800 {
-		initialReward = 85853149583786000
-	}
-	epochsInSlot := 1 << 13
-	targetRewardPerEpoch := uint64(initialReward * epochsInSlot)
-	aux := (((1 << 31) * poolStake) / totalStake) + ((2 << 31) * validatorStake / totalValidatorsStake)
-	aux2 := iotago.Mana(uint64(aux) * targetRewardPerEpoch * performanceFactor)
-	if aux2 < fixedCost {
-		return 0
-	}
-	reward := (aux2 >> 40) - fixedCost
-
-	return reward
-}
-
-func (m *Manager) loadCommitteeForEpoch(epochIndex iotago.EpochIndex) *account.Accounts {
-=======
-func (m *Tracker) loadCommitteeForEpoch(epochIndex iotago.EpochIndex) *account.Accounts {
->>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget):pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance/performance.go
-	accountsBytes, err := m.committeeStore.Get(epochIndex.Bytes())
+func (m *Tracker) loadCommitteeForEpoch(epoch iotago.EpochIndex) *account.Accounts {
+	accountsBytes, err := m.committeeStore.Get(epoch.Bytes())
 	if err != nil {
-		panic(errors.Wrapf(err, "failed to load committee for epoch %d", epochIndex))
+		panic(errors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
 
-	accounts, err := account.AccountsFromBytes(accountsBytes)
+	committee, err = account.AccountsFromBytes(accountsBytes)
 	if err != nil {
 		panic(errors.Wrapf(err, "failed to parse committee for epoch %d", epochIndex))
 	}
-	return accounts
+
+	return committee, true
 }
 
 func (m *Tracker) storeCommitteeForEpoch(epochIndex iotago.EpochIndex, committee *account.Accounts) error {
@@ -280,12 +171,6 @@ func (m *Tracker) storeCommitteeForEpoch(epochIndex iotago.EpochIndex, committee
 	}
 
 	return nil
-}
-
-func (m *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) *advancedset.AdvancedSet[iotago.AccountID] {
-	// TODO: we should choose candidates we tracked performance for
-
-	return &advancedset.AdvancedSet[iotago.AccountID]{}
 }
 
 func aggregatePerformanceFactors(pfs []uint64) uint64 {
