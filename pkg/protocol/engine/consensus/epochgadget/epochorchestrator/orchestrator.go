@@ -32,6 +32,7 @@ type Orchestrator struct {
 func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.Engine, epochgadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) epochgadget.Gadget {
 		return options.Apply(&Orchestrator{
+			events: 		   epochgadget.NewEvents(),
 			sybilProtection:    e.SybilProtection,
 			ledger:             e.Ledger,
 			timeProvider:       e.API().TimeProvider(),
@@ -84,7 +85,15 @@ func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 	return o.performanceManager.Export(writer, targetSlot)
 }
 
-func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) {
+func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
+	epoch := o.timeProvider.EpochFromSlot(slot)
+	if o.timeProvider.EpochEnd(epoch)-o.optsEpochEndNearingThreshold == slot {
+		newCommittee := o.selectNewCommittee(slot)
+		o.events.CommitteeSelected.Trigger(newCommittee)
+	}
+}
+
+func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
 	currentEpoch := o.timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 	candidates := o.performanceManager.EligibleValidatorCandidates(nextEpoch)
@@ -113,6 +122,8 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) {
 	newCommittee := o.sybilProtection.RotateCommittee(nextEpoch, weightedCandidates)
 	weightedCommittee := newCommittee.Accounts()
 	o.performanceManager.RegisterCommittee(nextEpoch, weightedCommittee)
+
+	return weightedCommittee
 }
 
 func WithEpochEndNearingThreshold(threshold iotago.SlotIndex) options.Option[Orchestrator] {
