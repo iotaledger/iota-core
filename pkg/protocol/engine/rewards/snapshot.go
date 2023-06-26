@@ -204,36 +204,50 @@ func (m *Manager) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 	return nil
 }
 
-func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotago.EpochIndex) error {
+func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
 	// export all stored pools
 	// in theory we could save the epoch count only once, because stats and rewards should be the same length
 	var epochCount uint64
 	if err := pWriter.WriteValue("pool rewards epoch count", epochCount, true); err != nil {
 		return errors.Wrap(err, "unable to write epoch count")
 	}
-	var innerErr error
-	err := m.rewardBaseStore.Iterate([]byte{}, func(key []byte, value []byte) bool {
-		epochIndex := iotago.EpochIndex(binary.LittleEndian.Uint64(key))
-		if epochIndex > epoch {
-			// continue
+	// TODO: restrict the ending condition according to eviction rules
+	for index := targetEpoch; index != iotago.EpochIndex(0); index-- {
+		if err := pWriter.WriteValue("epoch index", index); err != nil {
+			return errors.Wrap(err, "unable to write epoch index")
+		}
+		var accountCount uint64
+		if err := pWriter.WriteValue("pool rewards account count", accountCount, true); err != nil {
+			return errors.Wrap(err, "unable to write account count")
+		}
+		rewardsTree := ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(index))
+		var innerErr error
+		err := rewardsTree.Stream(func(key iotago.AccountID, value *AccountRewards) bool {
+			if err := pWriter.WriteValue("account id", key); err != nil {
+				innerErr = errors.Wrap(err, "unable to write account id")
+				return false
+			}
+			if err := pWriter.WriteValue("account rewards", value); err != nil {
+				innerErr = errors.Wrap(err, "unable to write account rewards")
+				return false
+			}
+			accountCount++
+
 			return true
+		})
+		if err != nil {
+			return errors.Wrap(err, "unable to stream rewards")
 		}
-		if err := pWriter.WriteBytes(key); err != nil {
-			innerErr = errors.Wrap(err, "unable to write epoch index")
-			return false
+		if innerErr != nil {
+			return innerErr
 		}
-		if err := pWriter.WriteBytes(value); err != nil {
-			innerErr = errors.Wrap(err, "unable to write epoch pools rewards")
-			return false
+		if err = pWriter.WriteValueAtBookmark("pool rewards account count", accountCount); err != nil {
+			return errors.Wrap(err, "unable to write account count")
 		}
 		epochCount++
-
-		return true
-	})
-	if err != nil {
-		return errors.Wrapf(err, "unable to iterate over reward base store: %s", innerErr)
 	}
-	if err = pWriter.WriteValueAtBookmark("pool rewards epoch count", epochCount); err != nil {
+
+	if err := pWriter.WriteValueAtBookmark("pool rewards epoch count", epochCount); err != nil {
 		return errors.Wrap(err, "unable to write epoch count")
 	}
 
