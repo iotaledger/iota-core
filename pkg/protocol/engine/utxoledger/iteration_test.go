@@ -46,7 +46,7 @@ func TestUTXOComputeBalance(t *testing.T) {
 	balance, count, err := manager.ComputeLedgerBalance()
 	require.NoError(t, err)
 	require.Equal(t, 5, count)
-	require.Equal(t, uint64(2_134_656_365+56_549_524+25_548_858+545_699_656+626_659_696), balance)
+	require.Equal(t, iotago.BaseToken(2_134_656_365+56_549_524+25_548_858+545_699_656+626_659_696), balance)
 }
 
 func TestUTXOIteration(t *testing.T) {

@@ -288,7 +288,7 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 			require.True(t.T, exists)
 
 			require.Equal(t.T, t.PublicKeys(previousAccountState[accountID].PubKeys, false), actualDiff.PubKeysRemoved)
-			require.Equal(t.T, -int64(previousAccountState[accountID].BICAmount), actualDiff.BICChange)
+			require.Equal(t.T, -iotago.BlockIssuanceCredits(previousAccountState[accountID].BICAmount), actualDiff.BICChange)
 			require.Equal(t.T, iotago.EmptyOutputID, actualDiff.NewOutputID)
 
 			return
