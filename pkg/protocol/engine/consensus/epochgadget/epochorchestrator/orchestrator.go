@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -67,11 +68,11 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	}
 }
 
-func (o *Orchestrator) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint64, epochStart, epochEnd iotago.EpochIndex) (validatorReward uint64, err error) {
+func (o *Orchestrator) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
 	return o.performanceManager.ValidatorReward(validatorID, stakeAmount, epochStart, epochEnd)
 }
 
-func (o *Orchestrator) DelegatorReward(validatorID iotago.AccountID, delegatedAmount uint64, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward uint64, err error) {
+func (o *Orchestrator) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
 	return o.performanceManager.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd)
 }
 

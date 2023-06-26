@@ -16,7 +16,7 @@ func (m *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	return iotago.Identifier(ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epochIndex)).Root())
 }
 
-func (m *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint64, epochStart, epochEnd iotago.EpochIndex) (validatorReward uint64, err error) {
+func (m *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -41,13 +41,13 @@ func (m *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint
 		if err != nil {
 			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
 		}
-		validatorReward += uint64(decayedEpochRewards)
+		validatorReward += decayedEpochRewards
 	}
 
 	return validatorReward, nil
 }
 
-func (m *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount uint64, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward uint64, err error) {
+func (m *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -71,7 +71,7 @@ func (m *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
 		}
 
-		delegatorsReward += uint64(decayedEpochRewards)
+		delegatorsReward += decayedEpochRewards
 	}
 
 	return delegatorsReward, nil
