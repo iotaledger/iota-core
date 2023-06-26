@@ -82,7 +82,7 @@ func WithGenesisSeed(genesisSeed []byte) options.Option[Options] {
 
 type AccountDetails struct {
 	Address   iotago.Address
-	Amount    uint64
+	Amount    iotago.BaseToken
 	IssuerKey ed25519.PublicKey
 }
 

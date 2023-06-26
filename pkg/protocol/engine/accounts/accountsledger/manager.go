@@ -202,7 +202,8 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 		accountOutput.AccountID,
 		append(
 			stakingOpts,
-			accounts.WithCredits(accounts.NewBlockIssuanceCredits(int64(accountOutput.Amount), m.latestCommittedSlot)),
+			// TODO: this is only used in the snapshots, but we shouldn't simply cast the iota value to credits here.
+			accounts.WithCredits(accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(accountOutput.Amount), m.latestCommittedSlot)),
 			accounts.WithOutputID(output.OutputID()),
 			accounts.WithPubKeys(ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...),
 		)...,
@@ -246,10 +247,10 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		accountData.RemovePublicKeys(diffChange.PubKeysAdded...)
 
 		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) - diffChange.StakeEndEpochChange)
-		accountData.ValidatorStake = uint64(int64(accountData.ValidatorStake) - diffChange.ValidatorStakeChange)
-		accountData.FixedCost = uint64(int64(accountData.FixedCost) - diffChange.FixedCostChange)
+		accountData.ValidatorStake = iotago.BaseToken(int64(accountData.ValidatorStake) - diffChange.ValidatorStakeChange)
+		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) - diffChange.FixedCostChange)
 
-		accountData.DelegationStake = uint64(int64(accountData.DelegationStake) - diffChange.DelegationStakeChange)
+		accountData.DelegationStake = iotago.BaseToken(int64(accountData.DelegationStake) - diffChange.DelegationStakeChange)
 
 		// collected to see if an account was destroyed between slotIndex and b.latestCommittedSlot index.
 		wasDestroyed = wasDestroyed || destroyed
@@ -282,8 +283,8 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prun
 	return slotDiff
 }
 
-func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]uint64, err error) {
-	burns = make(map[iotago.AccountID]uint64)
+func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]iotago.Mana, err error) {
+	burns = make(map[iotago.AccountID]iotago.Mana)
 	if set, exists := m.blockBurns.Get(slotIndex); exists {
 		for it := set.Iterator(); it.HasNext(); {
 			blockID := it.Next()
@@ -346,11 +347,11 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		accountData.AddPublicKeys(diffChange.PubKeysAdded...)
 		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
 
-		accountData.ValidatorStake = uint64(int64(accountData.ValidatorStake) + diffChange.ValidatorStakeChange)
+		accountData.ValidatorStake = iotago.BaseToken(int64(accountData.ValidatorStake) + diffChange.ValidatorStakeChange)
 		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) + diffChange.StakeEndEpochChange)
-		accountData.FixedCost = uint64(int64(accountData.FixedCost) + diffChange.FixedCostChange)
+		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) + diffChange.FixedCostChange)
 
-		accountData.DelegationStake = uint64(int64(accountData.DelegationStake) + diffChange.DelegationStakeChange)
+		accountData.DelegationStake = iotago.BaseToken(int64(accountData.DelegationStake) + diffChange.DelegationStakeChange)
 
 		m.accountsTree.Set(accountID, accountData)
 	}
@@ -360,14 +361,14 @@ func (m *Manager) evict(index iotago.SlotIndex) {
 	m.blockBurns.Delete(index)
 }
 
-func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]uint64, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) {
+func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]iotago.Mana, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) {
 	for id, burn := range burns {
 		accountDiff, exists := accountDiffs[id]
 		if !exists {
 			accountDiff = prunable.NewAccountDiff()
 			accountDiffs[id] = accountDiff
 		}
-		accountDiff.BICChange -= int64(burn)
+		accountDiff.BICChange -= iotago.BlockIssuanceCredits(burn)
 		accountDiffs[id] = accountDiff
 	}
 }

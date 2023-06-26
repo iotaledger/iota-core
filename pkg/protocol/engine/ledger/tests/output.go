@@ -14,12 +14,12 @@ func (m *MockedOutput) VBytes(_ *iotago.RentStructure, _ iotago.VBytesFunc) iota
 	panic("implement me")
 }
 
-func (m *MockedOutput) Deposit() uint64 {
+func (m *MockedOutput) Deposit() iotago.BaseToken {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m *MockedOutput) StoredMana() uint64 {
+func (m *MockedOutput) StoredMana() iotago.Mana {
 	//TODO implement me
 	panic("implement me")
 }

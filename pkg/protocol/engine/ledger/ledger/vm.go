@@ -63,9 +63,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 			return nil, xerrors.Errorf("could not get BIC inputs: %w", accountErr)
 		}
 
-		bicInputSet[inp.AccountID] = iotagovm.BlockIssuanceCredit{
-			Credits: b.Credits.Value,
-		}
+		bicInputSet[inp.AccountID] = b.Credits.Value
 	}
 	resolvedInputs.BICInputSet = bicInputSet
 

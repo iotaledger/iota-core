@@ -2,6 +2,8 @@ package accountsledger_test
 
 import (
 	"testing"
+
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestManager_Scenario1(t *testing.T) {
@@ -10,7 +12,7 @@ func TestManager_Scenario1(t *testing.T) {
 	ts.ApplySlotActions(1, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 10,
-			Burns:           []uint64{5},
+			Burns:           []iotago.Mana{5},
 			AddedKeys:       []string{"A.P1"},
 
 			NewOutputID: "A1",
@@ -29,7 +31,7 @@ func TestManager_Scenario1(t *testing.T) {
 	ts.ApplySlotActions(2, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 30,
-			Burns:           []uint64{15},
+			Burns:           []iotago.Mana{15},
 			AddedKeys:       []string{"A.P2"},
 
 			NewOutputID: "A2",
@@ -52,7 +54,7 @@ func TestManager_Scenario2(t *testing.T) {
 	ts.ApplySlotActions(1, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 10,
-			Burns:           []uint64{5},
+			Burns:           []iotago.Mana{5},
 			AddedKeys:       []string{"A.P1"},
 
 			NewOutputID: "A1",
@@ -81,7 +83,7 @@ func TestManager_Scenario2(t *testing.T) {
 	ts.ApplySlotActions(3, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 30,
-			Burns:           []uint64{15},
+			Burns:           []iotago.Mana{15},
 			AddedKeys:       []string{"A.P2"},
 
 			NewOutputID: "A2",
@@ -103,7 +105,7 @@ func TestManager_Scenario3(t *testing.T) {
 	ts.ApplySlotActions(1, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 10,
-			Burns:           []uint64{5},
+			Burns:           []iotago.Mana{5},
 			AddedKeys:       []string{"A.P1"},
 
 			NewOutputID: "A1",
@@ -139,7 +141,7 @@ func TestManager_Scenario4(t *testing.T) {
 	ts.ApplySlotActions(1, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 10,
-			Burns:           []uint64{5},
+			Burns:           []iotago.Mana{5},
 			AddedKeys:       []string{"A.P1"},
 
 			NewOutputID: "A1",
@@ -167,7 +169,7 @@ func TestManager_Scenario4(t *testing.T) {
 
 	ts.ApplySlotActions(3, map[string]*AccountActions{
 		"A": { // zero out the account data before removal
-			Burns:       []uint64{5},
+			Burns:       []iotago.Mana{5},
 			RemovedKeys: []string{"A.P1"},
 
 			NewOutputID: "A2",
@@ -203,7 +205,7 @@ func TestManager_Scenario5(t *testing.T) {
 	ts.ApplySlotActions(1, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 5,
-			Burns:           []uint64{5},
+			Burns:           []iotago.Mana{5},
 			AddedKeys:       []string{"A1", "A2"},
 
 			NewOutputID: "A1",
@@ -222,7 +224,7 @@ func TestManager_Scenario5(t *testing.T) {
 	ts.ApplySlotActions(2, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 5,
-			Burns:           []uint64{5},
+			Burns:           []iotago.Mana{5},
 			AddedKeys:       []string{"A3", "A4"},
 			Destroyed:       true,
 		},

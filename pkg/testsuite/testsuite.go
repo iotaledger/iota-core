@@ -29,7 +29,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-const MinIssuerAccountDeposit = uint64(84400)
+const MinIssuerAccountDeposit = iotago.BaseToken(84400)
 
 type TestSuite struct {
 	Testing     *testing.T
@@ -302,7 +302,7 @@ func (t *TestSuite) Shutdown() {
 	})
 }
 
-func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, optDeposit ...iotago.BaseToken) *mock.Node {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -328,19 +328,19 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	return node
 }
 
-func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, optDeposit ...iotago.BaseToken) *mock.Node {
 	return t.addNodeToPartition(name, partition, true, optDeposit...)
 }
 
-func (t *TestSuite) AddValidatorNode(name string, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) AddValidatorNode(name string, optDeposit ...iotago.BaseToken) *mock.Node {
 	return t.addNodeToPartition(name, mock.NetworkMainPartition, true, optDeposit...)
 }
 
-func (t *TestSuite) AddNodeToPartition(name string, partition string, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) AddNodeToPartition(name string, partition string, optDeposit ...iotago.BaseToken) *mock.Node {
 	return t.addNodeToPartition(name, partition, false, optDeposit...)
 }
 
-func (t *TestSuite) AddNode(name string, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) AddNode(name string, optDeposit ...iotago.BaseToken) *mock.Node {
 	return t.addNodeToPartition(name, mock.NetworkMainPartition, false, optDeposit...)
 }
 

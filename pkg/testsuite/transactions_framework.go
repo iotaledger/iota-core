@@ -103,8 +103,8 @@ func (t *TransactionFramework) CreateSimpleTransaction(alias string, outputCount
 
 func (t *TransactionFramework) CreateBasicOutputsEqually(outputCount int, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
 	inputStates := make([]*utxoledger.Output, 0, len(inputAliases))
-	totalInputDeposits := uint64(0)
-	totalInputStoredMana := uint64(0)
+	totalInputDeposits := iotago.BaseToken(0)
+	totalInputStoredMana := iotago.Mana(0)
 
 	for _, inputAlias := range inputAliases {
 		output := t.Output(inputAlias)
@@ -113,10 +113,10 @@ func (t *TransactionFramework) CreateBasicOutputsEqually(outputCount int, inputA
 		totalInputStoredMana += output.StoredMana()
 	}
 
-	manaAmount := totalInputStoredMana / uint64(outputCount)
+	manaAmount := totalInputStoredMana / iotago.Mana(outputCount)
 	remainderMana := totalInputStoredMana
 
-	tokenAmount := totalInputDeposits / uint64(outputCount)
+	tokenAmount := totalInputDeposits / iotago.BaseToken(outputCount)
 	remainderFunds := totalInputDeposits
 
 	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
@@ -140,14 +140,14 @@ func (t *TransactionFramework) CreateBasicOutputsEqually(outputCount int, inputA
 	return inputStates, outputStates, []*mock.HDWallet{t.wallet}
 }
 
-func (t *TransactionFramework) CreateBasicOutputs(depositDistribution, manaDistribution []uint64, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
+func (t *TransactionFramework) CreateBasicOutputs(depositDistribution []iotago.BaseToken, manaDistribution []iotago.Mana, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
 	if len(depositDistribution) != len(manaDistribution) {
 		panic("deposit and mana distributions should have the same length")
 	}
 
 	inputStates := make([]*utxoledger.Output, 0, len(inputAliases))
-	totalInputDeposits := uint64(0)
-	totalInputStoredMana := uint64(0)
+	totalInputDeposits := iotago.BaseToken(0)
+	totalInputStoredMana := iotago.Mana(0)
 
 	for _, inputAlias := range inputAliases {
 		output := t.Output(inputAlias)
@@ -315,13 +315,13 @@ func WithBlockIssuerExpirySlot(expirySlot iotago.SlotIndex) options.Option[iotag
 	}
 }
 
-func WithMana(mana uint64) options.Option[iotago.AccountOutput] {
+func WithMana(mana iotago.Mana) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		accountOutput.Mana = mana
 	}
 }
 
-func WithDeposit(deposit uint64) options.Option[iotago.AccountOutput] {
+func WithDeposit(deposit iotago.BaseToken) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		accountOutput.Amount = deposit
 	}

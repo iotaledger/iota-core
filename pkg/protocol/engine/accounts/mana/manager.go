@@ -35,7 +35,7 @@ func NewManager(manaDecayProvider *iotago.ManaDecayProvider, accountOutputResolv
 	}
 }
 
-func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotago.SlotIndex) (uint64, error) {
+func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotago.SlotIndex) (iotago.Mana, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -69,7 +69,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	}
 	updatedValue += manaPotential
 
-	mana.UpdateValue(uint64(updatedValue), currentSlot)
+	mana.UpdateValue(updatedValue, currentSlot)
 
 	return mana.Value(), nil
 }

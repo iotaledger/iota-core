@@ -84,8 +84,8 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 	epochSlotStart := m.timeProvider.EpochStart(epochIndex)
 	epochSlotEnd := m.timeProvider.EpochEnd(epochIndex)
 
-	var totalStake uint64
-	var totalValidatorStake uint64
+	var totalStake iotago.BaseToken
+	var totalValidatorStake iotago.BaseToken
 
 	for _, pool := range poolStakes {
 		totalStake += pool.PoolStake
@@ -130,7 +130,7 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex, poolStakes map[iotago
 	return nil
 }
 
-func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint64, epochStart, epochEnd iotago.EpochIndex) (validatorReward uint64, err error) {
+func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -145,23 +145,24 @@ func (m *Manager) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint
 			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
 		}
 
+		// TODO: check for overflows
 		unDecayedEpochRewards := rewardsForAccountInEpoch.FixedCost +
-			((poolStats.ProfitMargin * rewardsForAccountInEpoch.PoolRewards) >> 8) +
-			((((1<<8)-poolStats.ProfitMargin)*rewardsForAccountInEpoch.PoolRewards)>>8)*
-				stakeAmount/
-				rewardsForAccountInEpoch.PoolStake
+			((iotago.Mana(poolStats.ProfitMargin) * rewardsForAccountInEpoch.PoolRewards) >> 8) +
+			(((iotago.Mana(1<<8)-iotago.Mana(poolStats.ProfitMargin))*rewardsForAccountInEpoch.PoolRewards)>>8)*
+				iotago.Mana(stakeAmount)/
+				iotago.Mana(rewardsForAccountInEpoch.PoolStake)
 
-		decayedEpochRewards, err := m.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		decayedEpochRewards, err := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
 		if err != nil {
 			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
 		}
-		validatorReward += uint64(decayedEpochRewards)
+		validatorReward += decayedEpochRewards
 	}
 
 	return validatorReward, nil
 }
 
-func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount uint64, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward uint64, err error) {
+func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -176,16 +177,16 @@ func (m *Manager) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
 		}
 
-		unDecayedEpochRewards := ((((1 << 8) - poolStats.ProfitMargin) * rewardsForAccountInEpoch.PoolRewards) >> 8) *
-			delegatedAmount /
-			rewardsForAccountInEpoch.PoolStake
+		unDecayedEpochRewards := ((iotago.Mana((1<<8)-poolStats.ProfitMargin) * rewardsForAccountInEpoch.PoolRewards) >> 8) *
+			iotago.Mana(delegatedAmount) /
+			iotago.Mana(rewardsForAccountInEpoch.PoolStake)
 
-		decayedEpochRewards, err := m.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		decayedEpochRewards, err := m.decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
 		if err != nil {
 			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
 		}
 
-		delegatorsReward += uint64(decayedEpochRewards)
+		delegatorsReward += decayedEpochRewards
 	}
 
 	return delegatorsReward, nil
@@ -218,11 +219,16 @@ func aggregatePerformanceFactors(pfs []uint64) uint64 {
 	return sum / uint64(len(pfs))
 }
 
-func calculateProfitMargin(totalValidatorsStake, totalPoolStake uint64) uint64 {
-	return (1 << 8) * totalValidatorsStake / (totalValidatorsStake + totalPoolStake)
+func calculateProfitMargin(totalValidatorsStake iotago.BaseToken, totalPoolStake iotago.BaseToken) uint64 {
+	// TODO: take care of overflows here.
+	return (1 << 8) * uint64(totalValidatorsStake) / uint64(totalValidatorsStake+totalPoolStake)
 }
 
-func poolReward(totalValidatorsStake, totalStake, profitMargin, fixedCosts, performanceFactor uint64) uint64 {
+func poolReward(totalValidatorsStake iotago.BaseToken, totalStake iotago.BaseToken, profitMargin uint64, fixedCosts iotago.Mana, performanceFactor uint64) iotago.Mana {
 	// TODO: decay is calculated per epoch now, so do we need to calculate the rewards for each slot of the epoch?
-	return totalValidatorsStake * performanceFactor
+	_ = totalStake
+	_ = profitMargin
+	_ = fixedCosts
+
+	return iotago.Mana(totalValidatorsStake) * iotago.Mana(performanceFactor)
 }

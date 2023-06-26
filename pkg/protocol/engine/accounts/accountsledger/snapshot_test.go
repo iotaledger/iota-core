@@ -15,21 +15,21 @@ func TestManager_Import_Export(t *testing.T) {
 	ts.ApplySlotActions(1, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 10,
-			Burns:           []uint64{5},
+			Burns:           []iotago.Mana{5},
 			AddedKeys:       []string{"A.P1"},
 
 			NewOutputID: "A1",
 		},
 		"B": {
 			TotalAllotments: 20,
-			Burns:           []uint64{10},
+			Burns:           []iotago.Mana{10},
 			AddedKeys:       []string{"B.P1", "B.P2"},
 
 			NewOutputID: "B1",
 		},
 		"D": { // create a staking account
 			TotalAllotments: 0,
-			Burns:           []uint64{0},
+			Burns:           []iotago.Mana{0},
 			AddedKeys:       []string{"D.P1"},
 
 			ValidatorStakeChange:  20,
@@ -68,14 +68,14 @@ func TestManager_Import_Export(t *testing.T) {
 
 	ts.ApplySlotActions(2, map[string]*AccountActions{
 		"A": { // zero out the account data before removal
-			Burns:       []uint64{5},
+			Burns:       []iotago.Mana{5},
 			RemovedKeys: []string{"A.P1"},
 
 			NewOutputID: "A2",
 		},
 		"B": {
 			TotalAllotments: 5,
-			Burns:           []uint64{2},
+			Burns:           []iotago.Mana{2},
 			RemovedKeys:     []string{"B.P1"},
 
 			NewOutputID: "B2",
@@ -116,14 +116,14 @@ func TestManager_Import_Export(t *testing.T) {
 		},
 		"B": {
 			TotalAllotments: 10,
-			Burns:           []uint64{5},
+			Burns:           []iotago.Mana{5},
 			AddedKeys:       []string{"B.P3"},
 
 			NewOutputID: "B3",
 		},
 		"C": {
 			TotalAllotments: 10,
-			Burns:           []uint64{10},
+			Burns:           []iotago.Mana{10},
 			AddedKeys:       []string{"C.P1"},
 
 			NewOutputID: "C1",

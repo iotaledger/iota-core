@@ -36,8 +36,9 @@ func Test_TransitionAccount(t *testing.T) {
 	genesisAccountOutput := genesisAccount.Output().(*iotago.AccountOutput)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:       genesisAccountOutput.AccountID,
-		Credits:  accounts.NewBlockIssuanceCredits(int64(testsuite.MinIssuerAccountDeposit), 0),
+		ID: genesisAccountOutput.AccountID,
+		// TODO: why do we use the deposit here as credits?
+		Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit), 0),
 		OutputID: genesisAccount.OutputID(),
 		PubKeys:  advancedset.New(ed25519.PublicKey(oldKey)),
 	}, node1)
@@ -73,8 +74,9 @@ func Test_TransitionAccount(t *testing.T) {
 		}, false, node1)
 
 		ts.AssertAccountData(&accounts.AccountData{
-			ID:       genesisAccountOutput.AccountID,
-			Credits:  accounts.NewBlockIssuanceCredits(int64(testsuite.MinIssuerAccountDeposit), 0),
+			ID: genesisAccountOutput.AccountID,
+			// TODO: why do we use the deposit here as credits?
+			Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit), 0),
 			OutputID: iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
 			PubKeys:  advancedset.New(ed25519.PublicKey(oldKey), newKey),
 		}, node1)

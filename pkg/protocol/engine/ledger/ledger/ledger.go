@@ -569,7 +569,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 					continue
 				}
 
-				accountDiff.BICChange += int64(allotment.Value)
+				accountDiff.BICChange += iotago.BlockIssuanceCredits(allotment.Value)
 				accountDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
 
 				// we are not transitioning the allotted account, so the new and previous outputIDs are the same

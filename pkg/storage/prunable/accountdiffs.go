@@ -23,7 +23,7 @@ const (
 
 // AccountDiff represent the storable changes for a single account within a slot.
 type AccountDiff struct {
-	BICChange int64
+	BICChange iotago.BlockIssuanceCredits
 
 	PreviousUpdatedTime iotago.SlotIndex
 
@@ -62,7 +62,7 @@ func NewAccountDiff() *AccountDiff {
 func (d AccountDiff) Bytes() ([]byte, error) {
 	m := marshalutil.New()
 
-	m.WriteInt64(d.BICChange)
+	m.WriteInt64(int64(d.BICChange))
 	m.WriteUint64(uint64(d.PreviousUpdatedTime))
 	m.WriteBytes(lo.PanicOnErr(d.NewOutputID.Bytes()))
 	m.WriteBytes(lo.PanicOnErr(d.PreviousOutputID.Bytes()))

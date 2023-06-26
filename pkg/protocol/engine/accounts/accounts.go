@@ -21,9 +21,9 @@ type AccountData struct {
 	OutputID iotago.OutputID
 	PubKeys  *advancedset.AdvancedSet[ed25519.PublicKey]
 
-	ValidatorStake  uint64
-	DelegationStake uint64
-	FixedCost       uint64
+	ValidatorStake  iotago.BaseToken
+	DelegationStake iotago.BaseToken
+	FixedCost       iotago.Mana
 	StakeEndEpoch   iotago.EpochIndex
 }
 
@@ -170,9 +170,9 @@ func (a AccountData) Bytes() ([]byte, error) {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
 	})
 
-	m.WriteUint64(a.ValidatorStake)
-	m.WriteUint64(a.DelegationStake)
-	m.WriteUint64(a.FixedCost)
+	m.WriteUint64(uint64(a.ValidatorStake))
+	m.WriteUint64(uint64(a.DelegationStake))
+	m.WriteUint64(uint64(a.FixedCost))
 	m.WriteUint64(uint64(a.StakeEndEpoch))
 
 	return m.Bytes(), nil
@@ -198,19 +198,19 @@ func WithPubKeys(pubKeys ...ed25519.PublicKey) options.Option[AccountData] {
 	}
 }
 
-func WithValidatorStake(validatorStake uint64) options.Option[AccountData] {
+func WithValidatorStake(validatorStake iotago.BaseToken) options.Option[AccountData] {
 	return func(a *AccountData) {
 		a.ValidatorStake = validatorStake
 	}
 }
 
-func WithDelegationStake(delegationStake uint64) options.Option[AccountData] {
+func WithDelegationStake(delegationStake iotago.BaseToken) options.Option[AccountData] {
 	return func(a *AccountData) {
 		a.DelegationStake = delegationStake
 	}
 }
 
-func WithFixedCost(fixedCost uint64) options.Option[AccountData] {
+func WithFixedCost(fixedCost iotago.Mana) options.Option[AccountData] {
 	return func(a *AccountData) {
 		a.FixedCost = fixedCost
 	}

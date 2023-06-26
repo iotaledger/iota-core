@@ -2,6 +2,7 @@ package accountsledger_test
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -57,7 +58,7 @@ func NewTestSuite(test *testing.T) *TestSuite {
 				VBFactorData: 1,
 				VBFactorKey:  10,
 			},
-			TokenSupply:           utils.RandAmount(),
+			TokenSupply:           tpkg.RandBaseToken(math.MaxUint64),
 			GenesisUnixTimestamp:  time.Now().Unix(),
 			SlotDurationInSeconds: 10,
 			SlotsPerEpochExponent: 13,
@@ -147,7 +148,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 
 		// Put everything together in the format that the manager expects.
 		slotDetails.SlotDiff[accountID] = &prunable.AccountDiff{
-			BICChange:           int64(action.TotalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
+			BICChange:           iotago.BlockIssuanceCredits(action.TotalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
 			PubKeysAdded:        t.PublicKeys(action.AddedKeys, true),
 			PubKeysRemoved:      t.PublicKeys(action.RemovedKeys, true),
 			PreviousUpdatedTime: prevAccountFields.BICUpdatedAt,
@@ -200,7 +201,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 	require.NoError(t.T, err)
 }
 
-func (t *TestSuite) createBlockWithBurn(accountID iotago.AccountID, index iotago.SlotIndex, burn uint64) *blocks.Block {
+func (t *TestSuite) createBlockWithBurn(accountID iotago.AccountID, index iotago.SlotIndex, burn iotago.Mana) *blocks.Block {
 	innerBlock := tpkg.RandBlockWithIssuerAndBurnedMana(accountID, burn)
 	innerBlock.IssuingTime = t.API().TimeProvider().SlotStartTime(index)
 	modelBlock, err := model.BlockFromBlock(innerBlock, t.API())
@@ -238,7 +239,7 @@ func (t *TestSuite) AssertAccountLedgerUntil(slotIndex iotago.SlotIndex, account
 
 func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
 	expectedPubKeys := advancedset.New(t.PublicKeys(expectedState.PubKeys, false)...)
-	expectedCredits := accounts.NewBlockIssuanceCredits(int64(expectedState.BICAmount), expectedState.BICUpdatedTime)
+	expectedCredits := accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(expectedState.BICAmount), expectedState.BICUpdatedTime)
 
 	actualState, exists, err := t.Instance.Account(accountID, slotIndex)
 	require.NoError(t.T, err)
@@ -295,7 +296,7 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 	}
 
 	require.Equal(t.T, expectedAccountDiff.NewOutputID, actualDiff.NewOutputID)
-	require.Equal(t.T, expectedAccountDiff.BICChange-int64(accountsSlotBuildData.Burns[accountID]), actualDiff.BICChange)
+	require.Equal(t.T, expectedAccountDiff.BICChange-iotago.BlockIssuanceCredits(accountsSlotBuildData.Burns[accountID]), actualDiff.BICChange)
 	require.Equal(t.T, expectedAccountDiff.PubKeysAdded, actualDiff.PubKeysAdded)
 	require.Equal(t.T, expectedAccountDiff.PubKeysRemoved, actualDiff.PubKeysRemoved)
 }
@@ -346,8 +347,8 @@ func (t *TestSuite) PublicKeys(pubKeys []string, createIfNotExists bool) []ed255
 }
 
 type AccountActions struct {
-	TotalAllotments uint64
-	Burns           []uint64
+	TotalAllotments iotago.Mana
+	Burns           []iotago.Mana
 	Destroyed       bool
 	AddedKeys       []string
 	RemovedKeys     []string
@@ -362,15 +363,15 @@ type AccountActions struct {
 }
 
 type AccountState struct {
-	BICAmount      uint64
+	BICAmount      iotago.Mana
 	BICUpdatedTime iotago.SlotIndex
 
 	OutputID string
 	PubKeys  []string
 
-	ValidatorStake  uint64
-	DelegationStake uint64
-	FixedCost       uint64
+	ValidatorStake  iotago.BaseToken
+	DelegationStake iotago.BaseToken
+	FixedCost       iotago.Mana
 	StakeEndEpoch   iotago.EpochIndex
 
 	Destroyed bool
@@ -383,7 +384,7 @@ type latestAccountFields struct {
 }
 
 type slotData struct {
-	Burns             map[iotago.AccountID]uint64
+	Burns             map[iotago.AccountID]iotago.Mana
 	SlotDiff          map[iotago.AccountID]*prunable.AccountDiff
 	DestroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]
 }
@@ -391,7 +392,7 @@ type slotData struct {
 func newSlotData() *slotData {
 	return &slotData{
 		DestroyedAccounts: advancedset.New[iotago.AccountID](),
-		Burns:             make(map[iotago.AccountID]uint64),
+		Burns:             make(map[iotago.AccountID]iotago.Mana),
 		SlotDiff:          make(map[iotago.AccountID]*prunable.AccountDiff),
 	}
 }
