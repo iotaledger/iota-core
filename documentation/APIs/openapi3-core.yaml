@@ -1797,9 +1797,11 @@ components:
           description: The identifiers of the blocks this block references. Hex-encoded data with 0x prefix.
           items:
             type: string
+        # TODO: accountId is currently issuerId in iota.go
         accountId:
           type: string
           description: The identifier of the account of this block.
+        # TODO: issuerPublicKey is not part of Block in iota.go
         issuerPublicKey:
           type: string
           description: The public key of the issuer.
@@ -1807,8 +1809,8 @@ components:
           type: integer
           description: The timestamp of issuing this block.
         burnedMana:
-          type: integer
-          description: uint64, The mana burned in this block.
+          type: number
+          description: The mana burned in this block.
         commitment:
           $ref: '#/components/schemas/Commitment'
           description: The slot commitment contains in this block.
@@ -1823,6 +1825,9 @@ components:
         signature:
           type: string
           description: The signature of entire block, signed by the issuer.
+        nonce:
+          type: number
+          description: The nonce which fulfill the PoW requirements.
       required:
         - protocolVersion
         - strongParents
@@ -1844,7 +1849,7 @@ components:
             oneOf:
               - $ref: '#/components/schemas/SignatureUnlock'
               - $ref: '#/components/schemas/ReferenceUnlock'
-              - $ref: '#/components/schemas/AliasUnlock'
+              - $ref: '#/components/schemas/AccountUnlock'
               - $ref: '#/components/schemas/NFTUnlock'
       required:
         - type
@@ -1861,8 +1866,8 @@ components:
           type: string
           description: Network identifier. Plain string encoded number. This field signals for which network the block is meant for. It is computed out of the first 8 bytes of the `BLAKE2b-256` hash of the concatenation of the network name and protocol version string.
         creationTime:
-          type: integer
-          description: The timestamp of this transaction is created.
+          type: number
+          description: The slot index of this transaction is created.
         inputsCommitment:
           type: string
           description: BLAKE2b-256 hash of the BLAKE2b-256 hashes of the serialized outputs referenced in Inputs by their outputIds (transactionId || outputIndex). Hex-encoded data with 0x prefix.
@@ -1878,9 +1883,15 @@ components:
           items:
             anyOf:
               - $ref: '#/components/schemas/BasicOutput'
-              - $ref: '#/components/schemas/AliasOutput'
+              - $ref: '#/components/schemas/AccountOutput'
               - $ref: '#/components/schemas/FoundryOutput'
               - $ref: '#/components/schemas/NFTOutput'
+        allotments:
+          type: array
+          description: The accounts map with corresponding allotment values.
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/Allotment'
         payload:
           description: The optional embedded payload.
           oneOf:
@@ -1888,9 +1899,20 @@ components:
       required:
         - type
         - networkId
+        - creationTime
         - inputsCommitment
         - inputs
         - outputs
+
+    Allotment:
+      description: Allotment is a struct that represents a list of account IDs and an allotted value.
+      properties:
+        accountId: 
+          type: string
+          description: The account ID to allot the mana to.
+        value:
+          type: number
+          description: The amount of mana to allot.
 
     UTXOInput:
       description: Describes an input which references an unspent transaction output to consume.
@@ -1933,30 +1955,40 @@ components:
               - $ref: '#/components/schemas/StorageDepositReturnUnlockCondition'
               - $ref: '#/components/schemas/TimelockUnlockCondition'
               - $ref: '#/components/schemas/ExpirationUnlockCondition'
+        features:
+          type: array
+          description: The features on the output
+          items:
+            anyOf:
+              - $ref: '#/components/schemas/SenderFeature'
+              - $ref: '#/components/schemas/MetadataFeature'
+              - $ref: '#/components/schemas/TagFeature'
+        mana:
+          type: integer
+          description: The stored mana held by the output.
       required:
         - type
         - amount
-        - unlockConditions
+        - mana
 
-    AliasOutput:
-      description: Describes an alias account in the ledger that can be controlled by the state and governance controllers.
+    AccountOutput:
+      description: Describes an account in the ledger that can be controlled by the state and governance controllers.
       properties:
         type:
           type: integer
-          description: Set to value 4 to denote an Alias Output.
+          description: Set to value 4 to denote an Account Output.
         amount:
           type: string
           description: The amount of IOTA tokens to deposit with this output. Plain string encoded number.
+        accountId:
+          type: string
+          description: The identifier of the account.
         nativeTokens:
           type: array
           description: Native tokens held by the otuput.
           items:
             anyOf:
-              - $ref: '#/components/schemas/NativeToken'
-        aliasId:
-          type: string
-          description: Unique identifier of the alias, which is the BLAKE2b-256 hash of the Output ID that created it.
-            Alias Address = Alias Address Type || Alias ID. Hex-encoded data with 0x prefix.
+              - $ref: '#/components/schemas/NativeToken'        
         stateIndex:
           type: integer
           description: A counter that must increase by 1 every time the alias is state transitioned.
@@ -1979,7 +2011,7 @@ components:
           items:
             anyOf:
               - $ref: '#/components/schemas/SenderFeature'
-              - $ref: '#/components/schemas/MetadataFeature'
+              - $ref: '#/components/schemas/MetadataFeature'              
         immutableFeatures:
           type: array
           description: Immutable features that add utility to the output but do not impose unlocking conditions.
@@ -1988,20 +2020,24 @@ components:
             anyOf:
               - $ref: '#/components/schemas/IssuerFeature'
               - $ref: '#/components/schemas/MetadataFeature'
+              - $ref: '#/components/schemas/BlockIssuerFeature'
+        mana:
+          type: integer
+          description: The stored mana held by the output.
       required:
         - type
         - amount
-        - aliasId
+        - accountId
         - stateIndex
         - foundryCounter
-        - unlockConditions
+        - mana
 
     FoundryOutput:
       description: Describes a foundry output that is controlled by an alias.
       properties:
         type:
           type: integer
-          description: Set to value5 to denote a Foundry Output.
+          description: Set to value 5 to denote a Foundry Output.
         amount:
           type: string
           description: The amount of IOTA tokens to deposit with this output. Plain string encoded number.
@@ -2013,7 +2049,7 @@ components:
               - $ref: '#/components/schemas/NativeToken'
         serialNumber:
           type: integer
-          description: The serial number of the foundry with respect to the controlling alias.
+          description: The serial number of the foundry with respect to the controlling account.
         tokenScheme:
           type: array
           description: Defines the supply control scheme of the tokens controlled by the foundry.
@@ -2025,7 +2061,7 @@ components:
           description: Unlock condtions that define how the output an be unlocked in a transaction.
           items:
             anyOf:
-              - $ref: '#/components/schemas/ImmutableAliasAddressUnlockCondition'
+              - $ref: '#/components/schemas/ImmutableAccountAddressUnlockCondition'
         features:
           type: array
           description: Features that add utility to the output but do not impose unlocking conditions.
@@ -2039,12 +2075,15 @@ components:
           items:
             anyOf:
               - $ref: '#/components/schemas/MetadataFeature'
+        mana:
+          type: integer
+          description: The stored mana held by the output.
       required:
         - type
         - amount
         - serialNumber
         - tokenScheme
-        - unlockConditions
+        - mana
 
     NFTOutput:
       description: escribes an NFT output, a globally unique token with metadata attached.
@@ -2079,7 +2118,6 @@ components:
           items:
             anyOf:
               - $ref: '#/components/schemas/SenderFeature'
-              - $ref: '#/components/schemas/IssuerFeature'
               - $ref: '#/components/schemas/MetadataFeature'
               - $ref: '#/components/schemas/TagFeature'
         immutableFeatures:
@@ -2090,16 +2128,19 @@ components:
             anyOf:
               - $ref: '#/components/schemas/IssuerFeature'
               - $ref: '#/components/schemas/MetadataFeature'
+        mana:
+          type: integer
+          description: The stored mana held by the output
       required:
         - type
         - amount
         - nftId
-        - unlockConditions
+        - mana
 
     NativeToken:
       description: A native token and its balance in the output.
       properties:
-        tokenId:
+        id:
           type: string
           description: Hex-encoded identifier with 0x prefix of the native token. Same as foundryId of the controlling foundry.
         amount:
@@ -2122,18 +2163,18 @@ components:
         - type
         - pubKeyHash
 
-    AliasAddress:
+    AccountAddress:
       description: Address of an alias account.
       properties:
         type:
           type: integer
-          description: Set to value 8 to denote an Alias Address.
-        aliasId:
+          description: Set to value 8 to denote an Account Address.
+        accountId:
           type: string
-          description: The hex-encoded, 0x prefixed BLAKE2b-256 hash of the outputId that created the alias.
+          description: The hex-encoded, 0x prefixed BLAKE2b-256 hash of the outputId that created the account.
       required:
         - type
-        - aliasId
+        - accountId
 
     NFTAddress:
       description: Address of an NFT account.
@@ -2157,22 +2198,22 @@ components:
         address:
           oneOf:
             - $ref: '#/components/schemas/Ed25519Address'
-            - $ref: '#/components/schemas/AliasAddress'
+            - $ref: '#/components/schemas/AccountAddress'
             - $ref: '#/components/schemas/NFTAddress'
       required:
         - type
         - address
 
-    ImmutableAliasAddressUnlockCondition:
-      description: Can be unlocked by unlocking the permanent alias address.
+    ImmutableAccountAddressUnlockCondition:
+      description: Can be unlocked by unlocking the permanent account.
         The unlock condition has to be kept in future state transitions of the UTXO state machine.
       properties:
         type:
           type: integer
-          description: Set to value 6 to denote an Immutable Alias Address Unlock Condition.
+          description: Set to value 6 to denote an Immutable Account Address Unlock Condition.
         address:
           oneOf:
-            - $ref: '#/components/schemas/AliasAddress'
+            - $ref: '#/components/schemas/AccountAddress'
       required:
         - type
         - address
@@ -2186,15 +2227,15 @@ components:
         returnAddress:
           oneOf:
             - $ref: '#/components/schemas/Ed25519Address'
-            - $ref: '#/components/schemas/AliasAddress'
+            - $ref: '#/components/schemas/AccountAddress'
             - $ref: '#/components/schemas/NFTAddress'
-        returnAmount:
+        amount:
           type: string
           description: Amount of IOTA tokens the consuming transaction should deposit to the address defined in Return Address. Plain string encoded number.
       required:
         - type
         - returnAddress
-        - returnAmount
+        - amount
 
     TimelockUnlockCondition:
       description: Can be unlocked if the CTT has a >= Unix Timestamp.
@@ -2202,14 +2243,13 @@ components:
         type:
           type: integer
           description: Set to value 2 to denote an Timelock Unlock Condition.
-        unixTime:
+        slotIndex:
           type: integer
-          description: Unix time (seconds since Unix epoch) starting from which the output can be consumed.
+          description: The slot index until which the timelock applies (inclusive).
           minimum: 0
           exclusiveMinimum: true
       required:
         - type
-        - unixTime
 
     ExpirationUnlockCondition:
       description: Defines a unix time until which only Address, defined in Address Unlock Condition, is allowed to unlock the output. After the unix time, only Return Address can unlock it.
@@ -2220,17 +2260,16 @@ components:
         returnAddress:
           oneOf:
             - $ref: '#/components/schemas/Ed25519Address'
-            - $ref: '#/components/schemas/AliasAddress'
+            - $ref: '#/components/schemas/AccountAddress'
             - $ref: '#/components/schemas/NFTAddress'
-        unixTime:
+        slotIndex:
           type: integer
-          description: Before this unix time, Address Unlock Condition is allowed to unlock the output, after that only the address defined in Return Address.
+          description: The slot index at which the expiration happens.
           minimum: 0
           exclusiveMinimum: true
       required:
         - type
         - returnAddress
-        - unixTime
 
     StateControllerAddressUnlockCondition:
       description: Can be unlocked by unlocking the address.
@@ -2241,7 +2280,7 @@ components:
         address:
           oneOf:
             - $ref: '#/components/schemas/Ed25519Address'
-            - $ref: '#/components/schemas/AliasAddress'
+            - $ref: '#/components/schemas/AccountAddress'
             - $ref: '#/components/schemas/NFTAddress'
       required:
         - type
@@ -2256,7 +2295,7 @@ components:
         address:
           oneOf:
             - $ref: '#/components/schemas/Ed25519Address'
-            - $ref: '#/components/schemas/AliasAddress'
+            - $ref: '#/components/schemas/AccountAddress'
             - $ref: '#/components/schemas/NFTAddress'
       required:
         - type
@@ -2268,29 +2307,45 @@ components:
         type:
           type: integer
           description: Set to value 0 to denote a Sender Feature.
-        sender:
+        address:
           oneOf:
             - $ref: '#/components/schemas/Ed25519Address'
-            - $ref: '#/components/schemas/AliasAddress'
+            - $ref: '#/components/schemas/AccountAddress'
             - $ref: '#/components/schemas/NFTAddress'
       required:
         - type
-        - sender
+        - address
 
     IssuerFeature:
-      description: Identifies the validated issuer of the UTXO state machine (alias/NFT).
+      description: Identifies the validated issuer of the UTXO state machine (account/NFT).
       properties:
         type:
           type: integer
           description: Set to value 1 to denote an Issuer Feature.
-        issuer:
+        address:
           oneOf:
             - $ref: '#/components/schemas/Ed25519Address'
-            - $ref: '#/components/schemas/AliasAddress'
+            - $ref: '#/components/schemas/AccountAddress'
             - $ref: '#/components/schemas/NFTAddress'
       required:
         - type
-        - issuer
+        - address
+
+    BlockIssuerFeature:
+      description: A feature which indicates that this account can issue blocks.
+      properties:
+        blockIssuerKeys:
+          type: array
+          description: The keys allowed to issue blocks from an account with a BlockIssuerFeature.
+          items:
+            type: string
+            description: Ed25519 public key in Hex.
+        expirySlot:
+          type: integer
+          description: Indicates when the BlockIssuerKeys are expired.
+      required:
+        - blockIssuerKeys
+        - expirySlot
 
     MetadataFeature:
       description: Defines metadata (arbitrary binary data) that will be stored in the output.
@@ -2383,7 +2438,7 @@ components:
         - type
         - reference
 
-    AliasUnlock:
+    AccountUnlock:
       description: References a previous unlock that unlocks an Alias Output.
       properties:
         type:
@@ -2720,10 +2775,42 @@ components:
                 - vByteFactoKey
             genesisUnixTimestamp:
               type: integer
-              description: The genesis slot index.
+              description: The genesis timestamp at which the slots start to count.
             slotDurationInSeconds:
-              type: integer
+              type: number
               description: The duration of a slot, in seconds.
+            slotsPerEpochExponent:
+              type: number
+              description: The number of slots in an epoch expressed as an exponent of 2.
+            manaGenerationRate:
+              type: number
+              description: The amount of potential Mana generated by 1 IOTA in 1 slot.
+            manaGenerationRateExponent:
+              type: number
+              description: The scaling of ManaGenerationRate expressed as an exponent of 2.
+            manaDecayFactors:
+              type: array
+              description: a lookup table of epoch index diff to mana decay factor (slice index 0 = 1 epoch).
+              items:
+                type: number                
+            manaDecayFactorsExponent:
+              type: number
+              description: The scaling of ManaDecayFactors expressed as an exponent of 2.
+            manaDecayFactorEpochsSum:
+              type: number
+              description: An integer approximation of the sum of decay over epochs.
+            manaDecayFactorEpochsSumExponent:
+              type: number 
+              description: The scaling of ManaDecayFactorEpochsSum expressed as an exponent of 2.
+            stakingUnbondingPeriod:
+              type: number
+              description: The unbonding period in epochs before an account can stop staking.
+            evictionAge:
+              type: number
+              description: The age in slots when you can evict blocks by committing them into a slot commitments and when slots stop being a consumable accounts' state relative to the latest committed slot.
+            livenessThreshold:
+              type: number
+              description: Determine the if a block is eligibile by evaluating issuingTime and commitments in its pastcone to ATT and lastCommittedSlot respectively.
           required:
             - networkName
             - bech32Hrp
@@ -3018,7 +3105,7 @@ components:
       description: Returns an output and its metadata.
       anyOf:
         - $ref: '#/components/schemas/BasicOutput'
-        - $ref: '#/components/schemas/AliasOutput'
+        - $ref: '#/components/schemas/AccountOutput'
         - $ref: '#/components/schemas/FoundryOutput'
         - $ref: '#/components/schemas/NFTOutput'
 
