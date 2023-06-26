@@ -32,7 +32,7 @@ type Orchestrator struct {
 func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.Engine, epochgadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) epochgadget.Gadget {
 		return options.Apply(&Orchestrator{
-			events: 		   epochgadget.NewEvents(),
+			events:             epochgadget.NewEvents(),
 			sybilProtection:    e.SybilProtection,
 			ledger:             e.Ledger,
 			timeProvider:       e.API().TimeProvider(),

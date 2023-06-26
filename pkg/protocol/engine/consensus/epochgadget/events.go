@@ -2,9 +2,14 @@ package epochgadget
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/iota-core/pkg/core/account"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Events struct {
+	CommitteeSelected event.Event1[*account.Accounts]
+	RewardsCommitted  event.Event1[iotago.EpochIndex]
+
 	event.Group[Events, *Events]
 }
 

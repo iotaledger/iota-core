@@ -6,6 +6,7 @@ import (
 	"github.com/cockroachdb/errors"
 
 	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
