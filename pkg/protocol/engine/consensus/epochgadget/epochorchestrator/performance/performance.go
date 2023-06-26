@@ -118,9 +118,7 @@ func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex) {
 
 		}
 
-		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epoch))
-
-		rewardsTree.Set(accountID, &PoolRewards{
+		ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epoch)).Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: poolReward(committee.TotalValidatorStake(), committee.TotalStake(), profitMargin, pool.FixedCost, aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
@@ -128,6 +126,12 @@ func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex) {
 
 		return true
 	})
+}
+
+func (m *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) *advancedset.AdvancedSet[iotago.AccountID] {
+	// TODO: we should choose candidates we tracked performance for
+
+	return &advancedset.AdvancedSet[iotago.AccountID]{}
 }
 
 func (m *Tracker) poolStats(epoch iotago.EpochIndex) (poolStats *PoolsStats, err error) {
