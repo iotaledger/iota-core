@@ -1,7 +1,7 @@
 package libp2putil
 
 import (
-	"github.com/libp2p/go-libp2p"
+	golibp2p "github.com/libp2p/go-libp2p"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
@@ -11,7 +11,7 @@ import (
 )
 
 // GetLibp2pIdentity returns libp2p Host option for Identity from local peer object.
-func GetLibp2pIdentity(lPeer *peer.Local) (libp2p.Option, error) {
+func GetLibp2pIdentity(lPeer *peer.Local) (golibp2p.Option, error) {
 	ourPrivateKey, err := lPeer.Database().LocalPrivateKey()
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -22,7 +22,7 @@ func GetLibp2pIdentity(lPeer *peer.Local) (libp2p.Option, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	return libp2p.Identity(libp2pPrivateKey), nil
+	return golibp2p.Identity(libp2pPrivateKey), nil
 }
 
 // ToLibp2pPrivateKey transforms private key in our type to libp2p type.

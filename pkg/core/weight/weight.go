@@ -4,10 +4,10 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/core/account"
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Weight represents a mutable multi-tiered weight value that can be updated in-place.
@@ -15,8 +15,8 @@ type Weight struct {
 	// OnUpdate is an event that is triggered when the weight value is updated.
 	OnUpdate *event.Event1[Value]
 
-	// Voters is the set of validators that are contributing to the validators weight.
-	Voters *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]
+	// Voters is the set of voters contributing to the weight
+	Voters *advancedset.AdvancedSet[account.SeatIndex]
 
 	// value is the current weight Value.
 	value Value
@@ -26,9 +26,9 @@ type Weight struct {
 }
 
 // New creates a new Weight instance.
-func New(weights *account.SelectedAccounts[iotago.AccountID, *iotago.AccountID]) *Weight {
+func New() *Weight {
 	w := &Weight{
-		Voters:   weights.SelectAccounts(),
+		Voters:   advancedset.New[account.SeatIndex](),
 		OnUpdate: event.New1[Value](),
 	}
 
@@ -83,8 +83,8 @@ func (w *Weight) RemoveCumulativeWeight(delta int64) *Weight {
 }
 
 // AddVoter adds the given voter to the list of Voters, updates the weight and returns the Weight (for chaining).
-func (w *Weight) AddVoter(id iotago.AccountID) *Weight {
-	if w.Voters.Add(id) {
+func (w *Weight) AddVoter(seat account.SeatIndex) *Weight {
+	if added := w.Voters.Add(seat); added {
 		if newValue, valueUpdated := w.updateValidatorsWeight(); valueUpdated {
 			w.OnUpdate.Trigger(newValue)
 		}
@@ -94,8 +94,8 @@ func (w *Weight) AddVoter(id iotago.AccountID) *Weight {
 }
 
 // DeleteVoter removes the given voter from the list of Voters, updates the weight and returns the Weight (for chaining).
-func (w *Weight) DeleteVoter(id iotago.AccountID) *Weight {
-	if w.Voters.Delete(id) {
+func (w *Weight) DeleteVoter(seat account.SeatIndex) *Weight {
+	if deleted := w.Voters.Delete(seat); deleted {
 		if newValue, valueUpdated := w.updateValidatorsWeight(); valueUpdated {
 			w.OnUpdate.Trigger(newValue)
 		}
@@ -108,7 +108,7 @@ func (w *Weight) updateValidatorsWeight() (Value, bool) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	newValidatorWeight := w.Voters.TotalWeight()
+	newValidatorWeight := int64(w.Voters.Size())
 	if w.value.ValidatorsWeight() != newValidatorWeight {
 		w.value = w.value.SetValidatorsWeight(newValidatorWeight)
 
@@ -171,7 +171,7 @@ func (w *Weight) String() string {
 
 	return stringify.Struct("Weight",
 		stringify.NewStructField("Value", w.value),
-		stringify.NewStructField("Voters", w.Voters.Members()),
+		stringify.NewStructField("Voters", w.Voters),
 	)
 }
 

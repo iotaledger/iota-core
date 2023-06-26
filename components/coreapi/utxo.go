@@ -5,12 +5,12 @@ import (
 
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledgerstate"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func getOutput(c echo.Context) (*ledgerstate.Output, error) {
+func getOutput(c echo.Context) (*utxoledger.Output, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, err

@@ -11,15 +11,15 @@ import (
 	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
+	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type TestFramework struct {
-	Instance    mempool.MemPool[vote.MockedPower]
-	ConflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower]
+	Instance    mempool.MemPool[vote.MockedRank]
+	ConflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
 	stateIDByAlias     map[string]iotago.OutputID
 	transactionByAlias map[string]mempool.Transaction
@@ -32,7 +32,7 @@ type TestFramework struct {
 	mutex sync.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedPower], conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedPower], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank], conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
 	t := &TestFramework{
 		Instance:           instance,
 		ConflictDAG:        conflictDAG,

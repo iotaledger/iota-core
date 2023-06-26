@@ -25,10 +25,11 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 		}
 
 		if transactionID != loadedTransaction.ID() {
-			return errors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, transactionID, loadedTransaction.ID())
+			return errors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransaction.ID())
 		}
+
 		if !cmp.Equal(transaction, loadedTransaction.Transaction()) {
-			return errors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, transaction, loadedTransaction)
+			return errors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, transaction, loadedTransaction.Transaction())
 		}
 
 		return nil

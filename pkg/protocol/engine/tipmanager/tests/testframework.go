@@ -14,7 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
+	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
@@ -36,14 +36,13 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID()
 
-	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVotePower](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts())
-
-	t.Instance = tipmanagerv1.NewTipManager(conflictDAG, func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
+	t.Instance = tipmanagerv1.NewTipManager(func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]
 		return block, exists
 	}, func() iotago.BlockIDs {
 		return iotago.BlockIDs{iotago.EmptyBlockID()}
 	})
+	t.Instance.SetConflictDAG(conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()).SelectAccounts().SeatCount))
 
 	return t
 }
@@ -114,6 +113,6 @@ var protoParams = iotago.ProtocolParameters{
 		VBFactorData: 1,
 	},
 	TokenSupply:           5000,
-	GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+	GenesisUnixTimestamp:  time.Now().Unix(),
 	SlotDurationInSeconds: 10,
 }

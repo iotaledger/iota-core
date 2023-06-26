@@ -101,7 +101,7 @@ func New(
 			optsBootstrappedThreshold: 10 * time.Second,
 			optsSnapshotDepth:         5,
 		}, opts, func(e *Engine) {
-			e.BlockCache = blocks.New(e.EvictionState, func() *iotago.SlotTimeProvider { return e.API().SlotTimeProvider() })
+			e.BlockCache = blocks.New(e.EvictionState, func() *iotago.TimeProvider { return e.API().TimeProvider() })
 
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 
@@ -244,6 +244,8 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
 	if len(targetSlot) == 0 {
 		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index())
+	} else if targetSlot[0] <= lo.Return1(e.Storage.LastPrunedSlot()) {
+		return errors.Errorf("impossible to create a snapshot for slot %d because it is pruned (last pruned slot %d)", targetSlot[0], lo.Return1(e.Storage.LastPrunedSlot()))
 	}
 
 	if fileHandle, err := os.Create(filePath); err != nil {

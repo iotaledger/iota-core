@@ -11,12 +11,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/blake2b"
 
+	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/blockissuer"
+	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -34,16 +36,17 @@ import (
 type Node struct {
 	Testing *testing.T
 
-	Name   string
-	Weight int64
+	Name          string
+	Validator     bool
+	ValidatorSeat account.SeatIndex
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	blockIssuer *blockissuer.BlockIssuer
+	blockIssuer *blockfactory.BlockIssuer
 
 	privateKey ed25519.PrivateKey
-	pubKey     ed25519.PublicKey
+	PubKey     ed25519.PublicKey
 	AccountID  iotago.AccountID
 	PeerID     network.PeerID
 
@@ -60,14 +63,13 @@ type Node struct {
 	attachedBlocks []*blocks.Block
 }
 
-func NewNode(t *testing.T, net *Network, partition string, name string, weight int64) *Node {
+func NewNode(t *testing.T, net *Network, partition string, name string, validator bool) *Node {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		panic(err)
 	}
 
-	accountID := iotago.AccountID(*iotago.Ed25519AddressFromPubKey(pub))
-	accountID.RegisterAlias(name)
+	accountID := iotago.AccountID(blake2b.Sum256(iotago.Ed25519AddressFromPubKey(pub)[:]))
 
 	peerID := network.PeerID(pub)
 	identity.RegisterIDAlias(peerID, name)
@@ -76,8 +78,8 @@ func NewNode(t *testing.T, net *Network, partition string, name string, weight i
 		Testing: t,
 
 		Name:       name,
-		Weight:     weight,
-		pubKey:     pub,
+		Validator:  validator,
+		PubKey:     pub,
 		privateKey: priv,
 		AccountID:  accountID,
 		PeerID:     peerID,
@@ -97,7 +99,7 @@ func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
 
 	n.hookEvents()
 
-	n.blockIssuer = blockissuer.New(n.Protocol, blockissuer.NewEd25519Account(n.AccountID, n.privateKey), blockissuer.WithTipSelectionTimeout(3*time.Second), blockissuer.WithTipSelectionRetryInterval(time.Millisecond*100))
+	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
 	n.ctx, n.ctxCancel = context.WithCancel(context.Background())
 
@@ -151,7 +153,7 @@ func (n *Node) HookLogging() {
 
 	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
 		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
-			return lo.PanicOnErr(a.BlockID(n.Protocol.MainEngineInstance().API().SlotTimeProvider()))
+			return lo.PanicOnErr(a.BlockID(n.Protocol.MainEngineInstance().API().TimeProvider()))
 		}))
 	})
 
@@ -239,11 +241,11 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().SlotTimeProvider().IndexFromTime(newTime))
+		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().TimeProvider().SlotIndexFromTime(newTime))
 	})
 
 	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().SlotTimeProvider().IndexFromTime(newTime))
+		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().TimeProvider().SlotIndexFromTime(newTime))
 	})
 
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
@@ -292,12 +294,12 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
 	})
 
-	events.SybilProtection.OnlineCommitteeAccountAdded.Hook(func(accountID iotago.AccountID) {
-		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeAccountAdded: %s\n", n.Name, engineName, accountID)
+	events.SybilProtection.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatAdded: %d - %s\n", n.Name, engineName, seat, accountID)
 	})
 
-	events.SybilProtection.OnlineCommitteeAccountRemoved.Hook(func(accountID iotago.AccountID) {
-		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeAccountRemoved: %s\n", n.Name, engineName, accountID)
+	events.SybilProtection.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatRemoved: %d\n", n.Name, engineName, seat)
 	})
 
 	events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
@@ -367,11 +369,18 @@ func (n *Node) Wait() {
 func (n *Node) Shutdown() {
 	stopped := make(chan struct{}, 1)
 
-	n.Protocol.Events.Stopped.Hook(func() {
+	if n.Protocol != nil {
+		n.Protocol.Events.Stopped.Hook(func() {
+			close(stopped)
+		})
+	} else {
 		close(stopped)
-	})
+	}
 
-	n.ctxCancel()
+	if n.ctxCancel != nil {
+		n.ctxCancel()
+	}
+
 	n.Workers.Shutdown()
 
 	<-stopped
@@ -379,12 +388,11 @@ func (n *Node) Shutdown() {
 
 func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.AccountID = otherNode.AccountID
-	n.pubKey = otherNode.pubKey
+	n.PubKey = otherNode.PubKey
 	n.privateKey = otherNode.privateKey
-	n.AccountID.RegisterAlias(n.Name)
 }
 
-func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	modelBlock, err := n.blockIssuer.CreateBlock(ctx, opts...)
 	require.NoError(n.Testing, err)
 
@@ -393,7 +401,7 @@ func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Op
 	return blocks.NewBlock(modelBlock)
 }
 
-func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockissuer.BlockParams]) *blocks.Block {
+func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	block := n.CreateBlock(ctx, alias, opts...)
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
@@ -416,9 +424,14 @@ func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {
 				return
 			}
 
-			n.IssueBlock(ctx, fmt.Sprintf("activity %s.%d", n.Name, counter), blockissuer.WithPayload(&iotago.TaggedData{
-				Tag: []byte(fmt.Sprintf("activity %s.%d", n.Name, counter)),
-			}))
+			blockAlias := fmt.Sprintf("%s-activity.%d", n.Name, counter)
+			n.IssueBlock(ctx, blockAlias,
+				blockfactory.WithPayload(
+					&iotago.TaggedData{
+						Tag: []byte(blockAlias),
+					},
+				),
+			)
 
 			counter++
 			time.Sleep(1 * time.Second)

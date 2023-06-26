@@ -31,7 +31,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/utxoledger"
+	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
@@ -92,13 +92,13 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsTipManagerProvider:      tipmanagerv1.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
-		optsSybilProtectionProvider: poa.NewProvider(map[iotago.AccountID]int64{}),
+		optsSybilProtectionProvider: poa.NewProvider([]iotago.AccountID{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
 		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
-		optsLedgerProvider:          utxoledger.NewProvider(),
+		optsLedgerProvider:          ledger1.NewProvider(),
 
 		optsBaseDirectory:           "",
 		optsChainSwitchingThreshold: 3,

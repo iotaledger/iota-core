@@ -17,20 +17,16 @@ func TestConfirmationFlags(t *testing.T) {
 	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
 
-	nodeA := ts.AddValidatorNode("nodeA", 25)
-	nodeB := ts.AddValidatorNode("nodeB", 25)
-	nodeC := ts.AddValidatorNode("nodeC", 25)
-	nodeD := ts.AddValidatorNode("nodeD", 25)
+	nodeA := ts.AddValidatorNode("nodeA")
+	nodeB := ts.AddValidatorNode("nodeB")
+	nodeC := ts.AddValidatorNode("nodeC")
+	nodeD := ts.AddValidatorNode("nodeD")
 
-	expectedOnlineCommittee := map[iotago.AccountID]int64{
-		nodeA.AccountID: 25,
-	}
-
-	expectedCommittee := map[iotago.AccountID]int64{
-		nodeA.AccountID: 25,
-		nodeB.AccountID: 25,
-		nodeC.AccountID: 25,
-		nodeD.AccountID: 25,
+	expectedCommittee := []iotago.AccountID{
+		nodeA.AccountID,
+		nodeB.AccountID,
+		nodeC.AccountID,
+		nodeD.AccountID,
 	}
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"nodeA": {
@@ -76,8 +72,8 @@ func TestConfirmationFlags(t *testing.T) {
 		testsuite.WithLatestFinalizedSlot(0),
 		testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
-		testsuite.WithSybilProtectionCommittee(expectedCommittee),
-		testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee),
+		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
+		testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat),
 		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -105,6 +101,7 @@ func TestConfirmationFlags(t *testing.T) {
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
 		)
 	}
 
@@ -123,10 +120,9 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(2),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(lo.MergeMaps(expectedOnlineCommittee, map[iotago.AccountID]int64{
-				nodeB.AccountID: 25,
-			})),
+			testsuite.WithEqualStoredCommitmentAtIndex(2),
+			testsuite.WithSybilProtectionCommittee(4, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat),
 			testsuite.WithEvictedSlot(2),
 		)
 	}
@@ -158,10 +154,9 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(2),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(lo.MergeMaps(expectedOnlineCommittee, map[iotago.AccountID]int64{
-				nodeC.AccountID: 25,
-			})),
+			testsuite.WithEqualStoredCommitmentAtIndex(2),
+			testsuite.WithSybilProtectionCommittee(5, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat, nodeC.ValidatorSeat),
 			testsuite.WithEvictedSlot(2),
 		)
 	}
@@ -186,6 +181,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(3),
+			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithEvictedSlot(3),
 		)
 	}
@@ -210,8 +206,9 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(1),
 			testsuite.WithLatestCommitmentSlotIndex(3),
-			testsuite.WithSybilProtectionCommittee(expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee),
+			testsuite.WithEqualStoredCommitmentAtIndex(3),
+			testsuite.WithSybilProtectionCommittee(6, expectedCommittee),
+			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat, nodeC.ValidatorSeat),
 			testsuite.WithEvictedSlot(3),
 		)
 	}
