@@ -7,19 +7,19 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type BlockVotePower struct {
+type BlockVoteRank struct {
 	blockID iotago.BlockID
 	time    time.Time
 }
 
-func NewBlockVotePower(id iotago.BlockID, time time.Time) BlockVotePower {
-	return BlockVotePower{
+func NewBlockVoteRank(id iotago.BlockID, time time.Time) BlockVoteRank {
+	return BlockVoteRank{
 		blockID: id,
 		time:    time,
 	}
 }
 
-func (v BlockVotePower) Compare(other BlockVotePower) int {
+func (v BlockVoteRank) Compare(other BlockVoteRank) int {
 	if v.time.Before(other.time) {
 		return -1
 	} else if v.time.After(other.time) {

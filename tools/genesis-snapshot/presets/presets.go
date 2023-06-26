@@ -23,9 +23,10 @@ var Base = []options.Option[snapshotcreator.Options]{
 			VBFactorKey:  10,
 		},
 		TokenSupply:           1_000_0000,
-		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+		GenesisUnixTimestamp:  time.Now().Unix(),
 		SlotDurationInSeconds: 10,
-		MaxCommittableAge:     10,
+		EvictionAge:           10,
+		LivenessThreshold:     3,
 	}),
 	snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
 		iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
@@ -45,9 +46,10 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			VBFactorKey:  10,
 		},
 		TokenSupply:           100_0000_0000,
-		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+		GenesisUnixTimestamp:  time.Now().Unix(),
 		SlotDurationInSeconds: 10,
-		MaxCommittableAge:     10,
+		EvictionAge:           10,
+		LivenessThreshold:     3,
 	}),
 }
 
@@ -64,8 +66,9 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			VBFactorKey:  10,
 		},
 		TokenSupply:           1_000_0000,
-		GenesisUnixTimestamp:  uint32(time.Now().Unix()),
+		GenesisUnixTimestamp:  time.Now().Unix(),
 		SlotDurationInSeconds: 10,
-		MaxCommittableAge:     10,
+		EvictionAge:           10,
+		LivenessThreshold:     3,
 	}),
 }

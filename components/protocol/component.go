@@ -83,10 +83,10 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
-		validators := make(map[iotago.AccountID]int64)
+		var validators []iotago.AccountID
 		for _, validator := range ParamsProtocol.SybilProtection.Committee {
-			hex := lo.PanicOnErr(hexutil.DecodeHex(validator.Identity))
-			validators[iotago.AccountID(hex[:])] = validator.Weight
+			hex := lo.PanicOnErr(hexutil.DecodeHex(validator))
+			validators = append(validators, iotago.AccountID(hex[:]))
 		}
 
 		return protocol.New(
@@ -165,11 +165,11 @@ func configure() error {
 	// })
 
 	// deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
-	// 	Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
+	// 	Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().TimeProvider().SlotIndexFromTime(time), time.String())
 	// })
 
-	// deps.Protocol.Events.Engine.Clock.RatifiedAcceptedTimeUpdated.Hook(func(time time.Time) {
-	// 	Component.LogInfof("RatifiedAcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
+	// deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
+	// 	Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().TimeProvider().SlotIndexFromTime(time), time.String())
 	// })
 
 	// deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {

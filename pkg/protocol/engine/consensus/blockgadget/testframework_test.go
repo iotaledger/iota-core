@@ -51,7 +51,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 				VBFactorKey:  10,
 			},
 			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  uint32(time.Now().Truncate(10 * time.Second).Unix()),
+			GenesisUnixTimestamp:  time.Now().Truncate(10 * time.Second).Unix(),
 			SlotDurationInSeconds: 10,
 		},
 
@@ -64,7 +64,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		return prunable.NewRootBlocks(index, mapdb.NewMapDB())
 	})
 
-	t.blockCache = blocks.New(evictionState, t.api.SlotTimeProvider)
+	t.blockCache = blocks.New(evictionState, t.api.TimeProvider)
 	instance := thresholdblockgadget.New(t.blockCache, t.SybilProtection)
 	t.Events = instance.Events()
 	t.Instance = instance

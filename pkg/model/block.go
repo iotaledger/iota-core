@@ -42,7 +42,7 @@ func BlockFromBlock(iotaBlock *iotago.Block, api iotago.API, opts ...serix.Optio
 		return nil, err
 	}
 
-	blockID, err := iotaBlock.ID(api.SlotTimeProvider())
+	blockID, err := iotaBlock.ID(api.TimeProvider())
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func BlockFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Block, 
 		return nil, err
 	}
 
-	blockID, err := iotaBlock.ID(api.SlotTimeProvider())
+	blockID, err := iotaBlock.ID(api.TimeProvider())
 	if err != nil {
 		return nil, err
 	}

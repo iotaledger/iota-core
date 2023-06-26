@@ -70,7 +70,7 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 			}
 		}
 
-		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.api, actualOutputID, iotago.EmptyBlockID(), 0, t.api.SlotTimeProvider().IndexFromTime(time.Now()), clonedOutput)
+		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.api, actualOutputID, iotago.EmptyBlockID(), 0, t.api.TimeProvider().SlotIndexFromTime(time.Now()), clonedOutput)
 	}
 }
 
