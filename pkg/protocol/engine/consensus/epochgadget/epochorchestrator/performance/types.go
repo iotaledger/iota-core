@@ -1,4 +1,4 @@
-package rewards
+package performance
 
 import (
 	"github.com/pkg/errors"
@@ -6,15 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
-
-// Pool represents all the data we need for a given validator and epoch to calculate its rewards data.
-type Pool struct {
-	// Total stake of the pool, including delegators
-	PoolStake iotago.BaseToken
-	// Validator's stake
-	ValidatorStake iotago.BaseToken
-	FixedCost      iotago.Mana
-}
 
 // PoolsStats contains stats about the pools from all the validators for an epoch.
 type PoolsStats struct {
@@ -54,7 +45,7 @@ func (p PoolsStats) Bytes() (bytes []byte, err error) {
 	return m.Bytes(), nil
 }
 
-type AccountRewards struct {
+type PoolRewards struct {
 	// Total stake of the validator including delegations
 	PoolStake iotago.BaseToken
 	// Rewards normalized by performance factor
@@ -63,7 +54,7 @@ type AccountRewards struct {
 	FixedCost iotago.Mana
 }
 
-func (r *AccountRewards) FromBytes(bytes []byte) (n int, err error) {
+func (r *PoolRewards) FromBytes(bytes []byte) (n int, err error) {
 	m := marshalutil.New(bytes)
 
 	poolStake, err := m.ReadUint64()
@@ -87,7 +78,7 @@ func (r *AccountRewards) FromBytes(bytes []byte) (n int, err error) {
 	return m.ReadOffset(), nil
 }
 
-func (r AccountRewards) Bytes() (bytes []byte, err error) {
+func (r PoolRewards) Bytes() (bytes []byte, err error) {
 	m := marshalutil.New()
 	m.WriteUint64(uint64(r.PoolStake))
 	m.WriteUint64(uint64(r.PoolRewards))

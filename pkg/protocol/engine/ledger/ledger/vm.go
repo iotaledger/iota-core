@@ -76,14 +76,14 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 			if stakingFeature == nil {
 				return nil, xerrors.Errorf("cannot claim rewards from an AccountOutput at index %d without staking feature", inp.Index)
 			}
-			reward, rewardErr := l.rewardsManager.ValidatorReward(castOutput.AccountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			reward, rewardErr := l.epochGadget.ValidatorReward(castOutput.AccountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			if rewardErr != nil {
 				return nil, xerrors.Errorf("failed to get Validator reward for AccountOutput at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", castOutput.AccountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			}
 
 			rewardInputSet[castOutput.AccountID] += reward
 		case *iotago.DelegationOutput:
-			reward, rewardErr := l.rewardsManager.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
+			reward, rewardErr := l.epochGadget.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			if rewardErr != nil {
 				return nil, xerrors.Errorf("failed to get Delegator reward for DelegationOutput at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", castOutput.DelegationID, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}

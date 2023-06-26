@@ -1,4 +1,4 @@
-package rewards
+package performance
 
 import "testing"
 

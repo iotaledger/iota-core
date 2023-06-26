@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -53,6 +54,7 @@ type EngineManager struct {
 	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	slotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
+	epochGadgetProvider     module.Provider[*engine.Engine, epochgadget.Gadget]
 	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	attestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
@@ -180,6 +182,7 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.sybilProtectionProvider,
 		e.blockGadgetProvider,
 		e.slotGadgetProvider,
+		e.epochGadgetProvider,
 		e.notarizationProvider,
 		e.attestationProvider,
 		e.ledgerProvider,

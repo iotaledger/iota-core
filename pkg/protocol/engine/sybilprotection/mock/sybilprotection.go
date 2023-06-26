@@ -3,19 +3,18 @@ package mock
 import (
 	"fmt"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type ManualPOA struct {
-	accounts  *account.Accounts[iotago.AccountID, *iotago.AccountID]
-	committee *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
+	accounts  *account.Accounts
+	committee *account.SeatedAccounts
 	online    *advancedset.AdvancedSet[account.SeatIndex]
 	aliases   *shrinkingmap.ShrinkingMap[string, iotago.AccountID]
 
@@ -24,11 +23,11 @@ type ManualPOA struct {
 
 func NewManualPOA() *ManualPOA {
 	m := &ManualPOA{
-		accounts: account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()),
+		accounts: account.NewAccounts(),
 		online:   advancedset.New[account.SeatIndex](),
 		aliases:  shrinkingmap.New[string, iotago.AccountID](),
 	}
-	m.committee = m.accounts.SelectAccounts()
+	m.committee = m.accounts.SelectCommittee()
 
 	return m
 }
@@ -36,7 +35,7 @@ func NewManualPOA() *ManualPOA {
 func (m *ManualPOA) AddAccount(alias string) iotago.AccountID {
 	id := iotago.AccountID(tpkg.Rand32ByteArray())
 	id.RegisterAlias(alias)
-	m.accounts.Set(id, 0) // We don't care about weight with PoA
+	m.accounts.Set(id, &account.Pool{}) // We don't care about pools with PoA
 	m.aliases.Set(alias, id)
 	m.committee.Set(account.SeatIndex(m.committee.SeatCount()), id)
 
@@ -72,11 +71,11 @@ func (m *ManualPOA) SetOffline(aliases ...string) {
 	}
 }
 
-func (m *ManualPOA) Accounts() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
+func (m *ManualPOA) Accounts() *account.Accounts {
 	return m.accounts
 }
 
-func (m *ManualPOA) Committee(_ iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID] {
+func (m *ManualPOA) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
 	return m.committee
 }
 
@@ -86,6 +85,10 @@ func (m *ManualPOA) OnlineCommittee() *advancedset.AdvancedSet[account.SeatIndex
 
 func (m *ManualPOA) SeatCount() int {
 	return m.committee.SeatCount()
+}
+
+func (m *ManualPOA) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *account.SeatedAccounts {
+	return m.committee
 }
 
 func (m *ManualPOA) Shutdown() {}

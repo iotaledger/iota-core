@@ -18,6 +18,7 @@ const (
 	accountsPrefix
 	rewardsPrefix
 	poolStatsPrefix
+	committeePrefix
 )
 
 type Permanent struct {
@@ -35,6 +36,7 @@ type Permanent struct {
 	accounts        kvstore.KVStore
 	rewards         kvstore.KVStore
 	poolStats       kvstore.KVStore
+	committee       kvstore.KVStore
 }
 
 // New returns a new permanent storage instance.
@@ -65,6 +67,7 @@ func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(e
 		p.accounts = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{accountsPrefix}))
 		p.rewards = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{rewardsPrefix}))
 		p.poolStats = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{poolStatsPrefix}))
+		p.committee = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{committeePrefix}))
 	})
 }
 
@@ -112,6 +115,14 @@ func (p *Permanent) PoolStats(optRealm ...byte) kvstore.KVStore {
 	}
 
 	return lo.PanicOnErr(p.poolStats.WithExtendedRealm(optRealm))
+}
+
+func (p *Permanent) Committee(optRealm ...byte) kvstore.KVStore {
+	if len(optRealm) == 0 {
+		return p.committee
+	}
+
+	return lo.PanicOnErr(p.committee.WithExtendedRealm(optRealm))
 }
 
 // Attestations returns the "attestations" storage (or a specialized sub-storage if a realm is provided).

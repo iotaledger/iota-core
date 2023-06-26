@@ -1,4 +1,4 @@
-package rewards
+package performance
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ type TestSuite struct {
 
 	ProtocolParameters *iotago.ProtocolParameters
 
-	Instance *Manager
+	Instance *Tracker
 }
 
 func NewTestSuite(t *testing.T) *TestSuite {
@@ -76,7 +76,7 @@ func (t *TestSuite) initRewardManager() {
 
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
-	t.Instance = New(rewardsStore, poolStatsStore, perforanceFactorFunc, t.API().TimeProvider(), t.API().ManaDecayProvider())
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, perforanceFactorFunc, t.API().TimeProvider(), t.API().ManaDecayProvider())
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -98,7 +98,7 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 		t.applyPerformanceFactor(accID, epochIndex, action.ValidationBlocksSent)
 	}
 
-	poolStakes := make(map[iotago.AccountID]*Pool)
+	poolStakes := make(map[iotago.AccountID]*account.Pool)
 	for alias, action := range actions {
 		accountID := t.Account(alias, true)
 		poolStakes[accountID] = &Pool{
