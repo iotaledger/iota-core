@@ -5,11 +5,13 @@ import (
 
 	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
+
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestManager_Import_Export(t *testing.T) {
 	ts := NewTestSuite(t)
-
+	epochsCount := 3
 	epochActions := map[string]*EpochActions{
 		"A": {
 			PoolStake:            10,
@@ -24,20 +26,32 @@ func TestManager_Import_Export(t *testing.T) {
 			ValidationBlocksSent: 3,
 		},
 	}
-	ts.ApplyEpochActions(1, epochActions)
-	ts.ApplyEpochActions(2, epochActions)
+	for i := 0; i < epochsCount; i++ {
+		ts.RegisterCommitte(iotago.EpochIndex(i), epochActions)
+		ts.ApplyEpochActions(iotago.EpochIndex(i), epochActions)
+	}
+
 	writer := &writerseeker.WriterSeeker{}
-	targetSlot := ts.API().TimeProvider().EpochEnd(2)
+
+	delegtorRewardBeforeImport, validatorRewardBeforeImport := ts.saveCalculatedRewards(epochsCount, epochActions)
+	// export two full epochs
+	targetSlot := ts.API().TimeProvider().EpochEnd(3)
 	err := ts.Instance.Export(writer, targetSlot)
 	require.NoError(t, err)
 	err = ts.Instance.Import(writer.BytesReader())
 	require.NoError(t, err)
-	// export at the begining of the epoch
+	delegtorRewardAfterImport, validatorRewardAfterImport := ts.saveCalculatedRewards(epochsCount, epochActions)
+	require.Equal(t, delegtorRewardBeforeImport, delegtorRewardAfterImport)
+	require.Equal(t, validatorRewardBeforeImport, validatorRewardAfterImport)
+
+	delegtorRewardBeforeImport, validatorRewardBeforeImport = ts.saveCalculatedRewards(epochsCount, epochActions)
+	// export at the begining of the epoch 2, skip epoch 3 at all
 	targetSlot = ts.API().TimeProvider().EpochStart(2)
 	err = ts.Instance.Export(writer, targetSlot)
 	require.NoError(t, err)
 	err = ts.Instance.Import(writer.BytesReader())
 	require.NoError(t, err)
-
-	// TODO assert state
+	delegtorRewardAfterImport, validatorRewardAfterImport = ts.saveCalculatedRewards(epochsCount, epochActions)
+	require.Equal(t, delegtorRewardBeforeImport, delegtorRewardAfterImport)
+	require.Equal(t, validatorRewardBeforeImport, validatorRewardAfterImport)
 }

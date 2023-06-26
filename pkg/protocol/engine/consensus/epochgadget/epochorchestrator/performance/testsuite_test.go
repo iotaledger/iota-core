@@ -10,6 +10,7 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -76,7 +77,8 @@ func (t *TestSuite) initRewardManager() {
 
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, perforanceFactorFunc, t.API().TimeProvider(), t.API().ManaDecayProvider())
+	committeeStore := mapdb.NewMapDB()
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, t.API().TimeProvider(), t.API().ManaDecayProvider())
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -92,6 +94,20 @@ func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.Account
 	return t.accounts[alias]
 }
 
+func (t *TestSuite) RegisterCommitte(epoch iotago.EpochIndex, actions map[string]*EpochActions) {
+	committee := account.NewAccounts()
+	for alias, action := range actions {
+		accountID := t.Account(alias, true)
+		committee.Set(accountID, &account.Pool{
+			PoolStake:      action.PoolStake,
+			ValidatorStake: action.ValidatorStake,
+			FixedCost:      action.FixedCost,
+		})
+	}
+	err := t.Instance.RegisterCommittee(epoch, committee)
+	require.NoError(t.T, err)
+}
+
 func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
 	for accIDAlias, action := range actions {
 		accID := t.Account(accIDAlias, true)
@@ -101,18 +117,17 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 	poolStakes := make(map[iotago.AccountID]*account.Pool)
 	for alias, action := range actions {
 		accountID := t.Account(alias, true)
-		poolStakes[accountID] = &Pool{
+		poolStakes[accountID] = &account.Pool{
 			PoolStake:      action.PoolStake,
 			ValidatorStake: action.ValidatorStake,
 			FixedCost:      action.FixedCost,
 		}
 	}
 
-	err := t.Instance.ApplyEpoch(epochIndex, poolStakes)
-	require.NoError(t.T, err)
+	t.Instance.ApplyEpoch(epochIndex)
 }
 
-func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map[string]*EpochActions, expectedStats *PoolsStats) {
+func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
 	totalStake := iotago.BaseToken(0)
 	totalValidatorsStake := iotago.BaseToken(0)
 	for _, action := range actions {
@@ -155,6 +170,26 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochInde
 			require.NoError(t.T, err)
 		}
 	}
+}
+
+func (t *TestSuite) saveCalculatedRewards(epochsCount int, epochActions map[string]*EpochActions) (map[iotago.EpochIndex]map[string]iotago.Mana, map[iotago.EpochIndex]map[string]iotago.Mana) {
+	delegtorRewardPerAccount := make(map[iotago.EpochIndex]map[string]iotago.Mana)
+	validatorRewardPerAccount := make(map[iotago.EpochIndex]map[string]iotago.Mana)
+	for epochIndex := iotago.EpochIndex(0); epochIndex < iotago.EpochIndex(epochsCount); epochIndex++ {
+		delegtorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
+		validatorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
+		for aliasAccount := range epochActions {
+			reward, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, 1, iotago.EpochIndex(epochIndex))
+			require.NoError(t.T, err)
+			delegtorRewardPerAccount[epochIndex][aliasAccount] = reward
+		}
+		for aliasAccount := range epochActions {
+			reward, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true), 1, 1, iotago.EpochIndex(epochIndex))
+			require.NoError(t.T, err)
+			validatorRewardPerAccount[epochIndex][aliasAccount] = reward
+		}
+	}
+	return delegtorRewardPerAccount, validatorRewardPerAccount
 }
 
 type EpochActions struct {
