@@ -45,7 +45,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			VBFactorData: 1,
 			VBFactorKey:  10,
 		},
-		TokenSupply:           100_0000_0000,
+		TokenSupply:           10_000_000_000,
 		GenesisUnixTimestamp:  time.Now().Unix(),
 		SlotDurationInSeconds: 10,
 		EvictionAge:           10,

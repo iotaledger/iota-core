@@ -12,7 +12,6 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
@@ -123,15 +122,16 @@ func provide(c *dig.Container) error {
 }
 
 func configure() error {
-	deps.Protocol.Events.Error.Hook(func(err error) {
-		Component.LogErrorf("Error in Protocol: %s", err)
-	})
+	// deps.Protocol.Events.Error.Hook(func(err error) {
+	// 	Component.LogErrorf("Error in Protocol: %s", err)
+	// })
 
-	deps.Protocol.Events.Network.Error.Hook(func(err error, id network.PeerID) {
-		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
-	})
+	// deps.Protocol.Events.Network.Error.Hook(func(err error, id network.PeerID) {
+	// 	Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
+	// })
 
-	// TODO: uncomment here.
+	// // TODO: check whether we hooked to all events
+
 	// deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
 	// 	Component.LogInfof("BlockReceived: %s", block.ID())
 	// })
@@ -144,24 +144,24 @@ func configure() error {
 	// 	Component.LogInfof("BlockSolid: %s", block.ID())
 	// })
 
+	//  deps.Protocol.Events.Engine.Booker.WitnessAdded.Hook(func(block *blocks.Block) {
+	//  	Component.LogInfof("WitnessAdded: %s", block.ID())
+	//  })
+
 	// deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 	// 	Component.LogInfof("BlockBooked: %s", block.ID())
 	// })
 
-	// deps.Protocol.Events.Engine.Booker.WitnessAdded.Hook(func(block *blocks.Block) {
-	// 	Component.LogInfof("WitnessAdded: %s", block.ID())
+	// deps.Protocol.Events.Engine.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+	// 	Component.LogInfof("BlockPreAccepted: %s", block.ID())
 	// })
 
 	// deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 	// 	Component.LogInfof("BlockAccepted: %s", block.ID())
 	// })
 
-	// deps.Protocol.Events.Engine.BlockGadget.BlockRatifiedAccepted.Hook(func(block *blocks.Block) {
-	// 	Component.LogInfof("BlockRatifiedAccepted: %s", block.ID())
-	// })
-
-	// deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-	// 	Component.LogInfof("BlockConfirmed: %s", block.ID())
+	// deps.Protocol.Events.Engine.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
+	// 	Component.LogInfof("BlockPreConfirmed: %s", block.ID())
 	// })
 
 	// deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
@@ -170,10 +170,6 @@ func configure() error {
 
 	// deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
 	// 	Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().TimeProvider().SlotIndexFromTime(time), time.String())
-	// })
-
-	// deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
-	// 	Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().SlotTimeProvider().IndexFromTime(time), time.String())
 	// })
 
 	// deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
