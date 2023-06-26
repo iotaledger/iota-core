@@ -89,7 +89,19 @@ func calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken
 	return (1 << 8) * uint64(totalValidatorsStake) / (uint64(totalValidatorsStake) + uint64(totalPoolStake))
 }
 
-func poolReward(totalValidatorsStake, totalStake iotago.BaseToken, profitMargin uint64, fixedCosts iotago.Mana, performanceFactor uint64) iotago.Mana {
-	// TODO: decay is calculated per epoch now, so do we need to calculate the rewards for each slot of the epoch?
-	return iotago.Mana(uint64(totalValidatorsStake) * performanceFactor)
+func poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, fixedCost iotago.Mana, performanceFactor uint64) iotago.Mana {
+	initialReward := 233373068869021000
+	if slotIndex > 9460800 {
+		initialReward = 85853149583786000
+	}
+	epochsInSlot := 1 << 13
+	targetRewardPerEpoch := uint64(initialReward * epochsInSlot)
+	aux := (((1 << 31) * poolStake) / totalStake) + ((2 << 31) * validatorStake / totalValidatorsStake)
+	aux2 := iotago.Mana(uint64(aux) * targetRewardPerEpoch * performanceFactor)
+	if aux2 < fixedCost {
+		return 0
+	}
+	reward := (aux2 >> 40) - fixedCost
+
+	return reward
 }

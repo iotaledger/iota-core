@@ -84,7 +84,10 @@ func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex) {
 		if !exists {
 			panic("committee for epoch not found")
 		}
-		m.RegisterCommittee(epoch, committee)
+		err := m.RegisterCommittee(epoch, committee)
+		if err != nil {
+			panic("failed to register committee for epoch")
+		}
 	}
 
 	epochSlotStart := m.timeProvider.EpochStart(epoch)
@@ -121,7 +124,7 @@ func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex) {
 
 		ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epoch)).Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
-			PoolRewards: poolReward(committee.TotalValidatorStake(), committee.TotalStake(), profitMargin, pool.FixedCost, aggregatePerformanceFactors(intermediateFactors)),
+			PoolRewards: poolReward(epochSlotEnd, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
 		})
 
