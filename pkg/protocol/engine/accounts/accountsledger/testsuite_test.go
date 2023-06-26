@@ -99,7 +99,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	}
 
 	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB())
-	manager.SetLivenessThreshold(t.ProtocolParameters.LivenessThreshold)
+	manager.SetCommitmentEvictionAge(t.ProtocolParameters.EvictionAge * 2)
 
 	return manager
 }

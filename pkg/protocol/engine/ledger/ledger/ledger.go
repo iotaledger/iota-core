@@ -88,7 +88,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
 			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
 			l.rewardsManager = rewards.New(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
-			l.accountsLedger.SetLivenessThreshold(l.protocolParameters.LivenessThreshold)
+			l.accountsLedger.SetCommitmentEvictionAge(l.protocolParameters.EvictionAge * 2)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)

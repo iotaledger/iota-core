@@ -56,14 +56,14 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	}
 
 	// apply decay to stored Mana and potential that was added on last update
-	manaStored, err := m.manaDecayProvider.StoredManaWithDecay(iotago.Mana(mana.Value()), mana.UpdateTime(), currentSlot)
+	manaStored, err := m.manaDecayProvider.StoredManaWithDecay(mana.Value(), mana.UpdateTime(), currentSlot)
 	if err != nil {
 		return 0, err
 	}
 	updatedValue := manaStored
 
 	// get newly generated potential since last update and apply decay
-	manaPotential, err := m.manaDecayProvider.PotentialManaWithDecay(iotago.BaseToken(mana.Deposit()), mana.UpdateTime(), currentSlot)
+	manaPotential, err := m.manaDecayProvider.PotentialManaWithDecay(mana.Deposit(), mana.UpdateTime(), currentSlot)
 	if err != nil {
 		return 0, err
 	}

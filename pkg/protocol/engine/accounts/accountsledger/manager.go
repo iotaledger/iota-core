@@ -39,7 +39,7 @@ type Manager struct {
 	// block is a function that returns a block from the cache or from the database.
 	block func(id iotago.BlockID) (*blocks.Block, bool)
 
-	maxCommittableAge iotago.SlotIndex
+	commitmentEvictionAge iotago.SlotIndex
 
 	mutex sync.RWMutex
 
@@ -70,11 +70,11 @@ func (m *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
 	m.latestCommittedSlot = index
 }
 
-func (m *Manager) SetLivenessThreshold(livenessThreshold iotago.SlotIndex) {
+func (m *Manager) SetCommitmentEvictionAge(commitmentEvictionAge iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	m.maxCommittableAge = livenessThreshold
+	m.commitmentEvictionAge = commitmentEvictionAge
 }
 
 // TrackBlock adds the block to the blockBurns set to deduct the burn from credits upon slot commitment.
@@ -141,7 +141,7 @@ func (m *Manager) ApplyDiff(
 	m.latestCommittedSlot = slotIndex
 
 	// TODO: when to exactly evict?
-	m.evict(slotIndex - m.maxCommittableAge - 1)
+	m.evict(slotIndex - m.commitmentEvictionAge - 1)
 
 	return nil
 }
@@ -151,9 +151,9 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	// if m.latestCommittedSlot < m.maxCommittableAge we should have all history
-	if m.latestCommittedSlot >= m.maxCommittableAge && targetIndex < m.latestCommittedSlot-m.maxCommittableAge {
-		return nil, false, errors.Errorf("can't calculate account, target slot index older than accountIndex (%d<%d)", targetIndex, m.latestCommittedSlot-m.maxCommittableAge)
+	// if m.latestCommittedSlot < m.commitmentEvictionAge we should have all history
+	if m.latestCommittedSlot >= m.commitmentEvictionAge && targetIndex < m.latestCommittedSlot-m.commitmentEvictionAge {
+		return nil, false, errors.Errorf("can't calculate account, target slot index older than allowed (%d<%d)", targetIndex, m.latestCommittedSlot-m.commitmentEvictionAge)
 	}
 	if targetIndex > m.latestCommittedSlot {
 		return nil, false, errors.Errorf("can't retrieve account, slot %d is not committed yet, latest committed slot: %d", targetIndex, m.latestCommittedSlot)

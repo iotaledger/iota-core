@@ -217,8 +217,8 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (slotDiffsCount uint64, err error) {
 	// write slot diffs until being able to reach targetIndex, where the exported tree is at
 	slotIndex := iotago.SlotIndex(1)
-	if targetIndex > m.maxCommittableAge {
-		slotIndex = targetIndex - m.maxCommittableAge
+	if targetIndex > m.commitmentEvictionAge {
+		slotIndex = targetIndex - m.commitmentEvictionAge
 	}
 
 	for ; slotIndex <= targetIndex; slotIndex++ {
