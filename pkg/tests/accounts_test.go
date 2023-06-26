@@ -86,7 +86,7 @@ func Test_TransitionAccount(t *testing.T) {
 	{
 		newAccountBlockIssuerKey := utils.RandPubKey()
 		inputForNewAccount, newAccountOutputs, newAccountWallets := ts.TransactionFramework.CreateAccountFromInput("TX1:1",
-			testsuite.WithConditions(iotago.AccountOutputUnlockConditions{
+			testsuite.WithAccountConditions(iotago.AccountOutputUnlockConditions{
 				&iotago.StateControllerAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
 				&iotago.GovernorAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
 			}),

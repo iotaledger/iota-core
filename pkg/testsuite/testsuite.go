@@ -48,6 +48,8 @@ type TestSuite struct {
 	ProtocolParameters iotago.ProtocolParameters
 
 	optsGenesisTimestampOffset int64
+	optsLivenessThreshold      iotago.SlotIndex
+	optsEvictionAge            iotago.SlotIndex
 	optsAccounts               []snapshotcreator.AccountDetails
 	optsSnapshotOptions        []options.Option[snapshotcreator.Options]
 	optsWaitFor                time.Duration
@@ -72,6 +74,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsWaitFor:                DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
 		optsTick:                   DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 		optsGenesisTimestampOffset: 0,
+		optsLivenessThreshold:      3,
+		optsEvictionAge:            6,
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name())
 		t.ProtocolParameters = iotago.ProtocolParameters{
@@ -88,8 +92,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			GenesisUnixTimestamp:  time.Now().Truncate(10*time.Second).Unix() - t.optsGenesisTimestampOffset,
 			SlotDurationInSeconds: 10,
 			SlotsPerEpochExponent: 2,
-			EvictionAge:           10,
-			LivenessThreshold:     3,
+			EvictionAge:           t.optsEvictionAge,
+			LivenessThreshold:     t.optsLivenessThreshold,
 		}
 
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(t.ProtocolParameters.GenesisUnixTimestamp, 0))
@@ -494,6 +498,22 @@ func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Optio
 func WithGenesisTimestampOffset(offset int64) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
 		opts.optsGenesisTimestampOffset = offset
+	}
+}
+
+func WithLivenessThreshold(livenessThreshold iotago.SlotIndex) options.Option[TestSuite] {
+	// TODO: eventually this should not be used and common parameters should be used
+
+	return func(opts *TestSuite) {
+		opts.optsLivenessThreshold = livenessThreshold
+	}
+}
+
+func WithEvictionAge(evictionAge iotago.SlotIndex) options.Option[TestSuite] {
+	// TODO: eventually this should not be used and common parameters should be used
+
+	return func(opts *TestSuite) {
+		opts.optsEvictionAge = evictionAge
 	}
 }
 
