@@ -110,7 +110,7 @@ func (m *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 		if err := binary.Read(reader, binary.LittleEndian, &epochIndex); err != nil {
 			return errors.Wrap(err, "unable to read epoch index")
 		}
-		rewardsTree := ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epochIndex))
+		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epochIndex))
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
 			return errors.Wrap(err, "unable to read accounts count")
@@ -120,7 +120,7 @@ func (m *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
 				return errors.Wrap(err, "unable to read account id")
 			}
-			var reward AccountRewards
+			var reward PoolRewards
 			if err := binary.Read(reader, binary.LittleEndian, &reward); err != nil {
 				return errors.Wrap(err, "unable to read reward")
 			}
@@ -202,11 +202,7 @@ func (m *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 	return nil
 }
 
-<<<<<<< HEAD:pkg/protocol/engine/rewards/snapshot.go
-func (m *Manager) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
-=======
-func (m *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotago.EpochIndex) error {
->>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget):pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance/snapshot.go
+func (m *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
 	// export all stored pools
 	// in theory we could save the epoch count only once, because stats and rewards should be the same length
 	var epochCount uint64
@@ -225,13 +221,13 @@ func (m *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotag
 			return errors.Wrap(err, "unable to write account count")
 		}
 
-		rewardsTree := ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epoch))
+		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epoch))
 		if rewardsTree.IsNew() {
 			break
 		}
 
 		var innerErr error
-		err := rewardsTree.Stream(func(key iotago.AccountID, value *AccountRewards) bool {
+		err := rewardsTree.Stream(func(key iotago.AccountID, value *PoolRewards) bool {
 			if err := pWriter.WriteValue("account id", key); err != nil {
 				innerErr = errors.Wrap(err, "unable to write account id")
 				return false
@@ -259,10 +255,7 @@ func (m *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, epoch iotag
 	if err := pWriter.WriteValueAtBookmark("pool rewards epoch count", epochCount); err != nil {
 		return errors.Wrap(err, "unable to write epoch count")
 	}
-<<<<<<< HEAD:pkg/protocol/engine/rewards/snapshot.go
 
-=======
->>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget):pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance/snapshot.go
 	return nil
 }
 

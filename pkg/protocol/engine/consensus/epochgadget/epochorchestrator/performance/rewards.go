@@ -13,7 +13,7 @@ func (m *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	return iotago.Identifier(ads.NewMap[iotago.AccountID, RewardsForAccount](m.rewardsStorage(epochIndex)).Root())
+	return iotago.Identifier(ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epochIndex)).Root())
 }
 
 func (m *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint64, epochStart, epochEnd iotago.EpochIndex) (validatorReward uint64, err error) {
@@ -31,11 +31,11 @@ func (m *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount uint
 			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
 		}
 
-		unDecayedEpochRewards := rewardsForAccountInEpoch.FixedCost +
-			((poolStats.ProfitMargin * rewardsForAccountInEpoch.PoolRewards) >> 8) +
-			((((1<<8)-poolStats.ProfitMargin)*rewardsForAccountInEpoch.PoolRewards)>>8)*
-				stakeAmount/
-				rewardsForAccountInEpoch.PoolStake
+		unDecayedEpochRewards := uint64(rewardsForAccountInEpoch.FixedCost) +
+			((poolStats.ProfitMargin * uint64(rewardsForAccountInEpoch.PoolRewards)) >> 8) +
+			((((1<<8)-poolStats.ProfitMargin)*uint64(rewardsForAccountInEpoch.PoolRewards))>>8)*
+				uint64(stakeAmount)/
+				uint64(rewardsForAccountInEpoch.PoolStake)
 
 		decayedEpochRewards, err := m.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
 		if err != nil {
@@ -62,9 +62,9 @@ func (m *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
 		}
 
-		unDecayedEpochRewards := ((((1 << 8) - poolStats.ProfitMargin) * rewardsForAccountInEpoch.PoolRewards) >> 8) *
-			delegatedAmount /
-			rewardsForAccountInEpoch.PoolStake
+		unDecayedEpochRewards := ((((1 << 8) - poolStats.ProfitMargin) * uint64(rewardsForAccountInEpoch.PoolRewards)) >> 8) *
+			uint64(delegatedAmount) /
+			uint64(rewardsForAccountInEpoch.PoolStake)
 
 		decayedEpochRewards, err := m.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
 		if err != nil {
@@ -81,15 +81,15 @@ func (m *Tracker) rewardsStorage(epochIndex iotago.EpochIndex) kvstore.KVStore {
 	return lo.PanicOnErr(m.rewardBaseStore.WithExtendedRealm(epochIndex.Bytes()))
 }
 
-func (m *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *RewardsForAccount, exists bool) {
-	return ads.NewMap[iotago.AccountID, RewardsForAccount](m.rewardsStorage(epochIndex)).Get(accountID)
+func (m *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *PoolRewards, exists bool) {
+	return ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epochIndex)).Get(accountID)
 }
 
-func calculateProfitMargin(totalValidatorsStake, totalPoolStake uint64) uint64 {
-	return (1 << 8) * totalValidatorsStake / (totalValidatorsStake + totalPoolStake)
+func calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken) uint64 {
+	return (1 << 8) * uint64(totalValidatorsStake) / (uint64(totalValidatorsStake) + uint64(totalPoolStake))
 }
 
-func poolReward(totalValidatorsStake, totalStake, profitMargin, fixedCosts, performanceFactor uint64) uint64 {
+func poolReward(totalValidatorsStake, totalStake iotago.BaseToken, profitMargin uint64, fixedCosts iotago.Mana, performanceFactor uint64) iotago.Mana {
 	// TODO: decay is calculated per epoch now, so do we need to calculate the rewards for each slot of the epoch?
-	return totalValidatorsStake * performanceFactor
+	return iotago.Mana(uint64(totalValidatorsStake) * performanceFactor)
 }

@@ -12,8 +12,8 @@ import (
 type Accounts struct {
 	accountPools *shrinkingmap.ShrinkingMap[iotago.AccountID, *Pool]
 
-	totalStake          uint64
-	totalValidatorStake uint64
+	totalStake          iotago.BaseToken
+	totalValidatorStake iotago.BaseToken
 }
 
 func AccountsFromBytes(bytes []byte) (*Accounts, error) {
@@ -72,11 +72,11 @@ func (w *Accounts) Set(id iotago.AccountID, pool *Pool) {
 	return
 }
 
-func (w *Accounts) TotalStake() uint64 {
+func (w *Accounts) TotalStake() iotago.BaseToken {
 	return w.totalStake
 }
 
-func (w *Accounts) TotalValidatorStake() uint64 {
+func (w *Accounts) TotalValidatorStake() iotago.BaseToken {
 	return w.totalValidatorStake
 }
 

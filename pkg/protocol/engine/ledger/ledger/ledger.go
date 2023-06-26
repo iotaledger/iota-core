@@ -44,6 +44,7 @@ type Ledger struct {
 	utxoLedger       *utxoledger.Manager
 	accountsLedger   *accountsledger.Manager
 	manaManager      *mana.Manager
+	epochGadget      epochgadget.Gadget
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
 	sybilProtection sybilprotection.SybilProtection
@@ -87,11 +88,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
 			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
 			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
-<<<<<<< HEAD
 			l.accountsLedger.SetCommitmentEvictionAge(l.protocolParameters.EvictionAge)
-=======
-			l.accountsLedger.SetLivenessThreshold(l.protocolParameters.LivenessThreshold)
->>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget)
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			l.TriggerConstructed()

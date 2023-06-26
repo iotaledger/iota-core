@@ -6,7 +6,6 @@ import (
 	"github.com/cockroachdb/errors"
 
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -73,25 +72,22 @@ func (m *Tracker) BlockAccepted(block *blocks.Block) {
 	}
 }
 
-func (m *Manager) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return iotago.Identifier(ads.NewMap[iotago.AccountID, AccountRewards](m.rewardsStorage(epochIndex)).Root())
-}
-
-func (m *Manager) RegisterCommittee(epochIndex iotago.EpochIndex, committee *account.Accounts) error {
-	return m.storeCommitteeForEpoch(epochIndex, committee)
-}
-
-func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex) {
+func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	accounts := m.loadCommitteeForEpoch(epoch)
+	committee, exists := m.loadCommitteeForEpoch(epoch)
+	if !exists {
+		// If the committee for the epoch wasn't set before we promote the current one.
+		committee, exists = m.loadCommitteeForEpoch(epoch - 1)
+		if !exists {
+			panic("committee for epoch not found")
+		}
+		m.RegisterCommittee(epoch, committee)
+	}
 
-	epochSlotStart := m.timeProvider.EpochStart(epochIndex)
-	epochSlotEnd := m.timeProvider.EpochEnd(epochIndex)
+	epochSlotStart := m.timeProvider.EpochStart(epoch)
+	epochSlotEnd := m.timeProvider.EpochEnd(epoch)
 
 	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
 	poolsStats := PoolsStats{
@@ -100,11 +96,11 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex) {
 		ProfitMargin:        profitMargin,
 	}
 
-	if err := m.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolsStats.Bytes())); err != nil {
-		panic(errors.Wrapf(err, "failed to store pool stats for epoch %d", epochIndex))
+	if err := m.poolStatsStore.Set(epoch.Bytes(), lo.PanicOnErr(poolsStats.Bytes())); err != nil {
+		panic(errors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
-	committee.ForEach(func(id iotago.AccountID, pool *account.Pool) bool {
+	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
 		intermediateFactors := make([]uint64, 0)
 		for slot := epochSlotStart; slot <= epochSlotEnd; slot++ {
 			performanceFactorStorage := m.performanceFactorsFunc(slot)
@@ -112,9 +108,9 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex) {
 				intermediateFactors = append(intermediateFactors, 0)
 			}
 
-			pf, err := performanceFactorStorage.Load(id)
+			pf, err := performanceFactorStorage.Load(accountID)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to load performance factor for account %s", id))
+				panic(errors.Wrapf(err, "failed to load performance factor for account %s", accountID))
 				return false
 			}
 
@@ -122,7 +118,9 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex) {
 
 		}
 
-		rewardsTree.Set(id, &RewardsForAccount{
+		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epoch))
+
+		rewardsTree.Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: poolReward(committee.TotalValidatorStake(), committee.TotalStake(), profitMargin, pool.FixedCost, aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
@@ -134,27 +132,30 @@ func (m *Manager) ApplyEpoch(epochIndex iotago.EpochIndex) {
 
 func (m *Tracker) poolStats(epoch iotago.EpochIndex) (poolStats *PoolsStats, err error) {
 	poolStats = new(PoolsStats)
-	poolStatsBytes, err := m.poolStatsStore.Get(epochIndex.Bytes())
+	poolStatsBytes, err := m.poolStatsStore.Get(epoch.Bytes())
 	if err != nil {
-		return poolStats, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
+		return poolStats, errors.Wrapf(err, "failed to get pool stats for epoch %d", epoch)
 	}
 
 	if _, err := poolStats.FromBytes(poolStatsBytes); err != nil {
-		return poolStats, errors.Wrapf(err, "failed to parse pool stats for epoch %d", epochIndex)
+		return poolStats, errors.Wrapf(err, "failed to parse pool stats for epoch %d", epoch)
 	}
 
 	return poolStats, nil
 }
 
-func (m *Tracker) loadCommitteeForEpoch(epoch iotago.EpochIndex) *account.Accounts {
+func (m *Tracker) loadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
 	accountsBytes, err := m.committeeStore.Get(epoch.Bytes())
 	if err != nil {
+		if errors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil, false
+		}
 		panic(errors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
 
 	committee, err = account.AccountsFromBytes(accountsBytes)
 	if err != nil {
-		panic(errors.Wrapf(err, "failed to parse committee for epoch %d", epochIndex))
+		panic(errors.Wrapf(err, "failed to parse committee for epoch %d", epoch))
 	}
 
 	return committee, true

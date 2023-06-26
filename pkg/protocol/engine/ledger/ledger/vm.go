@@ -83,11 +83,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 			rewardInputSet[castOutput.AccountID] += reward
 		case *iotago.DelegationOutput:
-<<<<<<< HEAD
-			reward, rewardErr := l.rewardsManager.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
-=======
-			reward, rewardErr := l.epochGadget.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, iotago.EpochIndex(castOutput.StartEpoch), iotago.EpochIndex(castOutput.EndEpoch))
->>>>>>> 0e8154af (Epoch orchestrator, rewards and performance tracker as epochgadget)
+			reward, rewardErr := l.epochGadget.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			if rewardErr != nil {
 				return nil, xerrors.Errorf("failed to get Delegator reward for DelegationOutput at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", castOutput.DelegationID, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}

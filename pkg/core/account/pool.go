@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const poolBytesLength = 3 * marshalutil.Uint64Size
@@ -11,37 +12,40 @@ const poolBytesLength = 3 * marshalutil.Uint64Size
 // Pool represents all the data we need for a given validator and epoch to calculate its rewards data.
 type Pool struct {
 	// Total stake of the pool, including delegators
-	PoolStake uint64
+	PoolStake iotago.BaseToken
 	// Validator's stake
-	ValidatorStake uint64
-	FixedCost      uint64
+	ValidatorStake iotago.BaseToken
+	FixedCost      iotago.Mana
 }
 
 func (p *Pool) FromBytes(bytes []byte) (n int, err error) {
 	m := marshalutil.New(bytes)
-	p.PoolStake, err = m.ReadUint64()
+	poolStake, err := m.ReadUint64()
 	if err != nil {
 		return m.ReadOffset(), errors.Wrap(err, "failed to parse pool stake")
 	}
+	p.PoolStake = iotago.BaseToken(poolStake)
 
-	p.ValidatorStake, err = m.ReadUint64()
+	validatorStake, err := m.ReadUint64()
 	if err != nil {
 		return m.ReadOffset(), errors.Wrap(err, "failed to parse validator stake")
 	}
+	p.ValidatorStake = iotago.BaseToken(validatorStake)
 
-	p.FixedCost, err = m.ReadUint64()
+	fixedCost, err := m.ReadUint64()
 	if err != nil {
 		return m.ReadOffset(), errors.Wrap(err, "failed to parse fixed cost")
 	}
+	p.FixedCost = iotago.Mana(fixedCost)
 
 	return m.ReadOffset(), nil
 }
 
 func (p Pool) Bytes() (bytes []byte, err error) {
 	m := marshalutil.New()
-	m.WriteUint64(p.PoolStake)
-	m.WriteUint64(p.ValidatorStake)
-	m.WriteUint64(p.FixedCost)
+	m.WriteUint64(uint64(p.PoolStake))
+	m.WriteUint64(uint64(p.ValidatorStake))
+	m.WriteUint64(uint64(p.FixedCost))
 
 	return m.Bytes(), nil
 }
