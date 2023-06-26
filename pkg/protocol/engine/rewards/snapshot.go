@@ -265,9 +265,9 @@ func (m *Manager) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 
 		return true
 	}); err != nil {
-		return errors.Wrapf(err, "unable to iterate over pools stats")
+		return errors.Wrap(err, "unable to iterate over pools stats")
 	} else if innerErr != nil {
-		return errors.Wrapf(innerErr, "error while iterating over pools stats")
+		return errors.Wrap(innerErr, "error while iterating over pools stats")
 
 	}
 	if err := pWriter.WriteValueAtBookmark("pools stats epoch count", epochCount); err != nil {

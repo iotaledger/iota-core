@@ -119,7 +119,7 @@ func (p *Protocol) Run(ctx context.Context) error {
 
 	//nolint:contextcheck // false positive
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
-		return errors.Wrapf(err, "mainEngine initialize failed")
+		return errors.Wrap(err, "mainEngine initialize failed")
 	}
 
 	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())

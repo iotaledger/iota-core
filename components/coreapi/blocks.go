@@ -51,7 +51,7 @@ func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
 	slotCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
 	if len(references[model.StrongParentType]) == 0 {
-		return nil, errors.Wrapf(echo.ErrServiceUnavailable, "get references failed")
+		return nil, errors.Wrap(echo.ErrServiceUnavailable, "get references failed")
 	}
 
 	cBytes, err := deps.Protocol.API().JSONEncode(slotCommitment.Commitment())

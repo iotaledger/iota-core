@@ -210,7 +210,7 @@ func (s *Settings) tryImport(reader io.ReadSeeker) (err error) {
 	}
 
 	if consumedBytes, fromBytesErr := s.FromBytes(settingsBytes); fromBytesErr != nil {
-		return errors.Wrapf(fromBytesErr, "failed to read settings")
+		return errors.Wrap(fromBytesErr, "failed to read settings")
 	} else if consumedBytes != len(settingsBytes) {
 		return errors.Errorf("failed to read settings: consumed bytes (%d) != expected bytes (%d)", consumedBytes, len(settingsBytes))
 	}

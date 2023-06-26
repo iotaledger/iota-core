@@ -108,21 +108,21 @@ func (d *AccountDiff) FromReader(readSeeker io.ReadSeeker) error {
 
 func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err error) {
 	if err = binary.Read(reader, binary.LittleEndian, &d.BICChange); err != nil {
-		return offset, errors.Wrapf(err, "unable to read Account BIC balance value in the diff")
+		return offset, errors.Wrap(err, "unable to read Account BIC balance value in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousUpdatedTime); err != nil {
-		return offset, errors.Wrapf(err, "unable to read updated time in the diff")
+		return offset, errors.Wrap(err, "unable to read updated time in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.NewOutputID); err != nil {
-		return offset, errors.Wrapf(err, "unable to read updated time in the diff")
+		return offset, errors.Wrap(err, "unable to read updated time in the diff")
 	}
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousOutputID); err != nil {
-		return offset, errors.Wrapf(err, "unable to read updated time in the diff")
+		return offset, errors.Wrap(err, "unable to read updated time in the diff")
 	}
 
 	updatedAddedKeys, bytesRead, err := readPubKeys(reader, d.PubKeysAdded)
@@ -142,22 +142,22 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 	d.PubKeysRemoved = updatedRemovedKeys
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.ValidatorStakeChange); err != nil {
-		return offset, errors.Wrapf(err, "unable to read validator stake change in the diff")
+		return offset, errors.Wrap(err, "unable to read validator stake change in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.DelegationStakeChange); err != nil {
-		return offset, errors.Wrapf(err, "unable to read delegation stake change in the diff")
+		return offset, errors.Wrap(err, "unable to read delegation stake change in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.FixedCostChange); err != nil {
-		return offset, errors.Wrapf(err, "unable to read fixed cost change in the diff")
+		return offset, errors.Wrap(err, "unable to read fixed cost change in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.StakeEndEpochChange); err != nil {
-		return offset, errors.Wrapf(err, "unable to read new stake end epoch in the diff")
+		return offset, errors.Wrap(err, "unable to read new stake end epoch in the diff")
 	}
 	offset += 8
 
@@ -168,7 +168,7 @@ func readPubKeys(reader io.ReadSeeker, pubKeysToUpdate []ed25519.PublicKey) ([]e
 	var pubKeysLength uint64
 	var bytesConsumed int
 	if err := binary.Read(reader, binary.LittleEndian, &pubKeysLength); err != nil {
-		return nil, bytesConsumed, errors.Wrapf(err, "unable to read added pubKeys length in the diff")
+		return nil, bytesConsumed, errors.Wrap(err, "unable to read added pubKeys length in the diff")
 	}
 	bytesConsumed += 8
 
@@ -219,7 +219,7 @@ func NewAccountDiffs(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.AP
 func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff, destroyed bool) (err error) {
 	if destroyed {
 		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
-			return errors.Wrapf(err, "failed to set destroyed account")
+			return errors.Wrap(err, "failed to set destroyed account")
 		}
 
 	}
@@ -231,7 +231,7 @@ func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff
 func (b *AccountDiffs) Load(accountID iotago.AccountID) (accountDiff AccountDiff, destroyed bool, err error) {
 	destroyed, err = b.destroyedAccounts.Has(accountID)
 	if err != nil {
-		return accountDiff, false, errors.Wrapf(err, "failed to get destroyed account")
+		return accountDiff, false, errors.Wrap(err, "failed to get destroyed account")
 	} // load diff for a destroyed account to recreate the state
 
 	accountDiff, err = b.diffChangeStore.Get(accountID)

@@ -31,7 +31,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	}
 
 	if err := m.importAccountTree(reader, accountCount); err != nil {
-		return errors.Wrapf(err, "unable to import Account tree")
+		return errors.Wrap(err, "unable to import Account tree")
 	}
 
 	if err := m.readSlotDiffs(reader, slotDiffCount); err != nil {
@@ -83,7 +83,7 @@ func (m *Manager) importAccountTree(reader io.ReadSeeker, accountCount uint64) e
 	for i := uint64(0); i < accountCount; i++ {
 		accountData := &accounts.AccountData{}
 		if err := accountData.FromReader(reader); err != nil {
-			return errors.Wrapf(err, "unable to read account data")
+			return errors.Wrap(err, "unable to read account data")
 		}
 
 		m.accountsTree.Set(accountData.ID, accountData)
@@ -206,7 +206,7 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 			}
 
 			if err := diffStore.Store(accountID, *accountDiff, destroyed); err != nil {
-				return errors.Wrapf(err, "unable to store slot diff")
+				return errors.Wrap(err, "unable to store slot diff")
 			}
 		}
 	}
