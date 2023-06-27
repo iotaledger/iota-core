@@ -1868,6 +1868,13 @@ components:
         creationTime:
           type: number
           description: The slot index of this transaction is created.
+        contextInputs:
+          type: array
+          items:
+            anyOf:
+              - $ref: '#/components/schemas/CommitmentInput'
+              - $ref: '#/components/schemas/BICInput'
+              - $ref: '#/components/schemas/RewardInput'
         inputsCommitment:
           type: string
           description: BLAKE2b-256 hash of the BLAKE2b-256 hashes of the serialized outputs referenced in Inputs by their outputIds (transactionId || outputIndex). Hex-encoded data with 0x prefix.
@@ -1900,6 +1907,7 @@ components:
         - type
         - networkId
         - creationTime
+        - contextInputs
         - inputsCommitment
         - inputs
         - outputs
@@ -1913,6 +1921,45 @@ components:
         value:
           type: number
           description: The amount of mana to allot.
+
+    CommitmentInput:
+      description: Allows to reference commitment to a certain slot. It is used to provide the VM with the necessary context information from the node, to prove that the time at the transaction execution is past certain slot in the past, as it indicates that the slot has been already committed.
+      properties:
+        type:
+          type: integer
+          description: Set to value 1 to denote an Commitment Input.
+        commitmentId:
+          type: string
+          description: The commitment identifier to reference.
+      required:
+        - type
+        - commitmentId
+
+    BICInput:
+      description: Allows to provide the VM with context for the value of the BIC vector for a specific slot. It is necessary information needed for any Account transitions, and account destroying.
+      properties:
+        type:
+          type: integer
+          description: Set to value 2 to denote an Commitment Input.
+        accountId:
+          type: string
+          description: The account identifier.
+      required:
+        - type
+        - accountId
+
+    RewardInput:
+      description: c
+      properties:
+        type:
+          type: integer
+          description: Set to value 3 to denote an Commitment Input.
+        index:
+          type: integer
+          description: The index of the transaction input for which to claim rewards.
+      required:
+        - type
+        - index
 
     UTXOInput:
       description: Describes an input which references an unspent transaction output to consume.
@@ -2011,7 +2058,8 @@ components:
           items:
             anyOf:
               - $ref: '#/components/schemas/SenderFeature'
-              - $ref: '#/components/schemas/MetadataFeature'              
+              - $ref: '#/components/schemas/MetadataFeature'                
+              - $ref: '#/components/schemas/BlockIssuerFeature'            
         immutableFeatures:
           type: array
           description: Immutable features that add utility to the output but do not impose unlocking conditions.
@@ -2020,7 +2068,6 @@ components:
             anyOf:
               - $ref: '#/components/schemas/IssuerFeature'
               - $ref: '#/components/schemas/MetadataFeature'
-              - $ref: '#/components/schemas/BlockIssuerFeature'
         mana:
           type: integer
           description: The stored mana held by the output.

@@ -11,8 +11,36 @@ This document defines core models for IOTA V3 protocol.
   * [Slot Commitment ID](#slot-commitment-id)
 * [Payloads](#payloads)
   * [Tagged Data Payload](#tagged-data-payload)
-  * [Transaction](#transaction)
-  * [Outputs and Unlocks](#outputs-and-unlocks)
+  * [Transaction](#transaction-payload)
+* [Context Inputs](#context-inputs)
+  * [Commitment Input](#commitment-input)
+  * [BIC Input](#block-issuance-credits-bic-input)
+  * [Reward Input](#reward-input)
+* [Outputs](#outputs)
+  * [Basic Output](#basic-output)
+  * [Foundry Output](#foundry-output)
+  * [NFT Output](#nft-output)
+  * [Account Output](#account-output)
+* [Features](#features)
+  * [Tag Feature](#tag-feature)
+  * [Sender Feature](#sender-feature)
+  * [Issuer Feature](#issuer-feature)
+  * [Metadata Feature](#metadata-feature)
+  * [Block Issuer Feature](#block-issuer-feature)
+  * [Staking Feature](#staking-feature)
+* [Address](#address)
+  * [Ed25519 Address](#ed25519-address)
+  * [Account Address](#account-address)
+  * [NFT Address](#nft-address)
+* [Unlock Condition](#unlock-condition)
+  * [Address Unlock Condition](#address-unlock-condition)
+  * [Expiration Unlock Condition](#expiration-unlock-condition)
+  * [Timelock Unlock Condition](#timelock-unlock-condition)
+  * [Immutable Account Address Unlock Condition](#immutable-account-address-unlock-condition)
+  * [Storage Deposit Return Unlock Condition](#storage-deposit-return-unlock-condition)
+  * [Governor Address Unlock Condition](#governor-address-unlock-condition)
+  * [State Controller Address Unlock Condition](#state-controller-address-unlock-condition)
+* [Unlocks](#unlocks)
 * [Signature](#signature)
   * [Ed25519 Signature](#ed25519-signature)
 
@@ -167,6 +195,11 @@ The following table describes the serialization of a Block:
       </details>
   </tr>
   <tr>
+    <td>Burned Mana</td>
+    <td>uint64</td>
+    <td>The amount of mana burned in this block.</td>
+  </tr>
+  <tr>
     <td valign="top">Signature <code>oneOf</code></td>
     <td colspan="2">
       <details>
@@ -305,6 +338,7 @@ Calculation:
 
 The string format of Slot Commitment ID is hexadecimal encoding of Slot Commitment ID with `0x` prefix.
 
+
 ## Payloads
 The following table lists all currently specified payloads that can be part of a block. 
 
@@ -404,8 +438,37 @@ The following table describes the serialization of a Transaction Payload:
           <tr>
             <td>Creation Time</td>
             <td>uint64</td>
-            <td>The time at which this transaction was created by the client. It's a Unix-like timestamp in nanosecond.</td>
+            <td>The <b>slot index</b> at which this transaction was created by the client.</td>
           </tr>
+          <tr>
+            <td>Context Inputs Count</td>
+            <td>uint16</td>
+            <td>The number of context input entries.</td>
+          </tr>
+          <tr>
+            <td valign="top">Context Inputs <code>anyOf</code></td>
+            <td colspan="2">
+              <details>
+                <summary>Commitment Input</summary>
+                <blockquote>
+                  Describes an input which references commitment to a certain slot.
+                </blockquote>
+              </details>
+              <details>
+                <summary>BIC Input</summary>
+                <blockquote>
+                  Describes an input which denotes an BIC value of an account.
+                </blockquote>
+              </details>
+              <details>
+                <summary>Reward Input</summary>
+                <blockquote>
+                  Describes an input which claims the reward.
+                </blockquote>
+              </details>
+            </td>
+          </tr>
+          <tr>
           <tr>
             <td>Inputs Count</td>
             <td>uint16</td>
@@ -468,9 +531,9 @@ The following table describes the serialization of a Transaction Payload:
                 </blockquote>
               </details>
               <details>
-                <summary>Alias Output</summary>
+                <summary>Account Output</summary>
                 <blockquote>
-                  Describes an alias account in the ledger.
+                  Describes an account in the ledger.
                 </blockquote>
               </details>
               <details>
@@ -485,6 +548,41 @@ The following table describes the serialization of a Transaction Payload:
                   Describes a unique, non-fungible token deposit to a single address.
                 </blockquote>
               </details>
+            </td>
+          </tr>
+          <tr>
+            <td>Allotment Count</td>
+            <td>uint16</td>
+            <td>The number of allotment entries.</td>
+          </tr>
+          <tr>
+            <td valign="top">Allotments <code>anyOf</code></td>
+            <td colspan="2">
+              <details>
+                <summary>Allotment</summary>
+                <blockquote>
+                  Describes a list of accounts with the amount of mana to allot to.
+                </blockquote>
+                <table>
+                  <tr>
+                    <td><b>Name</b></td>
+                    <td><b>Type</b></td>
+                    <td><b>Description</b></td>
+                  </tr>
+                  <tr>
+                    <td>Account ID</td>
+                    <td>ByteArray[32]</td>
+                    <td>
+                      The account identifier to allot to.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Value</td>
+                    <td>uint64</td>
+                    <td>The amount of mana to allot.</td>
+                  </tr>
+                </table>
+              </details>              
             </td>
           </tr>
           <tr>
@@ -528,9 +626,9 @@ The following table describes the serialization of a Transaction Payload:
         </blockquote>
       </details>
       <details>
-        <summary>Alias Unlock</summary>
+        <summary>Account Unlock</summary>
         <blockquote>
-          References a previous unlock of a consumed alias output.
+          References a previous unlock of a consumed account output.
         </blockquote>
       </details>
       <details>
@@ -543,9 +641,1302 @@ The following table describes the serialization of a Transaction Payload:
   </tr>
 </table>
 
-Transaction validation rules follow [TIP 20 Transaction Payload with TIP-18 Output Types](https://github.com/iotaledger/tips/blob/ae7fbd336e506f907080aa6b16d6ffb0d7a5553c/tips/TIP-0020/tip-0020.md).
+#### Transaction Validation Rules
+Transaction validation rules follow [TIP 20 Transaction Payload with TIP-18 Output Types](https://github.com/iotaledger/tips/blob/ae7fbd336e506f907080aa6b16d6ffb0d7a5553c/tips/TIP-0020/tip-0020.md) with additional rules for new fields:
 
-### Outputs and Unlocks
+* 0 < `Context Inputs Count` < 128
+* No duplicate element of `Context Inputs` is allowed.
+
+
+## Context Inputs
+
+Context Inputs are inputs that indicate the different functions related to account, commitment and more. There could be more types of context inputs introduced in the future via protocol upgrades.
+
+Each input must be accompanied by a corresponding Unlock at the same index in the `Unlocks` part of the Transaction Payload.
+
+The following table lists all currently specified Context Input.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Context Input Type</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>Commitment Input</td>
+        <td>1</td>
+        <td>An input which allows to reference commitment to a certain slot.</td>
+    </tr>
+    <tr>
+        <td>Block Issuance Credits (BIC) Input</td>
+        <td>2</td>
+        <td>An input which allows to provide the VM with context for the value of the BIC vector for a specific slot.</td>
+    </tr>
+    <tr>
+        <td>Reward Input</td>
+        <td>3</td>
+        <td>An input which Allows to provide the VM with context of claiming rewards.</td>
+    </tr>
+</table>
+
+### Commitment Input
+
+A Commitment Input is an input that allows to reference commitment to a certain slot. It is used to provide the VM with the necessary context information from the node, to prove that the time at the transaction execution is past certain slot in the past, as it indicates that the slot has been already committed.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>Input Type</td>
+        <td>uint16</td>
+        <td>The input type of Commitment Input is 1.</td>
+    </tr>
+    <tr>
+        <td>Commitment ID</td>
+        <td>ByteArray[40]</td>
+        <td>The commitment identifier to reference to.</td>
+    </tr>
+</table>
+
+### Block Issuance Credits (BIC) Input
+
+A Block Issuance Credits Input is an input that allows to provide the VM with context for the value of the BIC vector for a specific slot. It is necessary information needed for any Account transitions, and account destroying. 
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>Input Type</td>
+        <td>uint16</td>
+        <td>The input type of BIC Input is 2.</td>
+    </tr>
+    <tr>
+        <td>Account ID</td>
+        <td>ByteArray[32]</td>
+        <td>The BIC of an account to use.</td>
+    </tr>
+</table>
+
+### Reward Input
+
+A Reward Input is an input indicates which transaction `Input` is the claiming reward. 
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>Input Type</td>
+        <td>uint16</td>
+        <td>The input type of Rewarad Input is 3.</td>
+    </tr>
+    <tr>
+        <td>Index</td>
+        <td>uint16</td>
+        <td>The index of the transaction input for which to claim rewards.</td>
+    </tr>
+</table>
+
+
+
+
+## Outputs
+The following table lists all currently specified Output.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Output Type</th>
+    </tr>
+    <tr>
+        <td>Basic Output</td>
+        <td>3</td>
+    </tr>
+    <tr>
+        <td>Account Output</td>
+        <td>4</td>
+    </tr>
+    <tr>
+        <td>Foundry Output</td>
+        <td>5</td>
+    </tr>
+    <tr>
+        <td>NFT Output</td>
+        <td>6</td>
+    </tr>
+</table>
+
+### Basic Output
+A Basic Output can hold native tokens and might have several unlock conditions and optional features. The combination of several features provide the base functionality for the output to be used as an on-ledger smart contract request.
+
+<table>
+  <tr>
+      <td><b>Name</b></td>
+      <td><b>Type</b></td>
+      <td><b>Description</b></td>
+  </tr>
+  <tr>
+      <td>Output Type</td>
+      <td>uint8</td>
+      <td>
+          Set to <strong>value 3</strong> to denote a <i>Basic Output</i>.
+      </td>
+  </tr>
+  <tr>
+      <td>Amount</td>
+      <td>uint64</td>
+      <td>The amount of IOTA coins held by the output.</td>
+  </tr>
+  <tr>
+      <td>Native Tokens Count</td>
+      <td>uint8</td>
+      <td>The number of native tokens held by the output.</td>
+  </tr>
+  <tr>
+      <td valign="top">Native Tokens <code>optAnyOf</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Native Token</summary>
+              <table>
+                  <tr>
+                      <td><b>Name</b></td>
+                      <td><b>Type</b></td>
+                      <td><b>Description</b></td>
+                  </tr>
+                  <tr>
+                      <td>Token ID</td>
+                      <td>ByteArray[38]</td>
+                      <td>
+                          Identifier of the native token.
+                      </td>
+                  </tr>
+                  <tr>
+                      <td>Amount</td>
+                      <td>uint256</td>
+                      <td>
+                          Amount of native tokens of the given <i>Token ID</i>.
+                      </td>
+                  </tr>
+              </table>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Unlock Conditions Count</td>
+      <td>uint8</td>
+      <td>The number of unlock conditions following.</td>
+  </tr>
+  <tr>
+      <td valign="top">Unlock Conditions <code>atMostOneOfEach</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Address Unlock Condition</summary>
+          </details>
+          <details>
+              <summary>Storage Deposit Return Unlock Condition</summary>
+              <blockquote>
+                  Defines the amount of IOTAs used as storage deposit that have to be returned to <i>Return Address</i>.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Timelock Unlock Condition</summary>
+              <blockquote>
+                  Defines a slot index until which the output can not be unlocked.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Expiration Unlock Condition</summary>
+              <blockquote>
+                  Defines a slot index until which only <i>Address</i>, defined in <i>Address Unlock Condition</i>,
+                  is allowed to unlock the output. After the slot index is reached/passed, only
+                  <i>Return Address</i> can unlock it.
+              </blockquote>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Features Count</td>
+      <td>uint8</td>
+      <td>The number of features following.</td>
+  </tr>
+  <tr>
+      <td valign="top">Features <code>atMostOneOfEach</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Sender Feature</summary>
+              <blockquote>
+                  Identifies the validated sender of the output.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Metadata Feature</summary>
+              <blockquote>
+                  Defines metadata (arbitrary binary data) that will be stored in the output.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Tag Feature</summary>
+              <blockquote>
+                  Defines an indexation tag to which the output can be indexed by additional node plugins.
+              </blockquote>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Mana</td>
+      <td>uint64</td>
+      <td>The amount of (stored) Mana held by the output.</td>
+  </tr>
+</table>
+
+### Foundry Output
+A foundry output is an output that controls the supply of user defined native tokens. It can mint and melt tokens according to the policy defined in the Token Scheme field of the output. Foundries can only be created and controlled by accounts.
+
+<table>
+  <tr>
+      <td><b>Name</b></td>
+      <td><b>Type</b></td>
+      <td><b>Description</b></td>
+  </tr>
+  <tr>
+      <td>Output Type</td>
+      <td>uint8</td>
+      <td>
+          Set to <strong>value 5</strong> to denote a <i>Foundry Output</i>.
+      </td>
+  </tr>
+  <tr>
+      <td>Amount</td>
+      <td>uint64</td>
+      <td>The amount of IOTA coins held by the output.</td>
+  </tr>
+  <tr>
+      <td>Native Tokens Count</td>
+      <td>uint8</td>
+      <td>The number of different native tokens held by the output.</td>
+  </tr>
+  <tr>
+      <td valign="top">Native Tokens <code>optAnyOf</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Native Token</summary>
+              <table>
+                  <tr>
+                      <td><b>Name</b></td>
+                      <td><b>Type</b></td>
+                      <td><b>Description</b></td>
+                  </tr>
+                  <tr>
+                      <td>Token ID</td>
+                      <td>ByteArray[38]</td>
+                      <td>
+                          Identifier of the native tokens.
+                      </td>
+                  </tr>
+                  <tr>
+                      <td>Amount</td>
+                      <td>uint256</td>
+                      <td>Amount of native tokens of the given <i>Token ID</i>.</td>
+                  </tr>
+              </table>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Serial Number</td>
+      <td>uint32</td>
+      <td>The serial number of the foundry with respect to the controlling account.</td>
+  </tr>
+  <tr>
+      <td valign="top">Token Scheme <code>oneOf</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Simple Token Scheme</summary>
+              <table>
+                  <tr>
+                      <td><b>Name</b></td>
+                      <td><b>Type</b></td>
+                      <td><b>Description</b></td>
+                  </tr>
+                  <tr>
+                      <td>Token Scheme Type</td>
+                      <td>uint8</td>
+                      <td>
+                          Set to <strong>value 0</strong> to denote an <i>Simple Token Scheme</i>.
+                      </td>
+                  </tr>
+                  <tr>
+                      <td>Minted Tokens</td>
+                      <td>uint256</td>
+                      <td>Amount of tokens minted by this foundry.</td>
+                  </tr>
+                  <tr>
+                      <td>Melted Tokens</td>
+                      <td>uint256</td>
+                      <td>Amount of tokens melted by this foundry.</td>
+                  </tr>
+                  <tr>
+                      <td>Maximum Supply</td>
+                      <td>uint256</td>
+                      <td>Maximum supply of tokens controlled by this foundry.</td>
+                  </tr>
+              </table>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Unlock Conditions Count</td>
+      <td>uint8</td>
+      <td>The number of unlock conditions following.</td>
+  </tr>
+  <tr>
+      <td valign="top">Unlock Conditions <code>atMostOneOfEach</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Immutable Account Address Unlock Condition</summary>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Features Count</td>
+      <td>uint8</td>
+      <td>The number of features following.</td>
+  </tr>
+  <tr>
+      <td valign="top">Features <code>atMostOneOfEach</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Metadata Feature</summary>
+              <blockquote>
+                  Defines metadata (arbitrary binary data) that will be stored in the output.
+              </blockquote>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Immutable Features Count</td>
+      <td>uint8</td>
+      <td>The number of immutable features following. Immutable features are defined upon deployment of the UTXO state machine and are not allowed to change in any future state transition.</td>
+  </tr>
+  <tr>
+      <td valign="top">Immutable Features <code>atMostOneOfEach</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Metadata Feature</summary>
+              <blockquote>
+                  Defines metadata (arbitrary binary data) that will be stored in the output.
+              </blockquote>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Mana</td>
+      <td>uint64</td>
+      <td>The amount of stored mana held by the outptu.</td>
+  </tr>
+</table>
+
+### NFT Output
+
+<table>
+  <tr>
+      <td><b>Name</b></td>
+      <td><b>Type</b></td>
+      <td><b>Description</b></td>
+  </tr>
+  <tr>
+      <td>Output Type</td>
+      <td>uint8</td>
+      <td>
+          Set to <strong>value 6</strong> to denote a <i>NFT Output</i>.
+      </td>
+  </tr>
+  <tr>
+      <td>Amount</td>
+      <td>uint64</td>
+      <td>The amount of IOTA coins held by the output.</td>
+  </tr>  
+  <tr>
+      <td>Native Tokens Count</td>
+      <td>uint8</td>
+      <td>The number of native tokens held by the output.</td>
+  </tr>
+  <tr>
+      <td valign="top">Native Tokens <code>optAnyOf</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Native Token</summary>
+              <table>
+                  <tr>
+                      <td><b>Name</b></td>
+                      <td><b>Type</b></td>
+                      <td><b>Description</b></td>
+                  </tr>
+                  <tr>
+                      <td>Token ID</td>
+                      <td>ByteArray[38]</td>
+                      <td>
+                          Identifier of the native token.
+                      </td>
+                  </tr>
+                  <tr>
+                      <td>Amount</td>
+                      <td>uint256</td>
+                      <td>
+                          Amount of native tokens of the given <i>Token ID</i>.
+                      </td>
+                  </tr>
+              </table>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>NFT ID</td>
+      <td>ByteArray[32]</td>
+      <td>Unique identifier of the NFT, which is the BLAKE2b-256 hash of the <i>Output ID</i> that created it.<i> NFT Address = NFT Address Type || NFT ID</i></td>
+  </tr>
+  <tr>
+      <td>Unlock Conditions Count</td>
+      <td>uint8</td>
+      <td>The number of unlock conditions following.</td>
+  </tr>
+  <tr>
+      <td valign="top">Unlock Conditions <code>atMostOneOfEach</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Address Unlock Condition</summary>
+          </details>
+          <details>
+              <summary>Storage Deposit Return Unlock Condition</summary>
+              <blockquote>
+                  Defines the amount of IOTAs used as storage deposit that have to be returned to <i>Return Address</i>.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Timelock Unlock Condition</summary>
+              <blockquote>
+                  Defines a slot index until which the output can not be unlocked.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Expiration Unlock Condition</summary>
+              <blockquote>
+                  Defines a slot index until which only <i>Address</i>, defined in <i>Address Unlock Condition</i>,
+                  is allowed to unlock the output. After the slot index is reached/passed, only
+                  <i>Return Address</i> can unlock it.
+              </blockquote>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Features Count</td>
+      <td>uint8</td>
+      <td>The number of features following.</td>
+  </tr>
+  <tr>
+      <td valign="top">Features <code>optAnyOf</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Sender Feature</summary>
+              <blockquote>
+                  Identifies the validated sender of the output.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Metadata Feature</summary>
+              <blockquote>
+                  Defines metadata (arbitrary binary data) that will be stored in the output.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Tag Feature</summary>
+              <blockquote>
+                  Defines an indexation tag to which the output can be indexed by additional node plugins.
+              </blockquote>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Immutable Features Count</td>
+      <td>uint8</td>
+      <td>The number of immutable features following. Immutable features are defined upon deployment of the UTXO state machine and are not allowed to change in any future state transition.</td>
+  </tr>
+  <tr>
+      <td valign="top">Immutable Features <code>optAnyOf</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Issuer Feature</summary>
+              <blockquote>
+                  Identifies the validated issuer of the UTXO state machine.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Metadata Feature</summary>
+              <blockquote>
+                  Defines metadata (arbitrary binary data) that will be stored in the output.
+              </blockquote>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Mana</td>
+      <td>uint64</td>
+      <td>The amount of stored Mana held by the output.</td>
+  </tr>
+</table>
+
+
+### Account Output
+
+<table>
+  <tr>
+      <td><b>Name</b></td>
+      <td><b>Type</b></td>
+      <td><b>Description</b></td>
+  </tr>
+  <tr>
+      <td>Output Type</td>
+      <td>uint8</td>
+      <td>
+          Set to <strong>value 4</strong> to denote a <i>Account Output</i>.
+      </td>
+  </tr>
+  <tr>
+      <td>Amount</td>
+      <td>uint64</td>
+      <td>The amount of IOTA coins held by the output.</td>
+  </tr>
+  <tr>
+      <td>Native Tokens Count</td>
+      <td>uint8</td>
+      <td>The number of native tokens held by the output.</td>
+  </tr>
+  <tr>
+      <td valign="top">Native Tokens <code>optAnyOf</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Native Token</summary>
+              <table>
+                  <tr>
+                      <td><b>Name</b></td>
+                      <td><b>Type</b></td>
+                      <td><b>Description</b></td>
+                  </tr>
+                  <tr>
+                      <td>Token ID</td>
+                      <td>ByteArray[38]</td>
+                      <td>
+                          Identifier of the native token.
+                      </td>
+                  </tr>
+                  <tr>
+                      <td>Amount</td>
+                      <td>uint256</td>
+                      <td>
+                          Amount of native tokens of the given <i>Token ID</i>.
+                      </td>
+                  </tr>
+              </table>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Account ID</td>
+      <td>ByteArray[32]</td>
+      <td>Unique identifier of the account, which is the BLAKE2b-256 hash of the <i>Output ID</i> that created it.<i> Account Address = Account Address Type || Account ID</i></td>
+  </tr>
+  <tr>
+      <td>State Index</td>
+      <td>uint32</td>
+      <td>A counter that must increase by 1 every time the account is state transitioned.</td>
+  </tr>
+  <tr>
+      <td>State Metadata</td>
+      <td>(uint16)ByteArray</td>
+      <td>Metadata that can only be changed by the state controller. A leading uint16 denotes its length.</td>
+  </tr>
+  <tr>
+      <td>Foundry Counter</td>
+      <td>uint32</td>
+      <td>A counter that denotes the number of foundries created by this account.</td>
+  </tr>
+  <tr>
+      <td>Unlock Conditions Count</td>
+      <td>uint8</td>
+      <td>The number of unlock conditions following.</td>
+  </tr>
+  <tr>
+      <td valign="top">Unlock Conditions <code>atMostOneOfEach</code></td>
+      <td colspan="2">
+          <details>
+              <summary>State Controller Address Unlock Condition</summary>
+          </details>
+          <details>
+              <summary>Governor Address Unlock Condition</summary>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Features Count</td>
+      <td>uint8</td>
+      <td>The number of features following.</td>
+  </tr>
+  <tr>
+      <td valign="top">Features <code>atMostOneOfEach</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Sender Feature</summary>
+              <blockquote>
+                  Identifies the validated sender of the output.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Metadata Feature</summary>
+              <blockquote>
+                  Defines metadata (arbitrary binary data) that will be stored in the output.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Block Issuer Feature</summary>
+              <blockquote>
+                  Contains the public keys to verify block signatures and allows for unbonding the issuer deposit.
+              </blockquote>
+          </details>
+      </td>
+  </tr>
+  <tr>
+      <td>Immutable Features Count</td>
+      <td>uint8</td>
+      <td>The number of immutable features following. Immutable features are defined upon deployment of the UTXO state machine and are not allowed to change in any future state transition.</td>
+  </tr>
+  <tr>
+      <td valign="top">Immutable Features <code>atMostOneOfEach</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Issuer Feature</summary>
+              <blockquote>
+                  Identifies the validated issuer of the UTXO state machine.
+              </blockquote>
+          </details>
+          <details>
+              <summary>Metadata Feature</summary>
+              <blockquote>
+                  Defines metadata (arbitrary binary data) that will be stored in the output.
+              </blockquote>
+          </details>
+      </td>
+  </tr>
+   <tr>
+      <td>Mana</td>
+      <td>uint64</td>
+      <td>The amount of stored Mana held by the output.</td>
+  </tr>
+</table>
+
+
+## Features
+
+The following table lists all currently specified Features.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Output Type</th>
+    </tr>
+    <tr>
+        <td>Sender Feature</td>
+        <td>0</td>
+    </tr>
+    <tr>
+        <td>Issuer Feature</td>
+        <td>1</td>
+    </tr>
+    <tr>
+        <td>Metadata Feature</td>
+        <td>2</td>
+    </tr>
+    <tr>
+        <td>Tag Feature</td>
+        <td>3</td>
+    </tr>
+    <tr>
+        <td>Block Issuer Feature</td>
+        <td>4</td>
+    </tr>
+    <tr>
+        <td>Staking Feature</td>
+        <td>5</td>
+    </tr>
+</table>
+
+
+### Sender Feature
+<table>
+  <tr>
+      <td><b>Name</b></td>
+      <td><b>Type</b></td>
+      <td><b>Description</b></td>
+  </tr>
+  <tr>
+      <td>Feature Type</td>
+      <td>uint8</td>
+      <td>
+          Set to <strong>value 0</strong> to denote a <i>Sender Feature</i>.
+      </td>
+  </tr>
+  <tr>
+      <td valign="top">Sender <code>oneOf</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Ed25519 Address</summary>
+          </details>
+          <details>
+              <summary>Account Address</summary>
+          </details>
+          <details>
+              <summary>NFT Address</summary>
+          </details>
+      </td>
+  </tr>
+</table>
+
+
+### Issuer Feature
+<table>
+  <tr>
+      <td><b>Name</b></td>
+      <td><b>Type</b></td>
+      <td><b>Description</b></td>
+  </tr>
+  <tr>
+      <td>Feature Type</td>
+      <td>uint8</td>
+      <td>
+          Set to <strong>value 1</strong> to denote an <i>Issuer Feature</i>.
+      </td>
+  </tr>
+  <tr>
+      <td valign="top">Issuer <code>oneOf</code></td>
+      <td colspan="2">
+          <details>
+              <summary>Ed25519 Address</summary>
+          </details>
+          <details>
+              <summary>Account Address</summary>
+          </details>
+          <details>
+              <summary>NFT Address</summary>
+          </details>
+      </td>
+  </tr>
+</table>
+
+### Metadata Feature
+ <table>
+  <tr>
+      <td><b>Name</b></td>
+      <td><b>Type</b></td>
+      <td><b>Description</b></td>
+  </tr>
+  <tr>
+      <td>Feature Type</td>
+      <td>uint8</td>
+      <td>
+          Set to <strong>value 2</strong> to denote a <i>Metadata Feature</i>.
+      </td>
+  </tr>
+  <tr>
+      <td>Data</td>
+      <td>(uint16)ByteArray</td>
+      <td>Binary data. A leading uint16 denotes its length.</td>
+  </tr>
+</table>
+
+### Tag Feature
+<table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Feature Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 3</strong> to denote a <i>Tag Feature</i>.
+        </td>
+    </tr>
+    <tr>
+        <td>Tag</td>
+        <td>(uint8)ByteArray</td>
+        <td>Binary indexation data. A leading uint8 denotes its length.</td>
+    </tr>
+</table>
+
+
+### Block Issuer Feature
+Block Issuer Feature is a feature which indicates that this account can issue blocks.
+The feature includes a block issuer address as well as an expiry slot.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>Feature Type</td>
+        <td>uint8</td>
+        <td>The input type of Block Issuer Feature is 4.</td>
+    </tr>
+    <tr>
+      <td>Block Issuer Keys Count</td>
+      <td>uint8</td>
+      <td>The number of block issuer keys entries.</td>
+    </tr>
+    <tr>
+        <td valign="top">Block Issuer Keys <code>anyOf</code></td>
+        <td colspan="2">
+            <details>
+                <summary>Ed25519 Public Key</summary>
+                <table>
+                    <tr>
+                        <td><b>Name</b></td>
+                        <td><b>Type</b></td>
+                        <td><b>Description</b></td>
+                    </tr>
+                    <tr>
+                        <td>Public Key Type</td>
+                        <td>uint8</td>
+                        <td>
+                            Set to <strong>value 0</strong> to denote an <i>Ed25519 Public Key</i>.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Public Key</td>
+                        <td>ByteArray[32]</td>
+                        <td>The raw bytes of the Ed25519 public key.</td>
+                    </tr>
+                </table>
+            </details>
+        </td>
+    </tr>
+    <tr>
+        <td>Expiry Slot</td>
+        <td>uint64</td>
+        <td>The slot index at which the issuer deposit can be unlocked.</td>
+    </tr>
+</table>
+
+### Staking Feature
+Staking Feature is a feature which indicates that this account wants to register as a validator.
+The feature includes a fixed cost that the staker can set and will receive as part of its rewards, as well as a range of epoch indices in which the feature is considered active and can claim rewards.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>Staking Type</td>
+        <td>uint8</td>
+        <td>The input type of Staking Feature is 5.</td>
+    </tr>
+    <tr>
+        <td>Staked Amount</td>
+        <td>uint64</td>
+        <td>The amount of IOTA coins that are locked and staked in the containing account.</td>
+    </tr>
+    <tr>
+        <td>Fixed Cost</td>
+        <td>uint64</td>
+        <td>The fixed cost of the validator, which it receives as part of its Mana rewards.</td>
+    </tr>
+    <tr>
+        <td>Start Epoch</td>
+        <td>uint64</td>
+        <td>The epoch index at which the staking starts.</td>
+    </tr>
+    <tr>
+        <td>End Epoch</td>
+        <td>uint64</td>
+        <td>The epoch index at which the staking ends.</td>
+    </tr>
+</table>
+
+
+
+
+## Address
+
+The following table lists all currently specified Address.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Output Type</th>
+    </tr>
+    <tr>
+        <td>Ed25519 Address</td>
+        <td>0</td>
+    </tr>
+    <tr>
+        <td>Account Address</td>
+        <td>8</td>
+    </tr>
+    <tr>
+        <td>NFT Address</td>
+        <td>16</td>
+    </tr>
+</table>
+
+### Ed25519 Address
+
+<table>
+  <tr>
+      <td><b>Name</b></td>
+      <td><b>Type</b></td>
+      <td><b>Description</b></td>
+  </tr>
+  <tr>
+      <td>Address Type</td>
+      <td>uint8</td>
+      <td>
+          Set to <strong>value 0</strong> to denote an <i>Ed25519 Address</i>.
+      </td>
+  </tr>
+  <tr>
+      <td>PubKeyHash</td>
+      <td>ByteArray[32]</td>
+      <td>The raw bytes of the Ed25519 address which is a BLAKE2b-256 hash of the Ed25519 public key.</td>
+  </tr>
+</table>
+
+### Account Address
+
+<table>
+  <tr>
+      <td><b>Name</b></td>
+      <td><b>Type</b></td>
+      <td><b>Description</b></td>
+  </tr>
+  <tr>
+      <td>Address Type</td>
+      <td>uint8</td>
+      <td>
+          Set to <strong>value 8</strong> to denote an <i>Account Address</i>.
+      </td>
+  </tr>
+  <tr>
+      <td>Account ID</td>
+      <td>ByteArray[32]</td>
+      <td>The raw bytes of the <i>Account ID</i> which is the BLAKE2b-256 hash of the outputID that created it.</td>
+  </tr>
+</table>
+
+### NFT Address
+<table>
+  <tr>
+      <td><b>Name</b></td>
+      <td><b>Type</b></td>
+      <td><b>Description</b></td>
+  </tr>
+  <tr>
+      <td>Address Type</td>
+      <td>uint8</td>
+      <td>
+          Set to <strong>value 16</strong> to denote an <i>NFT Address</i>.
+      </td>
+  </tr>
+  <tr>
+      <td>NFT ID</td>
+      <td>ByteArray[32]</td>
+      <td>The raw bytes of the <i>NFT ID</i> which is the BLAKE2b-256 hash of the outputID that created it.</td>
+  </tr>
+</table>
+
+
+## Unlock Condition
+
+The following table lists all currently specified Unlock Condition.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Output Type</th>
+    </tr>
+    <tr>
+        <td>Address</td>
+        <td>0</td>
+    </tr>
+    <tr>
+        <td>Storage Deposit Return</td>
+        <td>1</td>
+    </tr>
+    <tr>
+        <td>Timelock</td>
+        <td>2</td>
+    </tr>
+    <tr>
+        <td>Expiration</td>
+        <td>3</td>
+    </tr>
+    <tr>
+        <td>State Controller Address</td>
+        <td>4</td>
+    </tr>
+    <tr>
+        <td>Governor Address</td>
+        <td>5</td>
+    </tr>
+    <tr>
+        <td>Immutable Account Address</td>
+        <td>6</td>
+    </tr>
+</table>
+
+### Address Unlock Condition
+ <table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Condition Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 0</strong> to denote an <i>Address Unlock Condition</i>.
+        </td>
+    </tr>
+    <tr>
+        <td>Address</td>
+        <td colspan="2">
+            <details>
+                <summary>Ed25519 Address</summary>
+            </details>
+            <details>
+                <summary>Account Address</summary>
+            </details>
+            <details>
+                <summary>NFT Address</summary>
+            </details>
+        </td>
+    </tr>
+</table>
+
+### Storage Deposit Return Unlock Condition
+<table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Condition Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 1</strong> to denote a <i>Storage Deposit Return Unlock Condition</i>.
+        </td>
+    </tr>
+    <tr>
+        <td valign="top">Return Address <code>oneOf</code></td>
+        <td colspan="2">
+            <details>
+                <summary>Ed25519 Address</summary>
+            </details>
+            <details>
+                <summary>Account Address</summary>
+            </details>
+            <details>
+                <summary>NFT Address</summary>
+            </details>
+        </td>
+    </tr>
+    <tr>
+        <td>Return Amount</td>
+        <td>uint64</td>
+        <td>
+            Amount of IOTA coins the consuming transaction should deposit to the address defined in <i>Return Address</i>.
+        </td>
+    </tr>
+</table>
+
+### Timelock Unlock Condition
+<table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Condition Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 2</strong> to denote a <i>Timelock Unlock Condition</i>.
+        </td>
+    </tr>
+    <tr>
+        <td>Slot Index</td>
+        <td>uint64</td>
+        <td>
+            Slot index starting from which the output can be consumed.
+        </td>
+    </tr>
+</table>
+
+### Expiration Unlock Condition
+<table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Condition Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 3</strong> to denote an <i>Expiration Unlock Condition</i>.
+        </td>
+    </tr>
+    <tr>
+        <td valign="top">Return Address <code>oneOf</code></td>
+        <td colspan="2">
+            <details>
+                <summary>Ed25519 Address</summary>
+            </details>
+            <details>
+                <summary>Account Address</summary>
+            </details>
+            <details>
+                <summary>NFT Address</summary>
+            </details>
+        </td>
+    </tr>
+    <tr>
+        <td>Slot Index</td>
+        <td>uint64</td>
+        <td>
+            Before this slot index, <i>Address Unlock Condition</i> is allowed to unlock the output, after that only the address defined in <i>Return Address</i>.
+        </td>
+    </tr>
+</table>
+
+
+### State Controller Address Unlock Condition
+ <table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Condition Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 4</strong> to denote an <i>State Controller Address Unlock Condition</i>.
+        </td>
+    </tr>
+    <tr>
+        <td>Address</td>
+        <td colspan="2">
+            <details>
+                <summary>Ed25519 Address</summary>
+            </details>
+            <details>
+                <summary>Account Address</summary>
+            </details>
+            <details>
+                <summary>NFT Address</summary>
+            </details>
+        </td>
+    </tr>
+</table>
+
+### Governor Address Unlock Condition
+<table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Condition Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 5</strong> to denote an <i>Governor Address Unlock Condition</i>.
+        </td>
+    </tr>
+    <tr>
+        <td>Address</td>
+        <td colspan="2">
+            <details>
+                <summary>Ed25519 Address</summary>
+            </details>
+            <details>
+                <summary>Account Address</summary>
+            </details>
+            <details>
+                <summary>NFT Address</summary>
+            </details>
+        </td>
+    </tr>
+</table>
+
+### Immutable Account Address Unlock Condition
+<table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Condition Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 6</strong> to denote an <i>Immutable Account Address Unlock Condition</i>.
+        </td>
+    </tr>
+    <tr>
+        <td>Address</td>
+        <td colspan="2">
+            <details>
+                <summary>Account Address</summary>
+                <table>
+                    <tr>
+                        <td><b>Name</b></td>
+                        <td><b>Type</b></td>
+                        <td><b>Description</b></td>
+                    </tr>
+                    <tr>
+                        <td>Address Type</td>
+                        <td>uint8</td>
+                        <td>
+                            Set to <strong>value 8</strong> to denote an <i>Account Address</i>.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Account ID</td>
+                        <td>ByteArray[32]</td>
+                        <td>The raw bytes of the <i>Account ID</i> which is the BLAKE2b-256 hash of the outputID that created it.</td>
+                    </tr>
+                </table>
+            </details>
+        </td>
+    </tr>
+</table>
+
+
+## Unlocks
 Output and unlock designs are the same as described in [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#output-design)
 
 ## Signature
@@ -590,3 +1981,5 @@ The following table describes the serialization of a Ed25519 signature:
         <td>The signature.</td>
     </tr>
 </table>
+
+
