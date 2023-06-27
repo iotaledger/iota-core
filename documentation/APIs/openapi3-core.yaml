@@ -1997,7 +1997,7 @@ components:
           description: Hex-encoded metadata with 0x prefix that can only be changed by the state controller.
         foundryCounter:
           type: integer
-          description: A counter that denotes the number of foundries created by this alias account.
+          description: A counter that denotes the number of foundries created by this account.
         unlockConditions:
           type: array
           description: Unlock condtions that define how the output an be unlocked in a transaction.
@@ -2086,7 +2086,7 @@ components:
         - mana
 
     NFTOutput:
-      description: escribes an NFT output, a globally unique token with metadata attached.
+      description: Describes an NFT output, a globally unique token with metadata attached.
       properties:
         type:
           type: integer
@@ -2334,6 +2334,10 @@ components:
     BlockIssuerFeature:
       description: A feature which indicates that this account can issue blocks.
       properties:
+        type:
+          type: integer
+          description: Set to value 4 to denote a Metadata Feature.
+          example: 4
         blockIssuerKeys:
           type: array
           description: The keys allowed to issue blocks from an account with a BlockIssuerFeature.
@@ -2344,6 +2348,7 @@ components:
           type: integer
           description: Indicates when the BlockIssuerKeys are expired.
       required:
+        - type
         - blockIssuerKeys
         - expirySlot
 
