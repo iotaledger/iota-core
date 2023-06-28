@@ -50,11 +50,11 @@ func (p *PriorityQueue[Element, Priority]) Pop() (element Element, exists bool) 
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	if p.heap.Len() == 0 {
-		return element, false
+	if p.heap.Len() != 0 {
+		element, exists = heap.Pop(&p.heap).(Element)
 	}
 
-	return heap.Pop(&p.heap).(Element), true
+	return element, exists
 }
 
 // PopUntil removes all elements with a priority lower than the given priority from the queue.
@@ -64,7 +64,9 @@ func (p *PriorityQueue[Element, Priority]) PopUntil(priority Priority) []Element
 
 	values := make([]Element, 0)
 	for p.heap.Len() != 0 && p.heap[0].Key.CompareTo(priority) <= 0 {
-		values = append(values, heap.Pop(&p.heap).(*generalheap.HeapElement[Priority, Element]).Value)
+		if heapElement, ok := heap.Pop(&p.heap).(*generalheap.HeapElement[Priority, Element]); ok {
+			values = append(values, heapElement.Value)
+		}
 	}
 
 	return values
@@ -77,7 +79,9 @@ func (p *PriorityQueue[Element, Priority]) PopAll() []Element {
 
 	values := make([]Element, 0)
 	for p.heap.Len() != 0 {
-		values = append(values, heap.Pop(&p.heap).(Element))
+		if element, ok := heap.Pop(&p.heap).(Element); ok {
+			values = append(values, element)
+		}
 	}
 
 	return values
