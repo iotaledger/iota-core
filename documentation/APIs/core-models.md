@@ -761,6 +761,7 @@ A Reward Input is an input indicates which transaction `Input` is the claiming r
 
 
 ## Inputs
+No changes are made in all types of Inputs.
 
 The following table lists all currently specified Input.
 
@@ -804,6 +805,14 @@ The following table lists all currently specified Input.
 
 
 ## Outputs
+
+Outputs designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#output-design).
+
+And few changes are made:
+* Rename `Alias` to `Account`.
+* Add `Mana` in every output type, indicates the stored mana held by an output.
+* `Alias Output` is now `Account Output`, with more features added to features.
+
 The following table lists all currently specified Output.
 
 <table>
@@ -1419,7 +1428,14 @@ A foundry output is an output that controls the supply of user defined native to
 
 Output Features that do not introduce unlocking conditions, but rather add new functionality and add constraints on output creation are grouped under Features. Each output must not contain more than one feature of each type and not all feature types are supported for each output type.
 
-Details of `Sender Feature`, `Issuer Feature`, `Metadata Feature` and `Tag Feature`  are described in [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/ae7fbd336e506f907080aa6b16d6ffb0d7a5553c/tips/TIP-0018/tip-0018.md#features). This document introduces 2 additional new features, `Block Issuer Feature` and `Staking Feature`.
+Features designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#features).
+
+2 new Features are introduced in this document:
+* Block Issuer Feature
+* Staking Feature
+
+And changes to other Features:
+* Rename `Alias` to `Account`.
 
 The following table lists all currently specified Features.
 
@@ -1747,7 +1763,7 @@ The following table lists all currently specified Address.
 
 ## Unlock Condition
 
-Unlock Condition designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#output-design).
+Unlock Condition designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#unlock-conditions).
 
 No new unlock Condition types are introduced, only a few changes are made:
 * Rename `Alias` to `Account`.
