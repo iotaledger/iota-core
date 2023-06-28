@@ -60,8 +60,22 @@ func (o *Orchestrator) BlockAccepted(block *blocks.Block) {
 
 func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	currentEpoch := o.timeProvider.EpochFromSlot(slot)
+
 	if o.timeProvider.EpochEnd(currentEpoch) == slot {
-		o.performanceManager.ApplyEpoch(currentEpoch)
+		committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
+		if !exists {
+			// If the committee for the epoch wasn't set before we promote the current one.
+			committee, exists = o.performanceManager.LoadCommitteeForEpoch(currentEpoch - 1)
+			if !exists {
+				panic("committee for epoch not found")
+			}
+			err := o.performanceManager.RegisterCommittee(currentEpoch, committee)
+			if err != nil {
+				panic("failed to register committee for epoch")
+			}
+		}
+
+		o.performanceManager.ApplyEpoch(currentEpoch, committee)
 	}
 }
 

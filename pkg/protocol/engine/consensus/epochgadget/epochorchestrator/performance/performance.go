@@ -73,22 +73,9 @@ func (m *Tracker) BlockAccepted(block *blocks.Block) {
 	}
 }
 
-func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex) {
+func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-
-	committee, exists := m.loadCommitteeForEpoch(epoch)
-	if !exists {
-		// If the committee for the epoch wasn't set before we promote the current one.
-		committee, exists = m.loadCommitteeForEpoch(epoch - 1)
-		if !exists {
-			panic("committee for epoch not found")
-		}
-		err := m.RegisterCommittee(epoch, committee)
-		if err != nil {
-			panic("failed to register committee for epoch")
-		}
-	}
 
 	epochSlotStart := m.timeProvider.EpochStart(epoch)
 	epochSlotEnd := m.timeProvider.EpochEnd(epoch)
@@ -152,7 +139,7 @@ func (m *Tracker) poolStats(epoch iotago.EpochIndex) (poolStats *PoolsStats, err
 	return poolStats, nil
 }
 
-func (m *Tracker) loadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
+func (m *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
 	accountsBytes, err := m.committeeStore.Get(epoch.Bytes())
 	if err != nil {
 		if errors.Is(err, kvstore.ErrKeyNotFound) {
