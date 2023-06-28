@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -39,9 +38,9 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 			performanceManager: performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider()),
 		}, opts,
 			func(o *Orchestrator) {
-				e.Events.BlockGadget.BlockAccepted.Hook(o.BlockAccepted)
-				e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) { o.CommitSlot(scd.Commitment.Index()) })
-				e.Events.SlotGadget.SlotFinalized.Hook(o.slotFinalized)
+				// e.Events.BlockGadget.BlockAccepted.Hook(o.BlockAccepted)
+				// e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) { o.CommitSlot(scd.Commitment.Index()) })
+				// e.Events.SlotGadget.SlotFinalized.Hook(o.slotFinalized)
 
 				e.Events.EpochGadget.LinkTo(o.events)
 			},
