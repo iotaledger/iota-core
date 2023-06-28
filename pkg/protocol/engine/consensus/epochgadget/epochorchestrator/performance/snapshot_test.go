@@ -27,7 +27,6 @@ func TestManager_Import_Export(t *testing.T) {
 		},
 	}
 	for i := 0; i < epochsCount; i++ {
-		ts.RegisterCommitte(iotago.EpochIndex(i), epochActions)
 		ts.ApplyEpochActions(iotago.EpochIndex(i), epochActions)
 	}
 

@@ -131,8 +131,10 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 
 	newCommittee := o.sybilProtection.RotateCommittee(nextEpoch, weightedCandidates)
 	weightedCommittee := newCommittee.Accounts()
-	o.performanceManager.RegisterCommittee(nextEpoch, weightedCommittee)
-
+	err := o.performanceManager.RegisterCommittee(nextEpoch, weightedCommittee)
+	if err != nil {
+		panic("failed to register committee for epoch")
+	}
 	return weightedCommittee
 }
 

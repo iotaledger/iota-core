@@ -94,7 +94,7 @@ func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.Account
 	return t.accounts[alias]
 }
 
-func (t *TestSuite) RegisterCommitte(epoch iotago.EpochIndex, actions map[string]*EpochActions) {
+func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
 	committee := account.NewAccounts()
 	for alias, action := range actions {
 		accountID := t.Account(alias, true)
@@ -104,27 +104,15 @@ func (t *TestSuite) RegisterCommitte(epoch iotago.EpochIndex, actions map[string
 			FixedCost:      action.FixedCost,
 		})
 	}
-	err := t.Instance.RegisterCommittee(epoch, committee)
-	require.NoError(t.T, err)
-}
 
-func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
+	err := t.Instance.RegisterCommittee(epochIndex, committee)
+	require.NoError(t.T, err)
 	for accIDAlias, action := range actions {
 		accID := t.Account(accIDAlias, true)
 		t.applyPerformanceFactor(accID, epochIndex, action.ValidationBlocksSent)
 	}
 
-	poolStakes := make(map[iotago.AccountID]*account.Pool)
-	for alias, action := range actions {
-		accountID := t.Account(alias, true)
-		poolStakes[accountID] = &account.Pool{
-			PoolStake:      action.PoolStake,
-			ValidatorStake: action.ValidatorStake,
-			FixedCost:      action.FixedCost,
-		}
-	}
-
-	t.Instance.ApplyEpoch(epochIndex)
+	t.Instance.ApplyEpoch(epochIndex, committee)
 }
 
 func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
