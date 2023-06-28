@@ -58,12 +58,15 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 	bicInputSet := make(iotagovm.BICInputSet)
 	for _, inp := range bicInputs {
-		b, _, accountErr := l.accountsLedger.Account(inp.AccountID, loadedCommitment.Index)
+		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, loadedCommitment.Index)
 		if accountErr != nil {
-			return nil, xerrors.Errorf("could not get BIC inputs: %w", accountErr)
+			return nil, xerrors.Errorf("could not get BIC input for account %s in slot %d: %w", inp.AccountID, loadedCommitment.Index, accountErr)
+		}
+		if !exists {
+			return nil, xerrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, loadedCommitment.Index)
 		}
 
-		bicInputSet[inp.AccountID] = b.Credits.Value
+		bicInputSet[inp.AccountID] = accountData.Credits.Value
 	}
 	resolvedInputs.BICInputSet = bicInputSet
 

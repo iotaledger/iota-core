@@ -210,7 +210,7 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 
 	delegationOutput := options.Apply(&iotago.DelegationOutput{
 		Amount:          input.Deposit(),
-		DelegatedAmount: 0,
+		DelegatedAmount: input.Deposit(),
 		DelegationID:    iotago.DelegationID{},
 		ValidatorID:     iotago.AccountID{},
 		StartEpoch:      0,
@@ -223,8 +223,7 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 
 	if delegationOutput.ValidatorID == iotago.EmptyAccountID() ||
 		delegationOutput.DelegatedAmount == 0 ||
-		delegationOutput.StartEpoch == 0 ||
-		delegationOutput.EndEpoch == 0 {
+		delegationOutput.StartEpoch == 0 {
 		panic(fmt.Sprintf("delegation output created incorrectly %+v", delegationOutput))
 	}
 
