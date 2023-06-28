@@ -51,6 +51,9 @@ type TipMetadata struct {
 	// isWeakTip is true if the block is a weak tip pool member and is not referenced by other tips.
 	isWeakTip *lpromise.Value[bool]
 
+	// isBlockIssuingTimeThresholdReached is true if the block has passed the block issuing time threshold.
+	isBlockIssuingTimeThresholdReached *lpromise.Value[bool]
+
 	// isMarkedOrphaned is true if the block was marked as orphaned.
 	isMarkedOrphaned *lpromise.Value[bool]
 
@@ -67,22 +70,23 @@ type TipMetadata struct {
 // NewBlockMetadata creates a new TipMetadata instance.
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
-		block:                           block,
-		tipPool:                         lpromise.NewValue[tipmanager.TipPool](),
-		isStrongTipPoolMember:           lpromise.NewValue[bool](),
-		isWeakTipPoolMember:             lpromise.NewValue[bool](),
-		isStronglyConnectedToTips:       lpromise.NewValue[bool](),
-		isConnectedToTips:               lpromise.NewValue[bool](),
-		stronglyConnectedStrongChildren: lpromise.NewValue[int](),
-		connectedWeakChildren:           lpromise.NewValue[int](),
-		isStronglyReferencedByOtherTips: lpromise.NewValue[bool](),
-		isReferencedByOtherTips:         lpromise.NewValue[bool](),
-		isStrongTip:                     lpromise.NewValue[bool](),
-		isWeakTip:                       lpromise.NewValue[bool](),
-		isMarkedOrphaned:                lpromise.NewValue[bool](),
-		isOrphaned:                      lpromise.NewValue[bool](),
-		orphanedStrongParents:           lpromise.NewValue[int](),
-		isEvicted:                       promise.NewEvent(),
+		block:                              block,
+		tipPool:                            lpromise.NewValue[tipmanager.TipPool](),
+		isStrongTipPoolMember:              lpromise.NewValue[bool](),
+		isWeakTipPoolMember:                lpromise.NewValue[bool](),
+		isStronglyConnectedToTips:          lpromise.NewValue[bool](),
+		isConnectedToTips:                  lpromise.NewValue[bool](),
+		stronglyConnectedStrongChildren:    lpromise.NewValue[int](),
+		connectedWeakChildren:              lpromise.NewValue[int](),
+		isStronglyReferencedByOtherTips:    lpromise.NewValue[bool](),
+		isReferencedByOtherTips:            lpromise.NewValue[bool](),
+		isStrongTip:                        lpromise.NewValue[bool](),
+		isWeakTip:                          lpromise.NewValue[bool](),
+		isBlockIssuingTimeThresholdReached: lpromise.NewValue[bool](),
+		isMarkedOrphaned:                   lpromise.NewValue[bool](),
+		isOrphaned:                         lpromise.NewValue[bool](),
+		orphanedStrongParents:              lpromise.NewValue[int](),
+		isEvicted:                          promise.NewEvent(),
 	}
 
 	t.deriveIsStrongTipPoolMember()
@@ -145,6 +149,22 @@ func (t *TipMetadata) IsWeakTip() bool {
 // OnIsWeakTipUpdated registers a callback that is triggered when the IsWeakTip property changes.
 func (t *TipMetadata) OnIsWeakTipUpdated(handler func(isWeakTip bool)) (unsubscribe func()) {
 	return t.isWeakTip.OnUpdate(func(_, isWeakTip bool) { handler(isWeakTip) })
+}
+
+// SetBlockIssuingTimeThresholdReached marks the block as having reached the block issuing time threshold.
+func (t *TipMetadata) SetBlockIssuingTimeThresholdReached() {
+	t.isBlockIssuingTimeThresholdReached.Set(true)
+}
+
+// OnBlockIssuingTimeThresholdReached registers a callback that is triggered when the block reaches the block
+// issuing time threshold.
+func (t *TipMetadata) OnBlockIssuingTimeThresholdReached(handler func()) (unsubscribe func()) {
+	return t.isBlockIssuingTimeThresholdReached.OnUpdate(func(_, _ bool) { handler() })
+}
+
+// WasBlockIssuingTimeThresholdReached returns true if the block reached the block issuing time threshold.
+func (t *TipMetadata) WasBlockIssuingTimeThresholdReached() bool {
+	return t.isBlockIssuingTimeThresholdReached.Get()
 }
 
 // SetMarkedOrphaned marks the block as orphaned (updated by the tip selection strategy).

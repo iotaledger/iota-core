@@ -16,6 +16,16 @@ type TipMetadata interface {
 	// TipPool returns the current TipPool of the block.
 	TipPool() TipPool
 
+	// SetBlockIssuingTimeThresholdReached marks the block as having reached the block issuing time threshold.
+	SetBlockIssuingTimeThresholdReached()
+
+	// OnBlockIssuingTimeThresholdReached registers a callback that is triggered when the block reaches the block
+	// issuing time threshold.
+	OnBlockIssuingTimeThresholdReached(handler func()) (unsubscribe func())
+
+	// WasBlockIssuingTimeThresholdReached returns true if the block reached the block issuing time threshold.
+	WasBlockIssuingTimeThresholdReached() bool
+
 	// SetTipPool sets the TipPool of the block (updated by the tip selection strategy).
 	SetTipPool(tipPool TipPool)
 
