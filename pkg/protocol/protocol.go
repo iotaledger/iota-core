@@ -27,6 +27,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -44,11 +45,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient"
-)
-
-var (
-	SupportedVersions = nodeclient.Versions{3} // make sure to add the versions sorted asc
 )
 
 type Protocol struct {
@@ -61,6 +57,7 @@ type Protocol struct {
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
 	networkProtocol *core.Protocol
+	supportVersions Versions
 
 	activeEngineMutex sync.RWMutex
 	mainEngine        *engine.Engine
@@ -93,6 +90,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	return options.Apply(&Protocol{
 		Events:                      NewEvents(),
 		Workers:                     workers,
+		supportVersions:             Versions{3},
 		dispatcher:                  dispatcher,
 		optsFilterProvider:          blockfilter.NewProvider(),
 		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
@@ -102,6 +100,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSybilProtectionProvider: poa.NewProvider([]iotago.AccountID{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
+		optsEpochGadgetProvider:     epochorchestrator.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
 		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
@@ -204,6 +203,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsSybilProtectionProvider,
 		p.optsBlockGadgetProvider,
 		p.optsSlotGadgetProvider,
+		p.optsEpochGadgetProvider,
 		p.optsNotarizationProvider,
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,
@@ -318,8 +318,8 @@ func (p *Protocol) API() iotago.API {
 	return p.MainEngineInstance().API()
 }
 
-func (p *Protocol) SupportedVersions() nodeclient.Versions {
-	return SupportedVersions
+func (p *Protocol) SupportedVersions() Versions {
+	return p.supportVersions
 }
 
 func (p *Protocol) ErrorHandler() func(error) {
