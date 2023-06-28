@@ -52,14 +52,6 @@ func (v *Value[T]) Get() T {
 	return v.value
 }
 
-// Read executes the given callback with the current value.
-func (v *Value[T]) Read(callback func(value T)) {
-	v.mutex.RLock()
-	defer v.mutex.RUnlock()
-
-	callback(v.value)
-}
-
 // Set sets the new value and triggers the registered callbacks if the value has changed.
 func (v *Value[T]) Set(newValue T) (previousValue T) {
 	return v.Compute(func(T) T { return newValue })

@@ -135,13 +135,7 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
 	}
 
-	t.blockIssuingTimeThreshold.Read(func(threshold time.Time) {
-		if tipMetadata.Block().IssuingTime().Before(threshold) {
-			tipMetadata.SetBlockIssuingTimeThresholdReached()
-		} else {
-			t.blockIssuingTimeThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime())
-		}
-	})
+	t.blockIssuingTimeThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime())
 }
 
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
