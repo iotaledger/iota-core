@@ -1,9 +1,5 @@
 package protocol
 
-var (
-	SupportedVersions = Versions{3} // make sure to add the versions sorted asc
-)
-
 // Versions is a slice of protocol versions.
 type Versions []uint32
 
