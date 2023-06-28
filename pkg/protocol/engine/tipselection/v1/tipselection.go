@@ -1,12 +1,16 @@
 package tipselectionv1
 
 import (
+	"time"
+
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	lpromise "github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/iota-core/pkg/core/timed"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -30,6 +34,10 @@ type TipSelection struct {
 	// memPool holds information about pending transactions.
 	memPool mempool.MemPool[ledger.BlockVoteRank]
 
+	blockIssuingTimeThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
+
+	blockIssuingTimeThreshold *lpromise.Value[time.Time]
+
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int
 
@@ -50,15 +58,25 @@ type TipSelection struct {
 // New is the constructor for the TipSelection.
 func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
-		tipManager:                   tipManager,
-		conflictDAG:                  conflictDAG,
-		rootBlocks:                   rootBlocksRetriever,
-		optMaxStrongParents:          8,
-		optMaxLikedInsteadReferences: 8,
-		optMaxWeakReferences:         8,
+		tipManager:                     tipManager,
+		conflictDAG:                    conflictDAG,
+		rootBlocks:                     rootBlocksRetriever,
+		blockIssuingTimeThresholdQueue: timed.NewPriorityQueue[tipmanager.TipMetadata](true),
+		blockIssuingTimeThreshold:      lpromise.NewValue[time.Time](),
+		optMaxStrongParents:            8,
+		optMaxLikedInsteadReferences:   8,
+		optMaxWeakReferences:           8,
 	}, opts, func(t *TipSelection) {
 		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
-	}, (*TipSelection).TriggerConstructed)
+
+		t.blockIssuingTimeThreshold.OnUpdate(func(_, threshold time.Time) {
+			for _, tip := range t.blockIssuingTimeThresholdQueue.PopUntil(threshold) {
+				tip.SetBlockIssuingTimeThresholdReached()
+			}
+		})
+
+		t.TriggerConstructed()
+	})
 }
 
 // SelectTips selects the tips that should be used as references for a new block.
@@ -97,6 +115,13 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 	return references
 }
 
+// UpdateBlockIssuingTimeThreshold updates the block issuing time threshold.
+func (t *TipSelection) UpdateBlockIssuingTimeThreshold(newThreshold time.Time) {
+	t.blockIssuingTimeThreshold.Compute(func(currentThreshold time.Time) time.Time {
+		return lo.Cond(newThreshold.Before(currentThreshold), currentThreshold, newThreshold)
+	})
+}
+
 // Shutdown does nothing but is required by the module.Interface.
 func (t *TipSelection) Shutdown() {}
 
@@ -109,6 +134,14 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 	} else {
 		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
 	}
+
+	t.blockIssuingTimeThreshold.Read(func(threshold time.Time) {
+		if tipMetadata.Block().IssuingTime().Before(threshold) {
+			tipMetadata.SetBlockIssuingTimeThresholdReached()
+		} else {
+			t.blockIssuingTimeThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime())
+		}
+	})
 }
 
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
