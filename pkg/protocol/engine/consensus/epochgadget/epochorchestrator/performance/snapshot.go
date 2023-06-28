@@ -47,7 +47,7 @@ func (m *Tracker) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 	targetEpoch := m.timeProvider.EpochFromSlot(targetSlotIndex)
 	positionedWriter := utils.NewPositionedWriter(writer)
 
-	// if target index is the last slot of the epoch, the epoch was committed
+	// if the target index is the last slot of the epoch, the epoch was committed
 	if m.timeProvider.EpochEnd(targetEpoch) != targetSlotIndex {
 		targetEpoch--
 	}
@@ -80,6 +80,7 @@ func (m *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 	if err := binary.Read(reader, binary.LittleEndian, &slotCount); err != nil {
 		return errors.Wrap(err, "unable to read slot count")
 	}
+
 	for i := uint64(0); i < slotCount; i++ {
 		var slotIndex iotago.SlotIndex
 		if err := binary.Read(reader, binary.LittleEndian, &slotIndex); err != nil {
@@ -116,21 +117,26 @@ func (m *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 	if err := binary.Read(reader, binary.LittleEndian, &epochCount); err != nil {
 		return errors.Wrap(err, "unable to read epoch count")
 	}
+
 	for i := uint64(0); i < epochCount; i++ {
 		var epochIndex iotago.EpochIndex
 		if err := binary.Read(reader, binary.LittleEndian, &epochIndex); err != nil {
 			return errors.Wrap(err, "unable to read epoch index")
 		}
+
 		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epochIndex))
+
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
 			return errors.Wrap(err, "unable to read accounts count")
 		}
+
 		for j := uint64(0); j < accountsCount; j++ {
 			var accountID iotago.AccountID
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
 				return errors.Wrap(err, "unable to read account id")
 			}
+
 			var reward PoolRewards
 			if err := binary.Read(reader, binary.LittleEndian, &reward); err != nil {
 				return errors.Wrap(err, "unable to read reward")
@@ -157,6 +163,7 @@ func (m *Tracker) importPoolsStats(reader io.ReadSeeker) error {
 		if err := binary.Read(reader, binary.LittleEndian, &poolStats); err != nil {
 			return errors.Wrap(err, "unable to read pool stats")
 		}
+
 		err := m.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolStats.Bytes()))
 		if err != nil {
 			return errors.Wrap(err, "unable to store pool stats")
@@ -177,10 +184,11 @@ func (m *Tracker) importCommittees(reader io.ReadSeeker) error {
 			return errors.Wrap(err, "unable to read epoch index")
 		}
 
-		var committee account.Accounts
-		if err := binary.Read(reader, binary.LittleEndian, &committee); err != nil {
-			return errors.Wrap(err, "unable to read pool stats")
+		committee := account.NewAccounts()
+		if err := committee.FromReader(reader); err != nil {
+			return errors.Wrap(err, "unable to read committee")
 		}
+
 		err := m.committeeStore.Set(epoch.Bytes(), lo.PanicOnErr(committee.Bytes()))
 		if err != nil {
 			return errors.Wrap(err, "unable to store committee")
@@ -244,9 +252,14 @@ func (m *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 	if err := pWriter.WriteValue("pool rewards epoch count", epochCount, true); err != nil {
 		return errors.Wrap(err, "unable to write epoch count")
 	}
-
-	// TODO: restrict the ending condition according to eviction rules
 	for epoch := targetEpoch; epoch > iotago.EpochIndex(0); epoch-- {
+		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epoch))
+
+		// if the tree is new, we can skip this epoch and the previous ones, as we never stored any rewards
+		if rewardsTree.IsNew() {
+			break
+		}
+
 		if err := pWriter.WriteValue("epoch index", epoch); err != nil {
 			return errors.Wrap(err, "unable to write epoch index")
 		}
@@ -256,14 +269,8 @@ func (m *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 			return errors.Wrap(err, "unable to write account count")
 		}
 
-		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epoch))
-		// if the tree is new, we can skip this epoch and the previous ones, as we never stored any rewards
-		if rewardsTree.IsNew() {
-			break
-		}
-
 		var innerErr error
-		err := rewardsTree.Stream(func(key iotago.AccountID, value *PoolRewards) bool {
+		if err := rewardsTree.Stream(func(key iotago.AccountID, value *PoolRewards) bool {
 			if err := pWriter.WriteValue("account id", key); err != nil {
 				innerErr = errors.Wrap(err, "unable to write account id")
 				return false
@@ -275,16 +282,17 @@ func (m *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 			accountCount++
 
 			return true
-		})
-		if err != nil {
+		}); err != nil {
 			return errors.Wrap(err, "unable to stream rewards")
 		}
 		if innerErr != nil {
 			return innerErr
 		}
-		if err = pWriter.WriteValueAtBookmark("pool rewards account count", accountCount); err != nil {
+
+		if err := pWriter.WriteValueAtBookmark("pool rewards account count", accountCount); err != nil {
 			return errors.Wrap(err, "unable to write account count")
 		}
+
 		epochCount++
 	}
 
@@ -340,20 +348,22 @@ func (m *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetEpoch 
 	}
 
 	var innerErr error
-	err := m.committeeStore.Iterate([]byte{}, func(key []byte, value []byte) bool {
-		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(key))
+	err := m.committeeStore.Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {
+		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
 		if epoch > targetEpoch {
 			return true
 		}
-		if err := pWriter.WriteBytes(key); err != nil {
+		if err := pWriter.WriteBytes(epochBytes); err != nil {
 			innerErr = errors.Wrap(err, "unable to write epoch index")
 			return false
 		}
-		if err := pWriter.WriteBytes(value); err != nil {
+		if err := pWriter.WriteBytes(committeeBytes); err != nil {
 			innerErr = errors.Wrap(err, "unable to write epoch committee")
 			return false
 		}
+
 		epochCount++
+
 		return true
 	})
 	if err != nil {
@@ -362,7 +372,7 @@ func (m *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetEpoch 
 	if innerErr != nil {
 		return errors.Wrapf(err, "error while iterating over committee base store")
 	}
-	if err = pWriter.WriteValueAtBookmark("committtee epoch count", epochCount); err != nil {
+	if err = pWriter.WriteValueAtBookmark("committees epoch count", epochCount); err != nil {
 		return errors.Wrap(err, "unable to write committee epoch count")
 	}
 

@@ -64,7 +64,7 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	if o.timeProvider.EpochEnd(currentEpoch) == slot {
 		committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
 		if !exists {
-			// If the committee for the epoch wasn't set before we promote the current one.
+			// If the committee for the epoch wasn't set before, we promote the current one.
 			committee, exists = o.performanceManager.LoadCommitteeForEpoch(currentEpoch - 1)
 			if !exists {
 				panic("committee for epoch not found")

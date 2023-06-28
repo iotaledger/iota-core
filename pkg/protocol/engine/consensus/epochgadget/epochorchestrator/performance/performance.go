@@ -148,8 +148,8 @@ func (m *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 		panic(errors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
 
-	committee, err = account.AccountsFromBytes(accountsBytes)
-	if err != nil {
+	committee = account.NewAccounts()
+	if _, err = committee.FromBytes(accountsBytes); err != nil {
 		panic(errors.Wrapf(err, "failed to parse committee for epoch %d", epoch))
 	}
 
