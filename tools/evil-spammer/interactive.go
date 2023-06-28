@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
@@ -126,16 +127,15 @@ const (
 var currentSpamOptions = []string{currentSpamRemove, back}
 
 const (
-	mpm = "Minute, rate is [mpm]"
-	mps = "Second, rate is [mps]"
+	mpm string = "Minute, rate is [mpm]"
+	mps string = "Second, rate is [mps]"
 )
-
-var timeUnits = []string{mpm, mps}
 
 var (
 	scenarios     = []string{"blk", "tx", "ds", "conflict-circle", "guava", "orange", "mango", "pear", "lemon", "banana", "kiwi", "peace"}
 	confirms      = []string{"enable", "disable"}
 	outputNumbers = []string{"100", "1000", "5000", "cancel"}
+	timeUnits     = []string{mpm, mps}
 )
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -621,6 +621,7 @@ func (m *Mode) parseSpamDetails(details spamDetailsSurvey) {
 	}
 	m.Config.Rate = rate
 	m.Config.duration = dur
+	fmt.Println(details)
 }
 
 func (m *Mode) parseSpamType(spamType spamTypeSurvey) {
@@ -778,14 +779,13 @@ func validateURL(url string) (ok bool) {
 }
 
 func timeUnitToString(d time.Duration) string {
-	defaultTimeUnit := ""
-	switch d {
-	case time.Minute:
-		defaultTimeUnit = mpm
-	case time.Second:
-		defaultTimeUnit = mps
+	durStr := d.String()
+
+	if strings.Contains(durStr, "s") {
+		return mps
+	} else {
+		return mpm
 	}
-	return defaultTimeUnit
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
