@@ -34,8 +34,10 @@ type TipSelection struct {
 	// memPool holds information about pending transactions.
 	memPool mempool.MemPool[ledger.BlockVoteRank]
 
+	// blockIssuingTimeThresholdQueue holds a queue of tips that are waiting to reach the block issuing time threshold.
 	blockIssuingTimeThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
 
+	// blockIssuingTimeThreshold holds the time when the next block can be issued.
 	blockIssuingTimeThreshold *lpromise.Value[time.Time]
 
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
