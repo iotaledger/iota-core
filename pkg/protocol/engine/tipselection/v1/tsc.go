@@ -1,7 +1,6 @@
 package tipselectionv1
 
 import (
-	"fmt"
 	"time"
 
 	lpromise "github.com/iotaledger/iota-core/pkg/core/promise"
@@ -21,26 +20,23 @@ func NewTSCManager() *TSCManager {
 	}
 
 	t.tscThreshold.OnUpdate(func(_, newThreshold time.Time) {
-		for _, tip := range t.tscQueue.PopUntil(newThreshold) {
-			// TODO: SET TSCThresholdReached()
-			fmt.Println(tip)
-		}
+		t.markTipsPastThreshold(newThreshold)
 	})
 
 	return t
 }
 
 func (t *TSCManager) Add(tip tipmanager.TipMetadata) {
-	t.tscThreshold.Read(func(tscThreshold time.Time) {
-		if tscThreshold.After(tip.Block().IssuingTime()) {
-			// TODO: SET TSCThresholdReached()
+	t.tscThreshold.Read(func(threshold time.Time) {
+		if threshold.After(tip.Block().IssuingTime()) {
+			// TODO: tip.SetTSCThresholdReached()
 		} else {
 			t.tscQueue.Push(tip, tip.Block().IssuingTime())
 		}
 	})
 }
 
-func (t *TSCManager) SetTSCThreshold(newThreshold time.Time) {
+func (t *TSCManager) UpdateThreshold(newThreshold time.Time) {
 	t.tscThreshold.Compute(func(currentThreshold time.Time) time.Time {
 		if newThreshold.Before(currentThreshold) {
 			return currentThreshold
@@ -48,4 +44,10 @@ func (t *TSCManager) SetTSCThreshold(newThreshold time.Time) {
 
 		return newThreshold
 	})
+}
+
+func (t *TSCManager) markTipsPastThreshold(threshold time.Time) {
+	for _, _ = range t.tscQueue.PopUntil(threshold) {
+		// TODO: tip.SetTSCThresholdReached()
+	}
 }
