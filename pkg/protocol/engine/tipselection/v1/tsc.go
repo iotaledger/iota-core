@@ -16,7 +16,7 @@ type TSCManager struct {
 
 func NewTSCManager() *TSCManager {
 	t := &TSCManager{
-		tscQueue:     timed.NewAscendingPriorityQueue[tipmanager.TipMetadata](),
+		tscQueue:     timed.NewPriorityQueue[tipmanager.TipMetadata](true),
 		tscThreshold: lpromise.NewValue[time.Time](),
 	}
 

@@ -3,6 +3,7 @@ package timed
 import (
 	"time"
 
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/priorityqueue"
 )
 
@@ -24,16 +25,15 @@ type PriorityQueue[ElementType any] interface {
 	Size() int
 }
 
-// NewDescendingPriorityQueue creates a new descending PriorityQueue.
-func NewDescendingPriorityQueue[T any]() PriorityQueue[T] {
+// NewPriorityQueue creates a new PriorityQueue that can optionally be set to ascending order (oldest element first).
+func NewPriorityQueue[T any](ascending ...bool) PriorityQueue[T] {
+	if lo.First(ascending) {
+		return &priorityQueueAscending[T]{
+			PriorityQueue: priorityqueue.New[T, timeAscending](),
+		}
+	}
+
 	return &priorityQueueDescending[T]{
 		PriorityQueue: priorityqueue.New[T, timeDescending](),
-	}
-}
-
-// NewAscendingPriorityQueue creates a new ascending PriorityQueue.
-func NewAscendingPriorityQueue[T any]() PriorityQueue[T] {
-	return &priorityQueueAscending[T]{
-		PriorityQueue: priorityqueue.New[T, timeAscending](),
 	}
 }

@@ -9,7 +9,7 @@ import (
 
 // TestAscendingPriorityQueue tests the ascending PriorityQueue.
 func TestPriorityQueueAscending(t *testing.T) {
-	queue := NewAscendingPriorityQueue[int]()
+	queue := NewPriorityQueue[int](true)
 
 	now := time.Now()
 	queue.Push(1337, now.Add(5*time.Second))
@@ -39,7 +39,7 @@ func TestTimeAscending_CompareTo(t *testing.T) {
 
 // TestDescendingPriorityQueue tests the descending PriorityQueue.
 func TestPriorityQueueDescending(t *testing.T) {
-	queue := NewDescendingPriorityQueue[int]()
+	queue := NewPriorityQueue[int]()
 
 	now := time.Now()
 	queue.Push(1337, now.Add(5*time.Second))
