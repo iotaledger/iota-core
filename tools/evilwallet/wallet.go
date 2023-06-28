@@ -4,11 +4,12 @@ import (
 	"crypto/ed25519"
 	"sync"
 
+	"go.uber.org/atomic"
+
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
-	"go.uber.org/atomic"
 )
 
 // region Wallet ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,11 +130,11 @@ func (w *Wallet) AddUnspentOutput(output *Output) {
 }
 
 // UnspentOutputBalance returns the balance on the unspent output sitting on the address specified.
-func (w *Wallet) UnspentOutputBalance(addr string) uint64 {
+func (w *Wallet) UnspentOutputBalance(addr string) iotago.BaseToken {
 	w.RLock()
 	defer w.RUnlock()
 
-	total := uint64(0)
+	total := iotago.BaseToken(0)
 	if out, ok := w.unspentOutputs[addr]; ok {
 		total += out.Balance
 	}

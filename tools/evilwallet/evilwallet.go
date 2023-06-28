@@ -22,8 +22,8 @@ import (
 
 const (
 	// FaucetRequestSplitNumber defines the number of outputs to split from a faucet request.
-	FaucetRequestSplitNumber = 100
-	faucetTokensPerRequest   = 10_0000
+	FaucetRequestSplitNumber                  = 100
+	faucetTokensPerRequest   iotago.BaseToken = 10_0000
 
 	waitForConfirmation   = 150 * time.Second
 	waitForSolidification = 150 * time.Second
@@ -38,7 +38,7 @@ const (
 
 var (
 	defaultClientsURLs   = []string{"http://localhost:8080", "http://localhost:8090"}
-	faucetBalance        = uint64(100_0000_0000)
+	faucetBalance        = iotago.BaseToken(100_0000_0000)
 	dockerProtocolParams = func() *iotago.ProtocolParameters {
 		options := snapshotcreator.NewOptions(presets.Docker...)
 		return &options.ProtocolParameters
@@ -275,7 +275,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 	})
 
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
-	txBuilder.SetCreationTime(e.optsProtocolParams.TimeProvider().SlotIndexFromTime(time.Now()))
+	txBuilder.SetCreationTime(e.optsProtocolParams.TimeProvider().SlotFromTime(time.Now()))
 	// fmt.Println(">>>>>>>>is slot time provider working:", e.optsProtocolParams.SlotTimeProvider().IndexFromTime(time.Now()))
 
 	tx, err := txBuilder.Build(e.optsProtocolParams, e.faucet.AddressSigner(faucetAddr))
@@ -592,7 +592,8 @@ func (e *EvilWallet) useFreshIfInputWalletNotProvided(buildOptions *Options) (*W
 // that indicates which outputs should be saved to the outputWallet.All other outputs are created with temporary wallet,
 // and their addresses are stored in tempAddresses.
 func (e *EvilWallet) matchOutputsWithAliases(buildOptions *Options, tempWallet *Wallet) (outputs []iotago.Output,
-	addrAliasMap map[string]string, tempAddresses map[string]types.Empty, err error) {
+	addrAliasMap map[string]string, tempAddresses map[string]types.Empty, err error,
+) {
 	err = e.updateOutputBalances(buildOptions)
 	if err != nil {
 		return nil, nil, nil, err
@@ -622,7 +623,7 @@ func (e *EvilWallet) matchOutputsWithAliases(buildOptions *Options, tempWallet *
 }
 
 func (e *EvilWallet) prepareRemainderOutput(buildOptions *Options, outputs []iotago.Output) (alias string, remainderOutput iotago.Output, remainderAddress *iotago.Ed25519Address, added bool) {
-	inputBalance := uint64(0)
+	inputBalance := iotago.BaseToken(0)
 
 	for inputAlias := range buildOptions.aliasInputs {
 		in, _ := e.aliasManager.GetInput(inputAlias)
@@ -644,7 +645,7 @@ func (e *EvilWallet) prepareRemainderOutput(buildOptions *Options, outputs []iot
 		}
 	}
 
-	outputBalance := uint64(0)
+	outputBalance := iotago.BaseToken(0)
 	for _, o := range outputs {
 		if o.Type() == iotago.OutputBasic {
 			bo := o.(*iotago.BasicOutput)
@@ -672,7 +673,7 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 	if buildOptions.areOutputsProvidedWithoutAliases() {
 		return
 	}
-	totalBalance := uint64(0)
+	totalBalance := iotago.BaseToken(0)
 	if !buildOptions.isBalanceProvided() {
 		if buildOptions.areInputsProvidedWithoutAliases() {
 			for _, input := range buildOptions.inputs {
@@ -703,7 +704,6 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 }
 
 func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[iotago.Output], w *Wallet) (tx *iotago.Transaction, err error) {
-
 	txBuilder := builder.NewTransactionBuilder(e.optsProtocolParams.NetworkID())
 
 	for _, input := range inputs {
@@ -730,7 +730,7 @@ func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[io
 		inputPrivateKey, _ := wallet.KeyPair(index)
 		walletKeys[i] = iotago.AddressKeys{Address: addr, Keys: inputPrivateKey}
 	}
-	txBuilder.SetCreationTime(e.optsProtocolParams.TimeProvider().SlotIndexFromTime(time.Now()))
+	txBuilder.SetCreationTime(e.optsProtocolParams.TimeProvider().SlotFromTime(time.Now()))
 
 	return txBuilder.Build(e.optsProtocolParams, iotago.NewInMemoryAddressSigner(walletKeys...))
 }

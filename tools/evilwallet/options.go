@@ -30,7 +30,7 @@ type Options struct {
 
 type OutputOption struct {
 	aliasName string
-	amount    uint64
+	amount    iotago.BaseToken
 	address   *iotago.Ed25519Address
 }
 

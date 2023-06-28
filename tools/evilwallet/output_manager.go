@@ -27,7 +27,7 @@ type Output struct {
 	OutputID     iotago.OutputID
 	Address      *iotago.Ed25519Address
 	Index        uint64
-	Balance      uint64
+	Balance      iotago.BaseToken
 	CreationTime iotago.SlotIndex
 
 	OutputStruct iotago.Output
@@ -142,7 +142,7 @@ func (o *OutputManager) Track(outputIDs []iotago.OutputID) (allConfirmed bool) {
 
 // CreateOutputFromAddress creates output, retrieves outputID, and adds it to the wallet.
 // Provided address should be generated from provided wallet. Considers only first output found on address.
-func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519Address, balance uint64, outputID iotago.OutputID, outputStruct iotago.Output) *Output {
+func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519Address, balance iotago.BaseToken, outputID iotago.OutputID, outputStruct iotago.Output) *Output {
 	index := w.AddrIndexMap(addr.String())
 	out := &Output{
 		Address:      addr,
