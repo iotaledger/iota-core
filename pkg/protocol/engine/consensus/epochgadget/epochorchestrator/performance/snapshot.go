@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -29,6 +30,11 @@ func (m *Tracker) Import(reader io.ReadSeeker) error {
 	err = m.importPoolsStats(reader)
 	if err != nil {
 		return errors.Wrap(err, "unable to import pool stats")
+	}
+
+	err = m.importCommittees(reader)
+	if err != nil {
+		return errors.Wrap(err, "unable to import committees")
 	}
 
 	return nil
@@ -59,6 +65,11 @@ func (m *Tracker) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 	err = m.exportPoolsStats(positionedWriter, targetEpoch)
 	if err != nil {
 		return errors.Wrap(err, "unable to export pool stats")
+	}
+
+	err = m.exportCommittees(positionedWriter, targetEpoch)
+	if err != nil {
+		return errors.Wrap(err, "unable to export committees")
 	}
 
 	return nil
@@ -155,6 +166,30 @@ func (m *Tracker) importPoolsStats(reader io.ReadSeeker) error {
 	return nil
 }
 
+func (m *Tracker) importCommittees(reader io.ReadSeeker) error {
+	var epochCount uint64
+	if err := binary.Read(reader, binary.LittleEndian, &epochCount); err != nil {
+		return errors.Wrap(err, "unable to read committees epoch count")
+	}
+	for i := uint64(0); i < epochCount; i++ {
+		var epoch iotago.EpochIndex
+		if err := binary.Read(reader, binary.LittleEndian, &epoch); err != nil {
+			return errors.Wrap(err, "unable to read epoch index")
+		}
+
+		var committee account.Accounts
+		if err := binary.Read(reader, binary.LittleEndian, &committee); err != nil {
+			return errors.Wrap(err, "unable to read pool stats")
+		}
+		err := m.committeeStore.Set(epoch.Bytes(), lo.PanicOnErr(committee.Bytes()))
+		if err != nil {
+			return errors.Wrap(err, "unable to store committee")
+		}
+	}
+
+	return nil
+}
+
 func (m *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, startSlot, targetSlot iotago.SlotIndex) error {
 	m.performanceFactorsMutex.RLock()
 	defer m.performanceFactorsMutex.RUnlock()
@@ -222,6 +257,7 @@ func (m *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 		}
 
 		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epoch))
+		// if the tree is new, we can skip this epoch and the previous ones, as we never stored any rewards
 		if rewardsTree.IsNew() {
 			break
 		}
@@ -290,6 +326,44 @@ func (m *Tracker) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 	}
 	if err := pWriter.WriteValueAtBookmark("pools stats epoch count", epochCount); err != nil {
 		return errors.Wrap(err, "unable to write epoch count")
+	}
+
+	return nil
+}
+
+func (m *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
+	// export all stored pools
+	// in theory we could save the epoch count only once, because stats and rewards should be the same length
+	var epochCount uint64
+	if err := pWriter.WriteValue("committees epoch count", epochCount, true); err != nil {
+		return errors.Wrap(err, "unable to write committees epoch count")
+	}
+
+	var innerErr error
+	err := m.committeeStore.Iterate([]byte{}, func(key []byte, value []byte) bool {
+		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(key))
+		if epoch > targetEpoch {
+			return true
+		}
+		if err := pWriter.WriteBytes(key); err != nil {
+			innerErr = errors.Wrap(err, "unable to write epoch index")
+			return false
+		}
+		if err := pWriter.WriteBytes(value); err != nil {
+			innerErr = errors.Wrap(err, "unable to write epoch committee")
+			return false
+		}
+		epochCount++
+		return true
+	})
+	if err != nil {
+		return errors.Wrapf(err, "unable to iterate over commit base store: %s", innerErr)
+	}
+	if innerErr != nil {
+		return errors.Wrapf(err, "error while iterating over committee base store")
+	}
+	if err = pWriter.WriteValueAtBookmark("committtee epoch count", epochCount); err != nil {
+		return errors.Wrap(err, "unable to write committee epoch count")
 	}
 
 	return nil
