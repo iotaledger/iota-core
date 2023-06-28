@@ -21,7 +21,7 @@ func NewTSCManager() *TSCManager {
 	}
 
 	t.blockIssuingTimeThreshold.OnUpdate(func(_, newThreshold time.Time) {
-		t.markTipsBlockIssuingTimeThresholdReached(newThreshold)
+		t.propagateBlockIssuingTimeThresholdReached(newThreshold)
 	})
 
 	return t
@@ -30,7 +30,7 @@ func NewTSCManager() *TSCManager {
 func (t *TSCManager) Add(tip tipmanager.TipMetadata) {
 	t.blockIssuingTimeThreshold.Read(func(threshold time.Time) {
 		if threshold.After(tip.Block().IssuingTime()) {
-			// TODO: tip.SetBlockIssuingTimeThresholdReached()
+			tip.SetBlockIssuingTimeThresholdReached()
 		} else {
 			t.queue.Push(tip, tip.Block().IssuingTime())
 		}
@@ -43,8 +43,8 @@ func (t *TSCManager) UpdateBlockIssuingTimeThreshold(newThreshold time.Time) {
 	})
 }
 
-func (t *TSCManager) markTipsBlockIssuingTimeThresholdReached(threshold time.Time) {
-	for _, _ = range t.queue.PopUntil(threshold) {
-		// TODO: tip.SetBlockIssuingTimeThresholdReached()
+func (t *TSCManager) propagateBlockIssuingTimeThresholdReached(threshold time.Time) {
+	for _, tip := range t.queue.PopUntil(threshold) {
+		tip.SetBlockIssuingTimeThresholdReached()
 	}
 }
