@@ -41,6 +41,10 @@ This document defines core models for IOTA V3 protocol.
   * [Governor Address Unlock Condition](#governor-address-unlock-condition)
   * [State Controller Address Unlock Condition](#state-controller-address-unlock-condition)
 * [Unlocks](#unlocks)
+    * [Signature Unlock](#signature-unlock)
+    * [Reference Unlock](#reference-unlock)
+    * [Account Unlock](#account-unlock)
+    * [NFT Unlock](#nft-unlock)
 * [Signature](#signature)
   * [Ed25519 Signature](#ed25519-signature)
 
@@ -1344,12 +1348,16 @@ A foundry output is an output that controls the supply of user defined native to
 
 ## Features
 
+Output Features that do not introduce unlocking conditions, but rather add new functionality and add constraints on output creation are grouped under Features. Each output must not contain more than one feature of each type and not all feature types are supported for each output type.
+
+Details of `Sender Feature`, `Issuer Feature`, `Metadata Feature` and `Tag Feature`  are described in [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/ae7fbd336e506f907080aa6b16d6ffb0d7a5553c/tips/TIP-0018/tip-0018.md#features). This document introduces 2 additional new features, `Block Issuer Feature` and `Staking Feature`.
+
 The following table lists all currently specified Features.
 
 <table>
     <tr>
         <th>Name</th>
-        <th>Output Type</th>
+        <th>Feature Type</th>
     </tr>
     <tr>
         <td>Sender Feature</td>
@@ -1379,6 +1387,8 @@ The following table lists all currently specified Features.
 
 
 ### Sender Feature
+SenderFeature is a feature which associates an output with a sender identity.
+
 <table>
   <tr>
       <td><b>Name</b></td>
@@ -1410,6 +1420,8 @@ The following table lists all currently specified Features.
 
 
 ### Issuer Feature
+Issuer Feature is a feature which associates an output with an issuer identity. 
+
 <table>
   <tr>
       <td><b>Name</b></td>
@@ -1440,6 +1452,8 @@ The following table lists all currently specified Features.
 </table>
 
 ### Metadata Feature
+Metadata Feature is a feature which simply holds binary data to be freely interpreted by higher layer applications.
+
  <table>
   <tr>
       <td><b>Name</b></td>
@@ -1461,6 +1475,8 @@ The following table lists all currently specified Features.
 </table>
 
 ### Tag Feature
+Tag Feature is a feature which allows to additionally tag an output by a user defined value.
+
 <table>
     <tr>
         <td><b>Name</b></td>
@@ -1667,44 +1683,54 @@ The following table lists all currently specified Address.
 
 ## Unlock Condition
 
+Unlock Condition designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#output-design).
+
+No new unlock Condition types are introduced, only a few changes are made:
+* Rename `Alias` to `Account`.
+* Change `Unix Time` to `Slot Index` in Timelock Unlock Condition. 
+* Change `Unix Time` to `Slot Index` in Expiration Unlock Condition. 
+
 The following table lists all currently specified Unlock Condition.
 
 <table>
     <tr>
         <th>Name</th>
-        <th>Output Type</th>
+        <th>Unlock Condition Type</th>
     </tr>
     <tr>
-        <td>Address</td>
+        <td>Address Unlock Condition</td>
         <td>0</td>
     </tr>
     <tr>
-        <td>Storage Deposit Return</td>
+        <td>Storage Deposit Return Unlock Condition</td>
         <td>1</td>
     </tr>
     <tr>
-        <td>Timelock</td>
+        <td>Timelock Unlock Condition</td>
         <td>2</td>
     </tr>
     <tr>
-        <td>Expiration</td>
+        <td>Expiration Unlock Condition</td>
         <td>3</td>
     </tr>
     <tr>
-        <td>State Controller Address</td>
+        <td>State Controller Address Unlock Condition</td>
         <td>4</td>
     </tr>
     <tr>
-        <td>Governor Address</td>
+        <td>Governor Address Unlock Condition</td>
         <td>5</td>
     </tr>
     <tr>
-        <td>Immutable Account Address</td>
+        <td>Immutable Account Address Unlock Condition</td>
         <td>6</td>
     </tr>
 </table>
 
 ### Address Unlock Condition
+
+Address Unlock Condition is an Unlock Condition defining an identity which has to be unlocked.
+
  <table>
     <tr>
         <td><b>Name</b></td>
@@ -1735,6 +1761,9 @@ The following table lists all currently specified Unlock Condition.
 </table>
 
 ### Storage Deposit Return Unlock Condition
+
+StorageDepositReturnUnlockCondition is an unlock condition which defines the amount of tokens which must be sent back to the return identity, when the output in which it occurs in, is consumed.
+
 <table>
     <tr>
         <td><b>Name</b></td>
@@ -1772,6 +1801,11 @@ The following table lists all currently specified Unlock Condition.
 </table>
 
 ### Timelock Unlock Condition
+
+TimelockUnlockCondition is an unlock condition which puts a time constraint on an output depending on the latest confirmed commitment's slot index T: the output can only be consumed, if T is equal or bigger than the one defined in the condition.
+
+`Unix Time` in Timelock Unlock Condition is changed to `Slot Index`.
+
 <table>
     <tr>
         <td><b>Name</b></td>
@@ -1795,6 +1829,9 @@ The following table lists all currently specified Unlock Condition.
 </table>
 
 ### Expiration Unlock Condition
+
+Expiration Unlock Condition is an unlock condition which puts a time constraint on whether the receiver or return identity can consume an output depending on the latest confirmed commitment's slot index T.
+
 <table>
     <tr>
         <td><b>Name</b></td>
@@ -1833,6 +1870,9 @@ The following table lists all currently specified Unlock Condition.
 
 
 ### State Controller Address Unlock Condition
+
+An unlock condition defined solely for Account Output. It is functionally equivalent to an Address Unlock Condition, however there are additional transition constraints defined for the Account UTXO state machine that can only be carried out by the State Controller Address, hence it's a distinct unlock condition type.
+
  <table>
     <tr>
         <td><b>Name</b></td>
@@ -1863,6 +1903,9 @@ The following table lists all currently specified Unlock Condition.
 </table>
 
 ### Governor Address Unlock Condition
+
+An unlock condition defined solely for Account Output. It is functionally equivalent to an Address Unlock Condition, however there are additional transition constraints defined for the Account UTXO state machine that can only be carried out by the Governor Address, hence it's a distinct unlock condition type.
+
 <table>
     <tr>
         <td><b>Name</b></td>
@@ -1893,6 +1936,11 @@ The following table lists all currently specified Unlock Condition.
 </table>
 
 ### Immutable Account Address Unlock Condition
+
+An unlock condition defined for chain constrained UTXOs that can only be unlocked by a permanent Account Address.
+
+Output unlocking is functionally equivalent to an Address Unlock Condition with an Account Address, however there are additional transition constraints: the next state of the UTXO machine must have the same Immutable Account Address Unlock Condition.
+
 <table>
     <tr>
         <td><b>Name</b></td>
@@ -1938,6 +1986,134 @@ The following table lists all currently specified Unlock Condition.
 
 ## Unlocks
 Output and unlock designs are the same as described in [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#output-design)
+
+No new unlock types are introduced, only on change to be made:
+* Rename `alias` to `account`.
+
+The following table lists all currently specified Unlock Condition.
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Unlock Type</th>
+    </tr>
+    <tr>
+        <td>Signature Unlock</td>
+        <td>0</td>
+    </tr>
+    <tr>
+        <td>Reference Unlock</td>
+        <td>1</td>
+    </tr>
+    <tr>
+        <td>Account Unlock</td>
+        <td>2</td>
+    </tr>
+    <tr>
+        <td>NFT Unlock</td>
+        <td>3</td>
+    </tr>
+</table>
+
+### Signature Unlock
+
+A Signature Unlock defines an Unlock which holds a signature signing the BLAKE2b-256 hash of the Transaction Essence (including the optional payload).
+
+ <table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 0</strong> to denote an <i>Signature Unlock</i>.
+        </td>
+    </tr>
+    <tr>
+        <td>Signature</td>
+        <td colspan="2">
+            <details>
+                <summary>Ed25519 Signature</summary>
+            </details>
+        </td>
+    </tr>
+</table>
+
+### Reference Unlock
+
+A Reference Unlock defines an Unlock which references a previous Unlock (which must not be another Reference Unlock). It must be used if multiple inputs can be unlocked via the same Unlock.
+
+<table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 1</strong> to denote an <i>Reference Unlock</i>.
+        </td>
+    </tr>
+    <tr>
+        <td>Reference</td>
+        <td>uint16</td>
+        <td>The other unlock this Reference Unlock references to.</td>
+    </tr>
+</table>
+
+### Account Unlock
+
+This unlock is similar to the Reference Unlock. However, it is valid if and only if the input of the transaction at index Account Reference Unlock Index is an alias output with the same Account ID as the one derived from the Address field of the to-be unlocked output.
+
+ <table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 3</strong> to denote an <i>Account Unlock</i>.
+        </td>
+    </tr>
+    <tr>
+        <td>Account Reference Unlock Index</td>
+        <td>uint16</td>
+        <td>The other unlock this Account Unlock references to.</td>
+    </tr>
+</table>
+
+### NFT Unlock
+
+An NFT Unlock looks and behaves like an Account Unlock, but the referenced input at the index must be an NFT output with the matching NFT ID.
+An NFT Unlock is only valid if the input in the transaction at index NFT Reference Unlock Index is the NFT output with the same NFT ID as the one derived from the Address field of the to-be unlocked output.
+
+<table>
+    <tr>
+        <td><b>Name</b></td>
+        <td><b>Type</b></td>
+        <td><b>Description</b></td>
+    </tr>
+    <tr>
+        <td>Unlock Type</td>
+        <td>uint8</td>
+        <td>
+            Set to <strong>value 4</strong> to denote an <i>NFT Unlock</i>.
+        </td>
+    </tr>
+    <tr>
+        <td>NFT Reference Unlock Index</td>
+        <td>uint16</td>
+        <td>The other unlock this NFT Unlock references to.</td>
+    </tr>
+</table>
 
 ## Signature
 

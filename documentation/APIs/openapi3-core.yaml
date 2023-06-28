@@ -2059,7 +2059,8 @@ components:
             anyOf:
               - $ref: '#/components/schemas/SenderFeature'
               - $ref: '#/components/schemas/MetadataFeature'                
-              - $ref: '#/components/schemas/BlockIssuerFeature'            
+              - $ref: '#/components/schemas/BlockIssuerFeature' 
+              - $ref: '#/components/schemas/StakingFeature'           
         immutableFeatures:
           type: array
           description: Immutable features that add utility to the output but do not impose unlocking conditions.
@@ -2394,6 +2395,30 @@ components:
         expirySlot:
           type: integer
           description: Indicates when the BlockIssuerKeys are expired.
+      required:
+        - type
+        - blockIssuerKeys
+        - expirySlot
+
+    StakingFeature:
+      description: A feature which indicates that this account can issue blocks.
+      properties:
+        type:
+          type: integer
+          description: Set to value 5 to denote a Metadata Feature.
+          example: 5
+        stakedAmount:
+          type: integer
+          description: The amount of IOTA coins that are locked and staked in the containing account.
+        fixedCost:
+          type: integer
+          description: Indicates when the BlockIssuerKeys are expired.
+        startEpoch:
+          type: integer
+          description: The epoch index at which the staking starts.
+        endEpoch:
+          type: integer
+          description: The epoch index at which the staking ends.
       required:
         - type
         - blockIssuerKeys
