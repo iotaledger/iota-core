@@ -811,7 +811,7 @@ Outputs designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https:/
 And few changes are made:
 * Rename `Alias` to `Account`.
 * Add `Mana` in every output type, indicates the stored mana held by an output.
-* `Alias Output` is now `Account Output`, with more features added to features.
+* `Alias Output` is now `Account Output`, with more features enabled.
 
 The following table lists all currently specified Output.
 
