@@ -9,6 +9,7 @@ import (
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func RandomRead(p []byte) (n int, err error) {
@@ -124,10 +125,6 @@ func RandTimestamp() time.Time {
 	return time.Unix(int64(RandUint32(math.MaxUint32)), 0)
 }
 
-func RandAmount() uint64 {
-	return RandUint64(math.MaxUint64)
-}
-
 func RandAddress(addressType iotago.AddressType) iotago.Address {
 	switch addressType {
 	case iotago.AddressEd25519:
@@ -164,10 +161,10 @@ func RandOutput(outputType iotago.OutputType) iotago.Output {
 }
 
 func RandOutputOnAddress(outputType iotago.OutputType, address iotago.Address) iotago.Output {
-	return RandOutputOnAddressWithAmount(outputType, address, RandAmount())
+	return RandOutputOnAddressWithAmount(outputType, address, tpkg.RandBaseToken(math.MaxUint64))
 }
 
-func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.Address, amount uint64) iotago.Output {
+func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.Address, amount iotago.BaseToken) iotago.Output {
 	var iotaOutput iotago.Output
 
 	switch outputType {
@@ -199,7 +196,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 		if address.Type() != iotago.AddressAccount {
 			panic("not an alias address")
 		}
-		supply := new(big.Int).SetUint64(RandAmount())
+		supply := new(big.Int).SetUint64(tpkg.RandUint64(math.MaxUint64))
 
 		//nolint:forcetypeassert // we already checked the type
 		iotaOutput = &iotago.FoundryOutput{

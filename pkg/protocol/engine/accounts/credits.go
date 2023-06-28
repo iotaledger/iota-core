@@ -11,12 +11,12 @@ const BlockIssuanceCreditsLength = 8 + 8
 
 // BlockIssuanceCredits is a weight annotated with the slot it was last updated in.
 type BlockIssuanceCredits struct {
-	Value      int64
+	Value      iotago.BlockIssuanceCredits
 	UpdateTime iotago.SlotIndex
 }
 
 // NewBlockIssuanceCredits creates a new Credits instance.
-func NewBlockIssuanceCredits(value int64, updateTime iotago.SlotIndex) (newCredits *BlockIssuanceCredits) {
+func NewBlockIssuanceCredits(value iotago.BlockIssuanceCredits, updateTime iotago.SlotIndex) (newCredits *BlockIssuanceCredits) {
 	return &BlockIssuanceCredits{
 		Value:      value,
 		UpdateTime: updateTime,
@@ -27,7 +27,7 @@ func NewBlockIssuanceCredits(value int64, updateTime iotago.SlotIndex) (newCredi
 func (c BlockIssuanceCredits) Bytes() ([]byte, error) {
 	m := marshalutil.New()
 
-	m.WriteInt64(c.Value)
+	m.WriteInt64(int64(c.Value))
 	m.WriteUint64(uint64(c.UpdateTime))
 
 	return m.Bytes(), nil
@@ -37,14 +37,14 @@ func (c BlockIssuanceCredits) Bytes() ([]byte, error) {
 func (c *BlockIssuanceCredits) FromBytes(bytes []byte) (int, error) {
 	m := marshalutil.New(bytes)
 
-	c.Value = lo.PanicOnErr(m.ReadInt64())
+	c.Value = iotago.BlockIssuanceCredits(lo.PanicOnErr(m.ReadInt64()))
 	c.UpdateTime = iotago.SlotIndex(lo.PanicOnErr(m.ReadUint64()))
 
 	return m.ReadOffset(), nil
 }
 
 // Update updates the Credits increasing Value and updateTime.
-func (c *BlockIssuanceCredits) Update(change int64, updateTime ...iotago.SlotIndex) {
+func (c *BlockIssuanceCredits) Update(change iotago.BlockIssuanceCredits, updateTime ...iotago.SlotIndex) {
 	c.Value += change
 	if len(updateTime) > 0 {
 		c.UpdateTime = updateTime[0]

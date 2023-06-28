@@ -12,12 +12,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
@@ -29,7 +29,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-const MinIssuerAccountDeposit = uint64(84400)
+const MinIssuerAccountDeposit = iotago.BaseToken(84400)
 
 type TestSuite struct {
 	Testing     *testing.T
@@ -48,6 +48,8 @@ type TestSuite struct {
 	ProtocolParameters iotago.ProtocolParameters
 
 	optsGenesisTimestampOffset int64
+	optsLivenessThreshold      iotago.SlotIndex
+	optsEvictionAge            iotago.SlotIndex
 	optsAccounts               []snapshotcreator.AccountDetails
 	optsSnapshotOptions        []options.Option[snapshotcreator.Options]
 	optsWaitFor                time.Duration
@@ -72,6 +74,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsWaitFor:                DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
 		optsTick:                   DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 		optsGenesisTimestampOffset: 0,
+		optsLivenessThreshold:      3,
+		optsEvictionAge:            6,
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name())
 		t.ProtocolParameters = iotago.ProtocolParameters{
@@ -87,9 +91,9 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			TokenSupply:           1_000_0000,
 			GenesisUnixTimestamp:  time.Now().Truncate(10*time.Second).Unix() - t.optsGenesisTimestampOffset,
 			SlotDurationInSeconds: 10,
-			EpochDurationInSlots:  8192,
-			EvictionAge:           10,
-			LivenessThreshold:     3,
+			SlotsPerEpochExponent: 2,
+			EvictionAge:           t.optsEvictionAge,
+			LivenessThreshold:     t.optsLivenessThreshold,
 		}
 
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(t.ProtocolParameters.GenesisUnixTimestamp, 0))
@@ -175,10 +179,10 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
-	issuingTime := slotTimeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	timeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
+	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.SlotIndexFromTime(time.Now()))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
 	block := node.IssueBlock(context.Background(), alias, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...))
 
@@ -192,10 +196,10 @@ func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIn
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	slotTimeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
-	issuingTime := slotTimeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	timeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
+	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), slotTimeProvider.SlotIndexFromTime(time.Now()))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
 	block := node.IssueBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment))...)
 
@@ -302,7 +306,7 @@ func (t *TestSuite) Shutdown() {
 	})
 }
 
-func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, optDeposit ...iotago.BaseToken) *mock.Node {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -328,19 +332,19 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	return node
 }
 
-func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, optDeposit ...iotago.BaseToken) *mock.Node {
 	return t.addNodeToPartition(name, partition, true, optDeposit...)
 }
 
-func (t *TestSuite) AddValidatorNode(name string, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) AddValidatorNode(name string, optDeposit ...iotago.BaseToken) *mock.Node {
 	return t.addNodeToPartition(name, mock.NetworkMainPartition, true, optDeposit...)
 }
 
-func (t *TestSuite) AddNodeToPartition(name string, partition string, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) AddNodeToPartition(name string, partition string, optDeposit ...iotago.BaseToken) *mock.Node {
 	return t.addNodeToPartition(name, partition, false, optDeposit...)
 }
 
-func (t *TestSuite) AddNode(name string, optDeposit ...uint64) *mock.Node {
+func (t *TestSuite) AddNode(name string, optDeposit ...iotago.BaseToken) *mock.Node {
 	return t.addNodeToPartition(name, mock.NetworkMainPartition, false, optDeposit...)
 }
 
@@ -494,6 +498,22 @@ func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Optio
 func WithGenesisTimestampOffset(offset int64) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
 		opts.optsGenesisTimestampOffset = offset
+	}
+}
+
+func WithLivenessThreshold(livenessThreshold iotago.SlotIndex) options.Option[TestSuite] {
+	// TODO: eventually this should not be used and common parameters should be used
+
+	return func(opts *TestSuite) {
+		opts.optsLivenessThreshold = livenessThreshold
+	}
+}
+
+func WithEvictionAge(evictionAge iotago.SlotIndex) options.Option[TestSuite] {
+	// TODO: eventually this should not be used and common parameters should be used
+
+	return func(opts *TestSuite) {
+		opts.optsEvictionAge = evictionAge
 	}
 }
 

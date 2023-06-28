@@ -70,7 +70,7 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 			}
 		}
 
-		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.api, actualOutputID, iotago.EmptyBlockID(), 0, t.api.TimeProvider().SlotIndexFromTime(time.Now()), clonedOutput)
+		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.api, actualOutputID, iotago.EmptyBlockID(), 0, t.api.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
 	}
 }
 
@@ -103,8 +103,8 @@ func (t *TransactionFramework) CreateSimpleTransaction(alias string, outputCount
 
 func (t *TransactionFramework) CreateBasicOutputsEqually(outputCount int, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
 	inputStates := make([]*utxoledger.Output, 0, len(inputAliases))
-	totalInputDeposits := uint64(0)
-	totalInputStoredMana := uint64(0)
+	totalInputDeposits := iotago.BaseToken(0)
+	totalInputStoredMana := iotago.Mana(0)
 
 	for _, inputAlias := range inputAliases {
 		output := t.Output(inputAlias)
@@ -113,10 +113,10 @@ func (t *TransactionFramework) CreateBasicOutputsEqually(outputCount int, inputA
 		totalInputStoredMana += output.StoredMana()
 	}
 
-	manaAmount := totalInputStoredMana / uint64(outputCount)
+	manaAmount := totalInputStoredMana / iotago.Mana(outputCount)
 	remainderMana := totalInputStoredMana
 
-	tokenAmount := totalInputDeposits / uint64(outputCount)
+	tokenAmount := totalInputDeposits / iotago.BaseToken(outputCount)
 	remainderFunds := totalInputDeposits
 
 	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
@@ -140,14 +140,14 @@ func (t *TransactionFramework) CreateBasicOutputsEqually(outputCount int, inputA
 	return inputStates, outputStates, []*mock.HDWallet{t.wallet}
 }
 
-func (t *TransactionFramework) CreateBasicOutputs(depositDistribution, manaDistribution []uint64, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
+func (t *TransactionFramework) CreateBasicOutputs(depositDistribution []iotago.BaseToken, manaDistribution []iotago.Mana, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
 	if len(depositDistribution) != len(manaDistribution) {
 		panic("deposit and mana distributions should have the same length")
 	}
 
 	inputStates := make([]*utxoledger.Output, 0, len(inputAliases))
-	totalInputDeposits := uint64(0)
-	totalInputStoredMana := uint64(0)
+	totalInputDeposits := iotago.BaseToken(0)
+	totalInputStoredMana := iotago.Mana(0)
 
 	for _, inputAlias := range inputAliases {
 		output := t.Output(inputAlias)
@@ -196,6 +196,47 @@ func (t *TransactionFramework) CreateAccountFromInput(inputAlias string, opts ..
 				&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 			},
 			Mana: input.StoredMana() - accountOutput.Mana,
+		})
+	}
+
+	return utxoledger.Outputs{input}, outputStates, []*mock.HDWallet{t.wallet}
+}
+
+// CreateDelegationFromInput creates a new DelegationOutput with given options from an input. If the remainder Output
+// is not created, then StoredMana from the input is not passed and can potentially be burned.
+// In order not to burn it, it needs to be assigned manually in another output in the transaction.
+func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts ...options.Option[iotago.DelegationOutput]) (utxoledger.Outputs, iotago.Outputs[iotago.Output], []*mock.HDWallet) {
+	input := t.Output(inputAlias)
+
+	delegationOutput := options.Apply(&iotago.DelegationOutput{
+		Amount:          input.Deposit(),
+		DelegatedAmount: input.Deposit(),
+		DelegationID:    iotago.DelegationID{},
+		ValidatorID:     iotago.AccountID{},
+		StartEpoch:      0,
+		EndEpoch:        0,
+		Conditions: iotago.DelegationOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
+		},
+		ImmutableFeatures: nil,
+	}, opts)
+
+	if delegationOutput.ValidatorID == iotago.EmptyAccountID() ||
+		delegationOutput.DelegatedAmount == 0 ||
+		delegationOutput.StartEpoch == 0 {
+		panic(fmt.Sprintf("delegation output created incorrectly %+v", delegationOutput))
+	}
+
+	outputStates := iotago.Outputs[iotago.Output]{delegationOutput}
+
+	// if options set an Amount, a remainder output needs to be created
+	if delegationOutput.Amount != input.Deposit() {
+		outputStates = append(outputStates, &iotago.BasicOutput{
+			Amount: input.Deposit() - delegationOutput.Amount,
+			Conditions: iotago.BasicOutputUnlockConditions{
+				&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
+			},
+			Mana: input.StoredMana(),
 		})
 	}
 
@@ -270,7 +311,51 @@ func (t *TransactionFramework) DefaultAddress() iotago.Address {
 	return t.wallet.Address()
 }
 
-// Account options
+// DelegationOutput options
+
+func WithDelegatedAmount(delegatedAmount iotago.BaseToken) options.Option[iotago.DelegationOutput] {
+	return func(delegationOutput *iotago.DelegationOutput) {
+		delegationOutput.DelegatedAmount = delegatedAmount
+	}
+}
+
+func WithDelegatedValidatorID(validatorID iotago.AccountID) options.Option[iotago.DelegationOutput] {
+	return func(delegationOutput *iotago.DelegationOutput) {
+		delegationOutput.ValidatorID = validatorID
+	}
+}
+
+func WithDelegationStartEpoch(startEpoch iotago.EpochIndex) options.Option[iotago.DelegationOutput] {
+	return func(delegationOutput *iotago.DelegationOutput) {
+		delegationOutput.StartEpoch = startEpoch
+	}
+}
+
+func WithDelegationEndEpoch(endEpoch iotago.EpochIndex) options.Option[iotago.DelegationOutput] {
+	return func(delegationOutput *iotago.DelegationOutput) {
+		delegationOutput.EndEpoch = endEpoch
+	}
+}
+
+func WithDelegationConditions(delegationConditions iotago.DelegationOutputUnlockConditions) options.Option[iotago.DelegationOutput] {
+	return func(delegationOutput *iotago.DelegationOutput) {
+		delegationOutput.Conditions = delegationConditions
+	}
+}
+
+func WithDelegationDeposit(deposit iotago.BaseToken) options.Option[iotago.DelegationOutput] {
+	return func(delegationOutput *iotago.DelegationOutput) {
+		delegationOutput.Amount = deposit
+	}
+}
+
+func WithDelegationImmutableFeatures(features iotago.DelegationOutputImmFeatures) options.Option[iotago.DelegationOutput] {
+	return func(delegationOutput *iotago.DelegationOutput) {
+		delegationOutput.ImmutableFeatures = features
+	}
+}
+
+// BlockIssuer options
 
 func WithBlockIssuerFeature(blockIssuerFeature *iotago.BlockIssuerFeature) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
@@ -315,49 +400,74 @@ func WithBlockIssuerExpirySlot(expirySlot iotago.SlotIndex) options.Option[iotag
 	}
 }
 
-func WithMana(mana uint64) options.Option[iotago.AccountOutput] {
+func WithStakingFeature(stakingFeature *iotago.StakingFeature) options.Option[iotago.AccountOutput] {
+	return func(accountOutput *iotago.AccountOutput) {
+		for idx, feature := range accountOutput.Features {
+			if feature.Type() == iotago.FeatureStaking {
+				accountOutput.Features[idx] = stakingFeature
+				return
+			}
+		}
+
+		accountOutput.Features = append(accountOutput.Features, stakingFeature)
+	}
+}
+
+func WithStakingEndEpoch(endEpoch iotago.EpochIndex) options.Option[iotago.AccountOutput] {
+	return func(accountOutput *iotago.AccountOutput) {
+		staking := accountOutput.FeatureSet().Staking()
+		if staking == nil {
+			panic("cannot update staking end epoch on account without BlockIssuer feature")
+		}
+		staking.EndEpoch = endEpoch
+	}
+}
+
+// Account options
+
+func WithAccountMana(mana iotago.Mana) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		accountOutput.Mana = mana
 	}
 }
 
-func WithDeposit(deposit uint64) options.Option[iotago.AccountOutput] {
+func WithAccountDeposit(deposit iotago.BaseToken) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		accountOutput.Amount = deposit
 	}
 }
 
-func WithIncreasedStateIndex() options.Option[iotago.AccountOutput] {
+func WithAccountIncreasedStateIndex() options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		accountOutput.StateIndex++
 	}
 }
 
-func WithIncreasedFoundryCounter(diff uint32) options.Option[iotago.AccountOutput] {
+func WithAccountIncreasedFoundryCounter(diff uint32) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		accountOutput.FoundryCounter += diff
 	}
 }
 
-func WithFeatures(features iotago.AccountOutputFeatures) options.Option[iotago.AccountOutput] {
+func WithAccountFeatures(features iotago.AccountOutputFeatures) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		accountOutput.Features = features
 	}
 }
 
-func WithImmutableFeatures(features iotago.AccountOutputImmFeatures) options.Option[iotago.AccountOutput] {
+func WithAccountImmutableFeatures(features iotago.AccountOutputImmFeatures) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		accountOutput.ImmutableFeatures = features
 	}
 }
 
-func WithConditions(conditions iotago.AccountOutputUnlockConditions) options.Option[iotago.AccountOutput] {
+func WithAccountConditions(conditions iotago.AccountOutputUnlockConditions) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		accountOutput.Conditions = conditions
 	}
 }
 
-func WithNativeTokens(nativeTokens iotago.NativeTokens) options.Option[iotago.AccountOutput] {
+func WithAccountNativeTokens(nativeTokens iotago.NativeTokens) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		accountOutput.NativeTokens = nativeTokens
 	}

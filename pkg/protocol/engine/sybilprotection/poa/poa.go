@@ -4,14 +4,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
@@ -23,15 +22,15 @@ import (
 type SybilProtection struct {
 	events *sybilprotection.Events
 
-	clock                clock.Clock
-	slotTimeProviderFunc func() *iotago.TimeProvider
-	workers              *workerpool.Group
-	accounts             *account.Accounts[iotago.AccountID, *iotago.AccountID]
-	committee            *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
-	onlineCommittee      *advancedset.AdvancedSet[account.SeatIndex]
-	inactivityManager    *timed.TaskExecutor[iotago.AccountID]
-	lastActivities       *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
-	mutex                sync.RWMutex
+	clock             clock.Clock
+	timeProviderFunc  func() *iotago.TimeProvider
+	workers           *workerpool.Group
+	accounts          *account.Accounts
+	committee         *account.SeatedAccounts
+	onlineCommittee   *advancedset.AdvancedSet[account.SeatIndex]
+	inactivityManager *timed.TaskExecutor[iotago.AccountID]
+	lastActivities    *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
+	mutex             sync.RWMutex
 
 	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID
@@ -46,7 +45,7 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 			&SybilProtection{
 				events:            sybilprotection.NewEvents(),
 				workers:           e.Workers.CreateGroup("SybilProtection"),
-				accounts:          account.NewAccounts[iotago.AccountID](mapdb.NewMapDB()),
+				accounts:          account.NewAccounts(),
 				inactivityManager: timed.NewTaskExecutor[iotago.AccountID](1),
 				lastActivities:    shrinkingmap.New[account.SeatIndex, time.Time](),
 
@@ -62,7 +61,7 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 					s.clock = e.Clock
 
 					e.Storage.Settings().HookInitialized(func() {
-						s.slotTimeProviderFunc = e.API().TimeProvider
+						s.timeProviderFunc = e.API().TimeProvider
 
 						e.Clock.HookInitialized(func() {
 							for _, v := range s.optsOnlineCommitteeStartup {
@@ -84,13 +83,13 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 
 var _ sybilprotection.SybilProtection = &SybilProtection{}
 
-// Accounts returns all the known validators.
-func (s *SybilProtection) Accounts() *account.Accounts[iotago.AccountID, *iotago.AccountID] {
-	return s.accounts
+func (s *SybilProtection) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *account.SeatedAccounts {
+	// we do nothing on PoA, we keep the same accounts and committee
+	return s.committee
 }
 
 // Committee returns the set of validators selected to be part of the committee.
-func (s *SybilProtection) Committee(_ iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID] {
+func (s *SybilProtection) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
 	// Note: we have PoA so our committee do not rotate right now
 	return s.committee
 }
@@ -112,9 +111,9 @@ func (s *SybilProtection) Shutdown() {
 
 func (s *SybilProtection) initializeAccounts(validators []iotago.AccountID) {
 	for _, id := range validators {
-		s.accounts.Set(id, 0) // We do not care about weights with PoA
+		s.accounts.Set(id, &account.Pool{}) // We do not care about the pool with PoA
 	}
-	s.committee = s.accounts.SelectAccounts(validators...)
+	s.committee = s.accounts.SelectCommittee(validators...)
 }
 
 func (s *SybilProtection) stopInactivityManager() {
@@ -129,7 +128,7 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	slotIndex := s.slotTimeProviderFunc().SlotIndexFromTime(activityTime)
+	slotIndex := s.timeProviderFunc().SlotFromTime(activityTime)
 	seat, exists := s.Committee(slotIndex).GetSeat(id)
 	if !exists {
 		// Only track identities that are part of the committee

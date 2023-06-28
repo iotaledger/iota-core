@@ -26,6 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -81,6 +82,7 @@ type Protocol struct {
 	optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
+	optsEpochGadgetProvider     module.Provider[*engine.Engine, epochgadget.Gadget]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
@@ -124,7 +126,7 @@ func (p *Protocol) Run(ctx context.Context) error {
 
 	//nolint:contextcheck // false positive
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
-		return errors.Wrapf(err, "mainEngine initialize failed")
+		return errors.Wrap(err, "mainEngine initialize failed")
 	}
 
 	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())

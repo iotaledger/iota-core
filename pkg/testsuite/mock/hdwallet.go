@@ -55,8 +55,8 @@ func (hd *HDWallet) Name() string {
 	return hd.name
 }
 
-func (hd *HDWallet) Balance() uint64 {
-	var balance uint64
+func (hd *HDWallet) Balance() iotago.BaseToken {
+	var balance iotago.BaseToken
 	for _, u := range hd.utxo {
 		balance += u.Deposit()
 	}

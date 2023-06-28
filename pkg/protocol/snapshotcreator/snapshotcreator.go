@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
@@ -69,6 +70,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		poa.NewProvider([]iotago.AccountID{}),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
+		epochorchestrator.NewProvider(),
 		slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
@@ -83,9 +85,9 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
 	}
 
-	totalAccountDeposit := lo.Reduce(opt.Accounts, func(accumulator uint64, details AccountDetails) uint64 {
+	totalAccountDeposit := lo.Reduce(opt.Accounts, func(accumulator iotago.BaseToken, details AccountDetails) iotago.BaseToken {
 		return accumulator + details.Amount
-	}, uint64(0))
+	}, iotago.BaseToken(0))
 	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply-totalAccountDeposit, opt.GenesisSeed, engineInstance, protocolParams); err != nil {
 		return errors.Wrap(err, "failed to create genesis outputs")
 	}
@@ -97,7 +99,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	return engineInstance.WriteSnapshot(opt.FilePath)
 }
 
-func createGenesisOutput(genesisTokenAmount uint64, genesisSeed []byte, engineInstance *engine.Engine, protocolParams *iotago.ProtocolParameters) (err error) {
+func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte, engineInstance *engine.Engine, protocolParams *iotago.ProtocolParameters) (err error) {
 	if genesisTokenAmount > 0 {
 		genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
 		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
@@ -137,7 +139,7 @@ func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Eng
 	return nil
 }
 
-func createOutput(address iotago.Address, tokenAmount uint64) (output iotago.Output) {
+func createOutput(address iotago.Address, tokenAmount iotago.BaseToken) (output iotago.Output) {
 	//switch ledgerVM.(type) {
 	//case *mockedvm.MockedVM:
 	//case *devnetvm.VM:
@@ -153,7 +155,7 @@ func createOutput(address iotago.Address, tokenAmount uint64) (output iotago.Out
 	}
 }
 
-func createAccount(address iotago.Address, tokenAmount uint64, pubkey ed25519.PublicKey) (output iotago.Output) {
+func createAccount(address iotago.Address, tokenAmount iotago.BaseToken, pubkey ed25519.PublicKey) (output iotago.Output) {
 	return &iotago.AccountOutput{
 		AccountID: blake2b.Sum256(lo.PanicOnErr(address.Encode())),
 		Amount:    tokenAmount,
