@@ -27,6 +27,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 		SlotDurationInSeconds: 10,
 		EvictionAge:           10,
 		LivenessThreshold:     3,
+		EpochNearingThreshold: 30,
 	}),
 	snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
 		iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
@@ -50,6 +51,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 		SlotDurationInSeconds: 10,
 		EvictionAge:           10,
 		LivenessThreshold:     3,
+		EpochNearingThreshold: 30,
 	}),
 }
 
@@ -70,5 +72,6 @@ var Feature = []options.Option[snapshotcreator.Options]{
 		SlotDurationInSeconds: 10,
 		EvictionAge:           10,
 		LivenessThreshold:     3,
+		EpochNearingThreshold: 30,
 	}),
 }
