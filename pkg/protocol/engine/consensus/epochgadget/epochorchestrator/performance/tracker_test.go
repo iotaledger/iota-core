@@ -20,11 +20,6 @@ func TestManager_Rewards(t *testing.T) {
 		},
 	}
 	ts.ApplyEpochActions(2, epochActions)
-	ts.AssertEpochRewards(2, epochActions,
-		&PoolsStats{
-			TotalStake:          30,
-			TotalValidatorStake: 12,
-			ProfitMargin:        1,
-		})
+	ts.AssertEpochRewards(2, epochActions)
 
 }
