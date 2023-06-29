@@ -73,7 +73,7 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
 					// recover if no node was part of the online committee anymore.
 					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
+						s.markValidatorActive(block.ProtocolBlock().IssuerID, block.IssuingTime())
 						s.events.BlockProcessed.Trigger(block)
 					})
 				})

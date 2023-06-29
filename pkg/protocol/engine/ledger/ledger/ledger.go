@@ -140,7 +140,7 @@ func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.Transact
 }
 
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
-	switch payload := block.Block().Payload.(type) {
+	switch payload := block.ProtocolBlock().Payload.(type) {
 	case mempool.Transaction:
 		transactionMetadata, err := l.memPool.AttachTransaction(payload, block.ID())
 		if err != nil {
@@ -219,7 +219,7 @@ func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
-	switch block.Block().Payload.(type) {
+	switch block.ProtocolBlock().Payload.(type) {
 	case *iotago.Transaction:
 		l.memPool.MarkAttachmentIncluded(block.ID())
 
@@ -641,9 +641,9 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
-	voteRank := ledger.NewBlockVoteRank(block.ID(), block.Block().IssuingTime)
+	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().IssuingTime)
 
-	seat, exists := l.sybilProtection.Committee(block.ID().Index()).GetSeat(block.Block().IssuerID)
+	seat, exists := l.sybilProtection.Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return
 	}

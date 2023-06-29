@@ -73,7 +73,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 
 			e.Events.Filter.BlockAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
-					b.errorHandler(errors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.Block().IssuerID))
+					b.errorHandler(errors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.ProtocolBlock().IssuerID))
 				}
 			}, event.WithWorkerPool(wp))
 
@@ -218,7 +218,7 @@ func (b *BlockDAG) isFutureBlock(block *blocks.Block) (isFutureBlock bool) {
 		// We set the block as future block so that we can skip some checks when revisiting it later in markSolid via the solidifier.
 		block.SetFuture()
 
-		lo.Return1(b.futureBlocks.Get(block.Block().SlotCommitment.Index, true).GetOrCreate(block.Block().SlotCommitment.MustID(), func() *advancedset.AdvancedSet[*blocks.Block] {
+		lo.Return1(b.futureBlocks.Get(block.ProtocolBlock().SlotCommitment.Index, true).GetOrCreate(block.ProtocolBlock().SlotCommitment.MustID(), func() *advancedset.AdvancedSet[*blocks.Block] {
 			return advancedset.New[*blocks.Block]()
 		})).Add(block)
 
@@ -281,7 +281,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 // canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
 func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
 	if b.evictionState.InRootBlockSlot(data.ID()) && !b.evictionState.IsRootBlock(data.ID()) {
-		return false, errors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.Block().IssuingTime)
+		return false, errors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().IssuingTime)
 	}
 
 	storedBlock, storedBlockExists := b.blockCache.Block(data.ID())

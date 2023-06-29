@@ -172,7 +172,7 @@ func configure() error {
 			return err
 		}
 
-		return responseByHeader(c, block.Block())
+		return responseByHeader(c, block.ProtocolBlock())
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
@@ -284,7 +284,7 @@ func configure() error {
 			return err
 		}
 
-		return responseByHeader(c, block.Block())
+		return responseByHeader(c, block.ProtocolBlock())
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteTransactionsIncludedBlockMetadata, func(c echo.Context) error {

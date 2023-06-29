@@ -41,8 +41,8 @@ type tipinfo struct {
 func sendVertex(blk *blocks.Block, finalized bool) {
 	broadcastWsBlock(&wsblk{MsgTypeVertex, &vertex{
 		ID:            blk.ID().ToHex(),
-		StrongParents: blk.Block().StrongParents.ToHex(),
-		WeakParents:   blk.Block().WeakParents.ToHex(),
+		StrongParents: blk.ProtocolBlock().StrongParents.ToHex(),
+		WeakParents:   blk.ProtocolBlock().WeakParents.ToHex(),
 		IsFinalized:   finalized,
 		// IsTx:          blk.Payload().Type() == devnetvm.TransactionType,
 	}}, true)

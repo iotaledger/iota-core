@@ -25,7 +25,7 @@ var (
 type Filter struct {
 	events *filter.Events
 
-	//TODO: add a slotIndex to this callback to get the valid ones for the block's slot
+	// TODO: add a slotIndex to this callback to get the valid ones for the block's slot
 	protocolParamsFunc func() iotago.ProtocolParameters
 
 	optsMaxAllowedWallClockDrift time.Duration
@@ -73,7 +73,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	if block.SlotCommitment().Index() > 0 && block.SlotCommitment().Index()+protocolParams.EvictionAge() > block.ID().Index() {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.Block().SlotCommitment.Index),
+			Reason: errors.WithMessagef(ErrCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.ProtocolBlock().SlotCommitment.Index),
 			Source: source,
 		})
 
@@ -81,7 +81,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	}
 
 	// Verify the timestamp is not too far in the future.
-	timeDelta := time.Since(block.Block().IssuingTime)
+	timeDelta := time.Since(block.ProtocolBlock().IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
@@ -95,8 +95,8 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	// Verify that if CommitmentInput referenced by a transaction is not too old.
 	// This check provides that Time-lock and other time-based checks in the VM don't have to rely on what is the relation of transaction to
 	// current wall time, because it will only receive transactions that are created in a recent and limited past.
-	if block.Block().Payload != nil && block.Block().Payload.PayloadType() == iotago.PayloadTransaction {
-		transaction, _ := block.Block().Payload.(*iotago.Transaction)
+	if block.ProtocolBlock().Payload != nil && block.ProtocolBlock().Payload.PayloadType() == iotago.PayloadTransaction {
+		transaction, _ := block.ProtocolBlock().Payload.(*iotago.Transaction)
 		if commitmentInput := transaction.CommitmentInput(); commitmentInput != nil {
 			// commitmentInput must reference a commitment
 			// that is between the latest possible, non-evicted committable slot in relation to the block time
@@ -127,7 +127,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 	if f.optsSignatureValidation {
 		// Verify the block signature.
-		if valid, err := block.Block().VerifySignature(); !valid {
+		if valid, err := block.ProtocolBlock().VerifySignature(); !valid {
 			if err != nil {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,

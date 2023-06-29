@@ -94,7 +94,7 @@ func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 
 func createExplorerBlock(block *model.Block) *ExplorerBlock {
 	// TODO: fill in missing fields
-	iotaBlk := block.Block()
+	iotaBlk := block.ProtocolBlock()
 
 	commitmentID, err := iotaBlk.SlotCommitment.ID()
 	if err != nil {
@@ -162,7 +162,7 @@ func getTransaction(c echo.Context) error {
 		return errors.Errorf("block not found: %s", output.BlockID().ToHex())
 	}
 
-	iotaTX, isTX := block.Block().Payload.(*iotago.Transaction)
+	iotaTX, isTX := block.ProtocolBlock().Payload.(*iotago.Transaction)
 	if !isTX {
 		return errors.Errorf("payload is not a transaction: %s", output.BlockID().ToHex())
 	}

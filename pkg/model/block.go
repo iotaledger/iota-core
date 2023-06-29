@@ -73,12 +73,12 @@ func (blk *Block) Data() []byte {
 	return blk.data
 }
 
-func (blk *Block) Block() *iotago.ProtocolBlock {
+func (blk *Block) ProtocolBlock() *iotago.ProtocolBlock {
 	return blk.protocolBlock
 }
 
 func (blk *Block) String() string {
-	encode, err := blk.api.JSONEncode(blk.Block())
+	encode, err := blk.api.JSONEncode(blk.ProtocolBlock())
 	if err != nil {
 		panic(err)
 	}

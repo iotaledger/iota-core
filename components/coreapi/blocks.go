@@ -37,9 +37,9 @@ func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
 	// TODO: fill in blockReason, TxState, TxReason.
 	bmResponse := &blockMetadataResponse{
 		BlockID:            block.ID().ToHex(),
-		StrongParents:      block.Block().StrongParents.ToHex(),
-		WeakParents:        block.Block().WeakParents.ToHex(),
-		ShallowLikeParents: block.Block().ShallowLikeParents.ToHex(),
+		StrongParents:      block.ProtocolBlock().StrongParents.ToHex(),
+		WeakParents:        block.ProtocolBlock().WeakParents.ToHex(),
+		ShallowLikeParents: block.ProtocolBlock().ShallowLikeParents.ToHex(),
 		BlockState:         blockStatePending.String(),
 	}
 

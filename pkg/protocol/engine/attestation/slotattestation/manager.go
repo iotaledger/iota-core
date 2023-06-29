@@ -148,7 +148,7 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iot
 // AddAttestationFromBlock adds an attestation from a block to the future attestations (beyond the attestation window).
 func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
 	// Only track attestations of active committee members.
-	if _, exists := m.committeeFunc(block.ID().Index()).GetSeat(block.Block().IssuerID); !exists {
+	if _, exists := m.committeeFunc(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID); !exists {
 		return
 	}
 
@@ -160,10 +160,10 @@ func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
 		return
 	}
 
-	newAttestation := iotago.NewAttestation(block.Block())
+	newAttestation := iotago.NewAttestation(block.ProtocolBlock())
 
 	// We keep only the latest attestation for each committee member.
-	m.futureAttestations.Get(block.ID().Index(), true).Compute(block.Block().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
+	m.futureAttestations.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
 		if !exists {
 			return newAttestation
 		}

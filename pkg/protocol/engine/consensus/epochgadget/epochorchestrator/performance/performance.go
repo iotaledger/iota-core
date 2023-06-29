@@ -62,12 +62,12 @@ func (m *Tracker) BlockAccepted(block *blocks.Block) {
 	// TODO: check if this block is a validator block
 
 	performanceFactors := m.performanceFactorsFunc(block.ID().Index())
-	pf, err := performanceFactors.Load(block.Block().IssuerID)
+	pf, err := performanceFactors.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
 		panic(err)
 	}
 
-	err = performanceFactors.Store(block.Block().IssuerID, pf+1)
+	err = performanceFactors.Store(block.ProtocolBlock().IssuerID, pf+1)
 	if err != nil {
 		panic(err)
 	}

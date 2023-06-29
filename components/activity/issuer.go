@@ -26,5 +26,5 @@ func issueActivityBlock(ctx context.Context) {
 		return
 	}
 
-	Component.LogInfof("Issued activity block: %s - commitment %s %d - latest finalized slot %d", block.ID(), block.Block().SlotCommitment.MustID(), block.Block().SlotCommitment.Index, block.Block().LatestFinalizedSlot)
+	Component.LogInfof("Issued activity block: %s - commitment %s %d - latest finalized slot %d", block.ID(), block.ProtocolBlock().SlotCommitment.MustID(), block.ProtocolBlock().SlotCommitment.Index, block.ProtocolBlock().LatestFinalizedSlot)
 }

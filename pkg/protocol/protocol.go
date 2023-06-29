@@ -265,11 +265,11 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 
 	isSolid, chain := p.ChainManager.ProcessCommitmentFromSource(block.SlotCommitment(), src)
 	if !isSolid {
-		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().ID() {
+		if block.ProtocolBlock().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().ID() {
 			return nil
 		}
 
-		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.Block().SlotCommitment.MustID(), mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
+		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitment.MustID(), mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
 
 	processed := false
@@ -291,7 +291,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	if !processed {
-		return errors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.Block().SlotCommitment.MustID())
+		return errors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.ProtocolBlock().SlotCommitment.MustID())
 	}
 
 	return nil

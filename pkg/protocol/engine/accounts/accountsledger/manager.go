@@ -125,7 +125,7 @@ func (m *Manager) ApplyDiff(
 	}
 
 	// load blocks burned in this slot
-	/// MOVE THIS TO UPDATE SLOT DIFF
+	// / MOVE THIS TO UPDATE SLOT DIFF
 	burns, err := m.computeBlockBurnsForSlot(slotIndex)
 	if err != nil {
 		return errors.Wrap(err, "could not create block burns for slot")
@@ -292,7 +292,7 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 			if !blockLoaded {
 				return nil, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
 			}
-			burns[block.Block().IssuerID] += block.Block().BurnedMana
+			burns[block.ProtocolBlock().IssuerID] += block.ProtocolBlock().BurnedMana
 		}
 	}
 
@@ -334,8 +334,8 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		}
 
 		if diffChange.BICChange != 0 || !exists {
-			//TODO: this needs to be decayed for (index - prevIndex) because update index is changed so it's impossible to use new decay
-			////
+			// TODO: this needs to be decayed for (index - prevIndex) because update index is changed so it's impossible to use new decay
+			// //
 			accountData.Credits.Update(diffChange.BICChange, index)
 		}
 

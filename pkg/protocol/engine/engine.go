@@ -354,7 +354,7 @@ func (e *Engine) setupEvictionState() {
 					e.errorHandler(errors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
 					return
 				}
-				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.Block().SlotCommitment.MustID())
+				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().SlotCommitment.MustID())
 			}
 		})
 	}, event.WithWorkerPool(wp))
