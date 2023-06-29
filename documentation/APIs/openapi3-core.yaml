@@ -21,7 +21,7 @@ tags:
   - name: accounts
     description: Everything about the accounts.
   - name: rewards
-    description: Everything about the accounts.
+    description: Everything about Mana rewards.
   - name: staking
     description: Everything about the node itself.
   - name: committee
@@ -173,7 +173,7 @@ paths:
         - accounts
       summary: Returns information of an account.
       description: >-
-        Returns information that are ideal for attaching a block. If slotIndex is not provided, the returned status would be current slot index. 
+        Returns information for an account's block issuer status. If slotIndex is not provided, the returned status is for the current slot index.  
       parameters:
         - in: path
           name: accountId
@@ -201,9 +201,9 @@ paths:
     get:
       tags:
         - accounts
-      summary: Returns the potential and stored mana of the account. If slotIndex is not provided, the returned status would be current slot index. 
+      summary: Returns the mana of an account. 
       description: >-
-        Returns mana of an account.
+        Returns the potential and stored mana of the account. If slotIndex is not provided, the returned status is for the current slot index.
       parameters:
         - in: path
           name: accountId
@@ -227,21 +227,86 @@ paths:
               schema:
                 $ref: '#/components/schemas/AccountManaResponse'
 
-  /api/core/v3/rewards/{outputId}:
+  /api/core/v3/rewards/staking/{accountId}:
     get:
       tags:
         - rewards
-      summary: Returns the totally available rewards of the output ID. 
+      summary: Returns the totally available Mana rewards of an account (stakers). 
       description: >-
-        Returns mana of an account.
+        Returns the totally available Mana rewards of an account of stakers. The rewards are calculated based on the start and end epoch in the respective output. However, rewards for an epoch only become available at the beginning of the next epoch. If the end epoch is equal or greater than the current epoch, the rewards response will not include the potentially available rewards for those epochs.
       parameters:
         - in: path
-          name: outputId
+          name: accountId
           schema:
             type: string
           example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
           required: true
-          description: Identifier of the output.
+          description: Identifier of the account.
+        - in: query
+          name: startEpoch
+          schema:
+            type: integer
+          example: 20
+          required: true
+          description: The epoch index in which the staking started.
+        - in: query
+          name: endEpoch
+          schema:
+            type: integer
+          example: 25
+          required: true
+          description: The epoch index in which the staking ends.
+        - in: query
+          name: stakedAmount
+          schema:
+            type: integer
+          example: 1000000
+          required: true
+          description: The amount of IOTA coins that are locked and staked in the containing account.
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountManaResponse'
+
+  /api/core/v3/rewards/delegation/{accountId}:
+    get:
+      tags:
+        - rewards
+      summary: Returns the totally available Mana rewards of account (delegators). 
+      description: >-
+        Returns the totally available Mana rewards of an account of delegators. The rewards are calculated based on the start and end epoch in the respective output. However, rewards for an epoch only become available at the beginning of the next epoch. If the end epoch is equal or greater than the current epoch, the rewards response will not include the potentially available rewards for those epochs.
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            type: string
+          example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
+          required: true
+          description: Identifier of the account.
+        - in: query
+          name: startEpoch
+          schema:
+            type: integer
+          example: 20
+          required: true
+          description: The epoch index in which the staking started.
+        - in: query
+          name: endEpoch
+          schema:
+            type: integer
+          example: 25
+          required: true
+          description: The epoch index in which the staking ends.
+        - in: query
+          name: stakedAmount
+          schema:
+            type: integer
+          example: 1000000
+          required: true
+          description: The amount of IOTA coins that are locked and staked in the containing account.
       responses:
         '200':
           description: "Successful operation."
@@ -255,15 +320,13 @@ paths:
       tags:
         - committee
       summary: Return the information of committee members. 
-      description: >-
-        TODO, performance factor, total pool stake
       responses:
         '200':
           description: "Successful operation."
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountStakingResponse'
+                $ref: '#/components/schemas/CommitteeResponse'
 
   /api/core/v3/staking/{accountId}:
     get:
@@ -2944,6 +3007,7 @@ components:
         - baseToken
         - features
 
+    # TODO: Update this.
     AccountStakingResponse:
       description: Returns the stored and potential mana of the account.
       properties:
@@ -2970,15 +3034,46 @@ components:
             - inactive
             - nonBlockIssuer
             - locked
-          description: Only 'active' account is allowed to issue blocks. To account to be active, the block issuer feature must be provided and the Block Issuance Credits (BIC) balances of an account should be non-negative. If the block issuer feature is not present, 'nonBlockIssuer' is returned. If the conditions are not met, it's 'inactive'. If the BIC balances is negative, the account is 'locked'.
+          description: Only an 'active' account is allowed to issue blocks. For the account to be active, the block issuer feature must be present and the Block Issuance Credits (BIC) balance of an account must be non-negative. If the block issuer feature is not present, 'nonBlockIssuer' is returned. If the slot in which the block issuer feature was added is not yet committed, the status is 'inactive'. If the BIC balance is negative, the account is 'locked'.
         slotIndex: 
           type: integer
         blockIssuerKeys:
           type: array
+          description: The keys allowed to issue blocks.
           items:
             type: string
-        bic:
+            description: Ed25519 public key in Hex.
+        blockIssuanceCredits:
           type: integer
+    
+    CommitteeResponse:
+      description: Returns the validator information of the committee.
+      properties:
+        totalStake:
+          type: integer
+          description: The total stake of the committee holds.
+        totalValidatorStake:
+          type: integer
+          description: The total stake of the validator holds.
+        validators:
+          type: array
+          description: The validators of the committee.
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/Validator'
+
+    Validator:
+      description: Returns information of a validator.
+      properties:
+        poolStake:
+          type: integer
+          description: The total stake of the pool, including delegators.
+        validatorStake:
+          type: integer
+          description: The validator's stake.
+        fixedCost:
+          type: integer
+
 
     IssuanceBlockHeaderResponse:
       description: Returns information that are ideal for attaching a block.
