@@ -90,39 +90,39 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		isEvicted:                          promise.NewEvent(),
 	}
 
-	agential.Gate2(t.isStrongTipPoolMember, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
+	agential.CreateTransformerWith2Inputs(t.isStrongTipPoolMember, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
 		return tipPool == tipmanager.StrongTipPool && !isOrphaned
 	}, t.tipPool, t.isOrphaned)
 
-	agential.Gate2(t.isWeakTipPoolMember, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
+	agential.CreateTransformerWith2Inputs(t.isWeakTipPoolMember, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
 		return tipPool == tipmanager.WeakTipPool && !isOrphaned
 	}, t.tipPool, t.isOrphaned)
 
-	agential.Gate2(t.isStronglyConnectedToTips, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
+	agential.CreateTransformerWith2Inputs(t.isStronglyConnectedToTips, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
 		return isStrongTipPoolMember || isStronglyReferencedByOtherTips
 	}, t.isStrongTipPoolMember, t.isStronglyReferencedByOtherTips)
 
-	agential.Gate3(t.isConnectedToTips, func(isReferencedByOtherTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
+	agential.CreateTransformerWith3Inputs(t.isConnectedToTips, func(isReferencedByOtherTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
 		return isReferencedByOtherTips || isStrongTipPoolMember || isWeakTipPoolMember
 	}, t.isReferencedByOtherTips, t.isStrongTipPoolMember, t.isWeakTipPoolMember)
 
-	agential.Transformer(t.isStronglyReferencedByOtherTips, func(stronglyConnectedStrongChildren int) bool {
+	agential.CreateTransformer(t.isStronglyReferencedByOtherTips, func(stronglyConnectedStrongChildren int) bool {
 		return stronglyConnectedStrongChildren > 0
 	}, t.stronglyConnectedStrongChildren)
 
-	agential.Gate2(t.isReferencedByOtherTips, func(connectedWeakChildren int, isStronglyReferencedByOtherTips bool) bool {
+	agential.CreateTransformerWith2Inputs(t.isReferencedByOtherTips, func(connectedWeakChildren int, isStronglyReferencedByOtherTips bool) bool {
 		return connectedWeakChildren > 0 || isStronglyReferencedByOtherTips
 	}, t.connectedWeakChildren, t.isStronglyReferencedByOtherTips)
 
-	agential.Gate2(t.isStrongTip, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
+	agential.CreateTransformerWith2Inputs(t.isStrongTip, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
 		return isStrongTipPoolMember && !isStronglyReferencedByOtherTips
 	}, t.isStrongTipPoolMember, t.isStronglyReferencedByOtherTips)
 
-	agential.Gate2(t.isWeakTip, func(isWeakTipPoolMember bool, isReferencedByOtherTips bool) bool {
+	agential.CreateTransformerWith2Inputs(t.isWeakTip, func(isWeakTipPoolMember bool, isReferencedByOtherTips bool) bool {
 		return isWeakTipPoolMember && !isReferencedByOtherTips
 	}, t.isWeakTipPoolMember, t.isReferencedByOtherTips)
 
-	agential.Gate2(t.isOrphaned, func(isMarkedOrphaned bool, orphanedStrongParents int) bool {
+	agential.CreateTransformerWith2Inputs(t.isOrphaned, func(isMarkedOrphaned bool, orphanedStrongParents int) bool {
 		return isMarkedOrphaned || orphanedStrongParents > 0
 	}, t.isMarkedOrphaned, t.orphanedStrongParents)
 
