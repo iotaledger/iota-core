@@ -3,8 +3,8 @@ package tipmanagerv1
 import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/promise"
-	"github.com/iotaledger/iota-core/pkg/core/agential"
 	lpromise "github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/iota-core/pkg/core/value"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -73,58 +73,36 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
 		block:                              block,
 		tipPool:                            lpromise.NewValue[tipmanager.TipPool](),
-		isStrongTipPoolMember:              lpromise.NewValue[bool](),
-		isWeakTipPoolMember:                lpromise.NewValue[bool](),
-		isStronglyConnectedToTips:          lpromise.NewValue[bool](),
-		isConnectedToTips:                  lpromise.NewValue[bool](),
-		stronglyConnectedStrongChildren:    lpromise.NewValue[int](),
-		connectedWeakChildren:              lpromise.NewValue[int](),
-		isStronglyReferencedByOtherTips:    lpromise.NewValue[bool](),
-		isReferencedByOtherTips:            lpromise.NewValue[bool](),
-		isStrongTip:                        lpromise.NewValue[bool](),
-		isWeakTip:                          lpromise.NewValue[bool](),
 		isBlockIssuingTimeThresholdReached: lpromise.NewValue[bool](),
 		isMarkedOrphaned:                   lpromise.NewValue[bool](),
-		isOrphaned:                         lpromise.NewValue[bool](),
-		orphanedStrongParents:              lpromise.NewValue[int](),
 		isEvicted:                          promise.NewEvent(),
+
+		// derived properties (internal flags)
+		isStrongTipPoolMember:           lpromise.NewValue[bool](),
+		isWeakTipPoolMember:             lpromise.NewValue[bool](),
+		isStronglyConnectedToTips:       lpromise.NewValue[bool](),
+		isConnectedToTips:               lpromise.NewValue[bool](),
+		isStronglyReferencedByOtherTips: lpromise.NewValue[bool](),
+		isReferencedByOtherTips:         lpromise.NewValue[bool](),
+		isStrongTip:                     lpromise.NewValue[bool](),
+		isWeakTip:                       lpromise.NewValue[bool](),
+		isOrphaned:                      lpromise.NewValue[bool](),
+
+		// derived properties (relational counters)
+		stronglyConnectedStrongChildren: lpromise.NewValue[int](),
+		connectedWeakChildren:           lpromise.NewValue[int](),
+		orphanedStrongParents:           lpromise.NewValue[int](),
 	}
 
-	agential.CreateTransformerWith2Inputs(t.isStrongTipPoolMember, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
-		return tipPool == tipmanager.StrongTipPool && !isOrphaned
-	}, t.tipPool, t.isOrphaned)
-
-	agential.CreateTransformerWith2Inputs(t.isWeakTipPoolMember, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
-		return tipPool == tipmanager.WeakTipPool && !isOrphaned
-	}, t.tipPool, t.isOrphaned)
-
-	agential.CreateTransformerWith2Inputs(t.isStronglyConnectedToTips, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
-		return isStrongTipPoolMember || isStronglyReferencedByOtherTips
-	}, t.isStrongTipPoolMember, t.isStronglyReferencedByOtherTips)
-
-	agential.CreateTransformerWith3Inputs(t.isConnectedToTips, func(isReferencedByOtherTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
-		return isReferencedByOtherTips || isStrongTipPoolMember || isWeakTipPoolMember
-	}, t.isReferencedByOtherTips, t.isStrongTipPoolMember, t.isWeakTipPoolMember)
-
-	agential.CreateTransformer(t.isStronglyReferencedByOtherTips, func(stronglyConnectedStrongChildren int) bool {
-		return stronglyConnectedStrongChildren > 0
-	}, t.stronglyConnectedStrongChildren)
-
-	agential.CreateTransformerWith2Inputs(t.isReferencedByOtherTips, func(connectedWeakChildren int, isStronglyReferencedByOtherTips bool) bool {
-		return connectedWeakChildren > 0 || isStronglyReferencedByOtherTips
-	}, t.connectedWeakChildren, t.isStronglyReferencedByOtherTips)
-
-	agential.CreateTransformerWith2Inputs(t.isStrongTip, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
-		return isStrongTipPoolMember && !isStronglyReferencedByOtherTips
-	}, t.isStrongTipPoolMember, t.isStronglyReferencedByOtherTips)
-
-	agential.CreateTransformerWith2Inputs(t.isWeakTip, func(isWeakTipPoolMember bool, isReferencedByOtherTips bool) bool {
-		return isWeakTipPoolMember && !isReferencedByOtherTips
-	}, t.isWeakTipPoolMember, t.isReferencedByOtherTips)
-
-	agential.CreateTransformerWith2Inputs(t.isOrphaned, func(isMarkedOrphaned bool, orphanedStrongParents int) bool {
-		return isMarkedOrphaned || orphanedStrongParents > 0
-	}, t.isMarkedOrphaned, t.orphanedStrongParents)
+	value.DeriveFrom2(t.isStrongTipPoolMember, isStrongTipPoolMember, t.tipPool, t.isOrphaned)
+	value.DeriveFrom2(t.isWeakTipPoolMember, isWeakTipPoolMember, t.tipPool, t.isOrphaned)
+	value.DeriveFrom2(t.isStronglyConnectedToTips, isStronglyConnectedToTips, t.isStrongTipPoolMember, t.isStronglyReferencedByOtherTips)
+	value.DeriveFrom3(t.isConnectedToTips, isConnectedToTips, t.isReferencedByOtherTips, t.isStrongTipPoolMember, t.isWeakTipPoolMember)
+	value.DeriveFrom1(t.isStronglyReferencedByOtherTips, isStronglyReferencedByOtherTips, t.stronglyConnectedStrongChildren)
+	value.DeriveFrom2(t.isReferencedByOtherTips, isReferencedByOtherTips, t.connectedWeakChildren, t.isStronglyReferencedByOtherTips)
+	value.DeriveFrom2(t.isStrongTip, isStrongTip, t.isStrongTipPoolMember, t.isStronglyReferencedByOtherTips)
+	value.DeriveFrom2(t.isWeakTip, isWeakTip, t.isWeakTipPoolMember, t.isReferencedByOtherTips)
+	value.DeriveFrom2(t.isOrphaned, isOrphaned, t.isMarkedOrphaned, t.orphanedStrongParents)
 
 	t.OnEvicted(func() { t.SetTipPool(tipmanager.DroppedTipPool) })
 
@@ -255,6 +233,42 @@ func (t *TipMetadata) setupWeakParent(weakParent *TipMetadata) {
 
 // code contract (make sure the type implements all required methods).
 var _ tipmanager.TipMetadata = new(TipMetadata)
+
+func isStrongTipPoolMember(tipPool tipmanager.TipPool, isOrphaned bool) bool {
+	return tipPool == tipmanager.StrongTipPool && !isOrphaned
+}
+
+func isWeakTipPoolMember(tipPool tipmanager.TipPool, isOrphaned bool) bool {
+	return tipPool == tipmanager.WeakTipPool && !isOrphaned
+}
+
+func isStronglyConnectedToTips(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
+	return isStrongTipPoolMember || isStronglyReferencedByOtherTips
+}
+
+func isConnectedToTips(isReferencedByOtherTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
+	return isReferencedByOtherTips || isStrongTipPoolMember || isWeakTipPoolMember
+}
+
+func isStronglyReferencedByOtherTips(stronglyConnectedStrongChildren int) bool {
+	return stronglyConnectedStrongChildren > 0
+}
+
+func isReferencedByOtherTips(connectedWeakChildren int, isStronglyReferencedByOtherTips bool) bool {
+	return connectedWeakChildren > 0 || isStronglyReferencedByOtherTips
+}
+
+func isStrongTip(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
+	return isStrongTipPoolMember && !isStronglyReferencedByOtherTips
+}
+
+func isWeakTip(isWeakTipPoolMember bool, isReferencedByOtherTips bool) bool {
+	return isWeakTipPoolMember && !isReferencedByOtherTips
+}
+
+func isOrphaned(isMarkedOrphaned bool, orphanedStrongParents int) bool {
+	return isMarkedOrphaned || orphanedStrongParents > 0
+}
 
 // increase increases the given value by 1.
 func increase(currentValue int) int {
