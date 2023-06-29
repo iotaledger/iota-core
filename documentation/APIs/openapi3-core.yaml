@@ -16,14 +16,12 @@ servers:
 tags:
   - name: node
     description: Everything about the node itself.
-  - name: congestion
-    description: Everything about the congestion.
   - name: accounts
     description: Everything about the accounts.
   - name: rewards
     description: Everything about Mana rewards.
   - name: staking
-    description: Everything about the node itself.
+    description: Everything about staking.
   - name: committee
     description: Everything about the committee.
   - name: blocks
@@ -32,10 +30,7 @@ tags:
     description: Everything about UTXOs.
   - name: commitments
     description: Everything about commitments.
-  - name: peers
-    description: Everything about the peers of the node.
-  - name: control
-    description: Everything about controlling the node.
+
 paths:
   /health:
     get:
@@ -108,29 +103,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-  '/api/core/v3/congestion':
+  '/api/core/v3/accounts/{accountId}/congestion':
     get:
       tags:
-        - congestion
-      summary: Check readiness of the node to issue a new block, and the mana cost based on the rate setter and current network congestion.
+        - accounts
+      summary: Check if the account is ready to issue a block.
       description: >-
-        Check readiness of the node to issue a new block based on the rate setter and current network congestion. If no accountID is provided in the
-        query string parameter, return the congestion info of the node that the request is sent to.
+        Check readiness of the node to issue a new block, the referenced mana cost based on the rate setter and current network congestion, and the block issuance credits of requested account.
       parameters:
-        - in: query
-          name: accountID
-          schema:
-            type: string
-          example: "did:iota:123456789abcdefghi"
-          required: false
-          description: Identifier of the account to be checked for readines.
         - in: query
           name: slotIndex
           schema:
             type: integer
           example: 1622568540
           required: false
-          description: Check the cost and issuance readiness for a specific slot index.
+          description: Check the referenced mana cost, block issuance credits and issuance readiness for a specific slot index.
       responses:
         '200':
           description: "Successful operation."
@@ -166,160 +153,70 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceUnavailableResponse'
 
-
-  /api/core/v3/accounts/{accountId}/status:
-    get:
-      tags:
-        - accounts
-      summary: Returns information of an account.
-      description: >-
-        Returns information for an account's block issuer status. If slotIndex is not provided, the returned status is for the current slot index.  
-      parameters:
-        - in: path
-          name: accountId
-          schema:
-            type: string
-          example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
-          required: true
-          description: Identifier of the account.
-        - in: query
-          name: slotIndex
-          schema:
-            type: integer
-          example: 1622568540
-          required: false
-          description: Check the account status for a specific slot index.
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AccountResponse'
-
-  /api/core/v3/accounts/{accountId}/mana:
-    get:
-      tags:
-        - accounts
-      summary: Returns the mana of an account. 
-      description: >-
-        Returns the potential and stored mana of the account. If slotIndex is not provided, the returned status is for the current slot index.
-      parameters:
-        - in: path
-          name: accountId
-          schema:
-            type: string
-          example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
-          required: true
-          description: Identifier of the account.
-        - in: query
-          name: slotIndex
-          schema:
-            type: integer
-          example: 1622568540
-          required: false
-          description: Check the mana of an account for a specific slot index.
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AccountManaResponse'
-
-  /api/core/v3/rewards/staking/{accountId}:
+  '/api/core/v3/rewards/{outputId}':
     get:
       tags:
         - rewards
-      summary: Returns the totally available Mana rewards of an account (stakers). 
+      summary: Returns the totally available Mana rewards of an account from account/delegation output. 
       description: >-
-        Returns the totally available Mana rewards of an account of stakers. The rewards are calculated based on the start and end epoch in the respective output. However, rewards for an epoch only become available at the beginning of the next epoch. If the end epoch is equal or greater than the current epoch, the rewards response will not include the potentially available rewards for those epochs.
+        Returns the totally available Mana rewards of an account up until current epoch index. However, rewards for an epoch only become available at the beginning of the next epoch. If the end epoch is equal or greater than the current epoch, the rewards response will not include the potentially available rewards for those epochs.
       parameters:
         - in: path
-          name: accountId
+          name: outputId
           schema:
             type: string
           example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
           required: true
-          description: Identifier of the account.
-        - in: query
-          name: startEpoch
-          schema:
-            type: integer
-          example: 20
-          required: true
-          description: The epoch index in which the staking started.
-        - in: query
-          name: endEpoch
-          schema:
-            type: integer
-          example: 25
-          required: true
-          description: The epoch index in which the staking ends.
-        - in: query
-          name: stakedAmount
-          schema:
-            type: integer
-          example: 1000000
-          required: true
-          description: The amount of IOTA coins that are locked and staked in the containing account.
+          description: Identifier of the output.
       responses:
         '200':
           description: "Successful operation."
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountManaResponse'
-
-  /api/core/v3/rewards/delegation/{accountId}:
-    get:
-      tags:
-        - rewards
-      summary: Returns the totally available Mana rewards of account (delegators). 
-      description: >-
-        Returns the totally available Mana rewards of an account of delegators. The rewards are calculated based on the start and end epoch in the respective output. However, rewards for an epoch only become available at the beginning of the next epoch. If the end epoch is equal or greater than the current epoch, the rewards response will not include the potentially available rewards for those epochs.
-      parameters:
-        - in: path
-          name: accountId
-          schema:
-            type: string
-          example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
-          required: true
-          description: Identifier of the account.
-        - in: query
-          name: startEpoch
-          schema:
-            type: integer
-          example: 20
-          required: true
-          description: The epoch index in which the staking started.
-        - in: query
-          name: endEpoch
-          schema:
-            type: integer
-          example: 25
-          required: true
-          description: The epoch index in which the staking ends.
-        - in: query
-          name: stakedAmount
-          schema:
-            type: integer
-          example: 1000000
-          required: true
-          description: The amount of IOTA coins that are locked and staked in the containing account.
-      responses:
-        '200':
-          description: "Successful operation."
+                $ref: '#/components/schemas/AccountRewardsResponse'
+              examples:
+                CongestionResponse:
+                  $ref: '#/components/examples/get-account-rewards-example'
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountManaResponse'
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+        '503':
+          description: "Unsuccessful operation: indicates that the node is not synced."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableResponse'
 
   /api/core/v3/committee:
     get:
       tags:
         - committee
-      summary: Return the information of committee members. 
+      summary: Return the information of committee members.
+      description: Return the information of committee members at the given epoch index. If epoch index is not provided, the current committee members are returned.
+      parameters:
+        - in: query
+          name: epochIndex
+          schema:
+            type: integer
+          example: 20
+          required: false
+          description: The epoch index to query.
       responses:
         '200':
           description: "Successful operation."
@@ -327,14 +224,79 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommitteeResponse'
+              examples:
+                CongestionResponse:
+                  $ref: '#/components/examples/get-committee-example'
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+        '503':
+          description: "Unsuccessful operation: indicates that the node is not synced."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableResponse'
+
+  /api/core/v3/staking:
+    get:
+      tags:
+        - staking
+      summary: Returns information of active stakers.         
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountStakingListResponse'
+              examples:
+                CongestionResponse:
+                  $ref: '#/components/examples/get-staker-list-example'
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+        '503':
+          description: "Unsuccessful operation: indicates that the node is not synced."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableResponse'
 
   /api/core/v3/staking/{accountId}:
     get:
       tags:
         - staking
-      summary: TODO, return performance factor of the account, total pool stake.
-      description: >-
-        Returns mana of an account.
+      summary: Return the information of requested staker.
       parameters:
         - in: path
           name: accountId
@@ -350,6 +312,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AccountStakingResponse'
+              examples:
+                CongestionResponse:
+                  $ref: '#/components/examples/get-staker-example'
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+        '503':
+          description: "Unsuccessful operation: indicates that the node is not synced."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableResponse'
 
   /api/core/v3/blocks/issuance:
     get:
@@ -698,7 +687,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
-
   
   '/api/core/v3/transactions/{transactionId}/included-block':
     get:
@@ -1026,252 +1014,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-
-  /api/core/v3/peers:
-    get:
-      tags:
-        - peers
-      summary: Get information about the peers of the node.
-      description: Get information about the peers of the node.
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PeersResponse'
-              examples:
-                default:
-                  $ref: '#/components/examples/get-peers-response-example'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-    post:
-      tags:
-        - peers
-      summary: Add a given peer to the node.
-      description: Add a given peer to the node.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AddPeerRequest'
-            examples:
-              default:
-                $ref: '#/components/examples/post-peer-request-example'
-        required: true
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AddPeerResponse'
-              examples:
-                default:
-                  $ref: '#/components/examples/post-peer-response-example'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '404':
-          description: "Unsuccessful operation: indicates that the requested data was not found."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotFoundResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-  '/api/core/v3/peers/{peerId}':
-    get:
-      tags:
-        - peers
-      summary: Get information about a given peer.
-      description: Get information about a given peer.
-      parameters:
-        - in: path
-          name: peerId
-          schema:
-            type: string
-          example: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
-          required: true
-          description: Identifier of the block.
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PeerResponse'
-              examples:
-                default:
-                  $ref: '#/components/examples/get-peer-response-example'
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '404':
-          description: "Unsuccessful operation: indicates that the requested data was not found."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotFoundResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-    delete:
-      tags:
-        - peers
-      summary: Remove/disconnect a given peer.
-      description: Remove/disconnect a given peer.
-      parameters:
-        - in: path
-          name: peerId
-          schema:
-            type: string
-          example: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
-          required: true
-          description: Identifier of the peer.
-      responses:
-        '204':
-          description: "Successful operation."
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-        '404':
-          description: "Unsuccessful operation: indicates that the requested data was not found."
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-
-  '/api/core/v3/control/database/prune':
-    post:
-      tags:
-        - control
-      summary: Prunes the node database.
-      description: Prunes the node database.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PruneDatabaseRequest'
-            examples:
-              default:
-                $ref: '#/components/examples/database-prune-request-example'
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PruneDatabaseResponse'
-              examples:
-                default:
-                  $ref: '#/components/examples/database-prune-response-example'
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '404':
-          description: "Unsuccessful operation: indicates that the requested data was not found."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotFoundResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-
-  '/api/core/v3/control/snapshot/create':
-    post:
-      tags:
-        - control
-      summary: Creates a new snapshot.
-      description: Creates a new snapshot.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateSnapshotRequest'
-            examples:
-              Full Snapshot:
-                $ref: '#/components/examples/create-full-snapshot-request-example'
-              Delta Snapshot:
-                $ref: '#/components/examples/create-delta-snapshot-request-example'
-      responses:
-        '200':
-          description: "Successful operation."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreateSnapshotResponse'
-              examples:
-                Full Snapshot:
-                  $ref: '#/components/examples/create-full-snapshot-response-example'
-                Delta Snapshot:
-                  $ref: '#/components/examples/create-delta-snapshot-response-example'
-        '400':
-          description: "Unsuccessful operation: indicates that the provided data is invalid."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BadRequestResponse'
-        '403':
-          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ForbiddenResponse'
-        '404':
-          description: "Unsuccessful operation: indicates that the requested data was not found."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotFoundResponse'
-        '500':
-          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InternalErrorResponse'
-
 components:
   examples:
     get-routes-response-example:
@@ -1535,8 +1277,55 @@ components:
         nonce: "105368"
         signature: "0xd2215b9307c272eb12ea42c18768b9e133ed5b674abc23c577f5096520e433c807930497ed3f90498a7c82bbc1a730f20201413b10a30cd8737403fdbb63bf874966ca205f25e790a8860fbc152a9775e430b9618cd6282d2a0d29969412de07"
     
+    get-committee-example:
+      value:
+        totalStake: 900000000
+        totalValidatorStake: 60000000
+        validators:
+          - accountId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+            poolStake: 200000
+            validatorStake: 100000
+            fixedCost: 50000
+            latestSupportedProtocolVersion: 3
+          - accountId: "0x897dr69bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+            poolStake: 205000
+            validatorStake: 90000
+            fixedCost: 52000
+            latestSupportedProtocolVersion: 3
+
+    get-staker-list-example:
+      value:
+        validators:
+          - accountId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+            poolStake: 200000
+            validatorStake: 100000
+            fixedCost: 50000
+            latestSupportedProtocolVersion: 3
+          - accountId: "0x897dr69bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+            poolStake: 205000
+            validatorStake: 90000
+            fixedCost: 52000
+            latestSupportedProtocolVersion: 3
+
+    get-staker-example:
+      value:
+        accountId: "0x897dr69bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
+        poolStake: 205000
+        validatorStake: 90000
+        fixedCost: 52000
+        latestSupportedProtocolVersion: 3
+
+    get-account-rewards-example:
+      value:
+        currentEpochIndex: 60
+        rewards: 800000
+
     get-congestion-estimate-response-example:
       value:
+        slotIndex: 20
+        ready: true
+        referencedManaCost: 50000
+        blockIssuanceCredits: 10000000
 
     get-block-by-id-empty-response-example:
       value:
@@ -1700,139 +1489,6 @@ components:
         consumedOutputs:
           - "0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6"
           - "0x7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7"
-
-    get-peers-response-example:
-      value:
-        - id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
-          multiAddresses:
-            - "/dns/abc.com/tcp/15602"
-          alias: abc
-          relation: known
-          connected: true
-          gossip:
-            heartbeat:
-              latestCommittedSlotIndex: 61527
-              prunedSlotIndex: 61200
-              latestConfirmedSlotIndex: 61527
-              connectedNeighbors: 5
-              syncedNeighbors: 7
-            metrics:
-              newBlocks: 3799
-              knownBlocks: 554
-              receivedBlocks: 4370
-              receivedBlockRequests: 0
-              receivedHeartbeats: 1
-              sentBlocks: 6
-              sentBlockRequests: 4325
-              sentHeartbeats: 9
-              droppedPackets: 0
-        - id: 12D3KooWNYDcJqxnWqCLSgeQKqNStwFUqHSJXPdSYTJnfxQESzie
-          multiAddresses:
-            - "/dns/xyz.com/tcp/15600"
-          alias: xyz
-          relation: known
-          connected: true
-          gossip:
-            heartbeat:
-              latestCommittedSlotIndex: 61527
-              prunedSlotIndex: 56508
-              latestConfirmedSlotIndex: 61527
-              connectedNeighbors: 5
-              syncedNeighbors: 6
-            metrics:
-              newBlocks: 510
-              knownBlocks: 79
-              receivedBlocks: 589
-              receivedBlockRequests: 0
-              receivedHeartbeats: 1
-              sentBlocks: 42
-              sentBlockRequests: 576
-              sentHeartbeats: 9
-              droppedPackets: 0
-
-    get-peer-response-example:
-      value:
-        id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
-        multiAddresses:
-          - "/dns/abc.com/tcp/15602"
-        alias: abc
-        relation: known
-        connected: true
-        gossip:
-          heartbeat:
-            latestCommittedSlotIndex: 61527
-            prunedSlotIndex: 61200
-            latestConfirmedSlotIndex: 61527
-            connectedNeighbors: 5
-            syncedNeighbors: 7
-          metrics:
-            newBlocks: 3799
-            knownBlocks: 554
-            receivedBlocks: 4370
-            receivedBlockRequests: 0
-            receivedHeartbeats: 1
-            sentBlocks: 6
-            sentBlockRequests: 4325
-            sentHeartbeats: 9
-            droppedPackets: 0
-
-    post-peer-request-example:
-      value:
-        multiAddress: >-
-          /dns/abc.com/tcp/15602/p2p/12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
-        alias: abc.com
-
-    post-peer-response-example:
-      value:
-        id: 12D3KooWMajsSUxSUFb3CRgmJvygYCGd27uMDdppVYNGud7xuKG5
-        multiAddresses:
-          - "/dns/abc.com/tcp/15602"
-        alias: abc
-        relation: known
-        connected: true
-        gossip:
-          heartbeat:
-            latestCommittedSlotIndex: 61527
-            prunedSlotIndex: 61200
-            latestConfirmedSlotIndex: 61527
-            connectedNeighbors: 5
-            syncedNeighbors: 7
-          metrics:
-            newBlocks: 3799
-            knownBlocks: 554
-            receivedBlocks: 4370
-            receivedBlockRequests: 0
-            receivedHeartbeats: 1
-            sentBlocks: 6
-            sentBlockRequests: 4325
-            sentHeartbeats: 9
-            droppedPackets: 0
-
-    database-prune-request-example:
-      value:
-        targetDatabaseSize: 21474836480
-
-    database-prune-response-example:
-      value:
-        index: 1560
-
-    create-full-snapshot-request-example:
-      value:
-        fullIndex: 1560
-
-    create-full-snapshot-response-example:
-      value:
-        fullIndex: 1560
-        fullFilePath: "snapshots/mainnet/full_snapshot_1560.bin"
-
-    create-delta-snapshot-request-example:
-      value:
-        deltaIndex: 1000
-
-    create-delta-snapshot-response-example:
-      value:
-        deltaIndex: 1000
-        deltaFilePath: "snapshots/mainnet/delta_snapshot_1000.bin"
 
   schemas:
 
@@ -2619,38 +2275,6 @@ components:
       required:
         - type
 
-    Peer:
-      description: The peer of a node.
-      properties:
-        id:
-          type: string
-          description: The identifier of the peer.
-        multiAddresses:
-          type: array
-          items:
-            type: string
-          description: The addresses of the peer.
-        alias:
-          type: string
-          description: The alias of the peer.
-        relation:
-          type: string
-          enum:
-            - known
-            - unknown
-            - autopeered
-        connected:
-          type: boolean
-          description: Tells whether the peer is connected or not.
-        gossip:
-          allOf:
-            - $ref: '#/components/schemas/Gossip'
-      required:
-        - id
-        - multiAddresses
-        - relation
-        - connected
-
     Gossip:
       description: Information about the gossip stream with the peer.
       properties:
@@ -3007,42 +2631,35 @@ components:
         - baseToken
         - features
 
-    # TODO: Update this.
     AccountStakingResponse:
-      description: Returns the stored and potential mana of the account.
-      properties:
-        potentialMana:
-          type: integer
-        storedMana:
-          type: integer
+      description: Returns the requested staking information of the account.
+      oneOf:
+        - $ref: '#/components/schemas/Validator'
 
-    AccountManaResponse:
+    AccountStakingListResponse:
+      description: Returns a list of active validators to stake.
+      properties:
+        validators:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/Validator'
+
+    AccountRewardsResponse:
       description: Returns the stored and potential mana of the account.
       properties:
-        potentialMana:
+        currentEpochIndex:
           type: integer
-        storedMana:
+          description: The epoch index of current time.
+        rewards:
           type: integer
+          description: The amount of rewards the account get.
 
     AccountResponse:
       description: Returns information that are ideal for attaching a block.
       properties:
-        accountStatus:
-          type: string
-          enum:
-            - active
-            - inactive
-            - nonBlockIssuer
-            - locked
-          description: Only an 'active' account is allowed to issue blocks. For the account to be active, the block issuer feature must be present and the Block Issuance Credits (BIC) balance of an account must be non-negative. If the block issuer feature is not present, 'nonBlockIssuer' is returned. If the slot in which the block issuer feature was added is not yet committed, the status is 'inactive'. If the BIC balance is negative, the account is 'locked'.
         slotIndex: 
           type: integer
-        blockIssuerKeys:
-          type: array
-          description: The keys allowed to issue blocks.
-          items:
-            type: string
-            description: Ed25519 public key in Hex.
         blockIssuanceCredits:
           type: integer
     
@@ -3054,7 +2671,7 @@ components:
           description: The total stake of the committee holds.
         totalValidatorStake:
           type: integer
-          description: The total stake of the validator holds.
+          description: The total stake of the validators hold.
         validators:
           type: array
           description: The validators of the committee.
@@ -3065,15 +2682,21 @@ components:
     Validator:
       description: Returns information of a validator.
       properties:
+        accountId: 
+          type: string
+          description: The account identifier of the validator
         poolStake:
           type: integer
           description: The total stake of the pool, including delegators.
         validatorStake:
           type: integer
-          description: The validator's stake.
+          description: The stake of validator holds.
         fixedCost:
           type: integer
-
+          description: The fixed cost of the validator, which it receives as part of its Mana rewards.
+        latestSupportedProtocolVersion:
+          type: integer
+          description: The latest protocol version the validator supported.
 
     IssuanceBlockHeaderResponse:
       description: Returns information that are ideal for attaching a block.
@@ -3102,22 +2725,22 @@ components:
     CongestionResponse:
       description: Provides the cost and readiness to issue estimates.
       properties:
-        slot-index:
+        slotIndex:
           type: integer
           description: The slot index for which the congestion estimate is provided.
         ready:
-          type: integer
+          type: boolean
           description: >
             Provided only if account specified in the request. Indicates if a node is ready to issue a block in a current congestion or should wait.
-            Values:
-              * `0`: ready to issue a block.
-              * `1`: need to wait.
-        cost:
+        referencedManaCost:
           type: integer
           description: The cost in mana for issuing a block in a current congestion estimated based on RMC and slot index.
+        blockIssuanceCredits:
+          type: integer
       required:
-        - slot-index
-        - cost
+        - slotIndex
+        - referencedManaCost
+        - blockIssuanceCredits
 
 
     Commitment:
@@ -3341,75 +2964,3 @@ components:
         - index
         - createdOutputs
         - consumedOutputs
-
-    PeersResponse:
-      description: Returns all peers of the node.
-      type: array
-      items:
-        $ref: '#/components/schemas/Peer'
-
-    PeerResponse:
-      description: Returns a given peer of the node.
-      properties:
-        allOf:
-          $ref: '#/components/schemas/Peer'
-
-    AddPeerRequest:
-      description: Adds a given peer to the node.
-      properties:
-        multiAddress:
-          type: string
-        alias:
-          type: string
-      required:
-        - multiAddress
-
-    AddPeerResponse:
-      description: Returns information about an added peer.
-      properties:
-        allOf:
-          $ref: '#/components/schemas/Peer'
-
-    PruneDatabaseRequest:
-      description:  Defines the request of a prune database REST API call
-      properties:
-        index:
-          type: integer
-          description: The pruning target index.
-        depth:
-          type: integer
-          description: The pruning depth.
-        targetDatabaseSize:
-          type: string
-          description: The target size of the database in bytes.
-
-    PruneDatabaseResponse:
-      description: Defines the response of a prune database REST API call
-      properties:
-        index:
-          type: integer
-          description: The index of the snapshot.
-      required:
-        - index
-
-    CreateSnapshotRequest:
-      description: Defines the request of a create snapshots REST API call.
-      properties:
-        index:
-          type: integer
-          description: The index of the snapshot.
-      required:
-        - index
-
-    CreateSnapshotResponse:
-      description: Defines the request of a create snapshots REST API call.
-      properties:
-        index:
-          type: integer
-          description: The index of the snapshot.
-        filePath:
-          type: string
-          description: The file path of the snapshot file.
-      required:
-        - index
-        - filePath
