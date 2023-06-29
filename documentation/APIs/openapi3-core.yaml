@@ -2887,7 +2887,10 @@ components:
               description: The age in slots when you can evict blocks by committing them into a slot commitments and when slots stop being a consumable accounts' state relative to the latest committed slot.
             livenessThreshold:
               type: number
-              description: Determine the if a block is eligibile by evaluating issuingTime and commitments in its pastcone to ATT and lastCommittedSlot respectively.
+              description: Determine if a block is eligibile by evaluating issuingTime and commitments in its pastcone to ATT and lastCommittedSlot respectively.
+            epochNearingThreshold:
+              type: number
+              description: Determine the slot that should trigger a new committee selection for the next and upcoming epoch.
           required:
             - networkName
             - bech32Hrp
@@ -2898,6 +2901,7 @@ components:
             - version
             - genesisSlotIndex
             - slotDurationInSeconds
+            - epochNearingThreshold
         baseToken:
           description: Gives info about the base token the network uses.
           properties:
