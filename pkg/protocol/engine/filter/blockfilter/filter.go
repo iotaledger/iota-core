@@ -18,7 +18,6 @@ var (
 	ErrCommitmentNotCommittable                  = errors.New("a block cannot commit to a slot that cannot objectively be committable yet")
 	ErrBlockTimeTooFarAheadInFuture              = errors.New("a block cannot be too far ahead in the future")
 	ErrInvalidSignature                          = errors.New("block has invalid signature")
-	ErrInvalidProofOfWork                        = errors.New("error validating PoW")
 	ErrTransactionCommitmentInputTooFarInThePast = errors.New("transaction in a block references too old CommitmentInput")
 )
 
@@ -26,7 +25,8 @@ var (
 type Filter struct {
 	events *filter.Events
 
-	protocolParamsFunc func() *iotago.ProtocolParameters
+	//TODO: add a slotIndex to this callback to get the valid ones for the block's slot
+	protocolParamsFunc func() iotago.ProtocolParameters
 
 	optsMaxAllowedWallClockDrift time.Duration
 	optsSignatureValidation      bool
@@ -67,33 +67,10 @@ func New(parameters func() *iotago.ProtocolParameters, opts ...options.Option[Fi
 // ProcessReceivedBlock processes block from the given source.
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID) {
 	protocolParams := f.protocolParamsFunc()
-	if protocolParams.MinPoWScore > 0 {
-		// Check if the block has enough PoW score.
-		score, _, err := block.Block().POW()
-		if err != nil {
-			f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-				Block:  block,
-				Reason: errors.WithMessage(ErrInvalidProofOfWork, "error calculating PoW score"),
-				Source: source,
-			})
-
-			return
-		}
-
-		if score < float64(protocolParams.MinPoWScore) {
-			f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-				Block:  block,
-				Reason: errors.WithMessagef(ErrInvalidProofOfWork, "score %f is less than min score %d", score, protocolParams.MinPoWScore),
-				Source: source,
-			})
-
-			return
-		}
-	}
 
 	// Check if the block is trying to commit to a slot that is not yet committable.
 	// This check, together with the optsMaxAllowedWallClockDrift makes sure that no one can issue blocks with commitments in the future.
-	if block.SlotCommitment().Index() > 0 && block.SlotCommitment().Index()+protocolParams.EvictionAge > block.ID().Index() {
+	if block.SlotCommitment().Index() > 0 && block.SlotCommitment().Index()+protocolParams.EvictionAge() > block.ID().Index() {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
 			Reason: errors.WithMessagef(ErrCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.Block().SlotCommitment.Index),
@@ -127,7 +104,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 			// and the slot that block is committing to.
 
 			// Parameters moved to the other side of inequality to avoid underflow errors with subtraction from an uint64 type.
-			if commitmentInput.CommitmentID.Index()+protocolParams.EvictionAge+protocolParams.EvictionAge < block.ID().Index() {
+			if commitmentInput.CommitmentID.Index()+protocolParams.EvictionAge()+protocolParams.EvictionAge() < block.ID().Index() {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,
 					Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while min allowed is %d", commitmentInput.CommitmentID.Index(), block.ID().Index()-protocolParams.LivenessThreshold-protocolParams.EvictionAge),
