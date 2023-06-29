@@ -202,7 +202,8 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 		accountOutput.AccountID,
 		append(
 			stakingOpts,
-			// TODO: this is only used in the snapshots, but we shouldn't simply cast the iota value to credits here.
+			// TODO: this is only used during genesis snapshot generation,
+			//  but we shouldn't simply cast the iota value to credits here.
 			accounts.WithCredits(accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(accountOutput.Amount), m.latestCommittedSlot)),
 			accounts.WithOutputID(output.OutputID()),
 			accounts.WithPubKeys(ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...),

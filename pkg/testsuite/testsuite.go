@@ -3,6 +3,7 @@ package testsuite
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"sync"
@@ -20,6 +21,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
@@ -30,6 +32,7 @@ import (
 )
 
 const MinIssuerAccountDeposit = iotago.BaseToken(84400)
+const MinValidatorAccountDeposit = iotago.BaseToken(87700)
 
 type TestSuite struct {
 	Testing     *testing.T
@@ -94,6 +97,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			SlotsPerEpochExponent: 2,
 			EvictionAge:           t.optsEvictionAge,
 			LivenessThreshold:     t.optsLivenessThreshold,
+			EpochNearingThreshold: 3,
 		}
 
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(t.ProtocolParameters.GenesisUnixTimestamp, 0))
@@ -317,15 +321,18 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	node := mock.NewNode(t.Testing, t.Network, partition, name, validator)
 	t.nodes.Set(name, node)
 
-	deposit := MinIssuerAccountDeposit
+	deposit := MinValidatorAccountDeposit
 	if len(optDeposit) > 0 {
 		deposit = optDeposit[0]
 	}
 	if deposit > 0 {
 		t.optsAccounts = append(t.optsAccounts, snapshotcreator.AccountDetails{
-			Address:   iotago.Ed25519AddressFromPubKey(node.PubKey),
-			Amount:    deposit,
-			IssuerKey: node.PubKey,
+			Address:         iotago.Ed25519AddressFromPubKey(node.PubKey),
+			Amount:          deposit,
+			IssuerKey:       node.PubKey,
+			StakingEpochEnd: math.MaxUint64,
+			FixedCost:       iotago.Mana(0),
+			StakedAmount:    deposit,
 		})
 	}
 
@@ -360,6 +367,7 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 	if t.optsAccounts != nil {
 		wallet := mock.NewHDWallet("genesis", t.genesisSeed[:], 0)
 		t.optsSnapshotOptions = append(t.optsSnapshotOptions, snapshotcreator.WithAccounts(lo.Map(t.optsAccounts, func(accountDetails snapshotcreator.AccountDetails) snapshotcreator.AccountDetails {
+			// if no custom address is assigned to the account, assign an address generated from GenesisSeed
 			if accountDetails.Address == nil {
 				accountDetails.Address = wallet.Address()
 			}
@@ -367,7 +375,9 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 			return accountDetails
 		})...))
 	}
+
 	// TODO: what if someone passes custom GenesisSeed? We set the random one anyway in the transaction framework.
+
 	err := snapshotcreator.CreateSnapshot(append([]options.Option[snapshotcreator.Options]{snapshotcreator.WithGenesisSeed(t.genesisSeed[:])}, t.optsSnapshotOptions...)...)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
@@ -380,6 +390,9 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(validators),
+			),
+			protocol.WithEpochGadgetProvider(
+				epochorchestrator.NewProvider(),
 			),
 		}
 		if len(nodesOptions) == 1 {

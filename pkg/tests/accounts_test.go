@@ -21,8 +21,10 @@ import (
 func Test_TransitionAccount(t *testing.T) {
 	oldGenesisOutputKey := utils.RandPubKey().ToEd25519()
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
-		Address:   nil,                               // nil address will be replaced with the address generated from genesis seed
-		Amount:    testsuite.MinIssuerAccountDeposit, // min amount to cover the rent. if it's too little then the snapshot creation will fail
+		// nil address will be replaced with the address generated from genesis seed
+		Address: nil,
+		// Min amount to cover the rent. If it's too little, then the snapshot creation will fail
+		Amount:    testsuite.MinIssuerAccountDeposit,
 		IssuerKey: oldGenesisOutputKey,
 	}), testsuite.WithGenesisTimestampOffset(100*10))
 	defer ts.Shutdown()
@@ -213,7 +215,7 @@ func Test_TransitionAccount(t *testing.T) {
 			ValidatorStakeChange:  0,
 			StakeEndEpochChange:   0,
 			FixedCostChange:       0,
-			DelegationStakeChange: 1966240,
+			DelegationStakeChange: 1965580,
 		}, false, node1)
 
 		ts.AssertAccountData(&accounts.AccountData{

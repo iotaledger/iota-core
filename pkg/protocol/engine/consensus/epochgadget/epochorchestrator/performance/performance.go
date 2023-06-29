@@ -1,6 +1,7 @@
 package performance
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/cockroachdb/errors"
@@ -80,6 +81,8 @@ func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	epochSlotStart := m.timeProvider.EpochStart(epoch)
 	epochSlotEnd := m.timeProvider.EpochEnd(epoch)
 
+	fmt.Println("apply epoch ", epoch, "committee.TotalValidatorStake()", committee.TotalValidatorStake(), "committee.TotalStake()", committee.TotalStake())
+
 	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
 	poolsStats := PoolsStats{
 		TotalStake:          committee.TotalStake(),
@@ -149,6 +152,7 @@ func (m *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 	}
 
 	committee = account.NewAccounts()
+	fmt.Println("loaded accountBytes", accountsBytes)
 	if _, err = committee.FromBytes(accountsBytes); err != nil {
 		panic(errors.Wrapf(err, "failed to parse committee for epoch %d", epoch))
 	}
@@ -161,8 +165,8 @@ func (m *Tracker) storeCommitteeForEpoch(epochIndex iotago.EpochIndex, committee
 	if err != nil {
 		return err
 	}
-
-	if err := m.committeeStore.Set(epochIndex.Bytes(), committeeBytes); err != nil {
+	fmt.Println("storing accountBytes", committeeBytes)
+	if err = m.committeeStore.Set(epochIndex.Bytes(), committeeBytes); err != nil {
 		return err
 	}
 

@@ -84,6 +84,10 @@ type AccountDetails struct {
 	Address   iotago.Address
 	Amount    iotago.BaseToken
 	IssuerKey ed25519.PublicKey
+
+	StakingEpochEnd iotago.EpochIndex
+	FixedCost       iotago.Mana
+	StakedAmount    iotago.BaseToken
 }
 
 func WithAccounts(accounts ...AccountDetails) options.Option[Options] {
