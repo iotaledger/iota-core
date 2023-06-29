@@ -18,6 +18,8 @@ tags:
     description: Query Basic Outputs.
   - name: account outputs
     description: Query Account Outputs. - TO BE UPDATED
+  - name: delegation outputs
+    description: Query Account Outputs.
   - name: foundry outputs
     description: Query Foundry Outputs.
   - name: nft outputs
@@ -343,7 +345,86 @@ paths:
               schema:
                 $ref: '#/components/schemas/InternalErrorResponse'
 
-
+  /api/indexer/v2/outputs/delegation:
+    get:
+      tags:
+        - delegation outputs
+      summary: Returns basic outputs filtered based on parameters.
+      description: Returns basic outputs filtered based on parameters.
+      parameters:
+        - in: query
+          name: address
+          schema:
+            type: string
+          example: iota1qrhacyfwlcnzkvzteumekfkrrwks98mpdm37cj4xx3drvmjvnep6xqgyzyx
+          description: The Bech32-encoded address that should be searched for in the Address Unlock Condition of outputs.
+        - in: query
+          name: validatorId
+          schema:
+            type: string
+          example: true
+          description: Filters outputs based on the account of the validator to which the output is delegating.
+        - in: query
+          name: createdBefore
+          schema:
+            type: integer
+          example: 1643383242
+          description: Return outputs that were created before a certain Unix timestamp.
+        - in: query
+          name: createdAfter
+          schema:
+            type: integer
+          example: 1643383242
+          description: Return outputs that were created after a certain Unix timestamp.
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+          example: 10
+          description: The maximum amount of items returned in one call. If there are more items, a cursor to the next page is returned too.
+            The parameter is ignored when pageSize is defined via the cursor parameter.
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          example: 0c78e998f5177834ecb3bae1596d5056af76e487386eecb19727465b4be86a790200.10
+          description: Starts the search from the cursor (confirmationMS+outputId.pageSize).
+      responses:
+        '200':
+          description: "Successful operation."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutputsResponse'
+              examples:
+                Query results in 3 outputs:
+                  $ref: >-
+                    #/components/examples/get-outputs-response-three-example
+                No matching outputIds found:
+                  $ref: >-
+                    #/components/examples/get-outputs-empty-response-example
+                Paging - more items found than it can fit on single page:
+                  $ref: >-
+                    #/components/examples/get-outputs-pagesize2-response-example
+        '400':
+          description: "Unsuccessful operation: indicates that the provided data is invalid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestResponse'
+        '403':
+          description: "Unsuccessful operation: indicates that the endpoint is not available for public use."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '500':
+          description: "Unsuccessful operation: indicates that an unexpected, internal server error happened which prevented the node from fulfilling the request."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalErrorResponse'
+ 
   /api/indexer/v2/outputs/foundry:
     get:
       tags:
