@@ -38,7 +38,7 @@ func CommitmentFromCommitment(iotaCommitment *iotago.Commitment, api iotago.API,
 		return nil, err
 	}
 
-	commitmentID, err := iotaCommitment.ID()
+	commitmentID, err := iotaCommitment.ID(api)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func CommitmentFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Co
 		return nil, err
 	}
 
-	commitmentID, err := iotaCommitment.ID()
+	commitmentID, err := iotaCommitment.ID(api)
 	if err != nil {
 		return nil, err
 	}
