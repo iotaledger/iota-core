@@ -1,9 +1,10 @@
-package promise
+package value
 
 import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
 // Value is a thread safe value that allows multiple consumers to subscribe to changes by registering callbacks that are
@@ -18,13 +19,13 @@ type Value[T comparable] struct {
 	value T
 
 	// updateCallbacks are the registered callbacks that are triggered when the value changes.
-	updateCallbacks *shrinkingmap.ShrinkingMap[UniqueID, *Callback[func(prevValue, newValue T)]]
+	updateCallbacks *shrinkingmap.ShrinkingMap[types.UniqueID, *Callback[func(prevValue, newValue T)]]
 
 	// uniqueUpdateID is the unique ID that is used to identify an update.
-	uniqueUpdateID UniqueID
+	uniqueUpdateID types.UniqueID
 
 	// uniqueCallbackID is the unique ID that is used to identify a callback.
-	uniqueCallbackID UniqueID
+	uniqueCallbackID types.UniqueID
 
 	// mutex is used to ensure that updating the value and registering/unregistering callbacks is thread safe.
 	mutex sync.RWMutex
@@ -37,10 +38,10 @@ type Value[T comparable] struct {
 	optTriggerWithInitialZeroValue bool
 }
 
-// NewValue creates a new Value instance.
-func NewValue[T comparable]() *Value[T] {
+// New creates a new Value instance.
+func New[T comparable]() *Value[T] {
 	return &Value[T]{
-		updateCallbacks: shrinkingmap.New[UniqueID, *Callback[func(prevValue, newValue T)]](),
+		updateCallbacks: shrinkingmap.New[types.UniqueID, *Callback[func(prevValue, newValue T)]](),
 	}
 }
 
@@ -111,7 +112,7 @@ func (v *Value[T]) WithTriggerWithInitialZeroValue(trigger bool) *Value[T] {
 
 // prepareDynamicTrigger atomically prepares the trigger by setting the new value and returning the new value, the
 // previous value, the triggerID and the callbacks to trigger.
-func (v *Value[T]) prepareDynamicTrigger(newValueGenerator func(T) T) (newValue, previousValue T, triggerID UniqueID, callbacksToTrigger []*Callback[func(prevValue, newValue T)]) {
+func (v *Value[T]) prepareDynamicTrigger(newValueGenerator func(T) T) (newValue, previousValue T, triggerID types.UniqueID, callbacksToTrigger []*Callback[func(prevValue, newValue T)]) {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 

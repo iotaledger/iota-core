@@ -1,4 +1,4 @@
-package promise
+package value
 
 import (
 	"github.com/iotaledger/hive.go/ds/advancedset"

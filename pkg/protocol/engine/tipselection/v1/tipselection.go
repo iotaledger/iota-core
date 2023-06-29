@@ -9,8 +9,8 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	lpromise "github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/timed"
+	"github.com/iotaledger/iota-core/pkg/core/value"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -38,7 +38,7 @@ type TipSelection struct {
 	blockIssuingTimeThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
 
 	// blockIssuingTimeThreshold holds the time when the next block can be issued.
-	blockIssuingTimeThreshold *lpromise.Value[time.Time]
+	blockIssuingTimeThreshold *value.Value[time.Time]
 
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int
@@ -64,7 +64,7 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 		conflictDAG:                    conflictDAG,
 		rootBlocks:                     rootBlocksRetriever,
 		blockIssuingTimeThresholdQueue: timed.NewPriorityQueue[tipmanager.TipMetadata](true),
-		blockIssuingTimeThreshold:      lpromise.NewValue[time.Time](),
+		blockIssuingTimeThreshold:      value.New[time.Time](),
 		optMaxStrongParents:            8,
 		optMaxLikedInsteadReferences:   8,
 		optMaxWeakReferences:           8,

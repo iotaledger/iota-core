@@ -1,4 +1,4 @@
-package promise
+package value
 
 import (
 	"sync"
@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
 // Set is a wrapper for an AdvancedSet that is extended by the ability to register callbacks that are
@@ -16,13 +17,13 @@ type Set[T comparable] struct {
 	value *advancedset.AdvancedSet[T]
 
 	// updateCallbacks are the registered callbacks that are triggered when the value changes.
-	updateCallbacks *shrinkingmap.ShrinkingMap[UniqueID, *Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]]
+	updateCallbacks *shrinkingmap.ShrinkingMap[types.UniqueID, *Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]]
 
 	// uniqueUpdateID is the unique ID that is used to identify an update.
-	uniqueUpdateID UniqueID
+	uniqueUpdateID types.UniqueID
 
 	// uniqueCallbackID is the unique ID that is used to identify a callback.
-	uniqueCallbackID UniqueID
+	uniqueCallbackID types.UniqueID
 
 	// mutex is the mutex that is used to synchronize the access to the value.
 	mutex sync.RWMutex
@@ -39,7 +40,7 @@ type Set[T comparable] struct {
 func NewSet[T comparable]() *Set[T] {
 	return &Set[T]{
 		value:           advancedset.New[T](),
-		updateCallbacks: shrinkingmap.New[UniqueID, *Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]](),
+		updateCallbacks: shrinkingmap.New[types.UniqueID, *Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]](),
 	}
 }
 
@@ -214,7 +215,7 @@ func (s *Set[T]) WithTriggerWithInitialEmptyValue(trigger bool) *Set[T] {
 }
 
 // set sets the given value as the new value of the set.
-func (s *Set[T]) set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T], triggerID UniqueID, callbacksToTrigger []*Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]) {
+func (s *Set[T]) set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T], triggerID types.UniqueID, callbacksToTrigger []*Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -225,7 +226,7 @@ func (s *Set[T]) set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMu
 }
 
 // applyMutations applies the given mutations to the set.
-func (s *Set[T]) applyMutations(mutations *SetMutations[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T], triggerID UniqueID, callbacksToTrigger []*Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]) {
+func (s *Set[T]) applyMutations(mutations *SetMutations[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T], triggerID types.UniqueID, callbacksToTrigger []*Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 

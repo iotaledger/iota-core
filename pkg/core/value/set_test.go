@@ -1,4 +1,4 @@
-package promise
+package value
 
 import (
 	"testing"

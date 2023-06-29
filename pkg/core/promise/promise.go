@@ -4,20 +4,21 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/ds/orderedmap"
+	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
 // Promise is a promise that can be resolved or rejected.
 type Promise[T any] struct {
 	// successCallbacks are called when the promise is resolved successfully.
-	successCallbacks *orderedmap.OrderedMap[UniqueID, func(T)]
+	successCallbacks *orderedmap.OrderedMap[types.UniqueID, func(T)]
 
 	// errorCallbacks are called when the promise is rejected.
-	errorCallbacks *orderedmap.OrderedMap[UniqueID, func(error)]
+	errorCallbacks *orderedmap.OrderedMap[types.UniqueID, func(error)]
 
 	// completeCallbacks are called when the promise is resolved or rejected.
-	completeCallbacks *orderedmap.OrderedMap[UniqueID, func()]
+	completeCallbacks *orderedmap.OrderedMap[types.UniqueID, func()]
 
-	callbackIDs UniqueID
+	callbackIDs types.UniqueID
 
 	// result is the result of the promise.
 	result T
@@ -35,9 +36,9 @@ type Promise[T any] struct {
 // New creates a new promise.
 func New[T any](optResolver ...func(p *Promise[T])) *Promise[T] {
 	p := &Promise[T]{
-		successCallbacks:  orderedmap.New[UniqueID, func(T)](),
-		errorCallbacks:    orderedmap.New[UniqueID, func(error)](),
-		completeCallbacks: orderedmap.New[UniqueID, func()](),
+		successCallbacks:  orderedmap.New[types.UniqueID, func(T)](),
+		errorCallbacks:    orderedmap.New[types.UniqueID, func(error)](),
+		completeCallbacks: orderedmap.New[types.UniqueID, func()](),
 	}
 
 	if len(optResolver) > 0 {
@@ -56,12 +57,12 @@ func (p *Promise[T]) Resolve(result T) *Promise[T] {
 		return p
 	}
 
-	p.successCallbacks.ForEach(func(key UniqueID, callback func(T)) bool {
+	p.successCallbacks.ForEach(func(key types.UniqueID, callback func(T)) bool {
 		callback(result)
 		return true
 	})
 
-	p.completeCallbacks.ForEach(func(key UniqueID, callback func()) bool {
+	p.completeCallbacks.ForEach(func(key types.UniqueID, callback func()) bool {
 		callback()
 		return true
 	})
@@ -84,12 +85,12 @@ func (p *Promise[T]) Reject(err error) *Promise[T] {
 		return p
 	}
 
-	p.errorCallbacks.ForEach(func(key UniqueID, callback func(error)) bool {
+	p.errorCallbacks.ForEach(func(key types.UniqueID, callback func(error)) bool {
 		callback(err)
 		return true
 	})
 
-	p.completeCallbacks.ForEach(func(key UniqueID, callback func()) bool {
+	p.completeCallbacks.ForEach(func(key types.UniqueID, callback func()) bool {
 		callback()
 		return true
 	})

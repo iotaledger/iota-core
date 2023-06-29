@@ -6,7 +6,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/iota-core/pkg/core/value"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 )
 
@@ -18,7 +18,7 @@ type ConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 	// members is the set of Conflicts that are conflicting over the shared resource.
 	members *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
 
-	allMembersEvicted *promise.Value[bool]
+	allMembersEvicted *value.Value[bool]
 
 	mutex sync.RWMutex
 }
@@ -27,7 +27,7 @@ type ConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 func NewConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.VoteRankType[VoteRank]](id ResourceID) *ConflictSet[ConflictID, ResourceID, VoteRank] {
 	return &ConflictSet[ConflictID, ResourceID, VoteRank]{
 		ID:                id,
-		allMembersEvicted: promise.NewValue[bool](),
+		allMembersEvicted: value.New[bool](),
 		members:           advancedset.New[*Conflict[ConflictID, ResourceID, VoteRank]](),
 	}
 }

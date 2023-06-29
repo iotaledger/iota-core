@@ -1,4 +1,4 @@
-package promise
+package value
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 )
 
 func TestValue(t *testing.T) {
-	myInt := NewValue[int]()
+	myInt := New[int]()
 
 	var wg sync.WaitGroup
 	wg.Add(2)
