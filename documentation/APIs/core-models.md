@@ -51,6 +51,9 @@ This document defines core models for IOTA V3 protocol.
   * [Ed25519 Signature](#ed25519-signature)
 
 ## Block
+
+Refer to [TIP 46 - Tangle Block for IOTA 2.0](https://github.com/iotaledger/tips-draft/blob/tip46/tips/TIP-0046/tip-0046.md) for more details.
+
 The following table describes the serialization of a Block:
 
 <table>
@@ -273,12 +276,12 @@ The string format of Block ID is hexadecimal encoding of Block ID with `0x` pref
 * There must be no trailing bytes after all block fields have been parsed.
 
 
-
 ## Slot Index
 
 Timeline is divided into slots, and each slot has a corresponding slot index, which is a `uint64`.
 To calculate the slot index of a timestamp, `genesisTimestamp` and the duration of a slot are needed.
 The slot index of timestamp `ts` is `(ts - genesisTimestamp)/duration + 1`.
+Slots are counted starting from 1 because 0 is reserved for the genesis which has to be addressable as its own.
 
 ## Slot Commitment
 
@@ -653,20 +656,12 @@ The following table describes the serialization of a Transaction Payload:
 </table>
 
 #### Transaction Validation Rules
-Transaction validation rules follow [TIP 20 Transaction Payload with TIP-18 Output Types](https://github.com/iotaledger/tips/blob/ae7fbd336e506f907080aa6b16d6ffb0d7a5553c/tips/TIP-0020/tip-0020.md) with additional rules for new fields:
-
-* 0 < `Context Inputs Count` < 128
-* No duplicate element of `Context Inputs` is allowed.
-* 0 < `Allotments Count` < 128
-* No duplicate element of `Allotments` is allowed.
+Transaction validation rules follow [TIP 45 Transaction Payload with IOTA 2.0 Output Types](https://github.com/iotaledger/tips-draft/blob/tip45/tips/TIP-0045/tip-0045.md#syntactic-validation)
 
 
 ## Context Inputs
 
-Context Inputs are inputs that indicate the different functions related to account, commitment and more. There could be more types of context inputs introduced in the future via protocol upgrade.
-
->> TODO: double check: currently in iota.go, len(unlocks) == len(inputs), context inputs are not included.
-Each input must be accompanied by a corresponding Unlock at the same index in the `Unlocks` part of the Transaction Payload.
+Context Inputs are inputs that indicate the different functions related to account, commitment and more. There could be more types of context inputs introduced in the future via protocol upgrade. Refer to [TIP 45 Transaction Payload with IOTA 2.0 Output Types - Inputs](https://github.com/iotaledger/tips-draft/blob/tip45/tips/TIP-0045/tip-0045.md#inputs) for more details.
 
 The following table lists all currently specified Context Input.
 
@@ -695,7 +690,7 @@ The following table lists all currently specified Context Input.
 
 ### Commitment Input
 
-A Commitment Input is an input that allows to reference commitment to a certain slot. It is used to provide the VM with the necessary context information from the node, to prove that the time at the transaction execution is past certain slot in the past, as it indicates that the slot has been already committed.
+A Commitment Input is an input that allows to reference commitment to a certain slot. It is used to provide the VM with the necessary context information from the node, to prove that the time at the transaction execution is past certain slot in the past, as it indicates that the slot has been already committed. 
 
 <table>
     <tr>
@@ -750,7 +745,7 @@ A Reward Input is an input indicates which transaction `Input` is the claiming r
     <tr>
         <td>Input Type</td>
         <td>uint16</td>
-        <td>The input type of Rewarad Input is 3.</td>
+        <td>The input type of Reward Input is 3.</td>
     </tr>
     <tr>
         <td>Index</td>
@@ -761,7 +756,7 @@ A Reward Input is an input indicates which transaction `Input` is the claiming r
 
 
 ## Inputs
-No changes are made in all types of Inputs.
+No changes are made in all types of Inputs. Refer to [TIP 45 Transaction Payload with IOTA 2.0 Output Types - Inputs](https://github.com/iotaledger/tips-draft/blob/tip45/tips/TIP-0045/tip-0045.md#inputs) for more details.
 
 The following table lists all currently specified Input.
 
@@ -806,8 +801,6 @@ The following table lists all currently specified Input.
 
 ## Outputs
 
-Outputs designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#output-design).
-
 And few changes are made:
 * Rename `Alias` to `Account`.
 * Add `Mana` in every output type, indicates the stored mana held by an output.
@@ -840,6 +833,8 @@ The following table lists all currently specified Output.
 
 ### Basic Output
 A Basic Output can hold native tokens and might have several unlock conditions and optional features. The combination of several features provide the base functionality for the output to be used as an on-ledger smart contract request.
+
+Refer to [TIP-41 Basic Output Type](https://github.com/iotaledger/tips-draft/blob/tip41/tips/TIP-0041/tip-0041.md) to check the detailed description.
 
 <table>
   <tr>
@@ -964,6 +959,8 @@ A Basic Output can hold native tokens and might have several unlock conditions a
 </table>
 
 ### Account Output
+
+Refer to [TIP-42 Account Output Type](https://github.com/iotaledger/tips-draft/blob/tip42/tips/TIP-0042/tip-0042.md) to check the detailed description.
 
 <table>
   <tr>
@@ -1123,6 +1120,8 @@ A Basic Output can hold native tokens and might have several unlock conditions a
 ### Foundry Output
 A foundry output is an output that controls the supply of user defined native tokens. It can mint and melt tokens according to the policy defined in the Token Scheme field of the output. Foundries can only be created and controlled by accounts.
 
+Refer to [TIP-44 Foundry Output Type](https://github.com/iotaledger/tips-draft/blob/tip44/tips/TIP-0044/tip-0044.md) to check the detailed description.
+
 <table>
   <tr>
       <td><b>Name</b></td>
@@ -1271,6 +1270,8 @@ A foundry output is an output that controls the supply of user defined native to
 </table>
 
 ### NFT Output
+
+Refer to [TIP-43 NFT Output Type](https://github.com/iotaledger/tips-draft/blob/tip43/tips/TIP-0043/tip-0043.md) to check the detailed description.
 
 <table>
   <tr>
@@ -1428,11 +1429,12 @@ A foundry output is an output that controls the supply of user defined native to
 
 Output Features that do not introduce unlocking conditions, but rather add new functionality and add constraints on output creation are grouped under Features. Each output must not contain more than one feature of each type and not all feature types are supported for each output type.
 
-Features designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#features).
+Features designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#features). 
 
 2 new Features are introduced in this document:
 * Block Issuer Feature
 * Staking Feature
+Refer to [TIP-42 Account Output Type- Features](https://github.com/iotaledger/tips-draft/blob/tip42/tips/TIP-0042/tip-0042.md#features) to check the detailed description.
 
 And changes to other Features:
 * Rename `Alias` to `Account`.
@@ -1763,7 +1765,8 @@ The following table lists all currently specified Address.
 
 ## Unlock Condition
 
-Unlock Condition designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#unlock-conditions).
+Unlock Condition designs are based on [TIP-18 Multi-Asset Ledger and ISC Support](https://github.com/iotaledger/tips/blob/main/tips/TIP-0018/tip-0018.md#unlock-conditions). Also refer to [TIP-42 Account Output Type- Unlock Conditions](https://github.com/iotaledger/tips-draft/blob/tip42/tips/TIP-0042/tip-0042.md#unlock-conditions) to check the detailed description.
+
 
 No new unlock Condition types are introduced, only a few changes are made:
 * Rename `Alias` to `Account`.
