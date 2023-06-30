@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -21,6 +22,7 @@ const (
 	latestCommitmentKey
 	latestFinalizedSlotKey
 	protocolParametersKey
+	protocolVersionEpochMappingKey
 )
 
 type APIByVersionProviderFunc func(byte) iotago.API
@@ -30,7 +32,8 @@ type Settings struct {
 	mutex sync.RWMutex
 	store kvstore.KVStore
 
-	apiByVersion map[byte]iotago.API
+	apiByVersion     map[iotago.Version]iotago.API
+	protocolVersions []*protocolVersionEpochStart
 }
 
 func NewSettings(store kvstore.KVStore) (settings *Settings) {
@@ -63,9 +66,8 @@ func (s *Settings) LatestAPI() iotago.API {
 	return s.API(iotago.LatestProtocolVersion())
 }
 
-func (s *Settings) APIForSlotIndex(_ iotago.SlotIndex) iotago.API {
-	// TODO: map index to epoch to version
-	return s.LatestAPI()
+func (s *Settings) APIForSlot(slot iotago.SlotIndex) iotago.API {
+	return s.API(s.VersionForSlot(slot))
 }
 
 func (s *Settings) API(version iotago.Version) iotago.API {
@@ -82,6 +84,7 @@ func (s *Settings) API(version iotago.Version) iotago.API {
 		panic(fmt.Errorf("protocol parameters for version %d not found", version))
 	}
 
+	// TODO: we need to double lock here as we're writing and obtain only the read lock above
 	var api iotago.API
 	switch protocolParams.Version() {
 	case 3:
@@ -121,6 +124,38 @@ func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) (er
 	}
 
 	return s.store.Set([]byte{protocolParametersKey, params.Version()}, bytes)
+}
+
+func (s *Settings) loadProtocolParametersEpochMapping(version iotago.Version) *protocolVersionEpochStart {
+	bytes, err := s.store.Get([]byte{protocolVersionEpochMappingKey, version})
+	if err != nil {
+		if errors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil
+		}
+		panic(err)
+	}
+
+	epoch, _, err := iotago.EpochIndexFromBytes(bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return &protocolVersionEpochStart{
+		Version:    version,
+		StartEpoch: epoch,
+	}
+}
+
+func (s *Settings) storeProtocolParametersEpochMapping(version iotago.Version, epoch iotago.EpochIndex) (err error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	bytes, err := epoch.Bytes()
+	if err != nil {
+		return err
+	}
+
+	return s.store.Set([]byte{protocolParametersKey, version}, bytes)
 }
 
 func (s *Settings) LatestCommitment() *model.Commitment {
@@ -171,6 +206,30 @@ func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
 	return s.store.Set([]byte{latestFinalizedSlotKey}, index.MustBytes())
 }
 
+func (s *Settings) ProtocolParametersAndVersionsHash() ([32]byte, error) {
+	// TODO: concatenate and hash protocol parameters and protocol versions
+	// bytes, err := p.Bytes()
+	// if err != nil {
+	// 	return [32]byte{}, err
+	// }
+	return blake2b.Sum256([]byte{}), nil
+}
+
+func (s *Settings) VersionForEpoch(epoch iotago.EpochIndex) iotago.Version {
+	for i := len(s.protocolVersions) - 1; i >= 0; i-- {
+		if s.protocolVersions[i].StartEpoch <= epoch {
+			return s.protocolVersions[i].Version
+		}
+	}
+
+	// This means that the protocol versions are not properly configured.
+	panic(fmt.Sprintf("could not find a protocol version for epoch %d", epoch))
+}
+
+func (s *Settings) VersionForSlot(slot iotago.SlotIndex) iotago.Version {
+	return s.VersionForEpoch(s.APIForSlot(slot).TimeProvider().EpochFromSlot(slot))
+}
+
 func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commitment) (err error) {
 	var commitmentBytes []byte
 	if targetCommitment != nil {
@@ -194,6 +253,22 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 	}
 	if _, err = writer.Write(finalizedSlotBytes); err != nil {
 		return errors.Wrap(err, "failed to write latest finalized slot")
+	}
+
+	if err := stream.WriteCollection(writer, func() (uint64, error) {
+		for _, versionEpochStart := range s.protocolVersions {
+			if err := stream.Write(writer, versionEpochStart.Version); err != nil {
+				return 0, errors.Wrap(err, "failed to encode version")
+			}
+
+			if err := stream.Write(writer, versionEpochStart.StartEpoch); err != nil {
+				return 0, errors.Wrap(err, "failed to encode epoch")
+			}
+		}
+
+		return uint64(len(s.protocolVersions)), nil
+	}); err != nil {
+		return errors.Wrap(err, "failed to stream write protocol parameters")
 	}
 
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
@@ -243,6 +318,42 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 	}
 	if err := s.SetLatestFinalizedSlot(slotIndex); err != nil {
 		return errors.Wrap(err, "failed to set latest finalized slot")
+	}
+
+	var prevProtocolVersionEpochStart *protocolVersionEpochStart
+	if err := stream.ReadCollection(reader, func(i int) error {
+		version, err := stream.Read[iotago.Version](reader)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse version")
+		}
+
+		epoch, err := stream.Read[iotago.EpochIndex](reader)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse version")
+		}
+
+		current := &protocolVersionEpochStart{
+			Version:    version,
+			StartEpoch: epoch,
+		}
+		if prevProtocolVersionEpochStart != nil &&
+			(current.Version <= prevProtocolVersionEpochStart.Version ||
+				current.StartEpoch <= prevProtocolVersionEpochStart.StartEpoch) {
+			panic(fmt.Sprintf("protocol versions not ordered correctly, %v is bigger than %v", prevProtocolVersionEpochStart, current))
+		}
+
+		// We store the versions into a sorted slice to be able to look up the versions quickly from memory.
+		s.protocolVersions = append(s.protocolVersions, current)
+		// We also store the versions into the DB so that we can load it when we start the node from disk without loading a snapshot.
+		if err := s.storeProtocolParametersEpochMapping(version, epoch); err != nil {
+			return errors.Wrap(err, "could not store protocol version epoch mapping")
+		}
+
+		prevProtocolVersionEpochStart = current
+
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "failed to stream read protocol versions epoch mapping")
 	}
 
 	if err := stream.ReadCollection(reader, func(i int) error {
@@ -296,4 +407,9 @@ func (s *Settings) String() string {
 	}
 
 	return builder.String()
+}
+
+type protocolVersionEpochStart struct {
+	Version    iotago.Version
+	StartEpoch iotago.EpochIndex
 }

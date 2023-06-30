@@ -1,8 +1,9 @@
 package blockfilter
 
 import (
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"time"
+
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 
 	"github.com/pkg/errors"
 
@@ -37,7 +38,7 @@ type Filter struct {
 func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
 	return module.Provide(func(e *engine.Engine) filter.Filter {
 
-		f := New(e.Storage.Settings().APIForSlotIndex, opts...)
+		f := New(e.Storage.Settings().APIForSlot, opts...)
 		f.TriggerConstructed()
 
 		e.HookConstructed(func() {

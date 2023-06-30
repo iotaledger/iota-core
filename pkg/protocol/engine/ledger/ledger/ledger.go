@@ -3,8 +3,9 @@ package ledger
 import (
 	cryptoed25519 "crypto/ed25519"
 	"fmt"
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"io"
+
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
@@ -65,7 +66,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.Commitments().Load,
 			e.BlockCache.Block,
 			e.Storage.AccountDiffs,
-			e.Storage.Settings().APIForSlotIndex,
+			e.Storage.Settings().APIForSlot,
 			e.SybilProtection,
 			e.EpochGadget,
 			e.ErrorHandler("ledger"),
@@ -83,7 +84,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 		})
 		e.Storage.Settings().HookInitialized(func() {
-			//TODO: how do we want to handle changing API here?
+			// TODO: how do we want to handle changing API here?
 			api := l.apiProvider(0)
 			l.manaManager = mana.NewManager(api.ManaDecayProvider(), l.resolveAccountOutput)
 			l.accountsLedger.SetCommitmentEvictionAge(api.ProtocolParameters().EvictionAge())

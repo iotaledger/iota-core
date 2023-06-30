@@ -61,7 +61,7 @@ func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(e
 		}
 
 		p.settings = NewSettings(lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{settingsPrefix})))
-		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.APIForSlotIndex)
+		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.APIForSlot)
 		p.sybilProtection = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{sybilProtectionPrefix}))
 		p.attestations = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{attestationsPrefix}))
 		p.ledger = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{ledgerPrefix}))

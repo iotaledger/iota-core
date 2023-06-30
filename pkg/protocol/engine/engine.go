@@ -104,7 +104,7 @@ func New(
 			optsBootstrappedThreshold: 10 * time.Second,
 			optsSnapshotDepth:         5,
 		}, opts, func(e *Engine) {
-			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings().APIForSlotIndex)
+			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings().APIForSlot)
 
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 
@@ -208,7 +208,7 @@ func (e *Engine) IsSynced() (isBootstrapped bool) {
 }
 
 func (e *Engine) APIForSlotIndex(slot iotago.SlotIndex) iotago.API {
-	return e.Storage.Settings().APIForSlotIndex(slot)
+	return e.Storage.Settings().APIForSlot(slot)
 }
 
 func (e *Engine) API(version iotago.Version) iotago.API {
