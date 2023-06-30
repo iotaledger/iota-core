@@ -34,11 +34,11 @@ type TipSelection struct {
 	// memPool holds information about pending transactions.
 	memPool mempool.MemPool[ledger.BlockVoteRank]
 
-	// blockIssuingTimeThresholdQueue holds a queue of tips that are waiting to reach the block issuing time threshold.
-	blockIssuingTimeThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
+	// livenessThresholdQueue holds a queue of tips that are waiting to reach the liveness threshold.
+	livenessThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
 
-	// blockIssuingTimeThreshold holds the time when the next block can be issued.
-	blockIssuingTimeThreshold *value.Value[time.Time]
+	// livenessThreshold holds the current liveness threshold.
+	livenessThreshold *value.Value[time.Time]
 
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int
@@ -60,20 +60,20 @@ type TipSelection struct {
 // New is the constructor for the TipSelection.
 func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
-		tipManager:                     tipManager,
-		conflictDAG:                    conflictDAG,
-		rootBlocks:                     rootBlocksRetriever,
-		blockIssuingTimeThresholdQueue: timed.NewPriorityQueue[tipmanager.TipMetadata](true),
-		blockIssuingTimeThreshold:      value.New[time.Time](),
-		optMaxStrongParents:            8,
-		optMaxLikedInsteadReferences:   8,
-		optMaxWeakReferences:           8,
+		tipManager:                   tipManager,
+		conflictDAG:                  conflictDAG,
+		rootBlocks:                   rootBlocksRetriever,
+		livenessThresholdQueue:       timed.NewPriorityQueue[tipmanager.TipMetadata](true),
+		livenessThreshold:            value.New[time.Time](),
+		optMaxStrongParents:          8,
+		optMaxLikedInsteadReferences: 8,
+		optMaxWeakReferences:         8,
 	}, opts, func(t *TipSelection) {
 		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
 
-		t.blockIssuingTimeThreshold.OnUpdate(func(_, threshold time.Time) {
-			for _, tip := range t.blockIssuingTimeThresholdQueue.PopUntil(threshold) {
-				tip.SetBlockIssuingTimeThresholdReached()
+		t.livenessThreshold.OnUpdate(func(_, threshold time.Time) {
+			for _, tip := range t.livenessThresholdQueue.PopUntil(threshold) {
+				tip.SetLivenessThresholdReached()
 			}
 		})
 
@@ -117,10 +117,10 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 	return references
 }
 
-// UpdateBlockIssuingTimeThreshold updates the block issuing time threshold.
-func (t *TipSelection) UpdateBlockIssuingTimeThreshold(newThreshold time.Time) {
-	t.blockIssuingTimeThreshold.Compute(func(currentThreshold time.Time) time.Time {
-		return lo.Cond(newThreshold.Before(currentThreshold), currentThreshold, newThreshold)
+// SetLivenessThreshold sets the liveness threshold used for tip selection (it can only increase monotonically).
+func (t *TipSelection) SetLivenessThreshold(threshold time.Time) {
+	t.livenessThreshold.Compute(func(currentThreshold time.Time) time.Time {
+		return lo.Cond(threshold.Before(currentThreshold), currentThreshold, threshold)
 	})
 }
 
@@ -137,7 +137,7 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
 	}
 
-	t.blockIssuingTimeThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime())
+	t.livenessThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime())
 }
 
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.

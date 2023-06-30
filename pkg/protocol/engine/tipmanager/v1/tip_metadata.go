@@ -51,8 +51,8 @@ type TipMetadata struct {
 	// isWeakTip is true if the block is a weak tip pool member and is not referenced by other tips.
 	isWeakTip *value.Value[bool]
 
-	// isBlockIssuingTimeThresholdReached is true if the block has passed the block issuing time threshold.
-	isBlockIssuingTimeThresholdReached *value.Value[bool]
+	// isLivenessThresholdReached is true if the block has reached the liveness threshold.
+	isLivenessThresholdReached *value.Value[bool]
 
 	// isMarkedOrphaned is true if the block was marked as orphaned.
 	isMarkedOrphaned *value.Value[bool]
@@ -71,11 +71,11 @@ type TipMetadata struct {
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
 		// main properties
-		block:                              block,
-		tipPool:                            value.New[tipmanager.TipPool](),
-		isBlockIssuingTimeThresholdReached: value.New[bool](),
-		isMarkedOrphaned:                   value.New[bool](),
-		isEvicted:                          promise.NewEvent(),
+		block:                      block,
+		tipPool:                    value.New[tipmanager.TipPool](),
+		isLivenessThresholdReached: value.New[bool](),
+		isMarkedOrphaned:           value.New[bool](),
+		isEvicted:                  promise.NewEvent(),
 
 		// derived properties (internal flags)
 		isStrongTipPoolMember:           value.New[bool](),
@@ -156,20 +156,19 @@ func (t *TipMetadata) OnIsWeakTipUpdated(handler func(isWeakTip bool)) (unsubscr
 	return t.isWeakTip.OnUpdate(func(_, isWeakTip bool) { handler(isWeakTip) })
 }
 
-// SetBlockIssuingTimeThresholdReached marks the block as having reached the block issuing time threshold.
-func (t *TipMetadata) SetBlockIssuingTimeThresholdReached() {
-	t.isBlockIssuingTimeThresholdReached.Set(true)
+// SetLivenessThresholdReached marks the block as having reached the liveness threshold.
+func (t *TipMetadata) SetLivenessThresholdReached() {
+	t.isLivenessThresholdReached.Set(true)
 }
 
-// OnBlockIssuingTimeThresholdReached registers a callback that is triggered when the block reaches the block
-// issuing time threshold.
-func (t *TipMetadata) OnBlockIssuingTimeThresholdReached(handler func()) (unsubscribe func()) {
-	return t.isBlockIssuingTimeThresholdReached.OnUpdate(func(_, _ bool) { handler() })
+// OnLivenessThresholdReached registers a callback that is triggered when the block reaches the liveness threshold.
+func (t *TipMetadata) OnLivenessThresholdReached(handler func()) (unsubscribe func()) {
+	return t.isLivenessThresholdReached.OnUpdate(func(_, _ bool) { handler() })
 }
 
-// WasBlockIssuingTimeThresholdReached returns true if the block reached the block issuing time threshold.
-func (t *TipMetadata) WasBlockIssuingTimeThresholdReached() bool {
-	return t.isBlockIssuingTimeThresholdReached.Get()
+// IsLivenessThresholdReached returns true if the block reached the liveness threshold.
+func (t *TipMetadata) IsLivenessThresholdReached() bool {
+	return t.isLivenessThresholdReached.Get()
 }
 
 // SetMarkedOrphaned marks the block as orphaned (updated by the tip selection strategy).
