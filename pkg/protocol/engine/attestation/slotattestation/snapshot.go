@@ -32,9 +32,13 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		// Read attestations.
 		var attestations []*iotago.Attestation
 		if err = stream.ReadCollection(reader, func(i int) error {
+			attestationBytes, err := stream.ReadBlob(reader)
+			if err != nil {
+				return errors.Wrap(err, "failed to read attestation")
+			}
 			importedAttestation := new(iotago.Attestation)
-			if err = stream.ReadSerializable(reader, importedAttestation); err != nil {
-				return errors.Wrapf(err, "failed to read attestation %d", i)
+			if _, err := api.Decode(attestationBytes, importedAttestation); err != nil {
+				return errors.Wrapf(err, "failed to decode attestation %d", i)
 			}
 
 			attestations = append(attestations, importedAttestation)

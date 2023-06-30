@@ -61,7 +61,7 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 					s.clock = e.Clock
 
 					e.Storage.Settings().HookInitialized(func() {
-						s.timeProviderFunc = e.API().TimeProvider
+						s.timeProviderFunc = e.API(iotago.LatestProtocolVersion()).TimeProvider
 
 						e.Clock.HookInitialized(func() {
 							for _, v := range s.optsOnlineCommitteeStartup {

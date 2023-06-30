@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -40,8 +41,8 @@ type Manager struct {
 	storage *storage.Storage
 
 	acceptedTimeFunc      func() time.Time
-	timeProviderFunc      func() *iotago.TimeProvider
 	minCommittableSlotAge iotago.SlotIndex
+	apiProvider           permanent.APIBySlotIndexProviderFunc
 
 	module.Module
 }
@@ -50,9 +51,7 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
 		m := NewManager(minCommittableSlotAge, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
 
-		m.timeProviderFunc = func() *iotago.TimeProvider {
-			return e.API().TimeProvider()
-		}
+		m.apiProvider = e.APIForSlotIndex
 
 		e.HookConstructed(func() {
 			m.storage = e.Storage
@@ -111,7 +110,8 @@ func (m *Manager) IsBootstrapped() bool {
 	// If acceptance time is in slot 10, then the latest committable index is 3 (with minCommittableSlotAge=6), because there are 6 full slots between slot 10 and slot 3.
 	// All slots smaller than 4 are committable, so in order to check if slot 3 is committed it's necessary to do m.minCommittableSlotAge-1,
 	// otherwise we'd expect slot 4 to be committed in order to be fully committed, which is impossible.
-	return m.storage.Settings().LatestCommitment().Index() >= m.timeProviderFunc().SlotFromTime(m.acceptedTimeFunc())-m.minCommittableSlotAge-1
+	latestIndex := m.storage.Settings().LatestCommitment().Index()
+	return latestIndex >= m.apiProvider(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())-m.minCommittableSlotAge-1
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
@@ -183,14 +183,17 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		accountRoot,
 	)
 
+	api := m.apiProvider(index)
+
 	newCommitment := iotago.NewCommitment(
+		api.ProtocolParameters().Version(),
 		index,
 		latestCommitment.ID(),
 		roots.ID(),
 		cumulativeWeight,
 	)
 
-	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, m.storage.Settings().API(), serix.WithValidation())
+	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, api, serix.WithValidation())
 	if err != nil {
 		return false
 	}
@@ -210,7 +213,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		m.errorHandler(errors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
 		return false
 	}
-	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(m.storage.Settings().API().Encode(roots))); err != nil {
+	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(api.Encode(roots))); err != nil {
 		m.errorHandler(errors.Wrapf(err, "failed to store latest roots for commitment %s", newModelCommitment.ID()))
 		return false
 	}

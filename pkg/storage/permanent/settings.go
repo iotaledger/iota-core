@@ -10,9 +10,9 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -196,56 +196,27 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		return errors.Wrap(err, "failed to write latest finalized slot")
 	}
 
-	var relativeCountersPosition int64
+	if err := stream.WriteCollection(writer, func() (uint64, error) {
+		var paramsCount uint64
+		var innerErr error
+		if err := s.store.Iterate([]byte{protocolParametersKey}, func(_ kvstore.Key, value kvstore.Value) bool {
+			if err := stream.WriteBlob(writer, value); err != nil {
+				innerErr = err
+				return false
+			}
+			paramsCount++
 
-	var paramsCount uint8
-	var paramsByteCount uint32
-
-	// The amount of protocolParameters contained within this snapshot.
-	if err := utils.WriteValueFunc(writer, paramsCount, &relativeCountersPosition); err != nil {
-		return errors.Wrap(err, "unable to write protocol parameters count")
-	}
-
-	// The amount of bytes the protocolParameters consume in this snapshot.
-	if err := utils.WriteValueFunc(writer, paramsByteCount, &relativeCountersPosition); err != nil {
-		return errors.Wrap(err, "unable to write protocol parameters count")
-	}
-
-	var innerErr error
-	if err := s.store.Iterate([]byte{protocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
-		if err := utils.WriteBytesFunc(writer, value, &relativeCountersPosition); err != nil {
-			innerErr = err
-			return false
+			return true
+		}); err != nil {
+			return 0, errors.Wrap(err, "failed to iterate over protocol parameters")
 		}
-		paramsCount++
-		paramsByteCount += uint32(len(value))
+		if innerErr != nil {
+			return 0, errors.Wrap(innerErr, "failed to write protocol parameters")
+		}
 
-		return true
+		return paramsCount, nil
 	}); err != nil {
-		return errors.Wrap(err, "failed to iterate over protocol parameters")
-	}
-	if innerErr != nil {
-		return errors.Wrap(innerErr, "failed to write protocol parameters")
-	}
-
-	// seek back to the file position of the counters
-	if _, err := writer.Seek(-relativeCountersPosition, io.SeekCurrent); err != nil {
-		return fmt.Errorf("unable to seek counter placeholders: %w", err)
-	}
-
-	var countersSize int64
-
-	if err := utils.WriteValueFunc(writer, paramsCount, &countersSize); err != nil {
-		return errors.Wrap(err, "unable to write protocol parameters count")
-	}
-
-	if err := utils.WriteValueFunc(writer, paramsByteCount, &countersSize); err != nil {
-		return errors.Wrap(err, "unable to write protocol parameters byte count")
-	}
-
-	// seek back to the last write position
-	if _, err := writer.Seek(relativeCountersPosition-countersSize, io.SeekCurrent); err != nil {
-		return fmt.Errorf("unable to seek to last written position: %w", err)
+		return errors.Wrap(err, "failed to stream write protocol parameters")
 	}
 
 	return nil
@@ -274,33 +245,23 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to set latest finalized slot")
 	}
 
-	var paramsCount uint8
-	var paramsByteCount uint32
-
-	if err = binary.Read(reader, binary.LittleEndian, &paramsCount); err != nil {
-		return errors.Wrap(err, "failed to read protocol parameters count")
-	}
-
-	if err = binary.Read(reader, binary.LittleEndian, &paramsByteCount); err != nil {
-		return errors.Wrap(err, "failed to read protocol parameters byte count")
-	}
-
-	parameterBytes := make([]byte, paramsByteCount)
-	if err = binary.Read(reader, binary.LittleEndian, parameterBytes); err != nil {
-		return errors.Wrap(err, "failed to read protocol parameters bytes")
-	}
-
-	var offset int
-	for i := uint8(0); i < paramsCount; i++ {
-		params, bytesRead, err := iotago.ProtocolParametersFromBytes(parameterBytes[offset:])
+	if err := stream.ReadCollection(reader, func(i int) error {
+		paramsBytes, err := stream.ReadBlob(reader)
+		if err != nil {
+			return errors.Wrapf(err, "failed to read protocol parameters bytes at index %d", i)
+		}
+		params, _, err := iotago.ProtocolParametersFromBytes(paramsBytes)
 		if err != nil {
 			return errors.Wrapf(err, "failed to parse protocol parameters at index %d", i)
 		}
-		offset += bytesRead
 
 		if err := s.StoreProtocolParameters(params); err != nil {
 			return errors.Wrapf(err, "failed to store protocol parameters at index %d", i)
 		}
+
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "failed to stream read protocol parameters")
 	}
 
 	// Now that we parsed the protocol parameters we can parse the commitment.

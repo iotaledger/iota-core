@@ -37,7 +37,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 			sybilProtection:    e.SybilProtection,
 			ledger:             e.Ledger,
 			apiProvider:        e.APIForSlotIndex,
-			performanceManager: performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider()),
+			performanceManager: performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.APIForSlotIndex),
 		}, opts,
 			func(o *Orchestrator) {
 				e.Events.BlockGadget.BlockAccepted.Hook(o.BlockAccepted)

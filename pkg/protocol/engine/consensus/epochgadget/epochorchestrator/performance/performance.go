@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -34,8 +35,7 @@ func NewTracker(
 	poolStatsStore kvstore.KVStore,
 	committeeStore kvstore.KVStore,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
-	timeProvider *iotago.TimeProvider,
-	decayProvider *iotago.ManaDecayProvider,
+	apiProvider permanent.APIBySlotIndexProviderFunc,
 ) *Tracker {
 	return &Tracker{
 		rewardBaseStore: rewardsBaseStore,
@@ -52,8 +52,6 @@ func NewTracker(
 			account.AccountsFromBytes,
 		),
 		performanceFactorsFunc: performanceFactorsFunc,
-		timeProvider:           timeProvider,
-		decayProvider:          decayProvider,
 	}
 }
 
