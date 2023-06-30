@@ -210,8 +210,8 @@ func (e *Engine) IsSynced() (isBootstrapped bool) {
 	return e.IsBootstrapped() // && time.Since(e.Clock.PreAccepted().Time()) < e.optsBootstrappedThreshold
 }
 
-func (e *Engine) API() iotago.API {
-	return e.Storage.Settings().API()
+func (e *Engine) API(version byte) iotago.API {
+	return e.Storage.Settings().API(version)
 }
 
 func (e *Engine) Initialize(snapshot ...string) (err error) {

@@ -20,8 +20,7 @@ import (
 )
 
 type TransactionFramework struct {
-	api         iotago.API
-	protoParams *iotago.ProtocolParameters
+	api iotago.API
 
 	wallet       *mock.HDWallet
 	states       map[string]*utxoledger.Output
@@ -37,7 +36,6 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 
 	tf := &TransactionFramework{
 		api:          protocol.API(),
-		protoParams:  protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(),
 		states:       map[string]*utxoledger.Output{"Genesis:0": genesisOutput},
 		transactions: make(map[string]*iotago.Transaction),
 		wallet:       mock.NewHDWallet("genesis", genesisSeed, 0),
@@ -57,13 +55,13 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 }
 
 func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.Transaction) {
-	(lo.PanicOnErr(transaction.ID())).RegisterAlias(alias)
+	(lo.PanicOnErr(transaction.ID(t.api))).RegisterAlias(alias)
 
 	t.transactions[alias] = transaction
 
-	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
+	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet(t.api)) {
 		clonedOutput := output.Clone()
-		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
+		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID(t.api)), outputID.Index())
 		if clonedOutput.Type() == iotago.OutputAccount {
 			if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID() {
 				accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
@@ -81,13 +79,13 @@ func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signin
 		walletKeys[i] = iotago.AddressKeys{Address: wallet.Address(), Keys: inputPrivateKey}
 	}
 
-	txBuilder := builder.NewTransactionBuilder(t.protoParams.NetworkID())
+	txBuilder := builder.NewTransactionBuilder(t.api)
 
 	// Always add a random payload to randomize transaction ID.
 	randomPayload := tpkg.Rand12ByteArray()
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
 
-	tx, err := options.Apply(txBuilder, opts).Build(t.protoParams, iotago.NewInMemoryAddressSigner(walletKeys...))
+	tx, err := options.Apply(txBuilder, opts).Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 	if err == nil {
 		t.RegisterTransaction(alias, tx)
 	}
@@ -296,7 +294,7 @@ func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
 }
 
 func (t *TransactionFramework) TransactionID(alias string) iotago.TransactionID {
-	return lo.PanicOnErr(t.Transaction(alias).ID())
+	return lo.PanicOnErr(t.Transaction(alias).ID(t.api))
 }
 
 func (t *TransactionFramework) Transactions(aliases ...string) []*iotago.Transaction {

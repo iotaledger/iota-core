@@ -315,8 +315,8 @@ func (p *Protocol) Network() *core.Protocol {
 	return p.networkProtocol
 }
 
-func (p *Protocol) API() iotago.API {
-	return p.MainEngineInstance().API()
+func (p *Protocol) API(version byte) iotago.API {
+	return p.MainEngineInstance().API(version)
 }
 
 func (p *Protocol) SupportedVersions() nodeclient.Versions {
