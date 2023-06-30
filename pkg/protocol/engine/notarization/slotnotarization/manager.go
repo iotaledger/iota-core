@@ -175,15 +175,22 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
+	api := m.apiProvider(index)
+
+	protocolParamsBytes, err := api.Encode(api.ProtocolParameters())
+	if err != nil {
+		m.errorHandler(errors.Wrap(err, "failed to encode protocol parameters"))
+		return false
+	}
+
 	roots := iotago.NewRoots(
 		iotago.Identifier(acceptedBlocks.Root()),
 		mutationRoot,
 		iotago.Identifier(attestationsRoot),
 		stateRoot,
 		accountRoot,
+		iotago.IdentifierFromData(protocolParamsBytes),
 	)
-
-	api := m.apiProvider(index)
 
 	newCommitment := iotago.NewCommitment(
 		api.ProtocolParameters().Version(),
