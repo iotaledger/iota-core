@@ -43,15 +43,6 @@ type TipMetadata interface {
 	// OnIsWeakTipUpdated registers a callback that is triggered when the IsWeakTip property changes.
 	OnIsWeakTipUpdated(handler func(isWeakTip bool)) (unsubscribe func())
 
-	// SetMarkedOrphaned marks the block as orphaned (updated by the tip selection strategy).
-	SetMarkedOrphaned(orphaned bool)
-
-	// IsMarkedOrphaned returns true if the block is marked as orphaned.
-	IsMarkedOrphaned() bool
-
-	// OnMarkedOrphanedUpdated registers a callback that is triggered when the IsMarkedOrphaned property changes.
-	OnMarkedOrphanedUpdated(handler func(orphaned bool)) (unsubscribe func())
-
 	// IsOrphaned returns true if the block is marked orphaned or if it has an orphaned strong parent.
 	IsOrphaned() bool
 

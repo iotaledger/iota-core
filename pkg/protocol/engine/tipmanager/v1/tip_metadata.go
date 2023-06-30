@@ -54,17 +54,34 @@ type TipMetadata struct {
 	// isLivenessThresholdReached is true if the block has reached the liveness threshold.
 	isLivenessThresholdReached *value.Value[bool]
 
-	// isMarkedOrphaned is true if the block was marked as orphaned.
+	// isMarkedOrphaned is true if the liveness threshold has been reached and the block was not accepted.
 	isMarkedOrphaned *value.Value[bool]
 
-	// isOrphaned is true if the block is either marked as orphaned or has at least one orphaned strong parent.
+	// isOrphaned is true if the block is either strongly or weakly orphaned.
 	isOrphaned *value.Value[bool]
 
-	// orphanedStrongParents holds the number of strong parents that are orphaned.
-	orphanedStrongParents *value.Value[int]
+	// stronglyOrphanedStrongParents holds the number of strong parents that are strongly orphaned.
+	stronglyOrphanedStrongParents *value.Value[int]
+
+	// weaklyOrphanedWeakParents holds the number of weak parents that are weakly orphaned.
+	weaklyOrphanedWeakParents *value.Value[int]
+
+	// anyStrongParentStronglyOrphaned is true if the block has at least one orphaned parent.
+	anyStrongParentStronglyOrphaned *value.Value[bool]
+
+	// anyWeakParentWeaklyOrphaned is true if the block has at least one weak parent that is weakly orphaned.
+	anyWeakParentWeaklyOrphaned *value.Value[bool]
 
 	// isEvicted is triggered when the block is removed from the TipManager.
 	isEvicted *promise.Event
+
+	// isStronglyOrphaned is true if the block is either marked as orphaned, any of its strong parents is strongly
+	// orphaned or any of its weak parents is weakly orphaned.
+	isStronglyOrphaned *value.Value[bool]
+
+	// isWeaklyOrphaned is true if the block is either marked as orphaned or has at least one weakly orphaned weak
+	// parent.
+	isWeaklyOrphaned *value.Value[bool]
 }
 
 // NewBlockMetadata creates a new TipMetadata instance.
@@ -87,11 +104,16 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		isStrongTip:                     value.New[bool](),
 		isWeakTip:                       value.New[bool](),
 		isOrphaned:                      value.New[bool](),
+		anyStrongParentStronglyOrphaned: value.New[bool](),
+		anyWeakParentWeaklyOrphaned:     value.New[bool](),
+		isStronglyOrphaned:              value.New[bool](),
+		isWeaklyOrphaned:                value.New[bool](),
 
 		// derived properties (relational counters)
 		stronglyConnectedStrongChildren: value.New[int](),
 		connectedWeakChildren:           value.New[int](),
-		orphanedStrongParents:           value.New[int](),
+		stronglyOrphanedStrongParents:   value.New[int](),
+		weaklyOrphanedWeakParents:       value.New[int](),
 	}
 
 	value.DeriveFrom2(t.isStrongTipPoolMember, isStrongTipPoolMember, t.tipPool, t.isOrphaned)
@@ -102,7 +124,12 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	value.DeriveFrom2(t.isReferencedByOtherTips, isReferencedByOtherTips, t.connectedWeakChildren, t.isStronglyReferencedByOtherTips)
 	value.DeriveFrom2(t.isStrongTip, isStrongTip, t.isStrongTipPoolMember, t.isStronglyReferencedByOtherTips)
 	value.DeriveFrom2(t.isWeakTip, isWeakTip, t.isWeakTipPoolMember, t.isReferencedByOtherTips)
-	value.DeriveFrom2(t.isOrphaned, isOrphaned, t.isMarkedOrphaned, t.orphanedStrongParents)
+	value.DeriveFrom2(t.isOrphaned, isOrphaned, t.isStronglyOrphaned, t.isWeaklyOrphaned)
+	value.DeriveFrom1(t.anyStrongParentStronglyOrphaned, anyStrongParentStronglyOrphaned, t.stronglyOrphanedStrongParents)
+	value.DeriveFrom1(t.anyWeakParentWeaklyOrphaned, anyWeakParentWeaklyOrphaned, t.weaklyOrphanedWeakParents)
+	value.DeriveFrom3(t.isStronglyOrphaned, isStronglyOrphaned, t.isMarkedOrphaned, t.anyStrongParentStronglyOrphaned, t.anyWeakParentWeaklyOrphaned)
+	value.DeriveFrom2(t.isWeaklyOrphaned, isWeaklyOrphaned, t.isMarkedOrphaned, t.anyWeakParentWeaklyOrphaned)
+	value.DeriveFrom1(t.isMarkedOrphaned, isMarkedOrphaned, t.isLivenessThresholdReached)
 
 	t.OnEvicted(func() { t.SetTipPool(tipmanager.DroppedTipPool) })
 
@@ -171,23 +198,6 @@ func (t *TipMetadata) IsLivenessThresholdReached() bool {
 	return t.isLivenessThresholdReached.Get()
 }
 
-// SetMarkedOrphaned marks the block as orphaned (updated by the tip selection strategy).
-func (t *TipMetadata) SetMarkedOrphaned(orphaned bool) {
-	t.isMarkedOrphaned.Set(orphaned)
-}
-
-// IsMarkedOrphaned returns true if the block is marked as orphaned.
-func (t *TipMetadata) IsMarkedOrphaned() bool {
-	return t.isMarkedOrphaned.Get()
-}
-
-// OnMarkedOrphanedUpdated registers a callback that is triggered when the IsMarkedOrphaned property changes.
-func (t *TipMetadata) OnMarkedOrphanedUpdated(handler func(orphaned bool)) (unsubscribe func()) {
-	return t.isMarkedOrphaned.OnUpdate(func(_, isMarkedOrphaned bool) {
-		handler(isMarkedOrphaned)
-	})
-}
-
 // IsOrphaned returns true if the block is marked orphaned or if it has an orphaned strong parent.
 func (t *TipMetadata) IsOrphaned() bool {
 	return t.isOrphaned.Get()
@@ -216,8 +226,8 @@ func (t *TipMetadata) setupStrongParent(strongParent *TipMetadata) {
 		}),
 	)
 
-	strongParent.OnIsOrphanedUpdated(func(isOrphaned bool) {
-		t.orphanedStrongParents.Compute(lo.Cond(isOrphaned, increase, decrease))
+	strongParent.isStronglyOrphaned.OnUpdate(func(_, isOrphaned bool) {
+		t.stronglyOrphanedStrongParents.Compute(lo.Cond(isOrphaned, increase, decrease))
 	})
 }
 
@@ -276,8 +286,36 @@ func isWeakTip(isWeakTipPoolMember bool, isReferencedByOtherTips bool) bool {
 }
 
 // isOrphaned returns true if the block is marked orphaned or if it has an orphaned strong parent.
-func isOrphaned(isMarkedOrphaned bool, orphanedStrongParents int) bool {
-	return isMarkedOrphaned || orphanedStrongParents > 0
+func isOrphaned(isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
+	return isStronglyOrphaned || isWeaklyOrphaned
+}
+
+// anyStrongParentStronglyOrphaned returns true if any of the strong parents is strongly orphaned.
+func anyStrongParentStronglyOrphaned(stronglyOrphanedStrongParents int) bool {
+	return stronglyOrphanedStrongParents > 0
+}
+
+// anyWeakParentWeaklyOrphaned returns true if any of the weak parents is weakly orphaned.
+func anyWeakParentWeaklyOrphaned(weaklyOrphanedWeakParents int) bool {
+	return weaklyOrphanedWeakParents > 0
+}
+
+// isStronglyOrphaned returns true if the block is marked orphaned or if any of the strong parents is strongly orphaned
+// or if any of the weak parents is weakly orphaned.
+func isStronglyOrphaned(isMarkedOrphaned, anyStrongParentStronglyOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+	return isMarkedOrphaned || anyStrongParentStronglyOrphaned || anyWeakParentWeaklyOrphaned
+}
+
+// isWeaklyOrphaned returns true if the block is marked orphaned or if any of the weak parents is weakly orphaned.
+func isWeaklyOrphaned(isMarkedOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+	return isMarkedOrphaned || anyWeakParentWeaklyOrphaned
+}
+
+// isMarkedOrphaned returns true if the block is marked orphaned.
+func isMarkedOrphaned(isLivenessThresholdReached bool) bool {
+	accepted := false
+
+	return isLivenessThresholdReached && !accepted
 }
 
 // increase increases the given value by 1.

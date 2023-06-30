@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/stringify"
+	"github.com/iotaledger/iota-core/pkg/core/value"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -36,7 +37,7 @@ type Block struct {
 	// BlockGadget block
 	preAccepted           bool
 	acceptanceRatifiers   *advancedset.AdvancedSet[account.SeatIndex]
-	accepted              bool
+	accepted              *value.Value[bool]
 	preConfirmed          bool
 	confirmationRatifiers *advancedset.AdvancedSet[account.SeatIndex]
 	confirmed             bool
@@ -71,6 +72,7 @@ func NewBlock(data *model.Block) *Block {
 		acceptanceRatifiers:   advancedset.New[account.SeatIndex](),
 		confirmationRatifiers: advancedset.New[account.SeatIndex](),
 		modelBlock:            data,
+		accepted:              value.New[bool](),
 	}
 }
 
@@ -90,7 +92,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		solid:       true,
 		booked:      true,
 		preAccepted: true,
-		accepted:    true, // This should be true since we commit and evict on acceptance.
+		accepted:    value.New[bool](true), // This should be true since we commit and evict on acceptance.
 	}
 }
 
@@ -427,22 +429,17 @@ func (b *Block) AcceptanceRatifiers() []account.SeatIndex {
 
 // IsAccepted returns true if the Block was accepted.
 func (b *Block) IsAccepted() bool {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return b.accepted
+	return b.accepted.Get()
 }
 
 // SetAccepted sets the Block as accepted.
 func (b *Block) SetAccepted() (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	return b.accepted.Set(true)
+}
 
-	if wasUpdated = !b.accepted; wasUpdated {
-		b.accepted = true
-	}
-
-	return wasUpdated
+// OnAccepted registers the given handler to be called when the Block was accepted.
+func (b *Block) OnAccepted(handler func()) (unsubscribe func()) {
+	return b.accepted.OnUpdate(func(_, _ bool) { handler() })
 }
 
 func (b *Block) AddConfirmationRatifier(seat account.SeatIndex) (added bool) {

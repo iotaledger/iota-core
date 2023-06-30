@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
@@ -39,8 +40,9 @@ type Value[T comparable] struct {
 }
 
 // New creates a new Value instance.
-func New[T comparable]() *Value[T] {
+func New[T comparable](initialValue ...T) *Value[T] {
 	return &Value[T]{
+		value:           lo.First(initialValue),
 		updateCallbacks: shrinkingmap.New[types.UniqueID, *Callback[func(prevValue, newValue T)]](),
 	}
 }
