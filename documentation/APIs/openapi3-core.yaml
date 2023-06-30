@@ -1612,6 +1612,7 @@ components:
               - $ref: '#/components/schemas/AccountOutput'
               - $ref: '#/components/schemas/FoundryOutput'
               - $ref: '#/components/schemas/NFTOutput'
+              - $ref: '#/components/schemas/DelegationOutput'
         allotments:
           type: array
           description: The accounts map with corresponding allotment values.
@@ -1798,6 +1799,75 @@ components:
         - stateIndex
         - foundryCounter
         - mana
+
+    DelegationOutput:
+      description: >-
+        Describes an delegation output in the ledger that can be controlled by the
+        state and governance controllers.
+      properties:
+        type:
+          type: integer
+          description: Set to value 7 to denote an Delegation Output.
+          example: 7
+        amount:
+          type: string
+          description: >-
+            The amount of IOTA tokens held by the output. Encoded as
+            plain string.
+          example: '100'
+        delegatedAmount:
+          type: integer
+          description: The amount of IOTA tokens that were delegated when the output was created.
+        delegationId:
+          type: string
+          description: >-
+            The identifier for this delegation output.
+          example: '0x1505ec099896ab05d9e08fbc7101ae4dff0093b3943b28f789ed2ca728bcc8d6'
+        validatorId:
+          type: string
+          description: >-
+            The Account ID of the validator to which this output is delegating.
+          example: '0x1505ec099896ab05d9e08fbc7101ae4dff0093b3943b28f789ed2ca728bcc8d6'
+        startEpoch:
+          type: integer
+          description: >-
+            The index of the first epoch for which this output delegates.
+          example: 10
+        endEpoch:
+          type: integer
+          description: >-
+            The index of the last epoch for which this output delegates.
+          example: 12
+        unlockConditions:
+          type: array
+          description: >-
+            Unlock condtions that define how the output can be unlocked in a
+            transaction.
+          items:
+            anyOf:
+              - $ref: '#/components/schemas/AddressUnlockCondition'
+        immutableFeatures:
+          type: array
+          description: >-
+            Immutable features that add utility to the output but do not impose
+            unlocking conditions. These blocks need to be kept in future
+            transitions of the UTXO state machine.
+          items:
+            anyOf:
+              - $ref: '#/components/schemas/IssuerFeature'
+        mana:
+          type: integer
+          description: The stored mana held by the output.
+          example: 3000
+      required:
+        - type
+        - amount
+        - delegatedAmount
+        - delegationId
+        - validatorId
+        - startEpoch
+        - endEpoch
+  
 
     FoundryOutput:
       description: Describes a foundry output that is controlled by an alias.
@@ -2907,6 +2977,7 @@ components:
         - $ref: '#/components/schemas/AccountOutput'
         - $ref: '#/components/schemas/FoundryOutput'
         - $ref: '#/components/schemas/NFTOutput'
+        - $ref: '#/components/schemas/DelegationOutput'
 
     OutputMetadataResponse:
       description: Returns metadata about an output.
