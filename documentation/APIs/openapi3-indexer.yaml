@@ -17,9 +17,9 @@ tags:
   - name: basic outputs
     description: Query Basic Outputs.
   - name: account outputs
-    description: Query Account Outputs. - TO BE UPDATED
-  - name: delegation outputs
     description: Query Account Outputs.
+  - name: delegation outputs
+    description: Query Delegation Outputs.
   - name: foundry outputs
     description: Query Foundry Outputs.
   - name: nft outputs
@@ -362,7 +362,7 @@ paths:
           name: validatorId
           schema:
             type: string
-          example: true
+          example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
           description: Filters outputs based on the account of the validator to which the output is delegating.
         - in: query
           name: createdBefore

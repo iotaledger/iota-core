@@ -109,7 +109,7 @@ paths:
         - accounts
       summary: Check if the account is ready to issue a block.
       description: >-
-        Check readiness of the node to issue a new block, the referenced mana cost based on the rate setter and current network congestion, and the block issuance credits of requested account.
+        Check the readiness of the node to issue a new block, the reference mana cost based on the rate setter and current network congestion, and the block issuance credits of the requested account.
       parameters:
         - in: path
           name: accountId
@@ -124,7 +124,7 @@ paths:
             type: integer
           example: 1622568540
           required: false
-          description: Check the referenced mana cost, block issuance credits and issuance readiness for a specific slot index.
+          description: Check the issuance readiness for a specific slot index.
       responses:
         '200':
           description: "Successful operation."
@@ -164,9 +164,9 @@ paths:
     get:
       tags:
         - rewards
-      summary: Returns the totally available Mana rewards of an account from account/delegation output. 
+      summary: Returns the totally available Mana rewards of an account  or delegation output. 
       description: >-
-        Returns the totally available Mana rewards of an account up until current epoch index. However, rewards for an epoch only become available at the beginning of the next epoch. If the end epoch is equal or greater than the current epoch, the rewards response will not include the potentially available rewards for those epochs.
+        Returns the totally available Mana rewards of an account or delegation output up until the current epoch index. Note that rewards for an epoch only become available at the beginning of the next epoch. If the end epoch of a staking feature is equal or greater than the current epoch, the rewards response will not include the potential future rewards for those epochs.
       parameters:
         - in: path
           name: outputId
@@ -174,14 +174,14 @@ paths:
             type: string
           example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
           required: true
-          description: Identifier of the output.
+          description: Identifier of the account or delegation output.
       responses:
         '200':
           description: "Successful operation."
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountRewardsResponse'
+                $ref: '#/components/schemas/ManaRewardsResponse'
               examples:
                 CongestionResponse:
                   $ref: '#/components/examples/get-account-rewards-example'
@@ -215,6 +215,7 @@ paths:
       tags:
         - committee
       summary: Return the information of committee members.
+      # TODO: Revisit when committee selection is implemented, maybe also includes the selected committee of next epoch, if it's selected
       description: Return the information of committee members at the given epoch index. If epoch index is not provided, the current committee members are returned.
       parameters:
         - in: query
@@ -263,7 +264,7 @@ paths:
     get:
       tags:
         - staking
-      summary: Returns information of active stakers.         
+      summary: Returns information of the active stakers.         
       responses:
         '200':
           description: "Successful operation."
@@ -1074,8 +1075,7 @@ components:
           subunit: "glow"
           useMetricPrefix: false
         features:
-          - pow
-          - consensus
+          - allowIncompleteBlock
 
     get-buildingBlock-response-example:
       value:
@@ -1331,7 +1331,7 @@ components:
       value:
         slotIndex: 20
         ready: true
-        referencedManaCost: 50000
+        referenceManaCost: 50000
         blockIssuanceCredits: 10000000
 
     get-block-by-id-empty-response-example:
@@ -1593,7 +1593,7 @@ components:
           description: Network identifier. Plain string encoded number. This field signals for which network the block is meant for. It is computed out of the first 8 bytes of the `BLAKE2b-256` hash of the concatenation of the network name and protocol version string.
         creationTime:
           type: number
-          description: The slot index of this transaction is created.
+          description: The slot index in which the transaction was created.
         contextInputs:
           type: array
           items:
@@ -1654,7 +1654,7 @@ components:
       properties:
         type:
           type: integer
-          description: Set to value 1 to denote an Commitment Input.
+          description: Set to value 1 to denote a Commitment Input.
         commitmentId:
           type: string
           description: The commitment identifier to reference.
@@ -1662,12 +1662,13 @@ components:
         - type
         - commitmentId
 
+    # TODO: Consider rename it to CreditsInput, need to be aligned to implementaion. 
     BICInput:
       description: Allows to provide the VM with context for the value of the BIC vector for a specific slot. It is necessary information needed for any Account transitions, and account destroying.
       properties:
         type:
           type: integer
-          description: Set to value 2 to denote an Commitment Input.
+          description: Set to value 2 to denote an BIC Input.
         accountId:
           type: string
           description: The account identifier.
@@ -1676,11 +1677,11 @@ components:
         - accountId
 
     RewardInput:
-      description: c
+      description: Allows to claim Mana rewards for a referenced account or delegation input in a transaction. This enables the transaction to add the Mana rewards on the output side if the claiming rules of the staking feature or delegation output are adhered to.
       properties:
         type:
           type: integer
-          description: Set to value 3 to denote an Commitment Input.
+          description: Set to value 3 to denote an a Reward Input.
         index:
           type: integer
           description: The index of the transaction input for which to claim rewards.
@@ -1814,12 +1815,12 @@ components:
       properties:
         type:
           type: integer
-          description: Set to value 7 to denote an Delegation Output.
+          description: Set to value 7 to denote a Delegation Output.
           example: 7
         amount:
           type: string
           description: >-
-            The amount of IOTA tokens held by the output. Encoded as
+            The amount of IOTA tokens held by the output. Encoded as a
             plain string.
           example: '100'
         delegatedAmount:
@@ -2180,7 +2181,7 @@ components:
       properties:
         type:
           type: integer
-          description: Set to value 4 to denote a Metadata Feature.
+          description: Set to value 4 to denote a Block Issuer Feature.
           example: 4
         blockIssuerKeys:
           type: array
@@ -2201,7 +2202,7 @@ components:
       properties:
         type:
           type: integer
-          description: Set to value 5 to denote a Metadata Feature.
+          description: Set to value 5 to denote a Staking Feature.
           example: 5
         stakedAmount:
           type: integer
@@ -2217,8 +2218,10 @@ components:
           description: The epoch index at which the staking ends.
       required:
         - type
-        - blockIssuerKeys
-        - expirySlot
+        - stakedAmount
+        - fixedCost
+        - startEpoch
+        - endEpoch
 
     MetadataFeature:
       description: Defines metadata (arbitrary binary data) that will be stored in the output.
@@ -2722,15 +2725,15 @@ components:
             oneOf:
               - $ref: '#/components/schemas/Validator'
 
-    AccountRewardsResponse:
-      description: Returns the stored and potential mana of the account.
+    ManaRewardsResponse:
+      description: Returns the mana rewards of an account or delegation output.
       properties:
         currentEpochIndex:
           type: integer
           description: The epoch index of current time.
         rewards:
           type: integer
-          description: The amount of rewards the account get.
+          description: The amount of totally available rewards the requested output may claim.
 
     AccountResponse:
       description: Returns information that are ideal for attaching a block.
@@ -2745,10 +2748,10 @@ components:
       properties:
         totalStake:
           type: integer
-          description: The total stake of the committee holds.
+          description: The total amount of delegated and staked IOTA tokens in the selected committee.
         totalValidatorStake:
           type: integer
-          description: The total stake of the validators hold.
+          description: The total amount of staked IOTA tokens in the selected committee.
         validators:
           type: array
           description: The validators of the committee.
@@ -2767,7 +2770,7 @@ components:
           description: The total stake of the pool, including delegators.
         validatorStake:
           type: integer
-          description: The stake of validator holds.
+          description: The stake of a validator.
         fixedCost:
           type: integer
           description: The fixed cost of the validator, which it receives as part of its Mana rewards.
@@ -2809,14 +2812,14 @@ components:
           type: boolean
           description: >
             Provided only if account specified in the request. Indicates if a node is ready to issue a block in a current congestion or should wait.
-        referencedManaCost:
+        referenceManaCost:
           type: integer
           description: The cost in mana for issuing a block in a current congestion estimated based on RMC and slot index.
         blockIssuanceCredits:
           type: integer
       required:
         - slotIndex
-        - referencedManaCost
+        - referenceManaCost
         - blockIssuanceCredits
 
 
