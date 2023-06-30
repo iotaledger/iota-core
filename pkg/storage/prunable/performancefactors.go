@@ -51,14 +51,16 @@ func (p *PerformanceFactors) Store(accountID iotago.AccountID, pf uint64) error 
 func (p *PerformanceFactors) ForEachPerformanceFactor(consumer func(accountID iotago.AccountID, pf uint64) error) error {
 	var innerErr error
 	if err := p.store.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
-		var accountID iotago.AccountID
-		if _, innerErr = accountID.FromBytes(key); innerErr != nil {
+		accountID, _, err := iotago.IdentifierFromBytes(key)
+		if err != nil {
+			innerErr = err
 			return false
 		}
 
 		serializablePf := new(storable.SerializableInt64)
-		_, err := serializablePf.FromBytes(value)
+		_, err = serializablePf.FromBytes(value)
 		if err != nil {
+			innerErr = err
 			return false
 		}
 

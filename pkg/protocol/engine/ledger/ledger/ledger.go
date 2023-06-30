@@ -3,6 +3,7 @@ package ledger
 import (
 	cryptoed25519 "crypto/ed25519"
 	"fmt"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"io"
 
 	"github.com/pkg/errors"
@@ -39,7 +40,7 @@ var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provide
 type Ledger struct {
 	events *ledger.Events
 
-	apiProvider func() iotago.API
+	apiProvider permanent.APIBySlotIndexProviderFunc
 
 	utxoLedger       *utxoledger.Manager
 	accountsLedger   *accountsledger.Manager
@@ -49,12 +50,9 @@ type Ledger struct {
 
 	sybilProtection sybilprotection.SybilProtection
 
-	memPool            mempool.MemPool[ledger.BlockVoteRank]
-	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
-	errorHandler       func(error)
-	protocolParameters *iotago.ProtocolParameters
-
-	manaDecayProvider *iotago.ManaDecayProvider
+	memPool      mempool.MemPool[ledger.BlockVoteRank]
+	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
+	errorHandler func(error)
 
 	module.Module
 }
@@ -67,7 +65,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.Commitments().Load,
 			e.BlockCache.Block,
 			e.Storage.AccountDiffs,
-			e.API,
+			e.Storage.Settings().APIForSlotIndex,
 			e.SybilProtection,
 			e.EpochGadget,
 			e.ErrorHandler("ledger"),
@@ -85,10 +83,10 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 		})
 		e.Storage.Settings().HookInitialized(func() {
-			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
-			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
-			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
-			l.accountsLedger.SetCommitmentEvictionAge(l.protocolParameters.EvictionAge)
+			//TODO: how do we want to handle changing API here?
+			api := l.apiProvider(0)
+			l.manaManager = mana.NewManager(api.ManaDecayProvider(), l.resolveAccountOutput)
+			l.accountsLedger.SetCommitmentEvictionAge(api.ProtocolParameters().EvictionAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			l.TriggerConstructed()
@@ -117,7 +115,7 @@ func New(
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
-	apiProvider func() iotago.API,
+	apiProvider permanent.APIBySlotIndexProviderFunc,
 	sybilProtection sybilprotection.SybilProtection,
 	epochGadget epochgadget.Gadget,
 	errorHandler func(error),
@@ -140,9 +138,8 @@ func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.Transact
 }
 
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
-	switch payload := block.ProtocolBlock().Payload.(type) {
-	case mempool.Transaction:
-		transactionMetadata, err := l.memPool.AttachTransaction(payload, block.ID())
+	if transaction, hasTransaction := block.Transaction(); hasTransaction {
+		transactionMetadata, err := l.memPool.AttachTransaction(transaction, block.ID())
 		if err != nil {
 			l.errorHandler(err)
 
@@ -150,10 +147,9 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 		}
 
 		return transactionMetadata, true
-	default:
-
-		return nil, false
 	}
+
+	return nil, false
 }
 
 func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, accountRoot iotago.Identifier, err error) {
@@ -219,12 +215,8 @@ func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
-	switch block.ProtocolBlock().Payload.(type) {
-	case *iotago.Transaction:
+	if _, hasTransaction := block.Transaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
-
-	default:
-		return
 	}
 }
 
@@ -254,7 +246,7 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Outp
 			return nil, ErrUnexpectedUnderlyingType
 		}
 
-		return utxoledger.CreateOutput(l.utxoLedger.API(), stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
+		return utxoledger.CreateOutput(l.utxoLedger.API, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
 	default:
 		panic("unexpected State type")
 	}
@@ -549,7 +541,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 			// output side
 			txWithMeta.Outputs().Range(func(stateMetadata mempool.StateMetadata) {
-				output := utxoledger.CreateOutput(l.utxoLedger.API(), stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationTime, stateMetadata.State().Output())
+				output := utxoledger.CreateOutput(l.utxoLedger.API, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationTime, stateMetadata.State().Output())
 				outputs = append(outputs, output)
 			})
 		}

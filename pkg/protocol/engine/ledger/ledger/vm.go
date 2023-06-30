@@ -96,14 +96,17 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 	resolvedInputs.RewardsInputSet = rewardInputSet
 
-	vmParams := &iotagovm.Params{External: &iotago.ExternalUnlockParameters{
-		ProtocolParameters: l.protocolParameters,
-	}}
+	//TODO: in which slot is this transaction?
+	api := l.apiProvider(tx.Essence.CreationTime)
+
+	vmParams := &iotagovm.Params{
+		API: api,
+	}
 	if err = stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
 		return nil, err
 	}
 
-	outputSet, err := tx.OutputsSet()
+	outputSet, err := tx.OutputsSet(api)
 	if err != nil {
 		return nil, err
 	}

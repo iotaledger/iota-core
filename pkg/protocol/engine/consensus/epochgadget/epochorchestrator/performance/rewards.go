@@ -13,7 +13,7 @@ func (m *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	return iotago.Identifier(ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epochIndex)).Root())
+	return iotago.Identifier(m.rewardsMap(epochIndex).Root())
 }
 
 func (m *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
@@ -26,7 +26,7 @@ func (m *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			continue
 		}
 
-		poolStats, err := m.poolStats(epochIndex)
+		poolStats, err := m.poolStatsStore.Get(epochIndex)
 		if err != nil {
 			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
 		}
@@ -57,7 +57,7 @@ func (m *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			continue
 		}
 
-		poolStats, err := m.poolStats(epochIndex)
+		poolStats, err := m.poolStatsStore.Get(epochIndex)
 		if err != nil {
 			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
 		}
@@ -78,11 +78,20 @@ func (m *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 }
 
 func (m *Tracker) rewardsStorage(epochIndex iotago.EpochIndex) kvstore.KVStore {
-	return lo.PanicOnErr(m.rewardBaseStore.WithExtendedRealm(epochIndex.Bytes()))
+	return lo.PanicOnErr(m.rewardBaseStore.WithExtendedRealm(epochIndex.MustBytes()))
+}
+
+func (m *Tracker) rewardsMap(epochIndex iotago.EpochIndex) *ads.Map[iotago.AccountID, *PoolRewards] {
+	return ads.NewMap(m.rewardsStorage(epochIndex),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		(*PoolRewards).Bytes,
+		PoolRewardsFromBytes,
+	)
 }
 
 func (m *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *PoolRewards, exists bool) {
-	return ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epochIndex)).Get(accountID)
+	return m.rewardsMap(epochIndex).Get(accountID)
 }
 
 func calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken) uint64 {

@@ -77,6 +77,26 @@ func (blk *Block) ProtocolBlock() *iotago.ProtocolBlock {
 	return blk.protocolBlock
 }
 
+func (blk *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
+	basicBlock, isBasicBlock := blk.BasicBlock()
+	if !isBasicBlock {
+		return nil, false
+	}
+
+	tx, isTransaction = basicBlock.Payload.(*iotago.Transaction)
+	return tx, isTransaction
+}
+
+func (blk *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) {
+	basicBlock, isBasicBlock = blk.ProtocolBlock().Block.(*iotago.BasicBlock)
+	return basicBlock, isBasicBlock
+}
+
+func (blk *Block) ValidatorBlock() (validatorBlock *iotago.ValidatorBlock, isValidatorBlock bool) {
+	validatorBlock, isValidatorBlock = blk.ProtocolBlock().Block.(*iotago.ValidatorBlock)
+	return validatorBlock, isValidatorBlock
+}
+
 func (blk *Block) String() string {
 	encode, err := blk.api.JSONEncode(blk.ProtocolBlock())
 	if err != nil {

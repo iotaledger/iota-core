@@ -3,9 +3,9 @@ package tipmanagerv1
 import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // TipMetadata represents the metadata for a block in the TipManager.
@@ -180,21 +180,21 @@ func (t *TipMetadata) setTipPool(newType tipmanager.TipPool) {
 }
 
 // propagateConnectedChildren returns the rules for the propagation of the internal connected children counters.
-func propagateConnectedChildren(isConnected bool, stronglyConnected bool) (propagationRules map[model.ParentsType]func(*TipMetadata)) {
+func propagateConnectedChildren(isConnected bool, stronglyConnected bool) (propagationRules map[iotago.ParentsType]func(*TipMetadata)) {
 	diffToApply := lo.Cond(isConnected, +1, -1)
 
 	updatedValue := func(value int) int {
 		return value + diffToApply
 	}
 
-	propagationRules = map[model.ParentsType]func(*TipMetadata){
-		model.WeakParentType: func(parent *TipMetadata) {
+	propagationRules = map[iotago.ParentsType]func(*TipMetadata){
+		iotago.WeakParentType: func(parent *TipMetadata) {
 			parent.weaklyConnectedChildren.Compute(updatedValue)
 		},
 	}
 
 	if stronglyConnected {
-		propagationRules[model.StrongParentType] = func(parent *TipMetadata) {
+		propagationRules[iotago.StrongParentType] = func(parent *TipMetadata) {
 			parent.stronglyConnectedChildren.Compute(updatedValue)
 		}
 	}

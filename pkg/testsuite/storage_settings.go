@@ -27,8 +27,8 @@ func (t *TestSuite) AssertProtocolParameters(parameters iotago.ProtocolParameter
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if !cmp.Equal(parameters, *node.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters()) {
-				return errors.Errorf("AssertProtocolParameters: %s: expected %s, got %s", node.Name, parameters.String(), node.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters().String())
+			if !cmp.Equal(parameters, *node.Protocol.MainEngineInstance().Storage.Settings().protocolParameters()) {
+				return errors.Errorf("AssertProtocolParameters: %s: expected %s, got %s", node.Name, parameters.String(), node.Protocol.MainEngineInstance().Storage.Settings().protocolParameters().String())
 			}
 
 			return nil

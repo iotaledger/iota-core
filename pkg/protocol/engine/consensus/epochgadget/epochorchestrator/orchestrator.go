@@ -1,6 +1,7 @@
 package epochorchestrator
 
 import (
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"io"
 
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -20,7 +21,7 @@ type Orchestrator struct {
 	events          *epochgadget.Events
 	sybilProtection sybilprotection.SybilProtection
 	ledger          ledger.Ledger
-	timeProvider    *iotago.TimeProvider
+	apiProvider     permanent.APIBySlotIndexProviderFunc
 
 	performanceManager *performance.Tracker
 
@@ -35,7 +36,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 			events:             epochgadget.NewEvents(),
 			sybilProtection:    e.SybilProtection,
 			ledger:             e.Ledger,
-			timeProvider:       e.API().TimeProvider(),
+			apiProvider:        e.APIForSlotIndex,
 			performanceManager: performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider()),
 		}, opts,
 			func(o *Orchestrator) {
@@ -59,9 +60,10 @@ func (o *Orchestrator) BlockAccepted(block *blocks.Block) {
 }
 
 func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
-	currentEpoch := o.timeProvider.EpochFromSlot(slot)
+	timeProvider := o.apiProvider(slot).TimeProvider()
+	currentEpoch := timeProvider.EpochFromSlot(slot)
 
-	if o.timeProvider.EpochEnd(currentEpoch) == slot {
+	if timeProvider.EpochEnd(currentEpoch) == slot {
 		committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
 		if !exists {
 			// If the committee for the epoch wasn't set before, we promote the current one.
@@ -96,15 +98,17 @@ func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 }
 
 func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
-	epoch := o.timeProvider.EpochFromSlot(slot)
-	if o.timeProvider.EpochEnd(epoch)-o.optsEpochEndNearingThreshold == slot {
+	timeProvider := o.apiProvider(slot).TimeProvider()
+	epoch := timeProvider.EpochFromSlot(slot)
+	if timeProvider.EpochEnd(epoch)-o.optsEpochEndNearingThreshold == slot {
 		newCommittee := o.selectNewCommittee(slot)
 		o.events.CommitteeSelected.Trigger(newCommittee)
 	}
 }
 
 func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
-	currentEpoch := o.timeProvider.EpochFromSlot(slot)
+	timeProvider := o.apiProvider(slot).TimeProvider()
+	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 	candidates := o.performanceManager.EligibleValidatorCandidates(nextEpoch)
 

@@ -51,7 +51,7 @@ func (b *Blocks) ForEachBlockIDInSlot(consumer func(blockID iotago.BlockID) erro
 	var innerErr error
 	if err := b.store.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
 		var blockID iotago.BlockID
-		blockID, innerErr = iotago.SlotIdentifierFromBytes(key)
+		blockID, _, innerErr = iotago.SlotIdentifierFromBytes(key)
 		if innerErr != nil {
 			return false
 		}

@@ -27,6 +27,8 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 			return errors.Wrap(err, "failed to read slot")
 		}
 
+		api := m.apiProvider(slotIndex)
+
 		// Read attestations.
 		var attestations []*iotago.Attestation
 		if err = stream.ReadCollection(reader, func(i int) error {
@@ -110,10 +112,17 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 			return errors.Wrapf(err, "failed to write slot %d", i)
 		}
 
+		api := m.apiProvider(i)
+
 		// Write attestations.
 		if err := stream.WriteCollection(writer, func() (uint64, error) {
 			for _, a := range attestations {
-				if writeErr := stream.WriteSerializable(writer, a); writeErr != nil {
+				bytes, err := api.Encode(a)
+				if err != nil {
+					return 0, errors.Wrapf(err, "failed to encode attestation %v", a)
+				}
+
+				if writeErr := stream.WriteBlob(writer, bytes); writeErr != nil {
 					return 0, errors.Wrapf(writeErr, "failed to write attestation %v", a)
 				}
 			}

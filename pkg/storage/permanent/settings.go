@@ -23,6 +23,7 @@ const (
 	protocolParametersKey
 )
 
+type APIByVersionProviderFunc func(byte) iotago.API
 type APIBySlotIndexProviderFunc func(iotago.SlotIndex) iotago.API
 
 type Settings struct {
@@ -155,14 +156,19 @@ func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 		}
 		panic(err)
 	}
-	return lo.PanicOnErr(iotago.SlotIndexFromBytes(bytes))
+	i, _, err := iotago.SlotIndexFromBytes(bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return i
 }
 
 func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	return s.store.Set([]byte{latestFinalizedSlotKey}, index.Bytes())
+	return s.store.Set([]byte{latestFinalizedSlotKey}, index.MustBytes())
 }
 
 func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commitment) (err error) {
@@ -182,7 +188,11 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		return errors.Wrap(err, "failed to write commitment bytes")
 	}
 
-	if _, err = writer.Write(s.LatestFinalizedSlot().Bytes()); err != nil {
+	finalizedSlotBytes, err := s.LatestFinalizedSlot().Bytes()
+	if err != nil {
+		return errors.Wrap(err, "failed to encode latest finalized slot")
+	}
+	if _, err = writer.Write(finalizedSlotBytes); err != nil {
 		return errors.Wrap(err, "failed to write latest finalized slot")
 	}
 
@@ -256,7 +266,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 	if err = binary.Read(reader, binary.LittleEndian, latestFinalizedSlotBytes); err != nil {
 		return errors.Wrap(err, "failed to read latest finalized slot bytes")
 	}
-	slotIndex, err := iotago.SlotIndexFromBytes(latestFinalizedSlotBytes[:])
+	slotIndex, _, err := iotago.SlotIndexFromBytes(latestFinalizedSlotBytes[:])
 	if err != nil {
 		return errors.Wrap(err, "failed to parse latest finalized slot")
 	}
@@ -304,7 +314,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to set latest commitment")
 	}
 
-	return s.SetSnapshotImported()
+	return nil
 }
 
 func (s *Settings) String() string {

@@ -104,7 +104,7 @@ func New(
 			optsBootstrappedThreshold: 10 * time.Second,
 			optsSnapshotDepth:         5,
 		}, opts, func(e *Engine) {
-			e.BlockCache = blocks.New(e.EvictionState, func() *iotago.TimeProvider { return e.API().TimeProvider() })
+			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings().APIForSlotIndex)
 
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 
@@ -122,13 +122,10 @@ func New(
 			e.TipManager = tipManagerProvider(e)
 
 			e.HookInitialized(lo.Batch(
-				e.Storage.Settings().TriggerInitialized,
 				e.Storage.Commitments().TriggerInitialized,
 			))
 
-			e.Storage.Settings().HookInitialized(func() {
-				e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Index())
-			})
+			e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Index())
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
@@ -210,6 +207,10 @@ func (e *Engine) IsSynced() (isBootstrapped bool) {
 	return e.IsBootstrapped() // && time.Since(e.Clock.PreAccepted().Time()) < e.optsBootstrappedThreshold
 }
 
+func (e *Engine) APIForSlotIndex(slot iotago.SlotIndex) iotago.API {
+	return e.Storage.Settings().APIForSlotIndex(slot)
+}
+
 func (e *Engine) API(version byte) iotago.API {
 	return e.Storage.Settings().API(version)
 }
@@ -228,8 +229,6 @@ func (e *Engine) Initialize(snapshot ...string) (err error) {
 			e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
 		}
 	} else {
-		e.Storage.Settings().UpdateAPI()
-		e.Storage.Settings().TriggerInitialized()
 		e.Storage.Commitments().TriggerInitialized()
 		e.Storage.Prunable.RestoreFromDisk()
 		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
@@ -345,7 +344,7 @@ func (e *Engine) setupEvictionState() {
 	wp := e.Workers.CreatePool("EvictionState", 1) // Using just 1 worker to avoid contention
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		block.ForEachParent(func(parent model.Parent) {
+		block.ForEachParent(func(parent iotago.Parent) {
 			// TODO: ONLY ADD STRONG PARENTS AFTER NOT DOWNLOADING PAST WEAK ARROWS
 			// TODO: is this correct? could this lock acceptance in some extreme corner case? something like this happened, that confirmation is correctly advancing per block, but acceptance does not. I think it might have something to do with root blocks
 			if parent.ID.Index() < block.ID().Index() && !e.EvictionState.IsRootBlock(parent.ID) {
@@ -354,7 +353,7 @@ func (e *Engine) setupEvictionState() {
 					e.errorHandler(errors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
 					return
 				}
-				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().SlotCommitment.MustID())
+				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().SlotCommitmentID)
 			}
 		})
 	}, event.WithWorkerPool(wp))
@@ -401,7 +400,7 @@ func (e *Engine) readSnapshot(filePath string) (err error) {
 
 	if err = e.Import(file); err != nil {
 		return errors.Wrap(err, "failed to import snapshot")
-	} else if err = e.Storage.Settings().SetSnapshotImported(true); err != nil {
+	} else if err = e.Storage.Settings().SetSnapshotImported(); err != nil {
 		return errors.Wrap(err, "failed to set snapshot imported flag")
 	}
 

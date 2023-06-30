@@ -201,22 +201,37 @@ func readPubKey(reader io.ReadSeeker) (pubKey ed25519.PublicKey, offset int, err
 type AccountDiffs struct {
 	api               iotago.API
 	slot              iotago.SlotIndex
-	diffChangeStore   *kvstore.TypedStore[iotago.AccountID, AccountDiff, *iotago.AccountID, *AccountDiff]
-	destroyedAccounts *kvstore.TypedStore[iotago.AccountID, types.Empty, *iotago.AccountID, *types.Empty] // TODO is there any store for set of keys only?
+	diffChangeStore   *kvstore.TypedStore[iotago.AccountID, *AccountDiff]
+	destroyedAccounts *kvstore.TypedStore[iotago.AccountID, types.Empty] // TODO is there any store for set of keys only?
 }
 
 // NewAccountDiffs creates a new AccountDiffs instance.
 func NewAccountDiffs(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.API) *AccountDiffs {
 	return &AccountDiffs{
-		api:               api,
-		slot:              slot,
-		diffChangeStore:   kvstore.NewTypedStore[iotago.AccountID, AccountDiff](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{diffChangePrefix}))),
-		destroyedAccounts: kvstore.NewTypedStore[iotago.AccountID, types.Empty](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{destroyedAccountsPrefix}))),
+		api:  api,
+		slot: slot,
+		diffChangeStore: kvstore.NewTypedStore[iotago.AccountID, *AccountDiff](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{diffChangePrefix})),
+			iotago.Identifier.Bytes,
+			iotago.IdentifierFromBytes,
+			(*AccountDiff).Bytes,
+			func(bytes []byte) (object *AccountDiff, consumed int, err error) {
+				diff := new(AccountDiff)
+				n, err := diff.FromBytes(bytes)
+
+				return diff, n, err
+			}),
+		destroyedAccounts: kvstore.NewTypedStore[iotago.AccountID, types.Empty](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{destroyedAccountsPrefix})),
+			iotago.Identifier.Bytes,
+			iotago.IdentifierFromBytes,
+			types.Empty.Bytes,
+			func(bytes []byte) (object types.Empty, consumed int, err error) {
+				return types.Void, 0, nil
+			}),
 	}
 }
 
 // Store stores the given accountID as a root block.
-func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff, destroyed bool) (err error) {
+func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff *AccountDiff, destroyed bool) (err error) {
 	if destroyed {
 		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
 			return errors.Wrap(err, "failed to set destroyed account")
@@ -228,7 +243,7 @@ func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff
 }
 
 // Load loads accountID and commitmentID for the given blockID.
-func (b *AccountDiffs) Load(accountID iotago.AccountID) (accountDiff AccountDiff, destroyed bool, err error) {
+func (b *AccountDiffs) Load(accountID iotago.AccountID) (accountDiff *AccountDiff, destroyed bool, err error) {
 	destroyed, err = b.destroyedAccounts.Has(accountID)
 	if err != nil {
 		return accountDiff, false, errors.Wrap(err, "failed to get destroyed account")
@@ -253,16 +268,16 @@ func (b *AccountDiffs) Delete(accountID iotago.AccountID) (err error) {
 }
 
 // Stream streams all accountIDs changes for a slot index.
-func (b *AccountDiffs) Stream(consumer func(accountID iotago.AccountID, accountDiff AccountDiff, destroyed bool) bool) error {
+func (b *AccountDiffs) Stream(consumer func(accountID iotago.AccountID, accountDiff *AccountDiff, destroyed bool) bool) error {
 	// We firstly iterate over the destroyed accounts, as they won't have a corresponding accountDiff.
 	if storageErr := b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, empty types.Empty) bool {
-		return consumer(accountID, AccountDiff{}, true)
+		return consumer(accountID, nil, true)
 	}); storageErr != nil {
 		return errors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)
 	}
 
 	// For those accounts that still exist, we might have an accountDiff.
-	if storageErr := b.diffChangeStore.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, accountDiff AccountDiff) bool {
+	if storageErr := b.diffChangeStore.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, accountDiff *AccountDiff) bool {
 		return consumer(accountID, accountDiff, false)
 	}); storageErr != nil {
 		return errors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)

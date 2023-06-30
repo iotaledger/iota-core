@@ -3,6 +3,7 @@ package utxoledger
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"io"
 
 	"github.com/pkg/errors"
@@ -27,7 +28,7 @@ func (o *Output) SnapshotBytes() []byte {
 	return m.Bytes()
 }
 
-func OutputFromSnapshotReader(reader io.ReadSeeker, api iotago.API) (*Output, error) {
+func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider permanent.APIBySlotIndexProviderFunc) (*Output, error) {
 	outputID := iotago.OutputID{}
 	if _, err := io.ReadFull(reader, outputID[:]); err != nil {
 		return nil, fmt.Errorf("unable to read LS output ID: %w", err)
@@ -59,24 +60,24 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, api iotago.API) (*Output, er
 	}
 
 	var output iotago.TxEssenceOutput
-	if _, err := api.Decode(outputBytes, &output, serix.WithValidation()); err != nil {
+	if _, err := apiProvider(blockID.Index()).Decode(outputBytes, &output, serix.WithValidation()); err != nil {
 		return nil, fmt.Errorf("invalid LS output address: %w", err)
 	}
 
-	return CreateOutput(api, outputID, blockID, indexBooked, indexCreated, output, outputBytes), nil
+	return CreateOutput(apiProvider, outputID, blockID, indexBooked, indexCreated, output, outputBytes), nil
 }
 
 func (s *Spent) SnapshotBytes() []byte {
 	m := marshalutil.New()
 	m.WriteBytes(s.Output().SnapshotBytes())
 	m.WriteBytes(s.transactionIDSpent[:])
-	m.WriteBytes(s.slotIndexSpent.Bytes())
+	m.WriteBytes(s.slotIndexSpent.MustBytes())
 	// we don't need to write indexSpent because this info is available in the milestoneDiff that consumes the output
 	return m.Bytes()
 }
 
-func SpentFromSnapshotReader(reader io.ReadSeeker, api iotago.API, indexSpent iotago.SlotIndex) (*Spent, error) {
-	output, err := OutputFromSnapshotReader(reader, api)
+func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider permanent.APIBySlotIndexProviderFunc, indexSpent iotago.SlotIndex) (*Spent, error) {
+	output, err := OutputFromSnapshotReader(reader, apiProvider)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +95,7 @@ func SpentFromSnapshotReader(reader io.ReadSeeker, api iotago.API, indexSpent io
 	return NewSpent(output, transactionIDSpent, indexSpent), nil
 }
 
-func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, api iotago.API) (*SlotDiff, error) {
+func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider permanent.APIBySlotIndexProviderFunc) (*SlotDiff, error) {
 	slotDiff := &SlotDiff{}
 
 	var diffIndex uint64
@@ -112,7 +113,7 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, api iotago.API) (*SlotDi
 
 	for i := uint64(0); i < createdCount; i++ {
 		var err error
-		slotDiff.Outputs[i], err = OutputFromSnapshotReader(reader, api)
+		slotDiff.Outputs[i], err = OutputFromSnapshotReader(reader, apiProvider)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read slot diff output: %w", err)
 		}
@@ -127,7 +128,7 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, api iotago.API) (*SlotDi
 
 	for i := uint64(0); i < consumedCount; i++ {
 		var err error
-		slotDiff.Spents[i], err = SpentFromSnapshotReader(reader, api, slotDiff.Index)
+		slotDiff.Spents[i], err = SpentFromSnapshotReader(reader, apiProvider, slotDiff.Index)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read slot diff spent: %w", err)
 		}
@@ -191,7 +192,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	}
 
 	for i := uint64(0); i < outputCount; i++ {
-		output, err := OutputFromSnapshotReader(reader, m.apiProviderFunc())
+		output, err := OutputFromSnapshotReader(reader, m.apiProvider)
 		if err != nil {
 			return fmt.Errorf("at pos %d: %w", i, err)
 		}
@@ -202,7 +203,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	}
 
 	for i := uint64(0); i < slotDiffCount; i++ {
-		slotDiff, err := ReadSlotDiffToSnapshotReader(reader, m.apiProviderFunc())
+		slotDiff, err := ReadSlotDiffToSnapshotReader(reader, m.apiProvider)
 		if err != nil {
 			return err
 		}

@@ -6,8 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -124,7 +122,7 @@ func (m *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 			return errors.Wrap(err, "unable to read epoch index")
 		}
 
-		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epochIndex))
+		rewardsTree := m.rewardsMap(epochIndex)
 
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
@@ -164,8 +162,7 @@ func (m *Tracker) importPoolsStats(reader io.ReadSeeker) error {
 			return errors.Wrap(err, "unable to read pool stats")
 		}
 
-		err := m.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolStats.Bytes()))
-		if err != nil {
+		if err := m.poolStatsStore.Set(epochIndex, &poolStats); err != nil {
 			return errors.Wrap(err, "unable to store pool stats")
 		}
 	}
@@ -184,13 +181,12 @@ func (m *Tracker) importCommittees(reader io.ReadSeeker) error {
 			return errors.Wrap(err, "unable to read epoch index")
 		}
 
-		committee := account.NewAccounts()
-		if err := committee.FromReader(reader); err != nil {
+		committee, _, err := account.AccountsFromReader(reader)
+		if err != nil {
 			return errors.Wrap(err, "unable to read committee")
 		}
 
-		err := m.committeeStore.Set(epoch.Bytes(), lo.PanicOnErr(committee.Bytes()))
-		if err != nil {
+		if err := m.committeeStore.Set(epoch, committee); err != nil {
 			return errors.Wrap(err, "unable to store committee")
 		}
 	}
@@ -253,7 +249,7 @@ func (m *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 		return errors.Wrap(err, "unable to write epoch count")
 	}
 	for epoch := targetEpoch; epoch > iotago.EpochIndex(0); epoch-- {
-		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](m.rewardsStorage(epoch))
+		rewardsTree := m.rewardsMap(epoch)
 
 		// if the tree is new, we can skip this epoch and the previous ones, as we never stored any rewards
 		if rewardsTree.IsNew() {
@@ -310,7 +306,7 @@ func (m *Tracker) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 	}
 	// export all stored pools
 	var innerErr error
-	if err := m.poolStatsStore.Iterate([]byte{}, func(key []byte, value []byte) bool {
+	if err := m.poolStatsStore.KVStore().Iterate([]byte{}, func(key []byte, value []byte) bool {
 		epochIndex := iotago.EpochIndex(binary.LittleEndian.Uint64(key))
 		if epochIndex > targetEpoch {
 			// continue
@@ -348,7 +344,7 @@ func (m *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetEpoch 
 	}
 
 	var innerErr error
-	err := m.committeeStore.Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {
+	err := m.committeeStore.KVStore().Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {
 		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
 		if epoch > targetEpoch {
 			return true

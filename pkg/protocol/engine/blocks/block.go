@@ -136,24 +136,28 @@ func (b *Block) IsRootBlock() bool {
 	return b.rootBlock != nil
 }
 
-func (b *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
-	basicBlock, isBasicBlock := b.BasicBlock()
-	if !isBasicBlock {
+func (b *Block) Transaction() (tx *iotago.Transaction, hasTransaction bool) {
+	if b.modelBlock == nil {
 		return nil, false
 	}
 
-	tx, isTransaction = basicBlock.Payload.(*iotago.Transaction)
-	return tx, isTransaction
+	return b.modelBlock.Transaction()
 }
 
 func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) {
-	basicBlock, isBasicBlock = b.ProtocolBlock().Block.(*iotago.BasicBlock)
-	return basicBlock, isBasicBlock
+	if b.modelBlock == nil {
+		return nil, false
+	}
+
+	return b.modelBlock.BasicBlock()
 }
 
 func (b *Block) ValidatorBlock() (validatorBlock *iotago.ValidatorBlock, isValidatorBlock bool) {
-	validatorBlock, isValidatorBlock = b.ProtocolBlock().Block.(*iotago.ValidatorBlock)
-	return validatorBlock, isValidatorBlock
+	if b.modelBlock == nil {
+		return nil, false
+	}
+
+	return b.modelBlock.ValidatorBlock()
 }
 
 func (b *Block) ID() iotago.BlockID {

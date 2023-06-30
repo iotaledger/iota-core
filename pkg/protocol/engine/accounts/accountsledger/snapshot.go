@@ -205,7 +205,7 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 				return errors.Wrap(err, "unable to read destroyed flag for Account")
 			}
 
-			if err := diffStore.Store(accountID, *accountDiff, destroyed); err != nil {
+			if err := diffStore.Store(accountID, accountDiff, destroyed); err != nil {
 				return errors.Wrap(err, "unable to store slot diff")
 			}
 		}
@@ -243,7 +243,7 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 			continue
 		}
 
-		if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff prunable.AccountDiff, destroyed bool) bool {
+		if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff *prunable.AccountDiff, destroyed bool) bool {
 			if err = pWriter.WriteBytes(lo.PanicOnErr(accountID.Bytes())); err != nil {
 				innerErr = errors.Wrapf(err, "unable to write AccountID for account %s", accountID)
 			}

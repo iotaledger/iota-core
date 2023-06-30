@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -66,6 +67,8 @@ type Manager struct {
 
 	commitmentMutex sync.RWMutex
 
+	apiProvider permanent.APIBySlotIndexProviderFunc
+
 	module.Module
 }
 
@@ -73,12 +76,12 @@ func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*
 	return module.Provide(func(e *engine.Engine) attestation.Attestations {
 		m := NewManager(attestationCommitmentOffset, e.Storage.Prunable.Attestations, e.SybilProtection.Committee)
 
-		e.Storage.Settings().HookInitialized(func() {
-			m.commitmentMutex.Lock()
-			m.lastCommittedSlot = e.Storage.Settings().LatestCommitment().ID().Index()
-			m.lastCumulativeWeight = e.Storage.Settings().LatestCommitment().Commitment().CumulativeWeight
-			m.commitmentMutex.Unlock()
-		})
+		//TODO: cleanup
+		m.commitmentMutex.Lock()
+		m.lastCommittedSlot = e.Storage.Settings().LatestCommitment().ID().Index()
+		m.lastCumulativeWeight = e.Storage.Settings().LatestCommitment().Commitment().CumulativeWeight
+		m.commitmentMutex.Unlock()
+		m.apiProvider = e.APIForSlotIndex
 
 		return m
 	})
@@ -130,7 +133,7 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 
 // GetMap returns the attestations that are included in the commitment of the given slot as ads.Map.
 // If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
-func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
+func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, *iotago.Attestation], error) {
 	m.commitmentMutex.RLock()
 	defer m.commitmentMutex.RUnlock()
 
@@ -160,7 +163,7 @@ func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
 		return
 	}
 
-	newAttestation := iotago.NewAttestation(block.ProtocolBlock())
+	newAttestation := iotago.NewAttestation(m.apiProvider(block.ID().Index()), block.ProtocolBlock())
 
 	// We keep only the latest attestation for each committee member.
 	m.futureAttestations.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {

@@ -182,22 +182,22 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 		}
 
 		selectStrongTips := createUniqueTipSelector(t.strongTipSet)
-		for strongTipCandidates := selectStrongTips(amount); len(strongTipCandidates) != 0; strongTipCandidates = selectStrongTips(amount - len(references[model.StrongParentType])) {
+		for strongTipCandidates := selectStrongTips(amount); len(strongTipCandidates) != 0; strongTipCandidates = selectStrongTips(amount - len(references[iotago.StrongParentType])) {
 			for _, strongTip := range strongTipCandidates {
 				if addedLikedInsteadReferences, updatedLikedConflicts, err := likedInsteadReferences(strongTip); err != nil {
 					// TODO: LOG REASON FOR DOWNGRADE?
 
 					strongTip.setTipPool(t.determineTipPool(strongTip, tipmanager.WeakTipPool))
-				} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[model.ShallowLikeParentType]) {
-					references[model.StrongParentType] = append(references[model.StrongParentType], strongTip.Block().ID())
-					references[model.ShallowLikeParentType] = append(references[model.ShallowLikeParentType], addedLikedInsteadReferences...)
+				} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[iotago.ShallowLikeParentType]) {
+					references[iotago.StrongParentType] = append(references[iotago.StrongParentType], strongTip.Block().ID())
+					references[iotago.ShallowLikeParentType] = append(references[iotago.ShallowLikeParentType], addedLikedInsteadReferences...)
 
 					likedConflicts = updatedLikedConflicts
 				}
 			}
 		}
 
-		if len(references[model.StrongParentType]) == 0 {
+		if len(references[iotago.StrongParentType]) == 0 {
 			rootBlocks := t.retrieveRootBlocks()
 
 			rootBlockCount := len(rootBlocks)
@@ -205,16 +205,16 @@ func (t *TipManager) SelectTips(amount int) (references model.ParentReferences) 
 				rootBlockCount = t.optMaxStrongParents
 			}
 
-			references[model.StrongParentType] = rootBlocks[:rootBlockCount]
+			references[iotago.StrongParentType] = rootBlocks[:rootBlockCount]
 		}
 
 		selectWeakTips := createUniqueTipSelector(t.weakTipSet)
-		for weakTipCandidates := selectWeakTips(t.optMaxWeakReferences); len(weakTipCandidates) != 0; weakTipCandidates = selectWeakTips(t.optMaxWeakReferences - len(references[model.WeakParentType])) {
+		for weakTipCandidates := selectWeakTips(t.optMaxWeakReferences); len(weakTipCandidates) != 0; weakTipCandidates = selectWeakTips(t.optMaxWeakReferences - len(references[iotago.WeakParentType])) {
 			for _, weakTip := range weakTipCandidates {
 				if tipPool := t.determineTipPool(weakTip, tipmanager.WeakTipPool); tipPool != tipmanager.WeakTipPool {
 					weakTip.setTipPool(tipPool)
 				} else {
-					references[model.WeakParentType] = append(references[model.WeakParentType], weakTip.Block().ID())
+					references[iotago.WeakParentType] = append(references[iotago.WeakParentType], weakTip.Block().ID())
 				}
 			}
 		}
@@ -326,7 +326,7 @@ func (t *TipManager) determineTipPool(tipMetadata *TipMetadata, minPool ...tipma
 }
 
 // updateParents updates the parents of the given Block.
-func (t *TipManager) updateParents(tipMetadata *TipMetadata, updates map[model.ParentsType]func(*TipMetadata)) {
+func (t *TipManager) updateParents(tipMetadata *TipMetadata, updates map[iotago.ParentsType]func(*TipMetadata)) {
 	if parentBlock := tipMetadata.Block(); parentBlock != nil && parentBlock.ProtocolBlock() != nil {
 		for _, parent := range parentBlock.ParentsWithType() {
 			metadataStorage := t.metadataStorage(parent.ID.Index())
