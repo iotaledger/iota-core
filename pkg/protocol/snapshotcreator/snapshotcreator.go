@@ -2,7 +2,6 @@ package snapshotcreator
 
 import (
 	"crypto/ed25519"
-	"encoding/binary"
 	"os"
 
 	"github.com/pkg/errors"
@@ -63,10 +62,10 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	}
 
 	accounts := account.NewAccounts()
-	for idx, accountData := range opt.Accounts {
+	for _, accountData := range opt.Accounts {
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
-			accounts.Set(generateGenesisAccountID(uint32(idx), accountData.Address), &account.Pool{
+			accounts.Set(blake2b.Sum256(accountData.IssuerKey), &account.Pool{
 				PoolStake:      accountData.StakedAmount,
 				ValidatorStake: accountData.StakedAmount,
 				FixedCost:      accountData.FixedCost,
@@ -135,7 +134,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine, protocolParams *iotago.ProtocolParameters) (err error) {
 	// Account outputs start from Genesis TX index 1
 	for idx, account := range accounts {
-		output := createAccount(uint32(idx), account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
+		output := createAccount(account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
 
 		if _, err = protocolParams.RentStructure.CoversStateRent(output, account.Amount); err != nil {
 			return errors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
@@ -162,9 +161,9 @@ func createOutput(address iotago.Address, tokenAmount iotago.BaseToken) (output 
 	}
 }
 
-func createAccount(idx uint32, address iotago.Address, tokenAmount iotago.BaseToken, pubkey ed25519.PublicKey, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
+func createAccount(address iotago.Address, tokenAmount iotago.BaseToken, pubkey ed25519.PublicKey, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
 	accountOutput := &iotago.AccountOutput{
-		AccountID: generateGenesisAccountID(idx, address),
+		AccountID: blake2b.Sum256(pubkey),
 		Amount:    tokenAmount,
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: address},
@@ -189,14 +188,4 @@ func createAccount(idx uint32, address iotago.Address, tokenAmount iotago.BaseTo
 	}
 
 	return accountOutput
-}
-
-func generateGenesisAccountID(idx uint32, address iotago.Address) iotago.AccountID {
-	// Snapshot might contain multiple accounts that are unlocked by the same address,
-	// so to differentiate their IDs, an Index needs to be used.
-	buffer := make([]byte, 4)
-	binary.BigEndian.PutUint32(buffer, idx)
-	accountID := blake2b.Sum256(append(lo.PanicOnErr(address.Encode()), buffer...))
-
-	return accountID
 }

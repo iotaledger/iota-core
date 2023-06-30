@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -19,17 +20,20 @@ import (
 )
 
 type Orchestrator struct {
-	events                *epochgadget.Events
-	sybilProtection       sybilprotection.SybilProtection // do we need the whole SybilProtection or just a callback to RotateCommittee?
-	ledger                ledger.Ledger                   // do we need the whole Ledger or just a callback to retrieve account data?
-	lastCommittedSlotFunc func() iotago.SlotIndex
-	timeProvider          *iotago.TimeProvider
+	events            *epochgadget.Events
+	sybilProtection   sybilprotection.SybilProtection // do we need the whole SybilProtection or just a callback to RotateCommittee?
+	ledger            ledger.Ledger                   // do we need the whole Ledger or just a callback to retrieve account data?
+	lastCommittedSlot iotago.SlotIndex
+	timeProvider      *iotago.TimeProvider
 
 	performanceManager *performance.Tracker
 
 	epochEndNearingThreshold iotago.SlotIndex
+	maxCommittableSlot       iotago.SlotIndex
 
 	optsEpochZeroCommittee *account.Accounts
+
+	mutex syncutils.Mutex
 
 	module.Module
 }
@@ -52,9 +56,8 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 						o.epochEndNearingThreshold = e.Storage.Settings().ProtocolParameters().EpochNearingThreshold
 
 						o.performanceManager = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
-						o.lastCommittedSlotFunc = func() iotago.SlotIndex {
-							return e.Storage.Settings().LatestCommitment().Index()
-						}
+						o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
+						o.maxCommittableSlot = e.Storage.Settings().ProtocolParameters().EvictionAge + e.Storage.Settings().ProtocolParameters().EvictionAge
 
 						if o.optsEpochZeroCommittee != nil {
 							if err := o.performanceManager.RegisterCommittee(0, o.optsEpochZeroCommittee); err != nil {
@@ -91,9 +94,13 @@ func (o *Orchestrator) BlockAccepted(block *blocks.Block) {
 }
 
 func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
-	currentEpoch := o.timeProvider.EpochFromSlot(slot)
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
 
-	if o.timeProvider.EpochEnd(currentEpoch) == slot {
+	currentEpoch := o.timeProvider.EpochFromSlot(slot)
+	o.lastCommittedSlot = slot
+
+	if o.timeProvider.EpochEnd(currentEpoch) == slot+o.maxCommittableSlot {
 		committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
 		if !exists {
 			// If the committee for the epoch wasn't set before, we promote the current one.
@@ -101,13 +108,11 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 			if !exists {
 				panic(fmt.Sprintf("committee for previous epoch %d not found", currentEpoch-1))
 			}
-			fmt.Println("commit epoch", currentEpoch, "but no committee for the new one so copy from epoch", currentEpoch-1, len(committee.IDs()), committee.TotalStake())
 
 			if err := o.performanceManager.RegisterCommittee(currentEpoch, committee); err != nil {
 				panic(ierrors.Wrap(err, "failed to register committee for epoch"))
 			}
 		}
-		fmt.Println("apply epoch on slot", slot)
 		o.performanceManager.ApplyEpoch(currentEpoch, committee)
 	}
 }
@@ -129,11 +134,15 @@ func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 }
 
 func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
 	epoch := o.timeProvider.EpochFromSlot(slot)
 
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
-	// committed slot still belongs to that epoch. Otherwise, skip committee selection because it's too late and the committee has been reused.
-	if slot+o.epochEndNearingThreshold == o.timeProvider.EpochEnd(epoch) && o.timeProvider.EpochFromSlot(o.lastCommittedSlotFunc()) == epoch {
+	// committed slot is earlier than the last slot of the epoch.
+	// Otherwise, skip committee selection because it's too late and the committee has been reused.
+	if slot+o.epochEndNearingThreshold == o.timeProvider.EpochEnd(epoch) && o.timeProvider.EpochEnd(epoch) > o.lastCommittedSlot+o.maxCommittableSlot {
 		newCommittee := o.selectNewCommittee(slot)
 		o.events.CommitteeSelected.Trigger(newCommittee)
 	}

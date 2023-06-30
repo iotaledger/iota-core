@@ -160,7 +160,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	// set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
+	// Set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
 	acceptedBlocks := m.slotMutations.AcceptedBlocks(index, true)
 
 	cumulativeWeight, attestationsRoot, err := m.attestation.Commit(index)

@@ -53,6 +53,8 @@ type TestSuite struct {
 	optsGenesisTimestampOffset int64
 	optsLivenessThreshold      iotago.SlotIndex
 	optsEvictionAge            iotago.SlotIndex
+	optsSlotsPerEpochExponent  uint8
+	optsEpochNearingThreshold  iotago.SlotIndex
 	optsAccounts               []snapshotcreator.AccountDetails
 	optsSnapshotOptions        []options.Option[snapshotcreator.Options]
 	optsWaitFor                time.Duration
@@ -79,6 +81,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsGenesisTimestampOffset: 0,
 		optsLivenessThreshold:      3,
 		optsEvictionAge:            6,
+		optsSlotsPerEpochExponent:  5,
+		optsEpochNearingThreshold:  16,
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name())
 		t.ProtocolParameters = iotago.ProtocolParameters{
@@ -94,10 +98,10 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			TokenSupply:           1_000_0000,
 			GenesisUnixTimestamp:  time.Now().Truncate(10*time.Second).Unix() - t.optsGenesisTimestampOffset,
 			SlotDurationInSeconds: 10,
-			SlotsPerEpochExponent: 2,
+			SlotsPerEpochExponent: t.optsSlotsPerEpochExponent,
 			EvictionAge:           t.optsEvictionAge,
 			LivenessThreshold:     t.optsLivenessThreshold,
-			EpochNearingThreshold: 3,
+			EpochNearingThreshold: t.optsEpochNearingThreshold,
 		}
 
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(t.ProtocolParameters.GenesisUnixTimestamp, 0))
@@ -527,6 +531,18 @@ func WithEvictionAge(evictionAge iotago.SlotIndex) options.Option[TestSuite] {
 
 	return func(opts *TestSuite) {
 		opts.optsEvictionAge = evictionAge
+	}
+}
+
+func WithSlotsPerEpochExponent(slotsPerEpochExponent uint8) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsSlotsPerEpochExponent = slotsPerEpochExponent
+	}
+}
+
+func WithEpochNearingThreshold(epochNearingThreshold iotago.SlotIndex) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsEpochNearingThreshold = epochNearingThreshold
 	}
 }
 
