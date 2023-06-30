@@ -111,6 +111,13 @@ paths:
       description: >-
         Check readiness of the node to issue a new block, the referenced mana cost based on the rate setter and current network congestion, and the block issuance credits of requested account.
       parameters:
+        - in: path
+          name: accountId
+          schema:
+            type: string
+          example: "0xf532a53545103276b46876c473846d98648ee418468bce76df4868648dd73e5d"
+          required: true
+          description: Identifier of the account.
         - in: query
           name: slotIndex
           schema:
