@@ -315,7 +315,7 @@ func (p *Protocol) Network() *core.Protocol {
 	return p.networkProtocol
 }
 
-func (p *Protocol) API(version byte) iotago.API {
+func (p *Protocol) API(version iotago.Version) iotago.API {
 	return p.MainEngineInstance().API(version)
 }
 

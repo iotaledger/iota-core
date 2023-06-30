@@ -211,7 +211,7 @@ func (e *Engine) APIForSlotIndex(slot iotago.SlotIndex) iotago.API {
 	return e.Storage.Settings().APIForSlotIndex(slot)
 }
 
-func (e *Engine) API(version byte) iotago.API {
+func (e *Engine) API(version iotago.Version) iotago.API {
 	return e.Storage.Settings().API(version)
 }
 

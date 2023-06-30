@@ -55,7 +55,7 @@ func (s *Settings) SetSnapshotImported() (err error) {
 	return s.store.Set([]byte{snapshotImportedKey}, []byte{1})
 }
 
-func (s *Settings) HighestSupportedProtocolVersion() byte {
+func (s *Settings) HighestSupportedProtocolVersion() iotago.Version {
 	return iotago.LatestProtocolVersion()
 }
 
@@ -64,11 +64,11 @@ func (s *Settings) LatestAPI() iotago.API {
 }
 
 func (s *Settings) APIForSlotIndex(_ iotago.SlotIndex) iotago.API {
-	//TODO: map index to epoch to version
+	// TODO: map index to epoch to version
 	return s.LatestAPI()
 }
 
-func (s *Settings) API(version byte) iotago.API {
+func (s *Settings) API(version iotago.Version) iotago.API {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -94,7 +94,7 @@ func (s *Settings) API(version byte) iotago.API {
 	}
 }
 
-func (s *Settings) protocolParameters(version byte) iotago.ProtocolParameters {
+func (s *Settings) protocolParameters(version iotago.Version) iotago.ProtocolParameters {
 	bytes, err := s.store.Get([]byte{protocolParametersKey, version})
 	if err != nil {
 		if errors.Is(err, kvstore.ErrKeyNotFound) {

@@ -31,7 +31,7 @@ func WithStrongParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
 			builder.references = make(model.ParentReferences)
 		}
 
-		builder.references[model.StrongParentType] = blockIDs
+		builder.references[iotago.StrongParentType] = blockIDs
 	}
 }
 func WithWeakParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
@@ -78,7 +78,7 @@ func WithIssuingTime(issuingTime time.Time) func(builder *BlockParams) {
 	}
 }
 
-func WithProtocolVersion(version byte) func(builder *BlockParams) {
+func WithProtocolVersion(version iotago.Version) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
 		builder.protocolVersion = &version
 	}
