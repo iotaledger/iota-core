@@ -106,7 +106,7 @@ func (s *State) EarliestRootCommitmentID(lastFinalizedSlot iotago.SlotIndex) (ea
 	}
 
 	if earliestCommitment.Index() == math.MaxInt64 {
-		return iotago.NewEmptyCommitment().MustID(), false
+		return iotago.CommitmentID{}, false
 	}
 
 	return earliestCommitment, true

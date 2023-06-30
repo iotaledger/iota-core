@@ -1,264 +1,328 @@
 package permanent
 
 import (
-	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"sync"
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/core/storable"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// region Settings /////////////////////////////////////////////////////////////////////////////////////////////////////
+const (
+	snapshotImportedKey = iota
+	latestCommitmentKey
+	latestFinalizedSlotKey
+	protocolParametersKey
+)
+
+type APIBySlotIndexProviderFunc func(iotago.SlotIndex) iotago.API
 
 type Settings struct {
-	*settingsModel
 	mutex sync.RWMutex
+	store kvstore.KVStore
 
-	api iotago.API
-
-	latestCommitment *model.Commitment
-
-	module.Module
+	apiByVersion map[byte]iotago.API
 }
 
-func NewSettings(path string) (settings *Settings) {
+func NewSettings(store kvstore.KVStore) (settings *Settings) {
 	s := &Settings{
-		settingsModel: storable.InitStruct(&settingsModel{
-			SnapshotImported:    false,
-			ProtocolParameters:  iotago.ProtocolParameters{},
-			LatestCommitment:    iotago.NewEmptyCommitment(),
-			LatestFinalizedSlot: 0,
-		}, path),
+		store: store,
 	}
-
-	s.UpdateAPI()
 
 	return s
 }
 
-func (s *Settings) API() iotago.API {
+func (s *Settings) IsSnapshotImported() bool {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return s.api
+	return lo.PanicOnErr(s.store.Has([]byte{snapshotImportedKey}))
 }
 
-func (s *Settings) SnapshotImported() (initialized bool) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	return s.settingsModel.SnapshotImported
-}
-
-func (s *Settings) SetSnapshotImported(initialized bool) (err error) {
+func (s *Settings) SetSnapshotImported() (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.settingsModel.SnapshotImported = initialized
-
-	if err = s.ToFile(); err != nil {
-		return errors.Wrap(err, "failed to persist initialized flag")
-	}
-
-	return nil
+	return s.store.Set([]byte{snapshotImportedKey}, []byte{1})
 }
 
-func (s *Settings) ProtocolParameters() *iotago.ProtocolParameters {
+func (s *Settings) HighestSupportedProtocolVersion() byte {
+	return iotago.LatestProtocolVersion()
+}
+
+func (s *Settings) LatestAPI() iotago.API {
+	return s.API(iotago.LatestProtocolVersion())
+}
+
+func (s *Settings) APIForSlotIndex(_ iotago.SlotIndex) iotago.API {
+	//TODO: map index to epoch to version
+	return s.LatestAPI()
+}
+
+func (s *Settings) API(version byte) iotago.API {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return &s.settingsModel.ProtocolParameters
+	if api, exists := s.apiByVersion[version]; exists {
+		return api
+	}
+
+	protocolParams := s.protocolParameters(version)
+
+	if protocolParams == nil {
+		panic(fmt.Errorf("protocol parameters for version %d not found", version))
+	}
+
+	var api iotago.API
+	switch protocolParams.Version() {
+	case 3:
+		api = iotago.V3API(protocolParams)
+		s.apiByVersion[3] = api
+
+		return api
+	default:
+		panic(fmt.Errorf("unsupported protocol version %d", protocolParams.Version()))
+	}
 }
 
-func (s *Settings) SetProtocolParameters(params iotago.ProtocolParameters) (err error) {
+func (s *Settings) protocolParameters(version byte) iotago.ProtocolParameters {
+	bytes, err := s.store.Get([]byte{protocolParametersKey, version})
+	if err != nil {
+		if errors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil
+		}
+		panic(err)
+	}
+
+	commitment, _, err := iotago.ProtocolParametersFromBytes(bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return commitment
+}
+
+func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.settingsModel.ProtocolParameters = params
-	s.UpdateAPI()
-
-	if err = s.ToFile(); err != nil {
-		return errors.Wrap(err, "failed to persist initialized flag")
+	bytes, err := params.Bytes()
+	if err != nil {
+		return err
 	}
 
-	return nil
+	return s.store.Set([]byte{protocolParametersKey, params.Version()}, bytes)
 }
 
 func (s *Settings) LatestCommitment() *model.Commitment {
 	s.mutex.RLock()
-	if s.latestCommitment == nil {
-		s.mutex.RUnlock()
-		s.mutex.Lock()
-		defer s.mutex.Unlock()
-
-		if s.api.TimeProvider().SlotDurationSeconds() == 0 {
-			panic("accessing the LatestCommitment before the settings are initialized")
-		}
-		s.latestCommitment = lo.PanicOnErr(model.CommitmentFromCommitment(s.settingsModel.LatestCommitment, s.api))
-
-		return s.latestCommitment
-	}
 	defer s.mutex.RUnlock()
 
-	return s.latestCommitment
+	bytes, err := s.store.Get([]byte{latestCommitmentKey})
+	if err != nil {
+		if errors.Is(err, kvstore.ErrKeyNotFound) {
+			return model.NewEmptyCommitment(s.LatestAPI())
+		}
+		panic(err)
+	}
+
+	return lo.PanicOnErr(model.CommitmentFromBytes(bytes, s.LatestAPI()))
 }
 
 func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.settingsModel.LatestCommitment = latestCommitment.Commitment()
-
-	if err = s.ToFile(); err != nil {
-		return errors.Wrap(err, "failed to persist latest commitment")
-	}
-
-	s.latestCommitment = latestCommitment
-
-	return nil
+	return s.store.Set([]byte{latestCommitmentKey}, latestCommitment.Data())
 }
 
 func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return s.settingsModel.LatestFinalizedSlot
+	bytes, err := s.store.Get([]byte{latestFinalizedSlotKey})
+	if err != nil {
+		if errors.Is(err, kvstore.ErrKeyNotFound) {
+			return 0
+		}
+		panic(err)
+	}
+	return lo.PanicOnErr(iotago.SlotIndexFromBytes(bytes))
 }
 
 func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.settingsModel.LatestFinalizedSlot = index
-
-	if err = s.ToFile(); err != nil {
-		return errors.Wrap(err, "failed to persist latest confirmed slot")
-	}
-
-	return nil
+	return s.store.Set([]byte{latestFinalizedSlotKey}, index.Bytes())
 }
 
 func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commitment) (err error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	// Replace latest commitment with target commitment. Usually it will be the same but we need to make sure to align
-	// if we export a snapshot not from the latest commitment.
-	cloned := s.settingsModel.CloneValues()
-	cloned.LatestCommitment = targetCommitment
-
-	settingsBytes, err := cloned.Bytes()
-	if err != nil {
-		return errors.Wrap(err, "failed to convert settings to bytes")
+	var commitmentBytes []byte
+	if targetCommitment != nil {
+		commitmentBytes, err = s.API(targetCommitment.Version).Encode(targetCommitment)
+		if err != nil {
+			return errors.Wrap(err, "failed to encode target commitment")
+		}
+	} else {
+		commitmentBytes = s.LatestCommitment().Data()
+	}
+	if err = binary.Write(writer, binary.LittleEndian, uint32(len(commitmentBytes))); err != nil {
+		return errors.Wrap(err, "failed to write commitment length")
+	}
+	if _, err := writer.Write(commitmentBytes); err != nil {
+		return errors.Wrap(err, "failed to write commitment bytes")
 	}
 
-	if err = binary.Write(writer, binary.LittleEndian, uint32(len(settingsBytes))); err != nil {
-		return errors.Wrap(err, "failed to write settings length")
+	if _, err = writer.Write(s.LatestFinalizedSlot().Bytes()); err != nil {
+		return errors.Wrap(err, "failed to write latest finalized slot")
 	}
 
-	if err = binary.Write(writer, binary.LittleEndian, settingsBytes); err != nil {
-		return errors.Wrap(err, "failed to write settings")
+	var relativeCountersPosition int64
+
+	var paramsCount uint8
+	var paramsByteCount uint32
+
+	// The amount of protocolParameters contained within this snapshot.
+	if err := utils.WriteValueFunc(writer, paramsCount, &relativeCountersPosition); err != nil {
+		return errors.Wrap(err, "unable to write protocol parameters count")
+	}
+
+	// The amount of bytes the protocolParameters consume in this snapshot.
+	if err := utils.WriteValueFunc(writer, paramsByteCount, &relativeCountersPosition); err != nil {
+		return errors.Wrap(err, "unable to write protocol parameters count")
+	}
+
+	var innerErr error
+	if err := s.store.Iterate([]byte{protocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
+		if err := utils.WriteBytesFunc(writer, value, &relativeCountersPosition); err != nil {
+			innerErr = err
+			return false
+		}
+		paramsCount++
+		paramsByteCount += uint32(len(value))
+
+		return true
+	}); err != nil {
+		return errors.Wrap(err, "failed to iterate over protocol parameters")
+	}
+	if innerErr != nil {
+		return errors.Wrap(innerErr, "failed to write protocol parameters")
+	}
+
+	// seek back to the file position of the counters
+	if _, err := writer.Seek(-relativeCountersPosition, io.SeekCurrent); err != nil {
+		return fmt.Errorf("unable to seek counter placeholders: %w", err)
+	}
+
+	var countersSize int64
+
+	if err := utils.WriteValueFunc(writer, paramsCount, &countersSize); err != nil {
+		return errors.Wrap(err, "unable to write protocol parameters count")
+	}
+
+	if err := utils.WriteValueFunc(writer, paramsByteCount, &countersSize); err != nil {
+		return errors.Wrap(err, "unable to write protocol parameters byte count")
+	}
+
+	// seek back to the last write position
+	if _, err := writer.Seek(relativeCountersPosition-countersSize, io.SeekCurrent); err != nil {
+		return fmt.Errorf("unable to seek to last written position: %w", err)
 	}
 
 	return nil
 }
 
 func (s *Settings) Import(reader io.ReadSeeker) (err error) {
-	if err = s.tryImport(reader); err != nil {
-		return errors.Wrap(err, "failed to import settings")
+	var commitmentLength uint32
+	if err = binary.Read(reader, binary.LittleEndian, &commitmentLength); err != nil {
+		return errors.Wrap(err, "failed to read commitment length")
 	}
 
-	s.TriggerInitialized()
+	commitmentBytes := make([]byte, commitmentLength)
+	if err = binary.Read(reader, binary.LittleEndian, commitmentBytes); err != nil {
+		return errors.Wrap(err, "failed to read commitment bytes")
+	}
 
-	return
+	var latestFinalizedSlotBytes [iotago.SlotIdentifierLength]byte
+	if err = binary.Read(reader, binary.LittleEndian, latestFinalizedSlotBytes); err != nil {
+		return errors.Wrap(err, "failed to read latest finalized slot bytes")
+	}
+	slotIndex, err := iotago.SlotIndexFromBytes(latestFinalizedSlotBytes[:])
+	if err != nil {
+		return errors.Wrap(err, "failed to parse latest finalized slot")
+	}
+	if err := s.SetLatestFinalizedSlot(slotIndex); err != nil {
+		return errors.Wrap(err, "failed to set latest finalized slot")
+	}
+
+	var paramsCount uint8
+	var paramsByteCount uint32
+
+	if err = binary.Read(reader, binary.LittleEndian, &paramsCount); err != nil {
+		return errors.Wrap(err, "failed to read protocol parameters count")
+	}
+
+	if err = binary.Read(reader, binary.LittleEndian, &paramsByteCount); err != nil {
+		return errors.Wrap(err, "failed to read protocol parameters byte count")
+	}
+
+	parameterBytes := make([]byte, paramsByteCount)
+	if err = binary.Read(reader, binary.LittleEndian, parameterBytes); err != nil {
+		return errors.Wrap(err, "failed to read protocol parameters bytes")
+	}
+
+	var offset int
+	for i := uint8(0); i < paramsCount; i++ {
+		params, bytesRead, err := iotago.ProtocolParametersFromBytes(parameterBytes[offset:])
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse protocol parameters at index %d", i)
+		}
+		offset += bytesRead
+
+		if err := s.StoreProtocolParameters(params); err != nil {
+			return errors.Wrapf(err, "failed to store protocol parameters at index %d", i)
+		}
+	}
+
+	// Now that we parsed the protocol parameters we can parse the commitment.
+	api := s.API(commitmentBytes[0]) // fetch an api for the commitment version
+	commitment, err := model.CommitmentFromBytes(commitmentBytes, api)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse commitment")
+	}
+
+	if err := s.SetLatestCommitment(commitment); err != nil {
+		return errors.Wrap(err, "failed to set latest commitment")
+	}
+
+	return s.SetSnapshotImported()
 }
 
 func (s *Settings) String() string {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
+	builder := stringify.NewStructBuilder("Settings")
+	builder.AddField(stringify.NewStructField("IsSnapshotImported", s.IsSnapshotImported()))
+	builder.AddField(stringify.NewStructField("LatestCommitment", s.LatestCommitment()))
+	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.LatestFinalizedSlot()))
+	if err := s.store.Iterate([]byte{protocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
+		params, _, err := iotago.ProtocolParametersFromBytes(value)
+		if err != nil {
+			panic(err)
+		}
+		builder.AddField(stringify.NewStructField(fmt.Sprintf("protocolParameters(%s)", key), params))
 
-	builder := stringify.NewStructBuilder("Settings", stringify.NewStructField("path", s.FilePath()))
-	builder.AddField(stringify.NewStructField("SnapshotImported", s.settingsModel.SnapshotImported))
-	builder.AddField(stringify.NewStructField("ProtocolParameters", s.settingsModel.ProtocolParameters))
-	builder.AddField(stringify.NewStructField("LatestCommitment", s.settingsModel.LatestCommitment))
-	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.settingsModel.LatestFinalizedSlot))
+		return true
+	}); err != nil {
+		panic(err)
+	}
 
 	return builder.String()
 }
-
-func (s *Settings) tryImport(reader io.ReadSeeker) (err error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	var settingsSize uint32
-	if err = binary.Read(reader, binary.LittleEndian, &settingsSize); err != nil {
-		return errors.Wrap(err, "failed to read settings length")
-	}
-
-	settingsBytes := make([]byte, settingsSize)
-	if err = binary.Read(reader, binary.LittleEndian, settingsBytes); err != nil {
-		return errors.Wrap(err, "failed to read settings bytes")
-	}
-
-	if consumedBytes, fromBytesErr := s.FromBytes(settingsBytes); fromBytesErr != nil {
-		return errors.Wrap(fromBytesErr, "failed to read settings")
-	} else if consumedBytes != len(settingsBytes) {
-		return errors.Errorf("failed to read settings: consumed bytes (%d) != expected bytes (%d)", consumedBytes, len(settingsBytes))
-	}
-
-	s.settingsModel.SnapshotImported = true
-
-	s.UpdateAPI()
-
-	if err = s.settingsModel.ToFile(); err != nil {
-		return errors.Wrap(err, "failed to persist chain ID")
-	}
-
-	return
-}
-
-func (s *Settings) UpdateAPI() {
-	s.api = iotago.LatestAPI(&s.settingsModel.ProtocolParameters)
-	iotago.SwapInternalAPI(s.api)
-}
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// region settingsModel ////////////////////////////////////////////////////////////////////////////////////////////////
-
-type settingsModel struct {
-	SnapshotImported    bool                      `serix:"0"`
-	ProtocolParameters  iotago.ProtocolParameters `serix:"1"`
-	LatestCommitment    *iotago.Commitment        `serix:"2"`
-	LatestFinalizedSlot iotago.SlotIndex          `serix:"3"`
-
-	storable.Struct[settingsModel, *settingsModel]
-}
-
-func (s *settingsModel) FromBytes(bytes []byte) (int, error) {
-	return serix.DefaultAPI.Decode(context.Background(), bytes, s)
-}
-
-func (s settingsModel) Bytes() ([]byte, error) {
-	return serix.DefaultAPI.Encode(context.Background(), s)
-}
-
-func (s *settingsModel) CloneValues() *settingsModel {
-	return &settingsModel{
-		SnapshotImported:    s.SnapshotImported,
-		ProtocolParameters:  s.ProtocolParameters,
-		LatestCommitment:    s.LatestCommitment,
-		LatestFinalizedSlot: s.LatestFinalizedSlot,
-	}
-}
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

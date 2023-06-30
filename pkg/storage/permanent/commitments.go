@@ -13,15 +13,15 @@ import (
 )
 
 type Commitments struct {
-	apiProviderFunc func() iotago.API
+	apiProviderFunc APIBySlotIndexProviderFunc
 	slice           *storable.ByteSlice
 	filePath        string
 
 	module.Module
 }
 
-func NewCommitments(path string, apiProviderFunc func() iotago.API) *Commitments {
-	commitmentsSlice, err := storable.NewByteSlice(path, uint64(len(model.NewEmptyCommitment(apiProviderFunc()).Data())))
+func NewCommitments(path string, apiProviderFunc APIBySlotIndexProviderFunc) *Commitments {
+	commitmentsSlice, err := storable.NewByteSlice(path, uint64(len(model.NewEmptyCommitment(apiProviderFunc(0)).Data())))
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create commitments file"))
 	}
@@ -51,7 +51,7 @@ func (c *Commitments) Load(index iotago.SlotIndex) (commitment *model.Commitment
 		return nil, errors.Wrapf(err, "failed to get commitment for slot %d", index)
 	}
 
-	return model.CommitmentFromBytes(bytes, c.apiProviderFunc())
+	return model.CommitmentFromBytes(bytes, c.apiProviderFunc(index))
 }
 
 func (c *Commitments) Close() (err error) {
@@ -82,20 +82,20 @@ func (c *Commitments) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex)
 }
 
 func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
-	var slotBoundary int64
+	var slotBoundary iotago.SlotIndex
 	if err = binary.Read(reader, binary.LittleEndian, &slotBoundary); err != nil {
 		return errors.Wrap(err, "failed to read slot boundary")
 	}
 
 	commitmentSize := c.slice.EntrySize()
 
-	for slotIndex := int64(0); slotIndex <= slotBoundary; slotIndex++ {
+	for slotIndex := iotago.SlotIndex(0); slotIndex <= slotBoundary; slotIndex++ {
 		commitmentBytes := make([]byte, commitmentSize)
 		if err = binary.Read(reader, binary.LittleEndian, commitmentBytes); err != nil {
 			return errors.Wrapf(err, "failed to read commitment bytes for slot %d", slotIndex)
 		}
 
-		newCommitment, err := model.CommitmentFromBytes(commitmentBytes, c.apiProviderFunc())
+		newCommitment, err := model.CommitmentFromBytes(commitmentBytes, c.apiProviderFunc(slotIndex))
 		if err != nil {
 			return errors.Wrapf(err, "failed to parse commitment of slot %d", slotIndex)
 		}

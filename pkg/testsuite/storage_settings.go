@@ -13,8 +13,8 @@ func (t *TestSuite) AssertSnapshotImported(imported bool, nodes ...*mock.Node) {
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if imported != node.Protocol.MainEngineInstance().Storage.Settings().SnapshotImported() {
-				return errors.Errorf("AssertSnapshotImported: %s: expected %v, got %v", node.Name, imported, node.Protocol.MainEngineInstance().Storage.Settings().SnapshotImported())
+			if imported != node.Protocol.MainEngineInstance().Storage.Settings().IsSnapshotImported() {
+				return errors.Errorf("AssertSnapshotImported: %s: expected %v, got %v", node.Name, imported, node.Protocol.MainEngineInstance().Storage.Settings().IsSnapshotImported())
 			}
 
 			return nil

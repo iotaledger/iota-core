@@ -20,7 +20,7 @@ type Commitment struct {
 }
 
 func NewEmptyCommitment(api iotago.API) *Commitment {
-	return lo.PanicOnErr(CommitmentFromCommitment(iotago.NewEmptyCommitment(), api))
+	return lo.PanicOnErr(CommitmentFromCommitment(iotago.NewEmptyCommitment(api.ProtocolParameters().Version()), api))
 }
 
 func newCommitment(commitmentID iotago.CommitmentID, iotaCommitment *iotago.Commitment, data []byte, api iotago.API) (*Commitment, error) {
@@ -38,7 +38,7 @@ func CommitmentFromCommitment(iotaCommitment *iotago.Commitment, api iotago.API,
 		return nil, err
 	}
 
-	commitmentID, err := iotaCommitment.ID(api)
+	commitmentID, err := iotaCommitment.ID()
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func CommitmentFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Co
 		return nil, err
 	}
 
-	commitmentID, err := iotaCommitment.ID(api)
+	commitmentID, err := iotaCommitment.ID()
 	if err != nil {
 		return nil, err
 	}

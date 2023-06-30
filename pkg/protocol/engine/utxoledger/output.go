@@ -134,7 +134,7 @@ func CreateOutput(api iotago.API, outputID iotago.OutputID, blockID iotago.Block
 }
 
 func NewOutput(api iotago.API, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
-	txID, err := transaction.ID()
+	txID, err := transaction.ID(api)
 	if err != nil {
 		return nil, err
 	}

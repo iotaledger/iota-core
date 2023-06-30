@@ -57,9 +57,8 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 			s.Permanent = permanent.New(s.dir, dbConfig, errorHandler)
 			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPruningDelay, errorHandler, s.optsPrunableManagerOptions...)
 
-			s.Permanent.Settings().HookInitialized(func() {
-				s.Prunable.Initialize(s.Settings().API())
-			})
+			//TODO: fix initialization order
+			s.Prunable.Initialize(s.Settings().APIForSlotIndex)
 		})
 }
 

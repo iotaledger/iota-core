@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	sybilProtectionPrefix byte = iota
+	settingsPrefix byte = iota
+	sybilProtectionPrefix
 	attestationsPrefix
 	ledgerPrefix
 	accountsPrefix
@@ -43,9 +44,7 @@ type Permanent struct {
 func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) *Permanent {
 	return options.Apply(&Permanent{
 		errorHandler: errorHandler,
-		settings:     NewSettings(baseDir.Path("settings.bin")),
 	}, opts, func(p *Permanent) {
-		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.API)
 
 		var err error
 		p.store, err = database.StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
@@ -61,6 +60,8 @@ func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(e
 			panic(err)
 		}
 
+		p.settings = NewSettings(lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{settingsPrefix})))
+		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.APIForSlotIndex)
 		p.sybilProtection = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{sybilProtectionPrefix}))
 		p.attestations = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{attestationsPrefix}))
 		p.ledger = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{ledgerPrefix}))
@@ -151,17 +152,7 @@ func (p *Permanent) Size() int64 {
 		return 0
 	}
 
-	settingsSize, err := p.settings.Size()
-	if err != nil {
-		panic(err)
-	}
-
-	commitmentsSize, err := p.settings.Size()
-	if err != nil {
-		panic(err)
-	}
-
-	return dbSize + settingsSize + commitmentsSize
+	return dbSize
 }
 
 func (p *Permanent) Shutdown() {

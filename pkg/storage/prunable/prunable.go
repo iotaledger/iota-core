@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -22,7 +23,7 @@ const (
 
 type Prunable struct {
 	pruningDelay iotago.SlotIndex
-	api          iotago.API
+	apiProvider  permanent.APIBySlotIndexProviderFunc
 	manager      *Manager
 	errorHandler func(error)
 }
@@ -35,8 +36,8 @@ func New(dbConfig database.Config, pruningDelay iotago.SlotIndex, errorHandler f
 	}
 }
 
-func (p *Prunable) Initialize(a iotago.API) {
-	p.api = a
+func (p *Prunable) Initialize(apiProvider permanent.APIBySlotIndexProviderFunc) {
+	p.apiProvider = apiProvider
 }
 
 func (p *Prunable) RestoreFromDisk() {
@@ -49,7 +50,7 @@ func (p *Prunable) Blocks(slot iotago.SlotIndex) *Blocks {
 		return nil
 	}
 
-	return NewBlocks(slot, store, p.api)
+	return NewBlocks(slot, store, p.apiProvider)
 }
 
 func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *RootBlocks {
@@ -71,7 +72,7 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
 		return nil
 	}
 
-	return NewAccountDiffs(slot, store, p.api)
+	return NewAccountDiffs(slot, store, p.apiProvider(slot))
 }
 
 func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *PerformanceFactors {

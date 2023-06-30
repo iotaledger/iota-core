@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -12,14 +13,14 @@ type Blocks struct {
 	slot  iotago.SlotIndex
 	store kvstore.KVStore
 
-	api iotago.API
+	apiProvider permanent.APIBySlotIndexProviderFunc
 }
 
-func NewBlocks(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.API) (newBlocks *Blocks) {
+func NewBlocks(slot iotago.SlotIndex, store kvstore.KVStore, apiProvider permanent.APIBySlotIndexProviderFunc) (newBlocks *Blocks) {
 	return &Blocks{
-		slot:  slot,
-		store: store,
-		api:   api,
+		slot:        slot,
+		store:       store,
+		apiProvider: apiProvider,
 	}
 }
 
@@ -34,7 +35,7 @@ func (b *Blocks) Load(id iotago.BlockID) (*model.Block, error) {
 		return nil, errors.Wrapf(err, "failed to get block %s", id)
 	}
 
-	return model.BlockFromIDAndBytes(id, blockBytes, b.api)
+	return model.BlockFromIDAndBytes(id, blockBytes, b.apiProvider(id.Index()))
 }
 
 func (b *Blocks) Store(block *model.Block) error {

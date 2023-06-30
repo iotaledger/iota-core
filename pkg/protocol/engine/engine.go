@@ -215,7 +215,7 @@ func (e *Engine) API() iotago.API {
 }
 
 func (e *Engine) Initialize(snapshot ...string) (err error) {
-	if !e.Storage.Settings().SnapshotImported() {
+	if !e.Storage.Settings().IsSnapshotImported() {
 		if len(snapshot) == 0 || snapshot[0] == "" {
 			panic("no snapshot path specified")
 		}
