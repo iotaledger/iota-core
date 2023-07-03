@@ -2,13 +2,13 @@ package mempoolv1
 
 import (
 	"github.com/iotaledger/hive.go/runtime/promise"
-	"github.com/iotaledger/iota-core/pkg/core/value"
+	"github.com/iotaledger/iota-core/pkg/core/agential"
 )
 
 // inclusionFlags represents important flags and events that relate to the inclusion of an entity in the distributed ledger.
 type inclusionFlags struct {
 	// accepted gets triggered when the entity gets marked as accepted.
-	accepted *value.Value[bool]
+	accepted agential.Receptor[bool]
 
 	// committed gets triggered when the entity gets marked as committed.
 	committed *promise.Event
@@ -23,7 +23,7 @@ type inclusionFlags struct {
 // newInclusionFlags creates a new inclusionFlags instance.
 func newInclusionFlags() *inclusionFlags {
 	return &inclusionFlags{
-		accepted:  value.New[bool](),
+		accepted:  agential.NewReceptor[bool](),
 		committed: promise.NewEvent(),
 		rejected:  promise.NewEvent(),
 		orphaned:  promise.NewEvent(),

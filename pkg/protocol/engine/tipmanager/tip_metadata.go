@@ -1,6 +1,7 @@
 package tipmanager
 
 import (
+	"github.com/iotaledger/iota-core/pkg/core/agential"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -14,7 +15,7 @@ type TipMetadata interface {
 	Block() *blocks.Block
 
 	// TipPool returns the current TipPool of the block.
-	TipPool() TipPool
+	TipPool() agential.Receptor[TipPool]
 
 	// SetLivenessThresholdReached marks the block as having reached the liveness threshold.
 	SetLivenessThresholdReached()
@@ -24,12 +25,6 @@ type TipMetadata interface {
 
 	// IsLivenessThresholdReached returns true if the block reached the liveness threshold.
 	IsLivenessThresholdReached() bool
-
-	// SetTipPool sets the TipPool of the block (updated by the tip selection strategy).
-	SetTipPool(tipPool TipPool)
-
-	// OnTipPoolUpdated registers a callback that is triggered when the TipPool of the block changes.
-	OnTipPoolUpdated(handler func(tipPool TipPool)) (unsubscribe func())
 
 	// IsStrongTip returns true if the block is an unreferenced strong tip.
 	IsStrongTip() bool
@@ -49,9 +44,5 @@ type TipMetadata interface {
 	// OnIsOrphanedUpdated registers a callback that is triggered when the IsOrphaned property changes.
 	OnIsOrphanedUpdated(handler func(orphaned bool)) (unsubscribe func())
 
-	// IsEvicted returns true if the block was evicted from the TipManager.
-	IsEvicted() bool
-
-	// OnEvicted registers a callback that is triggered when the block is evicted from the TipManager.
-	OnEvicted(handler func())
+	Evicted() agential.ReadOnlyReceptor[bool]
 }

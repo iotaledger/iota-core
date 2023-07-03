@@ -1,7 +1,7 @@
 package mempool
 
 import (
-	"github.com/iotaledger/iota-core/pkg/core/value"
+	"github.com/iotaledger/iota-core/pkg/core/agential"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -10,7 +10,7 @@ type StateMetadata interface {
 
 	State() State
 
-	ConflictIDs() *value.Set[iotago.TransactionID]
+	ConflictIDs() *agential.Set[iotago.TransactionID]
 
 	PendingSpenderCount() int
 

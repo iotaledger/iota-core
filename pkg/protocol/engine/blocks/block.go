@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/stringify"
-	"github.com/iotaledger/iota-core/pkg/core/value"
+	"github.com/iotaledger/iota-core/pkg/core/agential"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -37,7 +37,7 @@ type Block struct {
 	// BlockGadget block
 	preAccepted           bool
 	acceptanceRatifiers   *advancedset.AdvancedSet[account.SeatIndex]
-	accepted              *value.Value[bool]
+	accepted              agential.Receptor[bool]
 	preConfirmed          bool
 	confirmationRatifiers *advancedset.AdvancedSet[account.SeatIndex]
 	confirmed             bool
@@ -72,12 +72,12 @@ func NewBlock(data *model.Block) *Block {
 		acceptanceRatifiers:   advancedset.New[account.SeatIndex](),
 		confirmationRatifiers: advancedset.New[account.SeatIndex](),
 		modelBlock:            data,
-		accepted:              value.New[bool](),
+		accepted:              agential.NewReceptor[bool](),
 	}
 }
 
 func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
-	return &Block{
+	b := &Block{
 		witnesses:             advancedset.New[account.SeatIndex](),
 		conflictIDs:           advancedset.New[iotago.TransactionID](),
 		payloadConflictIDs:    advancedset.New[iotago.TransactionID](),
@@ -92,8 +92,12 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		solid:       true,
 		booked:      true,
 		preAccepted: true,
-		accepted:    value.New[bool](true), // This should be true since we commit and evict on acceptance.
+		accepted:    agential.NewReceptor[bool](), // This should be true since we commit and evict on acceptance.
 	}
+
+	b.accepted.Set(true)
+
+	return b
 }
 
 func NewMissingBlock(blockID iotago.BlockID) *Block {

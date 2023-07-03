@@ -16,3 +16,11 @@ const (
 	// DroppedTipPool represents a pool of blocks that are supposed to be ignored by the tip selection strategy.
 	DroppedTipPool
 )
+
+func (t TipPool) Max(other TipPool) TipPool {
+	if t > other {
+		return t
+	}
+
+	return other
+}

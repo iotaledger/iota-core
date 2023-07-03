@@ -9,8 +9,8 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/agential"
 	"github.com/iotaledger/iota-core/pkg/core/timed"
-	"github.com/iotaledger/iota-core/pkg/core/value"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -38,7 +38,7 @@ type TipSelection struct {
 	livenessThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
 
 	// livenessThreshold holds the current liveness threshold.
-	livenessThreshold *value.Value[time.Time]
+	livenessThreshold agential.Receptor[time.Time]
 
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int
@@ -64,7 +64,7 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 		conflictDAG:                  conflictDAG,
 		rootBlocks:                   rootBlocksRetriever,
 		livenessThresholdQueue:       timed.NewPriorityQueue[tipmanager.TipMetadata](true),
-		livenessThreshold:            value.New[time.Time](),
+		livenessThreshold:            agential.NewReceptor[time.Time](),
 		optMaxStrongParents:          8,
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,
@@ -90,7 +90,7 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 		if t.collectReferences(references, model.StrongParentType, t.tipManager.StrongTips, func(tip tipmanager.TipMetadata) {
 			addedLikedInsteadReferences, updatedLikedInsteadConflicts, err := t.likedInsteadReferences(previousLikedInsteadConflicts, tip)
 			if err != nil {
-				tip.SetTipPool(tipmanager.WeakTipPool)
+				tip.TipPool().Set(tipmanager.WeakTipPool)
 			} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[model.ShallowLikeParentType]) {
 				references[model.StrongParentType] = append(references[model.StrongParentType], tip.ID())
 				references[model.ShallowLikeParentType] = append(references[model.ShallowLikeParentType], addedLikedInsteadReferences...)
@@ -105,7 +105,7 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 
 		t.collectReferences(references, model.WeakParentType, t.tipManager.WeakTips, func(tip tipmanager.TipMetadata) {
 			if !t.isValidWeakTip(tip.Block()) {
-				tip.SetTipPool(tipmanager.DroppedTipPool)
+				tip.TipPool().Set(tipmanager.DroppedTipPool)
 			} else {
 				references[model.WeakParentType] = append(references[model.WeakParentType], tip.ID())
 			}
@@ -130,11 +130,11 @@ func (t *TipSelection) Shutdown() {}
 // classifyTip determines the initial tip pool of the given tip.
 func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 	if t.isValidStrongTip(tipMetadata.Block()) {
-		tipMetadata.SetTipPool(tipmanager.StrongTipPool)
+		tipMetadata.TipPool().Set(tipmanager.StrongTipPool)
 	} else if t.isValidWeakTip(tipMetadata.Block()) {
-		tipMetadata.SetTipPool(tipmanager.WeakTipPool)
+		tipMetadata.TipPool().Set(tipmanager.WeakTipPool)
 	} else {
-		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
+		tipMetadata.TipPool().Set(tipmanager.DroppedTipPool)
 	}
 
 	t.livenessThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime())

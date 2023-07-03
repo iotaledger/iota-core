@@ -1,4 +1,4 @@
-package value
+package agential
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 )
 
 func TestValue(t *testing.T) {
-	myInt := New[int]()
+	myInt := NewReceptor[int]()
 
 	var wg sync.WaitGroup
 	wg.Add(2)

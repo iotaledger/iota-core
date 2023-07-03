@@ -5,7 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/promise"
-	"github.com/iotaledger/iota-core/pkg/core/value"
+	"github.com/iotaledger/iota-core/pkg/core/agential"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -18,11 +18,11 @@ type StateMetadata struct {
 	spenderCount       uint64
 	spent              *promise.Event
 	doubleSpent        *promise.Event
-	spendAccepted      *value.Value[*TransactionMetadata]
-	spendCommitted     *value.Value[*TransactionMetadata]
+	spendAccepted      agential.Receptor[*TransactionMetadata]
+	spendCommitted     agential.Receptor[*TransactionMetadata]
 	allSpendersRemoved *event.Event
 
-	conflictIDs *value.Set[iotago.TransactionID]
+	conflictIDs *agential.Set[iotago.TransactionID]
 
 	*inclusionFlags
 }
@@ -34,11 +34,11 @@ func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *S
 
 		spent:              promise.NewEvent(),
 		doubleSpent:        promise.NewEvent(),
-		spendAccepted:      value.New[*TransactionMetadata](),
-		spendCommitted:     value.New[*TransactionMetadata](),
+		spendAccepted:      agential.NewReceptor[*TransactionMetadata](),
+		spendCommitted:     agential.NewReceptor[*TransactionMetadata](),
 		allSpendersRemoved: event.New(),
 
-		conflictIDs: value.NewSet[iotago.TransactionID](),
+		conflictIDs: agential.NewSet[iotago.TransactionID](),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(optSource...)
@@ -69,7 +69,7 @@ func (s *StateMetadata) State() mempool.State {
 	return s.state
 }
 
-func (s *StateMetadata) ConflictIDs() *value.Set[iotago.TransactionID] {
+func (s *StateMetadata) ConflictIDs() *agential.Set[iotago.TransactionID] {
 	return s.conflictIDs
 }
 

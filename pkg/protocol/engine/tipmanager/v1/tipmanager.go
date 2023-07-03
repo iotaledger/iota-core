@@ -89,7 +89,7 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 
 	if evictedObjects, deleted := t.tipMetadataStorage.DeleteAndReturn(slotIndex); deleted {
 		evictedObjects.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
-			tipMetadata.isEvicted.Trigger()
+			tipMetadata.isEvicted.Set(true)
 
 			return true
 		})
@@ -119,9 +119,9 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 
 	t.forEachParentByType(tipMetadata.Block(), func(parentType model.ParentsType, parentMetadata *TipMetadata) {
 		if parentType == model.StrongParentType {
-			tipMetadata.setupStrongParent(parentMetadata)
+			tipMetadata.connectStrongParent(parentMetadata)
 		} else {
-			tipMetadata.setupWeakParent(parentMetadata)
+			tipMetadata.connectWeakParent(parentMetadata)
 		}
 	})
 

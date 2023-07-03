@@ -1,4 +1,4 @@
-package value
+package agential
 
 import (
 	"github.com/iotaledger/hive.go/ds/advancedset"

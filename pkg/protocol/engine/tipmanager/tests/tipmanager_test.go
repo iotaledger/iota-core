@@ -20,13 +20,13 @@ func TestTipManager(t *testing.T) {
 		model.StrongParentType: {"Bernd"},
 	})
 
-	tf.AddBlock("Bernd").SetTipPool(tipmanager.StrongTipPool)
+	tf.AddBlock("Bernd").TipPool().Set(tipmanager.StrongTipPool)
 	tf.AssertStrongTips("Bernd")
 
-	tf.AddBlock("Bernd1").SetTipPool(tipmanager.StrongTipPool)
+	tf.AddBlock("Bernd1").TipPool().Set(tipmanager.StrongTipPool)
 	tf.AssertStrongTips("Bernd1")
 
-	tf.AddBlock("Bernd1.1").SetTipPool(tipmanager.StrongTipPool)
+	tf.AddBlock("Bernd1.1").TipPool().Set(tipmanager.StrongTipPool)
 	tf.AssertStrongTips("Bernd1", "Bernd1.1")
 }
 
@@ -43,14 +43,14 @@ func Test_Orphanage(t *testing.T) {
 		model.StrongParentType: {"A", "B"},
 	})
 
-	tf.AddBlock("A").SetTipPool(tipmanager.StrongTipPool)
+	tf.AddBlock("A").TipPool().Set(tipmanager.StrongTipPool)
 	tf.AssertStrongTips("A")
 
 	blockB := tf.AddBlock("B")
-	blockB.SetTipPool(tipmanager.StrongTipPool)
+	blockB.TipPool().Set(tipmanager.StrongTipPool)
 	tf.AssertStrongTips("A", "B")
 
-	tf.AddBlock("C").SetTipPool(tipmanager.StrongTipPool)
+	tf.AddBlock("C").TipPool().Set(tipmanager.StrongTipPool)
 	tf.AssertStrongTips("C")
 
 	blockB.SetLivenessThresholdReached()
