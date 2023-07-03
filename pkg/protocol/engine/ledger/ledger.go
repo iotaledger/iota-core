@@ -31,7 +31,6 @@ type Ledger interface {
 	AddAccount(account *utxoledger.Output) error
 	Import(reader io.ReadSeeker) error
 	Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error
-	IsBlockIssuerAllowed(*iotago.Block) error
 
 	module.Interface
 }
