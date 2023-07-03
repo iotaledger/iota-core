@@ -439,7 +439,7 @@ func (b *Block) IsAccepted() bool {
 
 // SetAccepted sets the Block as accepted.
 func (b *Block) SetAccepted() (wasUpdated bool) {
-	return b.accepted.Set(true)
+	return b.accepted.Set(true) == false
 }
 
 // OnAccepted registers the given handler to be called when the Block was accepted.

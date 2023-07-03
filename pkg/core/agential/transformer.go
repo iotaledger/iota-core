@@ -88,12 +88,11 @@ func NewThresholdTransformer[InputType comparable](updateFunc ...func(currentThr
 		Receptor: NewReceptor[int](),
 		updateFunc: lo.First(updateFunc, func(currentThreshold int, _, newInputValue InputType) int {
 			var zeroValue InputType
-
 			if newInputValue != zeroValue {
 				return currentThreshold + 1
-			} else {
-				return currentThreshold - 1
 			}
+
+			return currentThreshold - 1
 		}),
 	}
 }

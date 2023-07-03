@@ -19,7 +19,7 @@ type Receptor[T comparable] interface {
 type ReadOnlyReceptor[T comparable] interface {
 	Get() T
 
-	OnUpdate(consumer func(old, new T)) (unsubscribe func())
+	OnUpdate(consumer func(oldValue, newValue T)) (unsubscribe func())
 }
 
 // NewReceptor creates a new Receptor instance.
