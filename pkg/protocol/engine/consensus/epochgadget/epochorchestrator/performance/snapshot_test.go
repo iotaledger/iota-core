@@ -26,32 +26,59 @@ func TestManager_Import_Export(t *testing.T) {
 			ValidationBlocksSent: 3,
 		},
 	}
-	for i := 0; i < epochsCount; i++ {
-		ts.RegisterCommitte(iotago.EpochIndex(i), epochActions)
+	for i := 1; i <= epochsCount; i++ {
 		ts.ApplyEpochActions(iotago.EpochIndex(i), epochActions)
 	}
 
-	writer := &writerseeker.WriterSeeker{}
+	{
+		writer := &writerseeker.WriterSeeker{}
 
-	delegtorRewardBeforeImport, validatorRewardBeforeImport := ts.saveCalculatedRewards(epochsCount, epochActions)
-	// export two full epochs
-	targetSlot := ts.API().TimeProvider().EpochEnd(3)
-	err := ts.Instance.Export(writer, targetSlot)
-	require.NoError(t, err)
-	err = ts.Instance.Import(writer.BytesReader())
-	require.NoError(t, err)
-	delegtorRewardAfterImport, validatorRewardAfterImport := ts.saveCalculatedRewards(epochsCount, epochActions)
-	require.Equal(t, delegtorRewardBeforeImport, delegtorRewardAfterImport)
-	require.Equal(t, validatorRewardBeforeImport, validatorRewardAfterImport)
+		delegatorRewardBeforeImport, validatorRewardBeforeImport := ts.calculateExpectedRewards(epochsCount, epochActions)
+		// export two full epochs
+		targetSlot := ts.API().TimeProvider().EpochEnd(3)
+		err := ts.Instance.Export(writer, targetSlot)
+		require.NoError(t, err)
 
-	delegtorRewardBeforeImport, validatorRewardBeforeImport = ts.saveCalculatedRewards(epochsCount, epochActions)
-	// export at the begining of the epoch 2, skip epoch 3 at all
-	targetSlot = ts.API().TimeProvider().EpochStart(2)
-	err = ts.Instance.Export(writer, targetSlot)
-	require.NoError(t, err)
-	err = ts.Instance.Import(writer.BytesReader())
-	require.NoError(t, err)
-	delegtorRewardAfterImport, validatorRewardAfterImport = ts.saveCalculatedRewards(epochsCount, epochActions)
-	require.Equal(t, delegtorRewardBeforeImport, delegtorRewardAfterImport)
-	require.Equal(t, validatorRewardBeforeImport, validatorRewardAfterImport)
+		ts.InitRewardManager()
+
+		err = ts.Instance.Import(writer.BytesReader())
+		require.NoError(t, err)
+		delegatorRewardAfterImport, validatorRewardAfterImport := ts.calculateExpectedRewards(epochsCount, epochActions)
+		require.Equal(t, delegatorRewardBeforeImport, delegatorRewardAfterImport)
+		require.Equal(t, validatorRewardBeforeImport, validatorRewardAfterImport)
+	}
+	{
+		writer := &writerseeker.WriterSeeker{}
+
+		delegatorRewardBeforeImport, validatorRewardBeforeImport := ts.calculateExpectedRewards(epochsCount, epochActions)
+		// export at the beginning of epoch 2, skip epoch 3 at all
+		targetSlot := ts.API().TimeProvider().EpochStart(2)
+		err := ts.Instance.Export(writer, targetSlot)
+		require.NoError(t, err)
+
+		ts.InitRewardManager()
+
+		err = ts.Instance.Import(writer.BytesReader())
+		require.NoError(t, err)
+		delegatorRewardAfterImport, validatorRewardAfterImport := ts.calculateExpectedRewards(epochsCount, epochActions)
+
+		require.Equal(t, delegatorRewardBeforeImport[1]["A"], delegatorRewardAfterImport[1]["A"])
+		require.Equal(t, delegatorRewardBeforeImport[1]["B"], delegatorRewardAfterImport[1]["B"])
+		require.EqualValues(t, delegatorRewardAfterImport[2]["A"], 0)
+		require.EqualValues(t, delegatorRewardAfterImport[2]["B"], 0)
+		require.EqualValues(t, delegatorRewardAfterImport[3]["A"], 0)
+		require.EqualValues(t, delegatorRewardAfterImport[3]["B"], 0)
+		require.EqualValues(t, delegatorRewardAfterImport[4]["A"], 0)
+		require.EqualValues(t, delegatorRewardAfterImport[4]["B"], 0)
+
+		require.EqualValues(t, validatorRewardBeforeImport[1]["A"], validatorRewardAfterImport[1]["A"])
+		require.EqualValues(t, validatorRewardBeforeImport[1]["B"], validatorRewardAfterImport[1]["B"])
+		require.EqualValues(t, validatorRewardAfterImport[2]["A"], 0)
+		require.EqualValues(t, validatorRewardAfterImport[2]["B"], 0)
+		require.EqualValues(t, validatorRewardAfterImport[3]["A"], 0)
+		require.EqualValues(t, validatorRewardAfterImport[3]["B"], 0)
+		require.EqualValues(t, validatorRewardAfterImport[4]["A"], 0)
+		require.EqualValues(t, validatorRewardAfterImport[4]["B"], 0)
+
+	}
 }

@@ -54,7 +54,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 			ManaDecayFactorsExponent:         0,
 		},
 	}
-	ts.initRewardManager()
+	ts.InitRewardManager()
 
 	return ts
 }
@@ -63,7 +63,7 @@ func (t *TestSuite) API() iotago.API {
 	return iotago.LatestAPI(t.ProtocolParameters)
 }
 
-func (t *TestSuite) initRewardManager() {
+func (t *TestSuite) InitRewardManager() {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
 	perforanceFactorFunc := func(index iotago.SlotIndex) *prunable.PerformanceFactors {
 		if _, exists := prunableStores[index]; !exists {
@@ -94,7 +94,7 @@ func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.Account
 	return t.accounts[alias]
 }
 
-func (t *TestSuite) RegisterCommitte(epoch iotago.EpochIndex, actions map[string]*EpochActions) {
+func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
 	committee := account.NewAccounts()
 	for alias, action := range actions {
 		accountID := t.Account(alias, true)
@@ -104,27 +104,15 @@ func (t *TestSuite) RegisterCommitte(epoch iotago.EpochIndex, actions map[string
 			FixedCost:      action.FixedCost,
 		})
 	}
-	err := t.Instance.RegisterCommittee(epoch, committee)
-	require.NoError(t.T, err)
-}
 
-func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
+	err := t.Instance.RegisterCommittee(epochIndex, committee)
+	require.NoError(t.T, err)
 	for accIDAlias, action := range actions {
 		accID := t.Account(accIDAlias, true)
 		t.applyPerformanceFactor(accID, epochIndex, action.ValidationBlocksSent)
 	}
 
-	poolStakes := make(map[iotago.AccountID]*account.Pool)
-	for alias, action := range actions {
-		accountID := t.Account(alias, true)
-		poolStakes[accountID] = &account.Pool{
-			PoolStake:      action.PoolStake,
-			ValidatorStake: action.ValidatorStake,
-			FixedCost:      action.FixedCost,
-		}
-	}
-
-	t.Instance.ApplyEpoch(epochIndex)
+	t.Instance.ApplyEpoch(epochIndex, committee)
 }
 
 func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
@@ -172,24 +160,24 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochInde
 	}
 }
 
-func (t *TestSuite) saveCalculatedRewards(epochsCount int, epochActions map[string]*EpochActions) (map[iotago.EpochIndex]map[string]iotago.Mana, map[iotago.EpochIndex]map[string]iotago.Mana) {
-	delegtorRewardPerAccount := make(map[iotago.EpochIndex]map[string]iotago.Mana)
+func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[string]*EpochActions) (map[iotago.EpochIndex]map[string]iotago.Mana, map[iotago.EpochIndex]map[string]iotago.Mana) {
+	delegatorRewardPerAccount := make(map[iotago.EpochIndex]map[string]iotago.Mana)
 	validatorRewardPerAccount := make(map[iotago.EpochIndex]map[string]iotago.Mana)
-	for epochIndex := iotago.EpochIndex(0); epochIndex < iotago.EpochIndex(epochsCount); epochIndex++ {
-		delegtorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
+	for epochIndex := iotago.EpochIndex(1); epochIndex <= iotago.EpochIndex(epochsCount); epochIndex++ {
+		delegatorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
 		validatorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
 		for aliasAccount := range epochActions {
-			reward, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, 1, iotago.EpochIndex(epochIndex))
+			reward, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epochIndex, epochIndex)
 			require.NoError(t.T, err)
-			delegtorRewardPerAccount[epochIndex][aliasAccount] = reward
+			delegatorRewardPerAccount[epochIndex][aliasAccount] = reward
 		}
 		for aliasAccount := range epochActions {
-			reward, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true), 1, 1, iotago.EpochIndex(epochIndex))
+			reward, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true), 1, epochIndex, epochIndex)
 			require.NoError(t.T, err)
 			validatorRewardPerAccount[epochIndex][aliasAccount] = reward
 		}
 	}
-	return delegtorRewardPerAccount, validatorRewardPerAccount
+	return delegatorRewardPerAccount, validatorRewardPerAccount
 }
 
 type EpochActions struct {

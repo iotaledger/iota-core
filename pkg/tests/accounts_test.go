@@ -21,10 +21,16 @@ import (
 func Test_TransitionAccount(t *testing.T) {
 	oldGenesisOutputKey := utils.RandPubKey().ToEd25519()
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
-		Address:   nil,                               // nil address will be replaced with the address generated from genesis seed
-		Amount:    testsuite.MinIssuerAccountDeposit, // min amount to cover the rent. if it's too little then the snapshot creation will fail
+		// Nil address will be replaced with the address generated from genesis seed.
+		// A single key may unlock multiple accounts; that's why it can't be used as a source for AccountID derivation.
+		Address: nil,
+		// Min amount to cover the rent. If it's too little, then the snapshot creation will fail
+		Amount: testsuite.MinIssuerAccountDeposit,
+		// AccountID is derived from this field, so this must be set uniquely for each account.
 		IssuerKey: oldGenesisOutputKey,
-	}), testsuite.WithGenesisTimestampOffset(100*10))
+	}),
+		testsuite.WithGenesisTimestampOffset(100*10),
+	)
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1")
@@ -97,7 +103,7 @@ func Test_TransitionAccount(t *testing.T) {
 			testsuite.WithStakingFeature(&iotago.StakingFeature{
 				StakedAmount: 10000,
 				FixedCost:    421,
-				StartEpoch:   3,
+				StartEpoch:   1,
 				EndEpoch:     10,
 			}),
 		)
@@ -174,7 +180,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 		inputForNewDelegation, newDelegationOutputs, newDelegationWallets := ts.TransactionFramework.CreateDelegationFromInput("TX1:2",
 			testsuite.WithDelegatedValidatorID(newAccountOutput.AccountID),
-			testsuite.WithDelegationStartEpoch(7),
+			testsuite.WithDelegationStartEpoch(2),
 		)
 
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX2", newDelegationWallets,
@@ -213,7 +219,7 @@ func Test_TransitionAccount(t *testing.T) {
 			ValidatorStakeChange:  0,
 			StakeEndEpochChange:   0,
 			FixedCostChange:       0,
-			DelegationStakeChange: 1966240,
+			DelegationStakeChange: 1965580,
 		}, false, node1)
 
 		ts.AssertAccountData(&accounts.AccountData{

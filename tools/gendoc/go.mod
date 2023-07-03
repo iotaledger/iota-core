@@ -5,7 +5,7 @@ go 1.20
 replace github.com/iotaledger/iota-core => ../../
 
 require (
-	github.com/iotaledger/hive.go/app v0.0.0-20230626150812-c1170d7823ed
+	github.com/iotaledger/hive.go/app v0.0.0-20230630092834-5ab21b6bf7dd
 	github.com/iotaledger/hive.go/apputils v0.0.0-20230301135914-603c4dac79e1
 	github.com/iotaledger/iota-core v0.0.0-20230414140919-e676d4aef341
 )
@@ -53,6 +53,7 @@ require (
 	github.com/huin/goupnp v1.2.0 // indirect
 	github.com/iancoleman/orderedmap v0.2.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
+<<<<<<< HEAD
 	github.com/iotaledger/hive.go/ads v0.0.0-20230626150812-c1170d7823ed // indirect
 	github.com/iotaledger/hive.go/autopeering v0.0.0-20230626150812-c1170d7823ed // indirect
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230626150812-c1170d7823ed // indirect
@@ -68,6 +69,24 @@ require (
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230620163422-3926cc7ad264 // indirect
 	github.com/iotaledger/iota.go v1.0.0 // indirect
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230628092035-f64ceff283cf // indirect
+=======
+	github.com/iotaledger/hive.go/ads v0.0.0-20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/autopeering v0.0.0-20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/ds v0.0.0-20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20230630091739-ffba86d339c0 // indirect
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/lo v0.0.0-20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/logger v0.0.0-20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230630092834-5ab21b6bf7dd // indirect
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230620163422-3926cc7ad264 // indirect
+	github.com/iotaledger/iota.go v1.0.0 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230625151521-e938c00b6e99 // indirect
+>>>>>>> feat/staking-delegation-rewards
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
@@ -156,7 +175,7 @@ require (
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect

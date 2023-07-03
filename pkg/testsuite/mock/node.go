@@ -69,7 +69,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		panic(err)
 	}
 
-	accountID := iotago.AccountID(blake2b.Sum256(iotago.Ed25519AddressFromPubKey(pub)[:]))
+	accountID := iotago.AccountID(blake2b.Sum256(pub))
 
 	peerID := network.PeerID(pub)
 	identity.RegisterIDAlias(peerID, name)
