@@ -53,6 +53,6 @@ func Test_Orphanage(t *testing.T) {
 	tf.AddBlock("C").TipPool().Set(tipmanager.StrongTipPool)
 	tf.AssertStrongTips("C")
 
-	blockB.SetLivenessThresholdReached()
+	blockB.LivenessThresholdReached().Set(true)
 	tf.AssertStrongTips("A")
 }

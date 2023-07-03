@@ -14,35 +14,20 @@ type TipMetadata interface {
 	// Block returns the block that the TipMetadata belongs to.
 	Block() *blocks.Block
 
-	// TipPool returns the current TipPool of the block.
+	// TipPool exposes a Receptor that holds information about the TipPool the block is part of.
 	TipPool() agential.Receptor[TipPool]
 
-	// SetLivenessThresholdReached marks the block as having reached the liveness threshold.
-	SetLivenessThresholdReached()
-
-	// OnLivenessThresholdReached registers a callback that is triggered when the block reaches the liveness threshold.
-	OnLivenessThresholdReached(handler func()) (unsubscribe func())
-
-	// IsLivenessThresholdReached returns true if the block reached the liveness threshold.
-	IsLivenessThresholdReached() bool
+	// LivenessThresholdReached exposes a Receptor that receives a value of true if the liveness threshold is reached.
+	LivenessThresholdReached() agential.Receptor[bool]
 
 	// IsStrongTip returns true if the block is an unreferenced strong tip.
-	IsStrongTip() bool
-
-	// OnIsStrongTipUpdated registers a callback that is triggered when the IsStrongTip property changes.
-	OnIsStrongTipUpdated(handler func(isStrongTip bool)) (unsubscribe func())
+	IsStrongTip() agential.ReadOnlyReceptor[bool]
 
 	// IsWeakTip returns true if the block is an unreferenced weak tip.
-	IsWeakTip() bool
-
-	// OnIsWeakTipUpdated registers a callback that is triggered when the IsWeakTip property changes.
-	OnIsWeakTipUpdated(handler func(isWeakTip bool)) (unsubscribe func())
+	IsWeakTip() agential.ReadOnlyReceptor[bool]
 
 	// IsOrphaned returns true if the block is marked orphaned or if it has an orphaned strong parent.
-	IsOrphaned() bool
-
-	// OnIsOrphanedUpdated registers a callback that is triggered when the IsOrphaned property changes.
-	OnIsOrphanedUpdated(handler func(orphaned bool)) (unsubscribe func())
+	IsOrphaned() agential.ReadOnlyReceptor[bool]
 
 	Evicted() agential.ReadOnlyReceptor[bool]
 }

@@ -101,7 +101,7 @@ func (t *TipManager) Shutdown() {}
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
-	tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
+	tipMetadata.isStrongTip.OnUpdate(func(_, isStrongTip bool) {
 		if isStrongTip {
 			t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
 		} else {
@@ -109,7 +109,7 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 		}
 	})
 
-	tipMetadata.OnIsWeakTipUpdated(func(isWeakTip bool) {
+	tipMetadata.isWeakTip.OnUpdate(func(_, isWeakTip bool) {
 		if isWeakTip {
 			t.weakTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
 		} else {

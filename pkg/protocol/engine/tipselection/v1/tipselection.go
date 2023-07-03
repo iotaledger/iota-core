@@ -73,7 +73,7 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 
 		t.livenessThreshold.OnUpdate(func(_, threshold time.Time) {
 			for _, tip := range t.livenessThresholdQueue.PopUntil(threshold) {
-				tip.SetLivenessThresholdReached()
+				tip.LivenessThresholdReached().Set(true)
 			}
 		})
 
