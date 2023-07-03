@@ -35,7 +35,7 @@ type TipMetadata struct {
 	isStrongTipPoolMember *agential.TransformerWith3Inputs[bool, tipmanager.TipPool, bool, bool]
 
 	// isWeakTipPoolMember is true if the block is part of the weak tip pool and not orphaned.
-	isWeakTipPoolMember *agential.TransformerWith2Inputs[bool, tipmanager.TipPool, bool]
+	isWeakTipPoolMember *agential.TransformerWith3Inputs[bool, tipmanager.TipPool, bool, bool]
 
 	// isStronglyConnectedToTips is true if the block is either strongly referenced by others tips or is itself a strong
 	// tip pool member.
@@ -99,9 +99,9 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		return tipPool == tipmanager.StrongTipPool && !isOrphaned && !isEvicted
 	}, &t.tipPool, &t.isOrphaned, &t.isEvicted)
 
-	t.isWeakTipPoolMember = agential.NewTransformerWith2Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
-		return tipPool == tipmanager.WeakTipPool && !isOrphaned
-	}, &t.tipPool, &t.isOrphaned)
+	t.isWeakTipPoolMember = agential.NewTransformerWith3Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
+		return tipPool == tipmanager.WeakTipPool && !isOrphaned && !isEvicted
+	}, &t.tipPool, &t.isOrphaned, &t.isEvicted)
 
 	t.isStronglyConnectedToTips = agential.NewTransformerWith2Inputs(t, func(isStrongTipPoolMember bool, isStronglyReferencedByStronglyConnectedTips bool) bool {
 		return isStrongTipPoolMember || isStronglyReferencedByStronglyConnectedTips

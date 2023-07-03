@@ -109,6 +109,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 		payloadConflictIDs:    advancedset.New[iotago.TransactionID](),
 		acceptanceRatifiers:   advancedset.New[account.SeatIndex](),
 		confirmationRatifiers: advancedset.New[account.SeatIndex](),
+		accepted:              agential.NewReceptor[bool](),
 	}
 }
 
