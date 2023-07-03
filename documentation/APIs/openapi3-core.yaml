@@ -2535,17 +2535,17 @@ components:
             finalizedSlot:
               description: The index of latest confirmed slot.
               type: integer
-            ATT:
+            acceptedTangleTime:
               description: A notion of time that is anchored to the latest accepted block.
               type: integer
-            RATT:
-              description: The ATT after it has advanced with the system clock.
+            relativeAcceptedTangleTime:
+              description: The Accepted Tangle Time after it has advanced with the system clock.
               type: integer
-            CTT:
+            confirmedTangleTime:
               description: A notion of time that is anchored to the latest confirmed block.
               type: integer
-            RCTT:
-              description: The CTT after it has advanced with the system clock.
+            relativeConfirmedTangleTime:
+              description: The Confirmed Tangle Time after it has advanced with the system clock.
               type: integer
             latestCommittedSlot:
               type: object
