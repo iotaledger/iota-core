@@ -98,7 +98,7 @@ func NewThresholdTransformer[InputType comparable](updateFunc ...func(currentThr
 	}
 }
 
-func (t *ThresholdTransformer[InputType]) ProvideInput(input ReadOnlyReceptor[InputType]) (unsubscribe func()) {
+func (t *ThresholdTransformer[InputType]) Track(input ReadOnlyReceptor[InputType]) (unsubscribe func()) {
 	return input.OnUpdate(func(oldInputValue, newInputValue InputType) {
 		t.Receptor.Compute(func(currentThreshold int) int {
 			return t.updateFunc(currentThreshold, oldInputValue, newInputValue)

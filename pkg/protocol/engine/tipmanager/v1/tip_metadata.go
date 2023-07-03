@@ -32,7 +32,7 @@ type TipMetadata struct {
 	weaklyOrphanedWeakParents *agential.ThresholdTransformer[bool]
 
 	// isStrongTipPoolMember is true if the block is part of the strong tip pool and not orphaned.
-	isStrongTipPoolMember *agential.TransformerWith2Inputs[bool, tipmanager.TipPool, bool]
+	isStrongTipPoolMember *agential.TransformerWith3Inputs[bool, tipmanager.TipPool, bool, bool]
 
 	// isWeakTipPoolMember is true if the block is part of the weak tip pool and not orphaned.
 	isWeakTipPoolMember *agential.TransformerWith2Inputs[bool, tipmanager.TipPool, bool]
@@ -88,27 +88,23 @@ type TipMetadata struct {
 // NewBlockMetadata creates a new TipMetadata instance.
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
-		block:                           block,
-		constructed:                     agential.NewReceptor[bool](preventResets[bool]),
-		tipPool:                         agential.NewReceptor[tipmanager.TipPool](tipmanager.TipPool.Max),
-		isLivenessThresholdReached:      agential.NewReceptor[bool](preventResets[bool]),
-		isEvicted:                       agential.NewReceptor[bool](preventResets[bool]),
-		stronglyConnectedStrongChildren: agential.NewThresholdTransformer[bool](),
-		connectedWeakChildren:           agential.NewThresholdTransformer[bool](),
-		stronglyOrphanedStrongParents:   agential.NewThresholdTransformer[bool](),
-		weaklyOrphanedWeakParents:       agential.NewThresholdTransformer[bool](),
+		block:                      block,
+		constructed:                agential.NewReceptor[bool](trapDoor[bool]),
+		tipPool:                    agential.NewReceptor[tipmanager.TipPool](tipmanager.TipPool.Max),
+		isLivenessThresholdReached: agential.NewReceptor[bool](trapDoor[bool]),
+		isEvicted:                  agential.NewReceptor[bool](trapDoor[bool]),
 	}
 
-	t.isStrongTipPoolMember = agential.NewTransformerWith2Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
-		return tipPool == tipmanager.StrongTipPool && !isOrphaned
-	}, &t.tipPool, &t.isOrphaned)
+	t.isStrongTipPoolMember = agential.NewTransformerWith3Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
+		return tipPool == tipmanager.StrongTipPool && !isOrphaned && !isEvicted
+	}, &t.tipPool, &t.isOrphaned, &t.isEvicted)
 
 	t.isWeakTipPoolMember = agential.NewTransformerWith2Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
 		return tipPool == tipmanager.WeakTipPool && !isOrphaned
 	}, &t.tipPool, &t.isOrphaned)
 
-	t.isStronglyConnectedToTips = agential.NewTransformerWith2Inputs(t, func(isStrongTipPoolMember bool, IsStronglyReferencedByStronglyConnectedTips bool) bool {
-		return isStrongTipPoolMember || IsStronglyReferencedByStronglyConnectedTips
+	t.isStronglyConnectedToTips = agential.NewTransformerWith2Inputs(t, func(isStrongTipPoolMember bool, isStronglyReferencedByStronglyConnectedTips bool) bool {
+		return isStrongTipPoolMember || isStronglyReferencedByStronglyConnectedTips
 	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByStronglyConnectedTips)
 
 	t.isConnectedToTips = agential.NewTransformerWith3Inputs(t, func(isReferencedByOtherTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
@@ -155,7 +151,13 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		return isLivenessThresholdReached /* TODO: && !accepted */
 	}, &t.isLivenessThresholdReached)
 
-	t.isEvicted.OnUpdate(func(_, _ bool) { t.tipPool.Set(tipmanager.DroppedTipPool) })
+	t.stronglyConnectedStrongChildren = agential.NewThresholdTransformer[bool]()
+
+	t.connectedWeakChildren = agential.NewThresholdTransformer[bool]()
+
+	t.stronglyOrphanedStrongParents = agential.NewThresholdTransformer[bool]()
+
+	t.weaklyOrphanedWeakParents = agential.NewThresholdTransformer[bool]()
 
 	t.constructed.Set(true)
 
@@ -209,21 +211,19 @@ func (t *TipMetadata) OnConstructed(handler func()) (unsubscribe func()) {
 
 // connectStrongParent sets up the parent and children related properties for a strong parent.
 func (t *TipMetadata) connectStrongParent(strongParent *TipMetadata) {
-	unsubscribe := lo.Batch(
-		strongParent.stronglyConnectedStrongChildren.ProvideInput(t.isStronglyConnectedToTips),
+	t.stronglyOrphanedStrongParents.Track(strongParent.isStronglyOrphaned)
 
-		t.stronglyOrphanedStrongParents.ProvideInput(strongParent.isStronglyOrphaned),
-	)
-
+	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
+	unsubscribe := strongParent.stronglyConnectedStrongChildren.Track(t.isStronglyConnectedToTips)
 	strongParent.isEvicted.OnUpdate(func(_, _ bool) { unsubscribe() })
 }
 
 // connectWeakParent sets up the parent and children related properties for a weak parent.
 func (t *TipMetadata) connectWeakParent(weakParent *TipMetadata) {
 	unsubscribe := lo.Batch(
-		weakParent.connectedWeakChildren.ProvideInput(t.isConnectedToTips),
+		weakParent.connectedWeakChildren.Track(t.isConnectedToTips),
 
-		t.weaklyOrphanedWeakParents.ProvideInput(weakParent.isWeaklyOrphaned),
+		t.weaklyOrphanedWeakParents.Track(weakParent.isWeaklyOrphaned),
 	)
 
 	weakParent.isEvicted.OnUpdate(func(_, _ bool) { unsubscribe() })
@@ -232,7 +232,7 @@ func (t *TipMetadata) connectWeakParent(weakParent *TipMetadata) {
 // code contract (make sure the type implements all required methods).
 var _ tipmanager.TipMetadata = new(TipMetadata)
 
-func preventResets[T comparable](prevValue, newValue T) T {
+func trapDoor[T comparable](prevValue, newValue T) T {
 	var emptyValue T
 	if newValue == emptyValue {
 		return prevValue
