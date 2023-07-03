@@ -8,19 +8,19 @@ type TransformerWith1Input[TargetType, InputType1 comparable] struct {
 	transitionFunc func(InputType1) TargetType
 }
 
-func NewTransformerWith1Input[TargetType, InputType1 comparable](transitionFunc func(InputType1) TargetType) *TransformerWith1Input[TargetType, InputType1] {
-	return &TransformerWith1Input[TargetType, InputType1]{
+func NewTransformerWith1Input[TargetType, InputType1 comparable, InputSource1 ReadOnlyReceptor[InputType1]](agent Agent, transitionFunc func(InputType1) TargetType, input1 *InputSource1) *TransformerWith1Input[TargetType, InputType1] {
+	t := &TransformerWith1Input[TargetType, InputType1]{
 		receptor:       newReceptor[TargetType](),
 		transitionFunc: transitionFunc,
 	}
-}
 
-func (d *TransformerWith1Input[TargetType, InputType1]) ProvideInputs(input1 ReadOnlyReceptor[InputType1]) (unsubscribe func()) {
-	return lo.Batch(
-		input1.OnUpdate(func(_, input1 InputType1) {
-			d.Compute(func(_ TargetType) TargetType { return d.transitionFunc(input1) })
-		}),
-	)
+	agent.OnConstructed(func() {
+		(*input1).OnUpdate(func(_, input1 InputType1) {
+			t.Compute(func(_ TargetType) TargetType { return t.transitionFunc(input1) })
+		})
+	})
+
+	return t
 }
 
 type TransformerWith2Inputs[TargetType, InputType1, InputType2 comparable] struct {
@@ -29,27 +29,23 @@ type TransformerWith2Inputs[TargetType, InputType1, InputType2 comparable] struc
 	transitionFunc func(InputType1, InputType2) TargetType
 }
 
-func NewTransformerWith2Inputs[TargetType, InputType1, InputType2 comparable, InputSource1 ReadOnlyReceptor[InputType1], InputSource2 ReadOnlyReceptor[InputType2]](agent Agent, transitionFunc func(InputType1, InputType2) TargetType, input1 func() InputSource1, input2 func() InputSource2) *TransformerWith2Inputs[TargetType, InputType1, InputType2] {
+func NewTransformerWith2Inputs[TargetType, InputType1, InputType2 comparable, InputSource1 ReadOnlyReceptor[InputType1], InputSource2 ReadOnlyReceptor[InputType2]](agent Agent, transitionFunc func(InputType1, InputType2) TargetType, input1 *InputSource1, input2 *InputSource2) *TransformerWith2Inputs[TargetType, InputType1, InputType2] {
 	t := &TransformerWith2Inputs[TargetType, InputType1, InputType2]{
 		receptor:       newReceptor[TargetType](),
 		transitionFunc: transitionFunc,
 	}
 
-	agent.OnConstructed(func() { t.ProvideInputs(input1(), input2()) })
+	agent.OnConstructed(func() {
+		(*input1).OnUpdate(func(_, input1 InputType1) {
+			t.Compute(func(_ TargetType) TargetType { return t.transitionFunc(input1, (*input2).Get()) })
+		})
+
+		(*input2).OnUpdate(func(_, input2 InputType2) {
+			t.Compute(func(_ TargetType) TargetType { return t.transitionFunc((*input1).Get(), input2) })
+		})
+	})
 
 	return t
-}
-
-func (d *TransformerWith2Inputs[TargetType, InputType1, InputType2]) ProvideInputs(input1 ReadOnlyReceptor[InputType1], input2 ReadOnlyReceptor[InputType2]) (unsubscribe func()) {
-	return lo.Batch(
-		input1.OnUpdate(func(_, input1 InputType1) {
-			d.Compute(func(_ TargetType) TargetType { return d.transitionFunc(input1, input2.Get()) })
-		}),
-
-		input2.OnUpdate(func(_, input2 InputType2) {
-			d.Compute(func(_ TargetType) TargetType { return d.transitionFunc(input1.Get(), input2) })
-		}),
-	)
 }
 
 type TransformerWith3Inputs[TargetType, InputType1, InputType2, InputType3 comparable] struct {
@@ -58,27 +54,27 @@ type TransformerWith3Inputs[TargetType, InputType1, InputType2, InputType3 compa
 	transitionFunc func(InputType1, InputType2, InputType3) TargetType
 }
 
-func NewTransformerWith3Inputs[TargetType, InputType1, InputType2, InputType3 comparable](transitionFunc func(InputType1, InputType2, InputType3) TargetType) *TransformerWith3Inputs[TargetType, InputType1, InputType2, InputType3] {
-	return &TransformerWith3Inputs[TargetType, InputType1, InputType2, InputType3]{
+func NewTransformerWith3Inputs[TargetType, InputType1, InputType2, InputType3 comparable, InputSource1 ReadOnlyReceptor[InputType1], InputSource2 ReadOnlyReceptor[InputType2], InputSource3 ReadOnlyReceptor[InputType3]](agent Agent, transitionFunc func(InputType1, InputType2, InputType3) TargetType, input1 *InputSource1, input2 *InputSource2, input3 *InputSource3) *TransformerWith3Inputs[TargetType, InputType1, InputType2, InputType3] {
+	t := &TransformerWith3Inputs[TargetType, InputType1, InputType2, InputType3]{
 		receptor:       newReceptor[TargetType](),
 		transitionFunc: transitionFunc,
 	}
-}
 
-func (d *TransformerWith3Inputs[TargetType, InputType1, InputType2, InputType3]) ProvideInputs(input1 ReadOnlyReceptor[InputType1], input2 ReadOnlyReceptor[InputType2], input3 ReadOnlyReceptor[InputType3]) (unsubscribe func()) {
-	return lo.Batch(
-		input1.OnUpdate(func(_, input1 InputType1) {
-			d.Compute(func(_ TargetType) TargetType { return d.transitionFunc(input1, input2.Get(), input3.Get()) })
-		}),
+	agent.OnConstructed(func() {
+		(*input1).OnUpdate(func(_, input1 InputType1) {
+			t.Compute(func(_ TargetType) TargetType { return t.transitionFunc(input1, (*input2).Get(), (*input3).Get()) })
+		})
 
-		input2.OnUpdate(func(_, input2 InputType2) {
-			d.Compute(func(_ TargetType) TargetType { return d.transitionFunc(input1.Get(), input2, input3.Get()) })
-		}),
+		(*input2).OnUpdate(func(_, input2 InputType2) {
+			t.Compute(func(_ TargetType) TargetType { return t.transitionFunc((*input1).Get(), input2, (*input3).Get()) })
+		})
 
-		input3.OnUpdate(func(_, input3 InputType3) {
-			d.Compute(func(_ TargetType) TargetType { return d.transitionFunc(input1.Get(), input2.Get(), input3) })
-		}),
-	)
+		(*input3).OnUpdate(func(_, input3 InputType3) {
+			t.Compute(func(_ TargetType) TargetType { return t.transitionFunc((*input1).Get(), (*input2).Get(), input3) })
+		})
+	})
+
+	return t
 }
 
 type ThresholdTransformer[InputType comparable] struct {

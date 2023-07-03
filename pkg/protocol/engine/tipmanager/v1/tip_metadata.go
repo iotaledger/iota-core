@@ -81,25 +81,15 @@ type TipMetadata struct {
 	// isWeaklyOrphaned is true if the block is either marked as orphaned or has at least one weakly orphaned weak
 	// parent.
 	isWeaklyOrphaned *agential.TransformerWith2Inputs[bool, bool, bool]
-}
 
-func (t *TipMetadata) OnConstructed(handler func()) (unsubscribe func()) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (t *TipMetadata) IsStrongTipPoolMember() agential.Receptor[bool] {
-	return t.isStrongTipPoolMember
-}
-
-func (t *TipMetadata) IsStronglyReferencedByStronglyConnectedTips() agential.Receptor[bool] {
-	return t.isStronglyReferencedByStronglyConnectedTips
+	constructed agential.Receptor[bool]
 }
 
 // NewBlockMetadata creates a new TipMetadata instance.
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
 		block:                           block,
+		constructed:                     agential.NewReceptor[bool](preventResets[bool]),
 		tipPool:                         agential.NewReceptor[tipmanager.TipPool](tipmanager.TipPool.Max),
 		isLivenessThresholdReached:      agential.NewReceptor[bool](preventResets[bool]),
 		isEvicted:                       agential.NewReceptor[bool](preventResets[bool]),
@@ -111,69 +101,63 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 
 	t.isStrongTipPoolMember = agential.NewTransformerWith2Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
 		return tipPool == tipmanager.StrongTipPool && !isOrphaned
-	}, t.TipPool, t.IsOrphaned)
+	}, &t.tipPool, &t.isOrphaned)
 
 	t.isWeakTipPoolMember = agential.NewTransformerWith2Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool) bool {
 		return tipPool == tipmanager.WeakTipPool && !isOrphaned
-	}, t.TipPool, t.IsOrphaned)
+	}, &t.tipPool, &t.isOrphaned)
 
-	t.isStronglyConnectedToTips = agential.NewTransformerWith2Inputs(t, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
-		return isStrongTipPoolMember || isStronglyReferencedByOtherTips
-	}, t.IsStrongTipPoolMember, t.IsStronglyReferencedByStronglyConnectedTips)
-	/*
+	t.isStronglyConnectedToTips = agential.NewTransformerWith2Inputs(t, func(isStrongTipPoolMember bool, IsStronglyReferencedByStronglyConnectedTips bool) bool {
+		return isStrongTipPoolMember || IsStronglyReferencedByStronglyConnectedTips
+	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByStronglyConnectedTips)
 
+	t.isConnectedToTips = agential.NewTransformerWith3Inputs(t, func(isReferencedByOtherTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
+		return isReferencedByOtherTips || isStrongTipPoolMember || isWeakTipPoolMember
+	}, &t.isReferencedByOtherTips, &t.isStrongTipPoolMember, &t.isWeakTipPoolMember)
 
-		,
+	t.isStronglyReferencedByStronglyConnectedTips = agential.NewTransformerWith1Input[bool, int](t, func(stronglyConnectedStrongChildren int) bool {
+		return stronglyConnectedStrongChildren > 0
+	}, &t.stronglyConnectedStrongChildren)
 
-				isConnectedToTips: agential.NewTransformerWith3Inputs(func(isReferencedByOtherTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
-					return isReferencedByOtherTips || isStrongTipPoolMember || isWeakTipPoolMember
-				}),
+	t.isReferencedByOtherTips = agential.NewTransformerWith2Inputs[bool, int, bool](t, func(connectedWeakChildren int, isStronglyReferencedByStronglyConnectedTips bool) bool {
+		return connectedWeakChildren > 0 || isStronglyReferencedByStronglyConnectedTips
+	}, &t.connectedWeakChildren, &t.isStronglyReferencedByStronglyConnectedTips)
 
-				isStronglyReferencedByStronglyConnectedTips: agential.NewTransformerWith1Input[bool, int](func(stronglyConnectedStrongChildren int) bool {
-					return stronglyConnectedStrongChildren > 0
-				}),
+	t.isStrongTip = agential.NewTransformerWith2Inputs[bool, bool, bool](t, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
+		return isStrongTipPoolMember && !isStronglyReferencedByOtherTips
+	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByStronglyConnectedTips)
 
-				isReferencedByOtherTips: agential.NewTransformerWith2Inputs[bool, int, bool](func(connectedWeakChildren int, isStronglyReferencedByOtherTips bool) bool {
-					return connectedWeakChildren > 0 || isStronglyReferencedByOtherTips
-				}),
+	t.isWeakTip = agential.NewTransformerWith2Inputs[bool, bool, bool](t, func(isWeakTipPoolMember bool, isReferencedByOtherTips bool) bool {
+		return isWeakTipPoolMember && !isReferencedByOtherTips
+	}, &t.isWeakTipPoolMember, &t.isReferencedByOtherTips)
 
-				isStrongTip: agential.NewTransformerWith2Inputs[bool, bool, bool](func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
-					return isStrongTipPoolMember && !isStronglyReferencedByOtherTips
-				}),
+	t.isOrphaned = agential.NewTransformerWith2Inputs[bool, bool, bool](t, func(isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
+		return isStronglyOrphaned || isWeaklyOrphaned
+	}, &t.isStronglyOrphaned, &t.isWeaklyOrphaned)
 
-				isWeakTip: agential.NewTransformerWith2Inputs[bool, bool, bool](func(isWeakTipPoolMember bool, isReferencedByOtherTips bool) bool {
-					return isWeakTipPoolMember && !isReferencedByOtherTips
-				}),
+	t.anyStrongParentStronglyOrphaned = agential.NewTransformerWith1Input[bool, int](t, func(stronglyOrphanedStrongParents int) bool {
+		return stronglyOrphanedStrongParents > 0
+	}, &t.stronglyOrphanedStrongParents)
 
-				isOrphaned: agential.NewTransformerWith2Inputs[bool, bool, bool](func(isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
-					return isStronglyOrphaned || isWeaklyOrphaned
-				}),
+	t.anyWeakParentWeaklyOrphaned = agential.NewTransformerWith1Input[bool, int](t, func(weaklyOrphanedWeakParents int) bool {
+		return weaklyOrphanedWeakParents > 0
+	}, &t.weaklyOrphanedWeakParents)
 
-				anyStrongParentStronglyOrphaned: agential.NewTransformerWith1Input[bool, int](func(stronglyOrphanedStrongParents int) bool {
-					return stronglyOrphanedStrongParents > 0
-				}),
+	t.isStronglyOrphaned = agential.NewTransformerWith3Inputs[bool, bool, bool, bool](t, func(isMarkedOrphaned, anyStrongParentStronglyOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+		return isMarkedOrphaned || anyStrongParentStronglyOrphaned || anyWeakParentWeaklyOrphaned
+	}, &t.isMarkedOrphaned, &t.anyStrongParentStronglyOrphaned, &t.anyWeakParentWeaklyOrphaned)
 
-				anyWeakParentWeaklyOrphaned: agential.NewTransformerWith1Input[bool, int](func(weaklyOrphanedWeakParents int) bool {
-					return weaklyOrphanedWeakParents > 0
-				}),
+	t.isWeaklyOrphaned = agential.NewTransformerWith2Inputs[bool, bool, bool](t, func(isMarkedOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+		return isMarkedOrphaned || anyWeakParentWeaklyOrphaned
+	}, &t.isMarkedOrphaned, &t.anyWeakParentWeaklyOrphaned)
 
-				isStronglyOrphaned: agential.NewTransformerWith3Inputs[bool, bool, bool, bool](func(isMarkedOrphaned, anyStrongParentStronglyOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
-					return isMarkedOrphaned || anyStrongParentStronglyOrphaned || anyWeakParentWeaklyOrphaned
-				}),
-
-				isWeaklyOrphaned: agential.NewTransformerWith2Inputs[bool, bool, bool](func(isMarkedOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
-					return isMarkedOrphaned || anyWeakParentWeaklyOrphaned
-				}),
-
-				isMarkedOrphaned: agential.NewTransformerWith1Input[bool, bool](func(isLivenessThresholdReached bool) bool {
-					return isLivenessThresholdReached /* TODO: && !accepted */
-	/* }),
-	}
-	*/
-
-	t.connectGates()
+	t.isMarkedOrphaned = agential.NewTransformerWith1Input[bool, bool](t, func(isLivenessThresholdReached bool) bool {
+		return isLivenessThresholdReached /* TODO: && !accepted */
+	}, &t.isLivenessThresholdReached)
 
 	t.isEvicted.OnUpdate(func(_, _ bool) { t.tipPool.Set(tipmanager.DroppedTipPool) })
+
+	t.constructed.Set(true)
 
 	return t
 }
@@ -217,21 +201,10 @@ func (t *TipMetadata) Evicted() agential.ReadOnlyReceptor[bool] {
 	return t.isEvicted
 }
 
-func (t *TipMetadata) connectGates() {
-	t.isStrongTipPoolMember.ProvideInputs(t.tipPool, t.isOrphaned)
-	t.isWeakTipPoolMember.ProvideInputs(t.tipPool, t.isOrphaned)
-	t.isStronglyConnectedToTips.ProvideInputs(t.isStrongTipPoolMember, t.isStronglyReferencedByStronglyConnectedTips)
-	t.isConnectedToTips.ProvideInputs(t.isReferencedByOtherTips, t.isStrongTipPoolMember, t.isWeakTipPoolMember)
-	t.isStronglyReferencedByStronglyConnectedTips.ProvideInputs(t.stronglyConnectedStrongChildren)
-	t.isReferencedByOtherTips.ProvideInputs(t.connectedWeakChildren, t.isStronglyReferencedByStronglyConnectedTips)
-	t.isStrongTip.ProvideInputs(t.isStrongTipPoolMember, t.isStronglyReferencedByStronglyConnectedTips)
-	t.isWeakTip.ProvideInputs(t.isWeakTipPoolMember, t.isReferencedByOtherTips)
-	t.isOrphaned.ProvideInputs(t.isStronglyOrphaned, t.isWeaklyOrphaned)
-	t.anyStrongParentStronglyOrphaned.ProvideInputs(t.stronglyOrphanedStrongParents)
-	t.anyWeakParentWeaklyOrphaned.ProvideInputs(t.weaklyOrphanedWeakParents)
-	t.isStronglyOrphaned.ProvideInputs(t.isMarkedOrphaned, t.anyStrongParentStronglyOrphaned, t.anyWeakParentWeaklyOrphaned)
-	t.isWeaklyOrphaned.ProvideInputs(t.isMarkedOrphaned, t.anyWeakParentWeaklyOrphaned)
-	t.isMarkedOrphaned.ProvideInputs(t.isLivenessThresholdReached)
+func (t *TipMetadata) OnConstructed(handler func()) (unsubscribe func()) {
+	return t.constructed.OnUpdate(func(_, _ bool) {
+		handler()
+	})
 }
 
 // connectStrongParent sets up the parent and children related properties for a strong parent.
