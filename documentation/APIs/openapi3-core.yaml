@@ -2955,7 +2955,7 @@ components:
           description: >
             Values:
               * `1` - denotes that the referenced UTXO was already spent.
-              * `2` - denotes that the transaction is conflicting with another transaction.
+              * `2` - denotes that the transaction is conflicting with another transaction. Conflicting specifically means a double spend situation that both transaction pass all validation rules, eventually losing one(s) should have this reason. 
               * `3` - denotes that the referenced UTXO cannot be found.
               * `4` - denotes that the sum of the inputs and output values does not match.
               * `5` - denotes that the unlock block signature is invalid.
