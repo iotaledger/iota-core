@@ -339,7 +339,7 @@ func (t *Tracker) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 	return nil
 }
 
-func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
+func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, _ iotago.EpochIndex) error {
 	var epochCount uint64
 	if err := pWriter.WriteValue("committees epoch count", epochCount, true); err != nil {
 		return errors.Wrap(err, "unable to write committees epoch count")

@@ -95,7 +95,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 			if delegationID.Empty() {
 				delegationID = iotago.DelegationIDFromOutputID(inputStates[inp.Index].OutputID())
 			}
-			
+
 			delegationEnd := castOutput.EndEpoch
 			if delegationEnd == 0 {
 				delegationEnd = l.protocolParameters.TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
