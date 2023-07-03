@@ -31,7 +31,7 @@ type Orchestrator struct {
 	epochEndNearingThreshold iotago.SlotIndex
 	maxCommittableSlot       iotago.SlotIndex
 
-	optsEpochZeroCommittee *account.Accounts
+	optsInitialCommittee *account.Accounts
 
 	mutex syncutils.Mutex
 
@@ -61,8 +61,8 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 						// TODO: check if the following value is correctly set to twice eviction age
 						o.maxCommittableSlot = e.Storage.Settings().ProtocolParameters().EvictionAge + e.Storage.Settings().ProtocolParameters().EvictionAge
 
-						if o.optsEpochZeroCommittee != nil {
-							if err := o.performanceManager.RegisterCommittee(0, o.optsEpochZeroCommittee); err != nil {
+						if o.optsInitialCommittee != nil {
+							if err := o.performanceManager.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
 								panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
 							}
 						}
@@ -200,9 +200,10 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 	return weightedCommittee
 }
 
-// WithCommitteeForEpochZero registers the passed committee on a given slot. This is needed to generate Genesis snapshot with some initial committee.
-func WithCommitteeForEpochZero(committee *account.Accounts) options.Option[Orchestrator] {
+// WithInitialCommittee registers the passed committee on a given slot.
+// This is needed to generate Genesis snapshot with some initial committee.
+func WithInitialCommittee(committee *account.Accounts) options.Option[Orchestrator] {
 	return func(o *Orchestrator) {
-		o.optsEpochZeroCommittee = committee
+		o.optsInitialCommittee = committee
 	}
 }

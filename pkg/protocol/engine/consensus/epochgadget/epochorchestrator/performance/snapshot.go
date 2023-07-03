@@ -340,8 +340,6 @@ func (t *Tracker) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 }
 
 func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetEpoch iotago.EpochIndex) error {
-	// export all stored pools
-	// in theory we could save the epoch count only once, because stats and rewards should be the same length
 	var epochCount uint64
 	if err := pWriter.WriteValue("committees epoch count", epochCount, true); err != nil {
 		return errors.Wrap(err, "unable to write committees epoch count")
@@ -349,10 +347,17 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetEpoch 
 
 	var innerErr error
 	err := t.committeeStore.Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {
-		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
-		if epoch > targetEpoch {
-			return true
-		}
+		// TODO: committees for all available epochs should be included in the snapshot,
+		//  because if snapshot is generated after the committee has been selected,
+		//  then there is no way for the node to determine the committee.
+		//  There will be at most one epoch more in the store than targetEpoch,
+		//  so the question is whether we should explicitly make sure to only include one more committee,
+		//  or should we explicitly limit that? Currently we use the implicit assumption.
+		//epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
+		//if epoch > targetEpoch {
+		//	return true
+		//}
+
 		if err := pWriter.WriteBytes(epochBytes); err != nil {
 			innerErr = errors.Wrap(err, "unable to write epoch index")
 			return false
