@@ -9,13 +9,11 @@ import (
 )
 
 type Receptor[T comparable] interface {
-	ReadOnlyReceptor[T]
-
-	ReadOnly() ReadOnlyReceptor[T]
-
 	Set(newValue T) (previousValue T)
 
 	Compute(computeFunc func(currentValue T) T) (previousValue T)
+
+	ReadOnlyReceptor[T]
 }
 
 type ReadOnlyReceptor[T comparable] interface {
@@ -68,11 +66,6 @@ func newReceptor[T comparable](optUpdateFunc ...func(currentValue T, newValue T)
 		updateFunc:      lo.First(optUpdateFunc, func(_ T, newValue T) T { return newValue }),
 		updateCallbacks: shrinkingmap.New[types.UniqueID, *Callback[func(prevValue, newValue T)]](),
 	}
-}
-
-// ReadOnly returns a read only version of the receptor.
-func (r *receptor[T]) ReadOnly() ReadOnlyReceptor[T] {
-	return r
 }
 
 // Get returns the current value.

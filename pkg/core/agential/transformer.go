@@ -29,11 +29,15 @@ type TransformerWith2Inputs[TargetType, InputType1, InputType2 comparable] struc
 	transitionFunc func(InputType1, InputType2) TargetType
 }
 
-func NewTransformerWith2Inputs[TargetType, InputType1, InputType2 comparable](transitionFunc func(InputType1, InputType2) TargetType) *TransformerWith2Inputs[TargetType, InputType1, InputType2] {
-	return &TransformerWith2Inputs[TargetType, InputType1, InputType2]{
+func NewTransformerWith2Inputs[TargetType, InputType1, InputType2 comparable, InputSource1 ReadOnlyReceptor[InputType1], InputSource2 ReadOnlyReceptor[InputType2]](agent Agent, transitionFunc func(InputType1, InputType2) TargetType, input1 func() InputSource1, input2 func() InputSource2) *TransformerWith2Inputs[TargetType, InputType1, InputType2] {
+	t := &TransformerWith2Inputs[TargetType, InputType1, InputType2]{
 		receptor:       newReceptor[TargetType](),
 		transitionFunc: transitionFunc,
 	}
+
+	agent.OnConstructed(func() { t.ProvideInputs(input1(), input2()) })
+
+	return t
 }
 
 func (d *TransformerWith2Inputs[TargetType, InputType1, InputType2]) ProvideInputs(input1 ReadOnlyReceptor[InputType1], input2 ReadOnlyReceptor[InputType2]) (unsubscribe func()) {
@@ -75,4 +79,33 @@ func (d *TransformerWith3Inputs[TargetType, InputType1, InputType2, InputType3])
 			d.Compute(func(_ TargetType) TargetType { return d.transitionFunc(input1.Get(), input2.Get(), input3) })
 		}),
 	)
+}
+
+type ThresholdTransformer[InputType comparable] struct {
+	updateFunc func(currentThreshold int, oldInputValue, newInputValue InputType) int
+
+	Receptor[int]
+}
+
+func NewThresholdTransformer[InputType comparable](updateFunc ...func(currentThreshold int, oldInputValue, newInputValue InputType) int) *ThresholdTransformer[InputType] {
+	return &ThresholdTransformer[InputType]{
+		Receptor: NewReceptor[int](),
+		updateFunc: lo.First(updateFunc, func(currentThreshold int, _, newInputValue InputType) int {
+			var zeroValue InputType
+
+			if newInputValue != zeroValue {
+				return currentThreshold + 1
+			} else {
+				return currentThreshold - 1
+			}
+		}),
+	}
+}
+
+func (t *ThresholdTransformer[InputType]) ProvideInput(input ReadOnlyReceptor[InputType]) (unsubscribe func()) {
+	return input.OnUpdate(func(oldInputValue, newInputValue InputType) {
+		t.Receptor.Compute(func(currentThreshold int) int {
+			return t.updateFunc(currentThreshold, oldInputValue, newInputValue)
+		})
+	})
 }
