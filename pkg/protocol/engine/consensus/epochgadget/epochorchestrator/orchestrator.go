@@ -57,6 +57,8 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 
 						o.performanceManager = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
 						o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
+
+						// TODO: check if the following value is correctly set to twice eviction age
 						o.maxCommittableSlot = e.Storage.Settings().ProtocolParameters().EvictionAge + e.Storage.Settings().ProtocolParameters().EvictionAge
 
 						if o.optsEpochZeroCommittee != nil {
@@ -71,10 +73,9 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 				})
 
 				// TODO: does this potentially cause a data race due to fanning-in parallel events?
-				// TODO: introduce a mutex so that slotFinalized and slotCommitted do not race on RegisterCommittee.
-				// TODO: consider what happens when slot committed and slot finalized are triggered at the same time,
-				//  but are executed in different order on different nodes, thus resulting in a different committee being selected on those nodes. How to prevent that?
 				e.Events.BlockGadget.BlockAccepted.Hook(o.BlockAccepted)
+
+				// TODO: CommitSlot should be called directly from NotarizationManager and should return some trees to be put into actual commitment
 				e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) { o.CommitSlot(scd.Commitment.Index()) })
 
 				e.Events.SlotGadget.SlotFinalized.Hook(o.slotFinalized)
@@ -98,21 +99,34 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	defer o.mutex.Unlock()
 
 	currentEpoch := o.timeProvider.EpochFromSlot(slot)
+	nextEpoch := currentEpoch + 1
+
 	o.lastCommittedSlot = slot
 
+	// If the committed slot is `maxCommittableSlot`
+	// away from the end of the epoch, then register a committee for the next epoch.
 	if o.timeProvider.EpochEnd(currentEpoch) == slot+o.maxCommittableSlot {
-		committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
-		if !exists {
-			// If the committee for the epoch wasn't set before, we promote the current one.
-			committee, exists = o.performanceManager.LoadCommitteeForEpoch(currentEpoch - 1)
+		if _, committeeExists := o.performanceManager.LoadCommitteeForEpoch(nextEpoch); !committeeExists {
+			// If the committee for the epoch wasn't set before due to finalization of a slot,
+			// we promote the current committee to also serve in the next epoch.
+			committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
 			if !exists {
-				panic(fmt.Sprintf("committee for previous epoch %d not found", currentEpoch-1))
+				panic(fmt.Sprintf("committee for current epoch %d not found", currentEpoch))
 			}
 
-			if err := o.performanceManager.RegisterCommittee(currentEpoch, committee); err != nil {
-				panic(ierrors.Wrap(err, "failed to register committee for epoch"))
+			_ = o.sybilProtection.RotateCommittee(nextEpoch, committee)
+			if err := o.performanceManager.RegisterCommittee(nextEpoch, committee); err != nil {
+				panic(ierrors.Wrapf(err, "failed to register committee for epoch %d", nextEpoch))
 			}
 		}
+	}
+
+	if o.timeProvider.EpochEnd(currentEpoch) == slot {
+		committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
+		if !exists {
+			panic(fmt.Sprintf("committee for a finished epoch %d not found", currentEpoch))
+		}
+
 		o.performanceManager.ApplyEpoch(currentEpoch, committee)
 	}
 }
@@ -140,7 +154,7 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 	epoch := o.timeProvider.EpochFromSlot(slot)
 
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
-	// committed slot is earlier than the last slot of the epoch.
+	// committed slot is earlier than (the last slot of the epoch - maxCommittableSlot).
 	// Otherwise, skip committee selection because it's too late and the committee has been reused.
 	if slot+o.epochEndNearingThreshold == o.timeProvider.EpochEnd(epoch) && o.timeProvider.EpochEnd(epoch) > o.lastCommittedSlot+o.maxCommittableSlot {
 		newCommittee := o.selectNewCommittee(slot)
@@ -177,6 +191,7 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 	newCommittee := o.sybilProtection.RotateCommittee(nextEpoch, weightedCandidates)
 	weightedCommittee := newCommittee.Accounts()
 
+	// FIXME: weightedCommittee returned by the PoA sybil protection does not have stake specified, which will cause problems during rewards calculation.
 	err := o.performanceManager.RegisterCommittee(nextEpoch, weightedCommittee)
 	if err != nil {
 		panic("failed to register committee for epoch")

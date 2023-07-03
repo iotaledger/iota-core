@@ -112,6 +112,7 @@ func (s *SybilProtection) Shutdown() {
 func (s *SybilProtection) initializeAccounts(validators []iotago.AccountID) {
 	for _, id := range validators {
 		s.accounts.Set(id, &account.Pool{}) // We do not care about the pool with PoA
+		// FIXME: we actually do care because the total stake and delegation amount is used in the rewards calculation
 	}
 	s.committee = s.accounts.SelectCommittee(validators...)
 }
