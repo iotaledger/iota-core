@@ -124,7 +124,7 @@ paths:
             type: integer
           example: 1622568540
           required: false
-          description: Check the issuance readiness for a specific slot index.
+          description: Check the issuance readiness for a specific slot index. If this is not provided, current slot index will be used.
       responses:
         '200':
           description: "Successful operation."
@@ -264,7 +264,7 @@ paths:
     get:
       tags:
         - staking
-      summary: Returns information of the active stakers.         
+      summary: Returns information of the active stakers.
       responses:
         '200':
           description: "Successful operation."
@@ -1302,7 +1302,7 @@ components:
 
     get-staker-list-example:
       value:
-        validators:
+        stakers:
           - accountId: "0x309b169bfa60c8cf80afd730741862d200405d5df7cabfe9b564361dce1f7036"
             poolStake: 200000
             validatorStake: 100000
@@ -2717,9 +2717,9 @@ components:
         - $ref: '#/components/schemas/Validator'
 
     AccountStakingListResponse:
-      description: Returns a list of active validators to stake.
+      description: Returns a list of active stakers to stake.
       properties:
-        validators:
+        stakers:
           type: array
           items:
             oneOf:
@@ -2811,14 +2811,16 @@ components:
         ready:
           type: boolean
           description: >
-            Provided only if account specified in the request. Indicates if a node is ready to issue a block in a current congestion or should wait.
+            Indicates if a node is ready to issue a block in a current congestion or should wait.
         referenceManaCost:
           type: integer
           description: The cost in mana for issuing a block in a current congestion estimated based on RMC and slot index.
         blockIssuanceCredits:
           type: integer
+          description: The Block Issuance Credits of the requested account.
       required:
         - slotIndex
+        - ready
         - referenceManaCost
         - blockIssuanceCredits
 
