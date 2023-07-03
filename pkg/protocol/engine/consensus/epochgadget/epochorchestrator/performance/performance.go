@@ -15,13 +15,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type rewardParams struct {
-	TargetRewardFirstPeriod  uint64
-	TargetRewardChangeSlot   iotago.SlotIndex
-	TargetRewardSecondPeriod uint64
-	ValidatorBlocksPerSlot   uint8
-}
-
 type Tracker struct {
 	rewardBaseStore kvstore.KVStore
 	poolStatsStore  kvstore.KVStore
@@ -124,7 +117,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	})
 }
 
-func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) *advancedset.AdvancedSet[iotago.AccountID] {
+func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) *advancedset.AdvancedSet[iotago.AccountID] {
 	// TODO: we should choose candidates we tracked performance for
 
 	return &advancedset.AdvancedSet[iotago.AccountID]{}
@@ -167,11 +160,7 @@ func (t *Tracker) storeCommitteeForEpoch(epochIndex iotago.EpochIndex, committee
 		return err
 	}
 
-	if err := t.committeeStore.Set(epochIndex.Bytes(), committeeBytes); err != nil {
-		return err
-	}
-
-	return nil
+	return t.committeeStore.Set(epochIndex.Bytes(), committeeBytes)
 }
 
 func (t *Tracker) aggregatePerformanceFactors(issuedBlocksPerSlot []uint64) uint64 {

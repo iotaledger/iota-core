@@ -9,7 +9,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// TODO add later as a protocol params, after its refactor is finished
+// TODO: add later as a protocol params, after its refactor is finished.
 var (
 	targetRewardFirstPeriod  uint64           = 233373068869021000 // TODO current values are per slot, update with new when provided by Olivia
 	targetRewardChangeSlot   iotago.SlotIndex = 9460800
@@ -103,6 +103,7 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 	if (aux2 >> 40) < fixedCost {
 		return 0
 	}
+
 	return (aux2 >> 40) - fixedCost
 }
 
