@@ -79,19 +79,34 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 			if stakingFeature == nil {
 				return nil, xerrors.Errorf("cannot claim rewards from an AccountOutput at index %d without staking feature", inp.Index)
 			}
-			reward, rewardErr := l.epochGadget.ValidatorReward(castOutput.AccountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
-			if rewardErr != nil {
-				return nil, xerrors.Errorf("failed to get Validator reward for AccountOutput at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", castOutput.AccountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			accountID := castOutput.AccountID
+			if accountID.Empty() {
+				accountID = iotago.AccountIDFromOutputID(inputStates[inp.Index].OutputID())
 			}
 
-			rewardInputSet[castOutput.AccountID] += reward
+			reward, rewardErr := l.epochGadget.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			if rewardErr != nil {
+				return nil, xerrors.Errorf("failed to get Validator reward for AccountOutput at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			}
+
+			rewardInputSet[accountID] = reward
 		case *iotago.DelegationOutput:
-			reward, rewardErr := l.epochGadget.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
-			if rewardErr != nil {
-				return nil, xerrors.Errorf("failed to get Delegator reward for DelegationOutput at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", castOutput.DelegationID, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
+			delegationID := castOutput.DelegationID
+			if delegationID.Empty() {
+				delegationID = iotago.DelegationIDFromOutputID(inputStates[inp.Index].OutputID())
+			}
+			
+			delegationEnd := castOutput.EndEpoch
+			if delegationEnd == 0 {
+				delegationEnd = l.protocolParameters.TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
 			}
 
-			rewardInputSet[castOutput.DelegationID] += reward
+			reward, rewardErr := l.epochGadget.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
+			if rewardErr != nil {
+				return nil, xerrors.Errorf("failed to get Delegator reward for DelegationOutput at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", delegationID, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
+			}
+
+			rewardInputSet[delegationID] = reward
 		}
 	}
 	resolvedInputs.RewardsInputSet = rewardInputSet
