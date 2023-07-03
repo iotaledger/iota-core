@@ -1040,10 +1040,10 @@ components:
           lastAcceptedBlockId: "0x8d6f3b6e3a63ce388d2eb8c927c5b9ba328b0e427ae727d8b3dddc429f6fb24a0000000000000000"
           lastConfirmedBlockId: "0x59daaaba1cd10cd268966376e17710d100c90826fe258753d461acac99b7e3341500000000000000"
           finalizedSlot: 100
-          ATT: 1682328545
-          RATT: 1682328550
-          CTT: 1682328525
-          RCTT: 1682328535
+          acceptedTangleTime: 1682328545
+          relativeAcceptedTangleTime: 1682328550
+          confirmedTangleTime: 1682328525
+          relativeConfirmedTangleTime: 1682328535
           latestCommittedSlot: 107
           pruningSlot: 20
         metrics:
