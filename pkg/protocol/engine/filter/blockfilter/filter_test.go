@@ -24,17 +24,14 @@ type TestFramework struct {
 	api    iotago.API
 }
 
-func NewTestFramework(t *testing.T, protocolParams *iotago.ProtocolParameters, blockIssuerCheck func(*iotago.Block) error, optsFilter ...options.Option[Filter]) *TestFramework {
-
-	f := New(func() *iotago.ProtocolParameters {
-		return protocolParams
-	}, optsFilter...)
-	f.blockIssuerCheck = blockIssuerCheck
-
+func NewTestFramework(t *testing.T, protocolParams *iotago.ProtocolParameters, optsFilter ...options.Option[Filter]) *TestFramework {
 	tf := &TestFramework{
-		Test:   t,
-		api:    iotago.V3API(protocolParams),
-		Filter: f,
+		Test: t,
+		api:  iotago.V3API(protocolParams),
+
+		Filter: New(func() *iotago.ProtocolParameters {
+			return protocolParams
+		}, optsFilter...),
 	}
 
 	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
@@ -106,16 +103,6 @@ func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index iotago.Slot
 	t.processBlock(alias, block)
 }
 
-func (t *TestFramework) IssueUnsignedBlockWithBurnedMana(alias string, burnedMana uint64) {
-	block, err := builder.NewBlockBuilder().
-		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
-		BurnedMana(burnedMana).
-		Build()
-	require.NoError(t.Test, err)
-
-	t.processBlock(alias, block)
-}
-
 func (t *TestFramework) IssueSigned(alias string) {
 	keyPair := ed25519.GenerateKeyPair()
 	// We derive a dummy account from addr.
@@ -152,7 +139,6 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 
 	tf := NewTestFramework(t,
 		&protoParams,
-		func(*iotago.Block) error { return nil },
 		WithMaxAllowedWallClockDrift(allowedDrift),
 		WithSignatureValidation(false),
 	)
@@ -175,7 +161,6 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 func TestFilter_WithSignatureValidation(t *testing.T) {
 	tf := NewTestFramework(t,
 		&protoParams,
-		func(*iotago.Block) error { return nil },
 		WithSignatureValidation(true),
 	)
 
@@ -198,7 +183,6 @@ func TestFilter_MinCommittableSlotAge(t *testing.T) {
 
 	tf := NewTestFramework(t,
 		&params,
-		func(*iotago.Block) error { return nil },
 		WithMinCommittableSlotAge(3),
 		WithSignatureValidation(false),
 	)
@@ -238,7 +222,6 @@ func TestFilter_MinPoW(t *testing.T) {
 
 	tf := NewTestFramework(t,
 		&params,
-		func(*iotago.Block) error { return nil },
 		WithSignatureValidation(false),
 	)
 
@@ -254,65 +237,4 @@ func TestFilter_MinPoW(t *testing.T) {
 	require.GreaterOrEqual(t, tf.IssueUnsignedBlockWithPoWScore("valid", 1000), float64(params.MinPoWScore))
 	require.Less(t, tf.IssueUnsignedBlockWithoutPoW("invalid"), float64(params.MinPoWScore))
 	require.GreaterOrEqual(t, tf.IssueUnsignedBlockWithPoWScore("valid", 1000), float64(params.MinPoWScore))
-}
-
-func TestFilter_BurnedMana(t *testing.T) {
-	params := protoParams
-
-	tf := NewTestFramework(t,
-		&params,
-		func(*iotago.Block) error { return nil },
-		WithSignatureValidation(false),
-		WithReferenceManaCost(5),
-	)
-
-	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
-		require.True(t, strings.HasPrefix(block.ID().Alias(), "valid"))
-	})
-
-	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
-		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
-		require.True(t, errors.Is(event.Reason, ErrInsufficientBurnedMana))
-	})
-
-	tf.IssueUnsignedBlockWithBurnedMana("valid-5", 5)
-	tf.IssueUnsignedBlockWithBurnedMana("valid-6", 6)
-
-	tf.IssueUnsignedBlockWithBurnedMana("invalid-4", 4)
-	tf.IssueUnsignedBlockWithBurnedMana("invalid-0", 0)
-
-}
-
-func TestFilter_BICCheck(t *testing.T) {
-	params := protoParams
-
-	// use a check that burned Mana is even number as a proxy for account BIC
-	bicCheckFunc := func(b *iotago.Block) error {
-		if b.BurnedMana%2 == 0 {
-			return nil
-		}
-		return ErrNegativeBIC
-	}
-
-	tf := NewTestFramework(t,
-		&params,
-		bicCheckFunc,
-		WithSignatureValidation(false),
-	)
-
-	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
-		require.True(t, strings.HasPrefix(block.ID().Alias(), "valid"))
-	})
-
-	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
-		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
-		require.True(t, errors.Is(event.Reason, ErrNegativeBIC))
-	})
-
-	tf.IssueUnsignedBlockWithBurnedMana("valid-0", 0)
-	tf.IssueUnsignedBlockWithBurnedMana("valid-2", 2)
-
-	tf.IssueUnsignedBlockWithBurnedMana("invalid-1", 1)
-	tf.IssueUnsignedBlockWithBurnedMana("invalid-3", 3)
-
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -20,8 +19,6 @@ var (
 	ErrBlockTimeTooFarAheadInFuture = errors.New("a block cannot be too far ahead in the future")
 	ErrInvalidSignature             = errors.New("block has invalid signature")
 	ErrInvalidProofOfWork           = errors.New("error validating PoW")
-	ErrInsufficientBurnedMana       = errors.New("a block must burn at least the reference mana cost")
-	ErrNegativeBIC                  = errors.New("a block issuer must have non-negative block issuance credit")
 )
 
 // Filter filters blocks.
@@ -32,13 +29,7 @@ type Filter struct {
 
 	optsMaxAllowedWallClockDrift time.Duration
 	optsMinCommittableSlotAge    iotago.SlotIndex
-	optsMaxCommittableSlotAge    iotago.SlotIndex
 	optsSignatureValidation      bool
-
-	accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error)
-
-	// TODO: replace this placeholder for RMC with a link to the accounts manager with RMC provider.
-	optsReferenceManaCost uint64
 
 	module.Module
 }
@@ -49,8 +40,6 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 
 		e.HookConstructed(func() {
 			e.Events.Filter.LinkTo(f.events)
-			f.accountRetrieveFunc = e.Ledger.Account
-			f.TriggerConstructed()
 		})
 
 		return f
@@ -100,77 +89,12 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 		}
 	}
 
-	// Check that the block burns sufficient Mana to cover RMC
-	if block.Block().BurnedMana < f.optsReferenceManaCost {
-		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-			Block:  block,
-			Reason: errors.WithMessagef(ErrInsufficientBurnedMana, "block with burned mana %d while reference mana cost is %d", block.Block().BurnedMana, f.optsReferenceManaCost),
-			Source: source,
-		})
-
-		return
-	}
-
-	accountData, exists, err := f.accountRetrieveFunc(block.Block().IssuerID, block.SlotCommitment().Index())
-
-	if err != nil {
-		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-			Block:  block,
-			Reason: errors.Wrapf(err, "could not retrieve account information for block issuer %s", block.Block().IssuerID),
-			Source: source,
-		})
-
-		return
-	}
-
-	if !exists {
-		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-			Block:  block,
-			Reason: errors.Wrapf(err, "block issuer account %s does not exist in slot commitment %s", block.Block().IssuerID, block.SlotCommitment().Index()),
-			Source: source,
-		})
-
-		return
-	}
-	// Check that the issuer key is valid for this block issuer.
-	edSig, isEdSig := block.Block().Signature.(*iotago.Ed25519Signature)
-	if !isEdSig {
-		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-			Block:  block,
-			Reason: errors.WithMessagef(ErrInvalidSignature, "only ed2519 signatures supported, got %s", block.Block().Signature.Type()),
-			Source: source,
-		})
-
-		return
-	}
-	if !accountData.PubKeys.Has(edSig.PublicKey) {
-		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-			Block:  block,
-			Reason: errors.WithMessagef(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.Block().IssuerID, edSig.PublicKey, block.SlotCommitment().Index()),
-			Source: source,
-		})
-
-		return
-	}
-
-	// Check that the issuer of this block has non-negative block issuance credit
-	if accountData.Credits.Value < 0 {
-		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
-			Block:  block,
-			Reason: errors.Wrapf(err, "block issuer account %s is locked due to negative or non-existent BIC", block.Block().IssuerID),
-			Source: source,
-		})
-
-		return
-	}
-
 	// Check if the block is trying to commit to a slot that is not yet committable.
 	// This check, together with the optsMaxAllowedWallClockDrift makes sure, that no one can issue blocks with commitments in the future.
 	if f.optsMinCommittableSlotAge > 0 &&
 		block.SlotCommitment().Index() > 0 &&
 		(block.SlotCommitment().Index() > block.ID().Index() ||
-			block.ID().Index()-block.SlotCommitment().Index() < f.optsMinCommittableSlotAge ||
-			block.ID().Index()-block.SlotCommitment().Index() > f.optsMaxCommittableSlotAge) {
+			block.ID().Index()-block.SlotCommitment().Index() < f.optsMinCommittableSlotAge) {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
 			Reason: errors.WithMessagef(ErrCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.Block().SlotCommitment.Index),
@@ -229,13 +153,6 @@ func WithMinCommittableSlotAge(age iotago.SlotIndex) options.Option[Filter] {
 	}
 }
 
-// WithMaxCommittableSlotAge specifies the maximum age of a slot for it to be committable.
-func WithMaxCommittableSlotAge(age iotago.SlotIndex) options.Option[Filter] {
-	return func(filter *Filter) {
-		filter.optsMaxCommittableSlotAge = age
-	}
-}
-
 // WithMaxAllowedWallClockDrift specifies how far in the future are blocks allowed to be ahead of our own wall clock (defaults to 0 seconds).
 func WithMaxAllowedWallClockDrift(d time.Duration) options.Option[Filter] {
 	return func(filter *Filter) {
@@ -247,12 +164,5 @@ func WithMaxAllowedWallClockDrift(d time.Duration) options.Option[Filter] {
 func WithSignatureValidation(validation bool) options.Option[Filter] {
 	return func(filter *Filter) {
 		filter.optsSignatureValidation = validation
-	}
-}
-
-// WithReferenceManaCost specifies a placeholder for RMC.
-func WithReferenceManaCost(rmc uint64) options.Option[Filter] {
-	return func(filter *Filter) {
-		filter.optsReferenceManaCost = rmc
 	}
 }
