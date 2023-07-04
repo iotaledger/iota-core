@@ -36,11 +36,10 @@ type AccountDiff struct {
 	PubKeysAdded   []ed25519.PublicKey
 	PubKeysRemoved []ed25519.PublicKey
 
-	ValidatorStakeChange int64
-	StakeEndEpochChange  int64
-	FixedCostChange      int64
-
+	ValidatorStakeChange  int64
 	DelegationStakeChange int64
+	StakeEndEpochChange   int64
+	FixedCostChange       int64
 }
 
 // NewAccountDiff creates a new AccountDiff instance.
