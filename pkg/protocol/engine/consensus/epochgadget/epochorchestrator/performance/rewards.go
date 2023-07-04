@@ -15,6 +15,10 @@ var (
 	targetRewardChangeSlot   iotago.SlotIndex = 9460800
 	targetRewardSecondPeriod uint64           = 85853149583786000
 	validatorBlocksPerSlot   uint8            = 10
+	smalAccuracyShift        uint64           = 8
+	bigAccuracyShift         uint64           = 31
+	// TODO why do we choose 40 here, why dont we use ^31 again?
+	weirdAccuracyShift uint64 = 40
 )
 
 func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
@@ -33,21 +37,20 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		if !exists {
 			continue
 		}
-
-		poolStats, err := t.poolStats(epochIndex)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
+		poolStats, err2 := t.poolStats(epochIndex)
+		if err2 != nil {
+			return 0, errors.Wrapf(err2, "failed to get pool stats for epoch %d and accountID of the validator %s", epochIndex, validatorID.String())
 		}
 
 		unDecayedEpochRewards := uint64(rewardsForAccountInEpoch.FixedCost) +
-			((poolStats.ProfitMargin * uint64(rewardsForAccountInEpoch.PoolRewards)) >> 8) +
-			((((1<<8)-poolStats.ProfitMargin)*uint64(rewardsForAccountInEpoch.PoolRewards))>>8)*
+			decreaseAccuracy(poolStats.ProfitMargin*uint64(rewardsForAccountInEpoch.PoolRewards), smalAccuracyShift) +
+			decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, smalAccuracyShift)*uint64(rewardsForAccountInEpoch.PoolRewards), smalAccuracyShift)*
 				uint64(stakeAmount)/
 				uint64(rewardsForAccountInEpoch.PoolStake)
 
-		decayedEpochRewards, err := t.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
+		decayedEpochRewards, err2 := t.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		if err2 != nil {
+			return 0, errors.Wrapf(err2, "failed to calculate rewards with decay for epoch %d and validator accountID", epochIndex, validatorID.String())
 		}
 		validatorReward += decayedEpochRewards
 	}
@@ -65,18 +68,18 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			continue
 		}
 
-		poolStats, err := t.poolStats(epochIndex)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
+		poolStats, err2 := t.poolStats(epochIndex)
+		if err2 != nil {
+			return 0, errors.Wrapf(err2, "failed to get pool stats for epoch %d and validator account ID %s", epochIndex, validatorID.String())
 		}
 
-		unDecayedEpochRewards := ((((1 << 8) - poolStats.ProfitMargin) * uint64(rewardsForAccountInEpoch.PoolRewards)) >> 8) *
+		unDecayedEpochRewards := decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, smalAccuracyShift)*uint64(rewardsForAccountInEpoch.PoolRewards), smalAccuracyShift) *
 			uint64(delegatedAmount) /
 			uint64(rewardsForAccountInEpoch.PoolStake)
 
-		decayedEpochRewards, err := t.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
+		decayedEpochRewards, err2 := t.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		if err2 != nil {
+			return 0, errors.Wrapf(err2, "failed to calculate rewards with decay for epoch %d and validator accountID", epochIndex, validatorID.String())
 		}
 
 		delegatorsReward += decayedEpochRewards
@@ -102,15 +105,34 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 	// TODO: this calculation will overflow with ~4Gi poolstake already.
 	// maybe we can reuse the functions from the mana decay provider?
 	// should we move the mana decay functions to the safemath package?
-	aux := (((1 << 31) * poolStake) / totalStake) + ((1 << 31) * validatorStake / totalValidatorsStake)
+	aux := (increaseAccuracy(poolStake, bigAccuracyShift) / totalStake) + (increaseAccuracy(validatorStake, bigAccuracyShift) / totalValidatorsStake)
 	aux2 := iotago.Mana(uint64(aux) * initialReward * performanceFactor)
-	if (aux2 >> 40) < fixedCost {
+	if decreaseAccuracy(aux2, weirdAccuracyShift) < fixedCost {
 		return 0
 	}
 
-	return (aux2 >> 40) - fixedCost
+	return (aux2 >> weirdAccuracyShift) - fixedCost
 }
 
+// calculateProfitMargin calculates the profit margin of the pool by firstly increasing the accuracy of the given value, so the profit margin is moved to the power of 2^accuracyShift.
 func calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken) uint64 {
-	return (1 << 8) * uint64(totalValidatorsStake) / (uint64(totalValidatorsStake) + uint64(totalPoolStake))
+	return uint64(increaseAccuracy(totalValidatorsStake, smalAccuracyShift) / (totalValidatorsStake + totalPoolStake))
+}
+
+// increaseAccuracy shifts the bits of the given value to the left by the given amount, so that the value is moved to the power of 2^accuracyShift.
+// TODO make sure that we handle overflow here correctly if the inserted value is > 2^(64-accuracyShift).
+func increaseAccuracy[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint64) V {
+	return val << shift
+}
+
+// decreaseAccuracy reversts the accuracy operation of increaseAccuracy by shifting the bits of the given value to the right by the smalAccuracyShift.
+// This is a lossy operation. All values less than 2^accuracyShift will be rounded to 0.
+func decreaseAccuracy[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint64) V {
+	return val >> shift
+}
+
+// increasedAccuracyComplement returns the 'shifted' completition to "one" for the shifted value where one is the 2^accuracyShift.
+func increasedAccuracyComplement[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint64) V {
+	// it should never overflow for val=profit margin, if profit margin was previously scaled with increaseAccuracy.
+	return (1 << shift) - val
 }
