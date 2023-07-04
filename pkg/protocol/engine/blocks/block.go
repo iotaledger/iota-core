@@ -37,7 +37,7 @@ type Block struct {
 	// BlockGadget block
 	preAccepted           bool
 	acceptanceRatifiers   *advancedset.AdvancedSet[account.SeatIndex]
-	accepted              agential.Receptor[bool]
+	accepted              agential.ValueReceptor[bool]
 	preConfirmed          bool
 	confirmationRatifiers *advancedset.AdvancedSet[account.SeatIndex]
 	confirmed             bool
@@ -72,7 +72,7 @@ func NewBlock(data *model.Block) *Block {
 		acceptanceRatifiers:   advancedset.New[account.SeatIndex](),
 		confirmationRatifiers: advancedset.New[account.SeatIndex](),
 		modelBlock:            data,
-		accepted:              agential.NewReceptor[bool](),
+		accepted:              agential.NewValueReceptor[bool](),
 	}
 }
 
@@ -92,7 +92,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		solid:       true,
 		booked:      true,
 		preAccepted: true,
-		accepted:    agential.NewReceptor[bool](), // This should be true since we commit and evict on acceptance.
+		accepted:    agential.NewValueReceptor[bool](), // This should be true since we commit and evict on acceptance.
 	}
 
 	b.accepted.Set(true)
@@ -109,7 +109,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 		payloadConflictIDs:    advancedset.New[iotago.TransactionID](),
 		acceptanceRatifiers:   advancedset.New[account.SeatIndex](),
 		confirmationRatifiers: advancedset.New[account.SeatIndex](),
-		accepted:              agential.NewReceptor[bool](),
+		accepted:              agential.NewValueReceptor[bool](),
 	}
 }
 

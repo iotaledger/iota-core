@@ -6,8 +6,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
-// Callback is a wrapper for a callback function that is extended by an ID and a mutex.
-type Callback[T any] struct {
+// callback is a wrapper for a callback function that is extended by an ID and a mutex to ensure that the same callback
+// can not be triggered concurrently.
+type callback[T any] struct {
 	// ID is the unique identifier of the callback.
 	ID types.UniqueID
 
@@ -24,16 +25,16 @@ type Callback[T any] struct {
 	mutex sync.Mutex
 }
 
-// NewCallback is the constructor for the Callback type.
-func NewCallback[T any](id types.UniqueID, invoke T) *Callback[T] {
-	return &Callback[T]{
+// newCallback is the constructor for the callback type.
+func newCallback[T any](id types.UniqueID, invoke T) *callback[T] {
+	return &callback[T]{
 		ID:     id,
 		Invoke: invoke,
 	}
 }
 
 // Lock locks the callback for the given update and returns true if the callback was locked successfully.
-func (c *Callback[T]) Lock(updateID types.UniqueID) bool {
+func (c *callback[T]) Lock(updateID types.UniqueID) bool {
 	c.mutex.Lock()
 
 	if c.unsubscribed || updateID != 0 && updateID == c.lastUpdate {
@@ -48,12 +49,12 @@ func (c *Callback[T]) Lock(updateID types.UniqueID) bool {
 }
 
 // Unlock unlocks the callback.
-func (c *Callback[T]) Unlock() {
+func (c *callback[T]) Unlock() {
 	c.mutex.Unlock()
 }
 
 // MarkUnsubscribed marks the callback as unsubscribed (it will no longer trigger).
-func (c *Callback[T]) MarkUnsubscribed() {
+func (c *callback[T]) MarkUnsubscribed() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 

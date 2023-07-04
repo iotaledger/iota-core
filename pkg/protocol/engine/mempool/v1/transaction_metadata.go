@@ -21,8 +21,8 @@ type TransactionMetadata struct {
 	inputs            []*StateMetadata
 	outputs           []*StateMetadata
 	transaction       mempool.Transaction
-	parentConflictIDs *agential.Set[iotago.TransactionID]
-	conflictIDs       *agential.Set[iotago.TransactionID]
+	parentConflictIDs *agential.SetReceptor[iotago.TransactionID]
+	conflictIDs       *agential.SetReceptor[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -34,13 +34,13 @@ type TransactionMetadata struct {
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
-	allInputsAccepted     agential.Receptor[bool]
+	allInputsAccepted     agential.ValueReceptor[bool]
 	conflicting           *promise.Event
 	conflictAccepted      *promise.Event
 
 	// attachments
 	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
-	earliestIncludedAttachment agential.Receptor[iotago.BlockID]
+	earliestIncludedAttachment agential.ValueReceptor[iotago.BlockID]
 	allAttachmentsEvicted      *promise.Event
 
 	// mutex needed?
@@ -78,12 +78,12 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		evicted:            promise.NewEvent(),
 
 		unacceptedInputsCount: uint64(len(inputReferences)),
-		allInputsAccepted:     agential.NewReceptor[bool](),
+		allInputsAccepted:     agential.NewValueReceptor[bool](),
 		conflicting:           promise.NewEvent(),
 		conflictAccepted:      promise.NewEvent(),
 
 		attachments:                shrinkingmap.New[iotago.BlockID, bool](),
-		earliestIncludedAttachment: agential.NewReceptor[iotago.BlockID](),
+		earliestIncludedAttachment: agential.NewValueReceptor[iotago.BlockID](),
 		allAttachmentsEvicted:      promise.NewEvent(),
 
 		inclusionFlags: newInclusionFlags(),
@@ -122,7 +122,7 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	return outputs
 }
 
-func (t *TransactionMetadata) ConflictIDs() *agential.Set[iotago.TransactionID] {
+func (t *TransactionMetadata) ConflictIDs() *agential.SetReceptor[iotago.TransactionID] {
 	return t.conflictIDs
 }
 

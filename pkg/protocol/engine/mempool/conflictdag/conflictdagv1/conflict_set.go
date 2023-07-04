@@ -18,7 +18,7 @@ type ConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 	// members is the set of Conflicts that are conflicting over the shared resource.
 	members *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
 
-	allMembersEvicted agential.Receptor[bool]
+	allMembersEvicted agential.ValueReceptor[bool]
 
 	mutex sync.RWMutex
 }
@@ -27,7 +27,7 @@ type ConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 func NewConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.VoteRankType[VoteRank]](id ResourceID) *ConflictSet[ConflictID, ResourceID, VoteRank] {
 	return &ConflictSet[ConflictID, ResourceID, VoteRank]{
 		ID:                id,
-		allMembersEvicted: agential.NewReceptor[bool](),
+		allMembersEvicted: agential.NewValueReceptor[bool](),
 		members:           advancedset.New[*Conflict[ConflictID, ResourceID, VoteRank]](),
 	}
 }

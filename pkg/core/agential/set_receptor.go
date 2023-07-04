@@ -10,14 +10,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
-// Set is a wrapper for an AdvancedSet that is extended by the ability to register callbacks that are
+// SetReceptor is a wrapper for an AdvancedSet that is extended by the ability to register callbacks that are
 // triggered when the value changes.
-type Set[T comparable] struct {
+type SetReceptor[T comparable] struct {
 	// value is the current value of the set.
 	value *advancedset.AdvancedSet[T]
 
 	// updateCallbacks are the registered callbacks that are triggered when the value changes.
-	updateCallbacks *shrinkingmap.ShrinkingMap[types.UniqueID, *Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]]
+	updateCallbacks *shrinkingmap.ShrinkingMap[types.UniqueID, *callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]]
 
 	// uniqueUpdateID is the unique ID that is used to identify an update.
 	uniqueUpdateID types.UniqueID
@@ -36,24 +36,24 @@ type Set[T comparable] struct {
 	optTriggerWithInitialEmptyValue bool
 }
 
-// NewSet is the constructor for the Set type.
-func NewSet[T comparable]() *Set[T] {
-	return &Set[T]{
+// NewSet is the constructor for the SetReceptor type.
+func NewSet[T comparable]() *SetReceptor[T] {
+	return &SetReceptor[T]{
 		value:           advancedset.New[T](),
-		updateCallbacks: shrinkingmap.New[types.UniqueID, *Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]](),
+		updateCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]](),
 	}
 }
 
 // Get returns the current value of the set.
-func (s *Set[T]) Get() *advancedset.AdvancedSet[T] {
+func (s *SetReceptor[T]) Get() *advancedset.AdvancedSet[T] {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	return s.value
 }
 
-// Set sets the given value as the new value of the set.
-func (s *Set[T]) Set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T]) {
+// SetReceptor sets the given value as the new value of the set.
+func (s *SetReceptor[T]) Set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T]) {
 	s.applyOrderMutex.Lock()
 	defer s.applyOrderMutex.Unlock()
 
@@ -69,7 +69,7 @@ func (s *Set[T]) Set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMu
 }
 
 // Apply applies the given SetMutations to the set.
-func (s *Set[T]) Apply(mutations *SetMutations[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T]) {
+func (s *SetReceptor[T]) Apply(mutations *SetMutations[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T]) {
 	s.applyOrderMutex.Lock()
 	defer s.applyOrderMutex.Unlock()
 
@@ -85,12 +85,12 @@ func (s *Set[T]) Apply(mutations *SetMutations[T]) (updatedSet *advancedset.Adva
 }
 
 // OnUpdate registers the given callback to be triggered when the value of the set changes.
-func (s *Set[T]) OnUpdate(callback func(updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T])) (unsubscribe func()) {
+func (s *SetReceptor[T]) OnUpdate(callback func(updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T])) (unsubscribe func()) {
 	s.mutex.Lock()
 
 	currentValue := s.value
 
-	newCallback := NewCallback[func(*advancedset.AdvancedSet[T], *SetMutations[T])](s.uniqueCallbackID.Next(), callback)
+	newCallback := newCallback[func(*advancedset.AdvancedSet[T], *SetMutations[T])](s.uniqueCallbackID.Next(), callback)
 	s.updateCallbacks.Set(newCallback.ID, newCallback)
 
 	// we intertwine the mutexes to ensure that the callback is guaranteed to be triggered with the current value from
@@ -112,17 +112,17 @@ func (s *Set[T]) OnUpdate(callback func(updatedSet *advancedset.AdvancedSet[T], 
 }
 
 // Add adds the given elements to the set and returns the updated set and the applied mutations.
-func (s *Set[T]) Add(elements *advancedset.AdvancedSet[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T]) {
+func (s *SetReceptor[T]) Add(elements *advancedset.AdvancedSet[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T]) {
 	return s.Apply(NewSetMutations(WithAddedElements(elements)))
 }
 
 // Remove removes the given elements from the set and returns the updated set and the applied mutations.
-func (s *Set[T]) Remove(elements *advancedset.AdvancedSet[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T]) {
+func (s *SetReceptor[T]) Remove(elements *advancedset.AdvancedSet[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T]) {
 	return s.Apply(NewSetMutations(WithRemovedElements(elements)))
 }
 
 // InheritFrom registers the given sets to inherit their mutations to the set.
-func (s *Set[T]) InheritFrom(sources ...*Set[T]) (unsubscribe func()) {
+func (s *SetReceptor[T]) InheritFrom(sources ...*SetReceptor[T]) (unsubscribe func()) {
 	unsubscribeCallbacks := make([]func(), len(sources))
 
 	for i, source := range sources {
@@ -137,85 +137,85 @@ func (s *Set[T]) InheritFrom(sources ...*Set[T]) (unsubscribe func()) {
 }
 
 // Size returns the size of the set.
-func (s *Set[T]) Size() int {
+func (s *SetReceptor[T]) Size() int {
 	return s.Get().Size()
 }
 
 // IsEmpty returns true if the set is empty.
-func (s *Set[T]) IsEmpty() bool {
+func (s *SetReceptor[T]) IsEmpty() bool {
 	return s.Get().IsEmpty()
 }
 
 // Has returns true if the set contains the given element.
-func (s *Set[T]) Has(element T) bool {
+func (s *SetReceptor[T]) Has(element T) bool {
 	return s.Get().Has(element)
 }
 
 // HasAll returns true if the set contains all elements of the other set.
-func (s *Set[T]) HasAll(other *Set[T]) bool {
+func (s *SetReceptor[T]) HasAll(other *SetReceptor[T]) bool {
 	return s.Get().HasAll(other.Get())
 }
 
 // ForEach calls the callback for each element of the set (the iteration can be stopped by returning an error).
-func (s *Set[T]) ForEach(callback func(element T) error) error {
+func (s *SetReceptor[T]) ForEach(callback func(element T) error) error {
 	return s.Get().ForEach(callback)
 }
 
 // Range calls the callback for each element of the set.
-func (s *Set[T]) Range(callback func(element T)) {
+func (s *SetReceptor[T]) Range(callback func(element T)) {
 	s.Get().Range(callback)
 }
 
 // Intersect returns a new set that contains the intersection of the set and the other set.
-func (s *Set[T]) Intersect(other *advancedset.AdvancedSet[T]) *advancedset.AdvancedSet[T] {
+func (s *SetReceptor[T]) Intersect(other *advancedset.AdvancedSet[T]) *advancedset.AdvancedSet[T] {
 	return s.Get().Intersect(other)
 }
 
 // Filter returns a new set that contains the elements of the set that satisfy the predicate.
-func (s *Set[T]) Filter(predicate func(element T) bool) *advancedset.AdvancedSet[T] {
+func (s *SetReceptor[T]) Filter(predicate func(element T) bool) *advancedset.AdvancedSet[T] {
 	return s.Get().Filter(predicate)
 }
 
 // Equal returns true if the set is equal to the other set.
-func (s *Set[T]) Equal(other *advancedset.AdvancedSet[T]) bool {
+func (s *SetReceptor[T]) Equal(other *advancedset.AdvancedSet[T]) bool {
 	return s.Get().Equal(other)
 }
 
 // Is returns true if the set contains a single element that is equal to the given element.
-func (s *Set[T]) Is(element T) bool {
+func (s *SetReceptor[T]) Is(element T) bool {
 	return s.Get().Is(element)
 }
 
 // Clone returns a shallow copy of the set.
-func (s *Set[T]) Clone() *advancedset.AdvancedSet[T] {
+func (s *SetReceptor[T]) Clone() *advancedset.AdvancedSet[T] {
 	return s.Get().Clone()
 }
 
 // Slice returns a slice representation of the set.
-func (s *Set[T]) Slice() []T {
+func (s *SetReceptor[T]) Slice() []T {
 	return s.Get().Slice()
 }
 
 // Iterator returns an iterator for the set.
-func (s *Set[T]) Iterator() *walker.Walker[T] {
+func (s *SetReceptor[T]) Iterator() *walker.Walker[T] {
 	return s.Get().Iterator()
 }
 
 // String returns a human-readable version of the set.
-func (s *Set[T]) String() string {
+func (s *SetReceptor[T]) String() string {
 	return s.Get().String()
 }
 
 // WithTriggerWithInitialEmptyValue is an option that can be set to make the OnUpdate callbacks trigger immediately on
 // subscription even if the current value is empty.
-func (s *Set[T]) WithTriggerWithInitialEmptyValue(trigger bool) *Set[T] {
+func (s *SetReceptor[T]) WithTriggerWithInitialEmptyValue(trigger bool) *SetReceptor[T] {
 	s.optTriggerWithInitialEmptyValue = trigger
 
 	return s
 }
 
 // set sets the given value as the new value of the set.
-func (s *Set[T]) set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T], triggerID types.UniqueID, callbacksToTrigger []*Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]) {
+func (s *SetReceptor[T]) set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMutations[T], triggerID types.UniqueID, callbacksToTrigger []*callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -226,7 +226,7 @@ func (s *Set[T]) set(value *advancedset.AdvancedSet[T]) (appliedMutations *SetMu
 }
 
 // applyMutations applies the given mutations to the set.
-func (s *Set[T]) applyMutations(mutations *SetMutations[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T], triggerID types.UniqueID, callbacksToTrigger []*Callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]) {
+func (s *SetReceptor[T]) applyMutations(mutations *SetMutations[T]) (updatedSet *advancedset.AdvancedSet[T], appliedMutations *SetMutations[T], triggerID types.UniqueID, callbacksToTrigger []*callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 

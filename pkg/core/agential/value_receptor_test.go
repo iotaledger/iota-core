@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValue(t *testing.T) {
-	myInt := NewReceptor[int]()
+func TestValueReceptor(t *testing.T) {
+	myInt := NewValueReceptor[int]()
 
 	var wg sync.WaitGroup
 	wg.Add(2)

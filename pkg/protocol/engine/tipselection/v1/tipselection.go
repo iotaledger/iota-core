@@ -38,7 +38,7 @@ type TipSelection struct {
 	livenessThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
 
 	// livenessThreshold holds the current liveness threshold.
-	livenessThreshold agential.Receptor[time.Time]
+	livenessThreshold agential.ValueReceptor[time.Time]
 
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int
@@ -64,7 +64,7 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 		conflictDAG:                  conflictDAG,
 		rootBlocks:                   rootBlocksRetriever,
 		livenessThresholdQueue:       timed.NewPriorityQueue[tipmanager.TipMetadata](true),
-		livenessThreshold:            agential.NewReceptor[time.Time](),
+		livenessThreshold:            agential.NewValueReceptor[time.Time](),
 		optMaxStrongParents:          8,
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,

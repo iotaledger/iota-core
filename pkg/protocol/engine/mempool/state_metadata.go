@@ -10,7 +10,7 @@ type StateMetadata interface {
 
 	State() State
 
-	ConflictIDs() *agential.Set[iotago.TransactionID]
+	ConflictIDs() *agential.SetReceptor[iotago.TransactionID]
 
 	PendingSpenderCount() int
 
