@@ -118,7 +118,7 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 
 	attestations = make([]*iotago.Attestation, 0)
 	if err := adsMap.Stream(func(_ iotago.AccountID, attestation iotago.Attestation) bool {
-		attestations = append(attestations, &attestation)
+		attestations = append(attestations, attestation)
 
 		return true
 	}); err != nil {
@@ -253,7 +253,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	for _, a := range attestations {
 		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
 		if _, exists := m.committeeFunc(index).GetSeat(a.IssuerID); exists {
-			tree.Set(a.IssuerID, *a)
+			tree.Set(a.IssuerID, a)
 
 			m.lastCumulativeWeight++
 		}

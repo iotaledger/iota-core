@@ -163,9 +163,9 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	loadedAccount, exists := m.accountsTree.Get(accountID)
 
 	if !exists {
-		loadedAccount = *accounts.NewAccountData(accountID, accounts.WithCredits(accounts.NewBlockIssuanceCredits(0, targetIndex)))
+		loadedAccount = accounts.NewAccountData(accountID, accounts.WithCredits(accounts.NewBlockIssuanceCredits(0, targetIndex)))
 	}
-	wasDestroyed, err := m.rollbackAccountTo(&loadedAccount, targetIndex)
+	wasDestroyed, err := m.rollbackAccountTo(loadedAccount, targetIndex)
 	if err != nil {
 		return nil, false, err
 	}
@@ -175,7 +175,7 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 		return nil, false, nil
 	}
 
-	return &loadedAccount, true, nil
+	return loadedAccount, true, nil
 }
 
 // AddAccount adds a new account to the Account tree, allotting to it the balance on the given output.
@@ -210,7 +210,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 		)...,
 	)
 
-	m.accountsTree.Set(accountOutput.AccountID, *accountData)
+	m.accountsTree.Set(accountOutput.AccountID, accountData)
 
 	return nil
 }
@@ -331,7 +331,7 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 
 		accountData, exists := m.accountsTree.Get(accountID)
 		if !exists {
-			accountData = *accounts.NewAccountData(accountID)
+			accountData = accounts.NewAccountData(accountID)
 		}
 
 		if diffChange.BICChange != 0 || !exists {
