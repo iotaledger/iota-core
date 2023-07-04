@@ -53,11 +53,11 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 var _ filter.Filter = new(Filter)
 
 // New creates a new Filter.
-func New(parameters func() *iotago.ProtocolParameters, opts ...options.Option[Filter]) *Filter {
+func New(protocolParamsFunc func() *iotago.ProtocolParameters, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
 		events:                  filter.NewEvents(),
 		optsSignatureValidation: true,
-		protocolParamsFunc:      parameters,
+		protocolParamsFunc:      protocolParamsFunc,
 	}, opts,
 		(*Filter).TriggerConstructed,
 		(*Filter).TriggerInitialized,
