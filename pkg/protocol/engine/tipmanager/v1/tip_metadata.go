@@ -49,9 +49,9 @@ type TipMetadata struct {
 	// to the tips.
 	isStronglyReferencedByStronglyConnectedTips agential.ValueReceptor[bool]
 
-	// isReferencedByOtherTips is true if the block is strongly referenced by other tips or has at least one weak child
+	// isReferencedByTips is true if the block is strongly referenced by other tips or has at least one weak child
 	// that is connected to the tips.
-	isReferencedByOtherTips agential.ValueReceptor[bool]
+	isReferencedByTips agential.ValueReceptor[bool]
 
 	// isStrongTip is true if the block is a strong tip pool member and is not strongly referenced by other tips.
 	isStrongTip agential.ValueReceptor[bool]
@@ -95,59 +95,59 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		isEvicted:                  agential.NewValueReceptor[bool](trapDoor[bool]),
 	}
 
-	t.isStrongTipPoolMember = agential.NewDerivedValueReceptorFrom3Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
+	t.isStrongTipPoolMember = agential.DeriveValueFrom3Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
 		return tipPool == tipmanager.StrongTipPool && !isOrphaned && !isEvicted
 	}, &t.tipPool, &t.isOrphaned, &t.isEvicted)
 
-	t.isWeakTipPoolMember = agential.NewDerivedValueReceptorFrom3Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
+	t.isWeakTipPoolMember = agential.DeriveValueFrom3Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
 		return tipPool == tipmanager.WeakTipPool && !isOrphaned && !isEvicted
 	}, &t.tipPool, &t.isOrphaned, &t.isEvicted)
 
-	t.isStronglyConnectedToTips = agential.NewDerivedValueReceptorFrom2Inputs(t, func(isStrongTipPoolMember bool, isStronglyReferencedByStronglyConnectedTips bool) bool {
+	t.isStronglyConnectedToTips = agential.DeriveValueReceptorFrom2Inputs(t, func(isStrongTipPoolMember bool, isStronglyReferencedByStronglyConnectedTips bool) bool {
 		return isStrongTipPoolMember || isStronglyReferencedByStronglyConnectedTips
 	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByStronglyConnectedTips)
 
-	t.isConnectedToTips = agential.NewDerivedValueReceptorFrom3Inputs(t, func(isReferencedByOtherTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
-		return isReferencedByOtherTips || isStrongTipPoolMember || isWeakTipPoolMember
-	}, &t.isReferencedByOtherTips, &t.isStrongTipPoolMember, &t.isWeakTipPoolMember)
+	t.isConnectedToTips = agential.DeriveValueFrom3Inputs(t, func(isReferencedByTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
+		return isReferencedByTips || isStrongTipPoolMember || isWeakTipPoolMember
+	}, &t.isReferencedByTips, &t.isStrongTipPoolMember, &t.isWeakTipPoolMember)
 
-	t.isStronglyReferencedByStronglyConnectedTips = agential.NewValueReceptorFromInput[bool, int](t, func(stronglyConnectedStrongChildren int) bool {
+	t.isStronglyReferencedByStronglyConnectedTips = agential.DeriveValueReceptorFrom1Input[bool, int](t, func(stronglyConnectedStrongChildren int) bool {
 		return stronglyConnectedStrongChildren > 0
 	}, &t.stronglyConnectedStrongChildren)
 
-	t.isReferencedByOtherTips = agential.NewDerivedValueReceptorFrom2Inputs[bool, int, bool](t, func(connectedWeakChildren int, isStronglyReferencedByStronglyConnectedTips bool) bool {
+	t.isReferencedByTips = agential.DeriveValueReceptorFrom2Inputs[bool, int, bool](t, func(connectedWeakChildren int, isStronglyReferencedByStronglyConnectedTips bool) bool {
 		return connectedWeakChildren > 0 || isStronglyReferencedByStronglyConnectedTips
 	}, &t.connectedWeakChildren, &t.isStronglyReferencedByStronglyConnectedTips)
 
-	t.isStrongTip = agential.NewDerivedValueReceptorFrom2Inputs[bool, bool, bool](t, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
+	t.isStrongTip = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
 		return isStrongTipPoolMember && !isStronglyReferencedByOtherTips
 	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByStronglyConnectedTips)
 
-	t.isWeakTip = agential.NewDerivedValueReceptorFrom2Inputs[bool, bool, bool](t, func(isWeakTipPoolMember bool, isReferencedByOtherTips bool) bool {
-		return isWeakTipPoolMember && !isReferencedByOtherTips
-	}, &t.isWeakTipPoolMember, &t.isReferencedByOtherTips)
+	t.isWeakTip = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isWeakTipPoolMember bool, isReferencedByTips bool) bool {
+		return isWeakTipPoolMember && !isReferencedByTips
+	}, &t.isWeakTipPoolMember, &t.isReferencedByTips)
 
-	t.isOrphaned = agential.NewDerivedValueReceptorFrom2Inputs[bool, bool, bool](t, func(isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
+	t.isOrphaned = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
 		return isStronglyOrphaned || isWeaklyOrphaned
 	}, &t.isStronglyOrphaned, &t.isWeaklyOrphaned)
 
-	t.anyStrongParentStronglyOrphaned = agential.NewValueReceptorFromInput[bool, int](t, func(stronglyOrphanedStrongParents int) bool {
+	t.anyStrongParentStronglyOrphaned = agential.DeriveValueReceptorFrom1Input[bool, int](t, func(stronglyOrphanedStrongParents int) bool {
 		return stronglyOrphanedStrongParents > 0
 	}, &t.stronglyOrphanedStrongParents)
 
-	t.anyWeakParentWeaklyOrphaned = agential.NewValueReceptorFromInput[bool, int](t, func(weaklyOrphanedWeakParents int) bool {
+	t.anyWeakParentWeaklyOrphaned = agential.DeriveValueReceptorFrom1Input[bool, int](t, func(weaklyOrphanedWeakParents int) bool {
 		return weaklyOrphanedWeakParents > 0
 	}, &t.weaklyOrphanedWeakParents)
 
-	t.isStronglyOrphaned = agential.NewDerivedValueReceptorFrom3Inputs[bool, bool, bool, bool](t, func(isMarkedOrphaned, anyStrongParentStronglyOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+	t.isStronglyOrphaned = agential.DeriveValueFrom3Inputs[bool, bool, bool, bool](t, func(isMarkedOrphaned, anyStrongParentStronglyOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
 		return isMarkedOrphaned || anyStrongParentStronglyOrphaned || anyWeakParentWeaklyOrphaned
 	}, &t.isMarkedOrphaned, &t.anyStrongParentStronglyOrphaned, &t.anyWeakParentWeaklyOrphaned)
 
-	t.isWeaklyOrphaned = agential.NewDerivedValueReceptorFrom2Inputs[bool, bool, bool](t, func(isMarkedOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+	t.isWeaklyOrphaned = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isMarkedOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
 		return isMarkedOrphaned || anyWeakParentWeaklyOrphaned
 	}, &t.isMarkedOrphaned, &t.anyWeakParentWeaklyOrphaned)
 
-	t.isMarkedOrphaned = agential.NewValueReceptorFromInput[bool, bool](t, func(isLivenessThresholdReached bool) bool {
+	t.isMarkedOrphaned = agential.DeriveValueReceptorFrom1Input[bool, bool](t, func(isLivenessThresholdReached bool) bool {
 		return isLivenessThresholdReached /* TODO: && !accepted */
 	}, &t.isLivenessThresholdReached)
 
@@ -185,25 +185,25 @@ func (t *TipMetadata) LivenessThresholdReached() agential.ValueReceptor[bool] {
 }
 
 // IsStrongTip returns true if the block is currently an unreferenced strong tip.
-func (t *TipMetadata) IsStrongTip() agential.ReadOnlyValueReceptor[bool] {
+func (t *TipMetadata) IsStrongTip() agential.ValueReceptorReadOnly[bool] {
 	return t.isStrongTip
 }
 
 // IsWeakTip returns true if the block is an unreferenced weak tip.
-func (t *TipMetadata) IsWeakTip() agential.ReadOnlyValueReceptor[bool] {
+func (t *TipMetadata) IsWeakTip() agential.ValueReceptorReadOnly[bool] {
 	return t.isWeakTip
 }
 
 // IsOrphaned returns true if the block is marked orphaned or if it has an orphaned strong parent.
-func (t *TipMetadata) IsOrphaned() agential.ReadOnlyValueReceptor[bool] {
+func (t *TipMetadata) IsOrphaned() agential.ValueReceptorReadOnly[bool] {
 	return t.isOrphaned
 }
 
-func (t *TipMetadata) Evicted() agential.ReadOnlyValueReceptor[bool] {
+func (t *TipMetadata) Evicted() agential.ValueReceptorReadOnly[bool] {
 	return t.isEvicted
 }
 
-func (t *TipMetadata) Constructed() agential.ReadOnlyValueReceptor[bool] {
+func (t *TipMetadata) Constructed() agential.ValueReceptorReadOnly[bool] {
 	return t.constructed
 }
 

@@ -21,13 +21,13 @@ type TipMetadata interface {
 	LivenessThresholdReached() agential.ValueReceptor[bool]
 
 	// IsStrongTip returns true if the block is an unreferenced strong tip.
-	IsStrongTip() agential.ReadOnlyValueReceptor[bool]
+	IsStrongTip() agential.ValueReceptorReadOnly[bool]
 
 	// IsWeakTip returns true if the block is an unreferenced weak tip.
-	IsWeakTip() agential.ReadOnlyValueReceptor[bool]
+	IsWeakTip() agential.ValueReceptorReadOnly[bool]
 
 	// IsOrphaned returns true if the block is marked orphaned or if it has an orphaned strong parent.
-	IsOrphaned() agential.ReadOnlyValueReceptor[bool]
+	IsOrphaned() agential.ValueReceptorReadOnly[bool]
 
-	Evicted() agential.ReadOnlyValueReceptor[bool]
+	Evicted() agential.ValueReceptorReadOnly[bool]
 }

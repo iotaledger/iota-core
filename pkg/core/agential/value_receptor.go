@@ -20,13 +20,13 @@ type ValueReceptor[Type comparable] interface {
 	// Compute computes the new value based on the current value and sets it to the computed value.
 	Compute(computeFunc func(currentValue Type) Type) (previousValue Type)
 
-	// ReadOnlyValueReceptor imports the readable part of the valueReceptor API.
-	ReadOnlyValueReceptor[Type]
+	// ValueReceptorReadOnly imports the readable part of the valueReceptor API.
+	ValueReceptorReadOnly[Type]
 }
 
-// ReadOnlyValueReceptor is the read-only version of a ValueReceptor, that can i.e. be used to only expose read
+// ValueReceptorReadOnly is the read-only version of a ValueReceptor, that can i.e. be used to only expose read
 // access to a receptors value.
-type ReadOnlyValueReceptor[Type comparable] interface {
+type ValueReceptorReadOnly[Type comparable] interface {
 	// Get returns the current value.
 	Get() Type
 
@@ -80,7 +80,7 @@ func (v *valueReceptor[T]) Get() T {
 	return v.value
 }
 
-// SetReceptor sets the new value and triggers the registered callbacks if the value has changed.
+// Set sets the new value and triggers the registered callbacks if the value has changed.
 func (v *valueReceptor[T]) Set(newValue T) (previousValue T) {
 	return v.Compute(func(T) T { return newValue })
 }

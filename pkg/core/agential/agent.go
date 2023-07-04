@@ -4,5 +4,5 @@ package agential
 // environment.
 type Agent interface {
 	// Constructed returns a valueReceptor that is used to signal that the agent has been constructed.
-	Constructed() ReadOnlyValueReceptor[bool]
+	Constructed() ValueReceptorReadOnly[bool]
 }
