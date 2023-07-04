@@ -26,7 +26,7 @@ type Orchestrator struct {
 	lastCommittedSlot iotago.SlotIndex
 	timeProvider      *iotago.TimeProvider
 
-	performanceManager *performance.Tracker
+	performanceTracker *performance.Tracker
 
 	epochEndNearingThreshold iotago.SlotIndex
 	maxCommittableSlot       iotago.SlotIndex
@@ -55,14 +55,14 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 
 						o.epochEndNearingThreshold = e.Storage.Settings().ProtocolParameters().EpochNearingThreshold
 
-						o.performanceManager = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
+						o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
 						o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
 
 						// TODO: check if the following value is correctly set to twice eviction age
 						o.maxCommittableSlot = e.Storage.Settings().ProtocolParameters().EvictionAge + e.Storage.Settings().ProtocolParameters().EvictionAge
 
 						if o.optsInitialCommittee != nil {
-							if err := o.performanceManager.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
+							if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
 								panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
 							}
 						}
@@ -91,7 +91,7 @@ func (o *Orchestrator) Shutdown() {
 }
 
 func (o *Orchestrator) BlockAccepted(block *blocks.Block) {
-	o.performanceManager.BlockAccepted(block)
+	o.performanceTracker.BlockAccepted(block)
 }
 
 func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
@@ -106,45 +106,45 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	// If the committed slot is `maxCommittableSlot`
 	// away from the end of the epoch, then register a committee for the next epoch.
 	if o.timeProvider.EpochEnd(currentEpoch) == slot+o.maxCommittableSlot {
-		if _, committeeExists := o.performanceManager.LoadCommitteeForEpoch(nextEpoch); !committeeExists {
+		if _, committeeExists := o.performanceTracker.LoadCommitteeForEpoch(nextEpoch); !committeeExists {
 			// If the committee for the epoch wasn't set before due to finalization of a slot,
 			// we promote the current committee to also serve in the next epoch.
-			committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
+			committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 			if !exists {
 				panic(fmt.Sprintf("committee for current epoch %d not found", currentEpoch))
 			}
 
 			_ = o.sybilProtection.RotateCommittee(nextEpoch, committee)
-			if err := o.performanceManager.RegisterCommittee(nextEpoch, committee); err != nil {
+			if err := o.performanceTracker.RegisterCommittee(nextEpoch, committee); err != nil {
 				panic(ierrors.Wrapf(err, "failed to register committee for epoch %d", nextEpoch))
 			}
 		}
 	}
 
 	if o.timeProvider.EpochEnd(currentEpoch) == slot {
-		committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
+		committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 		if !exists {
 			panic(fmt.Sprintf("committee for a finished epoch %d not found", currentEpoch))
 		}
 
-		o.performanceManager.ApplyEpoch(currentEpoch, committee)
+		o.performanceTracker.ApplyEpoch(currentEpoch, committee)
 	}
 }
 
 func (o *Orchestrator) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
-	return o.performanceManager.ValidatorReward(validatorID, stakeAmount, epochStart, epochEnd)
+	return o.performanceTracker.ValidatorReward(validatorID, stakeAmount, epochStart, epochEnd)
 }
 
 func (o *Orchestrator) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
-	return o.performanceManager.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd)
+	return o.performanceTracker.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd)
 }
 
 func (o *Orchestrator) Import(reader io.ReadSeeker) error {
-	return o.performanceManager.Import(reader)
+	return o.performanceTracker.Import(reader)
 }
 
 func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error {
-	return o.performanceManager.Export(writer, targetSlot)
+	return o.performanceTracker.Export(writer, targetSlot)
 }
 
 func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
@@ -165,7 +165,7 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
 	currentEpoch := o.timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
-	candidates := o.performanceManager.EligibleValidatorCandidates(nextEpoch)
+	candidates := o.performanceTracker.EligibleValidatorCandidates(nextEpoch)
 
 	weightedCandidates := account.NewAccounts()
 	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
@@ -192,7 +192,7 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 	weightedCommittee := newCommittee.Accounts()
 
 	// FIXME: weightedCommittee returned by the PoA sybil protection does not have stake specified, which will cause problems during rewards calculation.
-	err := o.performanceManager.RegisterCommittee(nextEpoch, weightedCommittee)
+	err := o.performanceTracker.RegisterCommittee(nextEpoch, weightedCommittee)
 	if err != nil {
 		panic("failed to register committee for epoch")
 	}
