@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -63,12 +64,14 @@ func (t *Tracker) BlockAccepted(block *blocks.Block) {
 	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
 	pf, err := performanceFactors.Load(block.Block().IssuerID)
 	if err != nil {
-		panic(err)
+		// TODO replace panic with errors in the future, like triggering an error event
+		panic(ierrors.Errorf("failed to load performance factor for account %s", block.Block().IssuerID))
 	}
 
 	err = performanceFactors.Store(block.Block().IssuerID, pf+1)
 	if err != nil {
-		panic(err)
+		// TODO replace panic with errors in the future, like triggering an error event
+		panic(ierrors.Errorf("failed to store performance factor for account %s", block.Block().IssuerID))
 	}
 }
 
