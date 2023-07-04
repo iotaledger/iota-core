@@ -158,7 +158,7 @@ func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 func writeAccountData(writer *utils.PositionedWriter, accountData *accounts.AccountData) error {
 	accountBytes, err := accountData.Bytes()
 	if err != nil {
-		return errors.Wrap(err, "unable to get account data snapshot bytes")
+		return errors.Wrapf(err, "unable to get account data snapshot bytes for accountID %s", accountData.ID.String())
 	}
 
 	if err = writer.WriteBytes(accountBytes); err != nil {
@@ -178,7 +178,7 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 		}
 
 		if err := binary.Read(reader, binary.LittleEndian, &accountsInDiffCount); err != nil {
-			return errors.Wrap(err, "unable to read accounts count")
+			return errors.Wrap(err, "unable to read accounts in diff count")
 		}
 		if accountsInDiffCount == 0 {
 			continue
@@ -192,21 +192,21 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 		for j := uint64(0); j < accountsInDiffCount; j++ {
 			var accountID iotago.AccountID
 			if _, err := io.ReadFull(reader, accountID[:]); err != nil {
-				return errors.Wrap(err, "unable to read Account ID")
+				return errors.Wrapf(err, "unable to read Account ID for index %d", j)
 			}
 
 			accountDiff := prunable.NewAccountDiff()
 			if err := accountDiff.FromReader(reader); err != nil {
-				return errors.Wrap(err, "unable to read Account diff")
+				return errors.Wrapf(err, "unable to read Account diff for accountID %s", accountID.String())
 			}
 
 			var destroyed bool
 			if err := binary.Read(reader, binary.LittleEndian, &destroyed); err != nil {
-				return errors.Wrap(err, "unable to read destroyed flag for Account")
+				return errors.Wrapf(err, "unable to read destroyed flag for Account ID %s", accountID.String())
 			}
 
 			if err := diffStore.Store(accountID, *accountDiff, destroyed); err != nil {
-				return errors.Wrap(err, "unable to store slot diff")
+				return errors.Wrapf(err, "unable to store slot diff for accountID %s", accountID.String())
 			}
 		}
 	}
