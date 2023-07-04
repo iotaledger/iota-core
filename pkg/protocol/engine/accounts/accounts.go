@@ -99,23 +99,23 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	a.Credits = &BlockIssuanceCredits{}
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.Value); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read Account balance value")
+		return bytesConsumed, errors.Wrapf(err, "unable to read Account balance value for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.UpdateTime); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read updatedTime for Account balance")
+		return bytesConsumed, errors.Wrapf(err, "unable to read updatedTime for Account balance for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.OutputID); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read OutputID for Account")
+		return bytesConsumed, errors.Wrapf(err, "unable to read OutputID for Account for accountID %s", a.ID)
 	}
 	bytesConsumed += len(a.OutputID)
 
 	var pubKeyCount uint8
 	if err := binary.Read(reader, binary.LittleEndian, &pubKeyCount); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read pubKeyCount count")
+		return bytesConsumed, errors.Wrapf(err, "unable to read pubKeyCount count for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
@@ -124,7 +124,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 		var pubKey ed25519.PublicKey
 		bytesRead, err = io.ReadFull(reader, pubKey[:])
 		if err != nil {
-			return bytesConsumed, errors.Wrap(err, "unable to read public key")
+			return bytesConsumed, errors.Wrapf(err, "unable to read public key index %d for accountID %s", i, a.ID)
 		}
 		bytesConsumed += bytesRead
 
@@ -133,22 +133,22 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	a.PubKeys = advancedset.New(pubKeys...)
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.ValidatorStake)); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read validator stake")
+		return bytesConsumed, errors.Wrapf(err, "unable to read validator stake for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.DelegationStake)); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read delegation stake")
+		return bytesConsumed, errors.Wrapf(err, "unable to read delegation stake for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.FixedCost)); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read fixed cost")
+		return bytesConsumed, errors.Wrapf(err, "unable to read fixed cost for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.StakeEndEpoch)); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read stake end epoch")
+		return bytesConsumed, errors.Wrapf(err, "unable to read stake end epoch for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
