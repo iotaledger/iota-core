@@ -11,14 +11,14 @@ import (
 
 // TODO: add later as a protocol params, after its refactor is finished.
 var (
-	targetRewardFirstPeriod  uint64           = 233373068869021000 // TODO current values are per slot, update with new when provided by Olivia
-	targetRewardChangeSlot   iotago.SlotIndex = 9460800
-	targetRewardSecondPeriod uint64           = 85853149583786000
-	validatorBlocksPerSlot   uint8            = 10
-	smalAccuracyShift        uint64           = 8
-	bigAccuracyShift         uint64           = 31
+	targetRewardFirstPeriod   uint64           = 233373068869021000 // TODO current values are per slot, update with new when provided by Olivia
+	targetRewardChangeSlot    iotago.SlotIndex = 9460800
+	targetRewardSecondPeriod  uint64           = 85853149583786000
+	validatorBlocksPerSlot    uint8            = 10
+	profitMarginExponent      uint64           = 8
+	rewardCalculationExponent uint64           = 31
 	// TODO why do we choose 40 here, why dont we use ^31 again?
-	weirdAccuracyShift uint64 = 40
+	finalRewardScalingExponent uint64 = 40
 )
 
 func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
@@ -43,8 +43,8 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		}
 
 		unDecayedEpochRewards := uint64(rewardsForAccountInEpoch.FixedCost) +
-			decreaseAccuracy(poolStats.ProfitMargin*uint64(rewardsForAccountInEpoch.PoolRewards), smalAccuracyShift) +
-			decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, smalAccuracyShift)*uint64(rewardsForAccountInEpoch.PoolRewards), smalAccuracyShift)*
+			decreaseAccuracy(poolStats.ProfitMargin*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent) +
+			decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, profitMarginExponent)*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent)*
 				uint64(stakeAmount)/
 				uint64(rewardsForAccountInEpoch.PoolStake)
 
@@ -73,7 +73,7 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			return 0, errors.Wrapf(err2, "failed to get pool stats for epoch %d and validator account ID %s", epochIndex, validatorID.String())
 		}
 
-		unDecayedEpochRewards := decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, smalAccuracyShift)*uint64(rewardsForAccountInEpoch.PoolRewards), smalAccuracyShift) *
+		unDecayedEpochRewards := decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, profitMarginExponent)*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent) *
 			uint64(delegatedAmount) /
 			uint64(rewardsForAccountInEpoch.PoolStake)
 
@@ -105,18 +105,18 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 	// TODO: this calculation will overflow with ~4Gi poolstake already.
 	// maybe we can reuse the functions from the mana decay provider?
 	// should we move the mana decay functions to the safemath package?
-	aux := (increaseAccuracy(poolStake, bigAccuracyShift) / totalStake) + (increaseAccuracy(validatorStake, bigAccuracyShift) / totalValidatorsStake)
+	aux := (increaseAccuracy(poolStake, rewardCalculationExponent) / totalStake) + (increaseAccuracy(validatorStake, rewardCalculationExponent) / totalValidatorsStake)
 	aux2 := iotago.Mana(uint64(aux) * initialReward * performanceFactor)
-	if decreaseAccuracy(aux2, weirdAccuracyShift) < fixedCost {
+	if decreaseAccuracy(aux2, finalRewardScalingExponent) < fixedCost {
 		return 0
 	}
 
-	return (aux2 >> weirdAccuracyShift) - fixedCost
+	return (aux2 >> finalRewardScalingExponent) - fixedCost
 }
 
 // calculateProfitMargin calculates the profit margin of the pool by firstly increasing the accuracy of the given value, so the profit margin is moved to the power of 2^accuracyShift.
 func calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken) uint64 {
-	return uint64(increaseAccuracy(totalValidatorsStake, smalAccuracyShift) / (totalValidatorsStake + totalPoolStake))
+	return uint64(increaseAccuracy(totalValidatorsStake, profitMarginExponent) / (totalValidatorsStake + totalPoolStake))
 }
 
 // increaseAccuracy shifts the bits of the given value to the left by the given amount, so that the value is moved to the power of 2^accuracyShift.
@@ -125,7 +125,7 @@ func increaseAccuracy[V iotago.BaseToken | iotago.Mana | uint64](val V, shift ui
 	return val << shift
 }
 
-// decreaseAccuracy reversts the accuracy operation of increaseAccuracy by shifting the bits of the given value to the right by the smalAccuracyShift.
+// decreaseAccuracy reversts the accuracy operation of increaseAccuracy by shifting the bits of the given value to the right by the profitMarginExponent.
 // This is a lossy operation. All values less than 2^accuracyShift will be rounded to 0.
 func decreaseAccuracy[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint64) V {
 	return val >> shift
