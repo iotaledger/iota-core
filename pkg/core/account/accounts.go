@@ -34,8 +34,7 @@ func (a *Accounts) initialize() {
 }
 
 func (a *Accounts) Has(id iotago.AccountID) bool {
-	_, has := a.accountPools.Get(id)
-	return has
+	return a.accountPools.Has(id)
 }
 
 func (a *Accounts) Size() int {

@@ -108,20 +108,19 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	}
 	bytesConsumed += 8
 
-	var outputID iotago.OutputID
 	if err := binary.Read(reader, binary.LittleEndian, &a.OutputID); err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read updatedTime for Account balance")
+		return bytesConsumed, errors.Wrap(err, "unable to read OutputID for Account")
 	}
-	bytesConsumed += len(outputID)
+	bytesConsumed += len(a.OutputID)
 
-	var pubKeyCount int64
+	var pubKeyCount uint8
 	if err := binary.Read(reader, binary.LittleEndian, &pubKeyCount); err != nil {
 		return bytesConsumed, errors.Wrap(err, "unable to read pubKeyCount count")
 	}
 	bytesConsumed += 8
 
 	pubKeys := make([]ed25519.PublicKey, pubKeyCount)
-	for i := int64(0); i < pubKeyCount; i++ {
+	for i := uint8(0); i < pubKeyCount; i++ {
 		var pubKey ed25519.PublicKey
 		bytesRead, err = io.ReadFull(reader, pubKey[:])
 		if err != nil {
