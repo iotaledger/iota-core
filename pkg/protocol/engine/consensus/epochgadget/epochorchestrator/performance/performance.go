@@ -158,15 +158,19 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 }
 
 func (t *Tracker) storeCommitteeForEpoch(epochIndex iotago.EpochIndex, committee *account.Accounts) error {
-	committeeBytes, err := committee.Bytes()
+	accountsBytes, err := committee.Bytes()
 	if err != nil {
 		return err
 	}
 
-	return t.committeeStore.Set(epochIndex.Bytes(), committeeBytes)
+	return t.committeeStore.Set(epochIndex.Bytes(), accountsBytes)
 }
 
 func (t *Tracker) aggregatePerformanceFactors(issuedBlocksPerSlot []uint64) uint64 {
+	if len(issuedBlocksPerSlot) == 0 {
+		return 0
+	}
+
 	var sum uint64
 	for _, issuedBlocks := range issuedBlocksPerSlot {
 		if issuedBlocks > uint64(validatorBlocksPerSlot) {
@@ -176,5 +180,7 @@ func (t *Tracker) aggregatePerformanceFactors(issuedBlocksPerSlot []uint64) uint
 		sum += issuedBlocks
 	}
 
+	// TODO: we should scale the result by the amount of slots per epoch,
+	// otherwise we lose a lot of precision here.
 	return sum / uint64(len(issuedBlocksPerSlot))
 }
