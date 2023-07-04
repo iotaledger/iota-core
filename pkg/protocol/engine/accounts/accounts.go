@@ -117,7 +117,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	if err := binary.Read(reader, binary.LittleEndian, &pubKeyCount); err != nil {
 		return bytesConsumed, errors.Wrapf(err, "unable to read pubKeyCount count for accountID %s", a.ID)
 	}
-	bytesConsumed += 8
+	bytesConsumed++
 
 	pubKeys := make([]ed25519.PublicKey, pubKeyCount)
 	for i := uint8(0); i < pubKeyCount; i++ {
@@ -164,7 +164,7 @@ func (a AccountData) Bytes() ([]byte, error) {
 	m.WriteBytes(idBytes)
 	m.WriteBytes(lo.PanicOnErr(a.Credits.Bytes()))
 	m.WriteBytes(lo.PanicOnErr(a.OutputID.Bytes()))
-	m.WriteUint64(uint64(a.PubKeys.Size()))
+	m.WriteByte(byte(a.PubKeys.Size()))
 	a.PubKeys.Range(func(pubKey ed25519.PublicKey) {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
 	})
