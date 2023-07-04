@@ -408,8 +408,8 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.PubKeysAdded = lo.Map(createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
 
 		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
-			accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch)
 			accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
+			accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch)
 			accountDiff.FixedCostChange = int64(stakingFeature.FixedCost)
 		}
 	}
@@ -429,7 +429,8 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			return false
 		}
 
-		if createdOutput.OutputType() == iotago.OutputAccount {
+		switch createdOutput.OutputType() {
+		case iotago.OutputAccount:
 			createdAccount, _ := createdOutput.Output().(*iotago.AccountOutput)
 
 			// Skip if the account doesn't have a BIC feature.
@@ -444,9 +445,8 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			}
 
 			createdAccounts[accountID] = createdOutput
-		}
 
-		if createdOutput.OutputType() == iotago.OutputDelegation {
+		case iotago.OutputDelegation:
 			delegation, _ := createdOutput.Output().(*iotago.DelegationOutput)
 			createdAccountDelegation[delegation.DelegationID] = delegation
 		}
@@ -466,7 +466,8 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			return false
 		}
 
-		if spentOutput.OutputType() == iotago.OutputAccount {
+		switch spentOutput.OutputType() {
+		case iotago.OutputAccount:
 			consumedAccount, _ := spentOutput.Output().(*iotago.AccountOutput)
 			// Skip if the account doesn't have a BIC feature.
 			// TODO: do we even need to check for staking feature here if we require BlockIssuer with staking?
@@ -479,9 +480,8 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			if _, exists := createdAccounts[consumedAccount.AccountID]; !exists {
 				destroyedAccounts.Add(consumedAccount.AccountID)
 			}
-		}
 
-		if spentOutput.OutputType() == iotago.OutputDelegation {
+		case iotago.OutputDelegation:
 			delegationOutput, _ := spentOutput.Output().(*iotago.DelegationOutput)
 			if _, createdDelegationExists := createdAccountDelegation[delegationOutput.DelegationID]; createdDelegationExists {
 				delete(createdAccountDelegation, delegationOutput.DelegationID)

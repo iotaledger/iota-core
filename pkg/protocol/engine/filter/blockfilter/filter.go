@@ -20,6 +20,7 @@ var (
 	ErrInvalidSignature                          = errors.New("block has invalid signature")
 	ErrInvalidProofOfWork                        = errors.New("error validating PoW")
 	ErrTransactionCommitmentInputTooFarInThePast = errors.New("transaction in a block references too old CommitmentInput")
+	ErrTransactionCommitmentInputInTheFuture     = errors.New("transaction in a block references a CommitmentInput in the future")
 )
 
 // Filter filters blocks.
@@ -53,11 +54,11 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 var _ filter.Filter = new(Filter)
 
 // New creates a new Filter.
-func New(parameters func() *iotago.ProtocolParameters, opts ...options.Option[Filter]) *Filter {
+func New(protocolParamsFunc func() *iotago.ProtocolParameters, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
 		events:                  filter.NewEvents(),
 		optsSignatureValidation: true,
-		protocolParamsFunc:      parameters,
+		protocolParamsFunc:      protocolParamsFunc,
 	}, opts,
 		(*Filter).TriggerConstructed,
 		(*Filter).TriggerInitialized,
@@ -127,7 +128,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 			// and the slot that block is committing to.
 
 			// Parameters moved to the other side of inequality to avoid underflow errors with subtraction from an uint64 type.
-			if commitmentInput.CommitmentID.Index()+protocolParams.EvictionAge+protocolParams.EvictionAge < block.ID().Index() {
+			if commitmentInput.CommitmentID.Index()+protocolParams.LivenessThreshold+protocolParams.EvictionAge < block.ID().Index() {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,
 					Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while min allowed is %d", commitmentInput.CommitmentID.Index(), block.ID().Index()-protocolParams.LivenessThreshold-protocolParams.EvictionAge),
@@ -139,7 +140,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 			if commitmentInput.CommitmentID.Index() > block.SlotCommitment().Index() {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,
-					Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while max allowed is %d", commitmentInput.CommitmentID.Index(), block.SlotCommitment().Index()),
+					Reason: errors.WithMessagef(ErrTransactionCommitmentInputInTheFuture, "transaction in a block contains CommitmentInput to slot %d while max allowed is %d", commitmentInput.CommitmentID.Index(), block.SlotCommitment().Index()),
 					Source: source,
 				})
 
