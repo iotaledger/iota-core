@@ -41,8 +41,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	nodesP1 := []*mock.Node{node0, node1, node2, node3, node4}
 	nodesP2 := []*mock.Node{node5, node6}
 
-	validators := ts.Validators()
-
 	nodeOptions := []options.Option[protocol.Protocol]{
 		protocol.WithNotarizationProvider(
 			slotnotarization.NewProvider(1),
@@ -60,7 +58,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	nodeP1Options := append(nodeOptions,
 		protocol.WithSybilProtectionProvider(
-			poa.NewProvider(validators,
+			poa.NewProvider(
 				poa.WithOnlineCommitteeStartup(node0.AccountID, node1.AccountID, node2.AccountID, node3.AccountID, node4.AccountID),
 				poa.WithActivityWindow(1*time.Minute),
 			),
@@ -69,7 +67,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	nodeP2Options := append(nodeOptions,
 		protocol.WithSybilProtectionProvider(
-			poa.NewProvider(validators,
+			poa.NewProvider(
 				poa.WithOnlineCommitteeStartup(node5.AccountID, node6.AccountID),
 				poa.WithActivityWindow(1*time.Minute),
 			),

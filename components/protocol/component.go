@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -28,7 +27,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
 func init() {
@@ -88,12 +86,6 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
-		var validators []iotago.AccountID
-		for _, validator := range ParamsProtocol.SybilProtection.Committee {
-			hex := lo.PanicOnErr(hexutil.DecodeHex(validator))
-			validators = append(validators, iotago.AccountID(hex[:]))
-		}
-
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
@@ -108,7 +100,7 @@ func provide(c *dig.Container) error {
 			),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(validators),
+				poa.NewProvider(),
 			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),

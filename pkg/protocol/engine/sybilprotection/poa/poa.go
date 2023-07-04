@@ -1,6 +1,7 @@
 package poa
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -30,7 +31,8 @@ type SybilProtection struct {
 	onlineCommittee   *advancedset.AdvancedSet[account.SeatIndex]
 	inactivityManager *timed.TaskExecutor[iotago.AccountID]
 	lastActivities    *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
-	mutex             sync.RWMutex
+	activityMutex     sync.RWMutex
+	committeeMutex    sync.RWMutex
 
 	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID
@@ -39,7 +41,7 @@ type SybilProtection struct {
 }
 
 // NewProvider returns a new sybil protection provider that uses the ProofOfStake module.
-func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
+func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
 	return module.Provide(func(e *engine.Engine) sybilprotection.SybilProtection {
 		return options.Apply(
 			&SybilProtection{
@@ -49,12 +51,10 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 				inactivityManager: timed.NewTaskExecutor[iotago.AccountID](1),
 				lastActivities:    shrinkingmap.New[account.SeatIndex, time.Time](),
 
-				optsActivityWindow:         time.Second * 30,
-				optsOnlineCommitteeStartup: validators,
+				optsActivityWindow: time.Second * 30,
 			}, opts, func(s *SybilProtection) {
 				e.Events.SybilProtection.LinkTo(s.events)
 
-				s.initializeAccounts(validators)
 				s.onlineCommittee = advancedset.New[account.SeatIndex]()
 
 				e.HookConstructed(func() {
@@ -62,12 +62,7 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 
 					e.Storage.Settings().HookInitialized(func() {
 						s.timeProviderFunc = e.API().TimeProvider
-
-						e.Clock.HookInitialized(func() {
-							for _, v := range s.optsOnlineCommitteeStartup {
-								s.markValidatorActive(v, e.Clock.Accepted().RelativeTime())
-							}
-						})
+						s.TriggerConstructed()
 					})
 
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
@@ -76,6 +71,7 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
 						s.events.BlockProcessed.Trigger(block)
 					})
+
 				})
 			})
 	})
@@ -84,18 +80,27 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 var _ sybilprotection.SybilProtection = &SybilProtection{}
 
 func (s *SybilProtection) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *account.SeatedAccounts {
+	s.committeeMutex.RLock()
+	defer s.committeeMutex.RUnlock()
+
 	// we do nothing on PoA, we keep the same accounts and committee
 	return s.committee
 }
 
 // Committee returns the set of validators selected to be part of the committee.
 func (s *SybilProtection) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
+	s.committeeMutex.RLock()
+	defer s.committeeMutex.RUnlock()
+
 	// Note: we have PoA so our committee do not rotate right now
 	return s.committee
 }
 
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
 func (s *SybilProtection) OnlineCommittee() *advancedset.AdvancedSet[account.SeatIndex] {
+	s.activityMutex.RLock()
+	defer s.activityMutex.RUnlock()
+
 	return s.onlineCommittee
 }
 
@@ -109,12 +114,31 @@ func (s *SybilProtection) Shutdown() {
 	s.workers.Shutdown()
 }
 
-func (s *SybilProtection) initializeAccounts(validators []iotago.AccountID) {
-	for _, id := range validators {
-		s.accounts.Set(id, &account.Pool{}) // We do not care about the pool with PoA
-		// FIXME: we actually do care because the total stake and delegation amount is used in the rewards calculation
+func (s *SybilProtection) ImportCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
+	s.committeeMutex.Lock()
+	defer s.committeeMutex.Unlock()
+
+	s.accounts = validators
+	s.committee = s.accounts.SelectCommittee(validators.IDs()...)
+	fmt.Println("import committee", validators.IDs())
+	onlineValidators := s.accounts.IDs()
+	if len(s.optsOnlineCommitteeStartup) > 0 {
+		onlineValidators = s.optsOnlineCommitteeStartup
 	}
-	s.committee = s.accounts.SelectCommittee(validators...)
+
+	for _, v := range onlineValidators {
+		s.markValidatorActive(v, s.clock.Accepted().RelativeTime())
+	}
+}
+
+func (s *SybilProtection) SetCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
+	s.committeeMutex.Lock()
+	defer s.committeeMutex.Unlock()
+
+	s.accounts = validators
+	s.committee = s.accounts.SelectCommittee(validators.IDs()...)
+
+	fmt.Println("set committee", validators.IDs())
 }
 
 func (s *SybilProtection) stopInactivityManager() {
@@ -126,8 +150,8 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.activityMutex.Lock()
+	defer s.activityMutex.Unlock()
 
 	slotIndex := s.timeProviderFunc().SlotFromTime(activityTime)
 	seat, exists := s.Committee(slotIndex).GetSeat(id)
@@ -136,6 +160,7 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 		return
 	}
 
+	fmt.Println("mark seat active", id, seat)
 	if lastActivity, exists := s.lastActivities.Get(seat); exists && lastActivity.After(activityTime) {
 		return
 	} else if !exists {
@@ -149,11 +174,12 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 }
 
 func (s *SybilProtection) markSeatInactive(seat account.SeatIndex) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.activityMutex.Lock()
+	defer s.activityMutex.Unlock()
 
 	s.lastActivities.Delete(seat)
 	s.onlineCommittee.Delete(seat)
+	fmt.Println("mark seat inactive", seat)
 
 	s.events.OnlineCommitteeSeatRemoved.Trigger(seat)
 }

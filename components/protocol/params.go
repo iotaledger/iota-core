@@ -25,11 +25,6 @@ type ParametersProtocol struct {
 		// MaxAllowedClockDrift defines the maximum drift our wall clock can have to future blocks being received from the network.
 		MaxAllowedClockDrift time.Duration `default:"5s" usage:"the maximum drift our wall clock can have to future blocks being received from the network"`
 	}
-
-	// TODO: load this from a snapshot instead of program parameters
-	SybilProtection struct {
-		Committee []string `usage:"the identities of the validator"`
-	}
 }
 
 // ParametersDatabase contains the definition of configuration parameters used by the storage layer.

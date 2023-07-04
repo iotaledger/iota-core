@@ -387,13 +387,12 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
 
-	validators := t.Validators()
 	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 		baseOpts := []options.Option[protocol.Protocol]{
 			protocol.WithSnapshotPath(t.snapshotPath),
 			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(validators),
+				poa.NewProvider(),
 			),
 			protocol.WithEpochGadgetProvider(
 				epochorchestrator.NewProvider(),

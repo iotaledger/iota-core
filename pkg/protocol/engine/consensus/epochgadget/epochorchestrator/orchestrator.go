@@ -29,7 +29,7 @@ type Orchestrator struct {
 	performanceManager *performance.Tracker
 
 	epochEndNearingThreshold iotago.SlotIndex
-	maxCommittableSlot       iotago.SlotIndex
+	maxCommittableAge        iotago.SlotIndex
 
 	optsInitialCommittee *account.Accounts
 
@@ -52,28 +52,47 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 				e.HookConstructed(func() {
 					e.Storage.Settings().HookInitialized(func() {
 						o.timeProvider = e.API().TimeProvider()
+						o.maxCommittableAge = e.Storage.Settings().ProtocolParameters().EvictionAge + e.Storage.Settings().ProtocolParameters().EvictionAge
 
 						o.epochEndNearingThreshold = e.Storage.Settings().ProtocolParameters().EpochNearingThreshold
 
-						o.performanceManager = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
+						o.performanceManager = performance.NewTracker(o.maxCommittableAge, e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
 						o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
 
 						// TODO: check if the following value is correctly set to twice eviction age
-						o.maxCommittableSlot = e.Storage.Settings().ProtocolParameters().EvictionAge + e.Storage.Settings().ProtocolParameters().EvictionAge
 
 						if o.optsInitialCommittee != nil {
 							if err := o.performanceManager.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
-								panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
+								panic(ierrors.Wrap(err, "error while registering initial committee for epoch 1"))
 							}
 						}
+
+						// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
+						// so the committee should be available in the performance manager.
+						e.HookInitialized(func() {
+							// Make sure that the sybil protection knows about the committee of the current epoch
+							// (according to the latest committed slot), and potentially the next selected
+							// committee if we have one.
+							currentEpoch := o.timeProvider.EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
+
+							committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
+							if !exists {
+								panic("failed to load committee for last finalized slot to initialize sybil protection")
+							}
+							e.SybilProtection.ImportCommittee(currentEpoch, committee)
+
+							if nextCommittee, nextCommitteeExists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
+								e.SybilProtection.ImportCommittee(currentEpoch+1, nextCommittee)
+							}
+
+							e.SybilProtection.TriggerInitialized()
+						})
 
 						o.TriggerConstructed()
 						o.TriggerInitialized()
 					})
-				})
 
-				// TODO: does this potentially cause a data race due to fanning-in parallel events?
-				e.Events.BlockGadget.BlockAccepted.Hook(o.BlockAccepted)
+				})
 
 				// TODO: CommitSlot should be called directly from NotarizationManager and should return some trees to be put into actual commitment
 				e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) { o.CommitSlot(scd.Commitment.Index()) })
@@ -103,9 +122,9 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 
 	o.lastCommittedSlot = slot
 
-	// If the committed slot is `maxCommittableSlot`
+	// If the committed slot is `maxCommittableAge`
 	// away from the end of the epoch, then register a committee for the next epoch.
-	if o.timeProvider.EpochEnd(currentEpoch) == slot+o.maxCommittableSlot {
+	if o.timeProvider.EpochEnd(currentEpoch) == slot+o.maxCommittableAge {
 		if _, committeeExists := o.performanceManager.LoadCommitteeForEpoch(nextEpoch); !committeeExists {
 			// If the committee for the epoch wasn't set before due to finalization of a slot,
 			// we promote the current committee to also serve in the next epoch.
@@ -114,7 +133,9 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 				panic(fmt.Sprintf("committee for current epoch %d not found", currentEpoch))
 			}
 
-			_ = o.sybilProtection.RotateCommittee(nextEpoch, committee)
+			committee.SetReused()
+
+			o.sybilProtection.SetCommittee(nextEpoch, committee)
 			if err := o.performanceManager.RegisterCommittee(nextEpoch, committee); err != nil {
 				panic(ierrors.Wrapf(err, "failed to register committee for epoch %d", nextEpoch))
 			}
@@ -154,9 +175,9 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 	epoch := o.timeProvider.EpochFromSlot(slot)
 
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
-	// committed slot is earlier than (the last slot of the epoch - maxCommittableSlot).
+	// committed slot is earlier than (the last slot of the epoch - maxCommittableAge).
 	// Otherwise, skip committee selection because it's too late and the committee has been reused.
-	if slot+o.epochEndNearingThreshold == o.timeProvider.EpochEnd(epoch) && o.timeProvider.EpochEnd(epoch) > o.lastCommittedSlot+o.maxCommittableSlot {
+	if slot+o.epochEndNearingThreshold == o.timeProvider.EpochEnd(epoch) && o.timeProvider.EpochEnd(epoch) > o.lastCommittedSlot+o.maxCommittableAge {
 		newCommittee := o.selectNewCommittee(slot)
 		o.events.CommitteeSelected.Trigger(newCommittee)
 	}

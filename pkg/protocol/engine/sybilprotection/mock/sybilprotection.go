@@ -91,6 +91,12 @@ func (m *ManualPOA) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *a
 	return m.committee
 }
 
+func (m *ManualPOA) SetCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
+}
+
+func (m *ManualPOA) ImportCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
+}
+
 func (m *ManualPOA) Shutdown() {}
 
 var _ sybilprotection.SybilProtection = &ManualPOA{}

@@ -406,7 +406,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		node21.Initialize(
 			protocol.WithBaseDirectory(ts.Directory.Path(node2.Name)),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(ts.Validators()),
+				poa.NewProvider(),
 			),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
@@ -455,7 +455,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithSnapshotPath(snapshotPath),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node3.Name)),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(ts.Validators()),
+				poa.NewProvider(),
 			),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),

@@ -78,7 +78,7 @@ func (t *TestSuite) InitRewardManager() {
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
 	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, t.API().TimeProvider(), t.API().ManaDecayProvider())
+	t.Instance = NewTracker(0, rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, t.API().TimeProvider(), t.API().ManaDecayProvider())
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {

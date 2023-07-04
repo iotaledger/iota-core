@@ -22,21 +22,15 @@ type Tracker struct {
 
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
 
-	timeProvider  *iotago.TimeProvider
-	decayProvider *iotago.ManaDecayProvider
+	maxCommittableAge iotago.SlotIndex
+	timeProvider      *iotago.TimeProvider
+	decayProvider     *iotago.ManaDecayProvider
 
 	performanceFactorsMutex sync.RWMutex
 	mutex                   sync.RWMutex
 }
 
-func NewTracker(
-	rewardsBaseStore kvstore.KVStore,
-	poolStatsStore kvstore.KVStore,
-	committeeStore kvstore.KVStore,
-	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
-	timeProvider *iotago.TimeProvider,
-	decayProvider *iotago.ManaDecayProvider,
-) *Tracker {
+func NewTracker(maxCommittableAge iotago.SlotIndex, rewardsBaseStore kvstore.KVStore, poolStatsStore kvstore.KVStore, committeeStore kvstore.KVStore, performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors, timeProvider *iotago.TimeProvider, decayProvider *iotago.ManaDecayProvider) *Tracker {
 	return &Tracker{
 		rewardBaseStore:        rewardsBaseStore,
 		poolStatsStore:         poolStatsStore,
@@ -44,6 +38,7 @@ func NewTracker(
 		performanceFactorsFunc: performanceFactorsFunc,
 		timeProvider:           timeProvider,
 		decayProvider:          decayProvider,
+		maxCommittableAge:      maxCommittableAge,
 	}
 }
 
@@ -59,6 +54,7 @@ func (t *Tracker) BlockAccepted(block *blocks.Block) {
 	defer t.performanceFactorsMutex.Unlock()
 
 	// TODO: check if this block is a validator block
+	// TODO: include wannabe validator performance in the snapshot
 
 	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
 	pf, err := performanceFactors.Load(block.Block().IssuerID)

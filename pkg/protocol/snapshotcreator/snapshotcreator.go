@@ -80,7 +80,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		inmemoryblockdag.NewProvider(),
 		inmemorybooker.NewProvider(),
 		blocktime.NewProvider(),
-		poa.NewProvider([]iotago.AccountID{}),
+		poa.NewProvider(),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
 		epochorchestrator.NewProvider(epochorchestrator.WithInitialCommittee(accounts)),
