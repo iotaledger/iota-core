@@ -17,23 +17,19 @@ func (t *Tracker) Import(reader io.ReadSeeker) error {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	err := t.importPerformanceFactor(reader)
-	if err != nil {
+	if err := t.importPerformanceFactor(reader); err != nil {
 		return errors.Wrap(err, "unable to import performance factor")
 	}
 
-	err = t.importPoolRewards(reader)
-	if err != nil {
+	if err := t.importPoolRewards(reader); err != nil {
 		return errors.Wrap(err, "unable to import pool rewards")
 	}
 
-	err = t.importPoolsStats(reader)
-	if err != nil {
+	if err := t.importPoolsStats(reader); err != nil {
 		return errors.Wrap(err, "unable to import pool stats")
 	}
 
-	err = t.importCommittees(reader)
-	if err != nil {
+	if err := t.importCommittees(reader); err != nil {
 		return errors.Wrap(err, "unable to import committees")
 	}
 
@@ -96,13 +92,13 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 		for j := uint64(0); j < accountsCount; j++ {
 			var accountID iotago.AccountID
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
-				return errors.Wrap(err, "unable to read account id")
+				return errors.Wrapf(err, "unable to read account id for the slot index %d", slotIndex)
 			}
 			var performanceFactor uint64
 			if err := binary.Read(reader, binary.LittleEndian, &performanceFactor); err != nil {
-				return errors.Wrap(err, "unable to read performance factor")
+				return errors.Wrapf(err, "unable to read performance factor for account %s and slot index %d", accountID.String(), slotIndex)
 			}
-			err := performanceFactors.Store(accountID, performanceFactor)
+			err := performanceFactors.Store(accountID, uint64(performanceFactor))
 			if err != nil {
 				return errors.Wrap(err, "unable to store performance factor")
 			}
@@ -134,12 +130,12 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 		for j := uint64(0); j < accountsCount; j++ {
 			var accountID iotago.AccountID
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
-				return errors.Wrap(err, "unable to read account id")
+				return errors.Wrapf(err, "unable to read account id for the epoch index %d", epochIndex)
 			}
 
 			var reward PoolRewards
 			if err := binary.Read(reader, binary.LittleEndian, &reward); err != nil {
-				return errors.Wrap(err, "unable to read reward")
+				return errors.Wrapf(err, "unable to read reward for account %s and epoch index %d", accountID.String(), epochIndex)
 			}
 			rewardsTree.Set(accountID, &reward)
 		}
@@ -161,12 +157,12 @@ func (t *Tracker) importPoolsStats(reader io.ReadSeeker) error {
 
 		var poolStats PoolsStats
 		if err := binary.Read(reader, binary.LittleEndian, &poolStats); err != nil {
-			return errors.Wrap(err, "unable to read pool stats")
+			return errors.Wrapf(err, "unable to read pool stats for epoch index %d", epochIndex)
 		}
 
 		err := t.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolStats.Bytes()))
 		if err != nil {
-			return errors.Wrap(err, "unable to store pool stats")
+			return errors.Wrapf(err, "unable to store pool stats for the epoch index %d", epochIndex)
 		}
 	}
 
@@ -186,12 +182,12 @@ func (t *Tracker) importCommittees(reader io.ReadSeeker) error {
 
 		committee := account.NewAccounts()
 		if err := committee.FromReader(reader); err != nil {
-			return errors.Wrap(err, "unable to read committee")
+			return errors.Wrapf(err, "unable to read committee for the epoch index %d", epoch)
 		}
 
 		err := t.committeeStore.Set(epoch.Bytes(), lo.PanicOnErr(committee.Bytes()))
 		if err != nil {
-			return errors.Wrap(err, "unable to store committee")
+			return errors.Wrapf(err, "unable to store committee for the epoch index %d", epoch)
 		}
 	}
 
