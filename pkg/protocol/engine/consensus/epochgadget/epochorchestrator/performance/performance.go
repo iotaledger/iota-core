@@ -141,7 +141,7 @@ func (t *Tracker) poolStats(epoch iotago.EpochIndex) (poolStats *PoolsStats, err
 }
 
 func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
-	accountsBytes, err := t.committeeStore.Get(epoch.Bytes())
+	committeeBytes, err := t.committeeStore.Get(epoch.Bytes())
 	if err != nil {
 		if errors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, false
@@ -150,7 +150,7 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 	}
 
 	committee = account.NewAccounts()
-	if _, err = committee.FromBytes(accountsBytes); err != nil {
+	if _, err = committee.FromBytes(committeeBytes); err != nil {
 		panic(errors.Wrapf(err, "failed to parse committee for epoch %d", epoch))
 	}
 
@@ -167,6 +167,9 @@ func (t *Tracker) storeCommitteeForEpoch(epochIndex iotago.EpochIndex, committee
 }
 
 func (t *Tracker) aggregatePerformanceFactors(issuedBlocksPerSlot []uint64) uint64 {
+	if len(issuedBlocksPerSlot) == 0 {
+		return 0
+	}
 	var sum uint64
 	for _, issuedBlocks := range issuedBlocksPerSlot {
 		if issuedBlocks > uint64(validatorBlocksPerSlot) {
