@@ -117,7 +117,7 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 	}
 
 	attestations = make([]*iotago.Attestation, 0)
-	if err := adsMap.Stream(func(_ iotago.AccountID, attestation iotago.Attestation) bool {
+	if err := adsMap.Stream(func(_ iotago.AccountID, attestation *iotago.Attestation) bool {
 		attestations = append(attestations, attestation)
 
 		return true
