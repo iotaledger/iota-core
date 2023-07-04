@@ -101,8 +101,6 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	currentEpoch := o.timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 
-	o.lastCommittedSlot = slot
-
 	// If the committed slot is `maxCommittableSlot`
 	// away from the end of the epoch, then register a committee for the next epoch.
 	if o.timeProvider.EpochEnd(currentEpoch) == slot+o.maxCommittableSlot {
@@ -129,6 +127,8 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 
 		o.performanceTracker.ApplyEpoch(currentEpoch, committee)
 	}
+
+	o.lastCommittedSlot = slot
 }
 
 func (o *Orchestrator) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
@@ -156,7 +156,8 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
 	// committed slot is earlier than (the last slot of the epoch - maxCommittableSlot).
 	// Otherwise, skip committee selection because it's too late and the committee has been reused.
-	if slot+o.epochEndNearingThreshold == o.timeProvider.EpochEnd(epoch) && o.timeProvider.EpochEnd(epoch) > o.lastCommittedSlot+o.maxCommittableSlot {
+	epochEndSlot := o.timeProvider.EpochEnd(epoch)
+	if slot+o.epochEndNearingThreshold == epochEndSlot && epochEndSlot > o.lastCommittedSlot+o.maxCommittableSlot {
 		newCommittee := o.selectNewCommittee(slot)
 		o.events.CommitteeSelected.Trigger(newCommittee)
 	}
@@ -174,7 +175,8 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 			return err
 		}
 		if !exists {
-			panic("account does not exist")
+			// TODO: instead of panic, we should return an error here
+			panic(ierrors.Errorf("account of committee candidate does not exist: %s", candidate))
 		}
 
 		weightedCandidates.Set(candidate, &account.Pool{
@@ -185,6 +187,7 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 
 		return nil
 	}); err != nil {
+		// TODO: instead of panic, we should return an error here
 		panic(err)
 	}
 
@@ -194,7 +197,8 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 	// FIXME: weightedCommittee returned by the PoA sybil protection does not have stake specified, which will cause problems during rewards calculation.
 	err := o.performanceTracker.RegisterCommittee(nextEpoch, weightedCommittee)
 	if err != nil {
-		panic("failed to register committee for epoch")
+		// TODO: instead of panic, we should return an error here
+		panic(ierrors.Wrap(err, "failed to register committee for epoch"))
 	}
 
 	return weightedCommittee

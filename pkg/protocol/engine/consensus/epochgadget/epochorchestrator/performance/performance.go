@@ -76,8 +76,8 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	epochSlotStart := t.timeProvider.EpochStart(epoch)
-	epochSlotEnd := t.timeProvider.EpochEnd(epoch)
+	epochStartSlot := t.timeProvider.EpochStart(epoch)
+	epochEndSlot := t.timeProvider.EpochEnd(epoch)
 
 	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
 	poolsStats := PoolsStats{
@@ -91,11 +91,12 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	}
 
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
-		intermediateFactors := make([]uint64, 0)
-		for slot := epochSlotStart; slot <= epochSlotEnd; slot++ {
+		intermediateFactors := make([]uint64, 0, epochEndSlot+1-epochStartSlot)
+		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
 			performanceFactorStorage := t.performanceFactorsFunc(slot)
 			if performanceFactorStorage == nil {
 				intermediateFactors = append(intermediateFactors, 0)
+				continue
 			}
 
 			pf, err := performanceFactorStorage.Load(accountID)
@@ -104,12 +105,11 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			}
 
 			intermediateFactors = append(intermediateFactors, pf)
-
 		}
 
 		ads.NewMap[iotago.AccountID, PoolRewards](t.rewardsStorage(epoch)).Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
-			PoolRewards: t.poolReward(epochSlotEnd, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
+			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
 		})
 

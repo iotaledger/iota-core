@@ -294,7 +294,7 @@ func (l *Ledger) Import(reader io.ReadSeeker) error {
 	}
 
 	if err := l.epochGadget.Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import rewardsManager")
+		return errors.Wrap(err, "failed to import epochGadget")
 	}
 
 	return nil
@@ -310,7 +310,7 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 	}
 
 	if err := l.epochGadget.Export(writer, targetIndex); err != nil {
-		return errors.Wrap(err, "failed to export rewardsManager")
+		return errors.Wrap(err, "failed to export epochGadget")
 	}
 
 	return nil

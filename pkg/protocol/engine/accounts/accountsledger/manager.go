@@ -125,7 +125,7 @@ func (m *Manager) ApplyDiff(
 	}
 
 	// load blocks burned in this slot
-	// TODO: MOVE THIS TO UPDATE SLOT DIFF
+	// TODO: move this to update slot diff
 	burns, err := m.computeBlockBurnsForSlot(slotIndex)
 	if err != nil {
 		return errors.Wrap(err, "could not create block burns for slot")

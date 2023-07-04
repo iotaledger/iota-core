@@ -98,7 +98,11 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 	if slotIndex > targetRewardChangeSlot {
 		initialReward = targetRewardSecondPeriod
 	}
-	aux := (((1 << 31) * poolStake) / totalStake) + ((2 << 31) * validatorStake / totalValidatorsStake)
+
+	// TODO: this calculation will overflow with ~4Gi poolstake already.
+	// maybe we can reuse the functions from the mana decay provider?
+	// should we move the mana decay functions to the safemath package?
+	aux := (((1 << 31) * poolStake) / totalStake) + ((1 << 31) * validatorStake / totalValidatorsStake)
 	aux2 := iotago.Mana(uint64(aux) * initialReward * performanceFactor)
 	if (aux2 >> 40) < fixedCost {
 		return 0

@@ -173,7 +173,7 @@ func Test_TransitionAccount(t *testing.T) {
 		}, node1)
 	}
 
-	//CREATE A DELEGATION OUTPUT DELEGATING TO THE NEWLY CREATED ACCOUNT
+	// create a delegation output delegating to the newly created account
 	{
 		newAccount := ts.AccountOutput("TX2:0")
 		newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
