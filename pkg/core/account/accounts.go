@@ -64,7 +64,19 @@ func (a *Accounts) Get(id iotago.AccountID) (pool *Pool, exists bool) {
 
 // setWithoutLocking sets the weight of the given identity.
 func (a *Accounts) setWithoutLocking(id iotago.AccountID, pool *Pool) {
-	a.accountPools.Set(id, pool)
+	value, created := a.accountPools.GetOrCreate(id, func() *Pool {
+		return pool
+	})
+
+	if !created {
+		// if there was already an entry, we need to subtract the former
+		// stake first and set the new value
+		// TODO: use safemath
+		a.totalStake -= value.PoolStake
+		a.totalValidatorStake -= value.ValidatorStake
+
+		a.accountPools.Set(id, pool)
+	}
 
 	a.totalStake += pool.PoolStake
 	a.totalValidatorStake += pool.ValidatorStake
