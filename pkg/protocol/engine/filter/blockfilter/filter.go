@@ -20,6 +20,7 @@ var (
 	ErrInvalidSignature                          = errors.New("block has invalid signature")
 	ErrInvalidProofOfWork                        = errors.New("error validating PoW")
 	ErrTransactionCommitmentInputTooFarInThePast = errors.New("transaction in a block references too old CommitmentInput")
+	ErrTransactionCommitmentInputInTheFuture     = errors.New("transaction in a block references a CommitmentInput in the future")
 )
 
 // Filter filters blocks.
@@ -139,7 +140,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 			if commitmentInput.CommitmentID.Index() > block.SlotCommitment().Index() {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,
-					Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while max allowed is %d", commitmentInput.CommitmentID.Index(), block.SlotCommitment().Index()),
+					Reason: errors.WithMessagef(ErrTransactionCommitmentInputInTheFuture, "transaction in a block contains CommitmentInput to slot %d while max allowed is %d", commitmentInput.CommitmentID.Index(), block.SlotCommitment().Index()),
 					Source: source,
 				})
 

@@ -417,7 +417,7 @@ func WithStakingEndEpoch(endEpoch iotago.EpochIndex) options.Option[iotago.Accou
 	return func(accountOutput *iotago.AccountOutput) {
 		staking := accountOutput.FeatureSet().Staking()
 		if staking == nil {
-			panic("cannot update staking end epoch on account without BlockIssuer feature")
+			panic("cannot update staking end epoch on account without Staking feature")
 		}
 		staking.EndEpoch = endEpoch
 	}
