@@ -127,7 +127,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 			// and the slot that block is committing to.
 
 			// Parameters moved to the other side of inequality to avoid underflow errors with subtraction from an uint64 type.
-			if commitmentInput.CommitmentID.Index()+protocolParams.EvictionAge+protocolParams.EvictionAge < block.ID().Index() {
+			if commitmentInput.CommitmentID.Index()+protocolParams.LivenessThreshold+protocolParams.EvictionAge < block.ID().Index() {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,
 					Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while min allowed is %d", commitmentInput.CommitmentID.Index(), block.ID().Index()-protocolParams.LivenessThreshold-protocolParams.EvictionAge),
