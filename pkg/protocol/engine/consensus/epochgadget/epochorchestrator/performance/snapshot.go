@@ -83,6 +83,7 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 			return errors.Wrap(err, "unable to read slot index")
 		}
 
+		// TODO: if accounts count is limited to the committee size, we can lower this to uint8 or other matching value
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
 			return errors.Wrap(err, "unable to read accounts count")
@@ -94,7 +95,8 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
 				return errors.Wrapf(err, "unable to read account id for the slot index %d", slotIndex)
 			}
-			var performanceFactor uint64
+			// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
+			var performanceFactor uint16
 			if err := binary.Read(reader, binary.LittleEndian, &performanceFactor); err != nil {
 				return errors.Wrapf(err, "unable to read performance factor for account %s and slot index %d", accountID.String(), slotIndex)
 			}
@@ -207,12 +209,12 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 		if err := pWriter.WriteValue("slot index", currentSlot); err != nil {
 			return errors.Wrap(err, "unable to write slot index")
 		}
-
+		// TODO: if accounts count is limited to the committee size, we can lower this to uint8 or other matching value
 		var accountsCount uint64
 		if err := pWriter.WriteValue("pf account count", accountsCount, true); err != nil {
 			return errors.Wrap(err, "unable to write pf accounts count")
 		}
-
+		// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
 		if err := t.performanceFactorsFunc(currentSlot).ForEachPerformanceFactor(func(accountID iotago.AccountID, pf uint64) error {
 			if err := pWriter.WriteValue("account id", accountID); err != nil {
 				return errors.Wrap(err, "unable to write account id")
