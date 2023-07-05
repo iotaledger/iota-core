@@ -170,35 +170,37 @@ func (t *TipMetadata) Block() *blocks.Block {
 	return t.block
 }
 
-// TipPool is a receptor that holds the tip pool the block is currently in.
+// TipPool exposes a ValueReceptor that stores the current TipPool of the block.
 func (t *TipMetadata) TipPool() *agential.ValueReceptor[tipmanager.TipPool] {
 	return t.tipPool
 }
 
-// LivenessThresholdReached is a receptor that holds a boolean value indicating if the liveness threshold is reached.
-func (t *TipMetadata) LivenessThresholdReached() *agential.ValueReceptor[bool] {
+// IsLivenessThresholdReached exposes a ValueReceptor that stores if the liveness threshold was reached.
+func (t *TipMetadata) IsLivenessThresholdReached() *agential.ValueReceptor[bool] {
 	return t.isLivenessThresholdReached
 }
 
-// IsStrongTip returns true if the block is currently an unreferenced strong tip.
+// IsStrongTip returns a Value that indicates if the block is a strong tip.
 func (t *TipMetadata) IsStrongTip() agential.Value[bool] {
 	return t.isStrongTip
 }
 
-// IsWeakTip returns true if the block is an unreferenced weak tip.
+// IsWeakTip returns a Value that indicates if the block is a weak tip.
 func (t *TipMetadata) IsWeakTip() agential.Value[bool] {
 	return t.isWeakTip
 }
 
-// IsOrphaned returns true if the block is marked orphaned or if it has an orphaned strong parent.
+// IsOrphaned returns a Value that indicates if the block was orphaned.
 func (t *TipMetadata) IsOrphaned() agential.Value[bool] {
 	return t.isOrphaned
 }
 
-func (t *TipMetadata) Evicted() agential.Value[bool] {
+// IsEvicted returns true if the block was evicted from the TipManager.
+func (t *TipMetadata) IsEvicted() agential.Value[bool] {
 	return t.isEvicted
 }
 
+// Constructed returns a value that indicates if the TipMetadata has initialized all its properties.
 func (t *TipMetadata) Constructed() agential.Value[bool] {
 	return t.constructed
 }
