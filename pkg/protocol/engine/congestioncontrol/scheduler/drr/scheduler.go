@@ -26,10 +26,10 @@ type Scheduler struct {
 	optsMaxBufferSize                  int
 	optsAcceptedBlockScheduleThreshold time.Duration
 	optsMaxDeficit                     uint64
-	optsMinMana                        uint64
+	optsMinMana                        iotago.Mana
 	optsTokenBucketSize                float64
 
-	manaRetrieveFunc func(iotago.AccountID) (uint64, error)
+	manaRetrieveFunc func(iotago.AccountID) (iotago.Mana, error)
 
 	buffer      *BufferQueue
 	bufferMutex sync.RWMutex
@@ -62,7 +62,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 				s.updateChildren(block)
 			})
 			e.Ledger.HookInitialized(func() {
-				s.manaRetrieveFunc = func(accountID iotago.AccountID) (uint64, error) {
+				s.manaRetrieveFunc = func(accountID iotago.AccountID) (iotago.Mana, error) {
 					manaSlot := e.Storage.Settings().LatestCommitment().Index()
 
 					return e.Ledger.ManaManager().GetManaOnAccount(accountID, manaSlot)
@@ -213,7 +213,7 @@ func (s *Scheduler) skipBlock(block *blocks.Block) {
 	}
 }
 
-func (s *Scheduler) quantum(accountID iotago.AccountID) (uint64, error) {
+func (s *Scheduler) quantum(accountID iotago.AccountID) (iotago.Mana, error) {
 	mana, err := s.manaRetrieveFunc(accountID)
 
 	return mana / s.optsMinMana, err
@@ -363,6 +363,7 @@ func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds int64) er
 	if err == nil {
 		err = s.updateDeficit(issuerID, int64(quantum)*rounds)
 	}
+
 	return err
 }
 

@@ -8,7 +8,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type PassThroughScheduler struct {
+type Scheduler struct {
 	events *scheduler.Events
 
 	module.Module
@@ -29,20 +29,20 @@ func NewProvider() module.Provider[*engine.Engine, scheduler.Scheduler] {
 	})
 }
 
-func New() *PassThroughScheduler {
-	return &PassThroughScheduler{
+func New() *Scheduler {
+	return &Scheduler{
 		events: scheduler.NewEvents(),
 	}
 }
 
-func (s *PassThroughScheduler) Shutdown() {
+func (s *Scheduler) Shutdown() {
 }
 
-func (s *PassThroughScheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...*blocks.Block) bool {
+func (s *Scheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...*blocks.Block) bool {
 	return true
 }
 
-func (s *PassThroughScheduler) AddBlock(block *blocks.Block) {
+func (s *Scheduler) AddBlock(block *blocks.Block) {
 	if block.SetScheduled() {
 		s.events.BlockScheduled.Trigger(block)
 	}

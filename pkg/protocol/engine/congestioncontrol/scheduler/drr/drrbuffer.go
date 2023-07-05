@@ -83,7 +83,7 @@ func (b *BufferQueue) GetOrCreateIssuerQueue(issuerID iotago.AccountID) (*Issuer
 
 // Submit submits a block. Return blocks dropped from the scheduler to make room for the submitted block.
 // The submitted block can also be returned as dropped if the issuer does not have enough access mana.
-func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.AccountID) (uint64, error)) (elements []*blocks.Block, err error) {
+func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.AccountID) (iotago.Mana, error)) (elements []*blocks.Block, err error) {
 	issuerID := blk.Block().IssuerID
 	issuerQueue, err := b.GetOrCreateIssuerQueue(issuerID)
 	if err != nil {
@@ -105,7 +105,7 @@ func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.Accoun
 	return nil, nil
 }
 
-func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (uint64, error)) (droppedBlocks []*blocks.Block) {
+func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (iotago.Mana, error)) (droppedBlocks []*blocks.Block) {
 	start := b.Current()
 	// remove as many blocks as necessary to stay within max buffer size
 	for b.Size() > b.maxBuffer {
