@@ -18,7 +18,7 @@ type DerivedValueReceptor[ValueType comparable] struct {
 	unsubscribeMutex sync.Mutex
 }
 
-// Unsubscribe unsubscribes the DerivedValueReceptor from the input values.
+// Unsubscribe unsubscribes the DerivedValueReceptor from its input values.
 func (d *DerivedValueReceptor[ValueType]) Unsubscribe() {
 	d.unsubscribeMutex.Lock()
 	defer d.unsubscribeMutex.Unlock()
