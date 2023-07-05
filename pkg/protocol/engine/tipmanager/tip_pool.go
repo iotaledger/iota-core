@@ -17,6 +17,7 @@ const (
 	DroppedTipPool
 )
 
+// Max returns the maximum of the two TipPools.
 func (t TipPool) Max(other TipPool) TipPool {
 	if t > other {
 		return t
