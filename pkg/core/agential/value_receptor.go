@@ -8,16 +8,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
-// NewValueReceptor creates a new ValueReceptor instance with an optional transformation function that
-// can be used to rewrite the set value before it is stored.
-func NewValueReceptor[T comparable](transformationFunc ...func(currentValue T, newValue T) T) *ValueReceptor[T] {
-	return &ValueReceptor[T]{
-		transformationFunc:  lo.First(transformationFunc, func(_ T, newValue T) T { return newValue }),
-		registeredCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(prevValue, newValue T)]](),
-	}
-}
-
-// ValueReceptor implements the ValueReceptor interface.
+// ValueReceptor is an agent that can receive and hold a value. Its task is to inform subscribed consumers about
+// updates.
+//
+// The registered callbacks are guaranteed to receive all updates in exactly the same order as they happened and no
+// callback is ever more than 1 round of updates ahead of other callbacks.
 type ValueReceptor[T comparable] struct {
 	// value holds the current value.
 	value T
@@ -39,6 +34,15 @@ type ValueReceptor[T comparable] struct {
 
 	// setMutex is used to ensure that the order of updates is preserved.
 	setMutex sync.Mutex
+}
+
+// NewValueReceptor creates a new ValueReceptor instance with an optional transformation function that
+// can be used to rewrite the set value before it is stored.
+func NewValueReceptor[T comparable](transformationFunc ...func(currentValue T, newValue T) T) *ValueReceptor[T] {
+	return &ValueReceptor[T]{
+		transformationFunc:  lo.First(transformationFunc, func(_ T, newValue T) T { return newValue }),
+		registeredCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(prevValue, newValue T)]](),
+	}
 }
 
 // Get returns the current value.
