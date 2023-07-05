@@ -158,12 +158,12 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 }
 
 func (t *Tracker) storeCommitteeForEpoch(epochIndex iotago.EpochIndex, committee *account.Accounts) error {
-	accountsBytes, err := committee.Bytes()
+	committeeBytes, err := committee.Bytes()
 	if err != nil {
 		return err
 	}
 
-	return t.committeeStore.Set(epochIndex.Bytes(), accountsBytes)
+	return t.committeeStore.Set(epochIndex.Bytes(), committeeBytes)
 }
 
 func (t *Tracker) aggregatePerformanceFactors(issuedBlocksPerSlot []uint64) uint64 {
