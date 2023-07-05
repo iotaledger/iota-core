@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/iotaledger/iota-core/pkg/protocol"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
 //nolint:unused // transactions are currently unused
@@ -94,7 +94,7 @@ type infoResponse struct {
 	// The metrics of this node.
 	Metrics nodeMetrics `json:"metrics"`
 	// The protocol versions this node supports.
-	SupportedProtocolVersions protocol.Versions `json:"supportedProtocolVersions"`
+	SupportedProtocolVersions nodeclient.Versions `json:"supportedProtocolVersions"`
 	// The protocol parameters used by this node.
 	ProtocolParameters json.RawMessage `json:"protocol"`
 	// todo The base token of the network.

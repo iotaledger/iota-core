@@ -277,7 +277,7 @@ func (m *Manager) RollbackDiff(index iotago.SlotIndex, newOutputs Outputs, newSp
 	return m.RollbackDiffWithoutLocking(index, newOutputs, newSpents)
 }
 
-func (m *Manager) CheckLedgerState(tokenSupply uint64) error {
+func (m *Manager) CheckLedgerState(tokenSupply iotago.BaseToken) error {
 	total, _, err := m.ComputeLedgerBalance()
 	if err != nil {
 		return err

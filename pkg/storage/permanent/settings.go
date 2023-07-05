@@ -100,7 +100,7 @@ func (s *Settings) LatestCommitment() *model.Commitment {
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 
-		if s.api.TimeProvider().SlotDuration() == 0 {
+		if s.api.TimeProvider().SlotDurationSeconds() == 0 {
 			panic("accessing the LatestCommitment before the settings are initialized")
 		}
 		s.latestCommitment = lo.PanicOnErr(model.CommitmentFromCommitment(s.settingsModel.LatestCommitment, s.api))
@@ -210,7 +210,7 @@ func (s *Settings) tryImport(reader io.ReadSeeker) (err error) {
 	}
 
 	if consumedBytes, fromBytesErr := s.FromBytes(settingsBytes); fromBytesErr != nil {
-		return errors.Wrapf(fromBytesErr, "failed to read settings")
+		return errors.Wrap(fromBytesErr, "failed to read settings")
 	} else if consumedBytes != len(settingsBytes) {
 		return errors.Errorf("failed to read settings: consumed bytes (%d) != expected bytes (%d)", consumedBytes, len(settingsBytes))
 	}

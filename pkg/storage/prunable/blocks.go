@@ -55,7 +55,7 @@ func (b *Blocks) ForEachBlockIDInSlot(consumer func(blockID iotago.BlockID) erro
 			return false
 		}
 
-		return consumer(blockID) != nil
+		return consumer(blockID) == nil
 	}); err != nil {
 		return errors.Wrapf(err, "failed to stream blockIDs for slot %s", b.slot)
 	}

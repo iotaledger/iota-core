@@ -17,7 +17,7 @@ func (t *TestSuite) AssertStorageAccountDiffs(slotIndex iotago.SlotIndex, accoun
 			t.Eventually(func() error {
 				storedDiffChange, _, err := node.Protocol.MainEngineInstance().Storage.AccountDiffs(slotIndex).Load(accountID)
 				if err != nil {
-					return errors.Wrapf(err, "AssertStorageAccountDiffs: %s: error loading account diff: %s", node.Name, accountID.String())
+					return errors.Wrapf(err, "AssertStorageAccountDiffs: %s: error loading account diff: %s", node.Name, accountID)
 				}
 				// todo finish this, connect to other tests, is cmp enough
 				if !cmp.Equal(diffChange, storedDiffChange) {

@@ -209,7 +209,7 @@ func (m *Manager) UnspentOutputs(options ...IterateOption) (Outputs, error) {
 	return outputs, nil
 }
 
-func (m *Manager) ComputeLedgerBalance(options ...IterateOption) (balance uint64, count int, err error) {
+func (m *Manager) ComputeLedgerBalance(options ...IterateOption) (balance iotago.BaseToken, count int, err error) {
 	balance = 0
 	count = 0
 	consumerFunc := func(output *Output) bool {

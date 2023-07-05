@@ -2,6 +2,7 @@ package accountsledger_test
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -33,11 +34,11 @@ type TestSuite struct {
 
 	ProtocolParameters *iotago.ProtocolParameters
 
-	slotData                 *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *slotData]
-	accountsStatePerSlot     *shrinkingmap.ShrinkingMap[iotago.SlotIndex, map[iotago.AccountID]*AccountState]
-	latestOutputIDPerAccount *shrinkingmap.ShrinkingMap[iotago.AccountID, *latestAccountOutputID]
-	blocks                   *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
-	Instance                 *accountsledger.Manager
+	slotData               *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *slotData]
+	accountsStatePerSlot   *shrinkingmap.ShrinkingMap[iotago.SlotIndex, map[iotago.AccountID]*AccountState]
+	latestFieldsPerAccount *shrinkingmap.ShrinkingMap[iotago.AccountID, *latestAccountFields]
+	blocks                 *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
+	Instance               *accountsledger.Manager
 }
 
 func NewTestSuite(test *testing.T) *TestSuite {
@@ -57,17 +58,18 @@ func NewTestSuite(test *testing.T) *TestSuite {
 				VBFactorData: 1,
 				VBFactorKey:  10,
 			},
-			TokenSupply:           utils.RandAmount(),
+			TokenSupply:           tpkg.RandBaseToken(math.MaxUint64),
 			GenesisUnixTimestamp:  time.Now().Unix(),
 			SlotDurationInSeconds: 10,
-			EvictionAge:           10,
+			SlotsPerEpochExponent: 13,
+			EvictionAge:           6,
 			LivenessThreshold:     3,
 		},
 
-		blocks:                   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block](),
-		slotData:                 shrinkingmap.New[iotago.SlotIndex, *slotData](),
-		accountsStatePerSlot:     shrinkingmap.New[iotago.SlotIndex, map[iotago.AccountID]*AccountState](),
-		latestOutputIDPerAccount: shrinkingmap.New[iotago.AccountID, *latestAccountOutputID](),
+		blocks:                 memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block](),
+		slotData:               shrinkingmap.New[iotago.SlotIndex, *slotData](),
+		accountsStatePerSlot:   shrinkingmap.New[iotago.SlotIndex, map[iotago.AccountID]*AccountState](),
+		latestFieldsPerAccount: shrinkingmap.New[iotago.AccountID, *latestAccountFields](),
 	}
 
 	t.Instance = t.initAccountLedger()
@@ -96,8 +98,8 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 		return storage.Get(id)
 	}
 
-	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB(), t.API())
-	manager.SetLivenessThreshold(t.ProtocolParameters.LivenessThreshold)
+	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB())
+	manager.SetCommitmentEvictionAge(t.ProtocolParameters.EvictionAge * 2)
 
 	return manager
 }
@@ -133,34 +135,60 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 			slotDetails.DestroyedAccounts.Add(accountID)
 		}
 
-		//
-		prevAccountOutputID, exists := t.latestOutputIDPerAccount.Get(accountID)
+		prevAccountFields, exists := t.latestFieldsPerAccount.Get(accountID)
 		if !exists {
-			prevAccountOutputID = &latestAccountOutputID{
-				OutputID:  iotago.EmptyOutputID,
-				UpdatedAt: 0,
+			prevAccountFields = &latestAccountFields{
+				OutputID:       iotago.EmptyOutputID,
+				BICUpdatedAt:   0,
+				UpdatedInSlots: advancedset.New[iotago.SlotIndex](),
 			}
+			t.latestFieldsPerAccount.Set(accountID, prevAccountFields)
 		}
+		prevAccountFields.UpdatedInSlots.Add(slotIndex)
 
 		// Put everything together in the format that the manager expects.
 		slotDetails.SlotDiff[accountID] = &prunable.AccountDiff{
-			Change:         int64(action.TotalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
-			PubKeysAdded:   t.PublicKeys(action.AddedKeys, true),
-			PubKeysRemoved: t.PublicKeys(action.RemovedKeys, true),
+			BICChange:           iotago.BlockIssuanceCredits(action.TotalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
+			PubKeysAdded:        t.PublicKeys(action.AddedKeys, true),
+			PubKeysRemoved:      t.PublicKeys(action.RemovedKeys, true),
+			PreviousUpdatedTime: prevAccountFields.BICUpdatedAt,
 
-			PreviousUpdatedTime: prevAccountOutputID.UpdatedAt,
-			PreviousOutputID:    prevAccountOutputID.OutputID,
+			DelegationStakeChange: action.DelegationStakeChange,
+			ValidatorStakeChange:  action.ValidatorStakeChange,
+			StakeEndEpochChange:   action.StakeEndEpochChange,
+			FixedCostChange:       action.FixedCostChange,
+		}
+
+		if action.TotalAllotments+lo.Sum(action.Burns...) != 0 || !exists {
+			prevAccountFields.BICUpdatedAt = slotIndex
 		}
 
 		// If an output ID is specified, we need to update the latest output ID for the account as we transitioned it within this slot.
+		// Account creation and transition.
 		if action.NewOutputID != "" {
 			outputID := t.OutputID(action.NewOutputID, true)
-			slotDetails.SlotDiff[accountID].NewOutputID = outputID
-			t.latestOutputIDPerAccount.Set(accountID, &latestAccountOutputID{
-				OutputID:  outputID,
-				UpdatedAt: slotIndex,
-			})
+			slotDiff := slotDetails.SlotDiff[accountID]
+
+			slotDiff.NewOutputID = outputID
+			slotDiff.PreviousOutputID = prevAccountFields.OutputID
+
+			prevAccountFields.OutputID = outputID
+
+		} else if action.StakeEndEpochChange != 0 || action.ValidatorStakeChange != 0 || action.FixedCostChange != 0 {
+			panic("need to update outputID when updating stake end epoch or staking change")
 		}
+
+		// Account destruction.
+		if prevAccountFields.OutputID != iotago.EmptyOutputID && slotDetails.SlotDiff[accountID].NewOutputID == iotago.EmptyOutputID {
+			slotDetails.SlotDiff[accountID].PreviousOutputID = prevAccountFields.OutputID
+		}
+
+		// Sanity check for an incorrect case.
+		if prevAccountFields.OutputID == iotago.EmptyOutputID && slotDetails.SlotDiff[accountID].NewOutputID == iotago.EmptyOutputID {
+			panic("previous account OutputID in the local map and NewOutputID in slot diff cannot be empty")
+		}
+
+		fmt.Printf("prepared state diffs %+v\nprevAccountdata %+v\n", slotDetails.SlotDiff[accountID], prevAccountFields)
 	}
 
 	// Clone the diffs to prevent the manager from modifying it.
@@ -173,7 +201,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 	require.NoError(t.T, err)
 }
 
-func (t *TestSuite) createBlockWithBurn(accountID iotago.AccountID, index iotago.SlotIndex, burn uint64) *blocks.Block {
+func (t *TestSuite) createBlockWithBurn(accountID iotago.AccountID, index iotago.SlotIndex, burn iotago.Mana) *blocks.Block {
 	innerBlock := tpkg.RandBlockWithIssuerAndBurnedMana(accountID, burn)
 	innerBlock.IssuingTime = t.API().TimeProvider().SlotStartTime(index)
 	modelBlock, err := model.BlockFromBlock(innerBlock, t.API())
@@ -187,7 +215,7 @@ func (t *TestSuite) AssertAccountLedgerUntilWithoutNewState(slotIndex iotago.Slo
 	// Assert the state for each slot.
 	for i := iotago.SlotIndex(1); i <= slotIndex; i++ {
 		storedAccountsState, exists := t.accountsStatePerSlot.Get(i)
-		require.True(t.T, exists)
+		require.True(t.T, exists, "accountsStatePerSlot should exist for slot %d should exist", i)
 
 		for accountID, expectedState := range storedAccountsState {
 			t.assertAccountState(i, accountID, expectedState)
@@ -211,7 +239,7 @@ func (t *TestSuite) AssertAccountLedgerUntil(slotIndex iotago.SlotIndex, account
 
 func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
 	expectedPubKeys := advancedset.New(t.PublicKeys(expectedState.PubKeys, false)...)
-	expectedCredits := accounts.NewBlockIssuanceCredits(int64(expectedState.Amount), expectedState.UpdatedTime)
+	expectedCredits := accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(expectedState.BICAmount), expectedState.BICUpdatedTime)
 
 	actualState, exists, err := t.Instance.Account(accountID, slotIndex)
 	require.NoError(t.T, err)
@@ -229,11 +257,16 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 	require.Truef(t.T, expectedPubKeys.Equal(actualState.PubKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedPubKeys, actualState.PubKeys)
 
 	require.Equal(t.T, t.OutputID(expectedState.OutputID, false), actualState.OutputID)
+
+	require.Equal(t.T, expectedState.StakeEndEpoch, actualState.StakeEndEpoch, "slotIndex: %d, accountID %s: expected StakeEndEpoch: %d, actual: %d", slotIndex, accountID, expectedState.StakeEndEpoch, actualState.StakeEndEpoch)
+	require.Equal(t.T, expectedState.ValidatorStake, actualState.ValidatorStake, "slotIndex: %d, accountID %s: expected ValidatorStake: %d, actual: %d", slotIndex, accountID, expectedState.ValidatorStake, actualState.ValidatorStake)
+	require.Equal(t.T, expectedState.FixedCost, actualState.FixedCost, "slotIndex: %d, accountID %s: expected FixedCost: %d, actual: %d", slotIndex, accountID, expectedState.FixedCost, actualState.FixedCost)
+	require.Equal(t.T, expectedState.DelegationStake, actualState.DelegationStake, "slotIndex: %d, accountID %s: expected DelegationStake: %d, actual: %d", slotIndex, accountID, expectedState.DelegationStake, actualState.DelegationStake)
 }
 
 func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
 	actualDiff, destroyed, err := t.Instance.LoadSlotDiff(slotIndex, accountID)
-	if expectedState.UpdatedTime < slotIndex {
+	if !lo.Return1(t.latestFieldsPerAccount.Get(accountID)).UpdatedInSlots.Has(slotIndex) {
 		require.Errorf(t.T, err, "expected error for account %s at slot %d", accountID, slotIndex)
 		return
 	}
@@ -255,7 +288,7 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 			require.True(t.T, exists)
 
 			require.Equal(t.T, t.PublicKeys(previousAccountState[accountID].PubKeys, false), actualDiff.PubKeysRemoved)
-			require.Equal(t.T, -int64(previousAccountState[accountID].Amount), actualDiff.Change)
+			require.Equal(t.T, -iotago.BlockIssuanceCredits(previousAccountState[accountID].BICAmount), actualDiff.BICChange)
 			require.Equal(t.T, iotago.EmptyOutputID, actualDiff.NewOutputID)
 
 			return
@@ -263,7 +296,7 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 	}
 
 	require.Equal(t.T, expectedAccountDiff.NewOutputID, actualDiff.NewOutputID)
-	require.Equal(t.T, expectedAccountDiff.Change-int64(accountsSlotBuildData.Burns[accountID]), actualDiff.Change)
+	require.Equal(t.T, expectedAccountDiff.BICChange-iotago.BlockIssuanceCredits(accountsSlotBuildData.Burns[accountID]), actualDiff.BICChange)
 	require.Equal(t.T, expectedAccountDiff.PubKeysAdded, actualDiff.PubKeysAdded)
 	require.Equal(t.T, expectedAccountDiff.PubKeysRemoved, actualDiff.PubKeysRemoved)
 }
@@ -314,32 +347,44 @@ func (t *TestSuite) PublicKeys(pubKeys []string, createIfNotExists bool) []ed255
 }
 
 type AccountActions struct {
-	TotalAllotments uint64
-	Burns           []uint64
+	TotalAllotments iotago.Mana
+	Burns           []iotago.Mana
 	Destroyed       bool
 	AddedKeys       []string
 	RemovedKeys     []string
+
+	ValidatorStakeChange int64
+	StakeEndEpochChange  int64
+	FixedCostChange      int64
+
+	DelegationStakeChange int64
 
 	NewOutputID string
 }
 
 type AccountState struct {
-	Amount   uint64
+	BICAmount      iotago.Mana
+	BICUpdatedTime iotago.SlotIndex
+
 	OutputID string
 	PubKeys  []string
 
-	UpdatedTime iotago.SlotIndex
+	ValidatorStake  iotago.BaseToken
+	DelegationStake iotago.BaseToken
+	FixedCost       iotago.Mana
+	StakeEndEpoch   iotago.EpochIndex
 
 	Destroyed bool
 }
 
-type latestAccountOutputID struct {
-	OutputID  iotago.OutputID
-	UpdatedAt iotago.SlotIndex
+type latestAccountFields struct {
+	OutputID       iotago.OutputID
+	BICUpdatedAt   iotago.SlotIndex
+	UpdatedInSlots *advancedset.AdvancedSet[iotago.SlotIndex]
 }
 
 type slotData struct {
-	Burns             map[iotago.AccountID]uint64
+	Burns             map[iotago.AccountID]iotago.Mana
 	SlotDiff          map[iotago.AccountID]*prunable.AccountDiff
 	DestroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]
 }
@@ -347,7 +392,7 @@ type slotData struct {
 func newSlotData() *slotData {
 	return &slotData{
 		DestroyedAccounts: advancedset.New[iotago.AccountID](),
-		Burns:             make(map[iotago.AccountID]uint64),
+		Burns:             make(map[iotago.AccountID]iotago.Mana),
 		SlotDiff:          make(map[iotago.AccountID]*prunable.AccountDiff),
 	}
 }

@@ -1,6 +1,11 @@
 package prunable
 
 import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
+
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
@@ -18,7 +23,8 @@ const (
 
 // AccountDiff represent the storable changes for a single account within a slot.
 type AccountDiff struct {
-	Change              int64
+	BICChange iotago.BlockIssuanceCredits
+
 	PreviousUpdatedTime iotago.SlotIndex
 
 	// OutputID to which the Account has been transitioned to.
@@ -29,100 +35,163 @@ type AccountDiff struct {
 
 	PubKeysAdded   []ed25519.PublicKey
 	PubKeysRemoved []ed25519.PublicKey
+
+	ValidatorStakeChange  int64
+	DelegationStakeChange int64
+	StakeEndEpochChange   int64
+	FixedCostChange       int64
 }
 
 // NewAccountDiff creates a new AccountDiff instance.
 func NewAccountDiff() *AccountDiff {
 	return &AccountDiff{
-		Change:              0,
-		PreviousUpdatedTime: 0,
-		NewOutputID:         iotago.EmptyOutputID,
-		PreviousOutputID:    iotago.EmptyOutputID,
-		PubKeysAdded:        make([]ed25519.PublicKey, 0),
-		PubKeysRemoved:      make([]ed25519.PublicKey, 0),
+		BICChange:             0,
+		PreviousUpdatedTime:   0,
+		NewOutputID:           iotago.EmptyOutputID,
+		PreviousOutputID:      iotago.EmptyOutputID,
+		PubKeysAdded:          make([]ed25519.PublicKey, 0),
+		PubKeysRemoved:        make([]ed25519.PublicKey, 0),
+		ValidatorStakeChange:  0,
+		DelegationStakeChange: 0,
+		StakeEndEpochChange:   0,
+		FixedCostChange:       0,
 	}
 }
 
-func (b AccountDiff) Bytes() ([]byte, error) {
+func (d AccountDiff) Bytes() ([]byte, error) {
 	m := marshalutil.New()
 
-	m.WriteInt64(b.Change)
-	m.WriteUint64(uint64(b.PreviousUpdatedTime))
-	m.WriteBytes(lo.PanicOnErr(b.NewOutputID.Bytes()))
-	m.WriteBytes(lo.PanicOnErr(b.PreviousOutputID.Bytes()))
-	m.WriteUint64(uint64(len(b.PubKeysAdded)))
-	for _, pubKey := range b.PubKeysAdded {
+	m.WriteInt64(int64(d.BICChange))
+	m.WriteUint64(uint64(d.PreviousUpdatedTime))
+	m.WriteBytes(lo.PanicOnErr(d.NewOutputID.Bytes()))
+	m.WriteBytes(lo.PanicOnErr(d.PreviousOutputID.Bytes()))
+	m.WriteUint8(uint8(len(d.PubKeysAdded)))
+	for _, pubKey := range d.PubKeysAdded {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
 	}
-	m.WriteUint64(uint64(len(b.PubKeysRemoved)))
-	for _, pubKey := range b.PubKeysRemoved {
+	m.WriteUint8(uint8(len(d.PubKeysRemoved)))
+	for _, pubKey := range d.PubKeysRemoved {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
 	}
+
+	m.WriteInt64(d.ValidatorStakeChange)
+	m.WriteInt64(d.DelegationStakeChange)
+	m.WriteInt64(d.FixedCostChange)
+	m.WriteUint64(uint64(d.StakeEndEpochChange))
 
 	return m.Bytes(), nil
 }
 
-func (b *AccountDiff) Clone() *AccountDiff {
+func (d *AccountDiff) Clone() *AccountDiff {
 	return &AccountDiff{
-		Change:              b.Change,
-		PreviousUpdatedTime: b.PreviousUpdatedTime,
-		NewOutputID:         b.NewOutputID,
-		PreviousOutputID:    b.PreviousOutputID,
-		PubKeysAdded:        lo.CopySlice(b.PubKeysAdded),
-		PubKeysRemoved:      lo.CopySlice(b.PubKeysRemoved),
+		BICChange:             d.BICChange,
+		PreviousUpdatedTime:   d.PreviousUpdatedTime,
+		NewOutputID:           d.NewOutputID,
+		PreviousOutputID:      d.PreviousOutputID,
+		PubKeysAdded:          lo.CopySlice(d.PubKeysAdded),
+		PubKeysRemoved:        lo.CopySlice(d.PubKeysRemoved),
+		ValidatorStakeChange:  d.ValidatorStakeChange,
+		DelegationStakeChange: d.DelegationStakeChange,
+		FixedCostChange:       d.FixedCostChange,
+		StakeEndEpochChange:   d.StakeEndEpochChange,
 	}
 }
 
-func (b *AccountDiff) FromBytes(bytes []byte) (int, error) {
-	m := marshalutil.New(bytes)
+func (d *AccountDiff) FromBytes(b []byte) (int, error) {
+	return d.readFromReadSeeker(bytes.NewReader(b))
+}
 
-	change, err := m.ReadInt64()
+func (d *AccountDiff) FromReader(readSeeker io.ReadSeeker) error {
+	return lo.Return2(d.readFromReadSeeker(readSeeker))
+}
+
+func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err error) {
+	if err = binary.Read(reader, binary.LittleEndian, &d.BICChange); err != nil {
+		return offset, errors.Wrap(err, "unable to read account BIC balance value in the diff")
+	}
+	offset += 8
+
+	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousUpdatedTime); err != nil {
+		return offset, errors.Wrap(err, "unable to read previous updated time in the diff")
+	}
+	offset += 8
+
+	if err = binary.Read(reader, binary.LittleEndian, &d.NewOutputID); err != nil {
+		return offset, errors.Wrap(err, "unable to read new outputID in the diff")
+	}
+
+	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousOutputID); err != nil {
+		return offset, errors.Wrap(err, "unable to read previous outputID in the diff")
+	}
+
+	keysAdded, bytesRead, err := readPubKeys(reader)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to unmarshal change")
+		return offset, errors.Wrap(err, "unable to read added pubKeys in the diff")
 	}
+	offset += bytesRead
 
-	b.Change = change
+	d.PubKeysAdded = keysAdded
 
-	previousUpdatedTime, err := m.ReadUint64()
+	keysRemoved, bytesRead, err := readPubKeys(reader)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to unmarshal previous updated time")
+		return offset, errors.Wrap(err, "unable to read removed pubKeys in the diff")
 	}
+	offset += bytesRead
 
-	b.PreviousUpdatedTime = iotago.SlotIndex(previousUpdatedTime)
+	d.PubKeysRemoved = keysRemoved
 
-	if _, err = b.NewOutputID.FromBytes(lo.PanicOnErr(m.ReadBytes(iotago.OutputIDLength))); err != nil {
-		return 0, errors.Wrap(err, "failed to unmarshal new output id")
+	if err = binary.Read(reader, binary.LittleEndian, &d.ValidatorStakeChange); err != nil {
+		return offset, errors.Wrap(err, "unable to read validator stake change in the diff")
 	}
+	offset += 8
 
-	if _, err = b.PreviousOutputID.FromBytes(lo.PanicOnErr(m.ReadBytes(iotago.OutputIDLength))); err != nil {
-		return 0, errors.Wrap(err, "failed to unmarshal previous output id")
+	if err = binary.Read(reader, binary.LittleEndian, &d.DelegationStakeChange); err != nil {
+		return offset, errors.Wrap(err, "unable to read delegation stake change in the diff")
 	}
+	offset += 8
 
-	addedPubKeysLen := lo.PanicOnErr(m.ReadUint64())
-	b.PubKeysAdded = make([]ed25519.PublicKey, addedPubKeysLen)
+	if err = binary.Read(reader, binary.LittleEndian, &d.FixedCostChange); err != nil {
+		return offset, errors.Wrap(err, "unable to read fixed cost change in the diff")
+	}
+	offset += 8
 
-	for i := uint64(0); i < addedPubKeysLen; i++ {
-		pubKey := ed25519.PublicKey{}
-		if _, err = pubKey.FromBytes(lo.PanicOnErr(m.ReadBytes(ed25519.PublicKeySize))); err != nil {
-			return 0, errors.Wrap(err, "failed to unmarshal public key")
+	if err = binary.Read(reader, binary.LittleEndian, &d.StakeEndEpochChange); err != nil {
+		return offset, errors.Wrap(err, "unable to read new stake end epoch in the diff")
+	}
+	offset += 8
+
+	return offset, nil
+}
+
+func readPubKeys(reader io.ReadSeeker) ([]ed25519.PublicKey, int, error) {
+	var bytesConsumed int
+
+	var pubKeysLength uint8
+	if err := binary.Read(reader, binary.LittleEndian, &pubKeysLength); err != nil {
+		return nil, bytesConsumed, errors.Wrap(err, "unable to read pubKeys length in the diff")
+	}
+	bytesConsumed++
+
+	pubKeys := make([]ed25519.PublicKey, 0, pubKeysLength)
+	for k := uint8(0); k < pubKeysLength; k++ {
+		pubKey, bytesRead, err := readPubKey(reader)
+		if err != nil {
+			return nil, bytesConsumed, err
 		}
+		bytesConsumed += bytesRead
 
-		b.PubKeysAdded[i] = pubKey
+		pubKeys = append(pubKeys, pubKey)
 	}
 
-	removedPubKeysLen := lo.PanicOnErr(m.ReadUint64())
-	b.PubKeysRemoved = make([]ed25519.PublicKey, removedPubKeysLen)
+	return pubKeys, bytesConsumed, nil
+}
 
-	for i := uint64(0); i < removedPubKeysLen; i++ {
-		pubKey := ed25519.PublicKey{}
-		if _, err = pubKey.FromBytes(lo.PanicOnErr(m.ReadBytes(ed25519.PublicKeySize))); err != nil {
-			return 0, errors.Wrap(err, "failed to unmarshal public key")
-		}
-
-		b.PubKeysRemoved[i] = pubKey
+func readPubKey(reader io.ReadSeeker) (pubKey ed25519.PublicKey, offset int, err error) {
+	if offset, err = io.ReadFull(reader, pubKey[:]); err != nil {
+		return ed25519.PublicKey{}, offset, fmt.Errorf("unable to read public key: %w", err)
 	}
 
-	return m.ReadOffset(), nil
+	return pubKey, offset, nil
 }
 
 // AccountDiffs is the storable unit of Account changes for all account in a slot.
@@ -147,7 +216,7 @@ func NewAccountDiffs(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.AP
 func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff, destroyed bool) (err error) {
 	if destroyed {
 		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
-			return errors.Wrapf(err, "failed to set destroyed account")
+			return errors.Wrap(err, "failed to set destroyed account")
 		}
 
 	}
@@ -159,12 +228,12 @@ func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff
 func (b *AccountDiffs) Load(accountID iotago.AccountID) (accountDiff AccountDiff, destroyed bool, err error) {
 	destroyed, err = b.destroyedAccounts.Has(accountID)
 	if err != nil {
-		return accountDiff, false, errors.Wrapf(err, "failed to get destroyed account")
-	} // load diff for destroyed account to recreate the state
+		return accountDiff, false, errors.Wrap(err, "failed to get destroyed account")
+	} // load diff for a destroyed account to recreate the state
 
 	accountDiff, err = b.diffChangeStore.Get(accountID)
 	if err != nil {
-		return accountDiff, false, errors.Wrapf(err, "failed to get Account diff for account %s", accountID.String())
+		return accountDiff, false, errors.Wrapf(err, "failed to get account diff for account %s", accountID)
 	}
 
 	return accountDiff, destroyed, err
