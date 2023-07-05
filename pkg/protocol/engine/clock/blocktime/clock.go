@@ -32,10 +32,10 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 		}, opts, func(c *Clock) {
 			e.HookConstructed(func() {
 				latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
-				c.acceptedTime.Set(e.APIForSlotIndex(latestCommitmentIndex).TimeProvider().SlotEndTime(latestCommitmentIndex))
+				c.acceptedTime.Set(e.APIForSlot(latestCommitmentIndex).TimeProvider().SlotEndTime(latestCommitmentIndex))
 
 				latestFinalizedSlotIndex := e.Storage.Settings().LatestFinalizedSlot()
-				c.confirmedTime.Set(e.APIForSlotIndex(latestFinalizedSlotIndex).TimeProvider().SlotEndTime(latestFinalizedSlotIndex))
+				c.confirmedTime.Set(e.APIForSlot(latestFinalizedSlotIndex).TimeProvider().SlotEndTime(latestFinalizedSlotIndex))
 
 				c.TriggerInitialized()
 
@@ -53,7 +53,7 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 					}, asyncOpt).Unhook,
 
 					e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-						timeProvider := e.APIForSlotIndex(index).TimeProvider()
+						timeProvider := e.APIForSlot(index).TimeProvider()
 						slotEndTime := timeProvider.SlotEndTime(index)
 						c.acceptedTime.Advance(slotEndTime)
 						c.confirmedTime.Advance(slotEndTime)

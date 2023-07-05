@@ -23,8 +23,8 @@ type Tracker struct {
 
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
 
-	timeProvider  *iotago.TimeProvider
-	decayProvider *iotago.ManaDecayProvider
+	apiBySlotProvider  permanent.APIBySlotIndexProviderFunc
+	apiByEpochProvider permanent.APIByEpochIndexProviderFunc
 
 	performanceFactorsMutex sync.RWMutex
 	mutex                   sync.RWMutex
@@ -35,7 +35,8 @@ func NewTracker(
 	poolStatsStore kvstore.KVStore,
 	committeeStore kvstore.KVStore,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
-	apiProvider permanent.APIBySlotIndexProviderFunc,
+	apiBySlotProvider permanent.APIBySlotIndexProviderFunc,
+	apiByEpochProvider permanent.APIByEpochIndexProviderFunc,
 ) *Tracker {
 	return &Tracker{
 		rewardBaseStore: rewardsBaseStore,
@@ -52,6 +53,8 @@ func NewTracker(
 			account.AccountsFromBytes,
 		),
 		performanceFactorsFunc: performanceFactorsFunc,
+		apiBySlotProvider:      apiBySlotProvider,
+		apiByEpochProvider:     apiByEpochProvider,
 	}
 }
 
@@ -86,8 +89,9 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	epochStartSlot := t.timeProvider.EpochStart(epoch)
-	epochEndSlot := t.timeProvider.EpochEnd(epoch)
+	timeProvider := t.apiByEpochProvider(epoch).TimeProvider()
+	epochStartSlot := timeProvider.EpochStart(epoch)
+	epochEndSlot := timeProvider.EpochEnd(epoch)
 
 	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
 	poolsStats := &PoolsStats{

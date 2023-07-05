@@ -101,7 +101,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 			delegationEnd := castOutput.EndEpoch
 			if delegationEnd == 0 {
-				delegationEnd = l.protocolParameters.TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
+				delegationEnd = l.apiProvider(loadedCommitment.Index).TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
 			}
 
 			reward, rewardErr := l.epochGadget.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)

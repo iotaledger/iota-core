@@ -207,8 +207,12 @@ func (e *Engine) IsSynced() (isBootstrapped bool) {
 	return e.IsBootstrapped() // && time.Since(e.Clock.PreAccepted().Time()) < e.optsBootstrappedThreshold
 }
 
-func (e *Engine) APIForSlotIndex(slot iotago.SlotIndex) iotago.API {
+func (e *Engine) APIForSlot(slot iotago.SlotIndex) iotago.API {
 	return e.Storage.Settings().APIForSlot(slot)
+}
+
+func (e *Engine) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
+	return e.Storage.Settings().APIForEpoch(epoch)
 }
 
 func (e *Engine) API(version iotago.Version) iotago.API {

@@ -51,7 +51,7 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
 		m := NewManager(minCommittableSlotAge, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
 
-		m.apiProvider = e.APIForSlotIndex
+		m.apiProvider = e.APIForSlot
 
 		e.HookConstructed(func() {
 			m.storage = e.Storage

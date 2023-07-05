@@ -26,6 +26,7 @@ const (
 )
 
 type APIByVersionProviderFunc func(byte) iotago.API
+type APIByEpochIndexProviderFunc func(iotago.EpochIndex) iotago.API
 type APIBySlotIndexProviderFunc func(iotago.SlotIndex) iotago.API
 
 type Settings struct {
@@ -68,6 +69,10 @@ func (s *Settings) LatestAPI() iotago.API {
 
 func (s *Settings) APIForSlot(slot iotago.SlotIndex) iotago.API {
 	return s.API(s.VersionForSlot(slot))
+}
+
+func (s *Settings) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
+	return s.API(s.VersionForEpoch(epoch))
 }
 
 func (s *Settings) API(version iotago.Version) iotago.API {

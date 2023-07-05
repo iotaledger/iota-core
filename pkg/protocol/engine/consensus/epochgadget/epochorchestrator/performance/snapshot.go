@@ -38,15 +38,16 @@ func (t *Tracker) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	targetEpoch := t.timeProvider.EpochFromSlot(targetSlotIndex)
+	timeProvider := t.apiBySlotProvider(targetSlotIndex).TimeProvider()
+	targetEpoch := timeProvider.EpochFromSlot(targetSlotIndex)
 	positionedWriter := utils.NewPositionedWriter(writer)
 
 	// if the target index is the last slot of the epoch, the epoch was committed
-	if t.timeProvider.EpochEnd(targetEpoch) != targetSlotIndex {
+	if timeProvider.EpochEnd(targetEpoch) != targetSlotIndex {
 		targetEpoch--
 	}
 
-	err := t.exportPerformanceFactor(positionedWriter, t.timeProvider.EpochStart(targetEpoch+1), targetSlotIndex)
+	err := t.exportPerformanceFactor(positionedWriter, timeProvider.EpochStart(targetEpoch+1), targetSlotIndex)
 	if err != nil {
 		return errors.Wrap(err, "unable to export performance factor")
 	}

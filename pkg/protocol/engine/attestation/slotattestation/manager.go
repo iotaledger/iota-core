@@ -81,7 +81,7 @@ func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*
 		m.lastCommittedSlot = e.Storage.Settings().LatestCommitment().ID().Index()
 		m.lastCumulativeWeight = e.Storage.Settings().LatestCommitment().Commitment().CumulativeWeight
 		m.commitmentMutex.Unlock()
-		m.apiProvider = e.APIForSlotIndex
+		m.apiProvider = e.APIForSlot
 
 		return m
 	})

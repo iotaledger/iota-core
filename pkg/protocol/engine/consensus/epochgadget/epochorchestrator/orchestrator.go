@@ -1,7 +1,7 @@
 package epochorchestrator
 
 import (
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
+	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -16,21 +16,20 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Orchestrator struct {
-	events            *epochgadget.Events
+	events *epochgadget.Events
+
+	apiProvider permanent.APIBySlotIndexProviderFunc
+
 	sybilProtection   sybilprotection.SybilProtection // do we need the whole SybilProtection or just a callback to RotateCommittee?
 	ledger            ledger.Ledger                   // do we need the whole Ledger or just a callback to retrieve account data?
 	lastCommittedSlot iotago.SlotIndex
 
 	performanceTracker *performance.Tracker
-
-	epochEndNearingThreshold iotago.SlotIndex
-	maxCommittableSlot       iotago.SlotIndex
-
-	apiProvider     permanent.APIBySlotIndexProviderFunc
 
 	optsInitialCommittee *account.Accounts
 
@@ -46,21 +45,16 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 
 			// TODO: the following fields should be initialized after the engine is constructed,
 			//  otherwise we implicitly rely on the order of engine initialization which can change at any time.
+			apiProvider:     e.APIForSlot,
 			sybilProtection: e.SybilProtection,
 			ledger:          e.Ledger,
 		}, opts,
 			func(o *Orchestrator) {
 				e.HookConstructed(func() {
 					e.Storage.Settings().HookInitialized(func() {
-						o.timeProvider = e.API().TimeProvider()
 
-						o.epochEndNearingThreshold = e.Storage.Settings().ProtocolParameters().EpochNearingThreshold
-
-						o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
+						o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.APIForSlot, e.APIForEpoch)
 						o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
-
-						// TODO: check if the following value is correctly set to twice eviction age
-						o.maxCommittableSlot = e.Storage.Settings().ProtocolParameters().EvictionAge + e.Storage.Settings().ProtocolParameters().EvictionAge
 
 						if o.optsInitialCommittee != nil {
 							if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
@@ -99,13 +93,16 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	timeProvider := o.apiProvider(slot).TimeProvider()
+	api := o.apiProvider(slot)
+	timeProvider := api.TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 
 	// If the committed slot is `maxCommittableSlot`
 	// away from the end of the epoch, then register a committee for the next epoch.
-	if timeProvider.EpochEnd(currentEpoch) == slot+o.maxCommittableSlot {
+	//TODO: check if MCA is double evictionage
+	maxCommittableSlot := api.ProtocolParameters().EvictionAge() + api.ProtocolParameters().EvictionAge()
+	if timeProvider.EpochEnd(currentEpoch) == slot+maxCommittableSlot {
 		if _, committeeExists := o.performanceTracker.LoadCommitteeForEpoch(nextEpoch); !committeeExists {
 			// If the committee for the epoch wasn't set before due to finalization of a slot,
 			// we promote the current committee to also serve in the next epoch.
@@ -121,7 +118,7 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 		}
 	}
 
-	if o.timeProvider.EpochEnd(currentEpoch) == slot {
+	if timeProvider.EpochEnd(currentEpoch) == slot {
 		committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 		if !exists {
 			panic(fmt.Sprintf("committee for a finished epoch %d not found", currentEpoch))
@@ -153,13 +150,18 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	timeProvider := o.apiProvider(slot).TimeProvider()
+	api := o.apiProvider(slot)
+	timeProvider := api.TimeProvider()
+	epoch := timeProvider.EpochFromSlot(slot)
+
+	//TODO: check if MCA is double evictionage
+	maxCommittableSlot := api.ProtocolParameters().EvictionAge() + api.ProtocolParameters().EvictionAge()
 
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
 	// committed slot is earlier than (the last slot of the epoch - maxCommittableSlot).
 	// Otherwise, skip committee selection because it's too late and the committee has been reused.
 	epochEndSlot := timeProvider.EpochEnd(epoch)
-	if slot+o.epochEndNearingThreshold == epochEndSlot && epochEndSlot > o.lastCommittedSlot+o.maxCommittableSlot {
+	if slot+api.ProtocolParameters().EpochNearingThreshold() == epochEndSlot && epochEndSlot > o.lastCommittedSlot+maxCommittableSlot {
 		newCommittee := o.selectNewCommittee(slot)
 		o.events.CommitteeSelected.Trigger(newCommittee)
 	}
