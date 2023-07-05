@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
+	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -15,6 +16,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/pkg/errors"
+)
+
+var (
+	ErrInvalidSignature = errors.New("invalid signature")
 )
 
 type CommitmentFilter struct {
@@ -42,6 +48,10 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 		e.HookConstructed(func() {
 			e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				c.PromoteFutureBlocksUntil(details.Commitment.Index())
+			})
+
+			e.Events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
+				c.ProcessPreFilteredBlock(block)
 			})
 
 			e.Events.CommitmentFilter.LinkTo(c.events)
@@ -74,7 +84,7 @@ func (c *CommitmentFilter) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
 		if storage := c.futureBlocks.Get(i, false); storage != nil {
 			if futureBlocks, exists := storage.Get(cm.ID()); exists {
 				_ = futureBlocks.ForEach(func(futureBlock *model.Block) (err error) {
-					// TODO: filter here.
+					c.ProcessPreFilteredBlock(futureBlock)
 					return nil
 				})
 			}
@@ -103,6 +113,72 @@ func (c *CommitmentFilter) isFutureBlock(block *model.Block) (isFutureBlock bool
 
 func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if c.isFutureBlock(block) {
+		return
+	}
+
+	// check if the account exists in the specified slot.
+	accountData, exists, err := c.accountRetrieveFunc(block.Block().IssuerID, block.SlotCommitment().Index())
+	if err != nil {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.Wrapf(err, "could not retrieve account information for block issuer %s", block.Block().IssuerID),
+		})
+
+		return
+	}
+	if !exists {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.Wrapf(err, "block issuer account %s does not exist in slot commitment %s", block.Block().IssuerID, block.SlotCommitment().Index()),
+		})
+
+		return
+	}
+
+	// Check that the issuer key is valid for this block issuer and that the signature is valid
+	edSig, isEdSig := block.Block().Signature.(*iotago.Ed25519Signature)
+	if !isEdSig {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.WithMessagef(ErrInvalidSignature, "only ed2519 signatures supported, got %s", block.Block().Signature.Type()),
+		})
+
+		return
+	}
+	if !accountData.PubKeys.Has(edSig.PublicKey) {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.WithMessagef(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.Block().IssuerID, edSig.PublicKey, block.SlotCommitment().Index()),
+		})
+
+		return
+	}
+	signingMessage, err := block.Block().SigningMessage()
+	hiveEd25519.Verify(edSig.PublicKey[:], signingMessage, edSig.Signature[:])
+	if err != nil {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.WithMessagef(ErrInvalidSignature, "error: %s", err.Error()),
+		})
+
+		return
+	}
+	if !hiveEd25519.Verify(edSig.PublicKey[:], signingMessage, edSig.Signature[:]) {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ErrInvalidSignature,
+		})
+
+		return
+	}
+
+	// Check that the issuer of this block has non-negative block issuance credit
+	if accountData.Credits.Value < 0 {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: errors.Wrapf(err, "block issuer account %s is locked due to negative BIC", block.Block().IssuerID),
+		})
+
 		return
 	}
 

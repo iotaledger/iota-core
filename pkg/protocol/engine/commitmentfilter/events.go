@@ -3,7 +3,6 @@ package commitmentfilter
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 )
 
 type Events struct {
@@ -23,5 +22,4 @@ var NewEvents = event.CreateGroupConstructor(func() *Events {
 type BlockFilteredEvent struct {
 	Block  *model.Block
 	Reason error
-	Source network.PeerID
 }
