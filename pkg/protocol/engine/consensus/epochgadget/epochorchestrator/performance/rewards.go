@@ -73,7 +73,7 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 		}
 		poolStats, err := t.poolStats(epochIndex)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d and validator account ID %s", epochIndex, validatorID)
+			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 		if rewardsForAccountInEpoch.PoolStake == 0 {
 			continue

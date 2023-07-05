@@ -96,7 +96,7 @@ func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountI
 
 	accDiff, destroyed, err := s.Load(accountID)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "failed to load slot diff for account %s", accountID.String())
+		return nil, false, errors.Wrapf(err, "failed to load slot diff for account %s", accountID)
 	}
 
 	return &accDiff, destroyed, nil

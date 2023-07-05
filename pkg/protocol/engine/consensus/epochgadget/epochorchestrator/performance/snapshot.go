@@ -98,11 +98,11 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 			// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
 			var performanceFactor uint64
 			if err := binary.Read(reader, binary.LittleEndian, &performanceFactor); err != nil {
-				return errors.Wrapf(err, "unable to read performance factor for account %s and slot index %d", accountID.String(), slotIndex)
+				return errors.Wrapf(err, "unable to read performance factor for account %s and slot index %d", accountID, slotIndex)
 			}
 			err := performanceFactors.Store(accountID, performanceFactor)
 			if err != nil {
-				return errors.Wrapf(err, "unable to store performance factor for account %s and slot index %d", accountID.String(), slotIndex)
+				return errors.Wrapf(err, "unable to store performance factor for account %s and slot index %d", accountID, slotIndex)
 			}
 		}
 	}
@@ -137,7 +137,7 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 
 			var reward PoolRewards
 			if err := binary.Read(reader, binary.LittleEndian, &reward); err != nil {
-				return errors.Wrapf(err, "unable to read reward for account %s and epoch index %d", accountID.String(), epochIndex)
+				return errors.Wrapf(err, "unable to read reward for account %s and epoch index %d", accountID, epochIndex)
 			}
 			rewardsTree.Set(accountID, &reward)
 		}
@@ -220,7 +220,7 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 				return errors.Wrapf(err, "unable to write account id %s for slot %d", accountID, currentSlot)
 			}
 			if err := pWriter.WriteValue("performance factor", pf); err != nil {
-				return errors.Wrapf(err, "unable to write performance factor for account ID %s and slot index %d", accountID, currentSlot)
+				return errors.Wrapf(err, "unable to write performance factor for accountID %s and slot index %d", accountID, currentSlot)
 			}
 			accountsCount++
 
