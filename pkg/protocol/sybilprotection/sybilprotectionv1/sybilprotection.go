@@ -79,12 +79,12 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 							// committee if we have one.
 							currentEpoch := o.timeProvider.EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
 
-							committee, exists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch)
+							committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 							if !exists {
 								panic("failed to load committee for last finalized slot to initialize sybil protection")
 							}
 							o.seatManager.ImportCommittee(currentEpoch, committee)
-							if nextCommittee, nextCommitteeExists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
+							if nextCommittee, nextCommitteeExists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
 								o.seatManager.ImportCommittee(currentEpoch+1, nextCommittee)
 							}
 
