@@ -90,14 +90,14 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	api := o.apiProvider.APIForSlot(slot)
-	timeProvider := api.TimeProvider()
+	apiForSlot := o.apiProvider.APIForSlot(slot)
+	timeProvider := apiForSlot.TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 
 	// TODO: check if the following value is correctly set to twice eviction age
 	// maxCommittableSlot = 2 * evictionAge
-	maxCommittableSlot := api.ProtocolParameters().EvictionAge() + api.ProtocolParameters().EvictionAge()<<1
+	maxCommittableSlot := apiForSlot.ProtocolParameters().EvictionAge() << 1
 
 	// If the committed slot is `maxCommittableSlot`
 	// away from the end of the epoch, then register a committee for the next epoch.
@@ -149,19 +149,19 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	api := o.apiProvider.APIForSlot(slot)
-	timeProvider := api.TimeProvider()
+	apiForSlot := o.apiProvider.APIForSlot(slot)
+	timeProvider := apiForSlot.TimeProvider()
 	epoch := timeProvider.EpochFromSlot(slot)
 
 	// TODO: check if the following value is correctly set to twice eviction age
 	// maxCommittableSlot = 2 * evictionAge
-	maxCommittableSlot := api.ProtocolParameters().EvictionAge() + api.ProtocolParameters().EvictionAge()<<1
+	maxCommittableSlot := apiForSlot.ProtocolParameters().EvictionAge() << 1
 
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
 	// committed slot is earlier than (the last slot of the epoch - maxCommittableSlot).
 	// Otherwise, skip committee selection because it's too late and the committee has been reused.
 	epochEndSlot := timeProvider.EpochEnd(epoch)
-	if slot+api.ProtocolParameters().EpochNearingThreshold() == epochEndSlot && epochEndSlot > o.lastCommittedSlot+maxCommittableSlot {
+	if slot+apiForSlot.ProtocolParameters().EpochNearingThreshold() == epochEndSlot && epochEndSlot > o.lastCommittedSlot+maxCommittableSlot {
 		newCommittee := o.selectNewCommittee(slot)
 		o.events.CommitteeSelected.Trigger(newCommittee)
 	}
