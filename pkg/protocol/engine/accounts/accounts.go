@@ -91,7 +91,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 
 	bytesRead, err := io.ReadFull(reader, a.ID[:])
 	if err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read Account ID")
+		return bytesConsumed, errors.Wrap(err, "unable to read accountID")
 	}
 
 	bytesConsumed += bytesRead
@@ -99,17 +99,17 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	a.Credits = &BlockIssuanceCredits{}
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.Value); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read Account balance value for accountID %s", a.ID)
+		return bytesConsumed, errors.Wrapf(err, "unable to read account balance value for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.UpdateTime); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read updatedTime for Account balance for accountID %s", a.ID)
+		return bytesConsumed, errors.Wrapf(err, "unable to read updatedTime for account balance for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.OutputID); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read OutputID for Account for accountID %s", a.ID)
+		return bytesConsumed, errors.Wrapf(err, "unable to read OutputID for account for accountID %s", a.ID)
 	}
 	bytesConsumed += len(a.OutputID)
 

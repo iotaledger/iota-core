@@ -321,11 +321,7 @@ func (l *Ledger) Shutdown() {
 func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable.AccountDiff, index iotago.SlotIndex, consumedAccounts map[iotago.AccountID]*utxoledger.Output, createdAccounts map[iotago.AccountID]*utxoledger.Output) {
 	for consumedAccountID, consumedOutput := range consumedAccounts {
 		// We might have had an allotment on this account, and the diff already exists
-		accountDiff, exists := accountDiffs[consumedAccountID]
-		if !exists {
-			accountDiff = prunable.NewAccountDiff()
-			accountDiffs[consumedAccountID] = accountDiff
-		}
+		accountDiff := getAccountDiff(accountDiffs, consumedAccountID)
 
 		// Obtain account state at the current latest committed slot, which is index-1
 		accountData, exists, err := l.accountsLedger.Account(consumedAccountID, index-1)
@@ -385,11 +381,8 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		}
 
 		// We might have had an allotment on this account, and the diff already exists
-		accountDiff, exists := accountDiffs[createdAccountID]
-		if !exists {
-			accountDiff = prunable.NewAccountDiff()
-			accountDiffs[createdAccountID] = accountDiff
-		}
+		accountDiff := getAccountDiff(accountDiffs, createdAccountID)
+
 		// Change and PreviousUpdatedTime are either 0 if we did not have an allotment for this account, or we already
 		// have some values from the allotment, so no need to set them explicitly.
 		accountDiff.NewOutputID = createdOutput.OutputID()
@@ -422,7 +415,8 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 		case iotago.OutputAccount:
 			createdAccount, _ := createdOutput.Output().(*iotago.AccountOutput)
 
-			// Skip if the account doesn't have a BIC feature.
+			// if we create an account that doesn't have a block issuer feature or staking, we don't need to track the changes.
+			// the VM needs to make sure that no staking feature is created, if there was no block issuer feature.
 			// TODO: do we even need to check for staking feature here if we require BlockIssuer with staking?
 			if createdAccount.FeatureSet().BlockIssuer() == nil && createdAccount.FeatureSet().Staking() == nil {
 				return true
@@ -436,6 +430,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			createdAccounts[accountID] = createdOutput
 
 		case iotago.OutputDelegation:
+			// the delegation output was created => determine later if we need to add the stake to the validator
 			delegation, _ := createdOutput.Output().(*iotago.DelegationOutput)
 			createdAccountDelegation[delegation.DelegationID] = delegation
 		}
@@ -458,7 +453,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 		switch spentOutput.OutputType() {
 		case iotago.OutputAccount:
 			consumedAccount, _ := spentOutput.Output().(*iotago.AccountOutput)
-			// Skip if the account doesn't have a BIC feature.
+			// if we transition / destroy an account that doesn't have a block issuer feature or staking, we don't need to track the changes.
 			// TODO: do we even need to check for staking feature here if we require BlockIssuer with staking?
 			if consumedAccount.FeatureSet().BlockIssuer() == nil && consumedAccount.FeatureSet().Staking() == nil {
 				return true
@@ -472,15 +467,14 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 
 		case iotago.OutputDelegation:
 			delegationOutput, _ := spentOutput.Output().(*iotago.DelegationOutput)
+
+			// TODO: do we have a testcase that checks transitioning a delegation output twice in the same slot?
 			if _, createdDelegationExists := createdAccountDelegation[delegationOutput.DelegationID]; createdDelegationExists {
+				// the delegation output was created and destroyed in the same slot => do not track the delegation as newly created
 				delete(createdAccountDelegation, delegationOutput.DelegationID)
 			} else {
-				accountDiff, exists := accountDiffs[delegationOutput.ValidatorID]
-				if !exists {
-					accountDiff = prunable.NewAccountDiff()
-					accountDiffs[delegationOutput.ValidatorID] = accountDiff
-				}
-
+				// the delegation output was destroyed => subtract the stake from the validator account
+				accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorID)
 				accountDiff.DelegationStakeChange -= int64(delegationOutput.DelegatedAmount)
 			}
 		}
@@ -489,12 +483,8 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	})
 
 	for _, delegationOutput := range createdAccountDelegation {
-		accountDiff, exists := accountDiffs[delegationOutput.ValidatorID]
-		if !exists {
-			accountDiff = prunable.NewAccountDiff()
-			accountDiffs[delegationOutput.ValidatorID] = accountDiff
-		}
-
+		// the delegation output was newly created and not transitioned/destroyed => add the stake to the validator account
+		accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorID)
 		accountDiff.DelegationStakeChange += int64(delegationOutput.DelegatedAmount)
 	}
 
@@ -546,12 +536,10 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 		// process allotments
 		{
 			for _, allotment := range tx.Essence.Allotments {
-				accountDiff, exists := accountDiffs[allotment.AccountID]
-				if !exists {
-					// allotments won't change the outputID of the Account, so the diff defaults to empty new and previous outputIDs
-					accountDiff = prunable.NewAccountDiff()
-					accountDiffs[allotment.AccountID] = accountDiff
-				}
+				// in case it didn't exist, allotments won't change the outputID of the Account,
+				// so the diff defaults to empty new and previous outputIDs
+				accountDiff := getAccountDiff(accountDiffs, allotment.AccountID)
+
 				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID, stateDiff.Index()-1)
 				if accountErr != nil {
 					panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, stateDiff.Index()-1, accountErr))
@@ -642,4 +630,15 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 		//  Do we track witness weight of invalid blocks?
 		l.errorHandler(errors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
+}
+
+func getAccountDiff(accountDiffs map[iotago.AccountID]*prunable.AccountDiff, accountID iotago.AccountID) *prunable.AccountDiff {
+	accountDiff, exists := accountDiffs[accountID]
+	if !exists {
+		// initialize the account diff because it didn't exist before
+		accountDiff = prunable.NewAccountDiff()
+		accountDiffs[accountID] = accountDiff
+	}
+
+	return accountDiff
 }

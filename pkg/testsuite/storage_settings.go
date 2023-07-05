@@ -41,7 +41,7 @@ func (t *TestSuite) AssertLatestCommitment(commitment *iotago.Commitment, nodes 
 	for _, node := range nodes {
 		t.Eventually(func() error {
 			if !commitment.Equals(node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()) {
-				return errors.Errorf("AssertLatestCommitment: %s: expected %s, got %s", node.Name, commitment.String(), node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().String())
+				return errors.Errorf("AssertLatestCommitment: %s: expected %s, got %s", node.Name, commitment, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment())
 			}
 
 			return nil
@@ -98,7 +98,7 @@ func (t *TestSuite) AssertChainID(expectedChainID iotago.CommitmentID, nodes ...
 		t.Eventually(func() error {
 			actualChainID := node.Protocol.MainEngineInstance().ChainID()
 			if expectedChainID != node.Protocol.MainEngineInstance().ChainID() {
-				return errors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID.String(), expectedChainID.Index(), actualChainID, actualChainID.Index())
+				return errors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID, expectedChainID.Index(), actualChainID, actualChainID.Index())
 			}
 
 			return nil

@@ -31,7 +31,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	}
 
 	if err := m.importAccountTree(reader, accountCount); err != nil {
-		return errors.Wrap(err, "unable to import Account tree")
+		return errors.Wrap(err, "unable to import account tree")
 	}
 
 	if err := m.readSlotDiffs(reader, slotDiffCount); err != nil {
@@ -60,7 +60,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 
 	accountCount, err := m.exportAccountTree(pWriter, targetIndex)
 	if err != nil {
-		return errors.Wrapf(err, "unable to export Account for target index %d", targetIndex)
+		return errors.Wrapf(err, "unable to export account for target index %d", targetIndex)
 	}
 
 	if err = pWriter.WriteValueAtBookmark("accounts count", accountCount); err != nil {
@@ -110,7 +110,7 @@ func (m *Manager) exportAccountTree(pWriter *utils.PositionedWriter, targetIndex
 
 		return true
 	}); err != nil {
-		return 0, errors.Wrap(err, "error in streaming Account tree")
+		return 0, errors.Wrap(err, "error in streaming account tree")
 	} else if innerErr != nil {
 		return 0, errors.Wrap(innerErr, "error in exporting account")
 	}
@@ -142,13 +142,13 @@ func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 
 	for accountID, accountData := range destroyedAccounts {
 		if wasDestroyed, err := m.rollbackAccountTo(accountData, targetIndex); err != nil {
-			return 0, errors.Wrapf(err, "unable to rollback account %s to target slot index %d", accountID.String(), targetIndex)
+			return 0, errors.Wrapf(err, "unable to rollback account %s to target slot index %d", accountID, targetIndex)
 		} else if !wasDestroyed {
 			return 0, errors.Errorf("account %s was not destroyed", accountID)
 		}
 
 		if err = writeAccountData(pWriter, accountData); err != nil {
-			return 0, errors.Wrapf(err, "unable to write account %s to snapshot", accountID.String())
+			return 0, errors.Wrapf(err, "unable to write account %s to snapshot", accountID)
 		}
 	}
 
@@ -158,11 +158,11 @@ func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 func writeAccountData(writer *utils.PositionedWriter, accountData *accounts.AccountData) error {
 	accountBytes, err := accountData.Bytes()
 	if err != nil {
-		return errors.Wrapf(err, "unable to get account data snapshot bytes for accountID %s", accountData.ID.String())
+		return errors.Wrapf(err, "unable to get account data snapshot bytes for accountID %s", accountData.ID)
 	}
 
 	if err = writer.WriteBytes(accountBytes); err != nil {
-		return errors.Wrapf(err, "unable to write account data for account id %s", accountData.ID.String())
+		return errors.Wrapf(err, "unable to write account data for account id %s", accountData.ID)
 	}
 
 	return nil
@@ -192,21 +192,21 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 		for j := uint64(0); j < accountsInDiffCount; j++ {
 			var accountID iotago.AccountID
 			if _, err := io.ReadFull(reader, accountID[:]); err != nil {
-				return errors.Wrapf(err, "unable to read Account ID for index %d", j)
+				return errors.Wrapf(err, "unable to read accountID for index %d", j)
 			}
 
 			accountDiff := prunable.NewAccountDiff()
 			if err := accountDiff.FromReader(reader); err != nil {
-				return errors.Wrapf(err, "unable to read Account diff for accountID %s", accountID.String())
+				return errors.Wrapf(err, "unable to read account diff for accountID %s", accountID)
 			}
 
 			var destroyed bool
 			if err := binary.Read(reader, binary.LittleEndian, &destroyed); err != nil {
-				return errors.Wrapf(err, "unable to read destroyed flag for Account ID %s", accountID.String())
+				return errors.Wrapf(err, "unable to read destroyed flag for accountID %s", accountID)
 			}
 
 			if err := diffStore.Store(accountID, accountDiff, destroyed); err != nil {
-				return errors.Wrapf(err, "unable to store slot diff for accountID %s", accountID.String())
+				return errors.Wrapf(err, "unable to store slot diff for accountID %s", accountID)
 			}
 		}
 	}
@@ -245,7 +245,7 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 
 		if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff *prunable.AccountDiff, destroyed bool) bool {
 			if err = pWriter.WriteBytes(lo.PanicOnErr(accountID.Bytes())); err != nil {
-				innerErr = errors.Wrapf(err, "unable to write AccountID for account %s", accountID)
+				innerErr = errors.Wrapf(err, "unable to write accountID for account %s", accountID)
 			}
 
 			if err = pWriter.WriteBytes(lo.PanicOnErr(accountDiff.Bytes())); err != nil {

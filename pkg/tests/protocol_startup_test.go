@@ -540,6 +540,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 }
 
+// TODO: refactor the test to test the empty slots in a simpler way
 //func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 //	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
 //	defer ts.Shutdown()

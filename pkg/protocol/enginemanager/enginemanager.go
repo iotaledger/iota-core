@@ -26,6 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -59,6 +60,7 @@ type EngineManager struct {
 	attestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
 	tipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
+	tipSelectionProvider    module.Provider[*engine.Engine, tipselection.TipSelection]
 
 	activeInstance *engine.Engine
 }
@@ -82,6 +84,7 @@ func New(
 	attestationProvider module.Provider[*engine.Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
 	tipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager],
+	tipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection],
 ) *EngineManager {
 	return &EngineManager{
 		workers:                 workers,
@@ -102,6 +105,7 @@ func New(
 		attestationProvider:     attestationProvider,
 		ledgerProvider:          ledgerProvider,
 		tipManagerProvider:      tipManagerProvider,
+		tipSelectionProvider:    tipSelectionProvider,
 	}
 }
 
@@ -189,6 +193,7 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.attestationProvider,
 		e.ledgerProvider,
 		e.tipManagerProvider,
+		e.tipSelectionProvider,
 		append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))...,
 	)
 }
@@ -200,7 +205,7 @@ func (e *EngineManager) newEngineInstance(snapshotPath string) *engine.Engine {
 
 func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine, error) {
 	// Dump a snapshot at the target index
-	snapshotPath := filepath.Join(os.TempDir(), fmt.Sprintf("snapshot_%d_%s.bin", index, lo.PanicOnErr(uuid.NewUUID()).String()))
+	snapshotPath := filepath.Join(os.TempDir(), fmt.Sprintf("snapshot_%d_%s.bin", index, lo.PanicOnErr(uuid.NewUUID())))
 	if err := e.activeInstance.WriteSnapshot(snapshotPath, index); err != nil {
 		return nil, errors.Wrapf(err, "error exporting snapshot for index %s", index)
 	}

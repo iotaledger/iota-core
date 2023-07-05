@@ -107,7 +107,7 @@ func (d *AccountDiff) FromReader(readSeeker io.ReadSeeker) error {
 
 func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err error) {
 	if err = binary.Read(reader, binary.LittleEndian, &d.BICChange); err != nil {
-		return offset, errors.Wrap(err, "unable to read Account BIC balance value in the diff")
+		return offset, errors.Wrap(err, "unable to read account BIC balance value in the diff")
 	}
 	offset += 8
 
@@ -248,7 +248,7 @@ func (b *AccountDiffs) Load(accountID iotago.AccountID) (accountDiff *AccountDif
 
 	accountDiff, err = b.diffChangeStore.Get(accountID)
 	if err != nil {
-		return accountDiff, false, errors.Wrapf(err, "failed to get Account diff for account %s", accountID.String())
+		return accountDiff, false, errors.Wrapf(err, "failed to get account diff for account %s", accountID)
 	}
 
 	return accountDiff, destroyed, err

@@ -95,10 +95,12 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 
+	// TODO: check if the following value is correctly set to twice eviction age
+	// maxCommittableSlot = 2 * evictionAge
+	maxCommittableSlot := api.ProtocolParameters().EvictionAge() + api.ProtocolParameters().EvictionAge()<<1
+
 	// If the committed slot is `maxCommittableSlot`
 	// away from the end of the epoch, then register a committee for the next epoch.
-	//TODO: check if MCA is double evictionage
-	maxCommittableSlot := api.ProtocolParameters().EvictionAge() + api.ProtocolParameters().EvictionAge()
 	if timeProvider.EpochEnd(currentEpoch) == slot+maxCommittableSlot {
 		if _, committeeExists := o.performanceTracker.LoadCommitteeForEpoch(nextEpoch); !committeeExists {
 			// If the committee for the epoch wasn't set before due to finalization of a slot,
@@ -151,8 +153,9 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 	timeProvider := api.TimeProvider()
 	epoch := timeProvider.EpochFromSlot(slot)
 
-	//TODO: check if MCA is double evictionage
-	maxCommittableSlot := api.ProtocolParameters().EvictionAge() + api.ProtocolParameters().EvictionAge()
+	// TODO: check if the following value is correctly set to twice eviction age
+	// maxCommittableSlot = 2 * evictionAge
+	maxCommittableSlot := api.ProtocolParameters().EvictionAge() + api.ProtocolParameters().EvictionAge()<<1
 
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
 	// committed slot is earlier than (the last slot of the epoch - maxCommittableSlot).

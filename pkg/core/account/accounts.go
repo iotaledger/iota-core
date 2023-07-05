@@ -140,7 +140,7 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 		var accountID iotago.AccountID
 
 		if _, err = io.ReadFull(reader, accountID[:]); err != nil {
-			return 0, errors.Wrap(err, "unable to read Account ID")
+			return 0, errors.Wrap(err, "unable to read accountID")
 		}
 		n += iotago.AccountIDLength
 

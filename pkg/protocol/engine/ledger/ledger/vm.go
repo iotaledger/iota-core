@@ -50,7 +50,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	if commitment != nil {
 		loadedCommitment, err = l.loadCommitment(commitment.CommitmentID)
 		if err != nil {
-			return nil, xerrors.Errorf("could not load commitment: %w", err)
+			return nil, xerrors.Errorf("could not load commitment %s: %w", commitment.CommitmentID, err)
 		}
 
 		resolvedInputs.CommitmentInput = loadedCommitment
@@ -71,7 +71,8 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	resolvedInputs.BICInputSet = bicInputSet
 
 	rewardInputSet := make(iotagovm.RewardsInputSet)
-	// when refactoring this to be resolved by the mempool, the function that resolves ContextInputs should receive a slice with promises of UTXO inputs and wait until the necessary
+	// TODO: when refactoring this to be resolved by the mempool, the function that resolves ContextInputs should
+	// receive a slice with promises of UTXO inputs and wait until the necessary inputs are available
 	for _, inp := range rewardInputs {
 		outputID := inputStates[inp.Index].OutputID()
 
