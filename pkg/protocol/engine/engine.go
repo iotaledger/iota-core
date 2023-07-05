@@ -24,6 +24,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -50,6 +51,7 @@ type Engine struct {
 	SybilProtection sybilprotection.SybilProtection
 	BlockGadget     blockgadget.Gadget
 	SlotGadget      slotgadget.Gadget
+	EpochGadget     epochgadget.Gadget
 	Notarization    notarization.Notarization
 	Attestations    attestation.Attestations
 	Ledger          ledger.Ledger
@@ -86,6 +88,7 @@ func New(
 	sybilProtectionProvider module.Provider[*Engine, sybilprotection.SybilProtection],
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
+	epochGadgetProvider module.Provider[*Engine, epochgadget.Gadget],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
@@ -115,6 +118,7 @@ func New(
 			e.Clock = clockProvider(e)
 			e.BlockGadget = blockGadgetProvider(e)
 			e.SlotGadget = slotGadgetProvider(e)
+			e.EpochGadget = epochGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)

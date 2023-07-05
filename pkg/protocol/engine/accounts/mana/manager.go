@@ -35,7 +35,7 @@ func NewManager(manaDecayProvider *iotago.ManaDecayProvider, accountOutputResolv
 	}
 }
 
-func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotago.SlotIndex) (uint64, error) {
+func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotago.SlotIndex) (iotago.Mana, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -56,10 +56,18 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	}
 
 	// apply decay to stored Mana and potential that was added on last update
-	updatedValue := m.manaDecayProvider.StoredManaWithDecay(mana.Value(), mana.UpdateTime(), currentSlot)
+	manaStored, err := m.manaDecayProvider.StoredManaWithDecay(mana.Value(), mana.UpdateTime(), currentSlot)
+	if err != nil {
+		return 0, err
+	}
+	updatedValue := manaStored
 
 	// get newly generated potential since last update and apply decay
-	updatedValue += m.manaDecayProvider.PotentialManaWithDecay(mana.Deposit(), mana.UpdateTime(), currentSlot)
+	manaPotential, err := m.manaDecayProvider.PotentialManaWithDecay(mana.Deposit(), mana.UpdateTime(), currentSlot)
+	if err != nil {
+		return 0, err
+	}
+	updatedValue += manaPotential
 
 	mana.UpdateValue(updatedValue, currentSlot)
 

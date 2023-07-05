@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/vm/stardust"
 )
 
-func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.State) (outputStates []mempool.State, err error) {
+func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.State) ([]mempool.State, error) {
 	tx, ok := stateTransition.(*iotago.Transaction)
 	if !ok {
 		return nil, ErrUnexpectedUnderlyingType
@@ -24,53 +24,101 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 			CreationTime: inputState.CreationTime(),
 		}
 	}
+	resolvedInputs := iotagovm.ResolvedInputs{
+		InputSet: inputSet,
+	}
 
-	// resolve the BIC inputs from the BIC Manager
-	bicInputSet := iotagovm.BICInputSet{}
+	// TODO: refactor resolution of ContextInputs to be handled by Mempool
 	bicInputs, err := tx.BICInputs()
 	if err != nil {
 		return nil, xerrors.Errorf("could not get BIC inputs: %w", err)
 	}
-	for _, inp := range bicInputs {
-		// get the BIC inputs from bic manager
-		if _, err := l.loadCommitment(inp.CommitmentID); err != nil {
-			return nil, xerrors.Errorf("could not load commitment: %w", err)
-		}
-		b, _, err := l.accountsLedger.Account(inp.AccountID, inp.CommitmentID.Index())
-		if err != nil {
-			return nil, xerrors.Errorf("could not get BIC inputs: %w", err)
-		}
-		bicInputSet[inp.AccountID] = iotagovm.BlockIssuanceCredit{
-			AccountID:    inp.AccountID,
-			CommitmentID: inp.CommitmentID,
-			Value:        b.Credits.Value,
-		}
+
+	rewardInputs, err := tx.RewardInputs()
+	if err != nil {
+		return nil, xerrors.Errorf("could not get reward inputs: %w", err)
 	}
 
 	// resolve the commitment inputs from storage
-	commitmentInputSet := iotagovm.CommitmentInputSet{}
-	commitmentInputs, err := tx.CommitmentInputs()
-	if err != nil {
-		return nil, xerrors.Errorf("could not get Commitment inputs: %w", err)
-	}
-	for _, inp := range commitmentInputs {
-		c, err := l.loadCommitment(inp.CommitmentID)
-		if err != nil {
-			return nil, xerrors.Errorf("could not load commitment: %w", err)
-		}
-		commitmentInputSet[inp.CommitmentID] = c
+	commitment := tx.CommitmentInput()
+
+	if (len(rewardInputs) > 0 || len(bicInputs) > 0) && commitment == nil {
+		return nil, xerrors.Errorf("commitment input required with reward or BIC input")
 	}
 
-	resolvedInputs := iotagovm.ResolvedInputs{
-		InputSet:           inputSet,
-		BICInputSet:        bicInputSet,
-		CommitmentInputSet: commitmentInputSet,
+	var loadedCommitment *iotago.Commitment
+	if commitment != nil {
+		loadedCommitment, err = l.loadCommitment(commitment.CommitmentID)
+		if err != nil {
+			return nil, xerrors.Errorf("could not load commitment %s: %w", commitment.CommitmentID, err)
+		}
+
+		resolvedInputs.CommitmentInput = loadedCommitment
 	}
+
+	bicInputSet := make(iotagovm.BICInputSet)
+	for _, inp := range bicInputs {
+		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, loadedCommitment.Index)
+		if accountErr != nil {
+			return nil, xerrors.Errorf("could not get BIC input for account %s in slot %d: %w", inp.AccountID, loadedCommitment.Index, accountErr)
+		}
+		if !exists {
+			return nil, xerrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, loadedCommitment.Index)
+		}
+
+		bicInputSet[inp.AccountID] = accountData.Credits.Value
+	}
+	resolvedInputs.BICInputSet = bicInputSet
+
+	rewardInputSet := make(iotagovm.RewardsInputSet)
+	// TODO: when refactoring this to be resolved by the mempool, the function that resolves ContextInputs should
+	// receive a slice with promises of UTXO inputs and wait until the necessary inputs are available
+	for _, inp := range rewardInputs {
+		outputID := inputStates[inp.Index].OutputID()
+
+		switch castOutput := inputStates[inp.Index].Output().(type) {
+		case *iotago.AccountOutput:
+			stakingFeature := castOutput.FeatureSet().Staking()
+			if stakingFeature == nil {
+				return nil, xerrors.Errorf("cannot claim rewards from an AccountOutput %s at index %d without staking feature", outputID, inp.Index)
+			}
+			accountID := castOutput.AccountID
+			if accountID.Empty() {
+				accountID = iotago.AccountIDFromOutputID(outputID)
+			}
+
+			reward, rewardErr := l.epochGadget.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			if rewardErr != nil {
+				return nil, xerrors.Errorf("failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			}
+
+			rewardInputSet[accountID] = reward
+
+		case *iotago.DelegationOutput:
+			delegationID := castOutput.DelegationID
+			if delegationID.Empty() {
+				delegationID = iotago.DelegationIDFromOutputID(outputID)
+			}
+
+			delegationEnd := castOutput.EndEpoch
+			if delegationEnd == 0 {
+				delegationEnd = l.protocolParameters.TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
+			}
+
+			reward, rewardErr := l.epochGadget.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
+			if rewardErr != nil {
+				return nil, xerrors.Errorf("failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
+			}
+
+			rewardInputSet[delegationID] = reward
+		}
+	}
+	resolvedInputs.RewardsInputSet = rewardInputSet
 
 	vmParams := &iotagovm.Params{External: &iotago.ExternalUnlockParameters{
 		ProtocolParameters: l.protocolParameters,
 	}}
-	if err := stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
+	if err = stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
 		return nil, err
 	}
 
@@ -92,7 +140,6 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 }
 
 func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.Commitment, error) {
-	// TODO: cache the loaded commitments
 	c, err := l.commitmentLoader(inputCommitmentID.Index())
 	if err != nil {
 		return nil, xerrors.Errorf("could not get commitment inputs: %w", err)

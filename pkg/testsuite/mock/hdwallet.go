@@ -55,8 +55,8 @@ func (hd *HDWallet) Name() string {
 	return hd.name
 }
 
-func (hd *HDWallet) Balance() uint64 {
-	var balance uint64
+func (hd *HDWallet) Balance() iotago.BaseToken {
+	var balance iotago.BaseToken
 	for _, u := range hd.utxo {
 		balance += u.Deposit()
 	}
@@ -120,11 +120,11 @@ func (hd *HDWallet) PrintStatus() {
 		if len(nativeTokens) > 0 {
 			nativeTokenDescription = "["
 			for id, amount := range nativeTokens {
-				nativeTokenDescription += fmt.Sprintf("%s: %s, ", id.ToHex(), amount.Amount.String())
+				nativeTokenDescription += fmt.Sprintf("%s: %s, ", id.ToHex(), amount.Amount)
 			}
 			nativeTokenDescription += "]"
 		}
-		status += fmt.Sprintf("\t%s [%s] = %d %v\n", u.OutputID().ToHex(), u.OutputType().String(), u.Deposit(), nativeTokenDescription)
+		status += fmt.Sprintf("\t%s [%s] = %d %v\n", u.OutputID().ToHex(), u.OutputType(), u.Deposit(), nativeTokenDescription)
 	}
 	fmt.Printf("%s\n", status)
 }

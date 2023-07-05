@@ -59,7 +59,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		// 2. Verify the signature of the attestation.
 		if valid, err := att.VerifySignature(); !valid {
 			if err != nil {
-				return nil, 0, errors.Wrapf(err, "error validating attestation signature")
+				return nil, 0, errors.Wrap(err, "error validating attestation signature")
 			}
 
 			return nil, 0, errors.Errorf("invalid attestation signature")
@@ -73,7 +73,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		// TODO: this might differ if we have a Accounts with changing weights depending on the SlotIndex/epoch
 		attestationBlockID, err := att.BlockID(c.engine.API().TimeProvider())
 		if err != nil {
-			return nil, 0, errors.Wrapf(err, "error calculating blockID from attestation")
+			return nil, 0, errors.Wrap(err, "error calculating blockID from attestation")
 		}
 		if _, seatExists := c.engine.SybilProtection.Committee(attestationBlockID.Index()).GetSeat(att.IssuerID); seatExists {
 			seatCount++
@@ -83,7 +83,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 
 		blockID, err := att.BlockID(c.engine.API().TimeProvider())
 		if err != nil {
-			return nil, 0, errors.Wrapf(err, "error calculating blockID from attestation")
+			return nil, 0, errors.Wrap(err, "error calculating blockID from attestation")
 		}
 
 		blockIDs = append(blockIDs, blockID)
