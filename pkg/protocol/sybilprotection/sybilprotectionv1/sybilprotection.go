@@ -15,11 +15,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1/performance"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type Orchestrator struct {
+type SybilProtection struct {
 	events            *sybilprotection.Events
 	seatManager       seatmanager.SeatManager
 	ledger            ledger.Ledger // do we need the whole Ledger or just a callback to retrieve account data?
@@ -39,15 +40,13 @@ type Orchestrator struct {
 	module.Module
 }
 
-func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
+func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
 	return module.Provide(func(e *engine.Engine) sybilprotection.SybilProtection {
-		return options.Apply(&Orchestrator{
-			events: sybilprotection.NewEvents(),
-
-			// TODO: the following fields should be initialized after the engine is constructed,
-			//  otherwise we implicitly rely on the order of engine initialization which can change at any time.
+		return options.Apply(&SybilProtection{
+			events:                  sybilprotection.NewEvents(),
+			optsSeatManagerProvider: poa.NewProvider(),
 		}, opts,
-			func(o *Orchestrator) {
+			func(o *SybilProtection) {
 				o.seatManager = o.optsSeatManagerProvider(e)
 
 				e.HookConstructed(func() {
@@ -104,15 +103,15 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 	})
 }
 
-func (o *Orchestrator) Shutdown() {
+func (o *SybilProtection) Shutdown() {
 	o.TriggerStopped()
 }
 
-func (o *Orchestrator) BlockAccepted(block *blocks.Block) {
+func (o *SybilProtection) BlockAccepted(block *blocks.Block) {
 	o.performanceManager.BlockAccepted(block)
 }
 
-func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
+func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -151,27 +150,27 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	}
 }
 
-func (o *Orchestrator) SeatManager() seatmanager.SeatManager {
+func (o *SybilProtection) SeatManager() seatmanager.SeatManager {
 	return o.seatManager
 }
 
-func (o *Orchestrator) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
+func (o *SybilProtection) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
 	return o.performanceManager.ValidatorReward(validatorID, stakeAmount, epochStart, epochEnd)
 }
 
-func (o *Orchestrator) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
+func (o *SybilProtection) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
 	return o.performanceManager.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd)
 }
 
-func (o *Orchestrator) Import(reader io.ReadSeeker) error {
+func (o *SybilProtection) Import(reader io.ReadSeeker) error {
 	return o.performanceManager.Import(reader)
 }
 
-func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error {
+func (o *SybilProtection) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error {
 	return o.performanceManager.Export(writer, targetSlot)
 }
 
-func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
+func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -186,7 +185,7 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 	}
 }
 
-func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
+func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
 	currentEpoch := o.timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 	candidates := o.performanceManager.EligibleValidatorCandidates(nextEpoch)
@@ -226,14 +225,14 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 
 // WithInitialCommittee registers the passed committee on a given slot.
 // This is needed to generate Genesis snapshot with some initial committee.
-func WithInitialCommittee(committee *account.Accounts) options.Option[Orchestrator] {
-	return func(o *Orchestrator) {
+func WithInitialCommittee(committee *account.Accounts) options.Option[SybilProtection] {
+	return func(o *SybilProtection) {
 		o.optsInitialCommittee = committee
 	}
 }
 
-func WithSeatManagerProvider(seatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]) options.Option[Orchestrator] {
-	return func(o *Orchestrator) {
+func WithSeatManagerProvider(seatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]) options.Option[SybilProtection] {
+	return func(o *SybilProtection) {
 		o.optsSeatManagerProvider = seatManagerProvider
 	}
 }
