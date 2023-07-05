@@ -1,7 +1,6 @@
 package tipmanagerv1
 
 import (
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/agential"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
@@ -223,12 +222,10 @@ func (t *TipMetadata) connectStrongParent(strongParent *TipMetadata) {
 
 // connectWeakParent sets up the parent and children related properties for a weak parent.
 func (t *TipMetadata) connectWeakParent(weakParent *TipMetadata) {
-	unsubscribe := lo.Batch(
-		weakParent.connectedWeakChildren.Count(t.isConnectedToTips),
+	t.weaklyOrphanedWeakParents.Count(weakParent.isWeaklyOrphaned)
 
-		t.weaklyOrphanedWeakParents.Count(weakParent.isWeaklyOrphaned),
-	)
-
+	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
+	unsubscribe := weakParent.connectedWeakChildren.Count(t.isConnectedToTips)
 	weakParent.isEvicted.OnUpdate(func(_, _ bool) { unsubscribe() })
 }
 
