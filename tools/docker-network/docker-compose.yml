@@ -11,7 +11,7 @@ services:
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
       --p2p.seed=0x88ce2019dd99fd5a3c46e10ffc192549fc4491eee07552153ff66cf792b6a0af
-      --blockIssuer.issuerAccount=0x11a37a8e65fe5dca25cbeb896000eca615eaf88b97ca8dc70d8b1839b53dbf1c
+      --blockIssuer.issuerAccount=0x907c02e9302e0f0571f10f885594e56d8c54ff0708ab7a39bc1b74d396b93b12
       --blockIssuer.privateKey=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
       --activity.ignoreBootstrapped=true
     volumes:
@@ -31,7 +31,7 @@ services:
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
       --p2p.seed=0xf739eea09eb0f4820f26504a3135131a075089b4c901c19c2099513ee016f516
-      --blockIssuer.issuerAccount=0xb562e31344f3056982db1331592946f4df92481208a7ca16014ede54ccbfa6d1
+      --blockIssuer.issuerAccount=0x375358f92cc94750669598b0aaa55a6ff73310b90710e1fad524c0f911be0fea
       --blockIssuer.privateKey=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064
       --activity.ignoreBootstrapped=true
     volumes:
@@ -51,7 +51,7 @@ services:
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
       --p2p.seed=0x2ab2792bba8ab6deb7978165e4072d3f00def97a0138b98ba2d21eba54159705
-      --blockIssuer.issuerAccount=0xe20f6f0982a184f07fed9e069e218d51f9678c8b49fd1311033e822e1b5901ed
+      --blockIssuer.issuerAccount=0x6aee704f25558e8aa7630fed0121da53074188abc423b3c5810f80be4936eb6e
       --blockIssuer.privateKey=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
       --activity.ignoreBootstrapped=true
     volumes:

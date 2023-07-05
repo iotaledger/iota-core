@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -373,6 +374,10 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 			// if no custom address is assigned to the account, assign an address generated from GenesisSeed
 			if accountDetails.Address == nil {
 				accountDetails.Address = wallet.Address()
+			}
+
+			if accountDetails.AccountID.Empty() {
+				accountDetails.AccountID = blake2b.Sum256(accountDetails.IssuerKey)
 			}
 
 			return accountDetails

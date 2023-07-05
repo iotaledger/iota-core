@@ -2,8 +2,10 @@ package snapshotcreator
 
 import (
 	"crypto/ed25519"
+	"fmt"
 	"os"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/blake2b"
 
@@ -62,6 +64,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 
 	accounts := account.NewAccounts()
 	for _, accountData := range opt.Accounts {
+		fmt.Println("account ID ", accountData.AccountID, hexutil.Encode(accountData.IssuerKey))
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
 			accounts.Set(blake2b.Sum256(accountData.IssuerKey), &account.Pool{
@@ -132,7 +135,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine, protocolParams *iotago.ProtocolParameters) (err error) {
 	// Account outputs start from Genesis TX index 1
 	for idx, account := range accounts {
-		output := createAccount(account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
+		output := createAccount(account.AccountID, account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
 
 		if _, err = protocolParams.RentStructure.CoversStateRent(output, account.Amount); err != nil {
 			return errors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
@@ -159,9 +162,9 @@ func createOutput(address iotago.Address, tokenAmount iotago.BaseToken) (output 
 	}
 }
 
-func createAccount(address iotago.Address, tokenAmount iotago.BaseToken, pubkey ed25519.PublicKey, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
+func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmount iotago.BaseToken, pubkey ed25519.PublicKey, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
 	accountOutput := &iotago.AccountOutput{
-		AccountID: blake2b.Sum256(pubkey),
+		AccountID: accountID,
 		Amount:    tokenAmount,
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: address},
