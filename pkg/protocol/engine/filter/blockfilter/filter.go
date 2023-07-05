@@ -15,9 +15,11 @@ import (
 )
 
 var (
-	ErrCommitmentNotCommittable     = errors.New("a block cannot commit to a slot that cannot objectively be committable yet")
+	ErrCommitmentTooOld             = errors.New("a block cannot commit to a slot that is older than the block's slot minus maxCommittableAge")
+	ErrCommitmentTooRecent          = errors.New("a block cannot commit to a slot that is more recent than the block's slot minus minCommittableAge")
+	ErrCommitmentInputTooOld        = errors.New("a block cannot contain a commitment input with index older than the block's slot minus maxCommittableAge")
+	ErrCommitmentInputTooRecent     = errors.New("a block cannot contain a commitment input with index more recent than the block's slot minus minCommittableAge")
 	ErrBlockTimeTooFarAheadInFuture = errors.New("a block cannot be too far ahead in the future")
-	ErrInvalidSignature             = errors.New("block has invalid signature")
 	ErrInvalidProofOfWork           = errors.New("error validating PoW")
 )
 
@@ -28,7 +30,8 @@ type Filter struct {
 	protocolParamsFunc func() *iotago.ProtocolParameters
 
 	optsMaxAllowedWallClockDrift time.Duration
-	optsMinCommittableSlotAge    iotago.SlotIndex
+	optsMinCommittableAge        iotago.SlotIndex
+	optsMaxCommittableAge        iotago.SlotIndex
 	optsSignatureValidation      bool
 
 	module.Module
@@ -89,21 +92,6 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 		}
 	}
 
-	// Check if the block is trying to commit to a slot that is not yet committable.
-	// This check, together with the optsMaxAllowedWallClockDrift makes sure, that no one can issue blocks with commitments in the future.
-	if f.optsMinCommittableSlotAge > 0 &&
-		block.SlotCommitment().Index() > 0 &&
-		(block.SlotCommitment().Index() > block.ID().Index() ||
-			block.ID().Index()-block.SlotCommitment().Index() < f.optsMinCommittableSlotAge) {
-		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
-			Block:  block,
-			Reason: errors.WithMessagef(ErrCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.Block().SlotCommitment.Index),
-			Source: source,
-		})
-
-		return
-	}
-
 	// Verify the timestamp is not too far in the future.
 	timeDelta := time.Since(block.Block().IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
@@ -116,26 +104,57 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 		return
 	}
 
-	if f.optsSignatureValidation {
-		// Verify the block signature.
-		if valid, err := block.Block().VerifySignature(); !valid {
-			if err != nil {
-				f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
-					Block:  block,
-					Reason: errors.WithMessagef(ErrInvalidSignature, "error: %s", err.Error()),
-					Source: source,
-				})
+	// check that commitment is within allowed range.
+	if f.optsMinCommittableAge > 0 &&
+		block.SlotCommitment().Index() > 0 &&
+		(block.SlotCommitment().Index() > block.ID().Index() ||
+			block.ID().Index()-block.SlotCommitment().Index() < f.optsMinCommittableAge) {
+		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+			Block:  block,
+			Reason: errors.WithMessagef(ErrCommitmentTooRecent, "block at slot %d committing to slot %d", block.ID().Index(), block.SlotCommitment().Index()),
+			Source: source,
+		})
 
-				return
+		return
+	}
+	if block.ID().Index()-block.SlotCommitment().Index() > f.optsMaxCommittableAge {
+		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+			Block:  block,
+			Reason: errors.WithMessagef(ErrCommitmentTooOld, "block at slot %d committing to slot %d", block.ID().Index(), block.SlotCommitment().Index()),
+			Source: source,
+		})
+
+		return
+	}
+
+	// check that commitment inputs (if any) are within allowed range.
+	tx, isTX := block.Block().Payload.(*iotago.Transaction)
+	if isTX {
+		cInputs, err := tx.CommitmentInputs()
+		if err == nil {
+			for _, cInput := range cInputs {
+				if f.optsMinCommittableAge > 0 &&
+					cInput.CommitmentID.Index() > 0 &&
+					(cInput.CommitmentID.Index() > block.ID().Index() ||
+						block.ID().Index()-cInput.CommitmentID.Index() < f.optsMinCommittableAge) {
+					f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+						Block:  block,
+						Reason: errors.WithMessagef(ErrCommitmentTooRecent, "block at slot %d with commitment input to slot %d", block.ID().Index(), cInput.CommitmentID.Index()),
+						Source: source,
+					})
+
+					return
+				}
+				if block.ID().Index()-cInput.CommitmentID.Index() > f.optsMaxCommittableAge {
+					f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+						Block:  block,
+						Reason: errors.WithMessagef(ErrCommitmentTooOld, "block at slot %d committing to slot %d", block.ID().Index(), cInput.CommitmentID.Index()),
+						Source: source,
+					})
+
+					return
+				}
 			}
-
-			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
-				Block:  block,
-				Reason: ErrInvalidSignature,
-				Source: source,
-			})
-
-			return
 		}
 	}
 
@@ -146,10 +165,17 @@ func (f *Filter) Shutdown() {
 	f.TriggerStopped()
 }
 
-// WithMinCommittableSlotAge specifies how old a slot has to be for it to be committable.
-func WithMinCommittableSlotAge(age iotago.SlotIndex) options.Option[Filter] {
+// WithMinCommittableAge specifies how old a slot has to be for it to be committable.
+func WithMinCommittableAge(age iotago.SlotIndex) options.Option[Filter] {
 	return func(filter *Filter) {
-		filter.optsMinCommittableSlotAge = age
+		filter.optsMinCommittableAge = age
+	}
+}
+
+// WithMaxCommittableAge specifies how old a slot has to be for it to be committable.
+func WithMaxCommittableAge(age iotago.SlotIndex) options.Option[Filter] {
+	return func(filter *Filter) {
+		filter.optsMaxCommittableAge = age
 	}
 }
 
@@ -157,12 +183,5 @@ func WithMinCommittableSlotAge(age iotago.SlotIndex) options.Option[Filter] {
 func WithMaxAllowedWallClockDrift(d time.Duration) options.Option[Filter] {
 	return func(filter *Filter) {
 		filter.optsMaxAllowedWallClockDrift = d
-	}
-}
-
-// WithSignatureValidation specifies if the block signature should be validated (defaults to yes).
-func WithSignatureValidation(validation bool) options.Option[Filter] {
-	return func(filter *Filter) {
-		filter.optsSignatureValidation = validation
 	}
 }

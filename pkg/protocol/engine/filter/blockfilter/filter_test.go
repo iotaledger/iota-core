@@ -140,7 +140,6 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 	tf := NewTestFramework(t,
 		&protoParams,
 		WithMaxAllowedWallClockDrift(allowedDrift),
-		WithSignatureValidation(false),
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
@@ -158,33 +157,13 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 	tf.IssueUnsignedBlockAtTime("tooFarAheadFuture", time.Now().Add(allowedDrift).Add(1*time.Second))
 }
 
-func TestFilter_WithSignatureValidation(t *testing.T) {
-	tf := NewTestFramework(t,
-		&protoParams,
-		WithSignatureValidation(true),
-	)
-
-	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
-		require.Equal(t, "valid", block.ID().Alias())
-	})
-
-	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
-		require.Equal(t, "invalid", event.Block.ID().Alias())
-		require.True(t, errors.Is(event.Reason, ErrInvalidSignature))
-	})
-
-	tf.IssueUnsignedBlockAtTime("invalid", time.Now())
-	tf.IssueSigned("valid")
-}
-
-func TestFilter_MinCommittableSlotAge(t *testing.T) {
+func TestFilter_MinCommittableAge(t *testing.T) {
 	params := protoParams
 	params.GenesisUnixTimestamp = time.Now().Add(-5 * time.Minute).Unix()
 
 	tf := NewTestFramework(t,
 		&params,
-		WithMinCommittableSlotAge(3),
-		WithSignatureValidation(false),
+		WithMinCommittableAge(3),
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
@@ -193,7 +172,7 @@ func TestFilter_MinCommittableSlotAge(t *testing.T) {
 
 	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
-		require.True(t, errors.Is(event.Reason, ErrCommitmentNotCommittable))
+		require.True(t, errors.Is(event.Reason, ErrCommitmentTooRecent))
 	})
 
 	tf.IssueUnsignedBlockAtSlot("valid-1-0", 1, 0)
@@ -222,7 +201,6 @@ func TestFilter_MinPoW(t *testing.T) {
 
 	tf := NewTestFramework(t,
 		&params,
-		WithSignatureValidation(false),
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
