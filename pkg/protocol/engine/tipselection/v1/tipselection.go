@@ -178,6 +178,13 @@ func (t *TipSelection) isValidWeakTip(block *blocks.Block) bool {
 	return t.conflictDAG.LikedInstead(block.PayloadConflictIDs()).Size() == 0
 }
 
+// WithMaxStrongParents is an option for the TipSelection that allows to configure the maximum number of strong parents.
+func WithMaxStrongParents(maxStrongParents int) options.Option[TipSelection] {
+	return func(tipManager *TipSelection) {
+		tipManager.optMaxStrongParents = maxStrongParents
+	}
+}
+
 // WithMaxLikedInsteadReferences is an option for the TipSelection that allows to configure the maximum number of liked
 // instead references.
 func WithMaxLikedInsteadReferences(maxLikedInsteadReferences int) options.Option[TipSelection] {
