@@ -285,7 +285,13 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 
 	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
 		require.Contains(t, []string{"commitmentInputTooOld", "commitmentInputNewerThanBlockCommitment"}, event.Block.ID().Alias())
-		require.True(t, errors.Is(event.Reason, ErrTransactionCommitmentInputTooFarInThePast))
+
+		if strings.Contains(event.Block.ID().Alias(), "commitmentInputTooOld") {
+			require.True(t, errors.Is(event.Reason, ErrTransactionCommitmentInputTooFarInThePast))
+		}
+		if strings.Contains(event.Block.ID().Alias(), "commitmentInputNewerThanBlockCommitment") {
+			require.True(t, errors.Is(event.Reason, ErrTransactionCommitmentInputInTheFuture))
+		}
 	})
 
 	commitmentInputTooOld, err := builder.NewTransactionBuilder(protoParams.NetworkID()).

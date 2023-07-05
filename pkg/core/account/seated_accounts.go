@@ -65,7 +65,7 @@ func (s *SeatedAccounts) SeatCount() int {
 
 func (s *SeatedAccounts) Accounts() *Accounts {
 	accounts := NewAccounts()
-	s.seatsByAccount.ForEach(func(id iotago.AccountID, index SeatIndex) bool {
+	s.seatsByAccount.ForEachKey(func(id iotago.AccountID) bool {
 		pool, exists := s.accounts.Get(id)
 		if !exists {
 			panic("account not found")

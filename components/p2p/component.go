@@ -141,7 +141,7 @@ func provide(c *dig.Container) error {
 		}
 
 		if !peeringIP.IsGlobalUnicast() {
-			Component.LogWarnf("IP is not a global unicast address: %s", peeringIP.String())
+			Component.LogWarnf("IP is not a global unicast address: %s", peeringIP)
 		}
 
 		// TODO: remove requirement for PeeringKey in hive.go
@@ -212,7 +212,7 @@ func run() error {
 			}
 		}()
 
-		Component.LogInfof("started: bind-address=%s", localAddr.String())
+		Component.LogInfof("started: bind-address=%s", localAddr)
 
 		<-ctx.Done()
 	}, daemon.PriorityP2P); err != nil {
@@ -223,10 +223,10 @@ func run() error {
 		<-ctx.Done()
 		prvKey, _ := deps.PeerDB.LocalPrivateKey()
 		if err := deps.PeerDBKVSTore.Close(); err != nil {
-			Component.LogErrorfAndExit("unable to save identity %s: %s", prvKey.Public().String(), err)
+			Component.LogErrorfAndExit("unable to save identity %s: %s", prvKey.Public(), err)
 			return
 		}
-		Component.LogInfof("saved identity %s", prvKey.Public().String())
+		Component.LogInfof("saved identity %s", prvKey.Public())
 	}, daemon.PriorityPeerDatabase); err != nil {
 		Component.LogErrorfAndExit("Failed to start as daemon: %s", err)
 	}

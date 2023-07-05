@@ -11,10 +11,14 @@ import (
 
 // TODO: add later as a protocol params, after its refactor is finished.
 var (
-	targetRewardFirstPeriod  uint64           = 233373068869021000 // TODO current values are per slot, update with new when provided by Olivia
-	targetRewardChangeSlot   iotago.SlotIndex = 9460800
-	targetRewardSecondPeriod uint64           = 85853149583786000
-	validatorBlocksPerSlot   uint8            = 10
+	targetRewardFirstPeriod   uint64           = 233373068869021000 // TODO current values are per slot, update with new when provided by Olivia
+	targetRewardChangeSlot    iotago.SlotIndex = 9460800
+	targetRewardSecondPeriod  uint64           = 85853149583786000
+	validatorBlocksPerSlot    uint8            = 10
+	profitMarginExponent      uint64           = 8
+	rewardCalculationExponent uint64           = 31
+	// TODO why do we choose 40 here, why dont we use ^31 again?
+	finalRewardScalingExponent uint64 = 40
 )
 
 func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
@@ -24,59 +28,70 @@ func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	return iotago.Identifier(ads.NewMap[iotago.AccountID, PoolRewards](t.rewardsStorage(epochIndex)).Root())
 }
 
-func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
+func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
+	var validatorReward iotago.Mana
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
 		rewardsForAccountInEpoch, exists := t.rewardsForAccount(validatorID, epochIndex)
 		if !exists {
 			continue
 		}
 
+		if rewardsForAccountInEpoch.PoolStake == 0 {
+			continue
+		}
+
 		poolStats, err := t.poolStats(epochIndex)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
+			return 0, errors.Wrapf(err, "validator accountID %s", epochIndex, validatorID)
 		}
 
 		unDecayedEpochRewards := uint64(rewardsForAccountInEpoch.FixedCost) +
-			((poolStats.ProfitMargin * uint64(rewardsForAccountInEpoch.PoolRewards)) >> 8) +
-			((((1<<8)-poolStats.ProfitMargin)*uint64(rewardsForAccountInEpoch.PoolRewards))>>8)*
+			decreaseAccuracy(poolStats.ProfitMargin*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent) +
+			decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, profitMarginExponent)*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent)*
 				uint64(stakeAmount)/
 				uint64(rewardsForAccountInEpoch.PoolStake)
 
-		decayedEpochRewards, err := t.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
+		decayedEpochRewards, err2 := t.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		if err2 != nil {
+			return 0, errors.Wrapf(err2, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
+
 		validatorReward += decayedEpochRewards
 	}
 
 	return validatorReward, nil
 }
 
-func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
+func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
+	var delegatorsReward iotago.Mana
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
 		rewardsForAccountInEpoch, exists := t.rewardsForAccount(validatorID, epochIndex)
 		if !exists {
 			continue
 		}
 
-		poolStats, err := t.poolStats(epochIndex)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d", epochIndex)
+		if rewardsForAccountInEpoch.PoolStake == 0 {
+			continue
 		}
 
-		unDecayedEpochRewards := ((((1 << 8) - poolStats.ProfitMargin) * uint64(rewardsForAccountInEpoch.PoolRewards)) >> 8) *
+		poolStats, err := t.poolStats(epochIndex)
+		if err != nil {
+			return 0, errors.Wrapf(err, "validator accountID %s", epochIndex, validatorID)
+		}
+
+		unDecayedEpochRewards := decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, profitMarginExponent)*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent) *
 			uint64(delegatedAmount) /
 			uint64(rewardsForAccountInEpoch.PoolStake)
 
 		decayedEpochRewards, err := t.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d", epochIndex)
+			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 
 		delegatorsReward += decayedEpochRewards
@@ -98,15 +113,38 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 	if slotIndex > targetRewardChangeSlot {
 		initialReward = targetRewardSecondPeriod
 	}
-	aux := (((1 << 31) * poolStake) / totalStake) + ((2 << 31) * validatorStake / totalValidatorsStake)
+
+	// TODO: this calculation will overflow with ~4Gi poolstake already.
+	// maybe we can reuse the functions from the mana decay provider?
+	// should we move the mana decay functions to the safemath package?
+	aux := (increaseAccuracy(poolStake, rewardCalculationExponent) / totalStake) + (increaseAccuracy(validatorStake, rewardCalculationExponent) / totalValidatorsStake)
 	aux2 := iotago.Mana(uint64(aux) * initialReward * performanceFactor)
-	if (aux2 >> 40) < fixedCost {
+	if decreaseAccuracy(aux2, finalRewardScalingExponent) < fixedCost {
 		return 0
 	}
 
-	return (aux2 >> 40) - fixedCost
+	return (aux2 >> finalRewardScalingExponent) - fixedCost
 }
 
+// calculateProfitMargin calculates the profit margin of the pool by firstly increasing the accuracy of the given value, so the profit margin is moved to the power of 2^accuracyShift.
 func calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken) uint64 {
-	return (1 << 8) * uint64(totalValidatorsStake) / (uint64(totalValidatorsStake) + uint64(totalPoolStake))
+	return uint64(increaseAccuracy(totalValidatorsStake, profitMarginExponent) / (totalValidatorsStake + totalPoolStake))
+}
+
+// increaseAccuracy shifts the bits of the given value to the left by the given amount, so that the value is moved to the power of 2^accuracyShift.
+// TODO make sure that we handle overflow here correctly if the inserted value is > 2^(64-accuracyShift).
+func increaseAccuracy[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint64) V {
+	return val << shift
+}
+
+// decreaseAccuracy reversts the accuracy operation of increaseAccuracy by shifting the bits of the given value to the right by the profitMarginExponent.
+// This is a lossy operation. All values less than 2^accuracyShift will be rounded to 0.
+func decreaseAccuracy[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint64) V {
+	return val >> shift
+}
+
+// increasedAccuracyComplement returns the 'shifted' completition to "one" for the shifted value where one is the 2^accuracyShift.
+func increasedAccuracyComplement[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint64) V {
+	// it should never overflow for val=profit margin, if profit margin was previously scaled with increaseAccuracy.
+	return (1 << shift) - val
 }

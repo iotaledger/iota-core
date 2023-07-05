@@ -42,7 +42,7 @@ type dependencies struct {
 func accountFromParam(accountHex, privateKey string) blockfactory.Account {
 	accountID, err := iotago.IdentifierFromHexString(accountHex)
 	if err != nil {
-		panic(fmt.Sprintln("invalid account ID hex string", err))
+		panic(fmt.Sprintln("invalid accountID hex string", err))
 	}
 	privKey, err := crypto.ParseEd25519PrivateKeyFromString(privateKey)
 	if err != nil {

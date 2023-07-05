@@ -62,7 +62,7 @@ func NewTestSuite(test *testing.T) *TestSuite {
 			GenesisUnixTimestamp:  time.Now().Unix(),
 			SlotDurationInSeconds: 10,
 			SlotsPerEpochExponent: 13,
-			EvictionAge:           10,
+			EvictionAge:           6,
 			LivenessThreshold:     3,
 		},
 

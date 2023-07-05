@@ -38,7 +38,7 @@ func checkCfgSeedAgainstDB(cfgSeed []byte, peerDB *peer.DB) error {
 	}
 
 	if !bytes.Equal(prvKeyCfgBytes, prvKeyDBBytes) {
-		return errors.WithMessagef(ErrMismatchedPrivateKeys, "identities - pub keys (cfg/db): %s vs. %s", prvKeyCfg.Public().String(), prvKeyDB.Public().String())
+		return errors.WithMessagef(ErrMismatchedPrivateKeys, "identities - pub keys (cfg/db): %s vs. %s", prvKeyCfg.Public(), prvKeyDB.Public())
 	}
 
 	return nil

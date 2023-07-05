@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -59,12 +60,14 @@ func (t *Tracker) BlockAccepted(block *blocks.Block) {
 	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
 	pf, err := performanceFactors.Load(block.Block().IssuerID)
 	if err != nil {
-		panic(err)
+		// TODO replace panic with errors in the future, like triggering an error event
+		panic(ierrors.Errorf("failed to load performance factor for account %s", block.Block().IssuerID))
 	}
 
 	err = performanceFactors.Store(block.Block().IssuerID, pf+1)
 	if err != nil {
-		panic(err)
+		// TODO replace panic with errors in the future, like triggering an error event
+		panic(ierrors.Errorf("failed to store performance factor for account %s", block.Block().IssuerID))
 	}
 }
 
@@ -72,8 +75,8 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	epochSlotStart := t.timeProvider.EpochStart(epoch)
-	epochSlotEnd := t.timeProvider.EpochEnd(epoch)
+	epochStartSlot := t.timeProvider.EpochStart(epoch)
+	epochEndSlot := t.timeProvider.EpochEnd(epoch)
 
 	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
 	poolsStats := PoolsStats{
@@ -87,11 +90,12 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	}
 
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
-		intermediateFactors := make([]uint64, 0)
-		for slot := epochSlotStart; slot <= epochSlotEnd; slot++ {
+		intermediateFactors := make([]uint64, 0, epochEndSlot+1-epochStartSlot)
+		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
 			performanceFactorStorage := t.performanceFactorsFunc(slot)
 			if performanceFactorStorage == nil {
 				intermediateFactors = append(intermediateFactors, 0)
+				continue
 			}
 
 			pf, err := performanceFactorStorage.Load(accountID)
@@ -100,12 +104,11 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			}
 
 			intermediateFactors = append(intermediateFactors, pf)
-
 		}
 
 		ads.NewMap[iotago.AccountID, PoolRewards](t.rewardsStorage(epoch)).Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
-			PoolRewards: t.poolReward(epochSlotEnd, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
+			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
 		})
 
@@ -134,7 +137,7 @@ func (t *Tracker) poolStats(epoch iotago.EpochIndex) (poolStats *PoolsStats, err
 }
 
 func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
-	accountsBytes, err := t.committeeStore.Get(epoch.Bytes())
+	committeeBytes, err := t.committeeStore.Get(epoch.Bytes())
 	if err != nil {
 		if errors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, false
@@ -143,7 +146,7 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 	}
 
 	committee = account.NewAccounts()
-	if _, err = committee.FromBytes(accountsBytes); err != nil {
+	if _, err = committee.FromBytes(committeeBytes); err != nil {
 		panic(errors.Wrapf(err, "failed to parse committee for epoch %d", epoch))
 	}
 
@@ -160,6 +163,10 @@ func (t *Tracker) storeCommitteeForEpoch(epochIndex iotago.EpochIndex, committee
 }
 
 func (t *Tracker) aggregatePerformanceFactors(issuedBlocksPerSlot []uint64) uint64 {
+	if len(issuedBlocksPerSlot) == 0 {
+		return 0
+	}
+
 	var sum uint64
 	for _, issuedBlocks := range issuedBlocksPerSlot {
 		if issuedBlocks > uint64(validatorBlocksPerSlot) {
@@ -169,5 +176,7 @@ func (t *Tracker) aggregatePerformanceFactors(issuedBlocksPerSlot []uint64) uint
 		sum += issuedBlocks
 	}
 
+	// TODO: we should scale the result by the amount of slots per epoch,
+	// otherwise we lose a lot of precision here.
 	return sum / uint64(len(issuedBlocksPerSlot))
 }
