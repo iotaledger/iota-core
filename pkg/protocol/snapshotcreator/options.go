@@ -80,11 +80,17 @@ func WithGenesisSeed(genesisSeed []byte) options.Option[Options] {
 	}
 }
 
+// AccountDetails is a struct that specifies details of accounts created in the Genesis snapshot.
+// AccountID is derived from IssuerKey, therefore, this value must be unique for each account.
 type AccountDetails struct {
 	Address   iotago.Address
-	Amount    uint64
-	Mana      uint64
+	Amount    iotago.BaseToken
+	Mana      iotago.Mana
 	IssuerKey ed25519.PublicKey
+
+	StakingEpochEnd iotago.EpochIndex
+	FixedCost       iotago.Mana
+	StakedAmount    iotago.BaseToken
 }
 
 func WithAccounts(accounts ...AccountDetails) options.Option[Options] {

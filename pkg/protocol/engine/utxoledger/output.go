@@ -86,11 +86,11 @@ func (o *Output) Bytes() []byte {
 	return o.encodedOutput
 }
 
-func (o *Output) Deposit() uint64 {
+func (o *Output) Deposit() iotago.BaseToken {
 	return o.Output().Deposit()
 }
 
-func (o *Output) StoredMana() uint64 {
+func (o *Output) StoredMana() iotago.Mana {
 	return o.Output().StoredMana()
 }
 

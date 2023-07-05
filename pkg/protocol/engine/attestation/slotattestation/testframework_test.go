@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -34,7 +34,7 @@ type TestFramework struct {
 	bucketedStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, kvstore.KVStore]
 
 	api                 iotago.API
-	slotTimeProvider    *iotago.TimeProvider
+	timeProvider        *iotago.TimeProvider
 	attestationsByAlias *shrinkingmap.ShrinkingMap[string, *iotago.Attestation]
 	issuerByAlias       *shrinkingmap.ShrinkingMap[string, *issuer]
 
@@ -64,7 +64,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t := &TestFramework{
 		test:                test,
 		api:                 api,
-		slotTimeProvider:    api.TimeProvider(),
+		timeProvider:        api.TimeProvider(),
 		bucketedStorage:     shrinkingmap.New[iotago.SlotIndex, kvstore.KVStore](),
 		attestationsByAlias: shrinkingmap.New[string, *iotago.Attestation](),
 		issuerByAlias:       shrinkingmap.New[string, *issuer](),
@@ -76,15 +76,15 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		}))
 	}
 
-	committeeFunc := func(index iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID] {
-		accounts := account.NewAccounts[iotago.AccountID](mapdb.NewMapDB())
+	committeeFunc := func(index iotago.SlotIndex) *account.SeatedAccounts {
+		accounts := account.NewAccounts()
 		var members []iotago.AccountID
 		t.issuerByAlias.ForEach(func(alias string, issuer *issuer) bool {
-			accounts.Set(issuer.accountID, 0) // we don't care about weights with PoA
+			accounts.Set(issuer.accountID, &account.Pool{}) // we don't care about pools with PoA
 			members = append(members, issuer.accountID)
 			return true
 		})
-		return accounts.SelectAccounts(members...)
+		return accounts.SelectCommittee(members...)
 	}
 
 	t.Instance = slotattestation.NewManager(2, bucketedStorage, committeeFunc)
@@ -112,7 +112,7 @@ func (t *TestFramework) AddFutureAttestation(issuerAlias string, attestationAlia
 	defer t.mutex.Unlock()
 
 	issuer := t.issuer(issuerAlias)
-	issuingTime := t.slotTimeProvider.SlotStartTime(blockSlot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	issuingTime := t.timeProvider.SlotStartTime(blockSlot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
 	block, err := builder.NewBlockBuilder().
 		IssuingTime(issuingTime).
@@ -121,7 +121,7 @@ func (t *TestFramework) AddFutureAttestation(issuerAlias string, attestationAlia
 		Build()
 	require.NoError(t.test, err)
 
-	block.MustID(t.slotTimeProvider).RegisterAlias(attestationAlias)
+	block.MustID(t.timeProvider).RegisterAlias(attestationAlias)
 	att := iotago.NewAttestation(block)
 	t.attestationsByAlias.Set(attestationAlias, att)
 
@@ -132,7 +132,7 @@ func (t *TestFramework) AddFutureAttestation(issuerAlias string, attestationAlia
 }
 
 func (t *TestFramework) blockIDFromAttestation(att *iotago.Attestation) iotago.BlockID {
-	return lo.PanicOnErr(att.BlockID(t.slotTimeProvider))
+	return lo.PanicOnErr(att.BlockID(t.timeProvider))
 }
 
 func (t *TestFramework) attestation(alias string) *iotago.Attestation {

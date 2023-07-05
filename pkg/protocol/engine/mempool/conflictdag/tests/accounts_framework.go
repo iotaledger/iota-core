@@ -6,22 +6,22 @@ import (
 	"golang.org/x/crypto/blake2b"
 	"golang.org/x/xerrors"
 
-	"github.com/iotaledger/hive.go/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type AccountsTestFramework struct {
-	Instance  *account.Accounts[iotago.AccountID, *iotago.AccountID]
-	Committee *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
+	Instance  *account.Accounts
+	Committee *account.SeatedAccounts
 
 	test              *testing.T
 	identitiesByAlias map[string]iotago.AccountID
 }
 
-func NewAccountsTestFramework(test *testing.T, instance *account.Accounts[iotago.AccountID, *iotago.AccountID]) *AccountsTestFramework {
+func NewAccountsTestFramework(test *testing.T, instance *account.Accounts) *AccountsTestFramework {
 	return &AccountsTestFramework{
 		Instance:  instance,
-		Committee: instance.SelectAccounts(),
+		Committee: instance.SelectCommittee(),
 
 		test:              test,
 		identitiesByAlias: make(map[string]iotago.AccountID),
@@ -64,14 +64,6 @@ func (f *AccountsTestFramework) Has(alias string) bool {
 	return f.Committee.HasAccount(validatorID)
 }
 
-func (f *AccountsTestFramework) ForEachWeighted(callback func(id iotago.AccountID, weight int64) bool) error {
-	return f.Instance.ForEach(callback)
-}
-
-func (f *AccountsTestFramework) TotalWeight() int64 {
-	return f.Instance.TotalWeight()
-}
-
 func (f *AccountsTestFramework) CreateID(alias string) iotago.AccountID {
 	_, exists := f.identitiesByAlias[alias]
 	if exists {
@@ -82,7 +74,7 @@ func (f *AccountsTestFramework) CreateID(alias string) iotago.AccountID {
 	validatorID := iotago.IdentifierFromData(hashedAlias[:])
 	validatorID.RegisterAlias(alias)
 
-	f.Instance.Set(validatorID, 0) // we don't care about weights when doing PoA
+	f.Instance.Set(validatorID, &account.Pool{}) // we don't care about pools when doing PoA
 	f.Committee.Set(account.SeatIndex(f.Committee.SeatCount()), validatorID)
 
 	f.identitiesByAlias[alias] = validatorID

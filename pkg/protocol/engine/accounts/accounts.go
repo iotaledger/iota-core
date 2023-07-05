@@ -1,33 +1,43 @@
 package accounts
 
 import (
+	"bytes"
+	"encoding/binary"
+	"io"
+
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
-
-type AccountPublicKeys interface {
-	IsPublicKeyAllowed(iotago.AccountID, iotago.SlotIndex, ed25519.PublicKey) bool
-}
 
 type AccountData struct {
 	ID       iotago.AccountID
 	Credits  *BlockIssuanceCredits
 	OutputID iotago.OutputID
 	PubKeys  *advancedset.AdvancedSet[ed25519.PublicKey]
+
+	ValidatorStake  iotago.BaseToken
+	DelegationStake iotago.BaseToken
+	FixedCost       iotago.Mana
+	StakeEndEpoch   iotago.EpochIndex
 }
 
-func NewAccountData(id iotago.AccountID, credits *BlockIssuanceCredits, outputID iotago.OutputID, pubKeys ...ed25519.PublicKey) *AccountData {
-	return &AccountData{
-		ID:       id,
-		Credits:  credits,
-		OutputID: outputID,
-		PubKeys:  advancedset.New(pubKeys...),
-	}
+func NewAccountData(id iotago.AccountID, opts ...options.Option[AccountData]) *AccountData {
+	return options.Apply(&AccountData{
+		ID:              id,
+		Credits:         &BlockIssuanceCredits{},
+		OutputID:        iotago.EmptyOutputID,
+		PubKeys:         advancedset.New[ed25519.PublicKey](),
+		ValidatorStake:  0,
+		DelegationStake: 0,
+		FixedCost:       0,
+		StakeEndEpoch:   0,
+	}, opts)
 }
 
 func (a *AccountData) IsPublicKeyAllowed(pubKey ed25519.PublicKey) bool {
@@ -58,42 +68,91 @@ func (a *AccountData) Clone() *AccountData {
 			Value:      a.Credits.Value,
 			UpdateTime: a.Credits.UpdateTime,
 		},
-		PubKeys: keyCopy,
+		OutputID: a.OutputID,
+		PubKeys:  keyCopy,
+
+		ValidatorStake:  a.ValidatorStake,
+		DelegationStake: a.DelegationStake,
+		FixedCost:       a.FixedCost,
+		StakeEndEpoch:   a.StakeEndEpoch,
 	}
 }
 
-func (a *AccountData) FromBytes(bytes []byte) (int, error) {
-	m := marshalutil.New(bytes)
+func (a *AccountData) FromBytes(b []byte) (int, error) {
+	return a.readFromReadSeeker(bytes.NewReader(b))
+}
 
-	if _, err := a.ID.FromBytes(lo.PanicOnErr(m.ReadBytes(iotago.IdentifierLength))); err != nil {
-		return 0, errors.Wrap(err, "failed to unmarshal account id")
+func (a *AccountData) FromReader(readSeeker io.ReadSeeker) error {
+	return lo.Return2(a.readFromReadSeeker(readSeeker))
+}
+
+func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
+	var bytesConsumed int
+
+	bytesRead, err := io.ReadFull(reader, a.ID[:])
+	if err != nil {
+		return bytesConsumed, errors.Wrap(err, "unable to read accountID")
 	}
+
+	bytesConsumed += bytesRead
 
 	a.Credits = &BlockIssuanceCredits{}
-	if _, err := a.Credits.FromBytes(lo.PanicOnErr(m.ReadBytes(BlockIssuanceCreditsLength))); err != nil {
-		return 0, errors.Wrap(err, "failed to unmarshal block issuance credits")
-	}
 
-	if _, err := a.OutputID.FromBytes(lo.PanicOnErr(m.ReadBytes(iotago.OutputIDLength))); err != nil {
-		return 0, errors.Wrap(err, "failed to unmarshal output id")
+	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.Value); err != nil {
+		return bytesConsumed, errors.Wrapf(err, "unable to read account balance value for accountID %s", a.ID)
 	}
+	bytesConsumed += 8
 
-	pubKeysCount, err := m.ReadUint64()
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to unmarshal public keys count")
+	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.UpdateTime); err != nil {
+		return bytesConsumed, errors.Wrapf(err, "unable to read updatedTime for account balance for accountID %s", a.ID)
 	}
+	bytesConsumed += 8
 
-	a.PubKeys = advancedset.New[ed25519.PublicKey]()
-	for i := uint64(0); i < pubKeysCount; i++ {
-		pubKey := ed25519.PublicKey{}
-		if _, err = pubKey.FromBytes(lo.PanicOnErr(m.ReadBytes(ed25519.PublicKeySize))); err != nil {
-			return 0, errors.Wrap(err, "failed to unmarshal public key")
+	if err := binary.Read(reader, binary.LittleEndian, &a.OutputID); err != nil {
+		return bytesConsumed, errors.Wrapf(err, "unable to read OutputID for account for accountID %s", a.ID)
+	}
+	bytesConsumed += len(a.OutputID)
+
+	var pubKeyCount uint8
+	if err := binary.Read(reader, binary.LittleEndian, &pubKeyCount); err != nil {
+		return bytesConsumed, errors.Wrapf(err, "unable to read pubKeyCount count for accountID %s", a.ID)
+	}
+	bytesConsumed++
+
+	pubKeys := make([]ed25519.PublicKey, pubKeyCount)
+	for i := uint8(0); i < pubKeyCount; i++ {
+		var pubKey ed25519.PublicKey
+		bytesRead, err = io.ReadFull(reader, pubKey[:])
+		if err != nil {
+			return bytesConsumed, errors.Wrapf(err, "unable to read public key index %d for accountID %s", i, a.ID)
 		}
+		bytesConsumed += bytesRead
 
-		a.AddPublicKeys(pubKey)
+		pubKeys[i] = pubKey
 	}
+	a.PubKeys = advancedset.New(pubKeys...)
 
-	return m.ReadOffset(), nil
+	if err := binary.Read(reader, binary.LittleEndian, &(a.ValidatorStake)); err != nil {
+		return bytesConsumed, errors.Wrapf(err, "unable to read validator stake for accountID %s", a.ID)
+	}
+	bytesConsumed += 8
+
+	if err := binary.Read(reader, binary.LittleEndian, &(a.DelegationStake)); err != nil {
+		return bytesConsumed, errors.Wrapf(err, "unable to read delegation stake for accountID %s", a.ID)
+	}
+	bytesConsumed += 8
+
+	if err := binary.Read(reader, binary.LittleEndian, &(a.FixedCost)); err != nil {
+		return bytesConsumed, errors.Wrapf(err, "unable to read fixed cost for accountID %s", a.ID)
+	}
+	bytesConsumed += 8
+
+	if err := binary.Read(reader, binary.LittleEndian, &(a.StakeEndEpoch)); err != nil {
+		return bytesConsumed, errors.Wrapf(err, "unable to read stake end epoch for accountID %s", a.ID)
+	}
+	bytesConsumed += 8
+
+	return bytesConsumed, nil
 }
 
 func (a AccountData) Bytes() ([]byte, error) {
@@ -105,10 +164,59 @@ func (a AccountData) Bytes() ([]byte, error) {
 	m.WriteBytes(idBytes)
 	m.WriteBytes(lo.PanicOnErr(a.Credits.Bytes()))
 	m.WriteBytes(lo.PanicOnErr(a.OutputID.Bytes()))
-	m.WriteUint64(uint64(a.PubKeys.Size()))
+	m.WriteByte(byte(a.PubKeys.Size()))
 	a.PubKeys.Range(func(pubKey ed25519.PublicKey) {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
 	})
 
+	m.WriteUint64(uint64(a.ValidatorStake))
+	m.WriteUint64(uint64(a.DelegationStake))
+	m.WriteUint64(uint64(a.FixedCost))
+	m.WriteUint64(uint64(a.StakeEndEpoch))
+
 	return m.Bytes(), nil
+}
+
+func WithCredits(credits *BlockIssuanceCredits) options.Option[AccountData] {
+	return func(a *AccountData) {
+		a.Credits = credits
+	}
+}
+
+func WithOutputID(outputID iotago.OutputID) options.Option[AccountData] {
+	return func(a *AccountData) {
+		a.OutputID = outputID
+	}
+}
+
+func WithPubKeys(pubKeys ...ed25519.PublicKey) options.Option[AccountData] {
+	return func(a *AccountData) {
+		for _, pubKey := range pubKeys {
+			a.PubKeys.Add(pubKey)
+		}
+	}
+}
+
+func WithValidatorStake(validatorStake iotago.BaseToken) options.Option[AccountData] {
+	return func(a *AccountData) {
+		a.ValidatorStake = validatorStake
+	}
+}
+
+func WithDelegationStake(delegationStake iotago.BaseToken) options.Option[AccountData] {
+	return func(a *AccountData) {
+		a.DelegationStake = delegationStake
+	}
+}
+
+func WithFixedCost(fixedCost iotago.Mana) options.Option[AccountData] {
+	return func(a *AccountData) {
+		a.FixedCost = fixedCost
+	}
+}
+
+func WithStakeEndEpoch(stakeEndEpoch iotago.EpochIndex) options.Option[AccountData] {
+	return func(a *AccountData) {
+		a.StakeEndEpoch = stakeEndEpoch
+	}
 }

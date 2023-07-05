@@ -52,7 +52,7 @@ func runWebSocketStreams(component *app.Component) {
 			broadcastWsBlock(&wsblk{MsgTypeNodeStatus, currentNodeStatus()})
 			broadcastWsBlock(&wsblk{MsgTypeNeighborMetric, neighborMetrics()})
 			broadcastWsBlock(&wsblk{MsgTypeTipsMetric, &tipsInfo{
-				TotalTips: len(deps.Protocol.MainEngineInstance().TipManager.StrongTipSet()) + len(deps.Protocol.MainEngineInstance().TipManager.WeakTipSet()),
+				TotalTips: len(deps.Protocol.MainEngineInstance().TipManager.StrongTips()) + len(deps.Protocol.MainEngineInstance().TipManager.WeakTips()),
 			}})
 		case *componentsmetric:
 			broadcastWsBlock(&wsblk{MsgTypeComponentCounterMetric, x})

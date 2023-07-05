@@ -10,12 +10,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 )
 
@@ -55,6 +57,12 @@ func WithTipManagerProvider(optsTipManagerProvider module.Provider[*engine.Engin
 	}
 }
 
+func WithTipSelectionProvider(optsTipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsTipSelectionProvider = optsTipSelectionProvider
+	}
+}
+
 func WithBookerProvider(optsBookerProvider module.Provider[*engine.Engine, booker.Booker]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsBookerProvider = optsBookerProvider
@@ -82,6 +90,12 @@ func WithBlockGadgetProvider(optsBlockGadgetProvider module.Provider[*engine.Eng
 func WithSlotGadgetProvider(optsSlotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsSlotGadgetProvider = optsSlotGadgetProvider
+	}
+}
+
+func WithEpochGadgetProvider(optsEpochGadgetProvider module.Provider[*engine.Engine, epochgadget.Gadget]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsEpochGadgetProvider = optsEpochGadgetProvider
 	}
 }
 

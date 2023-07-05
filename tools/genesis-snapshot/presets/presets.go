@@ -25,8 +25,9 @@ var Base = []options.Option[snapshotcreator.Options]{
 		TokenSupply:           1_000_0000,
 		GenesisUnixTimestamp:  time.Now().Unix(),
 		SlotDurationInSeconds: 10,
-		EvictionAge:           10,
+		EvictionAge:           6,
 		LivenessThreshold:     3,
+		EpochNearingThreshold: 30,
 	}),
 	snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
 		iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
@@ -48,8 +49,9 @@ var Docker = []options.Option[snapshotcreator.Options]{
 		TokenSupply:           1_000_0000,
 		GenesisUnixTimestamp:  time.Now().Unix(),
 		SlotDurationInSeconds: 10,
-		EvictionAge:           10,
+		EvictionAge:           6,
 		LivenessThreshold:     3,
+		EpochNearingThreshold: 30,
 	}),
 }
 
@@ -68,7 +70,8 @@ var Feature = []options.Option[snapshotcreator.Options]{
 		TokenSupply:           1_000_0000,
 		GenesisUnixTimestamp:  time.Now().Unix(),
 		SlotDurationInSeconds: 10,
-		EvictionAge:           10,
+		EvictionAge:           6,
 		LivenessThreshold:     3,
+		EpochNearingThreshold: 30,
 	}),
 }

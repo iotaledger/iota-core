@@ -8,7 +8,7 @@ import (
 
 // Account represents an account.
 type Account interface {
-	// ID returns the account ID.
+	// ID returns the accountID.
 	ID() iotago.AccountID
 
 	// Address returns the account address.
@@ -34,7 +34,7 @@ func NewEd25519Account(accountID iotago.AccountID, privateKey ed25519.PrivateKey
 	}
 }
 
-// ID returns the account ID.
+// ID returns the accountID.
 func (e *Ed25519Account) ID() iotago.AccountID {
 	return e.accountID
 }

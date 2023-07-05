@@ -12,6 +12,7 @@ const (
 	rootBlocksPrefix
 	attestationsPrefix
 	accountDiffsPrefix
+	performanceFactorsPrefix
 	rootsPrefix
 )
 
@@ -71,6 +72,16 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
 	}
 
 	return NewAccountDiffs(slot, store, p.api)
+}
+
+func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *PerformanceFactors {
+	// TODO: make sure that the minimum pruning delay for this is at least 1 epoch, otherwise we won't be able to calculate the reward pools
+	store := p.manager.Get(slot, kvstore.Realm{performanceFactorsPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewPerformanceFactors(slot, store)
 }
 
 func (p *Prunable) Roots(slot iotago.SlotIndex) kvstore.KVStore {

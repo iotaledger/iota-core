@@ -118,7 +118,6 @@ func provide(c *dig.Container) error {
 			),
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(
-					blockfilter.WithMinCommittableSlotAge(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),
 					blockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
 					blockfilter.WithSignatureValidation(true),
 				),
@@ -167,11 +166,11 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().TimeProvider().SlotIndexFromTime(time), time.String())
+		Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().TimeProvider().SlotIndexFromTime(time), time.String())
+		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {

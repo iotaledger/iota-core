@@ -2,7 +2,7 @@ package vote
 
 import (
 	"github.com/iotaledger/hive.go/constraints"
-	"github.com/iotaledger/hive.go/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 )
 
 // Vote represents a vote that is cast by a voter.

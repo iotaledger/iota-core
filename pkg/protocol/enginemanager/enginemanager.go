@@ -20,12 +20,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -54,11 +56,13 @@ type EngineManager struct {
 	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	slotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
+	epochGadgetProvider     module.Provider[*engine.Engine, epochgadget.Gadget]
 	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	attestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
 	tipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
 	schedulerProvider       module.Provider[*engine.Engine, scheduler.Scheduler]
+	tipSelectionProvider    module.Provider[*engine.Engine, tipselection.TipSelection]
 
 	activeInstance *engine.Engine
 }
@@ -77,11 +81,13 @@ func New(
 	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection],
 	blockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget],
+	epochGadgetProvider module.Provider[*engine.Engine, epochgadget.Gadget],
 	notarizationProvider module.Provider[*engine.Engine, notarization.Notarization],
 	attestationProvider module.Provider[*engine.Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
 	tipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager],
 	schedulerProvider module.Provider[*engine.Engine, scheduler.Scheduler],
+	tipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection],
 ) *EngineManager {
 	return &EngineManager{
 		workers:                 workers,
@@ -97,11 +103,13 @@ func New(
 		sybilProtectionProvider: sybilProtectionProvider,
 		blockGadgetProvider:     blockGadgetProvider,
 		slotGadgetProvider:      slotGadgetProvider,
+		epochGadgetProvider:     epochGadgetProvider,
 		notarizationProvider:    notarizationProvider,
 		attestationProvider:     attestationProvider,
 		ledgerProvider:          ledgerProvider,
 		tipManagerProvider:      tipManagerProvider,
 		schedulerProvider:       schedulerProvider,
+		tipSelectionProvider:    tipSelectionProvider,
 	}
 }
 
@@ -184,11 +192,13 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.sybilProtectionProvider,
 		e.blockGadgetProvider,
 		e.slotGadgetProvider,
+		e.epochGadgetProvider,
 		e.notarizationProvider,
 		e.attestationProvider,
 		e.ledgerProvider,
 		e.tipManagerProvider,
 		e.schedulerProvider,
+		e.tipSelectionProvider,
 		e.engineOptions...,
 	)
 }
@@ -200,7 +210,7 @@ func (e *EngineManager) newEngineInstance() *engine.Engine {
 
 func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine, error) {
 	// Dump a snapshot at the target index
-	snapshotPath := filepath.Join(os.TempDir(), fmt.Sprintf("snapshot_%d_%s.bin", index, lo.PanicOnErr(uuid.NewUUID()).String()))
+	snapshotPath := filepath.Join(os.TempDir(), fmt.Sprintf("snapshot_%d_%s.bin", index, lo.PanicOnErr(uuid.NewUUID())))
 	if err := e.activeInstance.WriteSnapshot(snapshotPath, index); err != nil {
 		return nil, errors.Wrapf(err, "error exporting snapshot for index %s", index)
 	}

@@ -28,6 +28,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/passthrough"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -40,11 +42,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
 type Protocol struct {
@@ -57,6 +62,7 @@ type Protocol struct {
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
 	networkProtocol *core.Protocol
+	supportVersions nodeclient.Versions
 
 	activeEngineMutex sync.RWMutex
 	mainEngine        *engine.Engine
@@ -73,11 +79,13 @@ type Protocol struct {
 	optsFilterProvider          module.Provider[*engine.Engine, filter.Filter]
 	optsBlockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
 	optsTipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
+	optsTipSelectionProvider    module.Provider[*engine.Engine, tipselection.TipSelection]
 	optsBookerProvider          module.Provider[*engine.Engine, booker.Booker]
 	optsClockProvider           module.Provider[*engine.Engine, clock.Clock]
 	optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
+	optsEpochGadgetProvider     module.Provider[*engine.Engine, epochgadget.Gadget]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
@@ -89,15 +97,18 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	return options.Apply(&Protocol{
 		Events:                      NewEvents(),
 		Workers:                     workers,
+		supportVersions:             nodeclient.Versions{3},
 		dispatcher:                  dispatcher,
 		optsFilterProvider:          blockfilter.NewProvider(),
 		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
 		optsTipManagerProvider:      tipmanagerv1.NewProvider(),
+		optsTipSelectionProvider:    tipselectionv1.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
 		optsSybilProtectionProvider: poa.NewProvider([]iotago.AccountID{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
+		optsEpochGadgetProvider:     epochorchestrator.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
 		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
@@ -123,7 +134,7 @@ func (p *Protocol) Run(ctx context.Context) error {
 
 	//nolint:contextcheck // false positive
 	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
-		return errors.Wrapf(err, "mainEngine initialize failed")
+		return errors.Wrap(err, "mainEngine initialize failed")
 	}
 
 	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
@@ -201,11 +212,13 @@ func (p *Protocol) initEngineManager() {
 		p.optsSybilProtectionProvider,
 		p.optsBlockGadgetProvider,
 		p.optsSlotGadgetProvider,
+		p.optsEpochGadgetProvider,
 		p.optsNotarizationProvider,
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,
 		p.optsTipManagerProvider,
 		p.optsSchedulerProvider,
+		p.optsTipSelectionProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
@@ -227,7 +240,6 @@ func (p *Protocol) initChainManager() {
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		rootCommitment, valid := p.MainEngineInstance().EarliestRootCommitment(index)
-		fmt.Println("Slot finalized:", index, "root commitment:", rootCommitment, "valid:", valid)
 		if !valid {
 			return
 		}
@@ -316,8 +328,8 @@ func (p *Protocol) API() iotago.API {
 	return p.MainEngineInstance().API()
 }
 
-func (p *Protocol) SupportedVersions() Versions {
-	return SupportedVersions
+func (p *Protocol) SupportedVersions() nodeclient.Versions {
+	return p.supportVersions
 }
 
 func (p *Protocol) ErrorHandler() func(error) {
