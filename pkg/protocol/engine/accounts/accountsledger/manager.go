@@ -248,11 +248,10 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		accountData.RemovePublicKeys(diffChange.PubKeysAdded...)
 
 		// TODO: add safemath package, check for overflows in testcases
-		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) - diffChange.StakeEndEpochChange)
 		accountData.ValidatorStake = iotago.BaseToken(int64(accountData.ValidatorStake) - diffChange.ValidatorStakeChange)
-		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) - diffChange.FixedCostChange)
-
 		accountData.DelegationStake = iotago.BaseToken(int64(accountData.DelegationStake) - diffChange.DelegationStakeChange)
+		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) - diffChange.StakeEndEpochChange)
+		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) - diffChange.FixedCostChange)
 
 		// collected to see if an account was destroyed between slotIndex and b.latestCommittedSlot index.
 		wasDestroyed = wasDestroyed || destroyed
@@ -279,8 +278,8 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prun
 
 	slotDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
 	slotDiff.DelegationStakeChange = -int64(accountData.DelegationStake)
-	slotDiff.FixedCostChange = -int64(accountData.FixedCost)
 	slotDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
+	slotDiff.FixedCostChange = -int64(accountData.FixedCost)
 
 	return slotDiff
 }
@@ -351,10 +350,9 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 
 		// TODO: add safemath package, check for overflows in testcases
 		accountData.ValidatorStake = iotago.BaseToken(int64(accountData.ValidatorStake) + diffChange.ValidatorStakeChange)
+		accountData.DelegationStake = iotago.BaseToken(int64(accountData.DelegationStake) + diffChange.DelegationStakeChange)
 		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) + diffChange.StakeEndEpochChange)
 		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) + diffChange.FixedCostChange)
-
-		accountData.DelegationStake = iotago.BaseToken(int64(accountData.DelegationStake) + diffChange.DelegationStakeChange)
 
 		m.accountsTree.Set(accountID, accountData)
 	}
