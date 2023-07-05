@@ -296,7 +296,7 @@ func TestManagerForkDetectedAgain(t *testing.T) {
 }
 
 func TestEvaluateAgainstRootCommitment(t *testing.T) {
-	rootCommitment := iotago.NewCommitment(tpkg.TestAPI.ProtocolParameters().Version(), 1, iotago.SlotIdentifierRepresentingData(1, []byte{9}), iotago.Identifier{}, 0)
+	rootCommitment := iotago.NewCommitment(tpkg.TestAPI.Version(), 1, iotago.SlotIdentifierRepresentingData(1, []byte{9}), iotago.Identifier{}, 0)
 
 	modelRootCommitment, err := model.CommitmentFromCommitment(rootCommitment, tpkg.TestAPI)
 	require.NoError(t, err)
@@ -307,7 +307,7 @@ func TestEvaluateAgainstRootCommitment(t *testing.T) {
 
 	m.rootCommitment.PublishCommitment(modelRootCommitment)
 
-	isBelow, isRootCommitment := m.evaluateAgainstRootCommitment(iotago.NewCommitment(tpkg.TestAPI.ProtocolParameters().Version(), 0, iotago.SlotIdentifierRepresentingData(0, []byte{}), iotago.Identifier{}, 0))
+	isBelow, isRootCommitment := m.evaluateAgainstRootCommitment(iotago.NewCommitment(tpkg.TestAPI.Version(), 0, iotago.SlotIdentifierRepresentingData(0, []byte{}), iotago.Identifier{}, 0))
 	require.True(t, isBelow, "commitment with index 0 should be below root commitment")
 	require.False(t, isRootCommitment, "commitment with index 0 should not be the root commitment")
 
@@ -315,15 +315,15 @@ func TestEvaluateAgainstRootCommitment(t *testing.T) {
 	require.True(t, isBelow, "commitment with index 1 should be below root commitment")
 	require.True(t, isRootCommitment, "commitment with index 1 should be the root commitment")
 
-	isBelow, isRootCommitment = m.evaluateAgainstRootCommitment(iotago.NewCommitment(tpkg.TestAPI.ProtocolParameters().Version(), 1, iotago.SlotIdentifierRepresentingData(1, []byte{1}), iotago.Identifier{}, 0))
+	isBelow, isRootCommitment = m.evaluateAgainstRootCommitment(iotago.NewCommitment(tpkg.TestAPI.Version(), 1, iotago.SlotIdentifierRepresentingData(1, []byte{1}), iotago.Identifier{}, 0))
 	require.True(t, isBelow, "commitment with index 1 should be below root commitment")
 	require.False(t, isRootCommitment, "commitment with index 1 should be the root commitment")
 
-	isBelow, isRootCommitment = m.evaluateAgainstRootCommitment(iotago.NewCommitment(tpkg.TestAPI.ProtocolParameters().Version(), 1, iotago.SlotIdentifierRepresentingData(1, []byte{9}), iotago.Identifier{}, 0))
+	isBelow, isRootCommitment = m.evaluateAgainstRootCommitment(iotago.NewCommitment(tpkg.TestAPI.Version(), 1, iotago.SlotIdentifierRepresentingData(1, []byte{9}), iotago.Identifier{}, 0))
 	require.True(t, isBelow, "commitment with index 1 should be below root commitment")
 	require.True(t, isRootCommitment, "commitment with index 1 should be the root commitment")
 
-	isBelow, isRootCommitment = m.evaluateAgainstRootCommitment(iotago.NewCommitment(tpkg.TestAPI.ProtocolParameters().Version(), 2, iotago.SlotIdentifierRepresentingData(2, []byte{}), iotago.Identifier{}, 0))
+	isBelow, isRootCommitment = m.evaluateAgainstRootCommitment(iotago.NewCommitment(tpkg.TestAPI.Version(), 2, iotago.SlotIdentifierRepresentingData(2, []byte{}), iotago.Identifier{}, 0))
 	require.False(t, isBelow, "commitment with index 2 should not be below root commitment")
 	require.False(t, isRootCommitment, "commitment with index 2 should not be the root commitment")
 }

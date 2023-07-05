@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
@@ -36,7 +37,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](func() int { return 0 })
 	mempoolInstance := New[vote.MockedRank](mempooltests.VM, func(reference iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveState(reference.Ref())
-	}, workers, conflictDAG)
+	}, workers, conflictDAG, api.TestAPIProvider)
 
 	tf := mempooltests.NewTestFramework(t, mempoolInstance, conflictDAG, ledgerState, workers)
 
@@ -104,7 +105,7 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveState(reference.Ref())
-	}, workers, conflictDAG), conflictDAG, ledgerState, workers)
+	}, workers, conflictDAG, api.TestAPIProvider), conflictDAG, ledgerState, workers)
 }
 
 func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
@@ -115,5 +116,5 @@ func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveState(reference.Ref())
-	}, workers, conflictDAG, WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
+	}, workers, conflictDAG, api.TestAPIProvider, WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
 }

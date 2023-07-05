@@ -21,7 +21,7 @@ import (
 
 func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Output, spent *utxoledger.Spent) {
 	outputID := output.OutputID()
-	manager := utxoledger.New(mapdb.NewMapDB(), tpkg.API)
+	manager := utxoledger.New(mapdb.NewMapDB(), tpkg_iota.TestAPIProvider)
 
 	require.NoError(t, manager.AddUnspentOutput(output))
 

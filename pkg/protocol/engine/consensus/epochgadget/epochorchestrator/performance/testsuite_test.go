@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -51,7 +52,7 @@ func (t *TestSuite) InitRewardManager() {
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
 	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, tpkg.TestAPIProvider)
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, api.TestAPIProvider)
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -123,7 +124,7 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochInde
 	endSlot := tpkg.TestAPI.TimeProvider().EpochEnd(epochIndex)
 	for slot := startSlot; slot <= endSlot; slot++ {
 		for i := uint64(0); i < performanceFactor; i++ {
-			block := tpkg.RandBlockWithIssuerAndBurnedMana(accountID, 10)
+			block := tpkg.RandBasicBlockWithIssuerAndBurnedMana(accountID, 10)
 			block.IssuingTime = tpkg.TestAPI.TimeProvider().SlotStartTime(slot)
 			modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
 			t.Instance.BlockAccepted(blocks.NewBlock(modelBlock))
