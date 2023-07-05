@@ -18,8 +18,8 @@ type StateMetadata struct {
 	spenderCount       uint64
 	spent              *promise.Event
 	doubleSpent        *promise.Event
-	spendAccepted      agential.ValueReceptor[*TransactionMetadata]
-	spendCommitted     agential.ValueReceptor[*TransactionMetadata]
+	spendAccepted      *agential.ValueReceptor[*TransactionMetadata]
+	spendCommitted     *agential.ValueReceptor[*TransactionMetadata]
 	allSpendersRemoved *event.Event
 
 	conflictIDs *agential.SetReceptor[iotago.TransactionID]
@@ -38,7 +38,7 @@ func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *S
 		spendCommitted:     agential.NewValueReceptor[*TransactionMetadata](),
 		allSpendersRemoved: event.New(),
 
-		conflictIDs: agential.NewSet[iotago.TransactionID](),
+		conflictIDs: agential.NewSetReceptor[iotago.TransactionID](),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(optSource...)

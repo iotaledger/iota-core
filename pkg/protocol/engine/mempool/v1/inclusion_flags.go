@@ -8,7 +8,7 @@ import (
 // inclusionFlags represents important flags and events that relate to the inclusion of an entity in the distributed ledger.
 type inclusionFlags struct {
 	// accepted gets triggered when the entity gets marked as accepted.
-	accepted agential.ValueReceptor[bool]
+	accepted *agential.ValueReceptor[bool]
 
 	// committed gets triggered when the entity gets marked as committed.
 	committed *promise.Event

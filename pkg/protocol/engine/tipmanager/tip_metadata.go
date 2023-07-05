@@ -15,19 +15,19 @@ type TipMetadata interface {
 	Block() *blocks.Block
 
 	// TipPool exposes a ValueReceptor that holds information about the TipPool the block is part of.
-	TipPool() agential.ValueReceptor[TipPool]
+	TipPool() *agential.ValueReceptor[TipPool]
 
 	// LivenessThresholdReached exposes a ValueReceptor that receives a value of true if the liveness threshold is reached.
-	LivenessThresholdReached() agential.ValueReceptor[bool]
+	LivenessThresholdReached() *agential.ValueReceptor[bool]
 
 	// IsStrongTip returns true if the block is an unreferenced strong tip.
-	IsStrongTip() agential.ValueReceptorReadOnly[bool]
+	IsStrongTip() agential.Value[bool]
 
 	// IsWeakTip returns true if the block is an unreferenced weak tip.
-	IsWeakTip() agential.ValueReceptorReadOnly[bool]
+	IsWeakTip() agential.Value[bool]
 
 	// IsOrphaned returns true if the block is marked orphaned or if it has an orphaned strong parent.
-	IsOrphaned() agential.ValueReceptorReadOnly[bool]
+	IsOrphaned() agential.Value[bool]
 
-	Evicted() agential.ValueReceptorReadOnly[bool]
+	Evicted() agential.Value[bool]
 }

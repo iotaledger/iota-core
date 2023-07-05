@@ -37,7 +37,7 @@ type Block struct {
 	// BlockGadget block
 	preAccepted           bool
 	acceptanceRatifiers   *advancedset.AdvancedSet[account.SeatIndex]
-	accepted              agential.ValueReceptor[bool]
+	accepted              *agential.ValueReceptor[bool]
 	preConfirmed          bool
 	confirmationRatifiers *advancedset.AdvancedSet[account.SeatIndex]
 	confirmed             bool

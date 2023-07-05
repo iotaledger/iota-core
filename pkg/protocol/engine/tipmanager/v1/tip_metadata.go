@@ -14,85 +14,89 @@ type TipMetadata struct {
 	block *blocks.Block
 
 	// tipPool holds the tip pool the block is currently assigned to.
-	tipPool agential.ValueReceptor[tipmanager.TipPool]
+	tipPool *agential.ValueReceptor[tipmanager.TipPool]
 
 	// isLivenessThresholdReached is true if the block has reached the liveness threshold.
-	isLivenessThresholdReached agential.ValueReceptor[bool]
+	isLivenessThresholdReached *agential.ValueReceptor[bool]
 
 	// stronglyConnectedStrongChildren holds the number of strong children that are strongly connected to the tips.
-	stronglyConnectedStrongChildren *agential.ThresholdTransformer[bool]
+	stronglyConnectedStrongChildren *agential.Counter[bool]
 
 	// connectedWeakChildren holds the number of weak children that are connected to the tips.
-	connectedWeakChildren *agential.ThresholdTransformer[bool]
+	connectedWeakChildren *agential.Counter[bool]
 
 	// stronglyOrphanedStrongParents holds the number of strong parents that are strongly orphaned.
-	stronglyOrphanedStrongParents *agential.ThresholdTransformer[bool]
+	stronglyOrphanedStrongParents *agential.Counter[bool]
 
 	// weaklyOrphanedWeakParents holds the number of weak parents that are weakly orphaned.
-	weaklyOrphanedWeakParents *agential.ThresholdTransformer[bool]
+	weaklyOrphanedWeakParents *agential.Counter[bool]
 
 	// isStrongTipPoolMember is true if the block is part of the strong tip pool and not orphaned.
-	isStrongTipPoolMember agential.ValueReceptor[bool]
+	isStrongTipPoolMember *agential.DerivedValueReceptor[bool]
 
 	// isWeakTipPoolMember is true if the block is part of the weak tip pool and not orphaned.
-	isWeakTipPoolMember agential.ValueReceptor[bool]
+	isWeakTipPoolMember *agential.DerivedValueReceptor[bool]
 
 	// isStronglyConnectedToTips is true if the block is either strongly referenced by others tips or is itself a strong
 	// tip pool member.
-	isStronglyConnectedToTips agential.ValueReceptor[bool]
+	isStronglyConnectedToTips *agential.DerivedValueReceptor[bool]
 
 	// isConnectedToTips is true if the block is either referenced by others tips or is itself a weak or strong tip pool
 	// member.
-	isConnectedToTips agential.ValueReceptor[bool]
+	isConnectedToTips *agential.DerivedValueReceptor[bool]
 
 	// isStronglyReferencedByStronglyConnectedTips is true if the block has at least one strong child that is strongly connected
 	// to the tips.
-	isStronglyReferencedByStronglyConnectedTips agential.ValueReceptor[bool]
+	isStronglyReferencedByStronglyConnectedTips *agential.DerivedValueReceptor[bool]
 
 	// isReferencedByTips is true if the block is strongly referenced by other tips or has at least one weak child
 	// that is connected to the tips.
-	isReferencedByTips agential.ValueReceptor[bool]
+	isReferencedByTips *agential.DerivedValueReceptor[bool]
 
 	// isStrongTip is true if the block is a strong tip pool member and is not strongly referenced by other tips.
-	isStrongTip agential.ValueReceptor[bool]
+	isStrongTip *agential.DerivedValueReceptor[bool]
 
 	// isWeakTip is true if the block is a weak tip pool member and is not referenced by other tips.
-	isWeakTip agential.ValueReceptor[bool]
+	isWeakTip *agential.DerivedValueReceptor[bool]
 
 	// isMarkedOrphaned is true if the liveness threshold has been reached and the block was not accepted.
-	isMarkedOrphaned agential.ValueReceptor[bool]
+	isMarkedOrphaned *agential.DerivedValueReceptor[bool]
 
 	// isOrphaned is true if the block is either strongly or weakly orphaned.
-	isOrphaned agential.ValueReceptor[bool]
+	isOrphaned *agential.DerivedValueReceptor[bool]
 
 	// anyStrongParentStronglyOrphaned is true if the block has at least one orphaned parent.
-	anyStrongParentStronglyOrphaned agential.ValueReceptor[bool]
+	anyStrongParentStronglyOrphaned *agential.DerivedValueReceptor[bool]
 
 	// anyWeakParentWeaklyOrphaned is true if the block has at least one weak parent that is weakly orphaned.
-	anyWeakParentWeaklyOrphaned agential.ValueReceptor[bool]
+	anyWeakParentWeaklyOrphaned *agential.DerivedValueReceptor[bool]
 
 	// isEvicted is triggered when the block is removed from the TipManager.
-	isEvicted agential.ValueReceptor[bool]
+	isEvicted *agential.ValueReceptor[bool]
 
 	// isStronglyOrphaned is true if the block is either marked as orphaned, any of its strong parents is strongly
 	// orphaned or any of its weak parents is weakly orphaned.
-	isStronglyOrphaned agential.ValueReceptor[bool]
+	isStronglyOrphaned *agential.DerivedValueReceptor[bool]
 
 	// isWeaklyOrphaned is true if the block is either marked as orphaned or has at least one weakly orphaned weak
 	// parent.
-	isWeaklyOrphaned agential.ValueReceptor[bool]
+	isWeaklyOrphaned *agential.DerivedValueReceptor[bool]
 
-	constructed agential.ValueReceptor[bool]
+	constructed *agential.ValueReceptor[bool]
 }
 
 // NewBlockMetadata creates a new TipMetadata instance.
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
-		block:                      block,
-		tipPool:                    agential.NewValueReceptor[tipmanager.TipPool](tipmanager.TipPool.Max),
-		constructed:                agential.NewValueReceptor[bool](trapDoor[bool]),
-		isLivenessThresholdReached: agential.NewValueReceptor[bool](trapDoor[bool]),
-		isEvicted:                  agential.NewValueReceptor[bool](trapDoor[bool]),
+		block:                           block,
+		tipPool:                         agential.NewValueReceptor[tipmanager.TipPool](tipmanager.TipPool.Max),
+		constructed:                     agential.NewValueReceptor[bool](trapDoor[bool]),
+		isLivenessThresholdReached:      agential.NewValueReceptor[bool](trapDoor[bool]),
+		isEvicted:                       agential.NewValueReceptor[bool](trapDoor[bool]),
+		stronglyConnectedStrongChildren: agential.NewCounter[bool](),
+		connectedWeakChildren:           agential.NewCounter[bool](),
+		stronglyOrphanedStrongParents:   agential.NewCounter[bool](),
+		weaklyOrphanedWeakParents:       agential.NewCounter[bool](),
 	}
 
 	t.isStrongTipPoolMember = agential.DeriveValueFrom3Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
@@ -151,14 +155,6 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		return isLivenessThresholdReached /* TODO: && !accepted */
 	}, &t.isLivenessThresholdReached)
 
-	t.stronglyConnectedStrongChildren = agential.NewThresholdTransformer[bool]()
-
-	t.connectedWeakChildren = agential.NewThresholdTransformer[bool]()
-
-	t.stronglyOrphanedStrongParents = agential.NewThresholdTransformer[bool]()
-
-	t.weaklyOrphanedWeakParents = agential.NewThresholdTransformer[bool]()
-
 	t.constructed.Set(true)
 
 	return t
@@ -175,53 +171,53 @@ func (t *TipMetadata) Block() *blocks.Block {
 }
 
 // TipPool is a receptor that holds the tip pool the block is currently in.
-func (t *TipMetadata) TipPool() agential.ValueReceptor[tipmanager.TipPool] {
+func (t *TipMetadata) TipPool() *agential.ValueReceptor[tipmanager.TipPool] {
 	return t.tipPool
 }
 
 // LivenessThresholdReached is a receptor that holds a boolean value indicating if the liveness threshold is reached.
-func (t *TipMetadata) LivenessThresholdReached() agential.ValueReceptor[bool] {
+func (t *TipMetadata) LivenessThresholdReached() *agential.ValueReceptor[bool] {
 	return t.isLivenessThresholdReached
 }
 
 // IsStrongTip returns true if the block is currently an unreferenced strong tip.
-func (t *TipMetadata) IsStrongTip() agential.ValueReceptorReadOnly[bool] {
+func (t *TipMetadata) IsStrongTip() agential.Value[bool] {
 	return t.isStrongTip
 }
 
 // IsWeakTip returns true if the block is an unreferenced weak tip.
-func (t *TipMetadata) IsWeakTip() agential.ValueReceptorReadOnly[bool] {
+func (t *TipMetadata) IsWeakTip() agential.Value[bool] {
 	return t.isWeakTip
 }
 
 // IsOrphaned returns true if the block is marked orphaned or if it has an orphaned strong parent.
-func (t *TipMetadata) IsOrphaned() agential.ValueReceptorReadOnly[bool] {
+func (t *TipMetadata) IsOrphaned() agential.Value[bool] {
 	return t.isOrphaned
 }
 
-func (t *TipMetadata) Evicted() agential.ValueReceptorReadOnly[bool] {
+func (t *TipMetadata) Evicted() agential.Value[bool] {
 	return t.isEvicted
 }
 
-func (t *TipMetadata) Constructed() agential.ValueReceptorReadOnly[bool] {
+func (t *TipMetadata) Constructed() agential.Value[bool] {
 	return t.constructed
 }
 
 // connectStrongParent sets up the parent and children related properties for a strong parent.
 func (t *TipMetadata) connectStrongParent(strongParent *TipMetadata) {
-	t.stronglyOrphanedStrongParents.Track(strongParent.isStronglyOrphaned)
+	t.stronglyOrphanedStrongParents.Count(strongParent.isStronglyOrphaned)
 
 	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
-	unsubscribe := strongParent.stronglyConnectedStrongChildren.Track(t.isStronglyConnectedToTips)
+	unsubscribe := strongParent.stronglyConnectedStrongChildren.Count(t.isStronglyConnectedToTips)
 	strongParent.isEvicted.OnUpdate(func(_, _ bool) { unsubscribe() })
 }
 
 // connectWeakParent sets up the parent and children related properties for a weak parent.
 func (t *TipMetadata) connectWeakParent(weakParent *TipMetadata) {
 	unsubscribe := lo.Batch(
-		weakParent.connectedWeakChildren.Track(t.isConnectedToTips),
+		weakParent.connectedWeakChildren.Count(t.isConnectedToTips),
 
-		t.weaklyOrphanedWeakParents.Track(weakParent.isWeaklyOrphaned),
+		t.weaklyOrphanedWeakParents.Count(weakParent.isWeaklyOrphaned),
 	)
 
 	weakParent.isEvicted.OnUpdate(func(_, _ bool) { unsubscribe() })

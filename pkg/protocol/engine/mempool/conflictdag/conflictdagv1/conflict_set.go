@@ -18,7 +18,7 @@ type ConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 	// members is the set of Conflicts that are conflicting over the shared resource.
 	members *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
 
-	allMembersEvicted agential.ValueReceptor[bool]
+	allMembersEvicted *agential.ValueReceptor[bool]
 
 	mutex sync.RWMutex
 }

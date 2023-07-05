@@ -38,7 +38,7 @@ type TipSelection struct {
 	livenessThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
 
 	// livenessThreshold holds the current liveness threshold.
-	livenessThreshold agential.ValueReceptor[time.Time]
+	livenessThreshold *agential.ValueReceptor[time.Time]
 
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int

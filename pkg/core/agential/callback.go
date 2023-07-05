@@ -6,8 +6,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
-// callback is a wrapper for a callback function that is extended by an ID and a mutex to ensure that the same callback
-// can not be triggered concurrently.
+// callback is an internal wrapper for a callback function that is extended by an ID and a mutex (for call order
+// synchronization).
 type callback[T any] struct {
 	// ID is the unique identifier of the callback.
 	ID types.UniqueID

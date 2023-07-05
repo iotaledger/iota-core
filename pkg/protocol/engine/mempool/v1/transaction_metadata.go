@@ -34,13 +34,13 @@ type TransactionMetadata struct {
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
-	allInputsAccepted     agential.ValueReceptor[bool]
+	allInputsAccepted     *agential.ValueReceptor[bool]
 	conflicting           *promise.Event
 	conflictAccepted      *promise.Event
 
 	// attachments
 	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
-	earliestIncludedAttachment agential.ValueReceptor[iotago.BlockID]
+	earliestIncludedAttachment *agential.ValueReceptor[iotago.BlockID]
 	allAttachmentsEvicted      *promise.Event
 
 	// mutex needed?
@@ -67,8 +67,8 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		inputReferences:   inputReferences,
 		inputs:            make([]*StateMetadata, len(inputReferences)),
 		transaction:       transaction,
-		parentConflictIDs: agential.NewSet[iotago.TransactionID](),
-		conflictIDs:       agential.NewSet[iotago.TransactionID](),
+		parentConflictIDs: agential.NewSetReceptor[iotago.TransactionID](),
+		conflictIDs:       agential.NewSetReceptor[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
 		booked:             promise.NewEvent(),

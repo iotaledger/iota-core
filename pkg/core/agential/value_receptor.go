@@ -8,40 +8,17 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
-// ValueReceptor is an agent that can receive and hold a value. Its task is to inform subscribed consumers about
-// updates.
-//
-// The registered callbacks are guaranteed to receive all updates in exactly the same order as they happened and no
-// callback is ever more than 1 round of updates ahead of other callbacks.
-type ValueReceptor[Type comparable] interface {
-	// SetReceptor sets the value to the given value and returns the previous value.
-	Set(newValue Type) (previousValue Type)
-
-	// Compute computes the new value based on the current value and sets it to the computed value.
-	Compute(computeFunc func(currentValue Type) Type) (previousValue Type)
-
-	// ValueReceptorReadOnly imports the readable part of the valueReceptor API.
-	ValueReceptorReadOnly[Type]
-}
-
-// ValueReceptorReadOnly is the read-only version of a ValueReceptor, that can i.e. be used to only expose read
-// access to a receptors value.
-type ValueReceptorReadOnly[Type comparable] interface {
-	// Get returns the current value.
-	Get() Type
-
-	// OnUpdate registers the given callback that is triggered when the value changes.
-	OnUpdate(consumer func(oldValue, newValue Type)) (unsubscribe func())
-}
-
 // NewValueReceptor creates a new ValueReceptor instance with an optional transformation function that
 // can be used to rewrite the set value before it is stored.
-func NewValueReceptor[T comparable](transformationFunc ...func(currentValue T, newValue T) T) ValueReceptor[T] {
-	return newValueReceptor(transformationFunc...)
+func NewValueReceptor[T comparable](transformationFunc ...func(currentValue T, newValue T) T) *ValueReceptor[T] {
+	return &ValueReceptor[T]{
+		transformationFunc:  lo.First(transformationFunc, func(_ T, newValue T) T { return newValue }),
+		registeredCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(prevValue, newValue T)]](),
+	}
 }
 
-// valueReceptor implements the ValueReceptor interface.
-type valueReceptor[T comparable] struct {
+// ValueReceptor implements the ValueReceptor interface.
+type ValueReceptor[T comparable] struct {
 	// value holds the current value.
 	value T
 
@@ -64,16 +41,8 @@ type valueReceptor[T comparable] struct {
 	setMutex sync.Mutex
 }
 
-// newValueReceptor creates a new valueReceptor instance.
-func newValueReceptor[T comparable](transformationFunc ...func(currentValue T, newValue T) T) *valueReceptor[T] {
-	return &valueReceptor[T]{
-		transformationFunc:  lo.First(transformationFunc, func(_ T, newValue T) T { return newValue }),
-		registeredCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(prevValue, newValue T)]](),
-	}
-}
-
 // Get returns the current value.
-func (v *valueReceptor[T]) Get() T {
+func (v *ValueReceptor[T]) Get() T {
 	v.mutex.RLock()
 	defer v.mutex.RUnlock()
 
@@ -81,12 +50,12 @@ func (v *valueReceptor[T]) Get() T {
 }
 
 // Set sets the new value and triggers the registered callbacks if the value has changed.
-func (v *valueReceptor[T]) Set(newValue T) (previousValue T) {
+func (v *ValueReceptor[T]) Set(newValue T) (previousValue T) {
 	return v.Compute(func(T) T { return newValue })
 }
 
 // Compute computes the new value based on the current value and triggers the registered callbacks if the value changed.
-func (v *valueReceptor[T]) Compute(computeFunc func(currentValue T) T) (previousValue T) {
+func (v *ValueReceptor[T]) Compute(computeFunc func(currentValue T) T) (previousValue T) {
 	v.setMutex.Lock()
 	defer v.setMutex.Unlock()
 
@@ -102,7 +71,7 @@ func (v *valueReceptor[T]) Compute(computeFunc func(currentValue T) T) (previous
 }
 
 // OnUpdate registers a callback that is triggered when the value changes.
-func (v *valueReceptor[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe func()) {
+func (v *ValueReceptor[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe func()) {
 	v.mutex.Lock()
 
 	currentValue := v.value
@@ -131,7 +100,7 @@ func (v *valueReceptor[T]) OnUpdate(callback func(prevValue, newValue T)) (unsub
 
 // prepareDynamicTrigger atomically prepares the trigger by setting the new value and returning the new value, the
 // previous value, the triggerID and the callbacks to trigger.
-func (v *valueReceptor[T]) prepareDynamicTrigger(newValueGenerator func(T) T) (newValue, previousValue T, triggerID types.UniqueID, callbacksToTrigger []*callback[func(prevValue, newValue T)]) {
+func (v *ValueReceptor[T]) prepareDynamicTrigger(newValueGenerator func(T) T) (newValue, previousValue T, triggerID types.UniqueID, callbacksToTrigger []*callback[func(prevValue, newValue T)]) {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 
