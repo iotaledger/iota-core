@@ -23,6 +23,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
@@ -38,21 +39,22 @@ import (
 // region Engine /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Engine struct {
-	Events          *Events
-	Storage         *storage.Storage
-	Filter          filter.Filter
-	EvictionState   *eviction.State
-	BlockRequester  *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
-	BlockDAG        blockdag.BlockDAG
-	Booker          booker.Booker
-	Clock           clock.Clock
-	SybilProtection sybilprotection.SybilProtection
-	BlockGadget     blockgadget.Gadget
-	SlotGadget      slotgadget.Gadget
-	Notarization    notarization.Notarization
-	Attestations    attestation.Attestations
-	Ledger          ledger.Ledger
-	TipManager      tipmanager.TipManager
+	Events           *Events
+	Storage          *storage.Storage
+	Filter           filter.Filter
+	CommitmentFilter commitmentfilter.CommitmentFilter
+	EvictionState    *eviction.State
+	BlockRequester   *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
+	BlockDAG         blockdag.BlockDAG
+	Booker           booker.Booker
+	Clock            clock.Clock
+	SybilProtection  sybilprotection.SybilProtection
+	BlockGadget      blockgadget.Gadget
+	SlotGadget       slotgadget.Gadget
+	Notarization     notarization.Notarization
+	Attestations     attestation.Attestations
+	Ledger           ledger.Ledger
+	TipManager       tipmanager.TipManager
 
 	Workers      *workerpool.Group
 	errorHandler func(error)

@@ -1,4 +1,4 @@
-package filter
+package commitmentfilter
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -7,20 +7,20 @@ import (
 )
 
 type Events struct {
-	BlockPreFiltered *event.Event1[*BlockPreFilteredEvent]
-	BlockPreAllowed  *event.Event1[*model.Block]
+	BlockFiltered *event.Event1[*BlockFilteredEvent]
+	BlockAllowed  *event.Event1[*model.Block]
 
 	event.Group[Events, *Events]
 }
 
 var NewEvents = event.CreateGroupConstructor(func() *Events {
 	return &Events{
-		BlockPreFiltered: event.New1[*BlockPreFilteredEvent](),
-		BlockPreAllowed:  event.New1[*model.Block](),
+		BlockFiltered: event.New1[*BlockFilteredEvent](),
+		BlockAllowed:  event.New1[*model.Block](),
 	}
 })
 
-type BlockPreFilteredEvent struct {
+type BlockFilteredEvent struct {
 	Block  *model.Block
 	Reason error
 	Source network.PeerID

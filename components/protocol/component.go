@@ -142,7 +142,7 @@ func configure() error {
 		Component.LogInfof("BlockReceived: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+	deps.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		Component.LogInfof("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
 	})
 

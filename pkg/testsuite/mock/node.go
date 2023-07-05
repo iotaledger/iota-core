@@ -248,11 +248,11 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().TimeProvider().SlotIndexFromTime(newTime))
 	})
 
-	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
-		fmt.Printf("%s > [%s] Filter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
+	events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
+		fmt.Printf("%s > [%s] Filter.BlockPreAllowed: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+	events.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		fmt.Printf("%s > [%s] Filter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
 		n.Testing.Fatal("no blocks should be filtered")
 	})

@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
@@ -21,19 +22,20 @@ import (
 type Events struct {
 	BlockProcessed *event.Event1[iotago.BlockID]
 
-	EvictionState   *eviction.Events
-	Filter          *filter.Events
-	BlockRequester  *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
-	TipManager      *tipmanager.Events
-	BlockDAG        *blockdag.Events
-	Booker          *booker.Events
-	Clock           *clock.Events
-	BlockGadget     *blockgadget.Events
-	SlotGadget      *slotgadget.Events
-	Ledger          *ledger.Events
-	Notarization    *notarization.Events
-	ConflictDAG     *conflictdag.Events[iotago.TransactionID, iotago.OutputID]
-	SybilProtection *sybilprotection.Events
+	EvictionState    *eviction.Events
+	Filter           *filter.Events
+	CommitmentFilter *commitmentfilter.Events
+	BlockRequester   *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
+	TipManager       *tipmanager.Events
+	BlockDAG         *blockdag.Events
+	Booker           *booker.Events
+	Clock            *clock.Events
+	BlockGadget      *blockgadget.Events
+	SlotGadget       *slotgadget.Events
+	Ledger           *ledger.Events
+	Notarization     *notarization.Events
+	ConflictDAG      *conflictdag.Events[iotago.TransactionID, iotago.OutputID]
+	SybilProtection  *sybilprotection.Events
 
 	event.Group[Events, *Events]
 }

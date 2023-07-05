@@ -152,7 +152,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("3.1"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("3.1"), false, ts.Nodes()...) // too old. confirmation ratification threshold = 2
 
-		// Verify nodes' states: Slot 1 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 3.
+		// Verify nodes' states: Slot 1 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 3.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -188,7 +188,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("4.2", "5.1"), false, ts.Nodes()...) // too old. confirmation ratification threshold = 2
 
 		// Verify nodes' states:
-		// - Slot 3 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 5.
+		// - Slot 3 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 5.
 		// - 5.1 is accepted and commits to slot 1 -> slot 1 should be evicted.
 		// - rootblocks are still not evicted as RootBlocksEvictionDelay is 3.
 		// - slot 1 is still not finalized: there is no supermajority of confirmed blocks that commits to it.
@@ -231,7 +231,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("8.2", "9.1.2"), true, ts.Nodes()...)
 
 		// Verify nodes' states:
-		// - Slot 3 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 5.
+		// - Slot 3 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 5.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -272,7 +272,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("9.1.2", "9.2.2", "9.1.3", "9.2.3"), true, ts.Nodes()...) // too old. confirmation ratification threshold = 2
 
 		// Verify nodes' states:
-		// - Slot 7 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 9.
+		// - Slot 7 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 9.
 		// - rootblocks are evicted until slot 5 as RootBlocksEvictionDelay is 3.
 		// - slot 3 is finalized as "9.1.2", "9.2.2", "9.1.3", "9.2.3" are confirmed within slot 9 being a supermajority.
 		ts.AssertNodeState(ts.Nodes(),
@@ -317,7 +317,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("11.1", "12.2", "12.1"), true, ts.Nodes()...)
 
 		// Verify nodes' states:
-		// - Slot 10 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 12.
+		// - Slot 10 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 12.
 		// - rootblocks are evicted until slot 8 as RootBlocksEvictionDelay is 3.
 		// - Slot 7 is finalized: there is a supermajority of confirmed blocks that commits to it.
 		ts.AssertNodeState(ts.Nodes(),
@@ -359,7 +359,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("12.2", "12.1"), true, ts.Nodes()...)
 
 		// Verify nodes' states:
-		// - Slot 10 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 12.
+		// - Slot 10 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 12.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -664,7 +664,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("3.1"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("3.1"), false, ts.Nodes()...) // too old. confirmation ratification threshold = 2
 
-		// Verify nodes' states: Slot 1 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 3.
+		// Verify nodes' states: Slot 1 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 3.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -701,7 +701,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("4.2", "5.1"), false, ts.Nodes()...) // too old. confirmation ratification threshold = 2
 
 		// Verify nodes' states:
-		// - Slot 3 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 5.
+		// - Slot 3 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 5.
 		// - 5.1 is accepted and commits to slot 1 -> slot 1 should be evicted.
 		// - rootblocks are still not evicted as RootBlocksEvictionDelay is 3.
 		// - slot 1 is still not finalized: there is no supermajority of confirmed blocks that commits to it.
@@ -744,7 +744,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("9.2", "10.1.2"), true, ts.Nodes()...)
 
 		// Verify nodes' states:
-		// - Slot 3 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 5.
+		// - Slot 3 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 5.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),
@@ -785,7 +785,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("10.1.2", "10.2.2", "10.1.3", "10.2.3"), true, ts.Nodes()...) // too old. confirmation ratification threshold = 2
 
 		// Verify nodes' states:
-		// - Slot 8 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 10.
+		// - Slot 8 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 10.
 		// - rootblocks are evicted until slot 5 as RootBlocksEvictionDelay is 3.
 		// - slot 3 is finalized as "10.1.2", "10.2.2", "10.1.3", "10.2.3" are confirmed within slot 9 being a supermajority.
 		ts.AssertNodeState(ts.Nodes(),
@@ -830,7 +830,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("12.1", "13.2", "13.1"), true, ts.Nodes()...)
 
 		// Verify nodes' states:
-		// - Slot 10 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 12.
+		// - Slot 10 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 12.
 		// - rootblocks are evicted until slot 8 as RootBlocksEvictionDelay is 3.
 		// - slot 7 is finalized: there is a supermajority of confirmed blocks that commits to it.
 		ts.AssertNodeState(ts.Nodes(),
@@ -872,7 +872,7 @@ func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("13.2", "13.1"), true, ts.Nodes()...)
 
 		// Verify nodes' states:
-		// - Slot 11 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 13.
+		// - Slot 11 should be committed as the MinCommittableAge is 1, and we accepted a block at slot 13.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.ProtocolParameters),

@@ -39,16 +39,16 @@ type Manager struct {
 
 	storage *storage.Storage
 
-	acceptedTimeFunc      func() time.Time
-	slotTimeProviderFunc  func() *iotago.TimeProvider
-	minCommittableSlotAge iotago.SlotIndex
+	acceptedTimeFunc     func() time.Time
+	slotTimeProviderFunc func() *iotago.TimeProvider
+	minCommittableAge    iotago.SlotIndex
 
 	module.Module
 }
 
-func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine.Engine, notarization.Notarization] {
+func NewProvider(minCommittableAge iotago.SlotIndex) module.Provider[*engine.Engine, notarization.Notarization] {
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
-		m := NewManager(minCommittableSlotAge, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
+		m := NewManager(minCommittableAge, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
 
 		m.slotTimeProviderFunc = func() *iotago.TimeProvider {
 			return e.API().TimeProvider()
@@ -85,12 +85,12 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 	})
 }
 
-func NewManager(minCommittableSlotAge iotago.SlotIndex, workers *workerpool.Group, errorHandler func(error)) *Manager {
+func NewManager(minCommittableAge iotago.SlotIndex, workers *workerpool.Group, errorHandler func(error)) *Manager {
 	return &Manager{
-		minCommittableSlotAge: minCommittableSlotAge,
-		events:                notarization.NewEvents(),
-		workers:               workers,
-		errorHandler:          errorHandler,
+		minCommittableAge: minCommittableAge,
+		events:            notarization.NewEvents(),
+		workers:           workers,
+		errorHandler:      errorHandler,
 	}
 }
 
@@ -108,10 +108,10 @@ func (m *Manager) tryCommitUntil(block *blocks.Block) {
 
 // IsBootstrapped returns if the Manager finished committing all pending slots up to the current acceptance time.
 func (m *Manager) IsBootstrapped() bool {
-	// If acceptance time is in slot 10, then the latest committable index is 3 (with minCommittableSlotAge=6), because there are 6 full slots between slot 10 and slot 3.
-	// All slots smaller than 4 are committable, so in order to check if slot 3 is committed it's necessary to do m.minCommittableSlotAge-1,
+	// If acceptance time is in slot 10, then the latest committable index is 3 (with minCommittableAge=6), because there are 6 full slots between slot 10 and slot 3.
+	// All slots smaller than 4 are committable, so in order to check if slot 3 is committed it's necessary to do m.minCommittableAge-1,
 	// otherwise we'd expect slot 4 to be committed in order to be fully committed, which is impossible.
-	return m.storage.Settings().LatestCommitment().Index() >= m.slotTimeProviderFunc().SlotIndexFromTime(m.acceptedTimeFunc())-m.minCommittableSlotAge-1
+	return m.storage.Settings().LatestCommitment().Index() >= m.slotTimeProviderFunc().SlotIndexFromTime(m.acceptedTimeFunc())-m.minCommittableAge-1
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
@@ -124,9 +124,9 @@ func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 	return
 }
 
-// MinCommittableSlotAge returns the minimum age of a slot to be committable.
-func (m *Manager) MinCommittableSlotAge() iotago.SlotIndex {
-	return m.minCommittableSlotAge
+// MinCommittableAge returns the minimum age of a slot to be committable.
+func (m *Manager) MinCommittableAge() iotago.SlotIndex {
+	return m.minCommittableAge
 }
 
 func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
@@ -146,11 +146,11 @@ func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
 }
 
 func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool {
-	if acceptedBlockIndex < m.minCommittableSlotAge {
+	if acceptedBlockIndex < m.minCommittableAge {
 		return false
 	}
 
-	return index < acceptedBlockIndex-m.minCommittableSlotAge
+	return index < acceptedBlockIndex-m.minCommittableAge
 }
 
 func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
