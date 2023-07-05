@@ -77,7 +77,7 @@ func TestConfirmationFlags(t *testing.T) {
 		testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
-		testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat),
+		testsuite.WithSybilProtectionOnlineCommittee(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(nodeA.AccountID))),
 		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -126,7 +126,10 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(2),
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(4, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat),
+			testsuite.WithSybilProtectionOnlineCommittee(
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(nodeA.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(nodeB.AccountID)),
+			),
 			testsuite.WithEvictedSlot(2),
 		)
 	}
@@ -160,7 +163,11 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(2),
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(5, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat, nodeC.ValidatorSeat),
+			testsuite.WithSybilProtectionOnlineCommittee(
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(nodeA.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(nodeB.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(nodeC.AccountID)),
+			),
 			testsuite.WithEvictedSlot(2),
 		)
 	}
@@ -212,7 +219,11 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(3),
 			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithSybilProtectionCommittee(6, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat, nodeC.ValidatorSeat),
+			testsuite.WithSybilProtectionOnlineCommittee(
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(nodeA.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(nodeB.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(nodeC.AccountID)),
+			),
 			testsuite.WithEvictedSlot(3),
 		)
 	}

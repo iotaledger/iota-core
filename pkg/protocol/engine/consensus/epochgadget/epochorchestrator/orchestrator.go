@@ -66,6 +66,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 								panic(ierrors.Wrap(err, "error while registering initial committee for epoch 1"))
 							}
 						}
+						o.TriggerConstructed()
 
 						// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
 						// so the committee should be available in the performance manager.
@@ -80,7 +81,6 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 								panic("failed to load committee for last finalized slot to initialize sybil protection")
 							}
 							e.SybilProtection.ImportCommittee(currentEpoch, committee)
-
 							if nextCommittee, nextCommitteeExists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
 								e.SybilProtection.ImportCommittee(currentEpoch+1, nextCommittee)
 							}
@@ -88,10 +88,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 							e.SybilProtection.TriggerInitialized()
 						})
 
-						o.TriggerConstructed()
-						o.TriggerInitialized()
 					})
-
 				})
 
 				// TODO: CommitSlot should be called directly from NotarizationManager and should return some trees to be put into actual commitment

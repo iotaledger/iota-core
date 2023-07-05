@@ -71,8 +71,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		node1.ValidatorSeat,
-		node2.ValidatorSeat,
+		lo.Return1(node1.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(node1.AccountID)),
+		lo.Return1(node1.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(node2.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.

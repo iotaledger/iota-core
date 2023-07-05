@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -95,15 +96,15 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		node6.AccountID,
 	}
 	expectedP1Committee := []account.SeatIndex{
-		node0.ValidatorSeat,
-		node1.ValidatorSeat,
-		node2.ValidatorSeat,
-		node3.ValidatorSeat,
-		node4.ValidatorSeat,
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(node0.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(node1.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(node2.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(node3.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(node4.AccountID)),
 	}
 	expectedP2Committee := []account.SeatIndex{
-		node5.ValidatorSeat,
-		node6.ValidatorSeat,
+		lo.Return1(node5.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(node5.AccountID)),
+		lo.Return1(node5.Protocol.MainEngineInstance().SybilProtection.Committee(1).GetSeat(node6.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.

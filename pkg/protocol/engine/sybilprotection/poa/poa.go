@@ -29,7 +29,7 @@ type SybilProtection struct {
 	accounts          *account.Accounts
 	committee         *account.SeatedAccounts
 	onlineCommittee   *advancedset.AdvancedSet[account.SeatIndex]
-	inactivityManager *timed.TaskExecutor[iotago.AccountID]
+	inactivityManager *timed.TaskExecutor[account.SeatIndex]
 	lastActivities    *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
 	activityMutex     sync.RWMutex
 	committeeMutex    sync.RWMutex
@@ -48,7 +48,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 				events:            sybilprotection.NewEvents(),
 				workers:           e.Workers.CreateGroup("SybilProtection"),
 				accounts:          account.NewAccounts(),
-				inactivityManager: timed.NewTaskExecutor[iotago.AccountID](1),
+				inactivityManager: timed.NewTaskExecutor[account.SeatIndex](1),
 				lastActivities:    shrinkingmap.New[account.SeatIndex, time.Time](),
 
 				optsActivityWindow: time.Second * 30,
@@ -63,15 +63,21 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 					e.Storage.Settings().HookInitialized(func() {
 						s.timeProviderFunc = e.API().TimeProvider
 						s.TriggerConstructed()
-					})
 
-					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
-					// recover if no node was part of the online committee anymore.
-					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
-						s.events.BlockProcessed.Trigger(block)
-					})
+						// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
+						// recover if no node was part of the online committee anymore.
+						e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+							seat, exists := s.Committee(block.ID().Index()).GetSeat(block.Block().IssuerID)
+							if !exists {
+								// Only track identities that are part of the committee.
+								return
+							}
 
+							s.markSeatActive(seat, block.Block().IssuerID, block.IssuingTime())
+
+							s.events.BlockProcessed.Trigger(block)
+						})
+					})
 				})
 			})
 	})
@@ -127,7 +133,15 @@ func (s *SybilProtection) ImportCommittee(_ iotago.EpochIndex, validators *accou
 	}
 
 	for _, v := range onlineValidators {
-		s.markValidatorActive(v, s.clock.Accepted().RelativeTime())
+		activityTime := s.clock.Accepted().RelativeTime()
+
+		seat, exists := s.committee.GetSeat(v)
+		if !exists {
+			// Only track identities that are part of the committee.
+			return
+		}
+
+		s.markSeatActive(seat, v, activityTime)
 	}
 }
 
@@ -145,7 +159,7 @@ func (s *SybilProtection) stopInactivityManager() {
 	s.inactivityManager.Shutdown(timed.CancelPendingElements)
 }
 
-func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime time.Time) {
+func (s *SybilProtection) markSeatActive(seat account.SeatIndex, id iotago.AccountID, activityTime time.Time) {
 	if s.clock.WasStopped() {
 		return
 	}
@@ -153,14 +167,6 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 	s.activityMutex.Lock()
 	defer s.activityMutex.Unlock()
 
-	slotIndex := s.timeProviderFunc().SlotFromTime(activityTime)
-	seat, exists := s.Committee(slotIndex).GetSeat(id)
-	if !exists {
-		// Only track identities that are part of the committee
-		return
-	}
-
-	fmt.Println("mark seat active", id, seat)
 	if lastActivity, exists := s.lastActivities.Get(seat); exists && lastActivity.After(activityTime) {
 		return
 	} else if !exists {
@@ -170,7 +176,7 @@ func (s *SybilProtection) markValidatorActive(id iotago.AccountID, activityTime 
 
 	s.lastActivities.Set(seat, activityTime)
 
-	s.inactivityManager.ExecuteAfter(id, func() { s.markSeatInactive(seat) }, activityTime.Add(s.optsActivityWindow).Sub(s.clock.Accepted().RelativeTime()))
+	s.inactivityManager.ExecuteAfter(seat, func() { s.markSeatInactive(seat) }, activityTime.Add(s.optsActivityWindow).Sub(s.clock.Accepted().RelativeTime()))
 }
 
 func (s *SybilProtection) markSeatInactive(seat account.SeatIndex) {
