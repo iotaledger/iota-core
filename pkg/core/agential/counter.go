@@ -27,11 +27,7 @@ func NewCounter[InputType comparable](condition ...func(inputValue InputType) bo
 func (t *Counter[InputType]) Count(input Value[InputType]) (unsubscribe func()) {
 	return input.OnUpdate(func(oldInputValue, newInputValue InputType) {
 		t.ValueReceptor.Compute(func(currentThreshold int) int {
-			if t.condition(newInputValue) {
-				return currentThreshold + 1
-			} else {
-				return currentThreshold - 1
-			}
+			return lo.Cond(t.condition(newInputValue), currentThreshold+1, currentThreshold-1)
 		})
 	})
 }
