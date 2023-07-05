@@ -24,7 +24,7 @@ var (
 		TokenSupply:           tpkg.RandBaseToken(math.MaxUint64),
 		GenesisUnixTimestamp:  time.Now().Unix(),
 		SlotDurationInSeconds: 10,
-		EvictionAge:           10,
+		EvictionAge:           6,
 		LivenessThreshold:     3,
 	}
 	api = iotago.LatestAPI(protocolParams)
