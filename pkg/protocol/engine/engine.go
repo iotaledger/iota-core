@@ -270,6 +270,8 @@ func (e *Engine) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to import commitments")
 	} else if err = e.Ledger.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import ledger")
+	} else if err := e.EpochGadget.Import(reader); err != nil {
+		return errors.Wrap(err, "failed to import epoch gadget")
 	} else if err = e.EvictionState.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import eviction state")
 	} else if err = e.Attestations.Import(reader); err != nil {
@@ -291,6 +293,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export commitments")
 	} else if err = e.Ledger.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export ledger")
+	} else if err := e.EpochGadget.Export(writer, targetSlot); err != nil {
+		return errors.Wrap(err, "failed to export epoch gadget")
 	} else if err = e.EvictionState.Export(writer, e.Storage.Settings().LatestFinalizedSlot(), targetSlot); err != nil {
 		// The rootcommitment is determined from the rootblocks. Therefore, we need to export starting from the last finalized slot.
 		return errors.Wrap(err, "failed to export eviction state")
