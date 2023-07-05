@@ -124,14 +124,14 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 		if commitmentInput := transaction.CommitmentInput(); commitmentInput != nil {
 			// commitmentInput must reference a commitment
 			// that is between the latest possible, non-evicted committable slot in relation to the block time
-			// (block.ID().Index() - protocolParams.LivenessThreshold - protocolParams.EvictionAge)
+			// block.ID().Index() - (2 * protocolParams.EvictionAge)
 			// and the slot that block is committing to.
 
 			// Parameters moved to the other side of inequality to avoid underflow errors with subtraction from an uint64 type.
-			if commitmentInput.CommitmentID.Index()+protocolParams.LivenessThreshold+protocolParams.EvictionAge < block.ID().Index() {
+			if commitmentInput.CommitmentID.Index()+(protocolParams.EvictionAge<<1) < block.ID().Index() {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,
-					Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while min allowed is %d", commitmentInput.CommitmentID.Index(), block.ID().Index()-protocolParams.LivenessThreshold-protocolParams.EvictionAge),
+					Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while min allowed is %d", commitmentInput.CommitmentID.Index(), block.ID().Index()-(protocolParams.EvictionAge<<1)),
 					Source: source,
 				})
 

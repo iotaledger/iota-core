@@ -59,7 +59,8 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 						o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
 
 						// TODO: check if the following value is correctly set to twice eviction age
-						o.maxCommittableSlot = e.Storage.Settings().ProtocolParameters().EvictionAge + e.Storage.Settings().ProtocolParameters().EvictionAge
+						// maxCommittableSlot = 2 * evictionAge
+						o.maxCommittableSlot = e.Storage.Settings().ProtocolParameters().EvictionAge << 1
 
 						if o.optsInitialCommittee != nil {
 							if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
