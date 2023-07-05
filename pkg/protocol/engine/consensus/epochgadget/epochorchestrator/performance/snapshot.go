@@ -96,11 +96,11 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 				return errors.Wrapf(err, "unable to read account id for the slot index %d", slotIndex)
 			}
 			// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
-			var performanceFactor uint16
+			var performanceFactor uint64
 			if err := binary.Read(reader, binary.LittleEndian, &performanceFactor); err != nil {
 				return errors.Wrapf(err, "unable to read performance factor for account %s and slot index %d", accountID.String(), slotIndex)
 			}
-			err := performanceFactors.Store(accountID, uint64(performanceFactor))
+			err := performanceFactors.Store(accountID, performanceFactor)
 			if err != nil {
 				return errors.Wrapf(err, "unable to store performance factor for account %s and slot index %d", accountID.String(), slotIndex)
 			}
@@ -365,7 +365,6 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, _ iotago.Epo
 			innerErr = errors.Wrap(err, "unable to write epoch committee")
 			return false
 		}
-
 		epochCount++
 
 		return true
