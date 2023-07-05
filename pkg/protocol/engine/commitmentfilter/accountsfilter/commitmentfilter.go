@@ -21,6 +21,7 @@ import (
 
 var (
 	ErrInvalidSignature = errors.New("invalid signature")
+	ErrNegativeBIC      = errors.New("negative BIC")
 )
 
 type CommitmentFilter struct {
@@ -112,6 +113,7 @@ func (c *CommitmentFilter) isFutureBlock(block *model.Block) (isFutureBlock bool
 }
 
 func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
+	// TODO: redo optimisations to mark future block rather than checking each time.
 	if c.isFutureBlock(block) {
 		return
 	}
@@ -140,7 +142,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if !isEdSig {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrInvalidSignature, "only ed2519 signatures supported, got %s", block.Block().Signature.Type()),
+			Reason: errors.Wrapf(ErrInvalidSignature, "only ed2519 signatures supported, got %s", block.Block().Signature.Type()),
 		})
 
 		return
@@ -148,7 +150,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if !accountData.PubKeys.Has(edSig.PublicKey) {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.Block().IssuerID, edSig.PublicKey, block.SlotCommitment().Index()),
+			Reason: errors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.Block().IssuerID, edSig.PublicKey, block.SlotCommitment().Index()),
 		})
 
 		return
@@ -176,7 +178,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if accountData.Credits.Value < 0 {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(err, "block issuer account %s is locked due to negative BIC", block.Block().IssuerID),
+			Reason: errors.Wrapf(ErrNegativeBIC, "block issuer account %s is locked due to negative BIC", block.Block().IssuerID),
 		})
 
 		return
