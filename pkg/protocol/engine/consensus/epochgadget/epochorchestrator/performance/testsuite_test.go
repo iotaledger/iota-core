@@ -2,9 +2,7 @@ package performance
 
 import (
 	"fmt"
-	"math"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -14,7 +12,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -33,35 +30,10 @@ func NewTestSuite(t *testing.T) *TestSuite {
 	ts := &TestSuite{
 		T:        t,
 		accounts: make(map[string]iotago.AccountID),
-
-		ProtocolParameters: &iotago.ProtocolParameters{
-			Version:     3,
-			NetworkName: utils.RandString(255),
-			Bech32HRP:   iotago.NetworkPrefix(utils.RandString(3)),
-			MinPoWScore: utils.RandUint32(50000),
-			RentStructure: iotago.RentStructure{
-				VByteCost:    100,
-				VBFactorData: 1,
-				VBFactorKey:  10,
-			},
-			TokenSupply:           tpkg.RandBaseToken(math.MaxUint64),
-			GenesisUnixTimestamp:  time.Now().Unix(),
-			SlotDurationInSeconds: 10,
-			SlotsPerEpochExponent: 1,
-			// TODO: add mana decay, so we actually test if the performance calculations take the mana decay into account
-			ManaDecayFactors:                 []uint32{},
-			ManaDecayFactorEpochsSum:         0,
-			ManaDecayFactorEpochsSumExponent: 0,
-			ManaDecayFactorsExponent:         0,
-		},
 	}
 	ts.InitRewardManager()
 
 	return ts
-}
-
-func (t *TestSuite) API() iotago.API {
-	return iotago.LatestAPI(t.ProtocolParameters)
 }
 
 func (t *TestSuite) InitRewardManager() {
@@ -79,7 +51,7 @@ func (t *TestSuite) InitRewardManager() {
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
 	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, t.API().TimeProvider(), t.API().ManaDecayProvider())
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, tpkg.TestAPIProvider)
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -147,13 +119,13 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 }
 
 func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochIndex iotago.EpochIndex, performanceFactor uint64) {
-	startSlot := t.API().TimeProvider().EpochStart(epochIndex)
-	endSlot := t.API().TimeProvider().EpochEnd(epochIndex)
+	startSlot := tpkg.TestAPI.TimeProvider().EpochStart(epochIndex)
+	endSlot := tpkg.TestAPI.TimeProvider().EpochEnd(epochIndex)
 	for slot := startSlot; slot <= endSlot; slot++ {
 		for i := uint64(0); i < performanceFactor; i++ {
 			block := tpkg.RandBlockWithIssuerAndBurnedMana(accountID, 10)
-			block.IssuingTime = t.API().TimeProvider().SlotStartTime(slot)
-			modelBlock, err := model.BlockFromBlock(block, t.API())
+			block.IssuingTime = tpkg.TestAPI.TimeProvider().SlotStartTime(slot)
+			modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
 			t.Instance.BlockAccepted(blocks.NewBlock(modelBlock))
 
 			require.NoError(t.T, err)

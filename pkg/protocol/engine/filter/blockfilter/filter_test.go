@@ -1,7 +1,6 @@
 package blockfilter
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -46,7 +45,7 @@ func NewTestFramework(t *testing.T, protocolParams *iotago.ProtocolParameters, o
 	return tf
 }
 
-func (t *TestFramework) processBlock(alias string, block *iotago.Block) {
+func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) {
 	modelBlock, err := model.BlockFromBlock(block, t.api)
 	require.NoError(t.Test, err)
 
@@ -55,8 +54,8 @@ func (t *TestFramework) processBlock(alias string, block *iotago.Block) {
 }
 
 func (t *TestFramework) IssueUnsignedBlockAtTime(alias string, issuingTime time.Time) {
-	block, err := builder.NewBlockBuilder().
-		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
+	block, err := builder.NewBasicBlockBuilder(t.api).
+		StrongParents(iotago.BlockIDs{}).
 		IssuingTime(issuingTime).
 		Build()
 	require.NoError(t.Test, err)
@@ -65,44 +64,15 @@ func (t *TestFramework) IssueUnsignedBlockAtTime(alias string, issuingTime time.
 }
 
 func (t *TestFramework) IssueUnsignedBlockAtSlotWithPayload(alias string, slot iotago.SlotIndex, committing iotago.SlotIndex, payload iotago.Payload) {
-	block, err := builder.NewBlockBuilder().
-		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
+	block, err := builder.NewBasicBlockBuilder(t.api).
+		StrongParents(iotago.BlockIDs{}).
 		IssuingTime(t.api.TimeProvider().SlotStartTime(slot)).
-		SlotCommitment(iotago.NewCommitment(committing, iotago.CommitmentID{}, iotago.Identifier{}, 0)).
+		SlotCommitmentID(iotago.NewCommitment(t.api.ProtocolParameters().Version(), committing, iotago.CommitmentID{}, iotago.Identifier{}, 0).MustID()).
 		Payload(payload).
 		Build()
 	require.NoError(t.Test, err)
 
 	t.processBlock(alias, block)
-}
-
-func (t *TestFramework) IssueUnsignedBlockWithoutPoW(alias string) (score float64) {
-	block, err := builder.NewBlockBuilder().
-		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
-		Build()
-	require.NoError(t.Test, err)
-
-	score, _, err = block.POW()
-	require.NoError(t.Test, err)
-
-	t.processBlock(alias, block)
-
-	return score
-}
-
-func (t *TestFramework) IssueUnsignedBlockWithPoWScore(alias string, minPowScore float64) (score float64) {
-	block, err := builder.NewBlockBuilder().
-		StrongParents(iotago.StrongParentsIDs{iotago.BlockID{}}).
-		ProofOfWork(context.Background(), minPowScore).
-		Build()
-	require.NoError(t.Test, err)
-
-	score, _, err = block.POW()
-	require.NoError(t.Test, err)
-
-	t.processBlock(alias, block)
-
-	return score
 }
 
 func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, index iotago.SlotIndex, committing iotago.SlotIndex) {

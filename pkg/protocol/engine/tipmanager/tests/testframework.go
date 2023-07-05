@@ -14,6 +14,7 @@ import (
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TestFramework struct {
@@ -45,24 +46,24 @@ func (t *TestFramework) AddBlock(alias string) tipmanager.TipMetadata {
 	return t.Instance.AddBlock(t.Block(alias))
 }
 
-func (t *TestFramework) CreateBlock(alias string, parents map[model.ParentsType][]string) *blocks.Block {
-	blockBuilder := builder.NewBlockBuilder()
+func (t *TestFramework) CreateBlock(alias string, parents map[iotago.ParentsType][]string) *blocks.Block {
+	blockBuilder := builder.NewBasicBlockBuilder(tpkg.TestAPI)
 	blockBuilder.IssuingTime(time.Now())
 
-	if strongParents, strongParentsExist := parents[model.StrongParentType]; strongParentsExist {
+	if strongParents, strongParentsExist := parents[iotago.StrongParentType]; strongParentsExist {
 		blockBuilder.StrongParents(lo.Map(strongParents, t.BlockID))
 	}
-	if weakParents, weakParentsExist := parents[model.WeakParentType]; weakParentsExist {
+	if weakParents, weakParentsExist := parents[iotago.WeakParentType]; weakParentsExist {
 		blockBuilder.WeakParents(lo.Map(weakParents, t.BlockID))
 	}
-	if shallowLikeParents, shallowLikeParentsExist := parents[model.ShallowLikeParentType]; shallowLikeParentsExist {
+	if shallowLikeParents, shallowLikeParentsExist := parents[iotago.ShallowLikeParentType]; shallowLikeParentsExist {
 		blockBuilder.ShallowLikeParents(lo.Map(shallowLikeParents, t.BlockID))
 	}
 
 	block, err := blockBuilder.Build()
 	require.NoError(t.test, err)
 
-	modelBlock, err := model.BlockFromBlock(block, iotago.V3API(&protoParams))
+	modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
 	require.NoError(t.test, err)
 
 	t.blocksByID[modelBlock.ID()] = blocks.NewBlock(modelBlock)
@@ -94,19 +95,4 @@ func (t *TestFramework) AssertStrongTips(aliases ...string) {
 	}
 
 	require.Equal(t.test, len(aliases), len(t.Instance.StrongTips()), "strongTips size does not match")
-}
-
-var protoParams = iotago.ProtocolParameters{
-	Version:     3,
-	NetworkName: "test",
-	Bech32HRP:   "rms",
-	MinPoWScore: 0,
-	RentStructure: iotago.RentStructure{
-		VByteCost:    100,
-		VBFactorKey:  10,
-		VBFactorData: 1,
-	},
-	TokenSupply:           5000,
-	GenesisUnixTimestamp:  time.Now().Unix(),
-	SlotDurationInSeconds: 10,
 }

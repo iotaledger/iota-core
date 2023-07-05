@@ -51,9 +51,9 @@ func blockMetadataFromTransactionID(c echo.Context) (*blockMetadataResponse, err
 	// TODO: fill in blockReason, TxState, TxReason.
 	bmResponse := &blockMetadataResponse{
 		BlockID:            block.ID().ToHex(),
-		StrongParents:      block.ProtocolBlock().StrongParents.ToHex(),
-		WeakParents:        block.ProtocolBlock().WeakParents.ToHex(),
-		ShallowLikeParents: block.ProtocolBlock().ShallowLikeParents.ToHex(),
+		StrongParents:      block.ProtocolBlock().Block.StrongParentIDs().ToHex(),
+		WeakParents:        block.ProtocolBlock().Block.WeakParentIDs().ToHex(),
+		ShallowLikeParents: block.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
 		BlockState:         blockStatePending.String(),
 	}
 
