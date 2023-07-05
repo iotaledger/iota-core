@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -117,8 +116,8 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 		}
 	})
 
-	t.forEachParentByType(tipMetadata.Block(), func(parentType model.ParentsType, parentMetadata *TipMetadata) {
-		if parentType == model.StrongParentType {
+	t.forEachParentByType(tipMetadata.Block(), func(parentType iotago.ParentsType, parentMetadata *TipMetadata) {
+		if parentType == iotago.StrongParentType {
 			tipMetadata.setupStrongParent(parentMetadata)
 		} else {
 			tipMetadata.setupWeakParent(parentMetadata)
@@ -129,8 +128,8 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 }
 
 // forEachParentByType iterates through the parents of the given block and calls the consumer for each parent.
-func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(parentType model.ParentsType, parentMetadata *TipMetadata)) {
-	if block == nil || block.Block() == nil {
+func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(parentType iotago.ParentsType, parentMetadata *TipMetadata)) {
+	if block == nil || block.ProtocolBlock() == nil {
 		return
 	}
 
