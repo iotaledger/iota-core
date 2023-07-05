@@ -30,7 +30,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -47,7 +47,7 @@ type Engine struct {
 	BlockDAG        blockdag.BlockDAG
 	Booker          booker.Booker
 	Clock           clock.Clock
-	SybilProtection sybilprotection.SybilProtection
+	SybilProtection seatmanager.SeatManager
 	BlockGadget     blockgadget.Gadget
 	SlotGadget      slotgadget.Gadget
 	EpochGadget     epochgadget.Gadget
@@ -83,7 +83,7 @@ func New(
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
 	clockProvider module.Provider[*Engine, clock.Clock],
-	sybilProtectionProvider module.Provider[*Engine, sybilprotection.SybilProtection],
+	sybilProtectionProvider module.Provider[*Engine, seatmanager.SeatManager],
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
 	epochGadgetProvider module.Provider[*Engine, epochgadget.Gadget],

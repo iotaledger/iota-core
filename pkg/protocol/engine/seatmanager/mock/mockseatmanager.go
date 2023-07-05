@@ -7,7 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -99,4 +99,4 @@ func (m *ManualPOA) ImportCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
 
 func (m *ManualPOA) Shutdown() {}
 
-var _ sybilprotection.SybilProtection = &ManualPOA{}
+var _ seatmanager.SeatManager = &ManualPOA{}

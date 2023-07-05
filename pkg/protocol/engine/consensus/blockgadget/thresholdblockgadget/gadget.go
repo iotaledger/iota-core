@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -20,7 +20,7 @@ import (
 type Gadget struct {
 	events *blockgadget.Events
 
-	sybilProtection sybilprotection.SybilProtection
+	sybilProtection seatmanager.SeatManager
 	blockCache      *blocks.Blocks
 
 	optsAcceptanceThreshold               float64
@@ -43,7 +43,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(blockCache *blocks.Blocks, sybilProtection sybilprotection.SybilProtection, opts ...options.Option[Gadget]) *Gadget {
+func New(blockCache *blocks.Blocks, sybilProtection seatmanager.SeatManager, opts ...options.Option[Gadget]) *Gadget {
 	return options.Apply(&Gadget{
 		events:          blockgadget.NewEvents(),
 		sybilProtection: sybilProtection,

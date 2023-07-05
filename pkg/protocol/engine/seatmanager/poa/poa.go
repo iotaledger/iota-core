@@ -15,13 +15,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // SybilProtection is a sybil protection module for the engine that manages the weights of actors according to their stake.
 type SybilProtection struct {
-	events *sybilprotection.Events
+	events *seatmanager.Events
 
 	clock             clock.Clock
 	timeProviderFunc  func() *iotago.TimeProvider
@@ -41,12 +41,12 @@ type SybilProtection struct {
 }
 
 // NewProvider returns a new sybil protection provider that uses the ProofOfStake module.
-func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
-	return module.Provide(func(e *engine.Engine) sybilprotection.SybilProtection {
+func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, seatmanager.SeatManager] {
+	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
 		return options.Apply(
 			&SybilProtection{
-				events:            sybilprotection.NewEvents(),
-				workers:           e.Workers.CreateGroup("SybilProtection"),
+				events:            seatmanager.NewEvents(),
+				workers:           e.Workers.CreateGroup("SeatManager"),
 				accounts:          account.NewAccounts(),
 				inactivityManager: timed.NewTaskExecutor[account.SeatIndex](1),
 				lastActivities:    shrinkingmap.New[account.SeatIndex, time.Time](),
@@ -83,7 +83,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 	})
 }
 
-var _ sybilprotection.SybilProtection = &SybilProtection{}
+var _ seatmanager.SeatManager = &SybilProtection{}
 
 func (s *SybilProtection) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *account.SeatedAccounts {
 	s.committeeMutex.RLock()

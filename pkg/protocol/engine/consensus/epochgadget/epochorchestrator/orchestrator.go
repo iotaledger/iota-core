@@ -15,14 +15,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Orchestrator struct {
 	events            *epochgadget.Events
-	sybilProtection   sybilprotection.SybilProtection // do we need the whole SybilProtection or just a callback to RotateCommittee?
-	ledger            ledger.Ledger                   // do we need the whole Ledger or just a callback to retrieve account data?
+	sybilProtection   seatmanager.SeatManager // do we need the whole SeatManager or just a callback to RotateCommittee?
+	ledger            ledger.Ledger           // do we need the whole Ledger or just a callback to retrieve account data?
 	lastCommittedSlot iotago.SlotIndex
 	timeProvider      *iotago.TimeProvider
 
@@ -87,7 +87,6 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 
 							e.SybilProtection.TriggerInitialized()
 						})
-
 					})
 				})
 

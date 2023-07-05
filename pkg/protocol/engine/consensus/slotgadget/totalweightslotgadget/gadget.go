@@ -14,7 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/votes"
 	"github.com/iotaledger/iota-core/pkg/votes/slottracker"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -27,7 +27,7 @@ type Gadget struct {
 	// Keep track of votes on slots (from commitments) per slot of blocks. I.e. a slot can only be finalized if
 	// optsSlotFinalizationThreshold is reached within a slot.
 	slotTrackers    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *slottracker.SlotTracker]
-	sybilProtection sybilprotection.SybilProtection
+	sybilProtection seatmanager.SeatManager
 
 	lastFinalizedSlot          iotago.SlotIndex
 	storeLastFinalizedSlotFunc func(index iotago.SlotIndex)

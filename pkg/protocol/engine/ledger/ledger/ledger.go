@@ -28,7 +28,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -47,7 +47,7 @@ type Ledger struct {
 	epochGadget      epochgadget.Gadget
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
-	sybilProtection sybilprotection.SybilProtection
+	sybilProtection seatmanager.SeatManager
 
 	memPool            mempool.MemPool[ledger.BlockVoteRank]
 	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
@@ -118,7 +118,7 @@ func New(
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
 	apiProvider func() iotago.API,
-	sybilProtection sybilprotection.SybilProtection,
+	sybilProtection seatmanager.SeatManager,
 	epochGadget epochgadget.Gadget,
 	errorHandler func(error),
 ) *Ledger {

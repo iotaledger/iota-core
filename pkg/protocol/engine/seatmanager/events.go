@@ -1,4 +1,4 @@
-package sybilprotection
+package seatmanager
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"

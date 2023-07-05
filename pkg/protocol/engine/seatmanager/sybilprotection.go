@@ -1,4 +1,4 @@
-package sybilprotection
+package seatmanager
 
 import (
 	"github.com/iotaledger/hive.go/ds/advancedset"
@@ -7,8 +7,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// SybilProtection is the minimal interface for the SybilProtection component of the IOTA protocol.
-type SybilProtection interface {
+// SeatManager is the minimal interface for the SeatManager component of the IOTA protocol.
+type SeatManager interface {
 	// RotateCommittee rotates the committee evaluating the given set of candidates to produce the new committee.
 	RotateCommittee(epochIndex iotago.EpochIndex, candidates *account.Accounts) *account.SeatedAccounts
 
@@ -26,7 +26,7 @@ type SybilProtection interface {
 	// OnlineCommittee returns the set of online validators that is used to track acceptance.
 	OnlineCommittee() *advancedset.AdvancedSet[account.SeatIndex]
 
-	// SeatCount returns the number of seats in the SybilProtection.
+	// SeatCount returns the number of seats in the SeatManager.
 	SeatCount() int
 
 	// Interface embeds the required methods of the module.Interface.

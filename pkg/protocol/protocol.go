@@ -36,8 +36,8 @@ import (
 	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
@@ -77,7 +77,7 @@ type Protocol struct {
 	optsTipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
 	optsBookerProvider          module.Provider[*engine.Engine, booker.Booker]
 	optsClockProvider           module.Provider[*engine.Engine, clock.Clock]
-	optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
+	optsSybilProtectionProvider module.Provider[*engine.Engine, seatmanager.SeatManager]
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
 	optsEpochGadgetProvider     module.Provider[*engine.Engine, epochgadget.Gadget]

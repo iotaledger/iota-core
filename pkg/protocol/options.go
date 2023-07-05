@@ -15,7 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 )
@@ -68,7 +68,7 @@ func WithClockProvider(optsClockProvider module.Provider[*engine.Engine, clock.C
 	}
 }
 
-func WithSybilProtectionProvider(optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]) options.Option[Protocol] {
+func WithSybilProtectionProvider(optsSybilProtectionProvider module.Provider[*engine.Engine, seatmanager.SeatManager]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsSybilProtectionProvider = optsSybilProtectionProvider
 	}
