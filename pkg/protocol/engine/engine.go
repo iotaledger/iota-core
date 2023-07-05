@@ -32,6 +32,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -55,6 +56,7 @@ type Engine struct {
 	Attestations    attestation.Attestations
 	Ledger          ledger.Ledger
 	TipManager      tipmanager.TipManager
+	TipSelection    tipselection.TipSelection
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -91,6 +93,7 @@ func New(
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
 	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
+	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	return options.Apply(
@@ -120,6 +123,7 @@ func New(
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
 			e.TipManager = tipManagerProvider(e)
+			e.TipSelection = tipSelectionProvider(e)
 
 			e.HookInitialized(lo.Batch(
 				e.Storage.Settings().TriggerInitialized,

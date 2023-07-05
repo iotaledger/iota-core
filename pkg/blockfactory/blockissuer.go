@@ -335,7 +335,7 @@ func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, _ iotago.Paylo
 	defer timeutil.CleanupTicker(interval)
 
 	for {
-		references = i.protocol.MainEngineInstance().TipManager.SelectTips(parentsCount)
+		references = i.protocol.MainEngineInstance().TipSelection.SelectTips(parentsCount)
 		if len(references[model.StrongParentType]) > 0 {
 			return references, nil
 		}

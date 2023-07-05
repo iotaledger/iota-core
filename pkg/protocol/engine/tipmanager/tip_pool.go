@@ -1,18 +1,18 @@
 package tipmanager
 
-// TipPool represents the pool a block is in.
+// TipPool represents a pool of blocks that are treated in a certain way by the tip selection strategy.
 type TipPool uint8
 
 const (
 	// UndefinedTipPool is the zero value of TipPool.
 	UndefinedTipPool TipPool = iota
 
-	// StrongTipPool represents a pool of blockMetadataStorage that are supposed to be picked up using strong references.
+	// StrongTipPool represents a pool of blocks that are supposed to be referenced through strong parents.
 	StrongTipPool
 
-	// WeakTipPool represents a pool of blockMetadataStorage that are supposed to be picked up using weak references.
+	// WeakTipPool represents a pool of blocks that are supposed to be referenced through weak parents.
 	WeakTipPool
 
-	// DroppedTipPool represents a pool of blockMetadataStorage that are supposed to be dropped.
+	// DroppedTipPool represents a pool of blocks that are supposed to be ignored by the tip selection strategy.
 	DroppedTipPool
 )
