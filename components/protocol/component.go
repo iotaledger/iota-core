@@ -22,7 +22,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -100,7 +100,7 @@ func provide(c *dig.Container) error {
 			),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(),
+				sybilprotectionv1.NewProvider(),
 			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),

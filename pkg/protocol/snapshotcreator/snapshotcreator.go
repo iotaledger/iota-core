@@ -18,13 +18,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager/poa"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -80,10 +79,9 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		inmemoryblockdag.NewProvider(),
 		inmemorybooker.NewProvider(),
 		blocktime.NewProvider(),
-		poa.NewProvider(),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
-		epochorchestrator.NewProvider(epochorchestrator.WithInitialCommittee(accounts)),
+		sybilprotectionv1.NewProvider(sybilprotectionv1.WithInitialCommittee(accounts)),
 		slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),

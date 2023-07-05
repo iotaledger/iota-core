@@ -1,4 +1,4 @@
-package epochorchestrator
+package sybilprotectionv1
 
 import (
 	"fmt"
@@ -11,18 +11,18 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1/performance"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Orchestrator struct {
-	events            *epochgadget.Events
-	sybilProtection   seatmanager.SeatManager // do we need the whole SeatManager or just a callback to RotateCommittee?
-	ledger            ledger.Ledger           // do we need the whole Ledger or just a callback to retrieve account data?
+	events            *sybilprotection.Events
+	seatManager       seatmanager.SeatManager
+	ledger            ledger.Ledger // do we need the whole Ledger or just a callback to retrieve account data?
 	lastCommittedSlot iotago.SlotIndex
 	timeProvider      *iotago.TimeProvider
 
@@ -31,25 +31,28 @@ type Orchestrator struct {
 	epochEndNearingThreshold iotago.SlotIndex
 	maxCommittableAge        iotago.SlotIndex
 
-	optsInitialCommittee *account.Accounts
+	optsInitialCommittee    *account.Accounts
+	optsSeatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]
 
 	mutex syncutils.Mutex
 
 	module.Module
 }
 
-func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.Engine, epochgadget.Gadget] {
-	return module.Provide(func(e *engine.Engine) epochgadget.Gadget {
+func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
+	return module.Provide(func(e *engine.Engine) sybilprotection.SybilProtection {
 		return options.Apply(&Orchestrator{
-			events: epochgadget.NewEvents(),
+			events: sybilprotection.NewEvents(),
 
 			// TODO: the following fields should be initialized after the engine is constructed,
 			//  otherwise we implicitly rely on the order of engine initialization which can change at any time.
-			sybilProtection: e.SybilProtection,
-			ledger:          e.Ledger,
 		}, opts,
 			func(o *Orchestrator) {
+				o.seatManager = o.optsSeatManagerProvider(e)
+
 				e.HookConstructed(func() {
+					o.ledger = e.Ledger
+
 					e.Storage.Settings().HookInitialized(func() {
 						o.timeProvider = e.API().TimeProvider()
 						o.maxCommittableAge = e.Storage.Settings().ProtocolParameters().EvictionAge + e.Storage.Settings().ProtocolParameters().EvictionAge
@@ -80,12 +83,12 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 							if !exists {
 								panic("failed to load committee for last finalized slot to initialize sybil protection")
 							}
-							e.SybilProtection.ImportCommittee(currentEpoch, committee)
+							o.seatManager.ImportCommittee(currentEpoch, committee)
 							if nextCommittee, nextCommitteeExists := o.performanceManager.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
-								e.SybilProtection.ImportCommittee(currentEpoch+1, nextCommittee)
+								o.seatManager.ImportCommittee(currentEpoch+1, nextCommittee)
 							}
 
-							e.SybilProtection.TriggerInitialized()
+							o.TriggerInitialized()
 						})
 					})
 				})
@@ -95,7 +98,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 
 				e.Events.SlotGadget.SlotFinalized.Hook(o.slotFinalized)
 
-				e.Events.EpochGadget.LinkTo(o.events)
+				e.Events.SybilProtection.LinkTo(o.events)
 			},
 		)
 	})
@@ -131,7 +134,7 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 
 			committee.SetReused()
 
-			o.sybilProtection.SetCommittee(nextEpoch, committee)
+			o.seatManager.SetCommittee(nextEpoch, committee)
 			if err := o.performanceManager.RegisterCommittee(nextEpoch, committee); err != nil {
 				panic(ierrors.Wrapf(err, "failed to register committee for epoch %d", nextEpoch))
 			}
@@ -146,6 +149,10 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 
 		o.performanceManager.ApplyEpoch(currentEpoch, committee)
 	}
+}
+
+func (o *Orchestrator) SeatManager() seatmanager.SeatManager {
+	return o.seatManager
 }
 
 func (o *Orchestrator) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
@@ -205,7 +212,7 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 		panic(err)
 	}
 
-	newCommittee := o.sybilProtection.RotateCommittee(nextEpoch, weightedCandidates)
+	newCommittee := o.seatManager.RotateCommittee(nextEpoch, weightedCandidates)
 	weightedCommittee := newCommittee.Accounts()
 
 	// FIXME: weightedCommittee returned by the PoA sybil protection does not have stake specified, which will cause problems during rewards calculation.
@@ -222,5 +229,11 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 func WithInitialCommittee(committee *account.Accounts) options.Option[Orchestrator] {
 	return func(o *Orchestrator) {
 		o.optsInitialCommittee = committee
+	}
+}
+
+func WithSeatManagerProvider(seatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]) options.Option[Orchestrator] {
+	return func(o *Orchestrator) {
+		o.optsSeatManagerProvider = seatManagerProvider
 	}
 }

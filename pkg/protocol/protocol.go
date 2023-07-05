@@ -26,8 +26,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -36,11 +34,11 @@ import (
 	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -77,10 +75,9 @@ type Protocol struct {
 	optsTipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
 	optsBookerProvider          module.Provider[*engine.Engine, booker.Booker]
 	optsClockProvider           module.Provider[*engine.Engine, clock.Clock]
-	optsSybilProtectionProvider module.Provider[*engine.Engine, seatmanager.SeatManager]
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
-	optsEpochGadgetProvider     module.Provider[*engine.Engine, epochgadget.Gadget]
+	optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
@@ -98,10 +95,9 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsTipManagerProvider:      tipmanagerv1.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
-		optsSybilProtectionProvider: poa.NewProvider(),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
-		optsEpochGadgetProvider:     epochorchestrator.NewProvider(),
+		optsSybilProtectionProvider: sybilprotectionv1.NewProvider(),
 		optsNotarizationProvider:    slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
 		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
@@ -201,10 +197,9 @@ func (p *Protocol) initEngineManager() {
 		p.optsBlockDAGProvider,
 		p.optsBookerProvider,
 		p.optsClockProvider,
-		p.optsSybilProtectionProvider,
 		p.optsBlockGadgetProvider,
 		p.optsSlotGadgetProvider,
-		p.optsEpochGadgetProvider,
+		p.optsSybilProtectionProvider,
 		p.optsNotarizationProvider,
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,

@@ -45,7 +45,7 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 				b.conflictDAG = b.ledger.ConflictDAG()
 			})
 
-			e.Events.SybilProtection.BlockProcessed.Hook(func(block *blocks.Block) {
+			e.Events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {
 				if err := b.Queue(block); err != nil {
 					b.errorHandler(err)
 				}

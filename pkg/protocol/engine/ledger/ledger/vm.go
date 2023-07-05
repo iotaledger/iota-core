@@ -84,7 +84,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 				accountID = iotago.AccountIDFromOutputID(inputStates[inp.Index].OutputID())
 			}
 
-			reward, rewardErr := l.epochGadget.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			reward, rewardErr := l.sybilProtection.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			if rewardErr != nil {
 				return nil, xerrors.Errorf("failed to get Validator reward for AccountOutput at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			}
@@ -101,7 +101,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 				delegationEnd = l.protocolParameters.TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
 			}
 
-			reward, rewardErr := l.epochGadget.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
+			reward, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
 			if rewardErr != nil {
 				return nil, xerrors.Errorf("failed to get Delegator reward for DelegationOutput at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", delegationID, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}

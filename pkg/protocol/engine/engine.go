@@ -24,14 +24,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -47,10 +46,9 @@ type Engine struct {
 	BlockDAG        blockdag.BlockDAG
 	Booker          booker.Booker
 	Clock           clock.Clock
-	SybilProtection seatmanager.SeatManager
 	BlockGadget     blockgadget.Gadget
 	SlotGadget      slotgadget.Gadget
-	EpochGadget     epochgadget.Gadget
+	SybilProtection sybilprotection.SybilProtection
 	Notarization    notarization.Notarization
 	Attestations    attestation.Attestations
 	Ledger          ledger.Ledger
@@ -83,10 +81,9 @@ func New(
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
 	clockProvider module.Provider[*Engine, clock.Clock],
-	sybilProtectionProvider module.Provider[*Engine, seatmanager.SeatManager],
 	blockGadgetProvider module.Provider[*Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*Engine, slotgadget.Gadget],
-	epochGadgetProvider module.Provider[*Engine, epochgadget.Gadget],
+	sybilProtectionProvider module.Provider[*Engine, sybilprotection.SybilProtection],
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
@@ -115,7 +112,6 @@ func New(
 			e.Clock = clockProvider(e)
 			e.BlockGadget = blockGadgetProvider(e)
 			e.SlotGadget = slotGadgetProvider(e)
-			e.EpochGadget = epochGadgetProvider(e)
 			e.Notarization = notarizationProvider(e)
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
@@ -270,7 +266,7 @@ func (e *Engine) Import(reader io.ReadSeeker) (err error) {
 		return errors.Wrap(err, "failed to import commitments")
 	} else if err = e.Ledger.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import ledger")
-	} else if err := e.EpochGadget.Import(reader); err != nil {
+	} else if err := e.SybilProtection.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import epoch gadget")
 	} else if err = e.EvictionState.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import eviction state")
@@ -293,7 +289,7 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return errors.Wrap(err, "failed to export commitments")
 	} else if err = e.Ledger.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export ledger")
-	} else if err := e.EpochGadget.Export(writer, targetSlot); err != nil {
+	} else if err := e.SybilProtection.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export epoch gadget")
 	} else if err = e.EvictionState.Export(writer, e.Storage.Settings().LatestFinalizedSlot(), targetSlot); err != nil {
 		// The rootcommitment is determined from the rootblocks. Therefore, we need to export starting from the last finalized slot.

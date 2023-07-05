@@ -8,14 +8,14 @@ import (
 )
 
 // WithActivityWindow sets the duration for which a validator is recognized as active after issuing a block.
-func WithActivityWindow(activityWindow time.Duration) options.Option[SybilProtection] {
-	return func(p *SybilProtection) {
+func WithActivityWindow(activityWindow time.Duration) options.Option[SeatManager] {
+	return func(p *SeatManager) {
 		p.optsActivityWindow = activityWindow
 	}
 }
 
-func WithOnlineCommitteeStartup(optsOnlineCommittee ...iotago.AccountID) options.Option[SybilProtection] {
-	return func(p *SybilProtection) {
+func WithOnlineCommitteeStartup(optsOnlineCommittee ...iotago.AccountID) options.Option[SeatManager] {
+	return func(p *SeatManager) {
 		p.optsOnlineCommitteeStartup = optsOnlineCommittee
 	}
 }

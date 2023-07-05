@@ -2,12 +2,13 @@ package mock
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -30,6 +31,10 @@ func NewManualPOA() *ManualPOA {
 	m.committee = m.accounts.SelectCommittee()
 
 	return m
+}
+
+func (m *ManualPOA) Events() *seatmanager.Events {
+	return nil
 }
 
 func (m *ManualPOA) AddAccount(alias string) iotago.AccountID {
@@ -95,6 +100,9 @@ func (m *ManualPOA) SetCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
 }
 
 func (m *ManualPOA) ImportCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
+}
+
+func (m *ManualPOA) markSeatActive(_ account.SeatIndex, _ iotago.AccountID, _ time.Time) {
 }
 
 func (m *ManualPOA) Shutdown() {}

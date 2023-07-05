@@ -15,12 +15,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// SybilProtection is a sybil protection module for the engine that manages the weights of actors according to their stake.
-type SybilProtection struct {
+// SeatManager is a sybil protection module for the engine that manages the weights of actors according to their stake.
+type SeatManager struct {
 	events *seatmanager.Events
 
 	clock             clock.Clock
@@ -41,21 +41,20 @@ type SybilProtection struct {
 }
 
 // NewProvider returns a new sybil protection provider that uses the ProofOfStake module.
-func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, seatmanager.SeatManager] {
+func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.Engine, seatmanager.SeatManager] {
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
 		return options.Apply(
-			&SybilProtection{
+			&SeatManager{
 				events:            seatmanager.NewEvents(),
 				workers:           e.Workers.CreateGroup("SeatManager"),
 				accounts:          account.NewAccounts(),
+				onlineCommittee:   advancedset.New[account.SeatIndex](),
 				inactivityManager: timed.NewTaskExecutor[account.SeatIndex](1),
 				lastActivities:    shrinkingmap.New[account.SeatIndex, time.Time](),
 
 				optsActivityWindow: time.Second * 30,
-			}, opts, func(s *SybilProtection) {
-				e.Events.SybilProtection.LinkTo(s.events)
-
-				s.onlineCommittee = advancedset.New[account.SeatIndex]()
+			}, opts, func(s *SeatManager) {
+				e.Events.SeatManager.LinkTo(s.events)
 
 				e.HookConstructed(func() {
 					s.clock = e.Clock
@@ -83,9 +82,9 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 	})
 }
 
-var _ seatmanager.SeatManager = &SybilProtection{}
+var _ seatmanager.SeatManager = &SeatManager{}
 
-func (s *SybilProtection) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *account.SeatedAccounts {
+func (s *SeatManager) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *account.SeatedAccounts {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
@@ -94,7 +93,7 @@ func (s *SybilProtection) RotateCommittee(_ iotago.EpochIndex, _ *account.Accoun
 }
 
 // Committee returns the set of validators selected to be part of the committee.
-func (s *SybilProtection) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
+func (s *SeatManager) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
@@ -103,24 +102,24 @@ func (s *SybilProtection) Committee(_ iotago.SlotIndex) *account.SeatedAccounts 
 }
 
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
-func (s *SybilProtection) OnlineCommittee() *advancedset.AdvancedSet[account.SeatIndex] {
+func (s *SeatManager) OnlineCommittee() *advancedset.AdvancedSet[account.SeatIndex] {
 	s.activityMutex.RLock()
 	defer s.activityMutex.RUnlock()
 
 	return s.onlineCommittee
 }
 
-func (s *SybilProtection) SeatCount() int {
+func (s *SeatManager) SeatCount() int {
 	return s.committee.SeatCount()
 }
 
-func (s *SybilProtection) Shutdown() {
+func (s *SeatManager) Shutdown() {
 	s.TriggerStopped()
 	s.stopInactivityManager()
 	s.workers.Shutdown()
 }
 
-func (s *SybilProtection) ImportCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
+func (s *SeatManager) ImportCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
@@ -145,7 +144,7 @@ func (s *SybilProtection) ImportCommittee(_ iotago.EpochIndex, validators *accou
 	}
 }
 
-func (s *SybilProtection) SetCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
+func (s *SeatManager) SetCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
@@ -155,11 +154,11 @@ func (s *SybilProtection) SetCommittee(_ iotago.EpochIndex, validators *account.
 	fmt.Println("set committee", validators.IDs())
 }
 
-func (s *SybilProtection) stopInactivityManager() {
+func (s *SeatManager) stopInactivityManager() {
 	s.inactivityManager.Shutdown(timed.CancelPendingElements)
 }
 
-func (s *SybilProtection) markSeatActive(seat account.SeatIndex, id iotago.AccountID, activityTime time.Time) {
+func (s *SeatManager) markSeatActive(seat account.SeatIndex, id iotago.AccountID, activityTime time.Time) {
 	if s.clock.WasStopped() {
 		return
 	}
@@ -179,7 +178,7 @@ func (s *SybilProtection) markSeatActive(seat account.SeatIndex, id iotago.Accou
 	s.inactivityManager.ExecuteAfter(seat, func() { s.markSeatInactive(seat) }, activityTime.Add(s.optsActivityWindow).Sub(s.clock.Accepted().RelativeTime()))
 }
 
-func (s *SybilProtection) markSeatInactive(seat account.SeatIndex) {
+func (s *SeatManager) markSeatInactive(seat account.SeatIndex) {
 	s.activityMutex.Lock()
 	defer s.activityMutex.Unlock()
 

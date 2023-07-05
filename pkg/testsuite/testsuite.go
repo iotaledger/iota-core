@@ -21,10 +21,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -391,11 +390,8 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		baseOpts := []options.Option[protocol.Protocol]{
 			protocol.WithSnapshotPath(t.snapshotPath),
 			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
-			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(),
-			),
 			protocol.WithEpochGadgetProvider(
-				epochorchestrator.NewProvider(),
+				sybilprotectionv1.NewProvider(),
 			),
 		}
 		if len(nodesOptions) == 1 {

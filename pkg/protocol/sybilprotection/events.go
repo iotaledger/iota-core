@@ -1,4 +1,4 @@
-package epochgadget
+package sybilprotection
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"

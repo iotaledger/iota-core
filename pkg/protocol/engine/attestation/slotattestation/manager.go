@@ -71,7 +71,7 @@ type Manager struct {
 
 func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*engine.Engine, attestation.Attestations] {
 	return module.Provide(func(e *engine.Engine) attestation.Attestations {
-		m := NewManager(attestationCommitmentOffset, e.Storage.Prunable.Attestations, e.SybilProtection.Committee)
+		m := NewManager(attestationCommitmentOffset, e.Storage.Prunable.Attestations, e.SybilProtection.SeatManager().Committee)
 
 		e.Storage.Settings().HookInitialized(func() {
 			m.commitmentMutex.Lock()

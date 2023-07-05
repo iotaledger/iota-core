@@ -16,7 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/seatmanager/mock"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -30,9 +30,9 @@ type TestFramework struct {
 	blocks     *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 	blockCache *blocks.Blocks
 
-	SybilProtection *mock.ManualPOA
-	Instance        blockgadget.Gadget
-	Events          *blockgadget.Events
+	SeatManager *mock.ManualPOA
+	Instance    blockgadget.Gadget
+	Events      *blockgadget.Events
 }
 
 func NewTestFramework(test *testing.T) *TestFramework {
@@ -55,7 +55,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 			SlotDurationInSeconds: 10,
 		},
 
-		SybilProtection: mock.NewManualPOA(),
+		SeatManager: mock.NewManualPOA(),
 	}
 
 	t.api = iotago.LatestAPI(t.protocolParameters)
@@ -65,7 +65,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	})
 
 	t.blockCache = blocks.New(evictionState, t.api.TimeProvider)
-	instance := thresholdblockgadget.New(t.blockCache, t.SybilProtection)
+	instance := thresholdblockgadget.New(t.blockCache, t.SeatManager)
 	t.Events = instance.Events()
 	t.Instance = instance
 
@@ -113,7 +113,7 @@ func (t *TestFramework) CreateBlock(alias string, issuerAlias string, parents ..
 
 	block, err := builder.NewBlockBuilder().
 		StrongParents(t.BlockIDs(parents...)).
-		Sign(t.SybilProtection.AccountID(issuerAlias), priv).
+		Sign(t.SeatManager.AccountID(issuerAlias), priv).
 		Build()
 	require.NoError(t, err)
 
