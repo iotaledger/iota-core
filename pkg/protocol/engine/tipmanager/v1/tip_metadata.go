@@ -45,9 +45,12 @@ type TipMetadata struct {
 	// member.
 	isConnectedToTips *agential.DerivedValueReceptor[bool]
 
-	// isStronglyReferencedByStronglyConnectedTips is true if the block has at least one strong child that is strongly connected
+	// isStronglyReferencedByTips is true if the block has at least one strong child that is strongly connected
 	// to the tips.
-	isStronglyReferencedByStronglyConnectedTips *agential.DerivedValueReceptor[bool]
+	isStronglyReferencedByTips *agential.DerivedValueReceptor[bool]
+
+	// isWeaklyReferencedByTips is true if the block has at least one weak child that is connected to the tips.
+	isWeaklyReferencedByTips *agential.DerivedValueReceptor[bool]
 
 	// isReferencedByTips is true if the block is strongly referenced by other tips or has at least one weak child
 	// that is connected to the tips.
@@ -107,25 +110,29 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		return tipPool == tipmanager.WeakTipPool && !isOrphaned && !isEvicted
 	}, &t.tipPool, &t.isOrphaned, &t.isEvicted)
 
-	t.isStronglyConnectedToTips = agential.DeriveValueReceptorFrom2Inputs(t, func(isStrongTipPoolMember bool, isStronglyReferencedByStronglyConnectedTips bool) bool {
-		return isStrongTipPoolMember || isStronglyReferencedByStronglyConnectedTips
-	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByStronglyConnectedTips)
+	t.isStronglyConnectedToTips = agential.DeriveValueReceptorFrom2Inputs(t, func(isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
+		return isStrongTipPoolMember || isStronglyReferencedByTips
+	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByTips)
 
 	t.isConnectedToTips = agential.DeriveValueFrom3Inputs(t, func(isReferencedByTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
 		return isReferencedByTips || isStrongTipPoolMember || isWeakTipPoolMember
 	}, &t.isReferencedByTips, &t.isStrongTipPoolMember, &t.isWeakTipPoolMember)
 
-	t.isStronglyReferencedByStronglyConnectedTips = agential.DeriveValueReceptorFrom1Input[bool, int](t, func(stronglyConnectedStrongChildren int) bool {
+	t.isStronglyReferencedByTips = agential.DeriveValueReceptorFrom1Input[bool, int](t, func(stronglyConnectedStrongChildren int) bool {
 		return stronglyConnectedStrongChildren > 0
 	}, &t.stronglyConnectedStrongChildren)
 
-	t.isReferencedByTips = agential.DeriveValueReceptorFrom2Inputs[bool, int, bool](t, func(connectedWeakChildren int, isStronglyReferencedByStronglyConnectedTips bool) bool {
-		return connectedWeakChildren > 0 || isStronglyReferencedByStronglyConnectedTips
-	}, &t.connectedWeakChildren, &t.isStronglyReferencedByStronglyConnectedTips)
+	t.isWeaklyReferencedByTips = agential.DeriveValueReceptorFrom1Input[bool, int](t, func(connectedWeakChildren int) bool {
+		return connectedWeakChildren > 0
+	}, &t.connectedWeakChildren)
+
+	t.isReferencedByTips = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isWeaklyReferencedByTips bool, isStronglyReferencedByTips bool) bool {
+		return isWeaklyReferencedByTips || isStronglyReferencedByTips
+	}, &t.isWeaklyReferencedByTips, &t.isStronglyReferencedByTips)
 
 	t.isStrongTip = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
 		return isStrongTipPoolMember && !isStronglyReferencedByOtherTips
-	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByStronglyConnectedTips)
+	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByTips)
 
 	t.isWeakTip = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isWeakTipPoolMember bool, isReferencedByTips bool) bool {
 		return isWeakTipPoolMember && !isReferencedByTips
