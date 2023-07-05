@@ -129,8 +129,8 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		return isWeaklyReferencedByTips || isStronglyReferencedByTips
 	}, &t.isWeaklyReferencedByTips, &t.isStronglyReferencedByTips)
 
-	t.isStrongTip = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isStrongTipPoolMember bool, isStronglyReferencedByOtherTips bool) bool {
-		return isStrongTipPoolMember && !isStronglyReferencedByOtherTips
+	t.isStrongTip = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
+		return isStrongTipPoolMember && !isStronglyReferencedByTips
 	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByTips)
 
 	t.isWeakTip = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isWeakTipPoolMember bool, isReferencedByTips bool) bool {
