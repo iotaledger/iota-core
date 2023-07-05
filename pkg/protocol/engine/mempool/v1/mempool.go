@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"sync"
 
 	"golang.org/x/xerrors"
@@ -16,6 +15,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -59,11 +59,11 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 
 	optForkAllTransactions bool
 
-	apiProvider permanent.APIBySlotIndexProviderFunc
+	apiProvider api.Provider
 }
 
 // New is the constructor of the MemPool.
-func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider permanent.APIBySlotIndexProviderFunc, opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
+func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider api.Provider, opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
 	return options.Apply(&MemPool[VoteRank]{
 		transactionAttached:    event.New1[mempool.TransactionMetadata](),
 		executeStateTransition: vm,
@@ -173,7 +173,7 @@ func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, bl
 		return nil, false, xerrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
 	}
 
-	newTransaction, err := NewTransactionWithMetadata(m.apiProvider(blockID.Index()), transaction)
+	newTransaction, err := NewTransactionWithMetadata(m.apiProvider.APIForSlot(blockID.Index()), transaction)
 	if err != nil {
 		return nil, false, xerrors.Errorf("failed to create transaction metadata: %w", err)
 	}

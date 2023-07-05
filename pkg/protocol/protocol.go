@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -124,11 +125,6 @@ func (p *Protocol) Run(ctx context.Context) error {
 
 	p.linkToEngine(p.mainEngine)
 
-	//nolint:contextcheck // false positive
-	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
-		return errors.Wrap(err, "mainEngine initialize failed")
-	}
-
 	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
 	if !valid {
 		panic("no root commitment found")
@@ -211,7 +207,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsTipManagerProvider,
 	)
 
-	mainEngine, err := p.engineManager.LoadActiveEngine()
+	mainEngine, err := p.engineManager.LoadActiveEngine(p.optsSnapshotPath)
 	if err != nil {
 		panic(fmt.Sprintf("could not load active engine: %s", err))
 	}
@@ -262,24 +258,24 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 		return errors.Errorf("protocol engine not yet initialized")
 	}
 
-	isSolid, chain := p.ChainManager.ProcessCommitmentFromSource(block.SlotCommitment(), src)
-	if !isSolid {
-		if block.ProtocolBlock().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().ID() {
-			return nil
-		}
+	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
+	if chainCommitment == nil {
+		return errors.Errorf("protocol ProcessBlock failed. Unknown commitment: %s", block.ProtocolBlock().SlotCommitmentID)
+	}
 
-		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitment.MustID(), mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
+	if !chainCommitment.IsSolid() {
+		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: chain: %s, slotcommitment: %s, latest commitment: %s, block ID: %s", chainCommitment.Chain().ForkingPoint.ID(), block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
 
 	processed := false
 
-	if mainChain := mainEngine.ChainID(); chain.ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
+	if mainChain := mainEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
 		mainEngine.ProcessBlockFromPeer(block, src)
 		processed = true
 	}
 
 	if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
-		if candidateChain := candidateEngine.ChainID(); chain.ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
+		if candidateChain := candidateEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
 			candidateEngine.ProcessBlockFromPeer(block, src)
 			if candidateEngine.IsBootstrapped() &&
 				candidateEngine.Storage.Settings().LatestCommitment().CumulativeWeight() > mainEngine.Storage.Settings().LatestCommitment().CumulativeWeight() {
@@ -290,7 +286,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	if !processed {
-		return errors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.ProtocolBlock().SlotCommitment.MustID())
+		return errors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.ProtocolBlock().SlotCommitmentID)
 	}
 
 	return nil
@@ -314,9 +310,23 @@ func (p *Protocol) Network() *core.Protocol {
 	return p.networkProtocol
 }
 
-func (p *Protocol) API(version iotago.Version) iotago.API {
-	return p.MainEngineInstance().API(version)
+func (p *Protocol) LatestAPI() iotago.API {
+	return p.MainEngineInstance().LatestAPI()
 }
+
+func (p *Protocol) APIForVersion(version iotago.Version) iotago.API {
+	return p.MainEngineInstance().APIForVersion(version)
+}
+
+func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
+	return p.MainEngineInstance().APIForSlot(slot)
+}
+
+func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
+	return p.MainEngineInstance().APIForEpoch(epoch)
+}
+
+var _ api.Provider = &Protocol{}
 
 func (p *Protocol) SupportedVersions() nodeclient.Versions {
 	return p.supportVersions

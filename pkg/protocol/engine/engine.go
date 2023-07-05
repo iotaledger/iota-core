@@ -68,6 +68,7 @@ type Engine struct {
 	mutex   sync.RWMutex
 
 	optsBootstrappedThreshold time.Duration
+	optsSnapshotPath          string
 	optsEntryPointsDepth      int
 	optsSnapshotDepth         int
 	optsBlockRequester        []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
@@ -93,6 +94,11 @@ func New(
 	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
+
+	var needsToImportSnapshot bool
+	var file *os.File
+	var fileErr error
+
 	return options.Apply(
 		&Engine{
 			Events:        NewEvents(),
@@ -101,13 +107,28 @@ func New(
 			Workers:       workers,
 			errorHandler:  errorHandler,
 
+			optsSnapshotPath:          "snapshot.bin",
 			optsBootstrappedThreshold: 10 * time.Second,
 			optsSnapshotDepth:         5,
 		}, opts, func(e *Engine) {
-			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings().APIForSlot)
+			needsToImportSnapshot = !e.Storage.Settings().IsSnapshotImported() && e.optsSnapshotPath != ""
 
+			// Import the settings from the snapshot file if needed.
+			if needsToImportSnapshot {
+				file, fileErr = os.Open(e.optsSnapshotPath)
+				if fileErr != nil {
+					panic(errors.Wrap(fileErr, "failed to open snapshot file"))
+				}
+
+				if err := e.ImportSettings(file); err != nil {
+					panic(errors.Wrap(err, "failed to import snapshot settings"))
+				}
+			}
+		},
+		func(e *Engine) {
+			// Setup all components
+			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings())
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
-
 			e.SybilProtection = sybilProtectionProvider(e)
 			e.BlockDAG = blockDAGProvider(e)
 			e.Filter = filterProvider(e)
@@ -120,18 +141,41 @@ func New(
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
 			e.TipManager = tipManagerProvider(e)
-
-			e.HookInitialized(lo.Batch(
-				e.Storage.Commitments().TriggerInitialized,
-			))
-
-			e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Index())
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
 		(*Engine).setupBlockRequester,
 		(*Engine).setupPruning,
 		(*Engine).TriggerConstructed,
+		func(e *Engine) {
+			// Import the rest of the snapshot if needed.
+			if needsToImportSnapshot {
+				if err := e.ImportContents(file); err != nil {
+					panic(errors.Wrap(err, "failed to import snapshot contents"))
+				}
+
+				if closeErr := file.Close(); closeErr != nil {
+					panic(closeErr)
+				}
+
+				if err := e.Storage.Settings().SetSnapshotImported(); err != nil {
+					panic(errors.Wrap(err, "failed to set snapshot imported"))
+				}
+
+			} else {
+				// Restore from Disk
+				e.Storage.Prunable.RestoreFromDisk()
+
+				e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
+				if err := e.Attestations.RestoreFromDisk(); err != nil {
+					panic(errors.Wrap(err, "failed to restore attestations from disk"))
+				}
+			}
+		},
+		func(e *Engine) {
+			fmt.Println("Engine Settings", e.Storage.Settings().String())
+		},
+		(*Engine).TriggerInitialized,
 	)
 }
 
@@ -215,37 +259,12 @@ func (e *Engine) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return e.Storage.Settings().APIForEpoch(epoch)
 }
 
-func (e *Engine) API(version iotago.Version) iotago.API {
-	return e.Storage.Settings().API(version)
+func (e *Engine) APIForVersion(version iotago.Version) iotago.API {
+	return e.Storage.Settings().APIForVersion(version)
 }
 
-func (e *Engine) Initialize(snapshot ...string) (err error) {
-	if !e.Storage.Settings().IsSnapshotImported() {
-		if len(snapshot) == 0 || snapshot[0] == "" {
-			panic("no snapshot path specified")
-		}
-		if err = e.readSnapshot(snapshot[0]); err != nil {
-			return errors.Wrapf(err, "failed to read snapshot from file '%s'", snapshot)
-		}
-
-		// Only mark any pruning indexes if we loaded a non-genesis snapshot
-		if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-			e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
-		}
-	} else {
-		e.Storage.Commitments().TriggerInitialized()
-		e.Storage.Prunable.RestoreFromDisk()
-		e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
-		if err := e.Attestations.RestoreFromDisk(); err != nil {
-			return errors.Wrap(err, "failed to restore attestations from disk")
-		}
-	}
-
-	e.TriggerInitialized()
-
-	fmt.Println("Engine Settings", e.Storage.Settings().String())
-
-	return
+func (e *Engine) LatestAPI() iotago.API {
+	return e.Storage.Settings().LatestAPI()
 }
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
@@ -266,10 +285,16 @@ func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) 
 	return
 }
 
-func (e *Engine) Import(reader io.ReadSeeker) (err error) {
+func (e *Engine) ImportSettings(reader io.ReadSeeker) (err error) {
 	if err = e.Storage.Settings().Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import settings")
-	} else if err = e.Storage.Commitments().Import(reader); err != nil {
+	}
+
+	return
+}
+
+func (e *Engine) ImportContents(reader io.ReadSeeker) (err error) {
+	if err = e.Storage.Commitments().Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import commitments")
 	} else if err = e.Ledger.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import ledger")
@@ -367,6 +392,8 @@ func (e *Engine) setupEvictionState() {
 	}, event.WithWorkerPool(wp))
 
 	e.Events.EvictionState.SlotEvicted.Hook(e.BlockCache.EvictUntil)
+
+	e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Index())
 }
 
 func (e *Engine) setupBlockRequester() {
@@ -389,26 +416,6 @@ func (e *Engine) setupPruning() {
 	e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		e.Storage.PruneUntilSlot(index)
 	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))
-}
-
-func (e *Engine) readSnapshot(filePath string) (err error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return errors.Wrap(err, "failed to open snapshot file")
-	}
-	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			panic(closeErr)
-		}
-	}()
-
-	if err = e.Import(file); err != nil {
-		return errors.Wrap(err, "failed to import snapshot")
-	} else if err = e.Storage.Settings().SetSnapshotImported(); err != nil {
-		return errors.Wrap(err, "failed to set snapshot imported flag")
-	}
-
-	return
 }
 
 // EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
@@ -440,6 +447,12 @@ func (e *Engine) ErrorHandler(componentName string) func(error) {
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // region Options //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func WithSnapshotPath(snapshotPath string) options.Option[Engine] {
+	return func(e *Engine) {
+		e.optsSnapshotPath = snapshotPath
+	}
+}
 
 func WithBootstrapThreshold(threshold time.Duration) options.Option[Engine] {
 	return func(e *Engine) {

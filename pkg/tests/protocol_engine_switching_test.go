@@ -112,11 +112,11 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	{
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
-			testsuite.WithProtocolParameters(ts.ProtocolParameters),
-			testsuite.WithLatestCommitment(iotago.NewEmptyCommitment()),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitment(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-			testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
+			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
+			testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())}),
 
 			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 			testsuite.WithEvictedSlot(0),
@@ -132,40 +132,40 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	{
 		// Issue until slot 7 becomes committable.
 		{
-			ts.IssueBlockAtSlot("P1.A0", 5, iotago.NewEmptyCommitment(), node0, iotago.EmptyBlockID())
-			ts.IssueBlockAtSlot("P1.A1", 5, iotago.NewEmptyCommitment(), node1, ts.Block("P1.A0").ID())
-			ts.IssueBlockAtSlot("P1.A2", 5, iotago.NewEmptyCommitment(), node2, ts.Block("P1.A1").ID())
-			ts.IssueBlockAtSlot("P1.A3", 5, iotago.NewEmptyCommitment(), node3, ts.Block("P1.A2").ID())
-			ts.IssueBlockAtSlot("P1.A4", 5, iotago.NewEmptyCommitment(), node4, ts.Block("P1.A3").ID())
+			ts.IssueBlockAtSlot("P1.A0", 5, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node0, iotago.EmptyBlockID())
+			ts.IssueBlockAtSlot("P1.A1", 5, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.Block("P1.A0").ID())
+			ts.IssueBlockAtSlot("P1.A2", 5, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, ts.Block("P1.A1").ID())
+			ts.IssueBlockAtSlot("P1.A3", 5, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node3, ts.Block("P1.A2").ID())
+			ts.IssueBlockAtSlot("P1.A4", 5, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node4, ts.Block("P1.A3").ID())
 
-			ts.IssueBlockAtSlot("P1.B0", 6, iotago.NewEmptyCommitment(), node0, ts.Block("P1.A4").ID())
-			ts.IssueBlockAtSlot("P1.B1", 6, iotago.NewEmptyCommitment(), node1, ts.Block("P1.B0").ID())
-			ts.IssueBlockAtSlot("P1.B2", 6, iotago.NewEmptyCommitment(), node2, ts.Block("P1.B1").ID())
-			ts.IssueBlockAtSlot("P1.B3", 6, iotago.NewEmptyCommitment(), node3, ts.Block("P1.B2").ID())
-			ts.IssueBlockAtSlot("P1.B4", 6, iotago.NewEmptyCommitment(), node4, ts.Block("P1.B3").ID())
+			ts.IssueBlockAtSlot("P1.B0", 6, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node0, ts.Block("P1.A4").ID())
+			ts.IssueBlockAtSlot("P1.B1", 6, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.Block("P1.B0").ID())
+			ts.IssueBlockAtSlot("P1.B2", 6, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, ts.Block("P1.B1").ID())
+			ts.IssueBlockAtSlot("P1.B3", 6, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node3, ts.Block("P1.B2").ID())
+			ts.IssueBlockAtSlot("P1.B4", 6, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node4, ts.Block("P1.B3").ID())
 
-			ts.IssueBlockAtSlot("P1.C0", 7, iotago.NewEmptyCommitment(), node0, ts.Block("P1.B4").ID())
-			ts.IssueBlockAtSlot("P1.C1", 7, iotago.NewEmptyCommitment(), node1, ts.Block("P1.C0").ID())
-			ts.IssueBlockAtSlot("P1.C2", 7, iotago.NewEmptyCommitment(), node2, ts.Block("P1.C1").ID())
-			ts.IssueBlockAtSlot("P1.C3", 7, iotago.NewEmptyCommitment(), node3, ts.Block("P1.C2").ID())
-			ts.IssueBlockAtSlot("P1.C4", 7, iotago.NewEmptyCommitment(), node4, ts.Block("P1.C3").ID())
+			ts.IssueBlockAtSlot("P1.C0", 7, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node0, ts.Block("P1.B4").ID())
+			ts.IssueBlockAtSlot("P1.C1", 7, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.Block("P1.C0").ID())
+			ts.IssueBlockAtSlot("P1.C2", 7, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, ts.Block("P1.C1").ID())
+			ts.IssueBlockAtSlot("P1.C3", 7, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node3, ts.Block("P1.C2").ID())
+			ts.IssueBlockAtSlot("P1.C4", 7, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node4, ts.Block("P1.C3").ID())
 
-			ts.IssueBlockAtSlot("P1.D0", 8, iotago.NewEmptyCommitment(), node0, ts.Block("P1.C4").ID())
-			ts.IssueBlockAtSlot("P1.D1", 8, iotago.NewEmptyCommitment(), node1, ts.Block("P1.D0").ID())
-			ts.IssueBlockAtSlot("P1.D2", 8, iotago.NewEmptyCommitment(), node2, ts.Block("P1.D1").ID())
-			ts.IssueBlockAtSlot("P1.D3", 8, iotago.NewEmptyCommitment(), node3, ts.Block("P1.D2").ID())
-			ts.IssueBlockAtSlot("P1.D4", 8, iotago.NewEmptyCommitment(), node4, ts.Block("P1.D3").ID())
+			ts.IssueBlockAtSlot("P1.D0", 8, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node0, ts.Block("P1.C4").ID())
+			ts.IssueBlockAtSlot("P1.D1", 8, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.Block("P1.D0").ID())
+			ts.IssueBlockAtSlot("P1.D2", 8, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, ts.Block("P1.D1").ID())
+			ts.IssueBlockAtSlot("P1.D3", 8, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node3, ts.Block("P1.D2").ID())
+			ts.IssueBlockAtSlot("P1.D4", 8, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node4, ts.Block("P1.D3").ID())
 
-			ts.IssueBlockAtSlot("P1.E0", 9, iotago.NewEmptyCommitment(), node0, ts.Block("P1.D4").ID())
-			ts.IssueBlockAtSlot("P1.E1", 9, iotago.NewEmptyCommitment(), node1, ts.Block("P1.E0").ID())
-			ts.IssueBlockAtSlot("P1.E2", 9, iotago.NewEmptyCommitment(), node2, ts.Block("P1.E1").ID())
-			ts.IssueBlockAtSlot("P1.E3", 9, iotago.NewEmptyCommitment(), node3, ts.Block("P1.E2").ID())
-			ts.IssueBlockAtSlot("P1.E4", 9, iotago.NewEmptyCommitment(), node4, ts.Block("P1.E3").ID())
-			ts.IssueBlockAtSlot("P1.E5", 9, iotago.NewEmptyCommitment(), node0, ts.Block("P1.E4").ID())
-			ts.IssueBlockAtSlot("P1.E6", 9, iotago.NewEmptyCommitment(), node1, ts.Block("P1.E5").ID())
-			ts.IssueBlockAtSlot("P1.E7", 9, iotago.NewEmptyCommitment(), node2, ts.Block("P1.E6").ID())
-			ts.IssueBlockAtSlot("P1.E8", 9, iotago.NewEmptyCommitment(), node3, ts.Block("P1.E7").ID())
-			ts.IssueBlockAtSlot("P1.E9", 9, iotago.NewEmptyCommitment(), node4, ts.Block("P1.E8").ID())
+			ts.IssueBlockAtSlot("P1.E0", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node0, ts.Block("P1.D4").ID())
+			ts.IssueBlockAtSlot("P1.E1", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.Block("P1.E0").ID())
+			ts.IssueBlockAtSlot("P1.E2", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, ts.Block("P1.E1").ID())
+			ts.IssueBlockAtSlot("P1.E3", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node3, ts.Block("P1.E2").ID())
+			ts.IssueBlockAtSlot("P1.E4", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node4, ts.Block("P1.E3").ID())
+			ts.IssueBlockAtSlot("P1.E5", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node0, ts.Block("P1.E4").ID())
+			ts.IssueBlockAtSlot("P1.E6", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.Block("P1.E5").ID())
+			ts.IssueBlockAtSlot("P1.E7", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, ts.Block("P1.E6").ID())
+			ts.IssueBlockAtSlot("P1.E8", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node3, ts.Block("P1.E7").ID())
+			ts.IssueBlockAtSlot("P1.E9", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node4, ts.Block("P1.E8").ID())
 
 			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P1.E6"), true, nodesP1...)
 			ts.AssertBlocksInCacheAccepted(ts.Blocks("P1.E2"), true, nodesP1...)
@@ -176,7 +176,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestCommitmentSlotIndex(7),
 				testsuite.WithEqualStoredCommitmentAtIndex(7),
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
-				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+				testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee...),
 				testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
@@ -223,7 +223,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestCommitmentSlotIndex(9),
 				testsuite.WithEqualStoredCommitmentAtIndex(9),
 				testsuite.WithLatestFinalizedSlot(7),
-				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+				testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee...),
 				testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
@@ -261,7 +261,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestCommitmentSlotIndex(10),
 				testsuite.WithEqualStoredCommitmentAtIndex(10),
 				testsuite.WithLatestFinalizedSlot(7),
-				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+				testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee...),
 				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
@@ -310,7 +310,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestCommitmentSlotIndex(11),
 				testsuite.WithEqualStoredCommitmentAtIndex(11),
 				testsuite.WithLatestFinalizedSlot(9),
-				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+				testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP1Committee...),
 				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
@@ -330,15 +330,15 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	// Issue blocks on partition 2.
 	{
 		{
-			ts.IssueBlockAtSlot("P2.A", 5, iotago.NewEmptyCommitment(), node5, iotago.EmptyBlockID())
-			ts.IssueBlockAtSlot("P2.B", 6, iotago.NewEmptyCommitment(), node6, ts.Block("P2.A").ID())
-			ts.IssueBlockAtSlot("P2.C", 7, iotago.NewEmptyCommitment(), node5, ts.Block("P2.B").ID())
-			ts.IssueBlockAtSlot("P2.D", 8, iotago.NewEmptyCommitment(), node6, ts.Block("P2.C").ID())
-			ts.IssueBlockAtSlot("P2.E", 9, iotago.NewEmptyCommitment(), node5, ts.Block("P2.D").ID())
-			ts.IssueBlockAtSlot("P2.F", 10, iotago.NewEmptyCommitment(), node6, ts.Block("P2.E").ID())
-			ts.IssueBlockAtSlot("P2.G", 11, iotago.NewEmptyCommitment(), node5, ts.Block("P2.F").ID())
-			ts.IssueBlockAtSlot("P2.H", 12, iotago.NewEmptyCommitment(), node6, ts.Block("P2.G").ID())
-			ts.IssueBlockAtSlot("P2.I", 13, iotago.NewEmptyCommitment(), node5, ts.Block("P2.H").ID())
+			ts.IssueBlockAtSlot("P2.A", 5, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node5, iotago.EmptyBlockID())
+			ts.IssueBlockAtSlot("P2.B", 6, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node6, ts.Block("P2.A").ID())
+			ts.IssueBlockAtSlot("P2.C", 7, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node5, ts.Block("P2.B").ID())
+			ts.IssueBlockAtSlot("P2.D", 8, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node6, ts.Block("P2.C").ID())
+			ts.IssueBlockAtSlot("P2.E", 9, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node5, ts.Block("P2.D").ID())
+			ts.IssueBlockAtSlot("P2.F", 10, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node6, ts.Block("P2.E").ID())
+			ts.IssueBlockAtSlot("P2.G", 11, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node5, ts.Block("P2.F").ID())
+			ts.IssueBlockAtSlot("P2.H", 12, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node6, ts.Block("P2.G").ID())
+			ts.IssueBlockAtSlot("P2.I", 13, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node5, ts.Block("P2.H").ID())
 
 			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.G", "P2.H"), true, nodesP2...)
 			ts.AssertBlocksInCachePreAccepted(ts.Blocks("P2.I"), false, nodesP2...) // block not referenced yet
@@ -351,7 +351,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithLatestCommitmentSlotIndex(8),
 				testsuite.WithEqualStoredCommitmentAtIndex(8),
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
-				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+				testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee...),
 				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
@@ -377,7 +377,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithEqualStoredCommitmentAtIndex(11),
 				testsuite.WithLatestCommitmentCumulativeWeight(0), // We haven't collected any attestation yet.
 				testsuite.WithLatestFinalizedSlot(0),              // Blocks do only commit to Genesis -> can't finalize a slot.
-				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+				testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee...),
 				testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
@@ -407,7 +407,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				testsuite.WithEqualStoredCommitmentAtIndex(13),
 				testsuite.WithLatestCommitmentCumulativeWeight(2),
 				testsuite.WithLatestFinalizedSlot(0), // Blocks do only commit to Genesis -> can't finalize a slot.
-				testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+				testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 
 				testsuite.WithSybilProtectionOnlineCommittee(expectedP2Committee...),
 				testsuite.WithSybilProtectionCommittee(18, expectedCommittee),

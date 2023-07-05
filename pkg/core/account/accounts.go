@@ -154,13 +154,12 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 		if err != nil {
 			return 0, errors.Wrap(err, "failed to parse pool")
 		}
-		a.setWithoutLocking(accountID, pool)
 
 		if c != poolBytesLength {
 			return 0, errors.Wrap(err, "invalid pool bytes length")
 		}
 
-		a.Set(accountID, pool)
+		a.setWithoutLocking(accountID, pool)
 	}
 
 	return n, nil

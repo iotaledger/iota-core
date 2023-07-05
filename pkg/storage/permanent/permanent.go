@@ -8,11 +8,11 @@ import (
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
-	"github.com/iotaledger/iota-core/pkg/storage/utils"
 )
 
 const (
 	settingsPrefix byte = iota
+	commitmentsPrefix
 	sybilProtectionPrefix
 	attestationsPrefix
 	ledgerPrefix
@@ -41,7 +41,7 @@ type Permanent struct {
 }
 
 // New returns a new permanent storage instance.
-func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) *Permanent {
+func New(dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) *Permanent {
 	return options.Apply(&Permanent{
 		errorHandler: errorHandler,
 	}, opts, func(p *Permanent) {
@@ -61,7 +61,7 @@ func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(e
 		}
 
 		p.settings = NewSettings(lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{settingsPrefix})))
-		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.APIForSlot)
+		p.commitments = NewCommitments(lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{commitmentsPrefix})), p.settings)
 		p.sybilProtection = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{sybilProtectionPrefix}))
 		p.attestations = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{attestationsPrefix}))
 		p.ledger = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{ledgerPrefix}))
@@ -156,10 +156,6 @@ func (p *Permanent) Size() int64 {
 }
 
 func (p *Permanent) Shutdown() {
-	if err := p.commitments.Close(); err != nil {
-		panic(err)
-	}
-
 	if err := p.healthTracker.MarkHealthy(); err != nil {
 		panic(err)
 	}

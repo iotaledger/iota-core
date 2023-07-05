@@ -5,9 +5,9 @@ import (
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -15,11 +15,11 @@ type Blocks struct {
 	Evict         *event.Event1[iotago.SlotIndex]
 	blocks        *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *Block]
 	evictionState *eviction.State
-	apiProvider   permanent.APIBySlotIndexProviderFunc
+	apiProvider   api.Provider
 	evictionMutex sync.RWMutex
 }
 
-func New(evictionState *eviction.State, apiProvider permanent.APIBySlotIndexProviderFunc) *Blocks {
+func New(evictionState *eviction.State, apiProvider api.Provider) *Blocks {
 	return &Blocks{
 		Evict:         event.New1[iotago.SlotIndex](),
 		blocks:        memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *Block](),
@@ -42,7 +42,7 @@ func (b *Blocks) Block(id iotago.BlockID) (block *Block, exists bool) {
 	defer b.evictionMutex.RUnlock()
 
 	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
-		return NewRootBlock(id, commitmentID, b.apiProvider(id.Index()).TimeProvider().SlotEndTime(id.Index())), true
+		return NewRootBlock(id, commitmentID, b.apiProvider.APIForSlot(id.Index()).TimeProvider().SlotEndTime(id.Index())), true
 	}
 
 	storage := b.blocks.Get(id.Index(), false)

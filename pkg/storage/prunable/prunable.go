@@ -3,8 +3,8 @@ package prunable
 import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -23,7 +23,7 @@ const (
 
 type Prunable struct {
 	pruningDelay iotago.SlotIndex
-	apiProvider  permanent.APIBySlotIndexProviderFunc
+	apiProvider  api.Provider
 	manager      *Manager
 	errorHandler func(error)
 }
@@ -36,7 +36,7 @@ func New(dbConfig database.Config, pruningDelay iotago.SlotIndex, errorHandler f
 	}
 }
 
-func (p *Prunable) Initialize(apiProvider permanent.APIBySlotIndexProviderFunc) {
+func (p *Prunable) Initialize(apiProvider api.Provider) {
 	p.apiProvider = apiProvider
 }
 
@@ -72,7 +72,7 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
 		return nil
 	}
 
-	return NewAccountDiffs(slot, store, p.apiProvider(slot))
+	return NewAccountDiffs(slot, store, p.apiProvider.APIForSlot(slot))
 }
 
 func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *PerformanceFactors {

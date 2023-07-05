@@ -11,10 +11,10 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -67,7 +67,7 @@ type Manager struct {
 
 	commitmentMutex sync.RWMutex
 
-	apiProvider permanent.APIBySlotIndexProviderFunc
+	apiProvider api.Provider
 
 	module.Module
 }
@@ -81,7 +81,7 @@ func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*
 		m.lastCommittedSlot = e.Storage.Settings().LatestCommitment().ID().Index()
 		m.lastCumulativeWeight = e.Storage.Settings().LatestCommitment().Commitment().CumulativeWeight
 		m.commitmentMutex.Unlock()
-		m.apiProvider = e.APIForSlot
+		m.apiProvider = e
 
 		return m
 	})
@@ -163,7 +163,7 @@ func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
 		return
 	}
 
-	newAttestation := iotago.NewAttestation(m.apiProvider(block.ID().Index()), block.ProtocolBlock())
+	newAttestation := iotago.NewAttestation(m.apiProvider.APIForSlot(block.ID().Index()), block.ProtocolBlock())
 
 	// We keep only the latest attestation for each committee member.
 	m.futureAttestations.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {

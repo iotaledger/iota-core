@@ -101,7 +101,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 			delegationEnd := castOutput.EndEpoch
 			if delegationEnd == 0 {
-				delegationEnd = l.apiProvider(loadedCommitment.Index).TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
+				delegationEnd = l.apiProvider.APIForSlot(loadedCommitment.Index).TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
 			}
 
 			reward, rewardErr := l.epochGadget.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
@@ -115,7 +115,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	resolvedInputs.RewardsInputSet = rewardInputSet
 
 	//TODO: in which slot is this transaction?
-	api := l.apiProvider(tx.Essence.CreationTime)
+	api := l.apiProvider.APIForSlot(tx.Essence.CreationTime)
 
 	vmParams := &iotagovm.Params{
 		API: api,

@@ -60,14 +60,13 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 				e.HookConstructed(func() {
 					s.clock = e.Clock
 
-					e.Storage.Settings().HookInitialized(func() {
-						s.timeProviderFunc = e.API(iotago.LatestProtocolVersion()).TimeProvider
+					//TODO: do we need to differentiate per version here?
+					s.timeProviderFunc = e.LatestAPI().TimeProvider
 
-						e.Clock.HookInitialized(func() {
-							for _, v := range s.optsOnlineCommitteeStartup {
-								s.markValidatorActive(v, e.Clock.Accepted().RelativeTime())
-							}
-						})
+					e.Clock.HookInitialized(func() {
+						for _, v := range s.optsOnlineCommitteeStartup {
+							s.markValidatorActive(v, e.Clock.Accepted().RelativeTime())
+						}
 					})
 
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to

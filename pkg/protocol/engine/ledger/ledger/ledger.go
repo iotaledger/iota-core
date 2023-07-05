@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
-
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 
@@ -16,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -41,7 +40,7 @@ var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provide
 type Ledger struct {
 	events *ledger.Events
 
-	apiProvider permanent.APIBySlotIndexProviderFunc
+	apiProvider api.Provider
 
 	utxoLedger       *utxoledger.Manager
 	accountsLedger   *accountsledger.Manager
@@ -66,7 +65,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.Commitments().Load,
 			e.BlockCache.Block,
 			e.Storage.AccountDiffs,
-			e.Storage.Settings().APIForSlot,
+			e,
 			e.SybilProtection,
 			e.EpochGadget,
 			e.ErrorHandler("ledger"),
@@ -80,17 +79,14 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
-			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e.APIForSlot, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
-		})
-		e.Storage.Settings().HookInitialized(func() {
+
 			// TODO: how do we want to handle changing API here?
-			api := l.apiProvider(0)
+			api := l.apiProvider.LatestAPI()
 			l.manaManager = mana.NewManager(api.ManaDecayProvider(), l.resolveAccountOutput)
 			l.accountsLedger.SetCommitmentEvictionAge(api.ProtocolParameters().EvictionAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
-
-			l.TriggerConstructed()
 
 			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)
 			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
@@ -116,7 +112,7 @@ func New(
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
-	apiProvider permanent.APIBySlotIndexProviderFunc,
+	apiProvider api.Provider,
 	sybilProtection sybilprotection.SybilProtection,
 	epochGadget epochgadget.Gadget,
 	errorHandler func(error),
@@ -247,7 +243,7 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Outp
 			return nil, ErrUnexpectedUnderlyingType
 		}
 
-		return utxoledger.CreateOutput(l.utxoLedger.API, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
+		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
 	default:
 		panic("unexpected State type")
 	}
@@ -542,7 +538,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 			// output side
 			txWithMeta.Outputs().Range(func(stateMetadata mempool.StateMetadata) {
-				output := utxoledger.CreateOutput(l.utxoLedger.API, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationTime, stateMetadata.State().Output())
+				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationTime, stateMetadata.State().Output())
 				outputs = append(outputs, output)
 			})
 		}

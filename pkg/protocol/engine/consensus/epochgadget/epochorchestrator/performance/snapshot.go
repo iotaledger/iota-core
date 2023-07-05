@@ -38,7 +38,7 @@ func (t *Tracker) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	timeProvider := t.apiBySlotProvider(targetSlotIndex).TimeProvider()
+	timeProvider := t.apiProvider.APIForSlot(targetSlotIndex).TimeProvider()
 	targetEpoch := timeProvider.EpochFromSlot(targetSlotIndex)
 	positionedWriter := utils.NewPositionedWriter(writer)
 

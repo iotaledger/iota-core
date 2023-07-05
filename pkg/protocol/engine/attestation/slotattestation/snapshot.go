@@ -27,7 +27,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 			return errors.Wrap(err, "failed to read slot")
 		}
 
-		api := m.apiProvider(slotIndex)
+		api := m.apiProvider.APIForSlot(slotIndex)
 
 		// Read attestations.
 		var attestations []*iotago.Attestation
@@ -116,7 +116,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 			return errors.Wrapf(err, "failed to write slot %d", i)
 		}
 
-		api := m.apiProvider(i)
+		api := m.apiProvider.APIForSlot(i)
 
 		// Write attestations.
 		if err := stream.WriteCollection(writer, func() (uint64, error) {

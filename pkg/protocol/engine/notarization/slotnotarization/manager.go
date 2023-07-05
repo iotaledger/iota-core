@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
@@ -18,7 +19,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/storage"
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -42,7 +42,7 @@ type Manager struct {
 
 	acceptedTimeFunc      func() time.Time
 	minCommittableSlotAge iotago.SlotIndex
-	apiProvider           permanent.APIBySlotIndexProviderFunc
+	apiProvider           api.Provider
 
 	module.Module
 }
@@ -51,7 +51,7 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
 		m := NewManager(minCommittableSlotAge, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
 
-		m.apiProvider = e.APIForSlot
+		m.apiProvider = e
 
 		e.HookConstructed(func() {
 			m.storage = e.Storage
@@ -72,12 +72,8 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 			e.Events.Notarization.LinkTo(m.events)
 
 			m.TriggerInitialized()
-		})
-
-		e.Storage.Settings().HookInitialized(func() {
 			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Index())
 			m.TriggerConstructed()
-			m.TriggerInitialized()
 		})
 
 		return m
@@ -111,7 +107,7 @@ func (m *Manager) IsBootstrapped() bool {
 	// All slots smaller than 4 are committable, so in order to check if slot 3 is committed it's necessary to do m.minCommittableSlotAge-1,
 	// otherwise we'd expect slot 4 to be committed in order to be fully committed, which is impossible.
 	latestIndex := m.storage.Settings().LatestCommitment().Index()
-	return latestIndex >= m.apiProvider(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())-m.minCommittableSlotAge-1
+	return latestIndex >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())-m.minCommittableSlotAge-1
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
@@ -175,7 +171,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	api := m.apiProvider(index)
+	api := m.apiProvider.APIForSlot(index)
 
 	protocolParamsBytes, err := api.Encode(api.ProtocolParameters())
 	if err != nil {

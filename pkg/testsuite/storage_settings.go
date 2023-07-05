@@ -1,7 +1,6 @@
 package testsuite
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -27,8 +26,8 @@ func (t *TestSuite) AssertProtocolParameters(parameters iotago.ProtocolParameter
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if !cmp.Equal(parameters, *node.Protocol.MainEngineInstance().Storage.Settings().protocolParameters()) {
-				return errors.Errorf("AssertProtocolParameters: %s: expected %s, got %s", node.Name, parameters.String(), node.Protocol.MainEngineInstance().Storage.Settings().protocolParameters().String())
+			if !parameters.(*iotago.V3ProtocolParameters).Equals(node.Protocol.MainEngineInstance().Storage.Settings().LatestAPI().ProtocolParameters().(*iotago.V3ProtocolParameters)) {
+				return errors.Errorf("AssertProtocolParameters: %s: expected %s, got %s", node.Name, parameters, node.Protocol.MainEngineInstance().Storage.Settings().LatestAPI().ProtocolParameters())
 			}
 
 			return nil

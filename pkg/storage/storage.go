@@ -54,11 +54,11 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 				PrefixHealth: []byte{storePrefixHealth},
 			}
 
-			s.Permanent = permanent.New(s.dir, dbConfig, errorHandler)
+			s.Permanent = permanent.New(dbConfig, errorHandler)
 			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPruningDelay, errorHandler, s.optsPrunableManagerOptions...)
 
 			// TODO: fix initialization order
-			s.Prunable.Initialize(s.Settings().APIForSlot)
+			s.Prunable.Initialize(s.Settings())
 		})
 }
 

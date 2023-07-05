@@ -10,8 +10,8 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -23,8 +23,7 @@ type Tracker struct {
 
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
 
-	apiBySlotProvider  permanent.APIBySlotIndexProviderFunc
-	apiByEpochProvider permanent.APIByEpochIndexProviderFunc
+	apiProvider api.Provider
 
 	performanceFactorsMutex sync.RWMutex
 	mutex                   sync.RWMutex
@@ -35,8 +34,7 @@ func NewTracker(
 	poolStatsStore kvstore.KVStore,
 	committeeStore kvstore.KVStore,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
-	apiBySlotProvider permanent.APIBySlotIndexProviderFunc,
-	apiByEpochProvider permanent.APIByEpochIndexProviderFunc,
+	apiProvider api.Provider,
 ) *Tracker {
 	return &Tracker{
 		rewardBaseStore: rewardsBaseStore,
@@ -53,8 +51,7 @@ func NewTracker(
 			account.AccountsFromBytes,
 		),
 		performanceFactorsFunc: performanceFactorsFunc,
-		apiBySlotProvider:      apiBySlotProvider,
-		apiByEpochProvider:     apiByEpochProvider,
+		apiProvider:            apiProvider,
 	}
 }
 
@@ -89,7 +86,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	timeProvider := t.apiByEpochProvider(epoch).TimeProvider()
+	timeProvider := t.apiProvider.APIForEpoch(epoch).TimeProvider()
 	epochStartSlot := timeProvider.EpochStart(epoch)
 	epochEndSlot := timeProvider.EpochEnd(epoch)
 

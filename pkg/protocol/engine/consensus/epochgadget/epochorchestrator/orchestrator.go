@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
@@ -16,14 +17,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Orchestrator struct {
 	events *epochgadget.Events
 
-	apiProvider permanent.APIBySlotIndexProviderFunc
+	apiProvider api.Provider
 
 	sybilProtection   sybilprotection.SybilProtection // do we need the whole SybilProtection or just a callback to RotateCommittee?
 	ledger            ledger.Ledger                   // do we need the whole Ledger or just a callback to retrieve account data?
@@ -45,26 +45,23 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 
 			// TODO: the following fields should be initialized after the engine is constructed,
 			//  otherwise we implicitly rely on the order of engine initialization which can change at any time.
-			apiProvider:     e.APIForSlot,
+			apiProvider:     e,
 			sybilProtection: e.SybilProtection,
 			ledger:          e.Ledger,
 		}, opts,
 			func(o *Orchestrator) {
 				e.HookConstructed(func() {
-					e.Storage.Settings().HookInitialized(func() {
+					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e)
+					o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
 
-						o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.APIForSlot, e.APIForEpoch)
-						o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
-
-						if o.optsInitialCommittee != nil {
-							if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
-								panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
-							}
+					if o.optsInitialCommittee != nil {
+						if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
+							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
 						}
+					}
 
-						o.TriggerConstructed()
-						o.TriggerInitialized()
-					})
+					o.TriggerConstructed()
+					o.TriggerInitialized()
 				})
 
 				// TODO: does this potentially cause a data race due to fanning-in parallel events?
@@ -93,7 +90,7 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	api := o.apiProvider(slot)
+	api := o.apiProvider.APIForSlot(slot)
 	timeProvider := api.TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
@@ -150,7 +147,7 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	api := o.apiProvider(slot)
+	api := o.apiProvider.APIForSlot(slot)
 	timeProvider := api.TimeProvider()
 	epoch := timeProvider.EpochFromSlot(slot)
 
@@ -168,7 +165,7 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 }
 
 func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
-	timeProvider := o.apiProvider(slot).TimeProvider()
+	timeProvider := o.apiProvider.APIForSlot(slot).TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 	candidates := o.performanceTracker.EligibleValidatorCandidates(nextEpoch)

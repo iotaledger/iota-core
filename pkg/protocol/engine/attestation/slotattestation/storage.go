@@ -73,7 +73,7 @@ func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[io
 		return nil, errors.Wrapf(err, "failed to get extended realm for tracker of slot %d", index)
 	}
 
-	api := m.apiProvider(index)
+	api := m.apiProvider.APIForSlot(index)
 
 	return kvstore.NewTypedStore[iotago.AccountID, *iotago.Attestation](trackerStorage,
 		iotago.Identifier.Bytes,
@@ -99,7 +99,7 @@ func (m *Manager) adsMapStorage(index iotago.SlotIndex) (*ads.Map[iotago.Account
 		return nil, errors.Wrapf(err, "failed to get extended realm for attestations of slot %d", index)
 	}
 
-	api := m.apiProvider(index)
+	api := m.apiProvider.APIForSlot(index)
 
 	return ads.NewMap(attestationsStorage,
 		iotago.Identifier.Bytes,

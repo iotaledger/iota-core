@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -12,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -24,10 +24,10 @@ type Manager struct {
 
 	stateTree *ads.Map[iotago.OutputID, *stateTreeMetadata]
 
-	apiProvider permanent.APIBySlotIndexProviderFunc
+	apiProvider api.Provider
 }
 
-func New(store kvstore.KVStore, apiProvider permanent.APIBySlotIndexProviderFunc) *Manager {
+func New(store kvstore.KVStore, apiProvider api.Provider) *Manager {
 	return &Manager{
 		store: store,
 		stateTree: ads.NewMap(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree})),
@@ -38,10 +38,6 @@ func New(store kvstore.KVStore, apiProvider permanent.APIBySlotIndexProviderFunc
 		),
 		apiProvider: apiProvider,
 	}
-}
-
-func (m *Manager) API(slot iotago.SlotIndex) iotago.API {
-	return m.apiProvider(slot)
 }
 
 // KVStore returns the underlying KVStore.

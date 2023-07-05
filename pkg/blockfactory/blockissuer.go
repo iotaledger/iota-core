@@ -94,7 +94,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 
 	var api iotago.API
 	if blockParams.protocolVersion != nil {
-		api = i.protocol.API(*blockParams.protocolVersion)
+		api = i.protocol.APIForVersion(*blockParams.protocolVersion)
 	} else {
 		api = i.protocol.MainEngineInstance().Storage.Settings().LatestAPI()
 	}

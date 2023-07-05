@@ -3,12 +3,11 @@ package blockfilter
 import (
 	"time"
 
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
-
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -28,7 +27,7 @@ var (
 type Filter struct {
 	events *filter.Events
 
-	apiProvider permanent.APIBySlotIndexProviderFunc
+	apiProvider api.Provider
 
 	optsMaxAllowedWallClockDrift time.Duration
 	optsSignatureValidation      bool
@@ -39,7 +38,7 @@ type Filter struct {
 func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
 	return module.Provide(func(e *engine.Engine) filter.Filter {
 
-		f := New(e.Storage.Settings().APIForSlot, opts...)
+		f := New(e, opts...)
 		f.TriggerConstructed()
 
 		e.HookConstructed(func() {
@@ -55,7 +54,7 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 var _ filter.Filter = new(Filter)
 
 // New creates a new Filter.
-func New(apiProvider permanent.APIBySlotIndexProviderFunc, opts ...options.Option[Filter]) *Filter {
+func New(apiProvider api.Provider, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
 		events:                  filter.NewEvents(),
 		optsSignatureValidation: true,
@@ -68,7 +67,7 @@ func New(apiProvider permanent.APIBySlotIndexProviderFunc, opts ...options.Optio
 
 // ProcessReceivedBlock processes block from the given source.
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID) {
-	api := f.apiProvider(block.ID().Index())
+	api := f.apiProvider.APIForSlot(block.ID().Index())
 	protocolParams := api.ProtocolParameters()
 
 	// Check if the block is trying to commit to a slot that is not yet committable.

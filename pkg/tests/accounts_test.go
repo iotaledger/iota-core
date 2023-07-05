@@ -66,15 +66,15 @@ func Test_TransitionAccount(t *testing.T) {
 			}}),
 		))
 
-		ts.IssueBlockAtSlotWithOptions("block1", 1, iotago.NewEmptyCommitment(), node1, blockfactory.WithPayload(tx1))
-		ts.IssueBlockAtSlot("block2", 8, iotago.NewEmptyCommitment(), node1, ts.BlockIDs("block1")...)
-		ts.IssueBlockAtSlot("block3", 8, iotago.NewEmptyCommitment(), node1, ts.BlockIDs("block2")...)
+		ts.IssueBlockAtSlotWithOptions("block1", 1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, blockfactory.WithPayload(tx1))
+		ts.IssueBlockAtSlot("block2", 8, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.BlockIDs("block1")...)
+		ts.IssueBlockAtSlot("block3", 8, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.BlockIDs("block2")...)
 		ts.AssertLatestCommitmentSlotIndex(1, node1)
 
 		ts.AssertAccountDiff(genesisAccountOutput.AccountID, 1, &prunable.AccountDiff{
 			BICChange:           0,
 			PreviousUpdatedTime: 0,
-			NewOutputID:         iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
+			NewOutputID:         iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 			PreviousOutputID:    genesisAccount.OutputID(),
 			PubKeysRemoved:      []ed25519.PublicKey{},
 			PubKeysAdded:        []ed25519.PublicKey{newGenesisOutputKey},
@@ -84,7 +84,7 @@ func Test_TransitionAccount(t *testing.T) {
 			ID: genesisAccountOutput.AccountID,
 			// TODO: why do we use the deposit here as credits?
 			Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit), 0),
-			OutputID: iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
+			OutputID: iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 			PubKeys:  advancedset.New(ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey),
 		}, node1)
 	}
@@ -136,7 +136,7 @@ func Test_TransitionAccount(t *testing.T) {
 			BICChange:             -iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit),
 			PreviousUpdatedTime:   0,
 			NewOutputID:           iotago.EmptyOutputID,
-			PreviousOutputID:      iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
+			PreviousOutputID:      iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 			PubKeysAdded:          []ed25519.PublicKey{},
 			PubKeysRemoved:        []ed25519.PublicKey{ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey},
 			ValidatorStakeChange:  0,
@@ -200,7 +200,7 @@ func Test_TransitionAccount(t *testing.T) {
 			BICChange:             -iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit),
 			PreviousUpdatedTime:   0,
 			NewOutputID:           iotago.EmptyOutputID,
-			PreviousOutputID:      iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
+			PreviousOutputID:      iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 			PubKeysAdded:          []ed25519.PublicKey{},
 			PubKeysRemoved:        []ed25519.PublicKey{ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey},
 			ValidatorStakeChange:  0,

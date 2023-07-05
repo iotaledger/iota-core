@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -51,7 +52,9 @@ func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, op
 	return newBlock(blockID, protocolBlock, data, api)
 }
 
-func BlockFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
+func BlockFromBytes(data []byte, apiProvider api.Provider, opts ...serix.Option) (*Block, error) {
+	api := apiProvider.APIForVersion(data[0])
+
 	iotaBlock := new(iotago.ProtocolBlock)
 	if _, err := api.Decode(data, iotaBlock, opts...); err != nil {
 		return nil, err

@@ -3,13 +3,13 @@ package utxoledger
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"io"
 
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -28,7 +28,7 @@ func (o *Output) SnapshotBytes() []byte {
 	return m.Bytes()
 }
 
-func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider permanent.APIBySlotIndexProviderFunc) (*Output, error) {
+func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider) (*Output, error) {
 	outputID := iotago.OutputID{}
 	if _, err := io.ReadFull(reader, outputID[:]); err != nil {
 		return nil, fmt.Errorf("unable to read LS output ID: %w", err)
@@ -60,7 +60,7 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider permanent.APIByS
 	}
 
 	var output iotago.TxEssenceOutput
-	if _, err := apiProvider(blockID.Index()).Decode(outputBytes, &output, serix.WithValidation()); err != nil {
+	if _, err := apiProvider.APIForSlot(blockID.Index()).Decode(outputBytes, &output, serix.WithValidation()); err != nil {
 		return nil, fmt.Errorf("invalid LS output address: %w", err)
 	}
 
@@ -76,7 +76,7 @@ func (s *Spent) SnapshotBytes() []byte {
 	return m.Bytes()
 }
 
-func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider permanent.APIBySlotIndexProviderFunc, indexSpent iotago.SlotIndex) (*Spent, error) {
+func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider, indexSpent iotago.SlotIndex) (*Spent, error) {
 	output, err := OutputFromSnapshotReader(reader, apiProvider)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider permanent.APIBySl
 	return NewSpent(output, transactionIDSpent, indexSpent), nil
 }
 
-func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider permanent.APIBySlotIndexProviderFunc) (*SlotDiff, error) {
+func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider) (*SlotDiff, error) {
 	slotDiff := &SlotDiff{}
 
 	var diffIndex uint64

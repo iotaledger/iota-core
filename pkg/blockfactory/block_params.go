@@ -40,7 +40,7 @@ func WithWeakParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
 			builder.references = make(model.ParentReferences)
 		}
 
-		builder.references[model.WeakParentType] = blockIDs
+		builder.references[iotago.WeakParentType] = blockIDs
 	}
 }
 
@@ -50,7 +50,7 @@ func WithShallowLikeParents(blockIDs ...iotago.BlockID) func(builder *BlockParam
 			builder.references = make(model.ParentReferences)
 		}
 
-		builder.references[model.ShallowLikeParentType] = blockIDs
+		builder.references[iotago.ShallowLikeParentType] = blockIDs
 	}
 }
 
