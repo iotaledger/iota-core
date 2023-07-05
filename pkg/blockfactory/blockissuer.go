@@ -169,7 +169,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
 
 	if err := i.issueBlock(block); err != nil {
-		return errors.Wrapf(err, "failed to issue block %s", block.ID().String())
+		return errors.Wrapf(err, "failed to issue block %s", block.ID())
 	}
 
 	select {

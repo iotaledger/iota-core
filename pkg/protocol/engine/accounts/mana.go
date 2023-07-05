@@ -7,14 +7,14 @@ import (
 
 // Mana is the stored and potential mana value of an account collected on the UTXO layer - used by the Scheduler.
 type Mana struct {
-	value      uint64           `serix:"0"`
-	deposit    uint64           `serix:"1"`
+	value      iotago.Mana      `serix:"0"`
+	deposit    iotago.BaseToken `serix:"1"`
 	updateTime iotago.SlotIndex `serix:"2"`
 
 	mutex syncutils.RWMutex
 }
 
-func NewMana(value uint64, deposit uint64, updateTime iotago.SlotIndex) *Mana {
+func NewMana(value iotago.Mana, deposit iotago.BaseToken, updateTime iotago.SlotIndex) *Mana {
 	return &Mana{
 		value:      value,
 		deposit:    deposit,
@@ -22,7 +22,7 @@ func NewMana(value uint64, deposit uint64, updateTime iotago.SlotIndex) *Mana {
 	}
 }
 
-func (m *Mana) Update(value uint64, deposit uint64, updateTime iotago.SlotIndex) {
+func (m *Mana) Update(value iotago.Mana, deposit iotago.BaseToken, updateTime iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -31,7 +31,7 @@ func (m *Mana) Update(value uint64, deposit uint64, updateTime iotago.SlotIndex)
 	m.updateTime = updateTime
 }
 
-func (m *Mana) UpdateValue(value uint64, updateTime iotago.SlotIndex) {
+func (m *Mana) UpdateValue(value iotago.Mana, updateTime iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -39,14 +39,14 @@ func (m *Mana) UpdateValue(value uint64, updateTime iotago.SlotIndex) {
 	m.updateTime = updateTime
 }
 
-func (m *Mana) Value() uint64 {
+func (m *Mana) Value() iotago.Mana {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
 	return m.value
 }
 
-func (m *Mana) Deposit() uint64 {
+func (m *Mana) Deposit() iotago.BaseToken {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 

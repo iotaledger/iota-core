@@ -1,19 +1,19 @@
 package sybilprotection
 
 import (
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // SybilProtection is the minimal interface for the SybilProtection component of the IOTA protocol.
 type SybilProtection interface {
-	// Accounts returns the weights of identities in the SybilProtection.
-	Accounts() *account.Accounts[iotago.AccountID, *iotago.AccountID]
+	// RotateCommittee rotates the committee evaluating the given set of candidates to produce the new committee.
+	RotateCommittee(epochIndex iotago.EpochIndex, candidates *account.Accounts) *account.SeatedAccounts
 
 	// Committee returns the set of validators that is used to track confirmation.
-	Committee(slotIndex iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
+	Committee(slotIndex iotago.SlotIndex) *account.SeatedAccounts
 
 	// OnlineCommittee returns the set of online validators that is used to track acceptance.
 	OnlineCommittee() *advancedset.AdvancedSet[account.SeatIndex]

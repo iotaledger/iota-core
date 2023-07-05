@@ -1,11 +1,13 @@
 package tpkg
 
 import (
+	"math"
 	"time"
 
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 var (
@@ -19,10 +21,10 @@ var (
 			VBFactorData: 1,
 			VBFactorKey:  10,
 		},
-		TokenSupply:           utils.RandAmount(),
+		TokenSupply:           tpkg.RandBaseToken(math.MaxUint64),
 		GenesisUnixTimestamp:  time.Now().Unix(),
 		SlotDurationInSeconds: 10,
-		EvictionAge:           10,
+		EvictionAge:           6,
 		LivenessThreshold:     3,
 	}
 	api = iotago.LatestAPI(protocolParams)
@@ -48,7 +50,7 @@ func RandLedgerStateOutputOnAddress(outputType iotago.OutputType, address iotago
 	return utxoledger.CreateOutput(api, utils.RandOutputID(), utils.RandBlockID(), utils.RandSlotIndex(), utils.RandSlotIndex(), utils.RandOutputOnAddress(outputType, address))
 }
 
-func RandLedgerStateOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.Address, amount uint64) *utxoledger.Output {
+func RandLedgerStateOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.Address, amount iotago.BaseToken) *utxoledger.Output {
 	return utxoledger.CreateOutput(api, utils.RandOutputID(), utils.RandBlockID(), utils.RandSlotIndex(), utils.RandSlotIndex(), utils.RandOutputOnAddressWithAmount(outputType, address, amount))
 }
 

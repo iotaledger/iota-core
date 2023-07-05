@@ -58,7 +58,7 @@ func (s *Spent) OutputType() iotago.OutputType {
 	return s.output.OutputType()
 }
 
-func (s *Spent) Deposit() uint64 {
+func (s *Spent) Deposit() iotago.BaseToken {
 	return s.output.Deposit()
 }
 

@@ -1,9 +1,9 @@
 package conflictdag
 
 import (
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 )
 

@@ -9,10 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
-	"github.com/iotaledger/hive.go/core/account"
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/core/weight"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -23,7 +22,7 @@ type SortedConflictSet = *SortedConflicts[iotago.TransactionID, iotago.OutputID,
 var NewSortedConflictSet = NewSortedConflicts[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
 func TestSortedConflict(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -81,7 +80,7 @@ func TestSortedConflict(t *testing.T) {
 }
 
 func TestSortedDecreaseHeaviest(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -108,7 +107,7 @@ func TestSortedDecreaseHeaviest(t *testing.T) {
 }
 
 func TestSortedConflictParallel(t *testing.T) {
-	weights := account.NewSeatedAccounts(account.NewAccounts[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB()))
+	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {

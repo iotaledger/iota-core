@@ -17,8 +17,8 @@ type ParametersBlockIssuer struct {
 	// TipSelectionRetryInterval the interval for retrying tip selection.
 	TipSelectionRetryInterval time.Duration `default:"200ms" usage:"the interval for retrying tip selection"`
 
-	// IssuerAccount the account ID of the account that will issue the blocks.
-	IssuerAccount string `default:"" usage:"the account ID of the account that will issue the blocks"`
+	// IssuerAccount the accountID of the account that will issue the blocks.
+	IssuerAccount string `default:"" usage:"the accountID of the account that will issue the blocks"`
 
 	// PrivateKey the private key of the account that will issue the blocks.
 	PrivateKey string `default:"" usage:"the private key of the account that will issue the blocks"`

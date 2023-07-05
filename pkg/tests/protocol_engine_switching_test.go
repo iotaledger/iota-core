@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
@@ -25,6 +25,8 @@ import (
 func TestProtocol_EngineSwitching(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithGenesisTimestampOffset(19*10),
+		testsuite.WithLivenessThreshold(1), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
+		testsuite.WithEvictionAge(1),       // TODO: remove this opt and use a proper value when refactoring the test with scheduler
 	)
 	defer ts.Shutdown()
 

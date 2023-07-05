@@ -6,11 +6,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -54,7 +54,7 @@ const (
 //		- obtain and evict from it attestations that *commit to* lastCommittedSlot-attestationCommitmentOffset
 //	- committed attestations: retrieved at slot that we are committing, stored at slot lastCommittedSlot-attestationCommitmentOffset
 type Manager struct {
-	committeeFunc               func(index iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
+	committeeFunc               func(index iotago.SlotIndex) *account.SeatedAccounts
 	attestationCommitmentOffset iotago.SlotIndex
 
 	futureAttestations  *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
@@ -84,7 +84,7 @@ func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*
 	})
 }
 
-func NewManager(attestationCommitmentOffset iotago.SlotIndex, bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore, committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]) *Manager {
+func NewManager(attestationCommitmentOffset iotago.SlotIndex, bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore, committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts) *Manager {
 	m := &Manager{
 		attestationCommitmentOffset: attestationCommitmentOffset,
 		committeeFunc:               committeeFunc,
