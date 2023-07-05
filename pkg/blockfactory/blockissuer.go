@@ -2,6 +2,7 @@ package blockfactory
 
 import (
 	"context"
+	"crypto/ed25519"
 	"time"
 
 	"github.com/pkg/errors"
@@ -174,106 +175,103 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 }
 
 func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock) (iotago.BlockID, error) {
-	//TODO: check block type
-	/*
-		// if anything changes, need to make a new signature
-		var resign bool
-		protoParams := i.protocol.MainEngineInstance().Storage.Settings().protocolParameters()
+	// if anything changes, need to make a new signature
+	var resign bool
 
-		if iotaBlock.ProtocolVersion != protoParams.Version {
-			return iotago.EmptyBlockID(), errors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
+	api := i.protocol.LatestAPI()
+	protoParams := api.ProtocolParameters()
+
+	if iotaBlock.ProtocolVersion != protoParams.Version() {
+		return iotago.EmptyBlockID(), errors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
+	}
+
+	if iotaBlock.NetworkID == 0 {
+		iotaBlock.NetworkID = protoParams.NetworkID()
+		resign = true
+	}
+
+	if iotaBlock.IssuingTime.IsZero() {
+		iotaBlock.IssuingTime = time.Now()
+		resign = true
+	}
+
+	if iotaBlock.SlotCommitmentID == iotago.EmptyCommitmentID {
+		iotaBlock.SlotCommitmentID = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID()
+		iotaBlock.LatestFinalizedSlot = i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
+		resign = true
+	}
+
+	switch innerBlock := iotaBlock.Block.(type) {
+	case *iotago.BasicBlock:
+		switch payload := innerBlock.Payload.(type) {
+		case *iotago.Transaction:
+			if payload.Essence.NetworkID != protoParams.NetworkID() {
+				return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Essence.NetworkID)
+			}
 		}
 
-		if iotaBlock.NetworkID == 0 {
-			iotaBlock.NetworkID = protoParams.NetworkID()
-			resign = true
-		}
-
-		if iotaBlock.IssuingTime.IsZero() {
-			iotaBlock.IssuingTime = time.Now()
-			resign = true
-		}
-
-		if iotaBlock.SlotCommitmentID == iotago.EmptyCommitmentID {
-			iotaBlock.SlotCommitmentID = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID()
-			iotaBlock.LatestFinalizedSlot = i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
-			resign = true
-		}
-					switch payload := iotaBlock.Payload.(type) {
-					case *iotago.Transaction:
-						if payload.Essence.NetworkID != protoParams.NetworkID() {
-							return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Essence.NetworkID)
-						}
-					}
-
-					var references model.ParentReferences
-					if len(iotaBlock.StrongParents) == 0 {
-						if iotaBlock.Nonce != 0 {
-							return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "no parents were given but nonce was != 0")
-						}
-
-						if !i.optsPoWEnabled && targetScore != 0 {
-							return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "no parents given and node PoW is disabled")
-						}
-
-						// only allow to update tips during proof of work if no parents were given
-						var err error
-						references, err = i.getReferences(ctx, iotaBlock.Payload)
-						if err != nil {
-							return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %s", err.Error())
-						}
-
-						iotaBlock.StrongParents = references[model.StrongParentType]
-						iotaBlock.WeakParents = references[model.WeakParentType]
-						iotaBlock.ShallowLikeParents = references[model.ShallowLikeParentType]
-						resign = true
-					} else {
-						references = make(model.ParentReferences)
-						references[model.StrongParentType] = iotaBlock.StrongParents
-						references[model.WeakParentType] = iotaBlock.WeakParents
-						references[model.ShallowLikeParentType] = iotaBlock.ShallowLikeParents
-					}
-
-					if err := i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitment.Index, references); err != nil {
-						return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %s", err.Error())
-					}
-
-				if iotaBlock.IssuerID.Empty() || resign {
-					if i.optsIncompleteBlockAccepted {
-						iotaBlock.IssuerID = i.Account.ID()
-
-						prvKey := i.Account.PrivateKey()
-						signature, err := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
-						if err != nil {
-							return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, err.Error())
-						}
-
-						edSig, isEdSig := signature.(*iotago.Ed25519Signature)
-						if !isEdSig {
-							return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "unsupported signature type")
-						}
-
-						iotaBlock.Signature = edSig
-					} else {
-						return iotago.EmptyBlockID(), errors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
-					}
-				}
-
-
-			modelBlock, err := model.BlockFromBlock(iotaBlock, i.protocol.API())
+		if len(iotaBlock.Parents()) == 0 {
+			// only allow to update tips during proof of work if no parents were given
+			references, err := i.getReferences(ctx, innerBlock.Payload)
 			if err != nil {
-				return iotago.EmptyBlockID(), errors.Wrap(err, "error serializing block to model block")
+				return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %s", err.Error())
 			}
 
-			i.events.BlockConstructed.Trigger(modelBlock)
+			innerBlock.StrongParents = references[iotago.StrongParentType]
+			innerBlock.WeakParents = references[iotago.WeakParentType]
+			innerBlock.ShallowLikeParents = references[iotago.ShallowLikeParentType]
+			resign = true
+		}
 
-			if err := i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
-				return iotago.EmptyBlockID(), errors.Wrap(err, "error issuing model block")
+	case *iotago.ValidatorBlock:
+		if len(iotaBlock.Parents()) == 0 {
+			//TODO: implement tipselection for validator blocks
+		}
+	}
+
+	var references model.ParentReferences
+	references = make(model.ParentReferences)
+	references[iotago.StrongParentType] = iotaBlock.Block.StrongParentIDs()
+	references[iotago.WeakParentType] = iotaBlock.Block.WeakParentIDs()
+	references[iotago.ShallowLikeParentType] = iotaBlock.Block.ShallowLikeParentIDs()
+
+	if err := i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Index(), references); err != nil {
+		return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %s", err.Error())
+	}
+
+	if iotaBlock.IssuerID.Empty() || resign {
+		if i.optsIncompleteBlockAccepted {
+			iotaBlock.IssuerID = i.Account.ID()
+
+			prvKey := i.Account.PrivateKey()
+			signature, err := iotaBlock.Sign(api, iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
+			if err != nil {
+				return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, err.Error())
 			}
 
-			return modelBlock.ID(), nil
-	*/
-	return iotago.EmptyBlockID(), nil
+			edSig, isEdSig := signature.(*iotago.Ed25519Signature)
+			if !isEdSig {
+				return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "unsupported signature type")
+			}
+
+			iotaBlock.Signature = edSig
+		} else {
+			return iotago.EmptyBlockID(), errors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
+		}
+	}
+
+	modelBlock, err := model.BlockFromBlock(iotaBlock, api)
+	if err != nil {
+		return iotago.EmptyBlockID(), errors.Wrap(err, "error serializing block to model block")
+	}
+
+	i.events.BlockConstructed.Trigger(modelBlock)
+
+	if err := i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
+		return iotago.EmptyBlockID(), errors.Wrap(err, "error issuing model block")
+	}
+
+	return modelBlock.ID(), nil
 }
 
 func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, strongParentsCountOpt ...int) (model.ParentReferences, error) {
