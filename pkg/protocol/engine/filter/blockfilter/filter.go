@@ -21,6 +21,7 @@ var (
 	ErrBlockTimeTooFarAheadInFuture              = errors.New("a block cannot be too far ahead in the future")
 	ErrInvalidSignature                          = errors.New("block has invalid signature")
 	ErrTransactionCommitmentInputTooFarInThePast = errors.New("transaction in a block references too old CommitmentInput")
+	ErrTransactionCommitmentInputInTheFuture     = errors.New("transaction in a block references a CommitmentInput in the future")
 )
 
 // Filter filters blocks.
@@ -108,7 +109,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 				// and the slot that block is committing to.
 
 				// Parameters moved to the other side of inequality to avoid underflow errors with subtraction from an uint64 type.
-				if commitmentInput.CommitmentID.Index()+protocolParams.EvictionAge()+protocolParams.EvictionAge() < block.ID().Index() {
+				if commitmentInput.CommitmentID.Index()+protocolParams.LivenessThreshold()+protocolParams.EvictionAge() < block.ID().Index() {
 					f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 						Block:  block,
 						Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while min allowed is %d", commitmentInput.CommitmentID.Index(), block.ID().Index()-protocolParams.LivenessThreshold()-protocolParams.EvictionAge()),
@@ -120,7 +121,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 				if commitmentInput.CommitmentID.Index() > block.ProtocolBlock().SlotCommitmentID.Index() {
 					f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 						Block:  block,
-						Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while max allowed is %d", commitmentInput.CommitmentID.Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
+						Reason: errors.WithMessagef(ErrTransactionCommitmentInputInTheFuture, "transaction in a block contains CommitmentInput to slot %d while max allowed is %d", commitmentInput.CommitmentID.Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
 						Source: source,
 					})
 

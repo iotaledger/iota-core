@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -18,6 +19,8 @@ type Accounts struct {
 
 	totalStake          iotago.BaseToken
 	totalValidatorStake iotago.BaseToken
+
+	mutex syncutils.RWMutex
 }
 
 // NewAccounts creates a new Weights instance.
@@ -33,8 +36,7 @@ func (a *Accounts) initialize() {
 }
 
 func (a *Accounts) Has(id iotago.AccountID) bool {
-	_, has := a.accountPools.Get(id)
-	return has
+	return a.accountPools.Has(id)
 }
 
 func (a *Accounts) Size() int {
@@ -42,8 +44,11 @@ func (a *Accounts) Size() int {
 }
 
 func (a *Accounts) IDs() []iotago.AccountID {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
 	ids := make([]iotago.AccountID, 0, a.accountPools.Size())
-	a.ForEach(func(id iotago.AccountID, pool *Pool) bool {
+	a.accountPools.ForEachKey(func(id iotago.AccountID) bool {
 		ids = append(ids, id)
 		return true
 	})
@@ -56,19 +61,45 @@ func (a *Accounts) Get(id iotago.AccountID) (pool *Pool, exists bool) {
 	return a.accountPools.Get(id)
 }
 
-// Set sets the weight of the given identity.
-func (a *Accounts) Set(id iotago.AccountID, pool *Pool) {
-	a.accountPools.Set(id, pool)
+// setWithoutLocking sets the weight of the given identity.
+func (a *Accounts) setWithoutLocking(id iotago.AccountID, pool *Pool) {
+	value, created := a.accountPools.GetOrCreate(id, func() *Pool {
+		return pool
+	})
+
+	if !created {
+		// if there was already an entry, we need to subtract the former
+		// stake first and set the new value
+		// TODO: use safemath
+		a.totalStake -= value.PoolStake
+		a.totalValidatorStake -= value.ValidatorStake
+
+		a.accountPools.Set(id, pool)
+	}
 
 	a.totalStake += pool.PoolStake
 	a.totalValidatorStake += pool.ValidatorStake
 }
 
+// Set sets the weight of the given identity.
+func (a *Accounts) Set(id iotago.AccountID, pool *Pool) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	a.setWithoutLocking(id, pool)
+}
+
 func (a *Accounts) TotalStake() iotago.BaseToken {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
 	return a.totalStake
 }
 
 func (a *Accounts) TotalValidatorStake() iotago.BaseToken {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
 	return a.totalValidatorStake
 }
 
@@ -94,6 +125,9 @@ func AccountsFromReader(readSeeker io.ReadSeeker) (*Accounts, int, error) {
 }
 
 func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	a.initialize()
 
 	var accountCount uint32
@@ -120,6 +154,7 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 		if err != nil {
 			return 0, errors.Wrap(err, "failed to parse pool")
 		}
+		a.setWithoutLocking(accountID, pool)
 
 		if c != poolBytesLength {
 			return 0, errors.Wrap(err, "invalid pool bytes length")
@@ -132,6 +167,9 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 }
 
 func (a *Accounts) Bytes() (bytes []byte, err error) {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
 	m := marshalutil.New()
 
 	m.WriteUint32(uint32(a.accountPools.Size()))

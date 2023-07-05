@@ -46,8 +46,9 @@ func (p *PerformanceFactors) Store(accountID iotago.AccountID, pf uint64) error 
 	return p.store.Set(lo.PanicOnErr(accountID.Bytes()), lo.PanicOnErr(storable.SerializableInt64(pf).Bytes()))
 }
 
-// ForEachPerformanceFactor iterates over all saved validators. Note that this stream function won't call the consumer function for inactive validators, so better to use the load over
-// every member of the committee if needed.
+// ForEachPerformanceFactor iterates over all saved validators.
+// Note that this stream function won't call the consumer function for inactive validators,
+// so better to use the load over every member of the committee if needed.
 func (p *PerformanceFactors) ForEachPerformanceFactor(consumer func(accountID iotago.AccountID, pf uint64) error) error {
 	var innerErr error
 	if err := p.store.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
@@ -58,13 +59,12 @@ func (p *PerformanceFactors) ForEachPerformanceFactor(consumer func(accountID io
 		}
 
 		serializablePf := new(storable.SerializableInt64)
-		_, err = serializablePf.FromBytes(value)
-		if err != nil {
+		if _, err := serializablePf.FromBytes(value); err != nil {
 			innerErr = err
 			return false
 		}
 
-		return consumer(accountID, uint64(*serializablePf)) != nil
+		return consumer(accountID, uint64(*serializablePf)) == nil
 	}); err != nil {
 		return errors.Wrapf(err, "failed to stream performance factors for slot %s", p.slot)
 	}

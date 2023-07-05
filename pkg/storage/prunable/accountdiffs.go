@@ -36,11 +36,10 @@ type AccountDiff struct {
 	PubKeysAdded   []ed25519.PublicKey
 	PubKeysRemoved []ed25519.PublicKey
 
-	ValidatorStakeChange int64
-	StakeEndEpochChange  int64
-	FixedCostChange      int64
-
+	ValidatorStakeChange  int64
 	DelegationStakeChange int64
+	StakeEndEpochChange   int64
+	FixedCostChange       int64
 }
 
 // NewAccountDiff creates a new AccountDiff instance.
@@ -66,11 +65,11 @@ func (d AccountDiff) Bytes() ([]byte, error) {
 	m.WriteUint64(uint64(d.PreviousUpdatedTime))
 	m.WriteBytes(lo.PanicOnErr(d.NewOutputID.Bytes()))
 	m.WriteBytes(lo.PanicOnErr(d.PreviousOutputID.Bytes()))
-	m.WriteUint64(uint64(len(d.PubKeysAdded)))
+	m.WriteUint8(uint8(len(d.PubKeysAdded)))
 	for _, pubKey := range d.PubKeysAdded {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
 	}
-	m.WriteUint64(uint64(len(d.PubKeysRemoved)))
+	m.WriteUint8(uint8(len(d.PubKeysRemoved)))
 	for _, pubKey := range d.PubKeysRemoved {
 		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
 	}
@@ -113,33 +112,33 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousUpdatedTime); err != nil {
-		return offset, errors.Wrap(err, "unable to read updated time in the diff")
+		return offset, errors.Wrap(err, "unable to read previous updated time in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.NewOutputID); err != nil {
-		return offset, errors.Wrap(err, "unable to read updated time in the diff")
+		return offset, errors.Wrap(err, "unable to read new outputID in the diff")
 	}
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousOutputID); err != nil {
-		return offset, errors.Wrap(err, "unable to read updated time in the diff")
+		return offset, errors.Wrap(err, "unable to read previous outputID in the diff")
 	}
 
-	updatedAddedKeys, bytesRead, err := readPubKeys(reader, d.PubKeysAdded)
+	keysAdded, bytesRead, err := readPubKeys(reader)
 	if err != nil {
 		return offset, errors.Wrap(err, "unable to read added pubKeys in the diff")
 	}
 	offset += bytesRead
 
-	d.PubKeysAdded = updatedAddedKeys
+	d.PubKeysAdded = keysAdded
 
-	updatedRemovedKeys, bytesRead, err := readPubKeys(reader, d.PubKeysRemoved)
+	keysRemoved, bytesRead, err := readPubKeys(reader)
 	if err != nil {
-		return offset, errors.Wrap(err, "unable to read added pubKeys in the diff")
+		return offset, errors.Wrap(err, "unable to read removed pubKeys in the diff")
 	}
 	offset += bytesRead
 
-	d.PubKeysRemoved = updatedRemovedKeys
+	d.PubKeysRemoved = keysRemoved
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.ValidatorStakeChange); err != nil {
 		return offset, errors.Wrap(err, "unable to read validator stake change in the diff")
@@ -164,29 +163,27 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 	return offset, nil
 }
 
-func readPubKeys(reader io.ReadSeeker, pubKeysToUpdate []ed25519.PublicKey) ([]ed25519.PublicKey, int, error) {
-	var pubKeysLength uint64
+func readPubKeys(reader io.ReadSeeker) ([]ed25519.PublicKey, int, error) {
 	var bytesConsumed int
+
+	var pubKeysLength uint8
 	if err := binary.Read(reader, binary.LittleEndian, &pubKeysLength); err != nil {
-		return nil, bytesConsumed, errors.Wrap(err, "unable to read added pubKeys length in the diff")
+		return nil, bytesConsumed, errors.Wrap(err, "unable to read pubKeys length in the diff")
 	}
-	bytesConsumed += 8
+	bytesConsumed++
 
-	if pubKeysLength == 0 {
-		return make([]ed25519.PublicKey, 0), bytesConsumed, nil
-	}
-
-	for k := uint64(0); k < pubKeysLength; k++ {
+	pubKeys := make([]ed25519.PublicKey, 0, pubKeysLength)
+	for k := uint8(0); k < pubKeysLength; k++ {
 		pubKey, bytesRead, err := readPubKey(reader)
 		if err != nil {
 			return nil, bytesConsumed, err
 		}
 		bytesConsumed += bytesRead
 
-		pubKeysToUpdate = append(pubKeysToUpdate, pubKey)
+		pubKeys = append(pubKeys, pubKey)
 	}
 
-	return pubKeysToUpdate, bytesConsumed, nil
+	return pubKeys, bytesConsumed, nil
 }
 
 func readPubKey(reader io.ReadSeeker) (pubKey ed25519.PublicKey, offset int, err error) {

@@ -230,7 +230,6 @@ func (p *Protocol) initChainManager() {
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		rootCommitment, valid := p.MainEngineInstance().EarliestRootCommitment(index)
-		fmt.Println("Slot finalized:", index, "root commitment:", rootCommitment, "valid:", valid)
 		if !valid {
 			return
 		}

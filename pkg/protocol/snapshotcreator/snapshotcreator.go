@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
@@ -60,6 +61,18 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		return errors.Wrap(err, "failed to set the genesis time")
 	}
 
+	accounts := account.NewAccounts()
+	for _, accountData := range opt.Accounts {
+		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
+		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
+			accounts.Set(blake2b.Sum256(accountData.IssuerKey), &account.Pool{
+				PoolStake:      accountData.StakedAmount,
+				ValidatorStake: accountData.StakedAmount,
+				FixedCost:      accountData.FixedCost,
+			})
+		}
+	}
+
 	engineInstance := engine.New(workers.CreateGroup("Engine"),
 		errorHandler,
 		s,
@@ -70,7 +83,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		poa.NewProvider([]iotago.AccountID{}),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
-		epochorchestrator.NewProvider(),
+		epochorchestrator.NewProvider(epochorchestrator.WithInitialCommittee(accounts)),
 		slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
@@ -121,7 +134,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine, protocolParams *iotago.ProtocolParameters) (err error) {
 	// Account outputs start from Genesis TX index 1
 	for idx, account := range accounts {
-		output := createAccount(account.Address, account.Amount, account.IssuerKey)
+		output := createAccount(account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
 
 		if _, err = protocolParams.RentStructure.CoversStateRent(output, account.Amount); err != nil {
 			return errors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
@@ -140,13 +153,6 @@ func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Eng
 }
 
 func createOutput(address iotago.Address, tokenAmount iotago.BaseToken) (output iotago.Output) {
-	//switch ledgerVM.(type) {
-	//case *mockedvm.MockedVM:
-	//case *devnetvm.VM:
-	//default:
-	//	return nil, nil, errors.Errorf("cannot create snapshot output for VM of type '%v'", ledgerVM)
-	//}
-
 	return &iotago.BasicOutput{
 		Amount: tokenAmount,
 		Conditions: iotago.BasicOutputUnlockConditions{
@@ -155,9 +161,9 @@ func createOutput(address iotago.Address, tokenAmount iotago.BaseToken) (output 
 	}
 }
 
-func createAccount(address iotago.Address, tokenAmount iotago.BaseToken, pubkey ed25519.PublicKey) (output iotago.Output) {
-	return &iotago.AccountOutput{
-		AccountID: blake2b.Sum256(lo.PanicOnErr(address.Encode())),
+func createAccount(address iotago.Address, tokenAmount iotago.BaseToken, pubkey ed25519.PublicKey, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
+	accountOutput := &iotago.AccountOutput{
+		AccountID: blake2b.Sum256(pubkey),
 		Amount:    tokenAmount,
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: address},
@@ -169,4 +175,17 @@ func createAccount(address iotago.Address, tokenAmount iotago.BaseToken, pubkey 
 			},
 		},
 	}
+
+	// The Staking feature is only added if both StakedAmount and StakeEndEpoch have non-zero values,
+	// otherwise the Staking feature state would be invalid.
+	if stakedAmount > 0 && stakeEndEpoch > 0 {
+		accountOutput.Features = append(accountOutput.Features, &iotago.StakingFeature{
+			StakedAmount: stakedAmount,
+			FixedCost:    stakeFixedCost,
+			StartEpoch:   0,
+			EndEpoch:     stakeEndEpoch,
+		})
+	}
+
+	return accountOutput
 }

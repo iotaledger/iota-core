@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -22,8 +23,7 @@ type Tracker struct {
 
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
 
-	timeProvider *iotago.TimeProvider
-
+	timeProvider  *iotago.TimeProvider
 	decayProvider *iotago.ManaDecayProvider
 
 	performanceFactorsMutex sync.RWMutex
@@ -55,37 +55,39 @@ func NewTracker(
 	}
 }
 
-func (m *Tracker) RegisterCommittee(epoch iotago.EpochIndex, committee *account.Accounts) error {
-	return m.committeeStore.Set(epoch, committee)
+func (t *Tracker) RegisterCommittee(epoch iotago.EpochIndex, committee *account.Accounts) error {
+	return t.committeeStore.Set(epoch, committee)
 }
 
-func (m *Tracker) BlockAccepted(block *blocks.Block) {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
+func (t *Tracker) BlockAccepted(block *blocks.Block) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
-	m.performanceFactorsMutex.Lock()
-	defer m.performanceFactorsMutex.Unlock()
+	t.performanceFactorsMutex.Lock()
+	defer t.performanceFactorsMutex.Unlock()
 
 	// TODO: check if this block is a validator block
 
-	performanceFactors := m.performanceFactorsFunc(block.ID().Index())
+	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
 	pf, err := performanceFactors.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
-		panic(err)
+		// TODO replace panic with errors in the future, like triggering an error event
+		panic(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 
 	err = performanceFactors.Store(block.ProtocolBlock().IssuerID, pf+1)
 	if err != nil {
-		panic(err)
+		// TODO replace panic with errors in the future, like triggering an error event
+		panic(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 }
 
-func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
-	epochSlotStart := m.timeProvider.EpochStart(epoch)
-	epochSlotEnd := m.timeProvider.EpochEnd(epoch)
+	epochStartSlot := t.timeProvider.EpochStart(epoch)
+	epochEndSlot := t.timeProvider.EpochEnd(epoch)
 
 	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
 	poolsStats := &PoolsStats{
@@ -94,29 +96,28 @@ func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		ProfitMargin:        profitMargin,
 	}
 
-	if err := m.poolStatsStore.Set(epoch, poolsStats); err != nil {
+	if err := t.poolStatsStore.Set(epoch, poolsStats); err != nil {
 		panic(errors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
-		intermediateFactors := make([]uint64, 0)
-		for slot := epochSlotStart; slot <= epochSlotEnd; slot++ {
-			performanceFactorStorage := m.performanceFactorsFunc(slot)
+		intermediateFactors := make([]uint64, 0, epochEndSlot+1-epochStartSlot)
+		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
+			performanceFactorStorage := t.performanceFactorsFunc(slot)
 			if performanceFactorStorage == nil {
 				intermediateFactors = append(intermediateFactors, 0)
+				continue
 			}
 
 			pf, err := performanceFactorStorage.Load(accountID)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to load performance factor for account %s", accountID))
-				return false
 			}
 
 			intermediateFactors = append(intermediateFactors, pf)
-
 		}
 
-		rewardsMap := ads.NewMap[iotago.AccountID, *PoolRewards](m.rewardsStorage(epoch),
+		rewardsMap := ads.NewMap[iotago.AccountID, *PoolRewards](t.rewardsStorage(epoch),
 			iotago.Identifier.Bytes,
 			iotago.IdentifierFromBytes,
 			(*PoolRewards).Bytes,
@@ -125,7 +126,7 @@ func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 		rewardsMap.Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
-			PoolRewards: poolReward(epochSlotEnd, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, aggregatePerformanceFactors(intermediateFactors)),
+			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
 		})
 
@@ -133,14 +134,14 @@ func (m *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	})
 }
 
-func (m *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) *advancedset.AdvancedSet[iotago.AccountID] {
+func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) *advancedset.AdvancedSet[iotago.AccountID] {
 	// TODO: we should choose candidates we tracked performance for
 
 	return &advancedset.AdvancedSet[iotago.AccountID]{}
 }
 
-func (m *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
-	c, err := m.committeeStore.Get(epoch)
+func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
+	c, err := t.committeeStore.Get(epoch)
 	if err != nil {
 		if errors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, false
@@ -150,11 +151,21 @@ func (m *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 	return c, true
 }
 
-func aggregatePerformanceFactors(pfs []uint64) uint64 {
-	var sum uint64
-	for _, pf := range pfs {
-		sum += pf
+func (t *Tracker) aggregatePerformanceFactors(issuedBlocksPerSlot []uint64) uint64 {
+	if len(issuedBlocksPerSlot) == 0 {
+		return 0
 	}
 
-	return sum / uint64(len(pfs))
+	var sum uint64
+	for _, issuedBlocks := range issuedBlocksPerSlot {
+		if issuedBlocks > uint64(validatorBlocksPerSlot) {
+			// we harshly punish validators that issue any blocks more than allowed
+			return 0
+		}
+		sum += issuedBlocks
+	}
+
+	// TODO: we should scale the result by the amount of slots per epoch,
+	// otherwise we lose a lot of precision here.
+	return sum / uint64(len(issuedBlocksPerSlot))
 }

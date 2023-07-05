@@ -25,7 +25,7 @@ type SlotMutations struct {
 }
 
 // NewSlotMutations creates a new SlotMutations instance.
-func NewSlotMutations(lastCommittedSlot iotago.SlotIndex) (newMutationFactory *SlotMutations) {
+func NewSlotMutations(lastCommittedSlot iotago.SlotIndex) *SlotMutations {
 	return &SlotMutations{
 		acceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, *ads.Set[iotago.BlockID]](),
 		latestCommittedIndex: lastCommittedSlot,
