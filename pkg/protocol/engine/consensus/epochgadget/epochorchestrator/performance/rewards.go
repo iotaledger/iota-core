@@ -45,7 +45,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 
 		poolStats, err := t.poolStats(epochIndex)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d and accountID of the validator %s", epochIndex, validatorID)
+			return 0, errors.Wrapf(err, "validator accountID %s", epochIndex, validatorID)
 		}
 
 		unDecayedEpochRewards := uint64(rewardsForAccountInEpoch.FixedCost) +
@@ -82,7 +82,7 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 
 		poolStats, err := t.poolStats(epochIndex)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d and validator accountID %s", epochIndex, validatorID)
+			return 0, errors.Wrapf(err, "validator accountID %s", epochIndex, validatorID)
 		}
 
 		unDecayedEpochRewards := decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, profitMarginExponent)*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent) *
