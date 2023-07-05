@@ -120,7 +120,6 @@ func provide(c *dig.Container) error {
 				blockfilter.NewProvider(
 					blockfilter.WithMinCommittableAge(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),
 					blockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
-					blockfilter.WithSignatureValidation(true),
 				),
 			),
 		)
