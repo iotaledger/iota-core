@@ -87,6 +87,7 @@ func (blk *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
 	}
 
 	tx, isTransaction = basicBlock.Payload.(*iotago.Transaction)
+
 	return tx, isTransaction
 }
 

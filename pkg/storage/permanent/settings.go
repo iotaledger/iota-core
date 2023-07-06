@@ -345,7 +345,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 		return ierrors.Wrap(err, "failed to set latest finalized slot")
 	}
 
-	var prevProtocolVersionEpochStart *protocolVersionEpochStart = nil
+	var prevProtocolVersionEpochStart *protocolVersionEpochStart
 	if err := stream.ReadCollection(reader, func(i int) error {
 		version, err := stream.Read[iotago.Version](reader)
 		if err != nil {

@@ -224,13 +224,13 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		}
 
 	case *iotago.ValidatorBlock:
+		//nolint:revive,staticcheck //temporarily disable
 		if len(iotaBlock.Parents()) == 0 {
 			//TODO: implement tipselection for validator blocks
 		}
 	}
 
-	var references model.ParentReferences
-	references = make(model.ParentReferences)
+	references := make(model.ParentReferences)
 	references[iotago.StrongParentType] = iotaBlock.Block.StrongParentIDs()
 	references[iotago.WeakParentType] = iotaBlock.Block.WeakParentIDs()
 	references[iotago.ShallowLikeParentType] = iotaBlock.Block.ShallowLikeParentIDs()

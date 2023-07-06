@@ -84,6 +84,7 @@ func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[io
 		func(bytes []byte) (object *iotago.Attestation, consumed int, err error) {
 			attestation := new(iotago.Attestation)
 			consumed, err = api.Decode(bytes, attestation)
+
 			return attestation, consumed, err
 		},
 	), nil
@@ -110,6 +111,7 @@ func (m *Manager) adsMapStorage(index iotago.SlotIndex) (*ads.Map[iotago.Account
 		func(bytes []byte) (object *iotago.Attestation, consumed int, err error) {
 			attestation := new(iotago.Attestation)
 			consumed, err = api.Decode(bytes, attestation)
+
 			return attestation, consumed, err
 		},
 	), nil

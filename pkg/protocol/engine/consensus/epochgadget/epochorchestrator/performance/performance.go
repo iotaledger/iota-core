@@ -149,6 +149,7 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 		}
 		panic(errors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
+
 	return c, true
 }
 
