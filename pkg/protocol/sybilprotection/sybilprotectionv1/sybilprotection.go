@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -12,7 +14,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
@@ -93,9 +94,6 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 					})
 				})
 
-				// TODO: CommitSlot should be called directly from NotarizationManager and should return some trees to be put into actual commitment
-				e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) { o.CommitSlot(scd.Commitment.Index()) })
-
 				e.Events.SlotGadget.SlotFinalized.Hook(o.slotFinalized)
 
 				e.Events.SybilProtection.LinkTo(o.events)
@@ -112,7 +110,7 @@ func (o *SybilProtection) BlockAccepted(block *blocks.Block) {
 	o.performanceTracker.BlockAccepted(block)
 }
 
-func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) {
+func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewardsRoot iotago.Identifier) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -150,8 +148,43 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) {
 
 		o.performanceTracker.ApplyEpoch(currentEpoch, committee)
 	}
+	var targetCommitteeEpoch iotago.EpochIndex
+	if o.timeProvider.EpochEnd(currentEpoch) > slot+o.maxCommittableAge {
+		targetCommitteeEpoch = currentEpoch
+	} else {
+		targetCommitteeEpoch = nextEpoch
+	}
+
+	committeeRoot = o.committeeRoot(targetCommitteeEpoch)
+
+	var targetRewardsEpoch iotago.EpochIndex
+	if o.timeProvider.EpochEnd(currentEpoch) == slot {
+		targetRewardsEpoch = nextEpoch
+	} else {
+		targetRewardsEpoch = currentEpoch
+	}
+
+	rewardsRoot = o.performanceTracker.RewardsRoot(targetRewardsEpoch)
 
 	o.lastCommittedSlot = slot
+
+	return
+}
+
+func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) iotago.Identifier {
+	committee, exists := o.performanceTracker.LoadCommitteeForEpoch(targetCommitteeEpoch)
+	if !exists {
+		panic(fmt.Sprintf("committee for a finished epoch %d not found", targetCommitteeEpoch))
+	}
+
+	comitteeTree := ads.NewSet[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB())
+	committee.ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
+		comitteeTree.Add(accountID)
+
+		return true
+	})
+
+	return iotago.Identifier(comitteeTree.Root())
 }
 
 func (o *SybilProtection) SeatManager() seatmanager.SeatManager {

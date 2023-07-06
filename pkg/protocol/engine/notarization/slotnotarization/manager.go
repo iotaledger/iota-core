@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -34,8 +35,9 @@ type Manager struct {
 	workers      *workerpool.Group
 	errorHandler func(error)
 
-	attestation attestation.Attestations
-	ledger      ledger.Ledger
+	attestation     attestation.Attestations
+	ledger          ledger.Ledger
+	sybilProtection sybilprotection.SybilProtection
 
 	storage *storage.Storage
 
@@ -59,6 +61,7 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 			m.acceptedTimeFunc = e.Clock.Accepted().Time
 
 			m.ledger = e.Ledger
+			m.sybilProtection = e.SybilProtection
 			m.attestation = e.Attestations
 
 			wpBlocks := m.workers.CreatePool("Blocks", 1) // Using just 1 worker to avoid contention
@@ -175,12 +178,16 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
+	committeeRoot, rewardsRoot := m.sybilProtection.CommitSlot(index)
+
 	roots := iotago.NewRoots(
 		iotago.Identifier(acceptedBlocks.Root()),
 		mutationRoot,
-		iotago.Identifier(attestationsRoot),
+		attestationsRoot,
 		stateRoot,
 		accountRoot,
+		committeeRoot,
+		rewardsRoot,
 	)
 
 	newCommitment := iotago.NewCommitment(

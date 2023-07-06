@@ -7,7 +7,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -218,7 +217,7 @@ func (m *Manager) determineAttestationsFromWindow(slotIndex iotago.SlotIndex) []
 	return slotAttestors.Values()
 }
 
-func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot types.Identifier, err error) {
+func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot iotago.Identifier, err error) {
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 
@@ -236,7 +235,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 
 	if !valid {
 		m.lastCommittedSlot = index
-		return 0, types.Identifier{}, nil
+		return 0, iotago.Identifier{}, nil
 	}
 
 	// Get all attestations for the valid time window of cutoffIndex up to index (as we just applied the pending attestations).
@@ -246,7 +245,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	// Store all attestations of cutoffIndex in bucketed storage via ads.Map / sparse merkle tree -> committed attestations.
 	tree, err := m.adsMapStorage(cutoffIndex)
 	if err != nil {
-		return 0, types.Identifier{}, errors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
+		return 0, iotago.Identifier{}, errors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
 	}
 
 	// Add all attestations to the tree and calculate the new cumulative weight.
@@ -261,7 +260,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 
 	m.lastCommittedSlot = index
 
-	return m.lastCumulativeWeight, tree.Root(), nil
+	return m.lastCumulativeWeight, iotago.Identifier(tree.Root()), nil
 }
 
 func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cutoffIndex iotago.SlotIndex, isValid bool) {

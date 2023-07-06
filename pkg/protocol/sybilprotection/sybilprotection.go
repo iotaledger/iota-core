@@ -14,6 +14,7 @@ type SybilProtection interface {
 	ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error)
 	DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error)
 	SeatManager() seatmanager.SeatManager
+	CommitSlot(iotago.SlotIndex) (iotago.Identifier, iotago.Identifier)
 
 	Import(io.ReadSeeker) error
 	Export(io.WriteSeeker, iotago.SlotIndex) error

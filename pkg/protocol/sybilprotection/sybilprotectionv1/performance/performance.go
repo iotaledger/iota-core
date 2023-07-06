@@ -89,6 +89,8 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		panic(errors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
+	rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](t.rewardsStorage(epoch))
+
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
 		intermediateFactors := make([]uint64, 0, epochEndSlot+1-epochStartSlot)
 		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
@@ -106,7 +108,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			intermediateFactors = append(intermediateFactors, pf)
 		}
 
-		ads.NewMap[iotago.AccountID, PoolRewards](t.rewardsStorage(epoch)).Set(accountID, &PoolRewards{
+		rewardsTree.Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
