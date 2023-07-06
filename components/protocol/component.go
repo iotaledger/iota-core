@@ -105,10 +105,10 @@ func provide(c *dig.Container) error {
 				poa.NewProvider(validators),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)+slotattestation.DefaultAttestationCommitmentOffset),
+				slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 			),
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(
@@ -159,12 +159,12 @@ func configure() error {
 	// 	Component.LogInfof("BlockAccepted: %s", block.ID())
 	// })
 
-	// deps.Protocol.Events.Engine.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
-	// 	Component.LogInfof("BlockPreConfirmed: %s", block.ID())
+	// deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
+	// 	Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time), time)
 	// })
 
-	// deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
-	// 	Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().TimeProvider().SlotIndexFromTime(time), time.String())
+	// deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
+	// 	Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time), time)
 	// })
 
 	// deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {

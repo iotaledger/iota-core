@@ -26,6 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -59,6 +60,7 @@ type EngineManager struct {
 	attestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
 	tipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
+	tipSelectionProvider    module.Provider[*engine.Engine, tipselection.TipSelection]
 
 	activeInstance *engine.Engine
 }
@@ -82,6 +84,7 @@ func New(
 	attestationProvider module.Provider[*engine.Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
 	tipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager],
+	tipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection],
 ) *EngineManager {
 	return &EngineManager{
 		workers:                 workers,
@@ -102,10 +105,11 @@ func New(
 		attestationProvider:     attestationProvider,
 		ledgerProvider:          ledgerProvider,
 		tipManagerProvider:      tipManagerProvider,
+		tipSelectionProvider:    tipSelectionProvider,
 	}
 }
 
-func (e *EngineManager) LoadActiveEngine() (*engine.Engine, error) {
+func (e *EngineManager) LoadActiveEngine(snapshotPath string) (*engine.Engine, error) {
 	info := &engineInfo{}
 	if err := ioutils.ReadJSONFromFile(e.infoFilePath(), info); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
@@ -116,13 +120,13 @@ func (e *EngineManager) LoadActiveEngine() (*engine.Engine, error) {
 	if len(info.Name) > 0 {
 		if exists, isDirectory, err := ioutils.PathExists(e.directory.Path(info.Name)); err == nil && exists && isDirectory {
 			// Load previous engine as active
-			e.activeInstance = e.loadEngineInstance(info.Name)
+			e.activeInstance = e.loadEngineInstance(info.Name, snapshotPath)
 		}
 	}
 
 	if e.activeInstance == nil {
 		// Start with a new instance and set to active
-		instance := e.newEngineInstance()
+		instance := e.newEngineInstance(snapshotPath)
 		if err := e.SetActiveInstance(instance); err != nil {
 			return nil, err
 		}
@@ -169,7 +173,7 @@ func (e *EngineManager) SetActiveInstance(instance *engine.Engine) error {
 	return ioutils.WriteJSONToFile(e.infoFilePath(), info, 0o644)
 }
 
-func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
+func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) *engine.Engine {
 	errorHandler := func(err error) {
 		e.errorHandler(errors.Wrapf(err, "engine (%s)", dirName[0:8]))
 	}
@@ -189,32 +193,24 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.attestationProvider,
 		e.ledgerProvider,
 		e.tipManagerProvider,
-		e.engineOptions...,
+		e.tipSelectionProvider,
+		append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))...,
 	)
 }
 
-func (e *EngineManager) newEngineInstance() *engine.Engine {
+func (e *EngineManager) newEngineInstance(snapshotPath string) *engine.Engine {
 	dirName := lo.PanicOnErr(uuid.NewUUID()).String()
-	return e.loadEngineInstance(dirName)
+	return e.loadEngineInstance(dirName, snapshotPath)
 }
 
 func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine, error) {
 	// Dump a snapshot at the target index
-	snapshotPath := filepath.Join(os.TempDir(), fmt.Sprintf("snapshot_%d_%s.bin", index, lo.PanicOnErr(uuid.NewUUID()).String()))
+	snapshotPath := filepath.Join(os.TempDir(), fmt.Sprintf("snapshot_%d_%s.bin", index, lo.PanicOnErr(uuid.NewUUID())))
 	if err := e.activeInstance.WriteSnapshot(snapshotPath, index); err != nil {
 		return nil, errors.Wrapf(err, "error exporting snapshot for index %s", index)
 	}
 
-	instance := e.newEngineInstance()
-	if err := instance.Initialize(snapshotPath); err != nil {
-		instance.Shutdown()
-		_ = instance.RemoveFromFilesystem()
-		_ = os.Remove(snapshotPath)
-
-		return nil, err
-	}
-
-	return instance, nil
+	return e.newEngineInstance(snapshotPath), nil
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

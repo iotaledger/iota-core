@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -12,14 +13,14 @@ type Blocks struct {
 	slot  iotago.SlotIndex
 	store kvstore.KVStore
 
-	api iotago.API
+	apiProvider api.Provider
 }
 
-func NewBlocks(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.API) (newBlocks *Blocks) {
+func NewBlocks(slot iotago.SlotIndex, store kvstore.KVStore, apiProvider api.Provider) (newBlocks *Blocks) {
 	return &Blocks{
-		slot:  slot,
-		store: store,
-		api:   api,
+		slot:        slot,
+		store:       store,
+		apiProvider: apiProvider,
 	}
 }
 
@@ -34,7 +35,7 @@ func (b *Blocks) Load(id iotago.BlockID) (*model.Block, error) {
 		return nil, errors.Wrapf(err, "failed to get block %s", id)
 	}
 
-	return model.BlockFromIDAndBytes(id, blockBytes, b.api)
+	return model.BlockFromIDAndBytes(id, blockBytes, b.apiProvider.APIForSlot(id.Index()))
 }
 
 func (b *Blocks) Store(block *model.Block) error {
@@ -50,12 +51,12 @@ func (b *Blocks) ForEachBlockIDInSlot(consumer func(blockID iotago.BlockID) erro
 	var innerErr error
 	if err := b.store.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
 		var blockID iotago.BlockID
-		blockID, innerErr = iotago.SlotIdentifierFromBytes(key)
+		blockID, _, innerErr = iotago.SlotIdentifierFromBytes(key)
 		if innerErr != nil {
 			return false
 		}
 
-		return consumer(blockID) != nil
+		return consumer(blockID) == nil
 	}); err != nil {
 		return errors.Wrapf(err, "failed to stream blockIDs for slot %s", b.slot)
 	}

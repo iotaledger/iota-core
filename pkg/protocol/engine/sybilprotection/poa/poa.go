@@ -60,20 +60,19 @@ func NewProvider(validators []iotago.AccountID, opts ...options.Option[SybilProt
 				e.HookConstructed(func() {
 					s.clock = e.Clock
 
-					e.Storage.Settings().HookInitialized(func() {
-						s.timeProviderFunc = e.API().TimeProvider
+					//TODO: do we need to differentiate per version here?
+					s.timeProviderFunc = e.LatestAPI().TimeProvider
 
-						e.Clock.HookInitialized(func() {
-							for _, v := range s.optsOnlineCommitteeStartup {
-								s.markValidatorActive(v, e.Clock.Accepted().RelativeTime())
-							}
-						})
+					e.Clock.HookInitialized(func() {
+						for _, v := range s.optsOnlineCommitteeStartup {
+							s.markValidatorActive(v, e.Clock.Accepted().RelativeTime())
+						}
 					})
 
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
 					// recover if no node was part of the online committee anymore.
 					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-						s.markValidatorActive(block.Block().IssuerID, block.IssuingTime())
+						s.markValidatorActive(block.ProtocolBlock().IssuerID, block.IssuingTime())
 						s.events.BlockProcessed.Trigger(block)
 					})
 				})
@@ -112,6 +111,7 @@ func (s *SybilProtection) Shutdown() {
 func (s *SybilProtection) initializeAccounts(validators []iotago.AccountID) {
 	for _, id := range validators {
 		s.accounts.Set(id, &account.Pool{}) // We do not care about the pool with PoA
+		// FIXME: we actually do care because the total stake and delegation amount is used in the rewards calculation
 	}
 	s.committee = s.accounts.SelectCommittee(validators...)
 }

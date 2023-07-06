@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -17,7 +16,7 @@ import (
 // SlotMutations is an in-memory data structure that enables the collection of mutations for uncommitted slots.
 type SlotMutations struct {
 	// acceptedBlocksBySlot stores the accepted blocks per slot.
-	acceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[iotago.BlockID, *iotago.BlockID]]
+	acceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[iotago.BlockID]]
 
 	// latestCommittedIndex stores the index of the latest committed slot.
 	latestCommittedIndex iotago.SlotIndex
@@ -26,9 +25,9 @@ type SlotMutations struct {
 }
 
 // NewSlotMutations creates a new SlotMutations instance.
-func NewSlotMutations(lastCommittedSlot iotago.SlotIndex) (newMutationFactory *SlotMutations) {
+func NewSlotMutations(lastCommittedSlot iotago.SlotIndex) *SlotMutations {
 	return &SlotMutations{
-		acceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, *ads.Set[iotago.BlockID, *iotago.BlockID]](),
+		acceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, *ads.Set[iotago.BlockID]](),
 		latestCommittedIndex: lastCommittedSlot,
 	}
 }
@@ -74,9 +73,9 @@ func (m *SlotMutations) Reset(index iotago.SlotIndex) {
 }
 
 // AcceptedBlocks returns the set of accepted blocks for the given slot.
-func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) *ads.Set[iotago.BlockID, *iotago.BlockID] {
+func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) *ads.Set[iotago.BlockID] {
 	if len(createIfMissing) > 0 && createIfMissing[0] {
-		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, newSet[iotago.BlockID, *iotago.BlockID]))
+		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, newSet))
 	}
 
 	return lo.Return1(m.acceptedBlocksBySlot.Get(index))
@@ -91,7 +90,10 @@ func (m *SlotMutations) evictUntil(index iotago.SlotIndex) {
 	m.latestCommittedIndex = index
 }
 
-// newSet is a generic constructor for a new ads.Set.
-func newSet[K any, KPtr serializer.MarshalablePtr[K]]() *ads.Set[K, KPtr] {
-	return ads.NewSet[K, KPtr](mapdb.NewMapDB())
+// newSet is a helper constructor for a new in-memory ads.Set[iotago.BlockID].
+func newSet() *ads.Set[iotago.BlockID] {
+	return ads.NewSet(mapdb.NewMapDB(),
+		iotago.SlotIdentifier.Bytes,
+		iotago.SlotIdentifierFromBytes,
+	)
 }

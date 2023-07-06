@@ -24,6 +24,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
+	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -42,9 +43,6 @@ import (
 func CreateSnapshot(opts ...options.Option[Options]) error {
 	opt := NewOptions(opts...)
 
-	protocolParams := &opt.ProtocolParameters
-	api := iotago.LatestAPI(protocolParams)
-
 	errorHandler := func(err error) {
 		panic(err)
 	}
@@ -54,11 +52,17 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, errorHandler)
 	defer s.Shutdown()
 
+	if err := s.Settings().StoreProtocolParameters(opt.ProtocolParameters); err != nil {
+		return errors.Wrap(err, "failed to store the protocol parameters")
+	}
+
+	if err := s.Settings().StoreProtocolParametersEpochMapping(opt.ProtocolParameters.Version(), 0); err != nil {
+		return errors.Wrap(err, "failed to set the protocol parameters epoch mapping")
+	}
+
+	api := s.Settings().LatestAPI()
 	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
 		return errors.Wrap(err, "failed to store empty commitment")
-	}
-	if err := s.Settings().SetProtocolParameters(opt.ProtocolParameters); err != nil {
-		return errors.Wrap(err, "failed to set the genesis time")
 	}
 
 	accounts := account.NewAccounts()
@@ -83,16 +87,15 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		poa.NewProvider([]iotago.AccountID{}),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
-		epochorchestrator.NewProvider(epochorchestrator.WithCommitteeForEpochZero(accounts)),
-		slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
+		epochorchestrator.NewProvider(epochorchestrator.WithInitialCommittee(accounts)),
+		slotnotarization.NewProvider(),
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
 		tipmanagerv1.NewProvider(),
+		tipselectionv1.NewProvider(),
+		engine.WithSnapshotPath(""), //magic to disable loading snapshot
 	)
 	defer engineInstance.Shutdown()
-
-	engineInstance.TriggerConstructed()
-	engineInstance.TriggerInitialized()
 
 	for blockID, commitmentID := range opt.RootBlocks {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
@@ -101,29 +104,29 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	totalAccountDeposit := lo.Reduce(opt.Accounts, func(accumulator iotago.BaseToken, details AccountDetails) iotago.BaseToken {
 		return accumulator + details.Amount
 	}, iotago.BaseToken(0))
-	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply-totalAccountDeposit, opt.GenesisSeed, engineInstance, protocolParams); err != nil {
+	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply()-totalAccountDeposit, opt.GenesisSeed, engineInstance); err != nil {
 		return errors.Wrap(err, "failed to create genesis outputs")
 	}
 
-	if err := createGenesisAccounts(opt.Accounts, engineInstance, protocolParams); err != nil {
+	if err := createGenesisAccounts(opt.Accounts, engineInstance); err != nil {
 		return errors.Wrap(err, "failed to create genesis account outputs")
 	}
 
 	return engineInstance.WriteSnapshot(opt.FilePath)
 }
 
-func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte, engineInstance *engine.Engine, protocolParams *iotago.ProtocolParameters) (err error) {
+func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte, engineInstance *engine.Engine) (err error) {
 	if genesisTokenAmount > 0 {
 		genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
 		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
 
-		if _, err = protocolParams.RentStructure.CoversStateRent(output, genesisTokenAmount); err != nil {
+		if _, err = engineInstance.LatestAPI().ProtocolParameters().RentStructure().CoversStateRent(output, genesisTokenAmount); err != nil {
 			return errors.Wrap(err, "min rent not covered by Genesis output with index 0")
 		}
 
 		// Genesis output is on Genesis TX index 0
 		// TODO: change genesis outputID from empty transaction id to some hash, to avoid problems when rolling back newly created accounts, whose previousOutputID is also emptyTrasactionID:0 (super edge case, but better have that covered)
-		if err := engineInstance.Ledger.AddUnspentOutput(utxoledger.CreateOutput(engineInstance.API(), iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0), iotago.EmptyBlockID(), 0, 0, output)); err != nil {
+		if err := engineInstance.Ledger.AddUnspentOutput(utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0), iotago.EmptyBlockID(), 0, 0, output)); err != nil {
 			return err
 		}
 	}
@@ -131,16 +134,16 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 	return nil
 }
 
-func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine, protocolParams *iotago.ProtocolParameters) (err error) {
+func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine) (err error) {
 	// Account outputs start from Genesis TX index 1
 	for idx, account := range accounts {
 		output := createAccount(account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
 
-		if _, err = protocolParams.RentStructure.CoversStateRent(output, account.Amount); err != nil {
+		if _, err = engineInstance.LatestAPI().ProtocolParameters().RentStructure().CoversStateRent(output, account.Amount); err != nil {
 			return errors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
 		}
 
-		accountOutput := utxoledger.CreateOutput(engineInstance.API(), iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)
+		accountOutput := utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)
 		if err = engineInstance.Ledger.AddUnspentOutput(accountOutput); err != nil {
 			return err
 		}

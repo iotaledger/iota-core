@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -28,7 +29,7 @@ func (l LexicalOrderedOutputs) Swap(i, j int) {
 }
 
 type Output struct {
-	api iotago.API
+	apiProvider api.Provider
 
 	outputID        iotago.OutputID
 	blockID         iotago.BlockID
@@ -72,7 +73,7 @@ func (o *Output) Output() iotago.Output {
 	o.outputOnce.Do(func() {
 		if o.output == nil {
 			var decoded iotago.TxEssenceOutput
-			if _, err := o.api.Decode(o.encodedOutput, &decoded); err != nil {
+			if _, err := o.apiProvider.APIForSlot(o.blockID.Index()).Decode(o.encodedOutput, &decoded); err != nil {
 				panic(err)
 			}
 			o.output = decoded
@@ -105,11 +106,11 @@ func (o Outputs) ToOutputSet() iotago.OutputSet {
 	return outputSet
 }
 
-func CreateOutput(api iotago.API, outputID iotago.OutputID, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, output iotago.Output, outputBytes ...[]byte) *Output {
+func CreateOutput(apiProvider api.Provider, outputID iotago.OutputID, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, output iotago.Output, outputBytes ...[]byte) *Output {
 	var encodedOutput []byte
 	if len(outputBytes) == 0 {
 		var err error
-		encodedOutput, err = api.Encode(output)
+		encodedOutput, err = apiProvider.APIForSlot(blockID.Index()).Encode(output)
 		if err != nil {
 			panic(err)
 		}
@@ -118,7 +119,7 @@ func CreateOutput(api iotago.API, outputID iotago.OutputID, blockID iotago.Block
 	}
 
 	o := &Output{
-		api:             api,
+		apiProvider:     apiProvider,
 		outputID:        outputID,
 		blockID:         blockID,
 		slotIndexBooked: slotIndexBooked,
@@ -133,8 +134,8 @@ func CreateOutput(api iotago.API, outputID iotago.OutputID, blockID iotago.Block
 	return o
 }
 
-func NewOutput(api iotago.API, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
-	txID, err := transaction.ID()
+func NewOutput(apiProvider api.Provider, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
+	txID, err := transaction.ID(apiProvider.APIForSlot(blockID.Index()))
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +147,7 @@ func NewOutput(api iotago.API, blockID iotago.BlockID, slotIndexBooked iotago.Sl
 	output = transaction.Essence.Outputs[int(index)]
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(txID, index)
 
-	return CreateOutput(api, outputID, blockID, slotIndexBooked, slotCreated, output), nil
+	return CreateOutput(apiProvider, outputID, blockID, slotIndexBooked, slotCreated, output), nil
 }
 
 // - kvStorable
@@ -165,9 +166,9 @@ func (o *Output) KVStorableKey() (key []byte) {
 
 func (o *Output) KVStorableValue() (value []byte) {
 	ms := marshalutil.New(48)
-	ms.WriteBytes(o.blockID[:])              // 32 bytes
-	ms.WriteBytes(o.slotIndexBooked.Bytes()) // 8 bytes
-	ms.WriteBytes(o.slotCreated.Bytes())     // 8 bytes
+	ms.WriteBytes(o.blockID[:])                  // 32 bytes
+	ms.WriteBytes(o.slotIndexBooked.MustBytes()) // 8 bytes
+	ms.WriteBytes(o.slotCreated.MustBytes())     // 8 bytes
 	ms.WriteBytes(o.encodedOutput)
 
 	return ms.Bytes()
@@ -231,7 +232,7 @@ func (m *Manager) ReadOutputByOutputIDWithoutLocking(outputID iotago.OutputID) (
 	}
 
 	output := &Output{
-		api: m.apiProviderFunc(),
+		apiProvider: m.apiProvider,
 	}
 	if err := output.kvStorableLoad(m, key, value); err != nil {
 		return nil, err

@@ -35,7 +35,7 @@ func TestConfirmationFlags(t *testing.T) {
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"nodeA": {
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
@@ -43,7 +43,7 @@ func TestConfirmationFlags(t *testing.T) {
 		},
 		"nodeB": {
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
@@ -51,7 +51,7 @@ func TestConfirmationFlags(t *testing.T) {
 		},
 		"nodeC": {
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
@@ -59,7 +59,7 @@ func TestConfirmationFlags(t *testing.T) {
 		},
 		"nodeD": {
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
@@ -71,11 +71,11 @@ func TestConfirmationFlags(t *testing.T) {
 	// Verify that nodes have the expected states.
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),
-		testsuite.WithProtocolParameters(ts.ProtocolParameters),
-		testsuite.WithLatestCommitment(iotago.NewEmptyCommitment()),
+		testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+		testsuite.WithLatestCommitment(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())),
 		testsuite.WithLatestFinalizedSlot(0),
-		testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
+		testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
+		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 		testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat),
 		testsuite.WithEvictedSlot(0),
@@ -85,11 +85,11 @@ func TestConfirmationFlags(t *testing.T) {
 
 	// Slots 1-3: only node A is online and issues blocks, make slot 1 committed.
 	{
-		ts.IssueBlockAtSlot("A.1.0", 1, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("Genesis"))
-		ts.IssueBlockAtSlot("A.1.1", 1, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.1.0"))
-		ts.IssueBlockAtSlot("A.2.0", 2, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.1.1"))
-		ts.IssueBlockAtSlot("A.2.1", 2, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.2.0"))
-		ts.IssueBlockAtSlot("A.3.0", 3, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.2.1"))
+		ts.IssueBlockAtSlot("A.1.0", 1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("Genesis"))
+		ts.IssueBlockAtSlot("A.1.1", 1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.1.0"))
+		ts.IssueBlockAtSlot("A.2.0", 2, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.1.1"))
+		ts.IssueBlockAtSlot("A.2.1", 2, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.2.0"))
+		ts.IssueBlockAtSlot("A.3.0", 3, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.2.1"))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.1.0", "A.1.1", "A.2.0", "A.2.1", "A.3.0"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1.0", "A.1.1", "A.2.0", "A.2.1"), true, ts.Nodes()...)
@@ -98,7 +98,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.1.0", "A.1.1", "A.2.0", "A.2.1", "A.3.0"), false, ts.Nodes()...)
 
 		// Make slot 1 committed.
-		ts.IssueBlockAtSlot("A.3.1", 3, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.3.0"))
+		ts.IssueBlockAtSlot("A.3.1", 3, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.3.0"))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.3.1"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3.0"), true, ts.Nodes()...)
@@ -113,7 +113,7 @@ func TestConfirmationFlags(t *testing.T) {
 	{
 		slot1Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 
-		ts.IssueBlockAtSlot("A.4.0", 4, iotago.NewEmptyCommitment(), nodeA, ts.BlockID("A.3.1"))
+		ts.IssueBlockAtSlot("A.4.0", 4, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.3.1"))
 		ts.IssueBlockAtSlot("A.4.1", 4, slot1Commitment, nodeA, ts.BlockID("A.4.0"))
 		ts.IssueBlockAtSlot("B.4.0", 4, slot1Commitment, nodeB, ts.BlockID("A.4.1"))
 		ts.IssueBlockAtSlot("A.4.2", 4, slot1Commitment, nodeA, ts.BlockID("B.4.0"))

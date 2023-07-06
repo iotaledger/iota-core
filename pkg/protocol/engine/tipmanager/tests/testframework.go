@@ -8,14 +8,13 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TestFramework struct {
@@ -38,36 +37,33 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t.Instance = tipmanagerv1.NewTipManager(func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]
 		return block, exists
-	}, func() iotago.BlockIDs {
-		return iotago.BlockIDs{iotago.EmptyBlockID()}
 	})
-	t.Instance.SetConflictDAG(conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](account.NewAccounts().SelectCommittee().SeatCount))
 
 	return t
 }
 
-func (t *TestFramework) AddBlock(alias string) {
-	t.Instance.AddBlock(t.Block(alias))
+func (t *TestFramework) AddBlock(alias string) tipmanager.TipMetadata {
+	return t.Instance.AddBlock(t.Block(alias))
 }
 
-func (t *TestFramework) CreateBlock(alias string, parents map[model.ParentsType][]string) *blocks.Block {
-	blockBuilder := builder.NewBlockBuilder()
+func (t *TestFramework) CreateBlock(alias string, parents map[iotago.ParentsType][]string) *blocks.Block {
+	blockBuilder := builder.NewBasicBlockBuilder(tpkg.TestAPI)
 	blockBuilder.IssuingTime(time.Now())
 
-	if strongParents, strongParentsExist := parents[model.StrongParentType]; strongParentsExist {
+	if strongParents, strongParentsExist := parents[iotago.StrongParentType]; strongParentsExist {
 		blockBuilder.StrongParents(lo.Map(strongParents, t.BlockID))
 	}
-	if weakParents, weakParentsExist := parents[model.WeakParentType]; weakParentsExist {
+	if weakParents, weakParentsExist := parents[iotago.WeakParentType]; weakParentsExist {
 		blockBuilder.WeakParents(lo.Map(weakParents, t.BlockID))
 	}
-	if shallowLikeParents, shallowLikeParentsExist := parents[model.ShallowLikeParentType]; shallowLikeParentsExist {
+	if shallowLikeParents, shallowLikeParentsExist := parents[iotago.ShallowLikeParentType]; shallowLikeParentsExist {
 		blockBuilder.ShallowLikeParents(lo.Map(shallowLikeParents, t.BlockID))
 	}
 
 	block, err := blockBuilder.Build()
 	require.NoError(t.test, err)
 
-	modelBlock, err := model.BlockFromBlock(block, iotago.V3API(&protoParams))
+	modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
 	require.NoError(t.test, err)
 
 	t.blocksByID[modelBlock.ID()] = blocks.NewBlock(modelBlock)
@@ -95,23 +91,8 @@ func (t *TestFramework) BlockID(alias string) iotago.BlockID {
 
 func (t *TestFramework) AssertStrongTips(aliases ...string) {
 	for _, alias := range aliases {
-		require.True(t.test, advancedset.New(lo.Map(t.Instance.StrongTipSet(), (*blocks.Block).ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
+		require.True(t.test, advancedset.New(lo.Map(t.Instance.StrongTips(), tipmanager.TipMetadata.ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
 	}
 
-	require.Equal(t.test, len(aliases), len(t.Instance.StrongTipSet()), "strongTips size does not match")
-}
-
-var protoParams = iotago.ProtocolParameters{
-	Version:     3,
-	NetworkName: "test",
-	Bech32HRP:   "rms",
-	MinPoWScore: 0,
-	RentStructure: iotago.RentStructure{
-		VByteCost:    100,
-		VBFactorKey:  10,
-		VBFactorData: 1,
-	},
-	TokenSupply:           5000,
-	GenesisUnixTimestamp:  time.Now().Unix(),
-	SlotDurationInSeconds: 10,
+	require.Equal(t.test, len(aliases), len(t.Instance.StrongTips()), "strongTips size does not match")
 }

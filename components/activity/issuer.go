@@ -13,7 +13,7 @@ func issueActivityBlock(ctx context.Context) {
 		return
 	}
 
-	block, err := deps.BlockIssuer.CreateBlock(ctx, blockfactory.WithPayload(&iotago.TaggedData{
+	modelBlock, err := deps.BlockIssuer.CreateBlock(ctx, blockfactory.WithPayload(&iotago.TaggedData{
 		Tag: []byte("ACTIVITY"),
 	}))
 	if err != nil {
@@ -21,11 +21,11 @@ func issueActivityBlock(ctx context.Context) {
 		return
 	}
 
-	if err := deps.BlockIssuer.IssueBlock(block); err != nil {
+	if err := deps.BlockIssuer.IssueBlock(modelBlock); err != nil {
 		Component.LogWarnf("error issuing activity block: %s", err.Error())
 		return
 	}
 
-	//TODO: uncomment here.
-	// Component.LogInfof("Issued activity block: %s - commitment %s %d - latest finalized slot %d", block.ID(), block.Block().SlotCommitment.MustID(), block.Block().SlotCommitment.Index, block.Block().LatestFinalizedSlot)
+	// TODO: uncomment this
+	// Component.LogInfof("Issued activity block: %s - commitment %s %d - latest finalized slot %d", modelBlock.ID(), modelBlock.ProtocolBlock().SlotCommitmentID, modelBlock.ProtocolBlock().SlotCommitmentID.Index(), modelBlock.ProtocolBlock().LatestFinalizedSlot)
 }

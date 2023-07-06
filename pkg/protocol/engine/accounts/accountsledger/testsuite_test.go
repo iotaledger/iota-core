@@ -2,9 +2,7 @@ package accountsledger_test
 
 import (
 	"fmt"
-	"math"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -32,8 +30,6 @@ type TestSuite struct {
 	pubKeys  map[string]ed25519.PublicKey
 	outputs  map[string]iotago.OutputID
 
-	ProtocolParameters *iotago.ProtocolParameters
-
 	slotData               *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *slotData]
 	accountsStatePerSlot   *shrinkingmap.ShrinkingMap[iotago.SlotIndex, map[iotago.AccountID]*AccountState]
 	latestFieldsPerAccount *shrinkingmap.ShrinkingMap[iotago.AccountID, *latestAccountFields]
@@ -47,24 +43,6 @@ func NewTestSuite(test *testing.T) *TestSuite {
 		accounts: make(map[string]iotago.AccountID),
 		pubKeys:  make(map[string]ed25519.PublicKey),
 		outputs:  make(map[string]iotago.OutputID),
-
-		ProtocolParameters: &iotago.ProtocolParameters{
-			Version:     3,
-			NetworkName: utils.RandString(255),
-			Bech32HRP:   iotago.NetworkPrefix(utils.RandString(3)),
-			MinPoWScore: utils.RandUint32(50000),
-			RentStructure: iotago.RentStructure{
-				VByteCost:    100,
-				VBFactorData: 1,
-				VBFactorKey:  10,
-			},
-			TokenSupply:           tpkg.RandBaseToken(math.MaxUint64),
-			GenesisUnixTimestamp:  time.Now().Unix(),
-			SlotDurationInSeconds: 10,
-			SlotsPerEpochExponent: 13,
-			EvictionAge:           10,
-			LivenessThreshold:     3,
-		},
 
 		blocks:                 memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block](),
 		slotData:               shrinkingmap.New[iotago.SlotIndex, *slotData](),
@@ -84,7 +62,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 			prunableStores[index] = mapdb.NewMapDB()
 		}
 
-		p := prunable.NewAccountDiffs(index, prunableStores[index], t.API())
+		p := prunable.NewAccountDiffs(index, prunableStores[index], tpkg.TestAPI)
 
 		return p
 	}
@@ -99,13 +77,9 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	}
 
 	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB())
-	manager.SetCommitmentEvictionAge(t.ProtocolParameters.EvictionAge * 2)
+	manager.SetCommitmentEvictionAge(tpkg.TestAPI.ProtocolParameters().EvictionAge() << 1)
 
 	return manager
-}
-
-func (t *TestSuite) API() iotago.API {
-	return iotago.LatestAPI(t.ProtocolParameters)
 }
 
 func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[string]*AccountActions) {
@@ -202,9 +176,9 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 }
 
 func (t *TestSuite) createBlockWithBurn(accountID iotago.AccountID, index iotago.SlotIndex, burn iotago.Mana) *blocks.Block {
-	innerBlock := tpkg.RandBlockWithIssuerAndBurnedMana(accountID, burn)
-	innerBlock.IssuingTime = t.API().TimeProvider().SlotStartTime(index)
-	modelBlock, err := model.BlockFromBlock(innerBlock, t.API())
+	innerBlock := tpkg.RandBasicBlockWithIssuerAndBurnedMana(accountID, burn)
+	innerBlock.IssuingTime = tpkg.TestAPI.TimeProvider().SlotStartTime(index)
+	modelBlock, err := model.BlockFromBlock(innerBlock, tpkg.TestAPI)
 
 	require.NoError(t.T, err)
 

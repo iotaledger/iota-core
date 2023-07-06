@@ -16,16 +16,12 @@ type ParametersProtocol struct {
 		Depth int `default:"5" usage:"defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate"`
 	}
 
-	Notarization struct {
-		// MinSlotCommittableAge defines the min age of a committable slot.
-		MinSlotCommittableAge int64 `default:"10" usage:"min age of a committable slot denoted in slots"`
-	}
-
 	Filter struct {
 		// MaxAllowedClockDrift defines the maximum drift our wall clock can have to future blocks being received from the network.
 		MaxAllowedClockDrift time.Duration `default:"5s" usage:"the maximum drift our wall clock can have to future blocks being received from the network"`
 	}
 
+	// TODO: load this from a snapshot instead of program parameters
 	SybilProtection struct {
 		Committee []string `usage:"the identities of the validator"`
 	}

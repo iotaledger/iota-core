@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -95,21 +94,20 @@ func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 
 func createExplorerBlock(block *model.Block) *ExplorerBlock {
 	// TODO: fill in missing fields
-	iotaBlk := block.Block()
-
-	commitmentID, err := iotaBlk.SlotCommitment.ID()
-	if err != nil {
-		return nil
-	}
+	iotaBlk := block.ProtocolBlock()
 
 	sigBytes, err := iotaBlk.Signature.Encode()
 	if err != nil {
 		return nil
 	}
 
-	payloadJSON, err := deps.Protocol.API().JSONEncode(iotaBlk.Payload)
-	if err != nil {
-		return nil
+	var payloadJSON []byte
+	basicBlock, isBasic := block.BasicBlock()
+	if isBasic {
+		payloadJSON, err = deps.Protocol.APIForVersion(iotaBlk.ProtocolVersion).JSONEncode(basicBlock.Payload)
+		if err != nil {
+			return nil
+		}
 	}
 
 	t := &ExplorerBlock{
@@ -119,41 +117,41 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 		IssuanceTimestamp:   iotaBlk.IssuingTime.Unix(),
 		IssuerID:            iotaBlk.IssuerID.String(),
 		Signature:           hexutil.EncodeHex(sigBytes),
-		StrongParents:       iotaBlk.StrongParents.ToHex(),
-		WeakParents:         iotaBlk.WeakParents.ToHex(),
-		ShallowLikedParents: iotaBlk.ShallowLikeParents.ToHex(),
+		StrongParents:       iotaBlk.Block.StrongParentIDs().ToHex(),
+		WeakParents:         iotaBlk.Block.WeakParentIDs().ToHex(),
+		ShallowLikedParents: iotaBlk.Block.ShallowLikeParentIDs().ToHex(),
 
 		PayloadType: func() iotago.PayloadType {
-			if iotaBlk.Payload != nil {
-				return iotaBlk.Payload.PayloadType()
+			if isBasic && basicBlock.Payload != nil {
+				return basicBlock.Payload.PayloadType()
 			}
 			return iotago.PayloadType(0)
 		}(),
-		Payload: func() json.RawMessage {
-			if iotaBlk.Payload != nil && iotaBlk.Payload.PayloadType() == iotago.PayloadTransaction {
-				tx := NewTransaction(iotaBlk.Payload.(*iotago.Transaction))
-				bytes, _ := json.Marshal(tx)
+		// TransactionID: func() string {
+		// 	if iotaBlk.Payload != nil && iotaBlk.Payload.PayloadType() == iotago.PayloadTransaction {
+		// 		tx := iotaBlk.Payload.(*iotago.Transaction)
+		// 		id, _ := tx.ID()
 
-				return bytes
-			}
-			return payloadJSON
-		}(),
-		TransactionID: func() string {
-			if iotaBlk.Payload != nil && iotaBlk.Payload.PayloadType() == iotago.PayloadTransaction {
-				tx := iotaBlk.Payload.(*iotago.Transaction)
-				id, _ := tx.ID()
-
-				return id.ToHex()
-			}
-			return ""
-		}(),
-		CommitmentID: commitmentID.ToHex(),
-		Commitment: CommitmentResponse{
-			Index:            uint64(iotaBlk.SlotCommitment.Index),
-			PrevID:           iotaBlk.SlotCommitment.PrevID.ToHex(),
-			RootsID:          iotaBlk.SlotCommitment.RootsID.ToHex(),
-			CumulativeWeight: iotaBlk.SlotCommitment.CumulativeWeight,
-		},
+		// 		return id.ToHex()
+		// 	}
+		// 	return ""
+		// }(),
+		// CommitmentID: commitmentID.ToHex(),
+		// Commitment: CommitmentResponse{
+		// 	Index:            uint64(iotaBlk.SlotCommitment.Index),
+		// 	PrevID:           iotaBlk.SlotCommitment.PrevID.ToHex(),
+		// 	RootsID:          iotaBlk.SlotCommitment.RootsID.ToHex(),
+		// 	CumulativeWeight: iotaBlk.SlotCommitment.CumulativeWeight,
+		// },
+		Payload:      payloadJSON,
+		CommitmentID: iotaBlk.SlotCommitmentID.ToHex(),
+		//TODO: remove from explorer or add link to a separate route
+		//Commitment: CommitmentResponse{
+		//	Index:            uint64(iotaBlk.SlotCommitmentID.Index()),
+		//	PrevID:           iotaBlk.SlotCommitment.PrevID.ToHex(),
+		//	RootsID:          iotaBlk.SlotCommitment.RootsID.ToHex(),
+		//	CumulativeWeight: iotaBlk.SlotCommitment.CumulativeWeight,
+		//},
 		LatestConfirmedSlot: uint64(iotaBlk.LatestFinalizedSlot),
 	}
 
@@ -180,7 +178,7 @@ func getTransaction(c echo.Context) error {
 		return errors.Errorf("block not found: %s", output.BlockID().ToHex())
 	}
 
-	iotaTX, isTX := block.Block().Payload.(*iotago.Transaction)
+	iotaTX, isTX := block.Transaction()
 	if !isTX {
 		return errors.Errorf("payload is not a transaction: %s", output.BlockID().ToHex())
 	}

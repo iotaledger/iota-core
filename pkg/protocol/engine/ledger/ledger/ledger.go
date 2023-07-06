@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -42,7 +43,7 @@ var (
 type Ledger struct {
 	events *ledger.Events
 
-	apiProvider func() iotago.API
+	apiProvider api.Provider
 
 	utxoLedger       *utxoledger.Manager
 	accountsLedger   *accountsledger.Manager
@@ -52,12 +53,9 @@ type Ledger struct {
 
 	sybilProtection sybilprotection.SybilProtection
 
-	memPool            mempool.MemPool[ledger.BlockVoteRank]
-	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
-	errorHandler       func(error)
-	protocolParameters *iotago.ProtocolParameters
-
-	manaDecayProvider *iotago.ManaDecayProvider
+	memPool      mempool.MemPool[ledger.BlockVoteRank]
+	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
+	errorHandler func(error)
 
 	module.Module
 }
@@ -70,7 +68,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.Commitments().Load,
 			e.BlockCache.Block,
 			e.Storage.AccountDiffs,
-			e.API,
+			e,
 			e.SybilProtection,
 			e.EpochGadget,
 			e.ErrorHandler("ledger"),
@@ -84,17 +82,14 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
-			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
-		})
-		e.Storage.Settings().HookInitialized(func() {
-			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
-			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
-			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
-			l.accountsLedger.SetCommitmentEvictionAge(l.protocolParameters.EvictionAge)
-			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
-			l.TriggerConstructed()
+			// TODO: how do we want to handle changing API here?
+			api := l.apiProvider.LatestAPI()
+			l.manaManager = mana.NewManager(api.ManaDecayProvider(), l.resolveAccountOutput)
+			l.accountsLedger.SetCommitmentEvictionAge(api.ProtocolParameters().EvictionAge())
+			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)
 			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
@@ -120,7 +115,7 @@ func New(
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
-	apiProvider func() iotago.API,
+	apiProvider api.Provider,
 	sybilProtection sybilprotection.SybilProtection,
 	epochGadget epochgadget.Gadget,
 	errorHandler func(error),
@@ -143,9 +138,8 @@ func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.Transact
 }
 
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
-	switch payload := block.Block().Payload.(type) {
-	case mempool.Transaction:
-		transactionMetadata, err := l.memPool.AttachTransaction(payload, block.ID())
+	if transaction, hasTransaction := block.Transaction(); hasTransaction {
+		transactionMetadata, err := l.memPool.AttachTransaction(transaction, block.ID())
 		if err != nil {
 			l.errorHandler(err)
 
@@ -153,10 +147,9 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 		}
 
 		return transactionMetadata, true
-	default:
-
-		return nil, false
 	}
+
+	return nil, false
 }
 
 func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, accountRoot iotago.Identifier, err error) {
@@ -222,12 +215,8 @@ func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
-	switch block.Block().Payload.(type) {
-	case *iotago.Transaction:
+	if _, hasTransaction := block.Transaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
-
-	default:
-		return
 	}
 }
 
@@ -257,7 +246,7 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Outp
 			return nil, ErrUnexpectedUnderlyingType
 		}
 
-		return utxoledger.CreateOutput(l.utxoLedger.API(), stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
+		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
 	default:
 		panic("unexpected State type")
 	}
@@ -296,9 +285,9 @@ func (l *Ledger) Import(reader io.ReadSeeker) error {
 		return errors.Wrap(err, "failed to import accountsLedger")
 	}
 
-	// if err := l.epochGadget.Import(reader); err != nil {
-	// 	return errors.Wrap(err, "failed to import rewardsManager")
-	// }
+	if err := l.epochGadget.Import(reader); err != nil {
+		return errors.Wrap(err, "failed to import epochGadget")
+	}
 
 	return nil
 }
@@ -312,9 +301,9 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 		return errors.Wrap(err, "failed to export accountsLedger")
 	}
 
-	// if err := l.epochGadget.Export(writer, targetIndex); err != nil {
-	// 	return errors.Wrap(err, "failed to export rewardsManager")
-	// }
+	if err := l.epochGadget.Export(writer, targetIndex); err != nil {
+		return errors.Wrap(err, "failed to export epochGadget")
+	}
 
 	return nil
 }
@@ -335,11 +324,7 @@ func (l *Ledger) Shutdown() {
 func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable.AccountDiff, index iotago.SlotIndex, consumedAccounts map[iotago.AccountID]*utxoledger.Output, createdAccounts map[iotago.AccountID]*utxoledger.Output) {
 	for consumedAccountID, consumedOutput := range consumedAccounts {
 		// We might have had an allotment on this account, and the diff already exists
-		accountDiff, exists := accountDiffs[consumedAccountID]
-		if !exists {
-			accountDiff = prunable.NewAccountDiff()
-			accountDiffs[consumedAccountID] = accountDiff
-		}
+		accountDiff := getAccountDiff(accountDiffs, consumedAccountID)
 
 		// Obtain account state at the current latest committed slot, which is index-1
 		accountData, exists, err := l.accountsLedger.Account(consumedAccountID, index-1)
@@ -399,11 +384,8 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		}
 
 		// We might have had an allotment on this account, and the diff already exists
-		accountDiff, exists := accountDiffs[createdAccountID]
-		if !exists {
-			accountDiff = prunable.NewAccountDiff()
-			accountDiffs[createdAccountID] = accountDiff
-		}
+		accountDiff := getAccountDiff(accountDiffs, createdAccountID)
+
 		// Change and PreviousUpdatedTime are either 0 if we did not have an allotment for this account, or we already
 		// have some values from the allotment, so no need to set them explicitly.
 		accountDiff.NewOutputID = createdOutput.OutputID()
@@ -411,8 +393,8 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.PubKeysAdded = lo.Map(createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
 
 		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
-			accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch)
 			accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
+			accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch)
 			accountDiff.FixedCostChange = int64(stakingFeature.FixedCost)
 		}
 	}
@@ -432,10 +414,12 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			return false
 		}
 
-		if createdOutput.OutputType() == iotago.OutputAccount {
+		switch createdOutput.OutputType() {
+		case iotago.OutputAccount:
 			createdAccount, _ := createdOutput.Output().(*iotago.AccountOutput)
 
-			// Skip if the account doesn't have a BIC feature.
+			// if we create an account that doesn't have a block issuer feature or staking, we don't need to track the changes.
+			// the VM needs to make sure that no staking feature is created, if there was no block issuer feature.
 			// TODO: do we even need to check for staking feature here if we require BlockIssuer with staking?
 			if createdAccount.FeatureSet().BlockIssuer() == nil && createdAccount.FeatureSet().Staking() == nil {
 				return true
@@ -447,9 +431,9 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			}
 
 			createdAccounts[accountID] = createdOutput
-		}
 
-		if createdOutput.OutputType() == iotago.OutputDelegation {
+		case iotago.OutputDelegation:
+			// the delegation output was created => determine later if we need to add the stake to the validator
 			delegation, _ := createdOutput.Output().(*iotago.DelegationOutput)
 			createdAccountDelegation[delegation.DelegationID] = delegation
 		}
@@ -469,9 +453,10 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			return false
 		}
 
-		if spentOutput.OutputType() == iotago.OutputAccount {
+		switch spentOutput.OutputType() {
+		case iotago.OutputAccount:
 			consumedAccount, _ := spentOutput.Output().(*iotago.AccountOutput)
-			// Skip if the account doesn't have a BIC feature.
+			// if we transition / destroy an account that doesn't have a block issuer feature or staking, we don't need to track the changes.
 			// TODO: do we even need to check for staking feature here if we require BlockIssuer with staking?
 			if consumedAccount.FeatureSet().BlockIssuer() == nil && consumedAccount.FeatureSet().Staking() == nil {
 				return true
@@ -482,19 +467,17 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			if _, exists := createdAccounts[consumedAccount.AccountID]; !exists {
 				destroyedAccounts.Add(consumedAccount.AccountID)
 			}
-		}
 
-		if spentOutput.OutputType() == iotago.OutputDelegation {
+		case iotago.OutputDelegation:
 			delegationOutput, _ := spentOutput.Output().(*iotago.DelegationOutput)
+
+			// TODO: do we have a testcase that checks transitioning a delegation output twice in the same slot?
 			if _, createdDelegationExists := createdAccountDelegation[delegationOutput.DelegationID]; createdDelegationExists {
+				// the delegation output was created and destroyed in the same slot => do not track the delegation as newly created
 				delete(createdAccountDelegation, delegationOutput.DelegationID)
 			} else {
-				accountDiff, exists := accountDiffs[delegationOutput.ValidatorID]
-				if !exists {
-					accountDiff = prunable.NewAccountDiff()
-					accountDiffs[delegationOutput.ValidatorID] = accountDiff
-				}
-
+				// the delegation output was destroyed => subtract the stake from the validator account
+				accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorID)
 				accountDiff.DelegationStakeChange -= int64(delegationOutput.DelegatedAmount)
 			}
 		}
@@ -503,12 +486,8 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	})
 
 	for _, delegationOutput := range createdAccountDelegation {
-		accountDiff, exists := accountDiffs[delegationOutput.ValidatorID]
-		if !exists {
-			accountDiff = prunable.NewAccountDiff()
-			accountDiffs[delegationOutput.ValidatorID] = accountDiff
-		}
-
+		// the delegation output was newly created and not transitioned/destroyed => add the stake to the validator account
+		accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorID)
 		accountDiff.DelegationStakeChange += int64(delegationOutput.DelegatedAmount)
 	}
 
@@ -552,7 +531,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 			// output side
 			txWithMeta.Outputs().Range(func(stateMetadata mempool.StateMetadata) {
-				output := utxoledger.CreateOutput(l.utxoLedger.API(), stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationTime, stateMetadata.State().Output())
+				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationTime, stateMetadata.State().Output())
 				outputs = append(outputs, output)
 			})
 		}
@@ -560,12 +539,10 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 		// process allotments
 		{
 			for _, allotment := range tx.Essence.Allotments {
-				accountDiff, exists := accountDiffs[allotment.AccountID]
-				if !exists {
-					// allotments won't change the outputID of the Account, so the diff defaults to empty new and previous outputIDs
-					accountDiff = prunable.NewAccountDiff()
-					accountDiffs[allotment.AccountID] = accountDiff
-				}
+				// in case it didn't exist, allotments won't change the outputID of the Account,
+				// so the diff defaults to empty new and previous outputIDs
+				accountDiff := getAccountDiff(accountDiffs, allotment.AccountID)
+
 				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID, stateDiff.Index()-1)
 				if accountErr != nil {
 					panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, stateDiff.Index()-1, accountErr))
@@ -644,9 +621,9 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
-	voteRank := ledger.NewBlockVoteRank(block.ID(), block.Block().IssuingTime)
+	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().IssuingTime)
 
-	seat, exists := l.sybilProtection.Committee(block.ID().Index()).GetSeat(block.Block().IssuerID)
+	seat, exists := l.sybilProtection.Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return
 	}
@@ -656,4 +633,15 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 		//  Do we track witness weight of invalid blocks?
 		l.errorHandler(errors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
+}
+
+func getAccountDiff(accountDiffs map[iotago.AccountID]*prunable.AccountDiff, accountID iotago.AccountID) *prunable.AccountDiff {
+	accountDiff, exists := accountDiffs[accountID]
+	if !exists {
+		// initialize the account diff because it didn't exist before
+		accountDiff = prunable.NewAccountDiff()
+		accountDiffs[accountID] = accountDiff
+	}
+
+	return accountDiff
 }

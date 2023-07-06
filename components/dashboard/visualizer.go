@@ -8,9 +8,9 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // var (
@@ -40,12 +40,16 @@ type tipinfo struct {
 // }
 
 func sendVertex(blk *blocks.Block, finalized bool) {
+	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock(), deps.Protocol.LatestAPI())
+	_, isTx := modelBlk.Transaction()
+
 	broadcastWsBlock(&wsblk{MsgTypeVertex, &vertex{
-		ID:            blk.ID().ToHex(),
-		StrongParents: blk.Block().StrongParents.ToHex(),
-		WeakParents:   blk.Block().WeakParents.ToHex(),
-		IsFinalized:   finalized,
-		IsTx:          blk.Block().Payload.PayloadType() == iotago.PayloadTransaction,
+		ID:                  blk.ID().ToHex(),
+		StrongParents:       blk.ProtocolBlock().Block.StrongParentIDs().ToHex(),
+		WeakParents:         blk.ProtocolBlock().Block.WeakParentIDs().ToHex(),
+		ShallowLikedParents: blk.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
+		IsFinalized:         finalized,
+		IsTx:                isTx,
 	}}, true)
 }
 

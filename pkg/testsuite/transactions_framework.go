@@ -10,6 +10,7 @@ import (
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
@@ -20,8 +21,7 @@ import (
 )
 
 type TransactionFramework struct {
-	api         iotago.API
-	protoParams *iotago.ProtocolParameters
+	apiProvider api.Provider
 
 	wallet       *mock.HDWallet
 	states       map[string]*utxoledger.Output
@@ -36,8 +36,7 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 	}
 
 	tf := &TransactionFramework{
-		api:          protocol.API(),
-		protoParams:  protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(),
+		apiProvider:  protocol,
 		states:       map[string]*utxoledger.Output{"Genesis:0": genesisOutput},
 		transactions: make(map[string]*iotago.Transaction),
 		wallet:       mock.NewHDWallet("genesis", genesisSeed, 0),
@@ -57,37 +56,40 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 }
 
 func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.Transaction) {
-	(lo.PanicOnErr(transaction.ID())).RegisterAlias(alias)
+	api := t.apiProvider.LatestAPI()
+	(lo.PanicOnErr(transaction.ID(api))).RegisterAlias(alias)
 
 	t.transactions[alias] = transaction
 
-	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
+	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet(api)) {
 		clonedOutput := output.Clone()
-		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
+		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID(api)), outputID.Index())
 		if clonedOutput.Type() == iotago.OutputAccount {
 			if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID() {
 				accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
 			}
 		}
 
-		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.api, actualOutputID, iotago.EmptyBlockID(), 0, t.api.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
+		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID(), 0, api.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
 	}
 }
 
 func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signingWallets []*mock.HDWallet, opts ...options.Option[builder.TransactionBuilder]) (*iotago.Transaction, error) {
+	api := t.apiProvider.LatestAPI()
+
 	walletKeys := make([]iotago.AddressKeys, len(signingWallets))
 	for i, wallet := range signingWallets {
 		inputPrivateKey, _ := wallet.KeyPair()
 		walletKeys[i] = iotago.AddressKeys{Address: wallet.Address(), Keys: inputPrivateKey}
 	}
 
-	txBuilder := builder.NewTransactionBuilder(t.protoParams.NetworkID())
+	txBuilder := builder.NewTransactionBuilder(api)
 
 	// Always add a random payload to randomize transaction ID.
 	randomPayload := tpkg.Rand12ByteArray()
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
 
-	tx, err := options.Apply(txBuilder, opts).Build(t.protoParams, iotago.NewInMemoryAddressSigner(walletKeys...))
+	tx, err := options.Apply(txBuilder, opts).Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 	if err == nil {
 		t.RegisterTransaction(alias, tx)
 	}
@@ -296,7 +298,8 @@ func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
 }
 
 func (t *TransactionFramework) TransactionID(alias string) iotago.TransactionID {
-	return lo.PanicOnErr(t.Transaction(alias).ID())
+	api := t.apiProvider.LatestAPI()
+	return lo.PanicOnErr(t.Transaction(alias).ID(api))
 }
 
 func (t *TransactionFramework) Transactions(aliases ...string) []*iotago.Transaction {
@@ -417,7 +420,7 @@ func WithStakingEndEpoch(endEpoch iotago.EpochIndex) options.Option[iotago.Accou
 	return func(accountOutput *iotago.AccountOutput) {
 		staking := accountOutput.FeatureSet().Staking()
 		if staking == nil {
-			panic("cannot update staking end epoch on account without BlockIssuer feature")
+			panic("cannot update staking end epoch on account without Staking feature")
 		}
 		staking.EndEpoch = endEpoch
 	}

@@ -31,7 +31,7 @@ type Manager struct {
 
 	// accountsTree represents the Block Issuer data vector for all registered accounts that have a block issuer feature
 	// at the latest committed slot, it is updated on the slot commitment.
-	accountsTree *ads.Map[iotago.AccountID, accounts.AccountData, *iotago.AccountID, *accounts.AccountData]
+	accountsTree *ads.Map[iotago.AccountID, *accounts.AccountData]
 
 	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
 	slotDiff func(iotago.SlotIndex) *prunable.AccountDiffs
@@ -52,10 +52,19 @@ func New(
 	accountsStore kvstore.KVStore,
 ) *Manager {
 	return &Manager{
-		blockBurns:   shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
-		accountsTree: ads.NewMap[iotago.AccountID, accounts.AccountData](accountsStore),
-		block:        blockFunc,
-		slotDiff:     slotDiffFunc,
+		blockBurns: shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.BlockID]](),
+		accountsTree: ads.NewMap(accountsStore,
+			iotago.Identifier.Bytes,
+			iotago.IdentifierFromBytes,
+			(*accounts.AccountData).Bytes,
+			func(bytes []byte) (object *accounts.AccountData, consumed int, err error) {
+				a := new(accounts.AccountData)
+				consumed, err = a.FromBytes(bytes)
+
+				return a, consumed, err
+			}),
+		block:    blockFunc,
+		slotDiff: slotDiffFunc,
 	}
 }
 
@@ -96,10 +105,10 @@ func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountI
 
 	accDiff, destroyed, err := s.Load(accountID)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "failed to load slot diff for account %s", accountID.String())
+		return nil, false, errors.Wrapf(err, "failed to load slot diff for account %s", accountID)
 	}
 
-	return &accDiff, destroyed, nil
+	return accDiff, destroyed, nil
 }
 
 // AccountsTreeRoot returns the root of the Account tree with all the account ledger data.
@@ -125,7 +134,7 @@ func (m *Manager) ApplyDiff(
 	}
 
 	// load blocks burned in this slot
-	/// MOVE THIS TO UPDATE SLOT DIFF
+	// TODO: move this to update slot diff
 	burns, err := m.computeBlockBurnsForSlot(slotIndex)
 	if err != nil {
 		return errors.Wrap(err, "could not create block burns for slot")
@@ -247,11 +256,11 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		accountData.AddPublicKeys(diffChange.PubKeysRemoved...)
 		accountData.RemovePublicKeys(diffChange.PubKeysAdded...)
 
-		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) - diffChange.StakeEndEpochChange)
+		// TODO: add safemath package, check for overflows in testcases
 		accountData.ValidatorStake = iotago.BaseToken(int64(accountData.ValidatorStake) - diffChange.ValidatorStakeChange)
-		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) - diffChange.FixedCostChange)
-
 		accountData.DelegationStake = iotago.BaseToken(int64(accountData.DelegationStake) - diffChange.DelegationStakeChange)
+		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) - diffChange.StakeEndEpochChange)
+		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) - diffChange.FixedCostChange)
 
 		// collected to see if an account was destroyed between slotIndex and b.latestCommittedSlot index.
 		wasDestroyed = wasDestroyed || destroyed
@@ -278,8 +287,8 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prun
 
 	slotDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
 	slotDiff.DelegationStakeChange = -int64(accountData.DelegationStake)
-	slotDiff.FixedCostChange = -int64(accountData.FixedCost)
 	slotDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
+	slotDiff.FixedCostChange = -int64(accountData.FixedCost)
 
 	return slotDiff
 }
@@ -293,7 +302,9 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 			if !blockLoaded {
 				return nil, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
 			}
-			burns[block.Block().IssuerID] += block.Block().BurnedMana
+			if basicBlock, isBasicBlock := block.BasicBlock(); isBasicBlock {
+				burns[block.ProtocolBlock().IssuerID] += basicBlock.BurnedMana
+			}
 		}
 	}
 
@@ -309,7 +320,7 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 			// TODO: should this diff be done in the same place as other diffs? it feels kind of out of place here
 			accountDiff = m.preserveDestroyedAccountData(accountID)
 		}
-		err := diffStore.Store(accountID, *accountDiff, destroyed)
+		err := diffStore.Store(accountID, accountDiff, destroyed)
 		if err != nil {
 			return errors.Wrapf(err, "could not store diff to slot %d", slotIndex)
 		}
@@ -335,8 +346,8 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		}
 
 		if diffChange.BICChange != 0 || !exists {
-			//TODO: this needs to be decayed for (index - prevIndex) because update index is changed so it's impossible to use new decay
-			////
+			// TODO: this needs to be decayed for (index - prevIndex) because update index is changed so it's impossible to use new decay
+			// //
 			accountData.Credits.Update(diffChange.BICChange, index)
 		}
 
@@ -348,11 +359,11 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		accountData.AddPublicKeys(diffChange.PubKeysAdded...)
 		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
 
+		// TODO: add safemath package, check for overflows in testcases
 		accountData.ValidatorStake = iotago.BaseToken(int64(accountData.ValidatorStake) + diffChange.ValidatorStakeChange)
+		accountData.DelegationStake = iotago.BaseToken(int64(accountData.DelegationStake) + diffChange.DelegationStakeChange)
 		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) + diffChange.StakeEndEpochChange)
 		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) + diffChange.FixedCostChange)
-
-		accountData.DelegationStake = iotago.BaseToken(int64(accountData.DelegationStake) + diffChange.DelegationStakeChange)
 
 		m.accountsTree.Set(accountID, accountData)
 	}

@@ -153,7 +153,7 @@ func (n *Node) HookLogging() {
 
 	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
 		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
-			return lo.PanicOnErr(a.BlockID(n.Protocol.MainEngineInstance().API().TimeProvider()))
+			return lo.PanicOnErr(a.BlockID(n.Protocol.APIForVersion(a.ProtocolVersion)))
 		}))
 	})
 
@@ -182,7 +182,7 @@ func (n *Node) HookLogging() {
 	})
 
 	events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
-		fmt.Printf("%s > TipManager.TipAdded: %s in pool %d\n", n.Name, tipMetadata.Block().ID(), tipMetadata.TipPool())
+		fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool())
 	})
 
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
@@ -241,11 +241,11 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().TimeProvider().SlotFromTime(newTime))
+		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
 	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.API().TimeProvider().SlotFromTime(newTime))
+		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
@@ -275,19 +275,19 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Index(), block.Block().SlotCommitment.MustID())
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Index(), block.ProtocolBlock().SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.Block().SlotCommitment.MustID())
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
 	})
 
 	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
@@ -406,7 +406,7 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
 
-	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.Block().LatestFinalizedSlot)
+	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }

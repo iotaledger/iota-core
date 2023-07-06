@@ -11,9 +11,9 @@ func info() (*nodeclient.InfoResponse, error) {
 	cl := deps.Protocol.MainEngineInstance().Clock
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
-	protoParams := deps.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters()
+	protoParams := deps.Protocol.LatestAPI().ProtocolParameters()
 
-	protoParamsBytes, err := deps.Protocol.API().JSONEncode(protoParams)
+	protoParamsBytes, err := deps.Protocol.LatestAPI().JSONEncode(protoParams)
 	if err != nil {
 		return nil, err
 	}
