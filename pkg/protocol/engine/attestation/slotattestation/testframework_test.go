@@ -178,5 +178,5 @@ func (t *TestFramework) AssertCommit(slot iotago.SlotIndex, expectedCW uint64, e
 
 	require.ElementsMatchf(t.test, expectedAttestations, attestationFromTree, "attestations from tree do not match expected ones: expected: %v, got: %v", lo.Values(expectedAttestationsAliases), attestationBlockIDsFromTree)
 
-	require.Equal(t.test, expectedTree.Root(), root)
+	require.Equal(t.test, iotago.Identifier(expectedTree.Root()), root)
 }
