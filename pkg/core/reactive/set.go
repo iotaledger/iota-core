@@ -30,7 +30,7 @@ type Set[ElementType comparable] interface {
 	// Add adds the given elements to the set and triggers the registered callbacks if the value has changed.
 	Add(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])
 	Remove(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])
-	InheritFrom(sources ...*set[ElementType]) (unsubscribe func())
+	InheritFrom(sources ...Set[ElementType]) (unsubscribe func())
 	Size() int
 	IsEmpty() bool
 	Has(element ElementType) bool
@@ -158,7 +158,7 @@ func (s *set[ElementType]) Remove(elements *advancedset.AdvancedSet[ElementType]
 }
 
 // InheritFrom registers the given sets to inherit their mutations to the set.
-func (s *set[ElementType]) InheritFrom(sources ...*set[ElementType]) (unsubscribe func()) {
+func (s *set[ElementType]) InheritFrom(sources ...Set[ElementType]) (unsubscribe func()) {
 	unsubscribeCallbacks := make([]func(), len(sources))
 
 	for i, source := range sources {

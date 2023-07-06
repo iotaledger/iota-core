@@ -22,7 +22,7 @@ type StateMetadata struct {
 	spendCommitted     reactive.Variable[*TransactionMetadata]
 	allSpendersRemoved *event.Event
 
-	conflictIDs *reactive.set[iotago.TransactionID]
+	conflictIDs reactive.Set[iotago.TransactionID]
 
 	*inclusionFlags
 }
@@ -69,7 +69,7 @@ func (s *StateMetadata) State() mempool.State {
 	return s.state
 }
 
-func (s *StateMetadata) ConflictIDs() *reactive.set[iotago.TransactionID] {
+func (s *StateMetadata) ConflictIDs() reactive.Set[iotago.TransactionID] {
 	return s.conflictIDs
 }
 
