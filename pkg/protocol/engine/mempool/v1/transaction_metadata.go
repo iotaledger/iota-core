@@ -67,8 +67,8 @@ func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction)
 		inputReferences:   inputReferences,
 		inputs:            make([]*StateMetadata, len(inputReferences)),
 		transaction:       transaction,
-		parentConflictIDs: reactive.NewSetReceptor[iotago.TransactionID](),
-		conflictIDs:       reactive.NewSetReceptor[iotago.TransactionID](),
+		parentConflictIDs: reactive.NewSet[iotago.TransactionID](),
+		conflictIDs:       reactive.NewSet[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
 		booked:             promise.NewEvent(),

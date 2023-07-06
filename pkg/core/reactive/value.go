@@ -1,6 +1,6 @@
 package reactive
 
-// Value defines a common interface to read the values of the various agential components.
+// Value defines an interface that allows subscribers to read a value and to be notified when the value changes.
 type Value[Type comparable] interface {
 	// Get returns the current value.
 	Get() Type

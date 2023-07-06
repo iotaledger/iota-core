@@ -38,7 +38,7 @@ func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *S
 		spendCommitted:     reactive.NewVariable[*TransactionMetadata](),
 		allSpendersRemoved: event.New(),
 
-		conflictIDs: reactive.NewSetReceptor[iotago.TransactionID](),
+		conflictIDs: reactive.NewSet[iotago.TransactionID](),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(optSource...)

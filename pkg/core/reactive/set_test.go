@@ -9,10 +9,10 @@ import (
 )
 
 func TestSet(t *testing.T) {
-	source1 := NewSetReceptor[int]()
-	source2 := NewSetReceptor[int]()
+	source1 := NewSet[int]()
+	source2 := NewSet[int]()
 
-	inheritedSet := NewSetReceptor[int]()
+	inheritedSet := NewSet[int]()
 	inheritedSet.InheritFrom(source1, source2)
 
 	source1.Add(advancedset.New(1, 2, 4))
@@ -24,7 +24,7 @@ func TestSet(t *testing.T) {
 	require.True(t, inheritedSet.Has(7))
 	require.True(t, inheritedSet.Has(9))
 
-	inheritedSet1 := NewSetReceptor[int]()
+	inheritedSet1 := NewSet[int]()
 	inheritedSet1.InheritFrom(source1, source2)
 
 	require.True(t, inheritedSet1.Has(1))

@@ -8,19 +8,29 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
+// Variable is a reactive component that acts as a thread-safe variable that informs subscribed consumers about updates.
 type Variable[T comparable] interface {
+	// Set sets the new value and triggers the registered callbacks if the value has changed.
 	Set(newValue T) (previousValue T)
 
+	// Compute sets the new value by applying the given function to the current value and triggers the registered
+	// callbacks if the value has changed.
 	Compute(computeFunc func(currentValue T) T) (previousValue T)
 
+	// Value imports the interface that allows subscribers to read the value and to be notified when it changes.
 	Value[T]
 }
 
-// variable is an agent that can receive and hold a value. Its task is to inform subscribed consumers about
-// updates.
-//
-// The registered callbacks are guaranteed to receive all updates in exactly the same order as they happened and no
-// callback is ever more than 1 round of updates ahead of other callbacks.
+// NewVariable creates a new Variable instance with an optional transformation function that can be used to rewrite the
+// set value before it is stored.
+func NewVariable[T comparable](transformationFunc ...func(currentValue T, newValue T) T) Variable[T] {
+	return &variable[T]{
+		transformationFunc:  lo.First(transformationFunc, func(_ T, newValue T) T { return newValue }),
+		registeredCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(prevValue, newValue T)]](),
+	}
+}
+
+// variable is the default implementation of the Variable interface.
 type variable[T comparable] struct {
 	// value holds the current value.
 	value T
@@ -42,15 +52,6 @@ type variable[T comparable] struct {
 
 	// setMutex is used to ensure that the order of updates is preserved.
 	setMutex sync.Mutex
-}
-
-// NewVariable creates a new variable instance with an optional transformation function that
-// can be used to rewrite the set value before it is stored.
-func NewVariable[T comparable](transformationFunc ...func(currentValue T, newValue T) T) Variable[T] {
-	return &variable[T]{
-		transformationFunc:  lo.First(transformationFunc, func(_ T, newValue T) T { return newValue }),
-		registeredCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(prevValue, newValue T)]](),
-	}
 }
 
 // Get returns the current value.
