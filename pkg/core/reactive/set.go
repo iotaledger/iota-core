@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/types"
@@ -31,20 +30,6 @@ type Set[ElementType comparable] interface {
 	Add(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])
 	Remove(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])
 	InheritFrom(sources ...Set[ElementType]) (unsubscribe func())
-	Size() int
-	IsEmpty() bool
-	Has(element ElementType) bool
-	HasAll(other *set[ElementType]) bool
-	ForEach(callback func(element ElementType) error) error
-	Range(callback func(element ElementType))
-	Intersect(other *advancedset.AdvancedSet[ElementType]) *advancedset.AdvancedSet[ElementType]
-	Filter(predicate func(element ElementType) bool) *advancedset.AdvancedSet[ElementType]
-	Equal(other *advancedset.AdvancedSet[ElementType]) bool
-	Is(element ElementType) bool
-	Clone() *advancedset.AdvancedSet[ElementType]
-	Slice() []ElementType
-	Iterator() *walker.Walker[ElementType]
-	String() string
 }
 
 // NewSet is the constructor for the Set type.
@@ -170,76 +155,6 @@ func (s *set[ElementType]) InheritFrom(sources ...Set[ElementType]) (unsubscribe
 	}
 
 	return lo.Batch(unsubscribeCallbacks...)
-}
-
-// Size returns the size of the set.
-func (s *set[ElementType]) Size() int {
-	return s.Get().Size()
-}
-
-// IsEmpty returns true if the set is empty.
-func (s *set[ElementType]) IsEmpty() bool {
-	return s.Get().IsEmpty()
-}
-
-// Has returns true if the set contains the given element.
-func (s *set[ElementType]) Has(element ElementType) bool {
-	return s.Get().Has(element)
-}
-
-// HasAll returns true if the set contains all elements of the other set.
-func (s *set[ElementType]) HasAll(other *set[ElementType]) bool {
-	return s.Get().HasAll(other.Get())
-}
-
-// ForEach calls the callback for each element of the set (the iteration can be stopped by returning an error).
-func (s *set[ElementType]) ForEach(callback func(element ElementType) error) error {
-	return s.Get().ForEach(callback)
-}
-
-// Range calls the callback for each element of the set.
-func (s *set[ElementType]) Range(callback func(element ElementType)) {
-	s.Get().Range(callback)
-}
-
-// Intersect returns a new set that contains the intersection of the set and the other set.
-func (s *set[ElementType]) Intersect(other *advancedset.AdvancedSet[ElementType]) *advancedset.AdvancedSet[ElementType] {
-	return s.Get().Intersect(other)
-}
-
-// Filter returns a new set that contains the elements of the set that satisfy the predicate.
-func (s *set[ElementType]) Filter(predicate func(element ElementType) bool) *advancedset.AdvancedSet[ElementType] {
-	return s.Get().Filter(predicate)
-}
-
-// Equal returns true if the set is equal to the other set.
-func (s *set[ElementType]) Equal(other *advancedset.AdvancedSet[ElementType]) bool {
-	return s.Get().Equal(other)
-}
-
-// Is returns true if the set contains a single element that is equal to the given element.
-func (s *set[ElementType]) Is(element ElementType) bool {
-	return s.Get().Is(element)
-}
-
-// Clone returns a shallow copy of the set.
-func (s *set[ElementType]) Clone() *advancedset.AdvancedSet[ElementType] {
-	return s.Get().Clone()
-}
-
-// Slice returns a slice representation of the set.
-func (s *set[ElementType]) Slice() []ElementType {
-	return s.Get().Slice()
-}
-
-// Iterator returns an iterator for the set.
-func (s *set[ElementType]) Iterator() *walker.Walker[ElementType] {
-	return s.Get().Iterator()
-}
-
-// String returns a human-readable version of the set.
-func (s *set[ElementType]) String() string {
-	return s.Get().String()
 }
 
 // set sets the given value as the new value of the set.
