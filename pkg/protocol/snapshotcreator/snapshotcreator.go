@@ -24,6 +24,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
+	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -89,6 +90,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
 		tipmanagerv1.NewProvider(),
+		tipselectionv1.NewProvider(),
 	)
 	defer engineInstance.Shutdown()
 
