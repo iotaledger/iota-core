@@ -111,10 +111,10 @@ func provide(c *dig.Container) error {
 				poa.NewProvider(validators),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)+slotattestation.DefaultAttestationCommitmentOffset),
+				slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 			),
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(
