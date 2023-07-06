@@ -59,23 +59,21 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				e.HookConstructed(func() {
 					s.clock = e.Clock
 
-					e.Storage.Settings().HookInitialized(func() {
-						s.timeProviderFunc = e.API().TimeProvider
-						s.TriggerConstructed()
+					s.timeProviderFunc = e.LatestAPI().TimeProvider
+					s.TriggerConstructed()
 
-						// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
-						// recover if no node was part of the online committee anymore.
-						e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-							seat, exists := s.Committee(block.ID().Index()).GetSeat(block.Block().IssuerID)
-							if !exists {
-								// Only track identities that are part of the committee.
-								return
-							}
+					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
+					// recover if no node was part of the online committee anymore.
+					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+						seat, exists := s.Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
+						if !exists {
+							// Only track identities that are part of the committee.
+							return
+						}
 
-							s.markSeatActive(seat, block.Block().IssuerID, block.IssuingTime())
+						s.markSeatActive(seat, block.ProtocolBlock().IssuerID, block.IssuingTime())
 
-							s.events.BlockProcessed.Trigger(block)
-						})
+						s.events.BlockProcessed.Trigger(block)
 					})
 				})
 			})

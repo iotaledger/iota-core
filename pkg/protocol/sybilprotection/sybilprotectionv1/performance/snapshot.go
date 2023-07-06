@@ -340,7 +340,8 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 	if err := pWriter.WriteValue("committees epoch count", epochCount, true); err != nil {
 		return errors.Wrap(err, "unable to write committees epoch count")
 	}
-	epochFromTargetSlot := t.timeProvider.EpochFromSlot(targetSlot)
+	apiForSlot := t.apiProvider.APIForSlot(targetSlot)
+	epochFromTargetSlot := apiForSlot.TimeProvider().EpochFromSlot(targetSlot)
 
 	var innerErr error
 	err := t.committeeStore.KVStore().Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {
@@ -352,12 +353,12 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 		//  or should we explicitly limit that? Currently we use the implicit assumption.
 		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
 		if epoch > epochFromTargetSlot {
-			if targetSlot+t.maxCommittableAge < t.timeProvider.EpochEnd(epochFromTargetSlot) {
+			// FIXME: EvictionAge here should be MaxCommittableAge, but not available at the time of writing
+			if targetSlot+apiForSlot.ProtocolParameters().EvictionAge() < apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) {
 				return true
 			}
 
-			committee := account.NewAccounts()
-			_, err := committee.FromBytes(committeeBytes)
+			committee, _, err := account.AccountsFromBytes(committeeBytes)
 			if err != nil {
 				innerErr = err // TODO: wrap the error
 				return false

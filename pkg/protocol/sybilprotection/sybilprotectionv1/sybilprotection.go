@@ -75,8 +75,9 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 						// Make sure that the sybil protection knows about the committee of the current epoch
 						// (according to the latest committed slot), and potentially the next selected
 						// committee if we have one.
-						// TODO: wouldn't LatestAPI be better here?
-						currentEpoch := e.APIForSlot(e.Storage.Settings().LatestCommitment().Index()).TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
+
+						// TODO: how do we handle changing API here?
+						currentEpoch := e.LatestAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
 
 						committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 						if !exists {
