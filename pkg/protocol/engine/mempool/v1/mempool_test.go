@@ -20,6 +20,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempooltests "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func TestMemPoolV1_InterfaceWithoutForkingEverything(t *testing.T) {
@@ -37,7 +38,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](func() int { return 0 })
 	mempoolInstance := New[vote.MockedRank](mempooltests.VM, func(reference iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveState(reference.Ref())
-	}, workers, conflictDAG, api.TestAPIProvider)
+	}, workers, conflictDAG, api.NewStaticProvider(tpkg.TestAPI))
 
 	tf := mempooltests.NewTestFramework(t, mempoolInstance, conflictDAG, ledgerState, workers)
 
@@ -105,7 +106,7 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveState(reference.Ref())
-	}, workers, conflictDAG, api.TestAPIProvider), conflictDAG, ledgerState, workers)
+	}, workers, conflictDAG, api.NewStaticProvider(tpkg.TestAPI)), conflictDAG, ledgerState, workers)
 }
 
 func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
@@ -116,5 +117,5 @@ func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveState(reference.Ref())
-	}, workers, conflictDAG, api.TestAPIProvider, WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
+	}, workers, conflictDAG, api.NewStaticProvider(tpkg.TestAPI), WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
 }

@@ -12,16 +12,17 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
-	tpkg_iota "github.com/iotaledger/iota.go/v4/tpkg"
+	iotago_tpkg "github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Output, spent *utxoledger.Spent) {
 	outputID := output.OutputID()
-	manager := utxoledger.New(mapdb.NewMapDB(), tpkg_iota.TestAPIProvider)
+	manager := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
 
 	require.NoError(t, manager.AddUnspentOutput(output))
 
@@ -76,17 +77,18 @@ func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Out
 	require.True(t, has)
 }
 
-func CreateOutputAndAssertSerialization(t *testing.T, api iotago.API, blockID iotago.BlockID, indexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, outputID iotago.OutputID, iotaOutput iotago.Output) *utxoledger.Output {
-	output := utxoledger.CreateOutput(api, outputID, blockID, indexBooked, slotCreated, iotaOutput)
-	outputBytes, err := api.Encode(output.Output())
+func CreateOutputAndAssertSerialization(t *testing.T, blockID iotago.BlockID, indexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, outputID iotago.OutputID, iotaOutput iotago.Output) *utxoledger.Output {
+	iotagoAPI := iotago_tpkg.TestAPI
+	output := utxoledger.CreateOutput(api.NewStaticProvider(iotagoAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput)
+	outputBytes, err := iotagoAPI.Encode(output.Output())
 	require.NoError(t, err)
 
 	require.Equal(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutput}, outputID[:]), output.KVStorableKey())
 
 	value := output.KVStorableValue()
 	require.Equal(t, blockID[:], value[:40])
-	require.Equal(t, indexBooked, lo.PanicOnErr(iotago.SlotIndexFromBytes(value[40:48])))
-	require.Equal(t, slotCreated, lo.PanicOnErr(iotago.SlotIndexFromBytes(value[48:56])))
+	require.Equal(t, indexBooked, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[40:48]))))
+	require.Equal(t, slotCreated, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[48:56]))))
 	require.Equal(t, outputBytes, value[56:])
 
 	return output
@@ -106,19 +108,18 @@ func CreateSpentAndAssertSerialization(t *testing.T, output *utxoledger.Output) 
 
 	value := spent.KVStorableValue()
 	require.Equal(t, transactionID[:], value[:32])
-	require.Equal(t, indexSpent, lo.PanicOnErr(iotago.SlotIndexFromBytes(value[32:40])))
+	require.Equal(t, indexSpent, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[32:40]))))
 
 	return spent
 }
 
 func TestExtendedOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.T) {
-	api := tpkg.API()
 	outputID := utils.RandOutputID()
 	blockID := utils.RandBlockID()
 	address := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	senderAddress := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	tag := utils.RandBytes(23)
-	amount := tpkg_iota.RandBaseToken(math.MaxUint64)
+	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
 	slotCreated := utils.RandSlotIndex()
 
@@ -139,7 +140,7 @@ func TestExtendedOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, api, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
@@ -147,12 +148,11 @@ func TestExtendedOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.
 }
 
 func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) {
-	api := tpkg.API()
 	outputID := utils.RandOutputID()
 	blockID := utils.RandBlockID()
 	address := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	senderAddress := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
-	amount := tpkg_iota.RandBaseToken(math.MaxUint64)
+	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
 	slotCreated := utils.RandSlotIndex()
 	timeLockUnlockSlot := utils.RandSlotIndex()
@@ -174,7 +174,7 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, api, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
@@ -182,12 +182,11 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 }
 
 func TestNFTOutputSerialization(t *testing.T) {
-	api := tpkg.API()
 	outputID := utils.RandOutputID()
 	blockID := utils.RandBlockID()
 	address := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	nftID := utils.RandNFTID()
-	amount := tpkg_iota.RandBaseToken(math.MaxUint64)
+	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
 	slotCreated := utils.RandSlotIndex()
 
@@ -206,7 +205,7 @@ func TestNFTOutputSerialization(t *testing.T) {
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, api, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
@@ -214,13 +213,12 @@ func TestNFTOutputSerialization(t *testing.T) {
 }
 
 func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
-	api := tpkg.API()
 	outputID := utils.RandOutputID()
 	blockID := utils.RandBlockID()
 	address := utils.RandNFTID()
 	issuerAddress := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	nftID := utils.RandNFTID()
-	amount := tpkg_iota.RandBaseToken(math.MaxUint64)
+	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
 	slotCreated := utils.RandSlotIndex()
 	expirationUnlockSlot := utils.RandSlotIndex()
@@ -247,7 +245,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, api, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
@@ -255,7 +253,6 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 }
 
 func TestAccountOutputSerialization(t *testing.T) {
-	api := tpkg.API()
 	outputID := utils.RandOutputID()
 	blockID := utils.RandBlockID()
 	aliasID := utils.RandAccountID()
@@ -263,7 +260,7 @@ func TestAccountOutputSerialization(t *testing.T) {
 	governor := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	issuer := utils.RandNFTID()
 	sender := utils.RandAccountID()
-	amount := tpkg_iota.RandBaseToken(math.MaxUint64)
+	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
 	slotCreated := utils.RandSlotIndex()
 
@@ -290,7 +287,7 @@ func TestAccountOutputSerialization(t *testing.T) {
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, api, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
@@ -298,14 +295,13 @@ func TestAccountOutputSerialization(t *testing.T) {
 }
 
 func TestFoundryOutputSerialization(t *testing.T) {
-	api := tpkg.API()
 	outputID := utils.RandOutputID()
 	blockID := utils.RandBlockID()
 	aliasID := utils.RandAccountID()
-	amount := tpkg_iota.RandBaseToken(math.MaxUint64)
+	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
 	slotCreated := utils.RandSlotIndex()
-	supply := new(big.Int).SetUint64(tpkg_iota.RandUint64(math.MaxUint64))
+	supply := new(big.Int).SetUint64(iotago_tpkg.RandUint64(math.MaxUint64))
 
 	iotaOutput := &iotago.FoundryOutput{
 		Amount:       amount,
@@ -322,7 +318,7 @@ func TestFoundryOutputSerialization(t *testing.T) {
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, api, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
