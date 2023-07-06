@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 )
 
@@ -52,6 +53,12 @@ func WithBlockDAGProvider(optsBlockDAGProvider module.Provider[*engine.Engine, b
 func WithTipManagerProvider(optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsTipManagerProvider = optsTipManagerProvider
+	}
+}
+
+func WithTipSelectionProvider(optsTipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsTipSelectionProvider = optsTipSelectionProvider
 	}
 }
 

@@ -9,7 +9,8 @@ import (
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/hive.go/runtime/promise"
+	lpromise "github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -20,8 +21,8 @@ type TransactionMetadata struct {
 	inputs            []*StateMetadata
 	outputs           []*StateMetadata
 	transaction       mempool.Transaction
-	parentConflictIDs *promise.Set[iotago.TransactionID]
-	conflictIDs       *promise.Set[iotago.TransactionID]
+	parentConflictIDs *lpromise.Set[iotago.TransactionID]
+	conflictIDs       *lpromise.Set[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -33,13 +34,13 @@ type TransactionMetadata struct {
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
-	allInputsAccepted     *promise.Value[bool]
+	allInputsAccepted     *lpromise.Value[bool]
 	conflicting           *promise.Event
 	conflictAccepted      *promise.Event
 
 	// attachments
 	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
-	earliestIncludedAttachment *promise.Value[iotago.BlockID]
+	earliestIncludedAttachment *lpromise.Value[iotago.BlockID]
 	allAttachmentsEvicted      *promise.Event
 
 	// mutex needed?
@@ -66,8 +67,8 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		inputReferences:   inputReferences,
 		inputs:            make([]*StateMetadata, len(inputReferences)),
 		transaction:       transaction,
-		parentConflictIDs: promise.NewSet[iotago.TransactionID](),
-		conflictIDs:       promise.NewSet[iotago.TransactionID](),
+		parentConflictIDs: lpromise.NewSet[iotago.TransactionID](),
+		conflictIDs:       lpromise.NewSet[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
 		booked:             promise.NewEvent(),
@@ -77,12 +78,12 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		evicted:            promise.NewEvent(),
 
 		unacceptedInputsCount: uint64(len(inputReferences)),
-		allInputsAccepted:     promise.NewValue[bool](),
+		allInputsAccepted:     lpromise.NewValue[bool](),
 		conflicting:           promise.NewEvent(),
 		conflictAccepted:      promise.NewEvent(),
 
 		attachments:                shrinkingmap.New[iotago.BlockID, bool](),
-		earliestIncludedAttachment: promise.NewValue[iotago.BlockID](),
+		earliestIncludedAttachment: lpromise.NewValue[iotago.BlockID](),
 		allAttachmentsEvicted:      promise.NewEvent(),
 
 		inclusionFlags: newInclusionFlags(),
@@ -121,7 +122,7 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	return outputs
 }
 
-func (t *TransactionMetadata) ConflictIDs() *promise.Set[iotago.TransactionID] {
+func (t *TransactionMetadata) ConflictIDs() *lpromise.Set[iotago.TransactionID] {
 	return t.conflictIDs
 }
 

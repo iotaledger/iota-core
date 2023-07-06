@@ -36,6 +36,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
@@ -73,6 +75,7 @@ type Protocol struct {
 	optsFilterProvider          module.Provider[*engine.Engine, filter.Filter]
 	optsBlockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
 	optsTipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
+	optsTipSelectionProvider    module.Provider[*engine.Engine, tipselection.TipSelection]
 	optsBookerProvider          module.Provider[*engine.Engine, booker.Booker]
 	optsClockProvider           module.Provider[*engine.Engine, clock.Clock]
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
@@ -93,6 +96,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsFilterProvider:          blockfilter.NewProvider(),
 		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
 		optsTipManagerProvider:      tipmanagerv1.NewProvider(),
+		optsTipSelectionProvider:    tipselectionv1.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
@@ -204,6 +208,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,
 		p.optsTipManagerProvider,
+		p.optsTipSelectionProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine()
