@@ -35,10 +35,10 @@ type counter[InputType comparable] struct {
 
 // Monitor adds the given input value as an input to the counter and returns a function that can be used to unsubscribe
 // from the input value.
-func (t *counter[InputType]) Monitor(input Value[InputType]) (unsubscribe func()) {
+func (c *counter[InputType]) Monitor(input Value[InputType]) (unsubscribe func()) {
 	return input.OnUpdate(func(_, newInputValue InputType) {
-		t.Compute(func(currentThreshold int) int {
-			return lo.Cond(t.condition(newInputValue), currentThreshold+1, currentThreshold-1)
+		c.Compute(func(currentThreshold int) int {
+			return lo.Cond(c.condition(newInputValue), currentThreshold+1, currentThreshold-1)
 		})
 	})
 }
