@@ -176,6 +176,7 @@ func (p *Protocol) shutdown() {
 		p.networkProtocol.Shutdown()
 	}
 
+	p.ChainManager.Shutdown()
 	p.Workers.Shutdown()
 
 	p.activeEngineMutex.RLock()
@@ -185,7 +186,6 @@ func (p *Protocol) shutdown() {
 	}
 	p.activeEngineMutex.RUnlock()
 
-	p.ChainManager.Shutdown()
 	p.SyncManager.Shutdown()
 }
 
