@@ -86,9 +86,8 @@ func TestAccounts(t *testing.T) {
 	accountBytes, err := accounts.Bytes()
 	require.NoError(t, err)
 
-	// check "FromBytes"
-	accounts2 := account.NewAccounts()
-	bytesRead, err := accounts2.FromBytes(accountBytes)
+	// check "AccountsFromBytes"
+	accounts2, bytesRead, err := account.AccountsFromBytes(accountBytes)
 	require.NoError(t, err)
 
 	// check if we read all the bytes
@@ -97,9 +96,9 @@ func TestAccounts(t *testing.T) {
 	// check if the new account is the same
 	require.Equal(t, accounts, accounts2)
 
-	// check "FromReader"
-	accounts3 := account.NewAccounts()
-	require.NoError(t, accounts3.FromReader(bytes.NewReader(accountBytes)))
+	// check "AccountsFromReader"
+	accounts3, _, err := account.AccountsFromReader(bytes.NewReader(accountBytes))
+	require.NoError(t, err)
 
 	// check if the new account is the same
 	require.Equal(t, accounts, accounts3)

@@ -48,7 +48,7 @@ func (m *Manager) ForEachOutput(consumer OutputConsumer, options ...IterateOptio
 		i++
 
 		output := &Output{
-			api: m.apiProviderFunc(),
+			apiProvider: m.apiProvider,
 		}
 		if err := output.kvStorableLoad(m, key, value); err != nil {
 			innerErr = err
@@ -163,7 +163,7 @@ func (m *Manager) ForEachUnspentOutput(consumer OutputConsumer, options ...Itera
 		}
 
 		output := &Output{
-			api: m.apiProviderFunc(),
+			apiProvider: m.apiProvider,
 		}
 		if err := output.kvStorableLoad(m, outputKey, value); err != nil {
 			innerErr = err

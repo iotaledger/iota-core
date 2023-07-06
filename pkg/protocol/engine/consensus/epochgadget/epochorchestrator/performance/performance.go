@@ -9,8 +9,8 @@ import (
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -18,13 +18,12 @@ import (
 
 type Tracker struct {
 	rewardBaseStore kvstore.KVStore
-	poolStatsStore  kvstore.KVStore
-	committeeStore  kvstore.KVStore
+	poolStatsStore  *kvstore.TypedStore[iotago.EpochIndex, *PoolsStats]
+	committeeStore  *kvstore.TypedStore[iotago.EpochIndex, *account.Accounts]
 
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
 
-	timeProvider  *iotago.TimeProvider
-	decayProvider *iotago.ManaDecayProvider
+	apiProvider api.Provider
 
 	performanceFactorsMutex sync.RWMutex
 	mutex                   sync.RWMutex
@@ -35,21 +34,29 @@ func NewTracker(
 	poolStatsStore kvstore.KVStore,
 	committeeStore kvstore.KVStore,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
-	timeProvider *iotago.TimeProvider,
-	decayProvider *iotago.ManaDecayProvider,
+	apiProvider api.Provider,
 ) *Tracker {
 	return &Tracker{
-		rewardBaseStore:        rewardsBaseStore,
-		poolStatsStore:         poolStatsStore,
-		committeeStore:         committeeStore,
+		rewardBaseStore: rewardsBaseStore,
+		poolStatsStore: kvstore.NewTypedStore(poolStatsStore,
+			iotago.EpochIndex.Bytes,
+			iotago.EpochIndexFromBytes,
+			(*PoolsStats).Bytes,
+			PoolsStatsFromBytes,
+		),
+		committeeStore: kvstore.NewTypedStore(committeeStore,
+			iotago.EpochIndex.Bytes,
+			iotago.EpochIndexFromBytes,
+			(*account.Accounts).Bytes,
+			account.AccountsFromBytes,
+		),
 		performanceFactorsFunc: performanceFactorsFunc,
-		timeProvider:           timeProvider,
-		decayProvider:          decayProvider,
+		apiProvider:            apiProvider,
 	}
 }
 
 func (t *Tracker) RegisterCommittee(epoch iotago.EpochIndex, committee *account.Accounts) error {
-	return t.storeCommitteeForEpoch(epoch, committee)
+	return t.committeeStore.Set(epoch, committee)
 }
 
 func (t *Tracker) BlockAccepted(block *blocks.Block) {
@@ -62,16 +69,16 @@ func (t *Tracker) BlockAccepted(block *blocks.Block) {
 	// TODO: check if this block is a validator block
 
 	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
-	pf, err := performanceFactors.Load(block.Block().IssuerID)
+	pf, err := performanceFactors.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
 		// TODO replace panic with errors in the future, like triggering an error event
-		panic(ierrors.Errorf("failed to load performance factor for account %s", block.Block().IssuerID))
+		panic(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 
-	err = performanceFactors.Store(block.Block().IssuerID, pf+1)
+	err = performanceFactors.Store(block.ProtocolBlock().IssuerID, pf+1)
 	if err != nil {
 		// TODO replace panic with errors in the future, like triggering an error event
-		panic(ierrors.Errorf("failed to store performance factor for account %s", block.Block().IssuerID))
+		panic(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 }
 
@@ -79,17 +86,18 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	epochStartSlot := t.timeProvider.EpochStart(epoch)
-	epochEndSlot := t.timeProvider.EpochEnd(epoch)
+	timeProvider := t.apiProvider.APIForEpoch(epoch).TimeProvider()
+	epochStartSlot := timeProvider.EpochStart(epoch)
+	epochEndSlot := timeProvider.EpochEnd(epoch)
 
 	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
-	poolsStats := PoolsStats{
+	poolsStats := &PoolsStats{
 		TotalStake:          committee.TotalStake(),
 		TotalValidatorStake: committee.TotalValidatorStake(),
 		ProfitMargin:        profitMargin,
 	}
 
-	if err := t.poolStatsStore.Set(epoch.Bytes(), lo.PanicOnErr(poolsStats.Bytes())); err != nil {
+	if err := t.poolStatsStore.Set(epoch, poolsStats); err != nil {
 		panic(errors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
@@ -110,7 +118,14 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			intermediateFactors = append(intermediateFactors, pf)
 		}
 
-		ads.NewMap[iotago.AccountID, PoolRewards](t.rewardsStorage(epoch)).Set(accountID, &PoolRewards{
+		rewardsMap := ads.NewMap[iotago.AccountID, *PoolRewards](t.rewardsStorage(epoch),
+			iotago.Identifier.Bytes,
+			iotago.IdentifierFromBytes,
+			(*PoolRewards).Bytes,
+			PoolRewardsFromBytes,
+		)
+
+		rewardsMap.Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
@@ -126,22 +141,8 @@ func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) *advancedset.
 	return &advancedset.AdvancedSet[iotago.AccountID]{}
 }
 
-func (t *Tracker) poolStats(epoch iotago.EpochIndex) (poolStats *PoolsStats, err error) {
-	poolStats = new(PoolsStats)
-	poolStatsBytes, err := t.poolStatsStore.Get(epoch.Bytes())
-	if err != nil {
-		return poolStats, errors.Wrapf(err, "failed to get pool stats for epoch %d", epoch)
-	}
-
-	if _, err := poolStats.FromBytes(poolStatsBytes); err != nil {
-		return poolStats, errors.Wrapf(err, "failed to parse pool stats for epoch %d", epoch)
-	}
-
-	return poolStats, nil
-}
-
 func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
-	committeeBytes, err := t.committeeStore.Get(epoch.Bytes())
+	c, err := t.committeeStore.Get(epoch)
 	if err != nil {
 		if errors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, false
@@ -149,21 +150,7 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 		panic(errors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
 
-	committee = account.NewAccounts()
-	if _, err = committee.FromBytes(committeeBytes); err != nil {
-		panic(errors.Wrapf(err, "failed to parse committee for epoch %d", epoch))
-	}
-
-	return committee, true
-}
-
-func (t *Tracker) storeCommitteeForEpoch(epochIndex iotago.EpochIndex, committee *account.Accounts) error {
-	committeeBytes, err := committee.Bytes()
-	if err != nil {
-		return err
-	}
-
-	return t.committeeStore.Set(epochIndex.Bytes(), committeeBytes)
+	return c, true
 }
 
 func (t *Tracker) aggregatePerformanceFactors(issuedBlocksPerSlot []uint64) uint64 {

@@ -106,7 +106,7 @@ func (s *State) EarliestRootCommitmentID(lastFinalizedSlot iotago.SlotIndex) (ea
 	}
 
 	if earliestCommitment.Index() == math.MaxInt64 {
-		return iotago.NewEmptyCommitment().MustID(), false
+		return iotago.CommitmentID{}, false
 	}
 
 	return earliestCommitment, true
@@ -253,15 +253,25 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 
 // Import imports the root blocks from the given reader.
 func (s *State) Import(reader io.ReadSeeker) (err error) {
-	var rootBlockID iotago.BlockID
-	var commitmentID iotago.CommitmentID
-
 	return stream.ReadCollection(reader, func(i int) error {
-		if err = stream.ReadSerializable(reader, &rootBlockID, iotago.BlockIDLength); err != nil {
+		blockIDBytes, err := stream.ReadBytes(reader, iotago.BlockIDLength)
+		if err != nil {
 			return errors.Wrapf(err, "failed to read root block id %d", i)
 		}
-		if err = stream.ReadSerializable(reader, &commitmentID, iotago.CommitmentIDLength); err != nil {
+
+		rootBlockID, _, err := iotago.SlotIdentifierFromBytes(blockIDBytes)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse root block id %d", i)
+		}
+
+		commitmentIDBytes, err := stream.ReadBytes(reader, iotago.CommitmentIDLength)
+		if err != nil {
 			return errors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
+		}
+
+		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse root block's %s commitment id", rootBlockID)
 		}
 
 		if s.rootBlocks.Get(rootBlockID.Index(), true).Set(rootBlockID, commitmentID) {

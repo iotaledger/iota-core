@@ -113,40 +113,58 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 	}
 }
 
-func (b *Block) Block() *iotago.Block {
+func (b *Block) ProtocolBlock() *iotago.ProtocolBlock {
 	if b.modelBlock == nil {
 		return nil
 	}
 
-	return b.modelBlock.Block()
+	return b.modelBlock.ProtocolBlock()
 }
 
-// TODO: maybe move to iota.go and introduce parent type.
 func (b *Block) Parents() (parents []iotago.BlockID) {
-	return b.modelBlock.Parents()
+	return b.modelBlock.ProtocolBlock().Parents()
 }
 
 func (b *Block) StrongParents() (parents []iotago.BlockID) {
-	return b.modelBlock.Block().StrongParents
+	return b.modelBlock.ProtocolBlock().Block.StrongParentIDs()
 }
 
 // ParentsWithType returns the parents of the block with their type.
-func (b *Block) ParentsWithType() []model.Parent {
-	return b.modelBlock.ParentsWithType()
+func (b *Block) ParentsWithType() []iotago.Parent {
+	return b.modelBlock.ProtocolBlock().ParentsWithType()
 }
 
 // ForEachParent executes a consumer func for each parent.
-func (b *Block) ForEachParent(consumer func(parent model.Parent)) {
-	b.modelBlock.ForEachParent(consumer)
+func (b *Block) ForEachParent(consumer func(parent iotago.Parent)) {
+	b.modelBlock.ProtocolBlock().ForEachParent(consumer)
 }
 
 func (b *Block) IsRootBlock() bool {
 	return b.rootBlock != nil
 }
 
-func (b *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
-	tx, isTransaction = b.Block().Payload.(*iotago.Transaction)
-	return tx, isTransaction
+func (b *Block) Transaction() (tx *iotago.Transaction, hasTransaction bool) {
+	if b.modelBlock == nil {
+		return nil, false
+	}
+
+	return b.modelBlock.Transaction()
+}
+
+func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) {
+	if b.modelBlock == nil {
+		return nil, false
+	}
+
+	return b.modelBlock.BasicBlock()
+}
+
+func (b *Block) ValidatorBlock() (validatorBlock *iotago.ValidatorBlock, isValidatorBlock bool) {
+	if b.modelBlock == nil {
+		return nil, false
+	}
+
+	return b.modelBlock.ValidatorBlock()
 }
 
 func (b *Block) ID() iotago.BlockID {
@@ -176,7 +194,7 @@ func (b *Block) IssuingTime() time.Time {
 		return b.rootBlock.issuingTime
 	}
 
-	return b.modelBlock.Block().IssuingTime
+	return b.modelBlock.ProtocolBlock().IssuingTime
 }
 
 func (b *Block) SlotCommitmentID() iotago.CommitmentID {
@@ -191,7 +209,7 @@ func (b *Block) SlotCommitmentID() iotago.CommitmentID {
 		return b.rootBlock.commitmentID
 	}
 
-	return b.modelBlock.Block().SlotCommitment.MustID()
+	return b.modelBlock.ProtocolBlock().SlotCommitmentID
 }
 
 // IsMissing returns a flag that indicates if the underlying Block data hasn't been stored, yet.
@@ -309,16 +327,16 @@ func (b *Block) SetInvalid() (wasUpdated bool) {
 	return true
 }
 
-func (b *Block) AppendChild(child *Block, childType model.ParentsType) {
+func (b *Block) AppendChild(child *Block, childType iotago.ParentsType) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
 	switch childType {
-	case model.StrongParentType:
+	case iotago.StrongParentType:
 		b.strongChildren = append(b.strongChildren, child)
-	case model.WeakParentType:
+	case iotago.WeakParentType:
 		b.weakChildren = append(b.weakChildren, child)
-	case model.ShallowLikeParentType:
+	case iotago.ShallowLikeParentType:
 		b.shallowLikeChildren = append(b.shallowLikeChildren, child)
 	}
 }

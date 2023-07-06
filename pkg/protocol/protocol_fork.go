@@ -50,7 +50,7 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 		return
 	}
 	var roots iotago.Roots
-	lo.PanicOnErr(p.API().Decode(rootsBytes, &roots))
+	lo.PanicOnErr(p.APIForSlot(commitmentID.Index()).Decode(rootsBytes, &roots))
 
 	p.networkProtocol.SendAttestations(commitment, attestations, roots.AttestationsProof(), src)
 }

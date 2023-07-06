@@ -19,19 +19,22 @@ func newStateMetadata(output *Output) *stateTreeMetadata {
 	}
 }
 
-func (s *stateTreeMetadata) FromBytes(b []byte) (int, error) {
+func stateMetadataFromBytes(b []byte) (*stateTreeMetadata, int, error) {
+	s := new(stateTreeMetadata)
+
 	var err error
-	s.Time, err = iotago.SlotIndexFromBytes(b)
+	var n int
+	s.Time, n, err = iotago.SlotIndexFromBytes(b)
 	if err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 
-	return 8, nil
+	return s, n, nil
 }
 
-func (s stateTreeMetadata) Bytes() ([]byte, error) {
+func (s *stateTreeMetadata) Bytes() ([]byte, error) {
 	ms := marshalutil.New(8)
-	ms.WriteBytes(s.Time.Bytes())
+	ms.WriteBytes(s.Time.MustBytes())
 
 	return ms.Bytes(), nil
 }
@@ -41,7 +44,12 @@ func (m *Manager) StateTreeRoot() iotago.Identifier {
 }
 
 func (m *Manager) CheckStateTree() bool {
-	comparisonTree := ads.NewMap[iotago.OutputID, stateTreeMetadata](mapdb.NewMapDB())
+	comparisonTree := ads.NewMap(mapdb.NewMapDB(),
+		iotago.OutputID.Bytes,
+		iotago.OutputIDFromBytes,
+		(*stateTreeMetadata).Bytes,
+		stateMetadataFromBytes,
+	)
 
 	if err := m.ForEachUnspentOutput(func(output *Output) bool {
 		comparisonTree.Set(output.OutputID(), newStateMetadata(output))

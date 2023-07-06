@@ -102,7 +102,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 			delegationEnd := castOutput.EndEpoch
 			if delegationEnd == 0 {
-				delegationEnd = l.protocolParameters.TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
+				delegationEnd = l.apiProvider.APIForSlot(loadedCommitment.Index).TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
 			}
 
 			reward, rewardErr := l.epochGadget.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
@@ -115,14 +115,17 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 	resolvedInputs.RewardsInputSet = rewardInputSet
 
-	vmParams := &iotagovm.Params{External: &iotago.ExternalUnlockParameters{
-		ProtocolParameters: l.protocolParameters,
-	}}
+	//TODO: in which slot is this transaction?
+	api := l.apiProvider.APIForSlot(tx.Essence.CreationTime)
+
+	vmParams := &iotagovm.Params{
+		API: api,
+	}
 	if err = stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
 		return nil, err
 	}
 
-	outputSet, err := tx.OutputsSet()
+	outputSet, err := tx.OutputsSet(api)
 	if err != nil {
 		return nil, err
 	}

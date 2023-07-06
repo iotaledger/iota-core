@@ -24,7 +24,7 @@ type SlotDiff struct {
 func slotDiffKeyForIndex(index iotago.SlotIndex) []byte {
 	m := marshalutil.New(9)
 	m.WriteByte(StoreKeyPrefixSlotDiffs)
-	m.WriteBytes(index.Bytes())
+	m.WriteBytes(index.MustBytes())
 
 	return m.Bytes()
 }
@@ -51,7 +51,7 @@ func (ms *SlotDiff) KVStorableValue() []byte {
 
 // note that this method relies on the data being available within other "tables".
 func (ms *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) error {
-	index, err := iotago.SlotIndexFromBytes(key[1:])
+	index, _, err := iotago.SlotIndexFromBytes(key[1:])
 	if err != nil {
 		return err
 	}
