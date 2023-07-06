@@ -133,6 +133,9 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) {
 			committee.SetReused()
 
 			o.seatManager.SetCommittee(nextEpoch, committee)
+
+			o.events.CommitteeSelected.Trigger(committee, nextEpoch)
+
 			if err := o.performanceTracker.RegisterCommittee(nextEpoch, committee); err != nil {
 				panic(ierrors.Wrapf(err, "failed to register committee for epoch %d", nextEpoch))
 			}
@@ -183,7 +186,7 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 	epochEndSlot := o.timeProvider.EpochEnd(epoch)
 	if slot+o.epochEndNearingThreshold == epochEndSlot && epochEndSlot > o.lastCommittedSlot+o.maxCommittableAge {
 		newCommittee := o.selectNewCommittee(slot)
-		o.events.CommitteeSelected.Trigger(newCommittee)
+		o.events.CommitteeSelected.Trigger(newCommittee, epoch+1)
 	}
 }
 
