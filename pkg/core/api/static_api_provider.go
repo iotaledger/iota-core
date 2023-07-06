@@ -12,7 +12,7 @@ type staticAPIProvider struct {
 	api iotago.API
 }
 
-func (t *staticAPIProvider) APIForVersion(byte) iotago.API {
+func (t *staticAPIProvider) APIForVersion(iotago.Version) iotago.API {
 	return t.api
 }
 

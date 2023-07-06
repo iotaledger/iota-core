@@ -43,7 +43,7 @@ func NewTestFramework(t *testing.T, api iotago.API, optsFilter ...options.Option
 	return tf
 }
 
-func (t *TestFramework) APIForVersion(byte) iotago.API {
+func (t *TestFramework) APIForVersion(iotago.Version) iotago.API {
 	return t.api
 }
 

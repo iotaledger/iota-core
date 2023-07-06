@@ -3,7 +3,7 @@ package api
 import iotago "github.com/iotaledger/iota.go/v4"
 
 type Provider interface {
-	APIForVersion(byte) iotago.API
+	APIForVersion(iotago.Version) iotago.API
 	APIForSlot(iotago.SlotIndex) iotago.API
 	APIForEpoch(iotago.EpochIndex) iotago.API
 
