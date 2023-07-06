@@ -1,4 +1,4 @@
-package agential
+package reactive
 
 import (
 	"sync"
@@ -8,12 +8,20 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
-// ValueReceptor is an agent that can receive and hold a value. Its task is to inform subscribed consumers about
+type Variable[T comparable] interface {
+	Set(newValue T) (previousValue T)
+
+	Compute(computeFunc func(currentValue T) T) (previousValue T)
+
+	Value[T]
+}
+
+// variable is an agent that can receive and hold a value. Its task is to inform subscribed consumers about
 // updates.
 //
 // The registered callbacks are guaranteed to receive all updates in exactly the same order as they happened and no
 // callback is ever more than 1 round of updates ahead of other callbacks.
-type ValueReceptor[T comparable] struct {
+type variable[T comparable] struct {
 	// value holds the current value.
 	value T
 
@@ -36,17 +44,17 @@ type ValueReceptor[T comparable] struct {
 	setMutex sync.Mutex
 }
 
-// NewValueReceptor creates a new ValueReceptor instance with an optional transformation function that
+// NewVariable creates a new variable instance with an optional transformation function that
 // can be used to rewrite the set value before it is stored.
-func NewValueReceptor[T comparable](transformationFunc ...func(currentValue T, newValue T) T) *ValueReceptor[T] {
-	return &ValueReceptor[T]{
+func NewVariable[T comparable](transformationFunc ...func(currentValue T, newValue T) T) Variable[T] {
+	return &variable[T]{
 		transformationFunc:  lo.First(transformationFunc, func(_ T, newValue T) T { return newValue }),
 		registeredCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(prevValue, newValue T)]](),
 	}
 }
 
 // Get returns the current value.
-func (v *ValueReceptor[T]) Get() T {
+func (v *variable[T]) Get() T {
 	v.mutex.RLock()
 	defer v.mutex.RUnlock()
 
@@ -54,12 +62,12 @@ func (v *ValueReceptor[T]) Get() T {
 }
 
 // Set sets the new value and triggers the registered callbacks if the value has changed.
-func (v *ValueReceptor[T]) Set(newValue T) (previousValue T) {
+func (v *variable[T]) Set(newValue T) (previousValue T) {
 	return v.Compute(func(T) T { return newValue })
 }
 
 // Compute computes the new value based on the current value and triggers the registered callbacks if the value changed.
-func (v *ValueReceptor[T]) Compute(computeFunc func(currentValue T) T) (previousValue T) {
+func (v *variable[T]) Compute(computeFunc func(currentValue T) T) (previousValue T) {
 	v.setMutex.Lock()
 	defer v.setMutex.Unlock()
 
@@ -75,7 +83,7 @@ func (v *ValueReceptor[T]) Compute(computeFunc func(currentValue T) T) (previous
 }
 
 // OnUpdate registers a callback that is triggered when the value changes.
-func (v *ValueReceptor[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe func()) {
+func (v *variable[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe func()) {
 	v.mutex.Lock()
 
 	currentValue := v.value
@@ -104,7 +112,7 @@ func (v *ValueReceptor[T]) OnUpdate(callback func(prevValue, newValue T)) (unsub
 
 // prepareDynamicTrigger atomically prepares the trigger by setting the new value and returning the new value, the
 // previous value, the triggerID and the callbacks to trigger.
-func (v *ValueReceptor[T]) prepareDynamicTrigger(newValueGenerator func(T) T) (newValue, previousValue T, triggerID types.UniqueID, callbacksToTrigger []*callback[func(prevValue, newValue T)]) {
+func (v *variable[T]) prepareDynamicTrigger(newValueGenerator func(T) T) (newValue, previousValue T, triggerID types.UniqueID, callbacksToTrigger []*callback[func(prevValue, newValue T)]) {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 

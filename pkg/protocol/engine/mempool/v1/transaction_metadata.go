@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/promise"
-	"github.com/iotaledger/iota-core/pkg/core/agential"
+	"github.com/iotaledger/iota-core/pkg/core/reactive"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -21,8 +21,8 @@ type TransactionMetadata struct {
 	inputs            []*StateMetadata
 	outputs           []*StateMetadata
 	transaction       mempool.Transaction
-	parentConflictIDs *agential.SetReceptor[iotago.TransactionID]
-	conflictIDs       *agential.SetReceptor[iotago.TransactionID]
+	parentConflictIDs *reactive.Set[iotago.TransactionID]
+	conflictIDs       *reactive.Set[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -34,13 +34,13 @@ type TransactionMetadata struct {
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
-	allInputsAccepted     *agential.ValueReceptor[bool]
+	allInputsAccepted     reactive.Variable[bool]
 	conflicting           *promise.Event
 	conflictAccepted      *promise.Event
 
 	// attachments
 	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
-	earliestIncludedAttachment *agential.ValueReceptor[iotago.BlockID]
+	earliestIncludedAttachment reactive.Variable[iotago.BlockID]
 	allAttachmentsEvicted      *promise.Event
 
 	// mutex needed?
@@ -67,8 +67,8 @@ func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction)
 		inputReferences:   inputReferences,
 		inputs:            make([]*StateMetadata, len(inputReferences)),
 		transaction:       transaction,
-		parentConflictIDs: agential.NewSetReceptor[iotago.TransactionID](),
-		conflictIDs:       agential.NewSetReceptor[iotago.TransactionID](),
+		parentConflictIDs: reactive.NewSetReceptor[iotago.TransactionID](),
+		conflictIDs:       reactive.NewSetReceptor[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
 		booked:             promise.NewEvent(),
@@ -78,12 +78,12 @@ func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction)
 		evicted:            promise.NewEvent(),
 
 		unacceptedInputsCount: uint64(len(inputReferences)),
-		allInputsAccepted:     agential.NewValueReceptor[bool](),
+		allInputsAccepted:     reactive.NewVariable[bool](),
 		conflicting:           promise.NewEvent(),
 		conflictAccepted:      promise.NewEvent(),
 
 		attachments:                shrinkingmap.New[iotago.BlockID, bool](),
-		earliestIncludedAttachment: agential.NewValueReceptor[iotago.BlockID](),
+		earliestIncludedAttachment: reactive.NewVariable[iotago.BlockID](),
 		allAttachmentsEvicted:      promise.NewEvent(),
 
 		inclusionFlags: newInclusionFlags(),
@@ -122,7 +122,7 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	return outputs
 }
 
-func (t *TransactionMetadata) ConflictIDs() *agential.SetReceptor[iotago.TransactionID] {
+func (t *TransactionMetadata) ConflictIDs() *reactive.Set[iotago.TransactionID] {
 	return t.conflictIDs
 }
 

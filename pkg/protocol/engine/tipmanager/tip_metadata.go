@@ -1,7 +1,7 @@
 package tipmanager
 
 import (
-	"github.com/iotaledger/iota-core/pkg/core/agential"
+	"github.com/iotaledger/iota-core/pkg/core/reactive"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -14,21 +14,21 @@ type TipMetadata interface {
 	// Block returns the block that the TipMetadata belongs to.
 	Block() *blocks.Block
 
-	// TipPool exposes a ValueReceptor that stores the current TipPool of the block.
-	TipPool() *agential.ValueReceptor[TipPool]
+	// TipPool exposes a variable that stores the current TipPool of the block.
+	TipPool() reactive.Variable[TipPool]
 
-	// IsLivenessThresholdReached exposes a ValueReceptor that stores if the liveness threshold was reached.
-	IsLivenessThresholdReached() *agential.ValueReceptor[bool]
+	// IsLivenessThresholdReached exposes a variable that stores if the liveness threshold was reached.
+	IsLivenessThresholdReached() reactive.Variable[bool]
 
 	// IsStrongTip returns a Value that indicates if the block is a strong tip.
-	IsStrongTip() agential.Value[bool]
+	IsStrongTip() reactive.Value[bool]
 
 	// IsWeakTip returns a Value that indicates if the block is a weak tip.
-	IsWeakTip() agential.Value[bool]
+	IsWeakTip() reactive.Value[bool]
 
 	// IsOrphaned returns a Value that indicates if the block was orphaned.
-	IsOrphaned() agential.Value[bool]
+	IsOrphaned() reactive.Value[bool]
 
 	// IsEvicted returns a Value that indicates if the block was evicted.
-	IsEvicted() agential.Value[bool]
+	IsEvicted() reactive.Value[bool]
 }

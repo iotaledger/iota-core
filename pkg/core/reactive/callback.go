@@ -1,4 +1,4 @@
-package agential
+package reactive
 
 import (
 	"sync"

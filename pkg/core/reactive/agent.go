@@ -1,4 +1,4 @@
-package agential
+package reactive
 
 // Agent is the interface that describes the minimal functionality of an agent as an entity that is separated from its
 // environment.

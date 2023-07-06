@@ -2,7 +2,7 @@ package mempool
 
 import (
 	"github.com/iotaledger/hive.go/ds/advancedset"
-	"github.com/iotaledger/iota-core/pkg/core/agential"
+	"github.com/iotaledger/iota-core/pkg/core/reactive"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -15,7 +15,7 @@ type TransactionMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateMetadata]
 
-	ConflictIDs() *agential.SetReceptor[iotago.TransactionID]
+	ConflictIDs() *reactive.Set[iotago.TransactionID]
 
 	Commit()
 

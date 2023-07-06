@@ -1,4 +1,4 @@
-package agential
+package reactive
 
 // Value defines a common interface to read the values of the various agential components.
 type Value[Type comparable] interface {

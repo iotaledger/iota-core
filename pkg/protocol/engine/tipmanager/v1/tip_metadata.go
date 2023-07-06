@@ -1,7 +1,7 @@
 package tipmanagerv1
 
 import (
-	"github.com/iotaledger/iota-core/pkg/core/agential"
+	"github.com/iotaledger/iota-core/pkg/core/reactive"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -13,151 +13,151 @@ type TipMetadata struct {
 	block *blocks.Block
 
 	// tipPool holds the tip pool the block is currently assigned to.
-	tipPool *agential.ValueReceptor[tipmanager.TipPool]
+	tipPool reactive.Variable[tipmanager.TipPool]
 
 	// isLivenessThresholdReached is true if the block has reached the liveness threshold.
-	isLivenessThresholdReached *agential.ValueReceptor[bool]
+	isLivenessThresholdReached reactive.Variable[bool]
 
 	// stronglyConnectedStrongChildren holds the number of strong children that are strongly connected to the tips.
-	stronglyConnectedStrongChildren *agential.Counter[bool]
+	stronglyConnectedStrongChildren *reactive.Counter[bool]
 
 	// connectedWeakChildren holds the number of weak children that are connected to the tips.
-	connectedWeakChildren *agential.Counter[bool]
+	connectedWeakChildren *reactive.Counter[bool]
 
 	// stronglyOrphanedStrongParents holds the number of strong parents that are strongly orphaned.
-	stronglyOrphanedStrongParents *agential.Counter[bool]
+	stronglyOrphanedStrongParents *reactive.Counter[bool]
 
 	// weaklyOrphanedWeakParents holds the number of weak parents that are weakly orphaned.
-	weaklyOrphanedWeakParents *agential.Counter[bool]
+	weaklyOrphanedWeakParents *reactive.Counter[bool]
 
 	// isStrongTipPoolMember is true if the block is part of the strong tip pool and not orphaned.
-	isStrongTipPoolMember *agential.DerivedValueReceptor[bool]
+	isStrongTipPoolMember *reactive.DerivedVariable[bool]
 
 	// isWeakTipPoolMember is true if the block is part of the weak tip pool and not orphaned.
-	isWeakTipPoolMember *agential.DerivedValueReceptor[bool]
+	isWeakTipPoolMember *reactive.DerivedVariable[bool]
 
 	// isStronglyConnectedToTips is true if the block is either strongly referenced by others tips or is itself a strong
 	// tip pool member.
-	isStronglyConnectedToTips *agential.DerivedValueReceptor[bool]
+	isStronglyConnectedToTips *reactive.DerivedVariable[bool]
 
 	// isConnectedToTips is true if the block is either referenced by others tips or is itself a weak or strong tip pool
 	// member.
-	isConnectedToTips *agential.DerivedValueReceptor[bool]
+	isConnectedToTips *reactive.DerivedVariable[bool]
 
 	// isStronglyReferencedByTips is true if the block has at least one strong child that is strongly connected
 	// to the tips.
-	isStronglyReferencedByTips *agential.DerivedValueReceptor[bool]
+	isStronglyReferencedByTips *reactive.DerivedVariable[bool]
 
 	// isWeaklyReferencedByTips is true if the block has at least one weak child that is connected to the tips.
-	isWeaklyReferencedByTips *agential.DerivedValueReceptor[bool]
+	isWeaklyReferencedByTips *reactive.DerivedVariable[bool]
 
 	// isReferencedByTips is true if the block is strongly referenced by other tips or has at least one weak child
 	// that is connected to the tips.
-	isReferencedByTips *agential.DerivedValueReceptor[bool]
+	isReferencedByTips *reactive.DerivedVariable[bool]
 
 	// isStrongTip is true if the block is a strong tip pool member and is not strongly referenced by other tips.
-	isStrongTip *agential.DerivedValueReceptor[bool]
+	isStrongTip *reactive.DerivedVariable[bool]
 
 	// isWeakTip is true if the block is a weak tip pool member and is not referenced by other tips.
-	isWeakTip *agential.DerivedValueReceptor[bool]
+	isWeakTip *reactive.DerivedVariable[bool]
 
 	// isMarkedOrphaned is true if the liveness threshold has been reached and the block was not accepted.
-	isMarkedOrphaned *agential.DerivedValueReceptor[bool]
+	isMarkedOrphaned *reactive.DerivedVariable[bool]
 
 	// isOrphaned is true if the block is either strongly or weakly orphaned.
-	isOrphaned *agential.DerivedValueReceptor[bool]
+	isOrphaned *reactive.DerivedVariable[bool]
 
 	// anyStrongParentStronglyOrphaned is true if the block has at least one orphaned parent.
-	anyStrongParentStronglyOrphaned *agential.DerivedValueReceptor[bool]
+	anyStrongParentStronglyOrphaned *reactive.DerivedVariable[bool]
 
 	// anyWeakParentWeaklyOrphaned is true if the block has at least one weak parent that is weakly orphaned.
-	anyWeakParentWeaklyOrphaned *agential.DerivedValueReceptor[bool]
+	anyWeakParentWeaklyOrphaned *reactive.DerivedVariable[bool]
 
 	// isEvicted is triggered when the block is removed from the TipManager.
-	isEvicted *agential.ValueReceptor[bool]
+	isEvicted reactive.Variable[bool]
 
 	// isStronglyOrphaned is true if the block is either marked as orphaned, any of its strong parents is strongly
 	// orphaned or any of its weak parents is weakly orphaned.
-	isStronglyOrphaned *agential.DerivedValueReceptor[bool]
+	isStronglyOrphaned *reactive.DerivedVariable[bool]
 
 	// isWeaklyOrphaned is true if the block is either marked as orphaned or has at least one weakly orphaned weak
 	// parent.
-	isWeaklyOrphaned *agential.DerivedValueReceptor[bool]
+	isWeaklyOrphaned *reactive.DerivedVariable[bool]
 
-	constructed *agential.ValueReceptor[bool]
+	constructed reactive.Variable[bool]
 }
 
 // NewBlockMetadata creates a new TipMetadata instance.
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
 		block:                           block,
-		tipPool:                         agential.NewValueReceptor[tipmanager.TipPool](tipmanager.TipPool.Max),
-		constructed:                     agential.NewValueReceptor[bool](trapDoor[bool]),
-		isLivenessThresholdReached:      agential.NewValueReceptor[bool](trapDoor[bool]),
-		isEvicted:                       agential.NewValueReceptor[bool](trapDoor[bool]),
-		stronglyConnectedStrongChildren: agential.NewCounter[bool](),
-		connectedWeakChildren:           agential.NewCounter[bool](),
-		stronglyOrphanedStrongParents:   agential.NewCounter[bool](),
-		weaklyOrphanedWeakParents:       agential.NewCounter[bool](),
+		tipPool:                         reactive.NewVariable[tipmanager.TipPool](tipmanager.TipPool.Max),
+		constructed:                     reactive.NewVariable[bool](trapDoor[bool]),
+		isLivenessThresholdReached:      reactive.NewVariable[bool](trapDoor[bool]),
+		isEvicted:                       reactive.NewVariable[bool](trapDoor[bool]),
+		stronglyConnectedStrongChildren: reactive.NewCounter[bool](),
+		connectedWeakChildren:           reactive.NewCounter[bool](),
+		stronglyOrphanedStrongParents:   reactive.NewCounter[bool](),
+		weaklyOrphanedWeakParents:       reactive.NewCounter[bool](),
 	}
 
-	t.isStrongTipPoolMember = agential.DeriveValueFrom3Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
+	t.isStrongTipPoolMember = reactive.NewDerivedVariable3(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
 		return tipPool == tipmanager.StrongTipPool && !isOrphaned && !isEvicted
 	}, &t.tipPool, &t.isOrphaned, &t.isEvicted)
 
-	t.isWeakTipPoolMember = agential.DeriveValueFrom3Inputs(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
+	t.isWeakTipPoolMember = reactive.NewDerivedVariable3(t, func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
 		return tipPool == tipmanager.WeakTipPool && !isOrphaned && !isEvicted
 	}, &t.tipPool, &t.isOrphaned, &t.isEvicted)
 
-	t.isStronglyConnectedToTips = agential.DeriveValueReceptorFrom2Inputs(t, func(isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
+	t.isStronglyConnectedToTips = reactive.NewDerivedVariable2(t, func(isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
 		return isStrongTipPoolMember || isStronglyReferencedByTips
 	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByTips)
 
-	t.isConnectedToTips = agential.DeriveValueFrom3Inputs(t, func(isReferencedByTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
+	t.isConnectedToTips = reactive.NewDerivedVariable3(t, func(isReferencedByTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
 		return isReferencedByTips || isStrongTipPoolMember || isWeakTipPoolMember
 	}, &t.isReferencedByTips, &t.isStrongTipPoolMember, &t.isWeakTipPoolMember)
 
-	t.isStronglyReferencedByTips = agential.DeriveValueReceptorFrom1Input[bool, int](t, func(stronglyConnectedStrongChildren int) bool {
+	t.isStronglyReferencedByTips = reactive.NewDerivedVariable1[bool, int](t, func(stronglyConnectedStrongChildren int) bool {
 		return stronglyConnectedStrongChildren > 0
 	}, &t.stronglyConnectedStrongChildren)
 
-	t.isWeaklyReferencedByTips = agential.DeriveValueReceptorFrom1Input[bool, int](t, func(connectedWeakChildren int) bool {
+	t.isWeaklyReferencedByTips = reactive.NewDerivedVariable1[bool, int](t, func(connectedWeakChildren int) bool {
 		return connectedWeakChildren > 0
 	}, &t.connectedWeakChildren)
 
-	t.isReferencedByTips = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isWeaklyReferencedByTips bool, isStronglyReferencedByTips bool) bool {
+	t.isReferencedByTips = reactive.NewDerivedVariable2[bool, bool, bool](t, func(isWeaklyReferencedByTips bool, isStronglyReferencedByTips bool) bool {
 		return isWeaklyReferencedByTips || isStronglyReferencedByTips
 	}, &t.isWeaklyReferencedByTips, &t.isStronglyReferencedByTips)
 
-	t.isStrongTip = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
+	t.isStrongTip = reactive.NewDerivedVariable2[bool, bool, bool](t, func(isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
 		return isStrongTipPoolMember && !isStronglyReferencedByTips
 	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByTips)
 
-	t.isWeakTip = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isWeakTipPoolMember bool, isReferencedByTips bool) bool {
+	t.isWeakTip = reactive.NewDerivedVariable2[bool, bool, bool](t, func(isWeakTipPoolMember bool, isReferencedByTips bool) bool {
 		return isWeakTipPoolMember && !isReferencedByTips
 	}, &t.isWeakTipPoolMember, &t.isReferencedByTips)
 
-	t.isOrphaned = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
+	t.isOrphaned = reactive.NewDerivedVariable2[bool, bool, bool](t, func(isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
 		return isStronglyOrphaned || isWeaklyOrphaned
 	}, &t.isStronglyOrphaned, &t.isWeaklyOrphaned)
 
-	t.anyStrongParentStronglyOrphaned = agential.DeriveValueReceptorFrom1Input[bool, int](t, func(stronglyOrphanedStrongParents int) bool {
+	t.anyStrongParentStronglyOrphaned = reactive.NewDerivedVariable1[bool, int](t, func(stronglyOrphanedStrongParents int) bool {
 		return stronglyOrphanedStrongParents > 0
 	}, &t.stronglyOrphanedStrongParents)
 
-	t.anyWeakParentWeaklyOrphaned = agential.DeriveValueReceptorFrom1Input[bool, int](t, func(weaklyOrphanedWeakParents int) bool {
+	t.anyWeakParentWeaklyOrphaned = reactive.NewDerivedVariable1[bool, int](t, func(weaklyOrphanedWeakParents int) bool {
 		return weaklyOrphanedWeakParents > 0
 	}, &t.weaklyOrphanedWeakParents)
 
-	t.isStronglyOrphaned = agential.DeriveValueFrom3Inputs[bool, bool, bool, bool](t, func(isMarkedOrphaned, anyStrongParentStronglyOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+	t.isStronglyOrphaned = reactive.NewDerivedVariable3[bool, bool, bool, bool](t, func(isMarkedOrphaned, anyStrongParentStronglyOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
 		return isMarkedOrphaned || anyStrongParentStronglyOrphaned || anyWeakParentWeaklyOrphaned
 	}, &t.isMarkedOrphaned, &t.anyStrongParentStronglyOrphaned, &t.anyWeakParentWeaklyOrphaned)
 
-	t.isWeaklyOrphaned = agential.DeriveValueReceptorFrom2Inputs[bool, bool, bool](t, func(isMarkedOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+	t.isWeaklyOrphaned = reactive.NewDerivedVariable2[bool, bool, bool](t, func(isMarkedOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
 		return isMarkedOrphaned || anyWeakParentWeaklyOrphaned
 	}, &t.isMarkedOrphaned, &t.anyWeakParentWeaklyOrphaned)
 
-	t.isMarkedOrphaned = agential.DeriveValueReceptorFrom1Input[bool, bool](t, func(isLivenessThresholdReached bool) bool {
+	t.isMarkedOrphaned = reactive.NewDerivedVariable1[bool, bool](t, func(isLivenessThresholdReached bool) bool {
 		return isLivenessThresholdReached /* TODO: && !accepted */
 	}, &t.isLivenessThresholdReached)
 
@@ -176,38 +176,38 @@ func (t *TipMetadata) Block() *blocks.Block {
 	return t.block
 }
 
-// TipPool exposes a ValueReceptor that stores the current TipPool of the block.
-func (t *TipMetadata) TipPool() *agential.ValueReceptor[tipmanager.TipPool] {
+// TipPool exposes a variable that stores the current TipPool of the block.
+func (t *TipMetadata) TipPool() reactive.Variable[tipmanager.TipPool] {
 	return t.tipPool
 }
 
-// IsLivenessThresholdReached exposes a ValueReceptor that stores if the liveness threshold was reached.
-func (t *TipMetadata) IsLivenessThresholdReached() *agential.ValueReceptor[bool] {
+// IsLivenessThresholdReached exposes a variable that stores if the liveness threshold was reached.
+func (t *TipMetadata) IsLivenessThresholdReached() reactive.Variable[bool] {
 	return t.isLivenessThresholdReached
 }
 
 // IsStrongTip returns a Value that indicates if the block is a strong tip.
-func (t *TipMetadata) IsStrongTip() agential.Value[bool] {
+func (t *TipMetadata) IsStrongTip() reactive.Value[bool] {
 	return t.isStrongTip
 }
 
 // IsWeakTip returns a Value that indicates if the block is a weak tip.
-func (t *TipMetadata) IsWeakTip() agential.Value[bool] {
+func (t *TipMetadata) IsWeakTip() reactive.Value[bool] {
 	return t.isWeakTip
 }
 
 // IsOrphaned returns a Value that indicates if the block was orphaned.
-func (t *TipMetadata) IsOrphaned() agential.Value[bool] {
+func (t *TipMetadata) IsOrphaned() reactive.Value[bool] {
 	return t.isOrphaned
 }
 
 // IsEvicted returns true if the block was evicted from the TipManager.
-func (t *TipMetadata) IsEvicted() agential.Value[bool] {
+func (t *TipMetadata) IsEvicted() reactive.Value[bool] {
 	return t.isEvicted
 }
 
 // Constructed returns a value that indicates if the TipMetadata has initialized all its properties.
-func (t *TipMetadata) Constructed() agential.Value[bool] {
+func (t *TipMetadata) Constructed() reactive.Value[bool] {
 	return t.constructed
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/timed"
-	"github.com/iotaledger/iota-core/pkg/core/agential"
+	"github.com/iotaledger/iota-core/pkg/core/reactive"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -38,7 +38,7 @@ type TipSelection struct {
 	livenessThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
 
 	// livenessThreshold holds the current liveness threshold.
-	livenessThreshold *agential.ValueReceptor[time.Time]
+	livenessThreshold reactive.Variable[time.Time]
 
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int
@@ -64,7 +64,7 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 		conflictDAG:                  conflictDAG,
 		rootBlocks:                   rootBlocksRetriever,
 		livenessThresholdQueue:       timed.NewPriorityQueue[tipmanager.TipMetadata](true),
-		livenessThreshold:            agential.NewValueReceptor[time.Time](),
+		livenessThreshold:            reactive.NewVariable[time.Time](),
 		optMaxStrongParents:          8,
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,
