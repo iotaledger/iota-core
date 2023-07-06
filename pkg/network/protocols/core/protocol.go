@@ -76,14 +76,15 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...network.PeerID
 }
 
 func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
-	var encodedAttestations []byte
+	var iotagoAPI iotago.API
 	if len(attestations) > 0 {
-		api := p.apiProvider.APIForVersion(attestations[0].ProtocolVersion)
-		encodedAttestations = lo.PanicOnErr(api.Encode(attestations))
+		iotagoAPI = p.apiProvider.APIForVersion(attestations[0].ProtocolVersion)
+	} else {
+		iotagoAPI = p.apiProvider.APIForSlot(cm.Index()) // we need an api to serialize empty slices as well
 	}
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
 		Commitment:   cm.Data(),
-		Attestations: encodedAttestations,
+		Attestations: lo.PanicOnErr(iotagoAPI.Encode(attestations)),
 		MerkleProof:  lo.PanicOnErr(json.Marshal(merkleProof)),
 	}}}, protocolID, to...)
 }
