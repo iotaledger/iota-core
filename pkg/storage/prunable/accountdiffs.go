@@ -233,7 +233,6 @@ func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff *AccountDif
 		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
 			return errors.Wrap(err, "failed to set destroyed account")
 		}
-
 	}
 
 	return b.diffChangeStore.Set(accountID, accountDiff)

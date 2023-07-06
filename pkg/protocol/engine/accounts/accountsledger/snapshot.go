@@ -195,14 +195,16 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 				return errors.Wrapf(err, "unable to read accountID for index %d", j)
 			}
 
-			accountDiff := prunable.NewAccountDiff()
-			if err := accountDiff.FromReader(reader); err != nil {
-				return errors.Wrapf(err, "unable to read account diff for accountID %s", accountID)
-			}
-
 			var destroyed bool
 			if err := binary.Read(reader, binary.LittleEndian, &destroyed); err != nil {
 				return errors.Wrapf(err, "unable to read destroyed flag for accountID %s", accountID)
+			}
+
+			accountDiff := prunable.NewAccountDiff()
+			if !destroyed {
+				if err := accountDiff.FromReader(reader); err != nil {
+					return errors.Wrapf(err, "unable to read account diff for accountID %s", accountID)
+				}
 			}
 
 			if err := diffStore.Store(accountID, accountDiff, destroyed); err != nil {
@@ -248,12 +250,14 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 				innerErr = errors.Wrapf(err, "unable to write accountID for account %s", accountID)
 			}
 
-			if err = pWriter.WriteBytes(lo.PanicOnErr(accountDiff.Bytes())); err != nil {
-				innerErr = errors.Wrapf(err, "unable to write account diff for account %s", accountID)
-			}
-
 			if err = pWriter.WriteValue("destroyed flag", destroyed); err != nil {
 				innerErr = errors.Wrapf(err, "unable to write destroyed flag for account %s", accountID)
+			}
+
+			if !destroyed {
+				if err = pWriter.WriteBytes(lo.PanicOnErr(accountDiff.Bytes())); err != nil {
+					innerErr = errors.Wrapf(err, "unable to write account diff for account %s", accountID)
+				}
 			}
 
 			accountsInDiffCount++
