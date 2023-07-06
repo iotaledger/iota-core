@@ -3,6 +3,7 @@ package performance
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +23,7 @@ type TestSuite struct {
 
 	accounts map[string]iotago.AccountID
 
-	ProtocolParameters *iotago.ProtocolParameters
+	API iotago.API
 
 	Instance *Tracker
 }
@@ -31,6 +32,15 @@ func NewTestSuite(t *testing.T) *TestSuite {
 	ts := &TestSuite{
 		T:        t,
 		accounts: make(map[string]iotago.AccountID),
+		API: iotago.V3API(
+			iotago.NewV3ProtocolParameters(
+				iotago.WithTimeProviderOptions(
+					time.Now().Unix(),
+					10,
+					1,
+				),
+			),
+		),
 	}
 	ts.InitRewardManager()
 
@@ -52,7 +62,7 @@ func (t *TestSuite) InitRewardManager() {
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
 	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, api.NewStaticProvider(tpkg.TestAPI))
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, api.NewStaticProvider(t.API))
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -120,13 +130,13 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 }
 
 func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochIndex iotago.EpochIndex, performanceFactor uint64) {
-	startSlot := tpkg.TestAPI.TimeProvider().EpochStart(epochIndex)
-	endSlot := tpkg.TestAPI.TimeProvider().EpochEnd(epochIndex)
+	startSlot := t.API.TimeProvider().EpochStart(epochIndex)
+	endSlot := t.API.TimeProvider().EpochEnd(epochIndex)
 	for slot := startSlot; slot <= endSlot; slot++ {
 		for i := uint64(0); i < performanceFactor; i++ {
 			block := tpkg.RandBasicBlockWithIssuerAndBurnedMana(accountID, 10)
-			block.IssuingTime = tpkg.TestAPI.TimeProvider().SlotStartTime(slot)
-			modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
+			block.IssuingTime = t.API.TimeProvider().SlotStartTime(slot)
+			modelBlock, err := model.BlockFromBlock(block, t.API)
 			t.Instance.BlockAccepted(blocks.NewBlock(modelBlock))
 
 			require.NoError(t.T, err)
