@@ -269,7 +269,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	if !chainCommitment.IsSolid() {
-		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: chain: %s, slotcommitment: %s, latest commitment: %s, block ID: %s", chainCommitment.Chain().ForkingPoint.ID(), block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
+		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
 
 	processed := false
