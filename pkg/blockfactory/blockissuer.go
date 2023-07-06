@@ -211,7 +211,6 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		}
 
 		if len(iotaBlock.Parents()) == 0 {
-			// only allow to update tips during proof of work if no parents were given
 			references, err := i.getReferences(ctx, innerBlock.Payload)
 			if err != nil {
 				return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %s", err.Error())
