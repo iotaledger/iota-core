@@ -352,7 +352,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnConflicting(func() {
 		m.conflictDAG.CreateConflict(transaction.ID())
 
-		unsubscribe := transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations *reactive.SetMutations[iotago.TransactionID]) {
+		unsubscribe := transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations reactive.SetMutations[iotago.TransactionID]) {
 			if err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements); err != nil {
 				panic(err)
 			}

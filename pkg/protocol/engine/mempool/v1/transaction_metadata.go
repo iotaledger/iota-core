@@ -21,8 +21,8 @@ type TransactionMetadata struct {
 	inputs            []*StateMetadata
 	outputs           []*StateMetadata
 	transaction       mempool.Transaction
-	parentConflictIDs *reactive.Set[iotago.TransactionID]
-	conflictIDs       *reactive.Set[iotago.TransactionID]
+	parentConflictIDs *reactive.set[iotago.TransactionID]
+	conflictIDs       *reactive.set[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -122,7 +122,7 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	return outputs
 }
 
-func (t *TransactionMetadata) ConflictIDs() *reactive.Set[iotago.TransactionID] {
+func (t *TransactionMetadata) ConflictIDs() *reactive.set[iotago.TransactionID] {
 	return t.conflictIDs
 }
 

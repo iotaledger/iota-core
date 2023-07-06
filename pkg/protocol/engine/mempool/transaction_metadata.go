@@ -15,7 +15,7 @@ type TransactionMetadata interface {
 
 	Outputs() *advancedset.AdvancedSet[StateMetadata]
 
-	ConflictIDs() *reactive.Set[iotago.TransactionID]
+	ConflictIDs() *reactive.set[iotago.TransactionID]
 
 	Commit()
 

@@ -11,12 +11,56 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
+// Set is a reactive data structure that represents a set of elements. It notifies its subscribers when the set is
+// updated.
+type Set[ElementType comparable] interface {
+	// Get returns the current value of the set.
+	Get() *advancedset.AdvancedSet[ElementType]
+
+	// Set sets the new value and triggers the registered callbacks if the value has changed.
+	Set(value *advancedset.AdvancedSet[ElementType]) (appliedMutations SetMutations[ElementType])
+
+	// Apply applies the given mutations to the current value and triggers the registered callbacks if the value has
+	// changed.
+	Apply(mutations SetMutations[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])
+
+	// OnUpdate registers the given callback that is triggered when the value changes.
+	OnUpdate(callback func(updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])) (unsubscribe func())
+
+	// Add adds the given elements to the set and triggers the registered callbacks if the value has changed.
+	Add(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])
+	Remove(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])
+	InheritFrom(sources ...*set[ElementType]) (unsubscribe func())
+	Size() int
+	IsEmpty() bool
+	Has(element ElementType) bool
+	HasAll(other *set[ElementType]) bool
+	ForEach(callback func(element ElementType) error) error
+	Range(callback func(element ElementType))
+	Intersect(other *advancedset.AdvancedSet[ElementType]) *advancedset.AdvancedSet[ElementType]
+	Filter(predicate func(element ElementType) bool) *advancedset.AdvancedSet[ElementType]
+	Equal(other *advancedset.AdvancedSet[ElementType]) bool
+	Is(element ElementType) bool
+	Clone() *advancedset.AdvancedSet[ElementType]
+	Slice() []ElementType
+	Iterator() *walker.Walker[ElementType]
+	String() string
+}
+
+// NewSet is the constructor for the Set type.
+func NewSet[T comparable]() Set[T] {
+	return &set[T]{
+		value:           advancedset.New[T](),
+		updateCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(*advancedset.AdvancedSet[T], SetMutations[T])]](),
+	}
+}
+
 // Set is an agent that can hold and mutate a set of values and that allows other agents to subscribe to updates
 // of the set.
 //
 // The registered callbacks are guaranteed to receive all updates in exactly the same order as they happened and no
 // callback is ever more than 1 round of updates ahead of other callbacks.
-type Set[ElementType comparable] struct {
+type set[ElementType comparable] struct {
 	// value is the current value of the set.
 	value *advancedset.AdvancedSet[ElementType]
 
@@ -34,22 +78,10 @@ type Set[ElementType comparable] struct {
 
 	// applyOrderMutex is an additional mutex that is used to ensure that the application order of mutations is ensured.
 	applyOrderMutex sync.Mutex
-
-	// optTriggerWithInitialEmptyValue is an option that can be set to make the OnUpdate callbacks trigger immediately
-	// on subscription even if the current value is empty.
-	optTriggerWithInitialEmptyValue bool
-}
-
-// NewSet is the constructor for the Set type.
-func NewSet[T comparable]() *Set[T] {
-	return &Set[T]{
-		value:           advancedset.New[T](),
-		updateCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(*advancedset.AdvancedSet[T], SetMutations[T])]](),
-	}
 }
 
 // Get returns the current value of the set.
-func (s *Set[ElementType]) Get() *advancedset.AdvancedSet[ElementType] {
+func (s *set[ElementType]) Get() *advancedset.AdvancedSet[ElementType] {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -57,7 +89,7 @@ func (s *Set[ElementType]) Get() *advancedset.AdvancedSet[ElementType] {
 }
 
 // Set sets the given value as the new value of the set.
-func (s *Set[ElementType]) Set(value *advancedset.AdvancedSet[ElementType]) (appliedMutations SetMutations[ElementType]) {
+func (s *set[ElementType]) Set(value *advancedset.AdvancedSet[ElementType]) (appliedMutations SetMutations[ElementType]) {
 	s.applyOrderMutex.Lock()
 	defer s.applyOrderMutex.Unlock()
 
@@ -73,7 +105,7 @@ func (s *Set[ElementType]) Set(value *advancedset.AdvancedSet[ElementType]) (app
 }
 
 // Apply applies the given SetMutations to the set.
-func (s *Set[ElementType]) Apply(mutations SetMutations[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType]) {
+func (s *set[ElementType]) Apply(mutations SetMutations[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType]) {
 	s.applyOrderMutex.Lock()
 	defer s.applyOrderMutex.Unlock()
 
@@ -89,7 +121,7 @@ func (s *Set[ElementType]) Apply(mutations SetMutations[ElementType]) (updatedSe
 }
 
 // OnUpdate registers the given callback to be triggered when the value of the set changes.
-func (s *Set[ElementType]) OnUpdate(callback func(updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])) (unsubscribe func()) {
+func (s *set[ElementType]) OnUpdate(callback func(updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])) (unsubscribe func()) {
 	s.mutex.Lock()
 
 	currentValue := s.value
@@ -116,17 +148,17 @@ func (s *Set[ElementType]) OnUpdate(callback func(updatedSet *advancedset.Advanc
 }
 
 // Add adds the given elements to the set and returns the updated set and the applied mutations.
-func (s *Set[ElementType]) Add(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType]) {
+func (s *set[ElementType]) Add(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType]) {
 	return s.Apply(NewSetMutations(WithAddedElements(elements)))
 }
 
 // Remove removes the given elements from the set and returns the updated set and the applied mutations.
-func (s *Set[ElementType]) Remove(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType]) {
+func (s *set[ElementType]) Remove(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType]) {
 	return s.Apply(NewSetMutations(WithRemovedElements(elements)))
 }
 
 // InheritFrom registers the given sets to inherit their mutations to the set.
-func (s *Set[ElementType]) InheritFrom(sources ...*Set[ElementType]) (unsubscribe func()) {
+func (s *set[ElementType]) InheritFrom(sources ...*set[ElementType]) (unsubscribe func()) {
 	unsubscribeCallbacks := make([]func(), len(sources))
 
 	for i, source := range sources {
@@ -141,85 +173,77 @@ func (s *Set[ElementType]) InheritFrom(sources ...*Set[ElementType]) (unsubscrib
 }
 
 // Size returns the size of the set.
-func (s *Set[ElementType]) Size() int {
+func (s *set[ElementType]) Size() int {
 	return s.Get().Size()
 }
 
 // IsEmpty returns true if the set is empty.
-func (s *Set[ElementType]) IsEmpty() bool {
+func (s *set[ElementType]) IsEmpty() bool {
 	return s.Get().IsEmpty()
 }
 
 // Has returns true if the set contains the given element.
-func (s *Set[ElementType]) Has(element ElementType) bool {
+func (s *set[ElementType]) Has(element ElementType) bool {
 	return s.Get().Has(element)
 }
 
 // HasAll returns true if the set contains all elements of the other set.
-func (s *Set[ElementType]) HasAll(other *Set[ElementType]) bool {
+func (s *set[ElementType]) HasAll(other *set[ElementType]) bool {
 	return s.Get().HasAll(other.Get())
 }
 
 // ForEach calls the callback for each element of the set (the iteration can be stopped by returning an error).
-func (s *Set[ElementType]) ForEach(callback func(element ElementType) error) error {
+func (s *set[ElementType]) ForEach(callback func(element ElementType) error) error {
 	return s.Get().ForEach(callback)
 }
 
 // Range calls the callback for each element of the set.
-func (s *Set[ElementType]) Range(callback func(element ElementType)) {
+func (s *set[ElementType]) Range(callback func(element ElementType)) {
 	s.Get().Range(callback)
 }
 
 // Intersect returns a new set that contains the intersection of the set and the other set.
-func (s *Set[ElementType]) Intersect(other *advancedset.AdvancedSet[ElementType]) *advancedset.AdvancedSet[ElementType] {
+func (s *set[ElementType]) Intersect(other *advancedset.AdvancedSet[ElementType]) *advancedset.AdvancedSet[ElementType] {
 	return s.Get().Intersect(other)
 }
 
 // Filter returns a new set that contains the elements of the set that satisfy the predicate.
-func (s *Set[ElementType]) Filter(predicate func(element ElementType) bool) *advancedset.AdvancedSet[ElementType] {
+func (s *set[ElementType]) Filter(predicate func(element ElementType) bool) *advancedset.AdvancedSet[ElementType] {
 	return s.Get().Filter(predicate)
 }
 
 // Equal returns true if the set is equal to the other set.
-func (s *Set[ElementType]) Equal(other *advancedset.AdvancedSet[ElementType]) bool {
+func (s *set[ElementType]) Equal(other *advancedset.AdvancedSet[ElementType]) bool {
 	return s.Get().Equal(other)
 }
 
 // Is returns true if the set contains a single element that is equal to the given element.
-func (s *Set[ElementType]) Is(element ElementType) bool {
+func (s *set[ElementType]) Is(element ElementType) bool {
 	return s.Get().Is(element)
 }
 
 // Clone returns a shallow copy of the set.
-func (s *Set[ElementType]) Clone() *advancedset.AdvancedSet[ElementType] {
+func (s *set[ElementType]) Clone() *advancedset.AdvancedSet[ElementType] {
 	return s.Get().Clone()
 }
 
 // Slice returns a slice representation of the set.
-func (s *Set[ElementType]) Slice() []ElementType {
+func (s *set[ElementType]) Slice() []ElementType {
 	return s.Get().Slice()
 }
 
 // Iterator returns an iterator for the set.
-func (s *Set[ElementType]) Iterator() *walker.Walker[ElementType] {
+func (s *set[ElementType]) Iterator() *walker.Walker[ElementType] {
 	return s.Get().Iterator()
 }
 
 // String returns a human-readable version of the set.
-func (s *Set[ElementType]) String() string {
+func (s *set[ElementType]) String() string {
 	return s.Get().String()
 }
 
-// WithTriggerWithInitialEmptyValue is an option that can be set to make the OnUpdate callbacks trigger immediately on
-// subscription even if the current value is empty.
-func (s *Set[ElementType]) WithTriggerWithInitialEmptyValue(trigger bool) *Set[ElementType] {
-	s.optTriggerWithInitialEmptyValue = trigger
-
-	return s
-}
-
 // set sets the given value as the new value of the set.
-func (s *Set[ElementType]) set(value *advancedset.AdvancedSet[ElementType]) (appliedMutations SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(*advancedset.AdvancedSet[ElementType], SetMutations[ElementType])]) {
+func (s *set[ElementType]) set(value *advancedset.AdvancedSet[ElementType]) (appliedMutations SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(*advancedset.AdvancedSet[ElementType], SetMutations[ElementType])]) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -230,7 +254,7 @@ func (s *Set[ElementType]) set(value *advancedset.AdvancedSet[ElementType]) (app
 }
 
 // applyMutations applies the given mutations to the set.
-func (s *Set[ElementType]) applyMutations(mutations SetMutations[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(*advancedset.AdvancedSet[ElementType], SetMutations[ElementType])]) {
+func (s *set[ElementType]) applyMutations(mutations SetMutations[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(*advancedset.AdvancedSet[ElementType], SetMutations[ElementType])]) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
