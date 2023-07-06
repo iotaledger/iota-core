@@ -15,12 +15,12 @@ require (
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d
-	github.com/iotaledger/hive.go/ds v0.0.0-20230706083020-ef6c3248369d
+	github.com/iotaledger/hive.go/ds v0.0.0-20230706133847-93fcdf0acb8e
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/lo v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/logger v0.0.0-20230706083020-ef6c3248369d
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230706083020-ef6c3248369d
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230706181250-4d386aa2d018
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230620163422-3926cc7ad264
