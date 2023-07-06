@@ -176,7 +176,7 @@ func (m *Manager) LoadCommitmentOrRequestMissing(id iotago.CommitmentID) *ChainC
 		return commitment
 	}
 
-	m.commitmentRequester.StartTicker(id)
+	m.Events.CommitmentMissing.Trigger(id)
 
 	return nil
 }
