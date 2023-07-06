@@ -107,6 +107,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsLivenessThreshold,
 					t.optsEpochNearingThreshold,
 				),
+				iotago.WithStakingOptions(1),
 			),
 		)
 
