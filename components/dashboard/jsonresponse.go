@@ -37,7 +37,7 @@ type Output struct {
 
 // NewOutput returns an Output from the given ledgerstate.Output.
 func NewOutput(output iotago.Output) (result *Output) {
-	outputJSON, err := deps.Protocol.API().JSONEncode(output)
+	outputJSON, err := deps.Protocol.LatestAPI().JSONEncode(output)
 	if err != nil {
 		return nil
 	}
@@ -50,7 +50,7 @@ func NewOutput(output iotago.Output) (result *Output) {
 
 // NewOutput returns an Output from the given ledgerstate.Output.
 func NewOutputFromLedgerstateOutput(output *utxoledger.Output) (result *Output) {
-	outputJSON, err := deps.Protocol.API().JSONEncode(output)
+	outputJSON, err := deps.Protocol.APIForSlot(output.SlotCreated()).JSONEncode(output)
 	if err != nil {
 		return nil
 	}
@@ -127,7 +127,7 @@ type Transaction struct {
 
 // NewTransaction returns a Transaction from the given ledgerstate.Transaction.
 func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
-	txID, err := iotaTx.ID()
+	txID, err := iotaTx.ID(deps.Protocol.LatestAPI())
 	if err != nil {
 		return nil
 	}
@@ -152,7 +152,7 @@ func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
 
 	dataPayload := make([]byte, 0)
 	if iotaTx.Essence.Payload != nil {
-		dataPayload, _ = deps.Protocol.API().Encode(iotaTx.Essence.Payload)
+		dataPayload, _ = deps.Protocol.LatestAPI().Encode(iotaTx.Essence.Payload)
 	}
 
 	return &Transaction{
@@ -212,7 +212,7 @@ func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
 	case *iotago.SignatureUnlock:
 		switch signature := unlock.Signature.(type) {
 		case *iotago.Ed25519Signature:
-			sigJSON, err := deps.Protocol.API().JSONEncode(signature)
+			sigJSON, err := deps.Protocol.LatestAPI().JSONEncode(signature)
 			if err != nil {
 				return nil
 			}

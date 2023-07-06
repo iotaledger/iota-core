@@ -160,7 +160,6 @@ Example:
 | debugRequestLoggerEnabled   | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                   |
 | allowIncompleteBlock        | Whether the node allows to fill in incomplete block and issue it for user                      | boolean | false                                                                                                                                                                                                   |
 | [jwtAuth](#restapi_jwtauth) | Configuration for jwtAuth                                                                      | object  |                                                                                                                                                                                                         |
-| [pow](#restapi_pow)         | Configuration for pow                                                                          | object  |                                                                                                                                                                                                         |
 | [limits](#restapi_limits)   | Configuration for limits                                                                       | object  |                                                                                                                                                                                                         |
 
 ### <a id="restapi_jwtauth"></a> JwtAuth
@@ -168,13 +167,6 @@ Example:
 | Name | Description                                                                                                                             | Type   | Default value |
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------- |
 | salt | Salt used inside the JWT tokens for the REST API. Change this to a different value to invalidate JWT tokens not matching this new value | string | "IOTA"        |
-
-### <a id="restapi_pow"></a> Pow
-
-| Name        | Description                                                                | Type    | Default value |
-| ----------- | -------------------------------------------------------------------------- | ------- | ------------- |
-| enabled     | Whether the node does PoW if blocks are received via API                   | boolean | false         |
-| workerCount | The amount of workers used for calculating PoW when issuing blocks via API | int     | 1             |
 
 ### <a id="restapi_limits"></a> Limits
 
@@ -208,10 +200,6 @@ Example:
       "allowIncompleteBlock": false,
       "jwtAuth": {
         "salt": "IOTA"
-      },
-      "pow": {
-        "enabled": false,
-        "workerCount": 1
       },
       "limits": {
         "maxBodyLength": "1M",
@@ -266,7 +254,6 @@ Example:
 | Name                                         | Description                       | Type   | Default value |
 | -------------------------------------------- | --------------------------------- | ------ | ------------- |
 | [snapshot](#protocol_snapshot)               | Configuration for snapshot        | object |               |
-| [notarization](#protocol_notarization)       | Configuration for notarization    | object |               |
 | [filter](#protocol_filter)                   | Configuration for filter          | object |               |
 | [sybilProtection](#protocol_sybilprotection) | Configuration for sybilProtection | object |               |
 
@@ -277,12 +264,6 @@ Example:
 | path  | The path of the snapshot file                                                              | string | "testnet/snapshot.bin" |
 | depth | Defines how many slot diffs are stored in the snapshot, starting from the full ledgerstate | int    | 5                      |
 
-### <a id="protocol_notarization"></a> Notarization
-
-| Name                  | Description                                    | Type | Default value |
-| --------------------- | ---------------------------------------------- | ---- | ------------- |
-| minSlotCommittableAge | Min age of a committable slot denoted in slots | int  | 6             |
-
 ### <a id="protocol_filter"></a> Filter
 
 | Name                 | Description                                                                                | Type   | Default value |
@@ -291,16 +272,9 @@ Example:
 
 ### <a id="protocol_sybilprotection"></a> SybilProtection
 
-| Name                                             | Description                 | Type  | Default value     |
-| ------------------------------------------------ | --------------------------- | ----- | ----------------- |
-| [committee](#protocol_sybilprotection_committee) | Configuration for committee | array | see example below |
-
-### <a id="protocol_sybilprotection_committee"></a> Committee
-
-| Name     | Description                   | Type   | Default value |
-| -------- | ----------------------------- | ------ | ------------- |
-| identity | The identity of the validator | string | ""            |
-| weight   | The weight of the validator   | int    | 0             |
+| Name      | Description                     | Type  | Default value |
+| --------- | ------------------------------- | ----- | ------------- |
+| committee | The identities of the validator | array |               |
 
 Example:
 
@@ -310,9 +284,6 @@ Example:
       "snapshot": {
         "path": "testnet/snapshot.bin",
         "depth": 5
-      },
-      "notarization": {
-        "minSlotCommittableAge": 6
       },
       "filter": {
         "maxAllowedClockDrift": "5s"
@@ -331,7 +302,7 @@ Example:
 | enabled                   | Whether the BlockIssuer component is enabled              | boolean | true          |
 | tipSelectionTimeout       | The timeout for tip selection                             | string  | "10s"         |
 | tipSelectionRetryInterval | The interval for retrying tip selection                   | string  | "200ms"       |
-| issuerAccount             | The account ID of the account that will issue the blocks  | string  | ""            |
+| issuerAccount             | The accountID of the account that will issue the blocks   | string  | ""            |
 | privateKey                | The private key of the account that will issue the blocks | string  | ""            |
 
 Example:

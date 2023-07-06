@@ -51,8 +51,8 @@ type TransactionMetadata struct {
 	*inclusionFlags
 }
 
-func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMetadata, error) {
-	transactionID, transactionIDErr := transaction.ID()
+func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction) (*TransactionMetadata, error) {
+	transactionID, transactionIDErr := transaction.ID(api)
 	if transactionIDErr != nil {
 		return nil, xerrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
 	}

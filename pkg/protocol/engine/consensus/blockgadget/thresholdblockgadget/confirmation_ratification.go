@@ -6,7 +6,7 @@ import (
 )
 
 func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
-	ratifier := votingBlock.Block().IssuerID
+	ratifier := votingBlock.ProtocolBlock().IssuerID
 	ratifierBlockIndex := votingBlock.ID().Index()
 
 	// Only track ratifier weight for issuers that are part of the committee.

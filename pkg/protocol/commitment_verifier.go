@@ -24,7 +24,20 @@ func NewCommitmentVerifier(mainEngine *engine.Engine) *CommitmentVerifier {
 
 func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (iotago.BlockIDs, error) {
 	// 1. Verify that the provided attestations are indeed the ones that were included in the commitment.
-	tree := ads.NewMap[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation](mapdb.NewMapDB())
+	tree := ads.NewMap[iotago.AccountID, *iotago.Attestation](mapdb.NewMapDB(),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		func(attestation *iotago.Attestation) ([]byte, error) {
+			return c.engine.APIForVersion(attestation.ProtocolVersion).Encode(attestation)
+		},
+		func(bytes []byte) (*iotago.Attestation, int, error) {
+			a := new(iotago.Attestation)
+			n, err := c.engine.APIForVersion(bytes[0]).Decode(bytes, a)
+
+			return a, n, err
+		},
+	)
+
 	for _, att := range attestations {
 		tree.Set(att.IssuerID, att)
 	}
@@ -56,8 +69,10 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		//  First, this can be based on the latest commonly known ledger state.
 		//  Later, this needs to include a proof of added/removed public keys.
 
+		api := c.engine.APIForVersion(att.ProtocolVersion)
+
 		// 2. Verify the signature of the attestation.
-		if valid, err := att.VerifySignature(); !valid {
+		if valid, err := att.VerifySignature(api); !valid {
 			if err != nil {
 				return nil, 0, errors.Wrap(err, "error validating attestation signature")
 			}
@@ -71,7 +86,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		}
 
 		// TODO: this might differ if we have a Accounts with changing weights depending on the SlotIndex/epoch
-		attestationBlockID, err := att.BlockID(c.engine.API().TimeProvider())
+		attestationBlockID, err := att.BlockID(api)
 		if err != nil {
 			return nil, 0, errors.Wrap(err, "error calculating blockID from attestation")
 		}
@@ -81,7 +96,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 
 		visitedIdentities.Add(att.IssuerID)
 
-		blockID, err := att.BlockID(c.engine.API().TimeProvider())
+		blockID, err := att.BlockID(api)
 		if err != nil {
 			return nil, 0, errors.Wrap(err, "error calculating blockID from attestation")
 		}

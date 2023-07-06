@@ -35,7 +35,7 @@ func TestManager_Import_Export(t *testing.T) {
 
 		delegatorRewardBeforeImport, validatorRewardBeforeImport := ts.calculateExpectedRewards(epochsCount, epochActions)
 		// export two full epochs
-		targetSlot := ts.API().TimeProvider().EpochEnd(3)
+		targetSlot := ts.API.TimeProvider().EpochEnd(3)
 		err := ts.Instance.Export(writer, targetSlot)
 		require.NoError(t, err)
 
@@ -52,7 +52,7 @@ func TestManager_Import_Export(t *testing.T) {
 
 		delegatorRewardBeforeImport, validatorRewardBeforeImport := ts.calculateExpectedRewards(epochsCount, epochActions)
 		// export at the beginning of epoch 2, skip epoch 3 at all
-		targetSlot := ts.API().TimeProvider().EpochStart(2)
+		targetSlot := ts.API.TimeProvider().EpochStart(2)
 		err := ts.Instance.Export(writer, targetSlot)
 		require.NoError(t, err)
 

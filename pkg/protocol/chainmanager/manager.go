@@ -168,6 +168,19 @@ func (m *Manager) Chain(ec iotago.CommitmentID) (chain *Chain) {
 	return nil
 }
 
+func (m *Manager) LoadCommitmentOrRequestMissing(id iotago.CommitmentID) *ChainCommitment {
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
+	if commitment, exists := m.commitment(id); exists {
+		return commitment
+	}
+
+	m.Events.CommitmentMissing.Trigger(id)
+
+	return nil
+}
+
 func (m *Manager) Commitments(id iotago.CommitmentID, amount int) (commitments []*ChainCommitment, err error) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()

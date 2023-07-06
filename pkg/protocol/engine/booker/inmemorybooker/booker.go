@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -137,18 +136,18 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset
 	conflictIDsToInherit := advancedset.New[iotago.TransactionID]()
 
 	// Inherit conflictIDs from parents based on the parent type.
-	for _, parent := range block.ModelBlock().ParentsWithType() {
+	for _, parent := range block.ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
 			return nil, errors.Errorf("parent %s does not exist", parent.ID)
 		}
 
 		switch parent.Type {
-		case model.StrongParentType:
+		case iotago.StrongParentType:
 			conflictIDsToInherit.AddAll(parentBlock.ConflictIDs())
-		case model.WeakParentType:
+		case iotago.WeakParentType:
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
-		case model.ShallowLikeParentType:
+		case iotago.ShallowLikeParentType:
 			// TODO: check whether it contains a TX, otherwise shallow like reference is invalid?
 
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())

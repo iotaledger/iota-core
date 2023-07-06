@@ -20,8 +20,8 @@ func (m *Manager) RestoreFromDisk() error {
 			return errors.Wrapf(err, "failed to get storage for slot %d", i)
 		}
 
-		err = storage.Iterate(kvstore.EmptyPrefix, func(key iotago.AccountID, value iotago.Attestation) bool {
-			m.applyToPendingAttestations(&value, cutoffIndex)
+		err = storage.Iterate(kvstore.EmptyPrefix, func(key iotago.AccountID, value *iotago.Attestation) bool {
+			m.applyToPendingAttestations(value, cutoffIndex)
 			return true
 		})
 		if err != nil {
@@ -54,7 +54,7 @@ func (m *Manager) writeToDisk() error {
 
 		attestations := m.determineAttestationsFromWindow(i)
 		for _, a := range attestations {
-			if err := storage.Set(a.IssuerID, *a); err != nil {
+			if err := storage.Set(a.IssuerID, a); err != nil {
 				return errors.Wrapf(err, "failed to set attestation %v", a)
 			}
 		}
@@ -63,7 +63,7 @@ func (m *Manager) writeToDisk() error {
 	return nil
 }
 
-func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
+func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[iotago.AccountID, *iotago.Attestation], error) {
 	trackerStorage := m.bucketedStorage(index)
 	if trackerStorage == nil {
 		return nil, errors.Errorf("failed to access storage for tracker of slot %d", index)
@@ -73,10 +73,24 @@ func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[io
 		return nil, errors.Wrapf(err, "failed to get extended realm for tracker of slot %d", index)
 	}
 
-	return kvstore.NewTypedStore[iotago.AccountID, iotago.Attestation](trackerStorage), nil
+	api := m.apiProvider.APIForSlot(index)
+
+	return kvstore.NewTypedStore[iotago.AccountID, *iotago.Attestation](trackerStorage,
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		func(v *iotago.Attestation) ([]byte, error) {
+			return api.Encode(v)
+		},
+		func(bytes []byte) (object *iotago.Attestation, consumed int, err error) {
+			attestation := new(iotago.Attestation)
+			consumed, err = api.Decode(bytes, attestation)
+
+			return attestation, consumed, err
+		},
+	), nil
 }
 
-func (m *Manager) adsMapStorage(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
+func (m *Manager) adsMapStorage(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, *iotago.Attestation], error) {
 	attestationsStorage := m.bucketedStorage(index)
 	if attestationsStorage == nil {
 		return nil, errors.Errorf("failed to access storage for attestors of slot %d", index)
@@ -86,5 +100,19 @@ func (m *Manager) adsMapStorage(index iotago.SlotIndex) (*ads.Map[iotago.Account
 		return nil, errors.Wrapf(err, "failed to get extended realm for attestations of slot %d", index)
 	}
 
-	return ads.NewMap[iotago.AccountID, iotago.Attestation](attestationsStorage), nil
+	api := m.apiProvider.APIForSlot(index)
+
+	return ads.NewMap(attestationsStorage,
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		func(v *iotago.Attestation) ([]byte, error) {
+			return api.Encode(v)
+		},
+		func(bytes []byte) (object *iotago.Attestation, consumed int, err error) {
+			attestation := new(iotago.Attestation)
+			consumed, err = api.Decode(bytes, attestation)
+
+			return attestation, consumed, err
+		},
+	), nil
 }

@@ -20,7 +20,7 @@ type StateDiff struct {
 
 	stateUsageCounters *shrinkingmap.ShrinkingMap[iotago.OutputID, int]
 
-	mutations *ads.Set[iotago.TransactionID, *iotago.TransactionID]
+	mutations *ads.Set[iotago.TransactionID]
 }
 
 func NewStateDiff(index iotago.SlotIndex) *StateDiff {
@@ -29,7 +29,7 @@ func NewStateDiff(index iotago.SlotIndex) *StateDiff {
 		createdOutputs:       shrinkingmap.New[iotago.OutputID, mempool.StateMetadata](),
 		executedTransactions: orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata](),
 		stateUsageCounters:   shrinkingmap.New[iotago.OutputID, int](),
-		mutations:            ads.NewSet[iotago.TransactionID, *iotago.TransactionID](mapdb.NewMapDB()),
+		mutations:            ads.NewSet(mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes),
 	}
 }
 
@@ -49,7 +49,7 @@ func (s *StateDiff) ExecutedTransactions() *orderedmap.OrderedMap[iotago.Transac
 	return s.executedTransactions
 }
 
-func (s *StateDiff) Mutations() *ads.Set[iotago.TransactionID, *iotago.TransactionID] {
+func (s *StateDiff) Mutations() *ads.Set[iotago.TransactionID] {
 	return s.mutations
 }
 

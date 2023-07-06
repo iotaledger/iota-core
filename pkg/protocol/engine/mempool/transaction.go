@@ -6,7 +6,7 @@ import (
 
 type Transaction interface {
 	// ID returns the identifier of the Transaction.
-	ID() (iotago.TransactionID, error)
+	ID(iotago.API) (iotago.TransactionID, error)
 
 	// Inputs returns the inputs of the Transaction.
 	Inputs() ([]iotago.IndexedUTXOReferencer, error)

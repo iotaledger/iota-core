@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -123,12 +122,15 @@ func (a *Accounts) SelectCommittee(members ...iotago.AccountID) *SeatedAccounts 
 	return NewSeatedAccounts(a, members...)
 }
 
-func (a *Accounts) FromBytes(b []byte) (n int, err error) {
-	return a.readFromReadSeeker(bytes.NewReader(b))
+func AccountsFromBytes(b []byte) (*Accounts, int, error) {
+	return AccountsFromReader(bytes.NewReader(b))
 }
 
-func (a *Accounts) FromReader(readSeeker io.ReadSeeker) error {
-	return lo.Return2(a.readFromReadSeeker(readSeeker))
+func AccountsFromReader(readSeeker io.ReadSeeker) (*Accounts, int, error) {
+	a := new(Accounts)
+	n, err := a.readFromReadSeeker(readSeeker)
+
+	return a, n, err
 }
 
 func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
@@ -157,9 +159,13 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 		}
 		n += poolBytesLength
 
-		pool := new(Pool)
-		if _, err := pool.FromBytes(poolBytes); err != nil {
-			return n, errors.Wrap(err, "failed to parse pool")
+		pool, c, err := PoolFromBytes(poolBytes)
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to parse pool")
+		}
+
+		if c != poolBytesLength {
+			return 0, errors.Wrap(err, "invalid pool bytes length")
 		}
 
 		a.setWithoutLocking(accountID, pool)
