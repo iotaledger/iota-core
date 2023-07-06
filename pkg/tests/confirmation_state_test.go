@@ -35,7 +35,7 @@ func TestConfirmationFlags(t *testing.T) {
 	ts.Run(map[string][]options.Option[protocol.Protocol]{
 		"nodeA": {
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
@@ -43,7 +43,7 @@ func TestConfirmationFlags(t *testing.T) {
 		},
 		"nodeB": {
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
@@ -51,7 +51,7 @@ func TestConfirmationFlags(t *testing.T) {
 		},
 		"nodeC": {
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
@@ -59,7 +59,7 @@ func TestConfirmationFlags(t *testing.T) {
 		},
 		"nodeD": {
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
 				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),

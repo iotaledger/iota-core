@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -34,8 +33,7 @@ func Test_TransitionAccount(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
-	// TODO: use the protocol parameters from the testsuite here
-	var minSlotCommittableAge iotago.SlotIndex = slotnotarization.DefaultMinSlotCommittableAge
+	minSlotCommittableAge := ts.API.ProtocolParameters().EvictionAge()
 
 	node1 := ts.AddValidatorNode("node1")
 

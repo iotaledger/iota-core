@@ -88,7 +88,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
 		epochorchestrator.NewProvider(epochorchestrator.WithInitialCommittee(accounts)),
-		slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
+		slotnotarization.NewProvider(),
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
 		tipmanagerv1.NewProvider(),

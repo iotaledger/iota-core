@@ -45,7 +45,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	nodeOptions := []options.Option[protocol.Protocol]{
 		protocol.WithNotarizationProvider(
-			slotnotarization.NewProvider(1),
+			slotnotarization.NewProvider(),
 		),
 		protocol.WithAttestationProvider(
 			slotattestation.NewProvider(2),

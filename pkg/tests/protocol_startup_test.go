@@ -42,7 +42,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				storage.WithPruningDelay(3),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(3),
@@ -54,7 +54,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				storage.WithPruningDelay(4),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(3),
@@ -413,7 +413,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				storage.WithPruningDelay(4),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(3),
@@ -462,7 +462,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				storage.WithPruningDelay(4),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(3),

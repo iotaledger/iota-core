@@ -23,10 +23,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-const (
-	DefaultMinSlotCommittableAge = 6
-)
-
 // Manager is the component that manages the slot commitments.
 type Manager struct {
 	events        *notarization.Events
@@ -47,9 +43,9 @@ type Manager struct {
 	module.Module
 }
 
-func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine.Engine, notarization.Notarization] {
+func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
-		m := NewManager(minCommittableSlotAge, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
+		m := NewManager(e.LatestAPI().ProtocolParameters().EvictionAge(), e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
 
 		m.apiProvider = e
 

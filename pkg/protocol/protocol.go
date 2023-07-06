@@ -107,7 +107,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
 		optsEpochGadgetProvider:     epochorchestrator.NewProvider(),
-		optsNotarizationProvider:    slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
+		optsNotarizationProvider:    slotnotarization.NewProvider(),
 		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          ledger1.NewProvider(),
