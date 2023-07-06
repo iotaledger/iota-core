@@ -16,7 +16,7 @@ require (
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230630092834-5ab21b6bf7dd
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230630092834-5ab21b6bf7dd
 	github.com/iotaledger/hive.go/ds v0.0.0-20230630092834-5ab21b6bf7dd
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20230630091739-ffba86d339c0
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20230630092834-5ab21b6bf7dd
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230630092834-5ab21b6bf7dd
 	github.com/iotaledger/hive.go/lo v0.0.0-20230630092834-5ab21b6bf7dd
 	github.com/iotaledger/hive.go/logger v0.0.0-20230630092834-5ab21b6bf7dd
@@ -24,7 +24,7 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230630092834-5ab21b6bf7dd
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230630092834-5ab21b6bf7dd
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230620163422-3926cc7ad264
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230630093338-f9d4c4f4d7dd
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230706114411-f6b44c201ba8
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.28.1
@@ -37,7 +37,7 @@ require (
 	github.com/zyedidia/generic v1.2.1
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.0
-	golang.org/x/crypto v0.10.0
+	golang.org/x/crypto v0.11.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 	google.golang.org/protobuf v1.31.0
 )
@@ -153,8 +153,8 @@ require (
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.11.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/text v0.10.0 // indirect
+	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
