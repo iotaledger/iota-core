@@ -18,7 +18,7 @@ type ParametersProtocol struct {
 
 	Notarization struct {
 		// MinSlotCommittableAge defines the min age of a committable slot.
-		MinSlotCommittableAge int64 `default:"6" usage:"min age of a committable slot denoted in slots"`
+		MinSlotCommittableAge int64 `default:"10" usage:"min age of a committable slot denoted in slots"`
 	}
 
 	Filter struct {

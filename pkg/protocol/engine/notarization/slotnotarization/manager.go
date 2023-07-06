@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	DefaultMinSlotCommittableAge = 6
+	DefaultMinSlotCommittableAge = 10
 )
 
 // Manager is the component that manages the slot commitments.
