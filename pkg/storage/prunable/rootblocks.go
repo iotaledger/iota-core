@@ -9,14 +9,19 @@ import (
 
 type RootBlocks struct {
 	slot  iotago.SlotIndex
-	store *kvstore.TypedStore[iotago.BlockID, iotago.CommitmentID, *iotago.BlockID, *iotago.CommitmentID]
+	store *kvstore.TypedStore[iotago.BlockID, iotago.CommitmentID]
 }
 
 // NewRootBlocks creates a new RootBlocks instance.
 func NewRootBlocks(slot iotago.SlotIndex, store kvstore.KVStore) *RootBlocks {
 	return &RootBlocks{
-		slot:  slot,
-		store: kvstore.NewTypedStore[iotago.BlockID, iotago.CommitmentID](store),
+		slot: slot,
+		store: kvstore.NewTypedStore[iotago.BlockID, iotago.CommitmentID](store,
+			iotago.SlotIdentifier.Bytes,
+			iotago.SlotIdentifierFromBytes,
+			iotago.SlotIdentifier.Bytes,
+			iotago.SlotIdentifierFromBytes,
+		),
 	}
 }
 

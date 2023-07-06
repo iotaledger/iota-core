@@ -7,6 +7,7 @@ import (
 
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func VM(_ context.Context, inputTransaction mempool.Transaction, _ []mempool.State) (outputs []mempool.State, err error) {
@@ -20,7 +21,7 @@ func VM(_ context.Context, inputTransaction mempool.Transaction, _ []mempool.Sta
 	}
 
 	for i := uint16(0); i < transaction.outputCount; i++ {
-		id, err := transaction.ID()
+		id, err := transaction.ID(tpkg.TestAPI)
 		if err != nil {
 			return nil, err
 		}

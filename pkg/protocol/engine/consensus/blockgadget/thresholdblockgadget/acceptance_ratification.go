@@ -8,7 +8,7 @@ import (
 )
 
 func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
-	ratifier := votingBlock.Block().IssuerID
+	ratifier := votingBlock.ProtocolBlock().IssuerID
 
 	// Only track ratifier weight for issuers that are part of the committee.
 	seat, exists := g.sybilProtection.Committee(votingBlock.ID().Index()).GetSeat(ratifier)

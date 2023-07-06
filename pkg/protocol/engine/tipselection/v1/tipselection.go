@@ -67,27 +67,27 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]) error {
 		previousLikedInsteadConflicts := advancedset.New[iotago.TransactionID]()
 
-		if t.collectReferences(references, model.StrongParentType, t.tipManager.StrongTips, func(tip tipmanager.TipMetadata) {
+		if t.collectReferences(references, iotago.StrongParentType, t.tipManager.StrongTips, func(tip tipmanager.TipMetadata) {
 			addedLikedInsteadReferences, updatedLikedInsteadConflicts, err := t.likedInsteadReferences(previousLikedInsteadConflicts, tip)
 			if err != nil {
 				tip.SetTipPool(tipmanager.WeakTipPool)
-			} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[model.ShallowLikeParentType]) {
-				references[model.StrongParentType] = append(references[model.StrongParentType], tip.ID())
-				references[model.ShallowLikeParentType] = append(references[model.ShallowLikeParentType], addedLikedInsteadReferences...)
+			} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[iotago.ShallowLikeParentType]) {
+				references[iotago.StrongParentType] = append(references[iotago.StrongParentType], tip.ID())
+				references[iotago.ShallowLikeParentType] = append(references[iotago.ShallowLikeParentType], addedLikedInsteadReferences...)
 
 				previousLikedInsteadConflicts = updatedLikedInsteadConflicts
 			}
-		}, amount); len(references[model.StrongParentType]) == 0 {
+		}, amount); len(references[iotago.StrongParentType]) == 0 {
 			rootBlocks := t.rootBlocks()
 
-			references[model.StrongParentType] = rootBlocks[:lo.Min(len(rootBlocks), t.optMaxStrongParents)]
+			references[iotago.StrongParentType] = rootBlocks[:lo.Min(len(rootBlocks), t.optMaxStrongParents)]
 		}
 
-		t.collectReferences(references, model.WeakParentType, t.tipManager.WeakTips, func(tip tipmanager.TipMetadata) {
+		t.collectReferences(references, iotago.WeakParentType, t.tipManager.WeakTips, func(tip tipmanager.TipMetadata) {
 			if !t.isValidWeakTip(tip.Block()) {
 				tip.SetTipPool(tipmanager.DroppedTipPool)
 			} else {
-				references[model.WeakParentType] = append(references[model.WeakParentType], tip.ID())
+				references[iotago.WeakParentType] = append(references[iotago.WeakParentType], tip.ID())
 			}
 		}, t.optMaxWeakReferences)
 
@@ -143,7 +143,7 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.Advanc
 
 // collectReferences collects tips from a tip selector (and calls the callback for each tip) until the amount of
 // references of the given type is reached.
-func (t *TipSelection) collectReferences(references model.ParentReferences, parentsType model.ParentsType, tipSelector func(optAmount ...int) []tipmanager.TipMetadata, callback func(tipmanager.TipMetadata), amount int) {
+func (t *TipSelection) collectReferences(references model.ParentReferences, parentsType iotago.ParentsType, tipSelector func(optAmount ...int) []tipmanager.TipMetadata, callback func(tipmanager.TipMetadata), amount int) {
 	seenTips := advancedset.New[iotago.BlockID]()
 	selectUniqueTips := func(amount int) (uniqueTips []tipmanager.TipMetadata) {
 		if amount > 0 {

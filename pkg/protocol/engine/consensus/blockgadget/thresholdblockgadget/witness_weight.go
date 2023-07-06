@@ -8,7 +8,7 @@ import (
 )
 
 func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
-	witness := votingBlock.Block().IssuerID
+	witness := votingBlock.ProtocolBlock().IssuerID
 
 	// Only track witness weight for issuers that are part of the committee.
 	seat, exists := g.sybilProtection.Committee(votingBlock.ID().Index()).GetSeat(witness)
