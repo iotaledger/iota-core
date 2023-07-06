@@ -74,26 +74,35 @@ type Manager struct {
 
 func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*engine.Engine, attestation.Attestations] {
 	return module.Provide(func(e *engine.Engine) attestation.Attestations {
-		m := NewManager(attestationCommitmentOffset, e.Storage.Prunable.Attestations, e.SybilProtection.Committee)
-
-		//TODO: cleanup
-		m.commitmentMutex.Lock()
-		m.lastCommittedSlot = e.Storage.Settings().LatestCommitment().ID().Index()
-		m.lastCumulativeWeight = e.Storage.Settings().LatestCommitment().Commitment().CumulativeWeight
-		m.commitmentMutex.Unlock()
-		m.apiProvider = e
-
-		return m
+		latestCommitment := e.Storage.Settings().LatestCommitment()
+		return NewManager(
+			latestCommitment.Index(),
+			latestCommitment.CumulativeWeight(),
+			attestationCommitmentOffset,
+			e.Storage.Prunable.Attestations,
+			e.SybilProtection.Committee,
+			e,
+		)
 	})
 }
 
-func NewManager(attestationCommitmentOffset iotago.SlotIndex, bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore, committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts) *Manager {
+func NewManager(
+	lastCommitedSlot iotago.SlotIndex,
+	lastCumulativeWeight uint64,
+	attestationCommitmentOffset iotago.SlotIndex,
+	bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore,
+	committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts,
+	apiProvider api.Provider,
+) *Manager {
 	m := &Manager{
+		lastCommittedSlot:           lastCommitedSlot,
+		lastCumulativeWeight:        lastCumulativeWeight,
 		attestationCommitmentOffset: attestationCommitmentOffset,
 		committeeFunc:               committeeFunc,
 		bucketedStorage:             bucketedStorage,
 		futureAttestations:          memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
 		pendingAttestations:         memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
+		apiProvider:                 apiProvider,
 	}
 	m.TriggerConstructed()
 
