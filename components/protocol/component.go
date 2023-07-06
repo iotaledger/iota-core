@@ -104,10 +104,10 @@ func provide(c *dig.Container) error {
 				sybilprotectionv1.NewProvider(),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(iotago.SlotIndex(ParamsProtocol.Notarization.MinSlotCommittableAge)+slotattestation.DefaultAttestationCommitmentOffset),
+				slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 			),
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(
@@ -159,11 +159,11 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.API().TimeProvider().SlotFromTime(time), time)
+		Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.API().TimeProvider().SlotFromTime(time), time)
+		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {

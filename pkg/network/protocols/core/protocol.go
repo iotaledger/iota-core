@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	nwmodels "github.com/iotaledger/iota-core/pkg/network/protocols/core/models"
@@ -28,7 +29,7 @@ const (
 type Protocol struct {
 	Events *Events
 
-	api iotago.API
+	apiProvider api.Provider
 
 	network                   network.Endpoint
 	workerPool                *workerpool.WorkerPool
@@ -38,13 +39,13 @@ type Protocol struct {
 	requestedBlockHashesMutex sync.Mutex
 }
 
-func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, api iotago.API, opts ...options.Option[Protocol]) (protocol *Protocol) {
+func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, apiProvider api.Provider, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
 		Events: NewEvents(),
 
 		network:                   network,
 		workerPool:                workerPool,
-		api:                       api,
+		apiProvider:               apiProvider,
 		duplicateBlockBytesFilter: bytesfilter.New(10000),
 		requestedBlockHashes:      shrinkingmap.New[types.Identifier, types.Empty](shrinkingmap.WithShrinkingThresholdCount(1000)),
 	}, opts, func(p *Protocol) {
@@ -75,9 +76,15 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...network.PeerID
 }
 
 func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
+	var iotagoAPI iotago.API
+	if len(attestations) > 0 {
+		iotagoAPI = p.apiProvider.APIForVersion(attestations[0].ProtocolVersion)
+	} else {
+		iotagoAPI = p.apiProvider.APIForSlot(cm.Index()) // we need an api to serialize empty slices as well
+	}
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
 		Commitment:   cm.Data(),
-		Attestations: lo.PanicOnErr(p.api.Encode(attestations)),
+		Attestations: lo.PanicOnErr(iotagoAPI.Encode(attestations)),
 		MerkleProof:  lo.PanicOnErr(json.Marshal(merkleProof)),
 	}}}, protocolID, to...)
 }
@@ -142,7 +149,7 @@ func (p *Protocol) onBlock(blockData []byte, id network.PeerID) {
 		return
 	}
 
-	block, err := model.BlockFromBytes(blockData, p.api, serix.WithValidation())
+	block, err := model.BlockFromBytes(blockData, p.apiProvider, serix.WithValidation())
 	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize block"), id)
 	}
@@ -161,7 +168,7 @@ func (p *Protocol) onBlockRequest(idBytes []byte, id network.PeerID) {
 }
 
 func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id network.PeerID) {
-	receivedCommitment, err := model.CommitmentFromBytes(commitmentBytes, p.api, serix.WithValidation())
+	receivedCommitment, err := model.CommitmentFromBytes(commitmentBytes, p.apiProvider, serix.WithValidation())
 	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize slot commitment"), id)
 
@@ -182,7 +189,7 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id network.PeerID) {
 }
 
 func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []byte, merkleProof []byte, id network.PeerID) {
-	cm, err := model.CommitmentFromBytes(commitmentBytes, p.api, serix.WithValidation())
+	cm, err := model.CommitmentFromBytes(commitmentBytes, p.apiProvider, serix.WithValidation())
 	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize commitment"), id)
 
@@ -190,7 +197,7 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 	}
 
 	var attestations []*iotago.Attestation
-	if _, err := p.api.Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
+	if _, err := p.apiProvider.APIForVersion(commitmentBytes[0]).Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize attestations"), id)
 
 		return

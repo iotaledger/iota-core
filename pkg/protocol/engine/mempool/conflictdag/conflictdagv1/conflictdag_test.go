@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
@@ -41,7 +40,10 @@ func transactionID(alias string) iotago.TransactionID {
 	hashedAlias := blake2b.Sum256([]byte(alias))
 
 	var result iotago.TransactionID
-	_ = lo.PanicOnErr(result.FromBytes(hashedAlias[:]))
+	result, _, err := iotago.IdentifierFromBytes(hashedAlias[:])
+	if err != nil {
+		panic(err)
+	}
 
 	result.RegisterAlias(alias)
 

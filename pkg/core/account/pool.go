@@ -18,30 +18,31 @@ type Pool struct {
 	FixedCost      iotago.Mana
 }
 
-func (p *Pool) FromBytes(bytes []byte) (n int, err error) {
+func PoolFromBytes(bytes []byte) (*Pool, int, error) {
+	p := new(Pool)
 	m := marshalutil.New(bytes)
 	poolStake, err := m.ReadUint64()
 	if err != nil {
-		return m.ReadOffset(), errors.Wrap(err, "failed to parse pool stake")
+		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse pool stake")
 	}
 	p.PoolStake = iotago.BaseToken(poolStake)
 
 	validatorStake, err := m.ReadUint64()
 	if err != nil {
-		return m.ReadOffset(), errors.Wrap(err, "failed to parse validator stake")
+		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse validator stake")
 	}
 	p.ValidatorStake = iotago.BaseToken(validatorStake)
 
 	fixedCost, err := m.ReadUint64()
 	if err != nil {
-		return m.ReadOffset(), errors.Wrap(err, "failed to parse fixed cost")
+		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse fixed cost")
 	}
 	p.FixedCost = iotago.Mana(fixedCost)
 
-	return m.ReadOffset(), nil
+	return p, m.ReadOffset(), nil
 }
 
-func (p Pool) Bytes() (bytes []byte, err error) {
+func (p *Pool) Bytes() (bytes []byte, err error) {
 	m := marshalutil.New()
 	m.WriteUint64(uint64(p.PoolStake))
 	m.WriteUint64(uint64(p.ValidatorStake))

@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -38,20 +39,16 @@ var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provide
 type Ledger struct {
 	events *ledger.Events
 
-	apiProvider func() iotago.API
+	apiProvider api.Provider
 
 	utxoLedger       *utxoledger.Manager
 	accountsLedger   *accountsledger.Manager
 	manaManager      *mana.Manager
 	sybilProtection  sybilprotection.SybilProtection
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
-
-	memPool            mempool.MemPool[ledger.BlockVoteRank]
-	conflictDAG        conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
-	errorHandler       func(error)
-	protocolParameters *iotago.ProtocolParameters
-
-	manaDecayProvider *iotago.ManaDecayProvider
+	memPool          mempool.MemPool[ledger.BlockVoteRank]
+	conflictDAG      conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
+	errorHandler     func(error)
 
 	module.Module
 }
@@ -64,7 +61,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.Commitments().Load,
 			e.BlockCache.Block,
 			e.Storage.AccountDiffs,
-			e.API,
+			e,
 			e.SybilProtection,
 			e.ErrorHandler("ledger"),
 		)
@@ -77,17 +74,14 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
-			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
-		})
-		e.Storage.Settings().HookInitialized(func() {
-			l.protocolParameters = e.Storage.Settings().ProtocolParameters()
-			l.manaDecayProvider = l.protocolParameters.ManaDecayProvider()
-			l.manaManager = mana.NewManager(l.manaDecayProvider, l.resolveAccountOutput)
-			l.accountsLedger.SetCommitmentEvictionAge(l.protocolParameters.EvictionAge)
-			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
-			l.TriggerConstructed()
+			// TODO: how do we want to handle changing API here?
+			api := l.apiProvider.LatestAPI()
+			l.manaManager = mana.NewManager(api.ManaDecayProvider(), l.resolveAccountOutput)
+			l.accountsLedger.SetCommitmentEvictionAge(api.ProtocolParameters().EvictionAge())
+			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)
 			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
@@ -113,7 +107,7 @@ func New(
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
-	apiProvider func() iotago.API,
+	apiProvider api.Provider,
 	sybilProtection sybilprotection.SybilProtection,
 	errorHandler func(error),
 ) *Ledger {
@@ -134,9 +128,8 @@ func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.Transact
 }
 
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
-	switch payload := block.Block().Payload.(type) {
-	case mempool.Transaction:
-		transactionMetadata, err := l.memPool.AttachTransaction(payload, block.ID())
+	if transaction, hasTransaction := block.Transaction(); hasTransaction {
+		transactionMetadata, err := l.memPool.AttachTransaction(transaction, block.ID())
 		if err != nil {
 			l.errorHandler(err)
 
@@ -144,10 +137,9 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 		}
 
 		return transactionMetadata, true
-	default:
-
-		return nil, false
 	}
+
+	return nil, false
 }
 
 func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, accountRoot iotago.Identifier, err error) {
@@ -213,12 +205,8 @@ func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
-	switch block.Block().Payload.(type) {
-	case *iotago.Transaction:
+	if _, hasTransaction := block.Transaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
-
-	default:
-		return
 	}
 }
 
@@ -248,7 +236,7 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Outp
 			return nil, ErrUnexpectedUnderlyingType
 		}
 
-		return utxoledger.CreateOutput(l.utxoLedger.API(), stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
+		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
 	default:
 		panic("unexpected State type")
 	}
@@ -525,7 +513,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 			// output side
 			txWithMeta.Outputs().Range(func(stateMetadata mempool.StateMetadata) {
-				output := utxoledger.CreateOutput(l.utxoLedger.API(), stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationTime, stateMetadata.State().Output())
+				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationTime, stateMetadata.State().Output())
 				outputs = append(outputs, output)
 			})
 		}
@@ -615,9 +603,9 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
-	voteRank := ledger.NewBlockVoteRank(block.ID(), block.Block().IssuingTime)
+	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().IssuingTime)
 
-	seat, exists := l.sybilProtection.SeatManager().Committee(block.ID().Index()).GetSeat(block.Block().IssuerID)
+	seat, exists := l.sybilProtection.SeatManager().Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return
 	}

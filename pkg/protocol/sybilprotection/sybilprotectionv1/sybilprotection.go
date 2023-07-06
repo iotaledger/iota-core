@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -22,16 +23,16 @@ import (
 )
 
 type SybilProtection struct {
-	events            *sybilprotection.Events
+	events *sybilprotection.Events
+
+	apiProvider api.Provider
+
 	seatManager       seatmanager.SeatManager
-	ledger            ledger.Ledger // do we need the whole Ledger or just a callback to retrieve account data?
+	sybilProtection   sybilprotection.SybilProtection // do we need the whole SybilProtection or just a callback to RotateCommittee?
+	ledger            ledger.Ledger                   // do we need the whole Ledger or just a callback to retrieve account data?
 	lastCommittedSlot iotago.SlotIndex
-	timeProvider      *iotago.TimeProvider
 
 	performanceTracker *performance.Tracker
-
-	epochEndNearingThreshold iotago.SlotIndex
-	maxCommittableAge        iotago.SlotIndex
 
 	optsInitialCommittee    *account.Accounts
 	optsSeatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]
@@ -44,53 +45,51 @@ type SybilProtection struct {
 func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
 	return module.Provide(func(e *engine.Engine) sybilprotection.SybilProtection {
 		return options.Apply(&SybilProtection{
-			events:                  sybilprotection.NewEvents(),
+			events: sybilprotection.NewEvents(),
+
+			apiProvider:             e,
 			optsSeatManagerProvider: poa.NewProvider(),
 		}, opts,
 			func(o *SybilProtection) {
 				o.seatManager = o.optsSeatManagerProvider(e)
 
 				e.HookConstructed(func() {
+					// TODO: the following fields should be initialized after the engine is constructed,
+					//  otherwise we implicitly rely on the order of engine initialization which can change at any time.
 					o.ledger = e.Ledger
 
-					e.Storage.Settings().HookInitialized(func() {
-						o.timeProvider = e.API().TimeProvider()
-						// maxCommittableAge = 2 * evictionAge
-						o.maxCommittableAge = e.Storage.Settings().ProtocolParameters().EvictionAge << 1
+					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e)
+					o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
 
-						o.epochEndNearingThreshold = e.Storage.Settings().ProtocolParameters().EpochNearingThreshold
+					// TODO: check if the following value is correctly set to twice eviction age
 
-						o.performanceTracker = performance.NewTracker(o.maxCommittableAge, e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e.API().TimeProvider(), e.API().ManaDecayProvider())
-						o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
-
-						// TODO: check if the following value is correctly set to twice eviction age
-
-						if o.optsInitialCommittee != nil {
-							if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
-								panic(ierrors.Wrap(err, "error while registering initial committee for epoch 1"))
-							}
+					if o.optsInitialCommittee != nil {
+						if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
+							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 1"))
 						}
-						o.TriggerConstructed()
+					}
+					o.TriggerConstructed()
 
-						// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
-						// so the committee should be available in the performance manager.
-						e.HookInitialized(func() {
-							// Make sure that the sybil protection knows about the committee of the current epoch
-							// (according to the latest committed slot), and potentially the next selected
-							// committee if we have one.
-							currentEpoch := o.timeProvider.EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
+					// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
+					// so the committee should be available in the performance manager.
+					e.HookInitialized(func() {
+						// Make sure that the sybil protection knows about the committee of the current epoch
+						// (according to the latest committed slot), and potentially the next selected
+						// committee if we have one.
 
-							committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
-							if !exists {
-								panic("failed to load committee for last finalized slot to initialize sybil protection")
-							}
-							o.seatManager.ImportCommittee(currentEpoch, committee)
-							if nextCommittee, nextCommitteeExists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
-								o.seatManager.ImportCommittee(currentEpoch+1, nextCommittee)
-							}
+						// TODO: how do we handle changing API here?
+						currentEpoch := e.LatestAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
 
-							o.TriggerInitialized()
-						})
+						committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
+						if !exists {
+							panic("failed to load committee for last finalized slot to initialize sybil protection")
+						}
+						o.seatManager.ImportCommittee(currentEpoch, committee)
+						if nextCommittee, nextCommitteeExists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
+							o.seatManager.ImportCommittee(currentEpoch+1, nextCommittee)
+						}
+
+						o.TriggerInitialized()
 					})
 				})
 
@@ -114,12 +113,18 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	currentEpoch := o.timeProvider.EpochFromSlot(slot)
+	apiForSlot := o.apiProvider.APIForSlot(slot)
+	timeProvider := apiForSlot.TimeProvider()
+	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 
-	// If the committed slot is `maxCommittableAge`
+	// TODO: check if the following value is correctly set to twice eviction age
+	// maxCommittableSlot = 2 * evictionAge
+	maxCommittableSlot := apiForSlot.ProtocolParameters().EvictionAge() << 1
+
+	// If the committed slot is `maxCommittableSlot`
 	// away from the end of the epoch, then register a committee for the next epoch.
-	if o.timeProvider.EpochEnd(currentEpoch) == slot+o.maxCommittableAge {
+	if timeProvider.EpochEnd(currentEpoch) == slot+maxCommittableSlot {
 		if _, committeeExists := o.performanceTracker.LoadCommitteeForEpoch(nextEpoch); !committeeExists {
 			// If the committee for the epoch wasn't set before due to finalization of a slot,
 			// we promote the current committee to also serve in the next epoch.
@@ -140,7 +145,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 		}
 	}
 
-	if o.timeProvider.EpochEnd(currentEpoch) == slot {
+	if timeProvider.EpochEnd(currentEpoch) == slot {
 		committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 		if !exists {
 			panic(fmt.Sprintf("committee for a finished epoch %d not found", currentEpoch))
@@ -211,20 +216,27 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	epoch := o.timeProvider.EpochFromSlot(slot)
+	apiForSlot := o.apiProvider.APIForSlot(slot)
+	timeProvider := apiForSlot.TimeProvider()
+	epoch := timeProvider.EpochFromSlot(slot)
+
+	// TODO: check if the following value is correctly set to twice eviction age
+	// maxCommittableSlot = 2 * evictionAge
+	maxCommittableSlot := apiForSlot.ProtocolParameters().EvictionAge() << 1
 
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
 	// committed slot is earlier than (the last slot of the epoch - maxCommittableAge).
 	// Otherwise, skip committee selection because it's too late and the committee has been reused.
-	epochEndSlot := o.timeProvider.EpochEnd(epoch)
-	if slot+o.epochEndNearingThreshold == epochEndSlot && epochEndSlot > o.lastCommittedSlot+o.maxCommittableAge {
+	epochEndSlot := timeProvider.EpochEnd(epoch)
+	if slot+apiForSlot.ProtocolParameters().EpochNearingThreshold() == epochEndSlot && epochEndSlot > o.lastCommittedSlot+maxCommittableSlot {
 		newCommittee := o.selectNewCommittee(slot)
 		o.events.CommitteeSelected.Trigger(newCommittee, epoch+1)
 	}
 }
 
 func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
-	currentEpoch := o.timeProvider.EpochFromSlot(slot)
+	timeProvider := o.apiProvider.APIForSlot(slot).TimeProvider()
+	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 	candidates := o.performanceTracker.EligibleValidatorCandidates(nextEpoch)
 

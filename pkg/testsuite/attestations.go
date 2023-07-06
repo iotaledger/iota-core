@@ -15,8 +15,8 @@ func (t *TestSuite) AssertAttestationsForSlot(slotIndex iotago.SlotIndex, blocks
 
 	expectedAttestations := make([]iotago.BlockID, len(blocks))
 	for i, block := range blocks {
-		att := iotago.NewAttestation(block.Block())
-		blockID, err := att.BlockID(t.ProtocolParameters.TimeProvider())
+		att := iotago.NewAttestation(t.API, block.ProtocolBlock())
+		blockID, err := att.BlockID(t.API)
 		require.NoError(t.Testing, err)
 		expectedAttestations[i] = blockID
 	}
@@ -30,7 +30,7 @@ func (t *TestSuite) AssertAttestationsForSlot(slotIndex iotago.SlotIndex, blocks
 
 			storedAttestations := make([]iotago.BlockID, 0)
 			err = attestationTree.Stream(func(key iotago.AccountID, att *iotago.Attestation) bool {
-				blockID, err := att.BlockID(t.ProtocolParameters.TimeProvider())
+				blockID, err := att.BlockID(t.API)
 				require.NoError(t.Testing, err)
 				storedAttestations = append(storedAttestations, blockID)
 

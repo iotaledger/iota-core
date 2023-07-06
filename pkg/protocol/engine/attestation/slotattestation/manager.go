@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -65,31 +66,42 @@ type Manager struct {
 
 	commitmentMutex sync.RWMutex
 
+	apiProvider api.Provider
+
 	module.Module
 }
 
 func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*engine.Engine, attestation.Attestations] {
 	return module.Provide(func(e *engine.Engine) attestation.Attestations {
-		m := NewManager(attestationCommitmentOffset, e.Storage.Prunable.Attestations, e.SybilProtection.SeatManager().Committee)
-
-		e.Storage.Settings().HookInitialized(func() {
-			m.commitmentMutex.Lock()
-			m.lastCommittedSlot = e.Storage.Settings().LatestCommitment().ID().Index()
-			m.lastCumulativeWeight = e.Storage.Settings().LatestCommitment().Commitment().CumulativeWeight
-			m.commitmentMutex.Unlock()
-		})
-
-		return m
+		latestCommitment := e.Storage.Settings().LatestCommitment()
+		return NewManager(
+			latestCommitment.Index(),
+			latestCommitment.CumulativeWeight(),
+			attestationCommitmentOffset,
+			e.Storage.Prunable.Attestations,
+			e.SybilProtection.SeatManager().Committee,
+			e,
+		)
 	})
 }
 
-func NewManager(attestationCommitmentOffset iotago.SlotIndex, bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore, committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts) *Manager {
+func NewManager(
+	lastCommitedSlot iotago.SlotIndex,
+	lastCumulativeWeight uint64,
+	attestationCommitmentOffset iotago.SlotIndex,
+	bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore,
+	committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts,
+	apiProvider api.Provider,
+) *Manager {
 	m := &Manager{
+		lastCommittedSlot:           lastCommitedSlot,
+		lastCumulativeWeight:        lastCumulativeWeight,
 		attestationCommitmentOffset: attestationCommitmentOffset,
 		committeeFunc:               committeeFunc,
 		bucketedStorage:             bucketedStorage,
 		futureAttestations:          memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
 		pendingAttestations:         memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
+		apiProvider:                 apiProvider,
 	}
 	m.TriggerConstructed()
 
@@ -129,7 +141,7 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 
 // GetMap returns the attestations that are included in the commitment of the given slot as ads.Map.
 // If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
-func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iotago.Attestation, *iotago.AccountID, *iotago.Attestation], error) {
+func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, *iotago.Attestation], error) {
 	m.commitmentMutex.RLock()
 	defer m.commitmentMutex.RUnlock()
 
@@ -147,7 +159,7 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, iot
 // AddAttestationFromBlock adds an attestation from a block to the future attestations (beyond the attestation window).
 func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
 	// Only track attestations of active committee members.
-	if _, exists := m.committeeFunc(block.ID().Index()).GetSeat(block.Block().IssuerID); !exists {
+	if _, exists := m.committeeFunc(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID); !exists {
 		return
 	}
 
@@ -159,10 +171,10 @@ func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
 		return
 	}
 
-	newAttestation := iotago.NewAttestation(block.Block())
+	newAttestation := iotago.NewAttestation(m.apiProvider.APIForSlot(block.ID().Index()), block.ProtocolBlock())
 
 	// We keep only the latest attestation for each committee member.
-	m.futureAttestations.Get(block.ID().Index(), true).Compute(block.Block().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
+	m.futureAttestations.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
 		if !exists {
 			return newAttestation
 		}

@@ -8,11 +8,12 @@ import (
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
-	"github.com/iotaledger/iota-core/pkg/storage/utils"
 )
 
 const (
-	sybilProtectionPrefix byte = iota
+	settingsPrefix byte = iota
+	commitmentsPrefix
+	sybilProtectionPrefix
 	attestationsPrefix
 	ledgerPrefix
 	accountsPrefix
@@ -40,12 +41,10 @@ type Permanent struct {
 }
 
 // New returns a new permanent storage instance.
-func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) *Permanent {
+func New(dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) *Permanent {
 	return options.Apply(&Permanent{
 		errorHandler: errorHandler,
-		settings:     NewSettings(baseDir.Path("settings.bin")),
 	}, opts, func(p *Permanent) {
-		p.commitments = NewCommitments(baseDir.Path("commitments.bin"), p.settings.API)
 
 		var err error
 		p.store, err = database.StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
@@ -61,6 +60,8 @@ func New(baseDir *utils.Directory, dbConfig database.Config, errorHandler func(e
 			panic(err)
 		}
 
+		p.settings = NewSettings(lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{settingsPrefix})))
+		p.commitments = NewCommitments(lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{commitmentsPrefix})), p.settings)
 		p.sybilProtection = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{sybilProtectionPrefix}))
 		p.attestations = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{attestationsPrefix}))
 		p.ledger = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{ledgerPrefix}))
@@ -151,24 +152,10 @@ func (p *Permanent) Size() int64 {
 		return 0
 	}
 
-	settingsSize, err := p.settings.Size()
-	if err != nil {
-		panic(err)
-	}
-
-	commitmentsSize, err := p.settings.Size()
-	if err != nil {
-		panic(err)
-	}
-
-	return dbSize + settingsSize + commitmentsSize
+	return dbSize
 }
 
 func (p *Permanent) Shutdown() {
-	if err := p.commitments.Close(); err != nil {
-		panic(err)
-	}
-
 	if err := p.healthTracker.MarkHealthy(); err != nil {
 		panic(err)
 	}

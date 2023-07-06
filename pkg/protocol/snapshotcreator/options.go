@@ -34,10 +34,9 @@ type Options struct {
 
 func NewOptions(opts ...options.Option[Options]) *Options {
 	return options.Apply(&Options{
-		FilePath:           "snapshot.bin",
-		DataBaseVersion:    1,
-		ProtocolParameters: iotago.ProtocolParameters{},
-		LedgerProvider:     ledger1.NewProvider,
+		FilePath:        "snapshot.bin",
+		DataBaseVersion: 1,
+		LedgerProvider:  ledger1.NewProvider,
 	}, opts)
 }
 

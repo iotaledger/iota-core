@@ -56,10 +56,6 @@
     "jwtAuth": {
       "salt": "IOTA"
     },
-    "pow": {
-      "enabled": false,
-      "workerCount": 1
-    },
     "limits": {
       "maxBodyLength": "1M",
       "maxResults": 1000
@@ -79,9 +75,6 @@
     "snapshot": {
       "path": "testnet/snapshot.bin",
       "depth": 5
-    },
-    "notarization": {
-      "minSlotCommittableAge": 6
     },
     "filter": {
       "maxAllowedClockDrift": "5s"

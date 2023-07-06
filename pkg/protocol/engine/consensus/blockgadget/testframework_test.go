@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
@@ -20,12 +21,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TestFramework struct {
 	*testing.T
-	api                iotago.API
-	protocolParameters *iotago.ProtocolParameters
 
 	blocks     *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 	blockCache *blocks.Blocks
@@ -40,36 +40,19 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		T:      test,
 		blocks: shrinkingmap.New[string, *blocks.Block](),
 
-		protocolParameters: &iotago.ProtocolParameters{
-			Version:     3,
-			NetworkName: test.Name(),
-			Bech32HRP:   "rms",
-			MinPoWScore: 0,
-			RentStructure: iotago.RentStructure{
-				VByteCost:    100,
-				VBFactorData: 1,
-				VBFactorKey:  10,
-			},
-			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  time.Now().Truncate(10 * time.Second).Unix(),
-			SlotDurationInSeconds: 10,
-		},
-
 		SeatManager: mock.NewManualPOA(),
 	}
-
-	t.api = iotago.LatestAPI(t.protocolParameters)
 
 	evictionState := eviction.NewState(func(index iotago.SlotIndex) *prunable.RootBlocks {
 		return prunable.NewRootBlocks(index, mapdb.NewMapDB())
 	})
 
-	t.blockCache = blocks.New(evictionState, t.api.TimeProvider)
+	t.blockCache = blocks.New(evictionState, api.NewStaticProvider(tpkg.TestAPI))
 	instance := thresholdblockgadget.New(t.blockCache, t.SeatManager)
 	t.Events = instance.Events()
 	t.Instance = instance
 
-	genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(int64(t.protocolParameters.GenesisUnixTimestamp), 0))
+	genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID(), time.Unix(int64(tpkg.TestAPI.ProtocolParameters().TimeProvider().GenesisUnixTime()), 0))
 	t.blocks.Set("Genesis", genesisBlock)
 	genesisBlock.ID().RegisterAlias("Genesis")
 	evictionState.AddRootBlock(genesisBlock.ID(), genesisBlock.SlotCommitmentID())
@@ -111,13 +94,13 @@ func (t *TestFramework) CreateBlock(alias string, issuerAlias string, parents ..
 	_, priv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 
-	block, err := builder.NewBlockBuilder().
+	block, err := builder.NewBasicBlockBuilder(tpkg.TestAPI).
 		StrongParents(t.BlockIDs(parents...)).
 		Sign(t.SeatManager.AccountID(issuerAlias), priv).
 		Build()
 	require.NoError(t, err)
 
-	modelBlock, err := model.BlockFromBlock(block, t.api)
+	modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
 	require.NoError(t, err)
 
 	blocksBlock := blocks.NewBlock(modelBlock)

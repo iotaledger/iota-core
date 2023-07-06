@@ -14,29 +14,30 @@ type PoolsStats struct {
 	ProfitMargin        uint64
 }
 
-func (p *PoolsStats) FromBytes(bytes []byte) (n int, err error) {
+func PoolsStatsFromBytes(bytes []byte) (*PoolsStats, int, error) {
+	p := new(PoolsStats)
 	m := marshalutil.New(bytes)
 	totalStake, err := m.ReadUint64()
 	if err != nil {
-		return m.ReadOffset(), errors.Wrap(err, "failed to parse total stake")
+		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse total stake")
 	}
 	p.TotalStake = iotago.BaseToken(totalStake)
 
 	totalValidatorStake, err := m.ReadUint64()
 	if err != nil {
-		return m.ReadOffset(), errors.Wrap(err, "failed to parse total validator stake")
+		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse total validator stake")
 	}
 	p.TotalValidatorStake = iotago.BaseToken(totalValidatorStake)
 
 	p.ProfitMargin, err = m.ReadUint64()
 	if err != nil {
-		return m.ReadOffset(), errors.Wrap(err, "failed to parse profit margin")
+		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse profit margin")
 	}
 
-	return m.ReadOffset(), nil
+	return p, m.ReadOffset(), nil
 }
 
-func (p PoolsStats) Bytes() (bytes []byte, err error) {
+func (p *PoolsStats) Bytes() ([]byte, error) {
 	m := marshalutil.New()
 	m.WriteUint64(uint64(p.TotalStake))
 	m.WriteUint64(uint64(p.TotalValidatorStake))
@@ -54,35 +55,36 @@ type PoolRewards struct {
 	FixedCost iotago.Mana
 }
 
-func (r *PoolRewards) FromBytes(bytes []byte) (n int, err error) {
+func PoolRewardsFromBytes(bytes []byte) (*PoolRewards, int, error) {
+	p := new(PoolRewards)
 	m := marshalutil.New(bytes)
 
 	poolStake, err := m.ReadUint64()
 	if err != nil {
-		return m.ReadOffset(), errors.Wrap(err, "failed to parse pool stake")
+		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse pool stake")
 	}
-	r.PoolStake = iotago.BaseToken(poolStake)
+	p.PoolStake = iotago.BaseToken(poolStake)
 
 	poolRewards, err := m.ReadUint64()
 	if err != nil {
-		return m.ReadOffset(), errors.Wrap(err, "failed to parse pool rewards")
+		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse pool rewards")
 	}
-	r.PoolRewards = iotago.Mana(poolRewards)
+	p.PoolRewards = iotago.Mana(poolRewards)
 
 	fixedCost, err := m.ReadUint64()
 	if err != nil {
-		return m.ReadOffset(), errors.Wrap(err, "failed to parse fixed cost")
+		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse fixed cost")
 	}
-	r.FixedCost = iotago.Mana(fixedCost)
+	p.FixedCost = iotago.Mana(fixedCost)
 
-	return m.ReadOffset(), nil
+	return p, m.ReadOffset(), nil
 }
 
-func (r PoolRewards) Bytes() (bytes []byte, err error) {
+func (p *PoolRewards) Bytes() ([]byte, error) {
 	m := marshalutil.New()
-	m.WriteUint64(uint64(r.PoolStake))
-	m.WriteUint64(uint64(r.PoolRewards))
-	m.WriteUint64(uint64(r.FixedCost))
+	m.WriteUint64(uint64(p.PoolStake))
+	m.WriteUint64(uint64(p.PoolRewards))
+	m.WriteUint64(uint64(p.FixedCost))
 
 	return m.Bytes(), nil
 }

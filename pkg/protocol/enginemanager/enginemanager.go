@@ -105,7 +105,7 @@ func New(
 	}
 }
 
-func (e *EngineManager) LoadActiveEngine() (*engine.Engine, error) {
+func (e *EngineManager) LoadActiveEngine(snapshotPath string) (*engine.Engine, error) {
 	info := &engineInfo{}
 	if err := ioutils.ReadJSONFromFile(e.infoFilePath(), info); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
@@ -116,13 +116,13 @@ func (e *EngineManager) LoadActiveEngine() (*engine.Engine, error) {
 	if len(info.Name) > 0 {
 		if exists, isDirectory, err := ioutils.PathExists(e.directory.Path(info.Name)); err == nil && exists && isDirectory {
 			// Load previous engine as active
-			e.activeInstance = e.loadEngineInstance(info.Name)
+			e.activeInstance = e.loadEngineInstance(info.Name, snapshotPath)
 		}
 	}
 
 	if e.activeInstance == nil {
 		// Start with a new instance and set to active
-		instance := e.newEngineInstance()
+		instance := e.newEngineInstance(snapshotPath)
 		if err := e.SetActiveInstance(instance); err != nil {
 			return nil, err
 		}
@@ -169,7 +169,7 @@ func (e *EngineManager) SetActiveInstance(instance *engine.Engine) error {
 	return ioutils.WriteJSONToFile(e.infoFilePath(), info, 0o644)
 }
 
-func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
+func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) *engine.Engine {
 	errorHandler := func(err error) {
 		e.errorHandler(errors.Wrapf(err, "engine (%s)", dirName[0:8]))
 	}
@@ -189,13 +189,13 @@ func (e *EngineManager) loadEngineInstance(dirName string) *engine.Engine {
 		e.ledgerProvider,
 		e.tipManagerProvider,
 		e.tipSelectionProvider,
-		e.engineOptions...,
+		append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))...,
 	)
 }
 
-func (e *EngineManager) newEngineInstance() *engine.Engine {
+func (e *EngineManager) newEngineInstance(snapshotPath string) *engine.Engine {
 	dirName := lo.PanicOnErr(uuid.NewUUID()).String()
-	return e.loadEngineInstance(dirName)
+	return e.loadEngineInstance(dirName, snapshotPath)
 }
 
 func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine, error) {
@@ -205,16 +205,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 		return nil, errors.Wrapf(err, "error exporting snapshot for index %s", index)
 	}
 
-	instance := e.newEngineInstance()
-	if err := instance.Initialize(snapshotPath); err != nil {
-		instance.Shutdown()
-		_ = instance.RemoveFromFilesystem()
-		_ = os.Remove(snapshotPath)
-
-		return nil, err
-	}
-
-	return instance, nil
+	return e.newEngineInstance(snapshotPath), nil
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

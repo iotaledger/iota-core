@@ -6,8 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -40,15 +38,16 @@ func (t *Tracker) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	targetEpoch := t.timeProvider.EpochFromSlot(targetSlotIndex)
+	timeProvider := t.apiProvider.APIForSlot(targetSlotIndex).TimeProvider()
+	targetEpoch := timeProvider.EpochFromSlot(targetSlotIndex)
 	positionedWriter := utils.NewPositionedWriter(writer)
 
 	// if the target index is the last slot of the epoch, the epoch was committed
-	if t.timeProvider.EpochEnd(targetEpoch) != targetSlotIndex {
+	if timeProvider.EpochEnd(targetEpoch) != targetSlotIndex {
 		targetEpoch--
 	}
 
-	err := t.exportPerformanceFactor(positionedWriter, t.timeProvider.EpochStart(targetEpoch+1), targetSlotIndex)
+	err := t.exportPerformanceFactor(positionedWriter, timeProvider.EpochStart(targetEpoch+1), targetSlotIndex)
 	if err != nil {
 		return errors.Wrap(err, "unable to export performance factor")
 	}
@@ -122,7 +121,7 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 			return errors.Wrap(err, "unable to read epoch index")
 		}
 
-		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](t.rewardsStorage(epochIndex))
+		rewardsTree := t.rewardsMap(epochIndex)
 
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
@@ -162,8 +161,7 @@ func (t *Tracker) importPoolsStats(reader io.ReadSeeker) error {
 			return errors.Wrapf(err, "unable to read pool stats for epoch index %d", epochIndex)
 		}
 
-		err := t.poolStatsStore.Set(epochIndex.Bytes(), lo.PanicOnErr(poolStats.Bytes()))
-		if err != nil {
+		if err := t.poolStatsStore.Set(epochIndex, &poolStats); err != nil {
 			return errors.Wrapf(err, "unable to store pool stats for the epoch index %d", epochIndex)
 		}
 	}
@@ -182,14 +180,13 @@ func (t *Tracker) importCommittees(reader io.ReadSeeker) error {
 			return errors.Wrap(err, "unable to read epoch index")
 		}
 
-		committee := account.NewAccounts()
-		if err := committee.FromReader(reader); err != nil {
+		committee, _, err := account.AccountsFromReader(reader)
+		if err != nil {
 			return errors.Wrapf(err, "unable to read committee for the epoch index %d", epoch)
 		}
 
-		err := t.committeeStore.Set(epoch.Bytes(), lo.PanicOnErr(committee.Bytes()))
-		if err != nil {
-			return errors.Wrapf(err, "unable to store committee for the epoch index %d", epoch)
+		if err := t.committeeStore.Set(epoch, committee); err != nil {
+			return errors.Wrap(err, "unable to store committee")
 		}
 	}
 
@@ -252,7 +249,7 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 	}
 	// TODO: make sure to adjust this loop if we add pruning later.
 	for epoch := targetEpoch; epoch > iotago.EpochIndex(0); epoch-- {
-		rewardsTree := ads.NewMap[iotago.AccountID, PoolRewards](t.rewardsStorage(epoch))
+		rewardsTree := t.rewardsMap(epoch)
 
 		// if the tree is new, we can skip this epoch and the previous ones, as we never stored any rewards
 		if rewardsTree.IsNew() {
@@ -309,7 +306,7 @@ func (t *Tracker) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 	}
 	// export all stored pools
 	var innerErr error
-	if err := t.poolStatsStore.Iterate([]byte{}, func(key []byte, value []byte) bool {
+	if err := t.poolStatsStore.KVStore().Iterate([]byte{}, func(key []byte, value []byte) bool {
 		epochIndex := iotago.EpochIndex(binary.LittleEndian.Uint64(key))
 		if epochIndex > targetEpoch {
 			// continue
@@ -343,10 +340,11 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 	if err := pWriter.WriteValue("committees epoch count", epochCount, true); err != nil {
 		return errors.Wrap(err, "unable to write committees epoch count")
 	}
-	epochFromTargetSlot := t.timeProvider.EpochFromSlot(targetSlot)
+	apiForSlot := t.apiProvider.APIForSlot(targetSlot)
+	epochFromTargetSlot := apiForSlot.TimeProvider().EpochFromSlot(targetSlot)
 
 	var innerErr error
-	err := t.committeeStore.Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {
+	err := t.committeeStore.KVStore().Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {
 		// TODO: committees for all available epochs should be included in the snapshot,
 		//  because if snapshot is generated after the committee has been selected,
 		//  then there is no way for the node to determine the committee.
@@ -355,12 +353,12 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 		//  or should we explicitly limit that? Currently we use the implicit assumption.
 		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
 		if epoch > epochFromTargetSlot {
-			if targetSlot+t.maxCommittableAge < t.timeProvider.EpochEnd(epochFromTargetSlot) {
+			// FIXME: EvictionAge here should be MaxCommittableAge, but not available at the time of writing
+			if targetSlot+apiForSlot.ProtocolParameters().EvictionAge() < apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) {
 				return true
 			}
 
-			committee := account.NewAccounts()
-			_, err := committee.FromBytes(committeeBytes)
+			committee, _, err := account.AccountsFromBytes(committeeBytes)
 			if err != nil {
 				innerErr = err // TODO: wrap the error
 				return false
