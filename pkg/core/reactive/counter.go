@@ -37,8 +37,8 @@ type counter[InputType comparable] struct {
 // from the input value.
 func (c *counter[InputType]) Monitor(input Value[InputType]) (unsubscribe func()) {
 	return input.OnUpdate(func(_, newInputValue InputType) {
-		c.Compute(func(currentThreshold int) int {
-			return lo.Cond(c.condition(newInputValue), currentThreshold+1, currentThreshold-1)
+		c.Compute(func(currentValue int) int {
+			return lo.Cond(c.condition(newInputValue), currentValue+1, currentValue-1)
 		})
 	})
 }

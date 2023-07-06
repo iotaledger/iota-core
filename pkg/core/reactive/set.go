@@ -21,7 +21,7 @@ type Set[ElementType comparable] struct {
 	value *advancedset.AdvancedSet[ElementType]
 
 	// updateCallbacks are the registered callbacks that are triggered when the value changes.
-	updateCallbacks *shrinkingmap.ShrinkingMap[types.UniqueID, *callback[func(*advancedset.AdvancedSet[ElementType], *SetMutations[ElementType])]]
+	updateCallbacks *shrinkingmap.ShrinkingMap[types.UniqueID, *callback[func(*advancedset.AdvancedSet[ElementType], SetMutations[ElementType])]]
 
 	// uniqueUpdateID is the unique ID that is used to identify an update.
 	uniqueUpdateID types.UniqueID
@@ -44,7 +44,7 @@ type Set[ElementType comparable] struct {
 func NewSet[T comparable]() *Set[T] {
 	return &Set[T]{
 		value:           advancedset.New[T](),
-		updateCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(*advancedset.AdvancedSet[T], *SetMutations[T])]](),
+		updateCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(*advancedset.AdvancedSet[T], SetMutations[T])]](),
 	}
 }
 
@@ -57,7 +57,7 @@ func (s *Set[ElementType]) Get() *advancedset.AdvancedSet[ElementType] {
 }
 
 // Set sets the given value as the new value of the set.
-func (s *Set[ElementType]) Set(value *advancedset.AdvancedSet[ElementType]) (appliedMutations *SetMutations[ElementType]) {
+func (s *Set[ElementType]) Set(value *advancedset.AdvancedSet[ElementType]) (appliedMutations SetMutations[ElementType]) {
 	s.applyOrderMutex.Lock()
 	defer s.applyOrderMutex.Unlock()
 
@@ -73,7 +73,7 @@ func (s *Set[ElementType]) Set(value *advancedset.AdvancedSet[ElementType]) (app
 }
 
 // Apply applies the given SetMutations to the set.
-func (s *Set[ElementType]) Apply(mutations *SetMutations[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations *SetMutations[ElementType]) {
+func (s *Set[ElementType]) Apply(mutations SetMutations[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType]) {
 	s.applyOrderMutex.Lock()
 	defer s.applyOrderMutex.Unlock()
 
@@ -89,12 +89,12 @@ func (s *Set[ElementType]) Apply(mutations *SetMutations[ElementType]) (updatedS
 }
 
 // OnUpdate registers the given callback to be triggered when the value of the set changes.
-func (s *Set[ElementType]) OnUpdate(callback func(updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations *SetMutations[ElementType])) (unsubscribe func()) {
+func (s *Set[ElementType]) OnUpdate(callback func(updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType])) (unsubscribe func()) {
 	s.mutex.Lock()
 
 	currentValue := s.value
 
-	newCallback := newCallback[func(*advancedset.AdvancedSet[ElementType], *SetMutations[ElementType])](s.uniqueCallbackID.Next(), callback)
+	newCallback := newCallback[func(*advancedset.AdvancedSet[ElementType], SetMutations[ElementType])](s.uniqueCallbackID.Next(), callback)
 	s.updateCallbacks.Set(newCallback.ID, newCallback)
 
 	// we intertwine the mutexes to ensure that the callback is guaranteed to be triggered with the current value from
@@ -116,12 +116,12 @@ func (s *Set[ElementType]) OnUpdate(callback func(updatedSet *advancedset.Advanc
 }
 
 // Add adds the given elements to the set and returns the updated set and the applied mutations.
-func (s *Set[ElementType]) Add(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations *SetMutations[ElementType]) {
+func (s *Set[ElementType]) Add(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType]) {
 	return s.Apply(NewSetMutations(WithAddedElements(elements)))
 }
 
 // Remove removes the given elements from the set and returns the updated set and the applied mutations.
-func (s *Set[ElementType]) Remove(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations *SetMutations[ElementType]) {
+func (s *Set[ElementType]) Remove(elements *advancedset.AdvancedSet[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType]) {
 	return s.Apply(NewSetMutations(WithRemovedElements(elements)))
 }
 
@@ -130,7 +130,7 @@ func (s *Set[ElementType]) InheritFrom(sources ...*Set[ElementType]) (unsubscrib
 	unsubscribeCallbacks := make([]func(), len(sources))
 
 	for i, source := range sources {
-		unsubscribeCallbacks[i] = source.OnUpdate(func(_ *advancedset.AdvancedSet[ElementType], appliedMutations *SetMutations[ElementType]) {
+		unsubscribeCallbacks[i] = source.OnUpdate(func(_ *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType]) {
 			if !appliedMutations.IsEmpty() {
 				s.Apply(appliedMutations)
 			}
@@ -219,7 +219,7 @@ func (s *Set[ElementType]) WithTriggerWithInitialEmptyValue(trigger bool) *Set[E
 }
 
 // set sets the given value as the new value of the set.
-func (s *Set[ElementType]) set(value *advancedset.AdvancedSet[ElementType]) (appliedMutations *SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(*advancedset.AdvancedSet[ElementType], *SetMutations[ElementType])]) {
+func (s *Set[ElementType]) set(value *advancedset.AdvancedSet[ElementType]) (appliedMutations SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(*advancedset.AdvancedSet[ElementType], SetMutations[ElementType])]) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -230,7 +230,7 @@ func (s *Set[ElementType]) set(value *advancedset.AdvancedSet[ElementType]) (app
 }
 
 // applyMutations applies the given mutations to the set.
-func (s *Set[ElementType]) applyMutations(mutations *SetMutations[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations *SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(*advancedset.AdvancedSet[ElementType], *SetMutations[ElementType])]) {
+func (s *Set[ElementType]) applyMutations(mutations SetMutations[ElementType]) (updatedSet *advancedset.AdvancedSet[ElementType], appliedMutations SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(*advancedset.AdvancedSet[ElementType], SetMutations[ElementType])]) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -264,8 +264,8 @@ type SetMutations[T comparable] struct {
 }
 
 // NewSetMutations creates a new SetMutations instance.
-func NewSetMutations[T comparable](opts ...options.Option[SetMutations[T]]) *SetMutations[T] {
-	return options.Apply(new(SetMutations[T]), opts, func(s *SetMutations[T]) {
+func NewSetMutations[T comparable](opts ...options.Option[SetMutations[T]]) SetMutations[T] {
+	return *options.Apply(new(SetMutations[T]), opts, func(s *SetMutations[T]) {
 		if s.RemovedElements == nil {
 			s.RemovedElements = advancedset.New[T]()
 		}
@@ -277,7 +277,7 @@ func NewSetMutations[T comparable](opts ...options.Option[SetMutations[T]]) *Set
 }
 
 // IsEmpty returns true if the SetMutations instance is empty.
-func (s *SetMutations[T]) IsEmpty() bool {
+func (s SetMutations[T]) IsEmpty() bool {
 	return s.RemovedElements.IsEmpty() && s.AddedElements.IsEmpty()
 }
 
