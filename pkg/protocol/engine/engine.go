@@ -162,6 +162,11 @@ func New(
 					panic(closeErr)
 				}
 
+				// Only mark any pruning indexes if we loaded a non-genesis snapshot
+				if e.Storage.Settings().LatestFinalizedSlot() > 0 {
+					e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
+				}
+
 				if err := e.Storage.Settings().SetSnapshotImported(); err != nil {
 					panic(errors.Wrap(err, "failed to set snapshot imported"))
 				}
