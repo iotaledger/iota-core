@@ -2,7 +2,6 @@ package mock
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -100,9 +99,6 @@ func (m *ManualPOA) SetCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
 }
 
 func (m *ManualPOA) ImportCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
-}
-
-func (m *ManualPOA) markSeatActive(_ account.SeatIndex, _ iotago.AccountID, _ time.Time) {
 }
 
 func (m *ManualPOA) Shutdown() {}
