@@ -34,7 +34,10 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-var ErrUnexpectedUnderlyingType = errors.New("unexpected underlying type provided by the interface")
+var (
+	ErrUnexpectedUnderlyingType    = errors.New("unexpected underlying type provided by the interface")
+	ErrTransactionMetadataNotFOund = errors.New("TransactionMetadata not found")
+)
 
 type Ledger struct {
 	events *ledger.Events
@@ -244,7 +247,7 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Outp
 	case *ExecutionOutput:
 		txWithMetadata, exists := l.memPool.TransactionMetadata(stateRef.Ref().TransactionID())
 		if !exists {
-			return nil, err
+			return nil, errors.Wrapf(ErrTransactionMetadataNotFOund, "error in getting output for %v", stateWithMetadata.ID())
 		}
 
 		earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
