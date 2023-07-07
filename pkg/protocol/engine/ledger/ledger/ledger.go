@@ -276,6 +276,10 @@ func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iot
 	return l.conflictDAG
 }
 
+func (l *Ledger) MemPool() mempool.MemPool[ledger.BlockVoteRank] {
+	return l.memPool
+}
+
 func (l *Ledger) Import(reader io.ReadSeeker) error {
 	if err := l.utxoLedger.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import utxoLedger")

@@ -48,10 +48,11 @@ type TipSelection struct {
 }
 
 // New is the constructor for the TipSelection.
-func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
+func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], memPool mempool.MemPool[ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
 		tipManager:                   tipManager,
 		conflictDAG:                  conflictDAG,
+		memPool:                      memPool,
 		rootBlocks:                   rootBlocksRetriever,
 		optMaxStrongParents:          8,
 		optMaxLikedInsteadReferences: 8,
