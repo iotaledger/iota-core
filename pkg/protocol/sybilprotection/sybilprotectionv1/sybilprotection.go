@@ -28,8 +28,7 @@ type SybilProtection struct {
 	apiProvider api.Provider
 
 	seatManager       seatmanager.SeatManager
-	sybilProtection   sybilprotection.SybilProtection // do we need the whole SybilProtection or just a callback to RotateCommittee?
-	ledger            ledger.Ledger                   // do we need the whole Ledger or just a callback to retrieve account data?
+	ledger            ledger.Ledger // do we need the whole Ledger or just a callback to retrieve account data?
 	lastCommittedSlot iotago.SlotIndex
 
 	performanceTracker *performance.Tracker

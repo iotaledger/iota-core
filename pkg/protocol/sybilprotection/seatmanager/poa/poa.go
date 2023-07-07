@@ -1,7 +1,6 @@
 package poa
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -108,6 +107,9 @@ func (s *SeatManager) OnlineCommittee() *advancedset.AdvancedSet[account.SeatInd
 }
 
 func (s *SeatManager) SeatCount() int {
+	s.committeeMutex.RLock()
+	defer s.committeeMutex.RUnlock()
+
 	return s.committee.SeatCount()
 }
 
@@ -123,7 +125,7 @@ func (s *SeatManager) ImportCommittee(_ iotago.EpochIndex, validators *account.A
 
 	s.accounts = validators
 	s.committee = s.accounts.SelectCommittee(validators.IDs()...)
-	fmt.Println("import committee", validators.IDs())
+
 	onlineValidators := s.accounts.IDs()
 	if len(s.optsOnlineCommitteeStartup) > 0 {
 		onlineValidators = s.optsOnlineCommitteeStartup
@@ -148,8 +150,6 @@ func (s *SeatManager) SetCommittee(_ iotago.EpochIndex, validators *account.Acco
 
 	s.accounts = validators
 	s.committee = s.accounts.SelectCommittee(validators.IDs()...)
-
-	fmt.Println("set committee", validators.IDs())
 }
 
 func (s *SeatManager) stopInactivityManager() {
@@ -182,7 +182,6 @@ func (s *SeatManager) markSeatInactive(seat account.SeatIndex) {
 
 	s.lastActivities.Delete(seat)
 	s.onlineCommittee.Delete(seat)
-	fmt.Println("mark seat inactive", seat)
 
 	s.events.OnlineCommitteeSeatRemoved.Trigger(seat)
 }
