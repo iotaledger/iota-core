@@ -90,7 +90,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		if err != nil {
 			return nil, 0, errors.Wrap(err, "error calculating blockID from attestation")
 		}
-		if _, seatExists := c.engine.SybilProtection.Committee(attestationBlockID.Index()).GetSeat(att.IssuerID); seatExists {
+		if _, seatExists := c.engine.SybilProtection.SeatManager().Committee(attestationBlockID.Index()).GetSeat(att.IssuerID); seatExists {
 			seatCount++
 		}
 

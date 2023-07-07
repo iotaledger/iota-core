@@ -14,7 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/votes"
 	"github.com/iotaledger/iota-core/pkg/votes/slottracker"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -26,8 +26,8 @@ type Gadget struct {
 
 	// Keep track of votes on slots (from commitments) per slot of blocks. I.e. a slot can only be finalized if
 	// optsSlotFinalizationThreshold is reached within a slot.
-	slotTrackers    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *slottracker.SlotTracker]
-	sybilProtection sybilprotection.SybilProtection
+	slotTrackers *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *slottracker.SlotTracker]
+	seatManager  seatmanager.SeatManager
 
 	lastFinalizedSlot          iotago.SlotIndex
 	storeLastFinalizedSlotFunc func(index iotago.SlotIndex)
@@ -47,13 +47,18 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 			optsSlotFinalizationThreshold: 0.67,
 			errorHandler:                  e.ErrorHandler("slotgadget"),
 		}, opts, func(g *Gadget) {
-			g.sybilProtection = e.SybilProtection
+
 			g.slotTrackers = shrinkingmap.New[iotago.SlotIndex, *slottracker.SlotTracker]()
 
 			e.Events.SlotGadget.LinkTo(g.events)
 			g.workers = e.Workers.CreateGroup("SlotGadget")
 
-			e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes, event.WithWorkerPool(g.workers.CreatePool("TrackAndRefresh", 1))) // Using just 1 worker to avoid contention
+			e.HookConstructed(func() {
+				g.seatManager = e.SybilProtection.SeatManager()
+				g.TriggerConstructed()
+
+				e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes, event.WithWorkerPool(g.workers.CreatePool("TrackAndRefresh", 1))) // Using just 1 worker to avoid contention
+			})
 
 			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
 				if err := e.Storage.Settings().SetLatestFinalizedSlot(index); err != nil {
@@ -112,7 +117,7 @@ func (g *Gadget) trackVotes(block *blocks.Block) {
 }
 
 func (g *Gadget) refreshSlotFinalization(tracker *slottracker.SlotTracker, previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) (finalizedSlots []iotago.SlotIndex) {
-	committeeTotalSeats := g.sybilProtection.SeatCount()
+	committeeTotalSeats := g.seatManager.SeatCount()
 
 	for i := lo.Max(g.lastFinalizedSlot, previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
 		attestorsTotalSeats := len(tracker.Voters(i))

@@ -1,6 +1,9 @@
 package account
 
 import (
+	"bytes"
+	"sort"
+
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -17,6 +20,9 @@ func NewSeatedAccounts(accounts *Accounts, optMembers ...iotago.AccountID) *Seat
 		accounts:       accounts,
 		seatsByAccount: shrinkingmap.New[iotago.AccountID, SeatIndex](),
 	}
+	sort.Slice(optMembers, func(i, j int) bool {
+		return bytes.Compare(optMembers[i][:], optMembers[j][:]) < 0
+	})
 
 	for i, member := range optMembers {
 		s.seatsByAccount.Set(member, SeatIndex(i))

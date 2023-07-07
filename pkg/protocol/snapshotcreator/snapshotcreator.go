@@ -2,8 +2,10 @@ package snapshotcreator
 
 import (
 	"crypto/ed25519"
+	"fmt"
 	"os"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/blake2b"
 
@@ -18,14 +20,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -67,6 +68,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 
 	accounts := account.NewAccounts()
 	for _, accountData := range opt.Accounts {
+		fmt.Println("account ID ", accountData.AccountID, hexutil.Encode(accountData.IssuerKey))
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
 			accounts.Set(blake2b.Sum256(accountData.IssuerKey), &account.Pool{
@@ -84,16 +86,15 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		inmemoryblockdag.NewProvider(),
 		inmemorybooker.NewProvider(),
 		blocktime.NewProvider(),
-		poa.NewProvider([]iotago.AccountID{}),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
-		epochorchestrator.NewProvider(epochorchestrator.WithInitialCommittee(accounts)),
+		sybilprotectionv1.NewProvider(sybilprotectionv1.WithInitialCommittee(accounts)),
 		slotnotarization.NewProvider(),
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
 		tipmanagerv1.NewProvider(),
 		tipselectionv1.NewProvider(),
-		engine.WithSnapshotPath(""), //magic to disable loading snapshot
+		engine.WithSnapshotPath(""), // magic to disable loading snapshot
 	)
 	defer engineInstance.Shutdown()
 
@@ -137,7 +138,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine) (err error) {
 	// Account outputs start from Genesis TX index 1
 	for idx, account := range accounts {
-		output := createAccount(account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
+		output := createAccount(account.AccountID, account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
 
 		if _, err = engineInstance.LatestAPI().ProtocolParameters().RentStructure().CoversStateRent(output, account.Amount); err != nil {
 			return errors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
@@ -164,9 +165,9 @@ func createOutput(address iotago.Address, tokenAmount iotago.BaseToken) (output 
 	}
 }
 
-func createAccount(address iotago.Address, tokenAmount iotago.BaseToken, pubkey ed25519.PublicKey, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
+func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmount iotago.BaseToken, pubkey ed25519.PublicKey, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
 	accountOutput := &iotago.AccountOutput{
-		AccountID: blake2b.Sum256(pubkey),
+		AccountID: accountID,
 		Amount:    tokenAmount,
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: address},

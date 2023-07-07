@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -62,7 +63,7 @@ func (t *Tracker) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 		return errors.Wrap(err, "unable to export pool stats")
 	}
 
-	err = t.exportCommittees(positionedWriter, targetEpoch)
+	err = t.exportCommittees(positionedWriter, targetSlotIndex)
 	if err != nil {
 		return errors.Wrap(err, "unable to export committees")
 	}
@@ -335,24 +336,35 @@ func (t *Tracker) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 	return nil
 }
 
-func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, _ iotago.EpochIndex) error {
+func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot iotago.SlotIndex) error {
 	var epochCount uint64
 	if err := pWriter.WriteValue("committees epoch count", epochCount, true); err != nil {
 		return errors.Wrap(err, "unable to write committees epoch count")
 	}
+	apiForSlot := t.apiProvider.APIForSlot(targetSlot)
+	epochFromTargetSlot := apiForSlot.TimeProvider().EpochFromSlot(targetSlot)
+
+	pointOfNoReturn := apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) - apiForSlot.ProtocolParameters().EvictionAge()*2
 
 	var innerErr error
 	err := t.committeeStore.KVStore().Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {
-		// TODO: committees for all available epochs should be included in the snapshot,
-		//  because if snapshot is generated after the committee has been selected,
-		//  then there is no way for the node to determine the committee.
-		//  There will be at most one epoch more in the store than targetEpoch,
-		//  so the question is whether we should explicitly make sure to only include one more committee,
-		//  or should we explicitly limit that? Currently we use the implicit assumption.
-		//epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
-		//if epoch > targetEpoch {
-		//	return true
-		//}
+		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
+
+		// We have a committee for an epoch higher than the targetSlot
+		// 1. we trust the point of no return, we export the committee for the next epoch
+		// 2. if we don't trust the point-of-no-return
+		// - we were able to rotate a committee, then we export it
+		// - we were not able to rotate a committee (reused), then we don't export it
+		if epoch > epochFromTargetSlot && targetSlot < pointOfNoReturn {
+			committee, _, err := account.AccountsFromBytes(committeeBytes)
+			if err != nil {
+				innerErr = ierrors.Wrapf(err, "failed to parse committee bytes for epoch %d", epoch)
+				return false
+			}
+			if committee.IsReused() {
+				return true
+			}
+		}
 
 		if err := pWriter.WriteBytes(epochBytes); err != nil {
 			innerErr = errors.Wrap(err, "unable to write epoch index")

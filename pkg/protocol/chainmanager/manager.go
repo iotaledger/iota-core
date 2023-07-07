@@ -311,7 +311,7 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 	// Note: we rely on the fact that the block filter will not let (not yet committable) commitments through.
 
 	forkedChainLatestCommitment := forkingPoint.Chain().LatestCommitment().Commitment()
-	mainChainLatestCommitment := m.RootCommitment().Chain().LatestCommitment().Commitment()
+	mainChainLatestCommitment := m.rootCommitment.Chain().LatestCommitment().Commitment()
 
 	// Check whether the chain is claiming to be heavier than the current main chain.
 	if forkedChainLatestCommitment.CumulativeWeight() <= mainChainLatestCommitment.CumulativeWeight() {
@@ -334,7 +334,7 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 
 		return &Fork{
 			Source:               source,
-			MainChain:            m.RootCommitment().Chain(),
+			MainChain:            m.rootCommitment.Chain(),
 			ForkedChain:          forkingPoint.Chain(),
 			ForkingPoint:         forkingPoint.Commitment(),
 			ForkLatestCommitment: forkedChainLatestCommitment,

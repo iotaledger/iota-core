@@ -1,10 +1,12 @@
-package epochorchestrator
+package sybilprotectionv1
 
 import (
 	"fmt"
 	"io"
 
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -12,81 +14,97 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator/performance"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1/performance"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type Orchestrator struct {
-	events *epochgadget.Events
+type SybilProtection struct {
+	events *sybilprotection.Events
 
 	apiProvider api.Provider
 
-	sybilProtection   sybilprotection.SybilProtection // do we need the whole SybilProtection or just a callback to RotateCommittee?
-	ledger            ledger.Ledger                   // do we need the whole Ledger or just a callback to retrieve account data?
+	seatManager       seatmanager.SeatManager
+	ledger            ledger.Ledger // do we need the whole Ledger or just a callback to retrieve account data?
 	lastCommittedSlot iotago.SlotIndex
 
 	performanceTracker *performance.Tracker
 
-	optsInitialCommittee *account.Accounts
+	optsInitialCommittee    *account.Accounts
+	optsSeatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]
 
 	mutex syncutils.Mutex
 
 	module.Module
 }
 
-func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.Engine, epochgadget.Gadget] {
-	return module.Provide(func(e *engine.Engine) epochgadget.Gadget {
-		return options.Apply(&Orchestrator{
-			events: epochgadget.NewEvents(),
+func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engine.Engine, sybilprotection.SybilProtection] {
+	return module.Provide(func(e *engine.Engine) sybilprotection.SybilProtection {
+		return options.Apply(&SybilProtection{
+			events: sybilprotection.NewEvents(),
 
-			// TODO: the following fields should be initialized after the engine is constructed,
-			//  otherwise we implicitly rely on the order of engine initialization which can change at any time.
-			apiProvider:     e,
-			sybilProtection: e.SybilProtection,
-			ledger:          e.Ledger,
+			apiProvider:             e,
+			optsSeatManagerProvider: poa.NewProvider(),
 		}, opts,
-			func(o *Orchestrator) {
+			func(o *SybilProtection) {
+				o.seatManager = o.optsSeatManagerProvider(e)
+
 				e.HookConstructed(func() {
+					o.ledger = e.Ledger
+
 					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e)
 					o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
 
 					if o.optsInitialCommittee != nil {
 						if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
-							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
+							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 1"))
 						}
 					}
-
 					o.TriggerConstructed()
-					o.TriggerInitialized()
+
+					// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
+					// so the committee should be available in the performance manager.
+					e.HookInitialized(func() {
+						// Make sure that the sybil protection knows about the committee of the current epoch
+						// (according to the latest committed slot), and potentially the next selected
+						// committee if we have one.
+
+						// TODO: how do we handle changing API here?
+						currentEpoch := e.LatestAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
+
+						committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
+						if !exists {
+							panic("failed to load committee for last finalized slot to initialize sybil protection")
+						}
+						o.seatManager.ImportCommittee(currentEpoch, committee)
+						if nextCommittee, nextCommitteeExists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
+							o.seatManager.ImportCommittee(currentEpoch+1, nextCommittee)
+						}
+
+						o.TriggerInitialized()
+					})
 				})
-
-				// TODO: does this potentially cause a data race due to fanning-in parallel events?
-				e.Events.BlockGadget.BlockAccepted.Hook(o.BlockAccepted)
-
-				// TODO: CommitSlot should be called directly from NotarizationManager and should return some trees to be put into actual commitment
-				e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) { o.CommitSlot(scd.Commitment.Index()) })
 
 				e.Events.SlotGadget.SlotFinalized.Hook(o.slotFinalized)
 
-				e.Events.EpochGadget.LinkTo(o.events)
+				e.Events.SybilProtection.LinkTo(o.events)
 			},
 		)
 	})
 }
 
-func (o *Orchestrator) Shutdown() {
+func (o *SybilProtection) Shutdown() {
 	o.TriggerStopped()
 }
 
-func (o *Orchestrator) BlockAccepted(block *blocks.Block) {
+func (o *SybilProtection) BlockAccepted(block *blocks.Block) {
 	o.performanceTracker.BlockAccepted(block)
 }
 
-func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
+func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewardsRoot iotago.Identifier) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -110,7 +128,12 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 				panic(fmt.Sprintf("committee for current epoch %d not found", currentEpoch))
 			}
 
-			_ = o.sybilProtection.RotateCommittee(nextEpoch, committee)
+			committee.SetReused()
+
+			o.seatManager.SetCommittee(nextEpoch, committee)
+
+			o.events.CommitteeSelected.Trigger(committee, nextEpoch)
+
 			if err := o.performanceTracker.RegisterCommittee(nextEpoch, committee); err != nil {
 				panic(ierrors.Wrapf(err, "failed to register committee for epoch %d", nextEpoch))
 			}
@@ -126,26 +149,71 @@ func (o *Orchestrator) CommitSlot(slot iotago.SlotIndex) {
 		o.performanceTracker.ApplyEpoch(currentEpoch, committee)
 	}
 
+	var targetCommitteeEpoch iotago.EpochIndex
+	// TODO: check if it is correct to check against EvictionAge here
+	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) > slot+apiForSlot.ProtocolParameters().EvictionAge() {
+		targetCommitteeEpoch = currentEpoch
+	} else {
+		targetCommitteeEpoch = nextEpoch
+	}
+
+	committeeRoot = o.committeeRoot(targetCommitteeEpoch)
+
+	var targetRewardsEpoch iotago.EpochIndex
+	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) == slot {
+		targetRewardsEpoch = nextEpoch
+	} else {
+		targetRewardsEpoch = currentEpoch
+	}
+
+	rewardsRoot = o.performanceTracker.RewardsRoot(targetRewardsEpoch)
+
 	o.lastCommittedSlot = slot
+
+	return
 }
 
-func (o *Orchestrator) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
+func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) iotago.Identifier {
+	committee, exists := o.performanceTracker.LoadCommitteeForEpoch(targetCommitteeEpoch)
+	if !exists {
+		panic(fmt.Sprintf("committee for a finished epoch %d not found", targetCommitteeEpoch))
+	}
+
+	comitteeTree := ads.NewSet[iotago.AccountID](
+		mapdb.NewMapDB(),
+		iotago.AccountID.Bytes,
+		iotago.IdentifierFromBytes,
+	)
+	committee.ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
+		comitteeTree.Add(accountID)
+
+		return true
+	})
+
+	return iotago.Identifier(comitteeTree.Root())
+}
+
+func (o *SybilProtection) SeatManager() seatmanager.SeatManager {
+	return o.seatManager
+}
+
+func (o *SybilProtection) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
 	return o.performanceTracker.ValidatorReward(validatorID, stakeAmount, epochStart, epochEnd)
 }
 
-func (o *Orchestrator) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
+func (o *SybilProtection) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
 	return o.performanceTracker.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd)
 }
 
-func (o *Orchestrator) Import(reader io.ReadSeeker) error {
+func (o *SybilProtection) Import(reader io.ReadSeeker) error {
 	return o.performanceTracker.Import(reader)
 }
 
-func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error {
+func (o *SybilProtection) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error {
 	return o.performanceTracker.Export(writer, targetSlot)
 }
 
-func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
+func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -158,16 +226,16 @@ func (o *Orchestrator) slotFinalized(slot iotago.SlotIndex) {
 	maxCommittableSlot := apiForSlot.ProtocolParameters().EvictionAge() << 1
 
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
-	// committed slot is earlier than (the last slot of the epoch - maxCommittableSlot).
+	// committed slot is earlier than (the last slot of the epoch - maxCommittableAge).
 	// Otherwise, skip committee selection because it's too late and the committee has been reused.
 	epochEndSlot := timeProvider.EpochEnd(epoch)
 	if slot+apiForSlot.ProtocolParameters().EpochNearingThreshold() == epochEndSlot && epochEndSlot > o.lastCommittedSlot+maxCommittableSlot {
 		newCommittee := o.selectNewCommittee(slot)
-		o.events.CommitteeSelected.Trigger(newCommittee)
+		o.events.CommitteeSelected.Trigger(newCommittee, epoch+1)
 	}
 }
 
-func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
+func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
 	timeProvider := o.apiProvider.APIForSlot(slot).TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
@@ -196,7 +264,7 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 		panic(err)
 	}
 
-	newCommittee := o.sybilProtection.RotateCommittee(nextEpoch, weightedCandidates)
+	newCommittee := o.seatManager.RotateCommittee(nextEpoch, weightedCandidates)
 	weightedCommittee := newCommittee.Accounts()
 
 	// FIXME: weightedCommittee returned by the PoA sybil protection does not have stake specified, which will cause problems during rewards calculation.
@@ -211,8 +279,14 @@ func (o *Orchestrator) selectNewCommittee(slot iotago.SlotIndex) *account.Accoun
 
 // WithInitialCommittee registers the passed committee on a given slot.
 // This is needed to generate Genesis snapshot with some initial committee.
-func WithInitialCommittee(committee *account.Accounts) options.Option[Orchestrator] {
-	return func(o *Orchestrator) {
+func WithInitialCommittee(committee *account.Accounts) options.Option[SybilProtection] {
+	return func(o *SybilProtection) {
 		o.optsInitialCommittee = committee
+	}
+}
+
+func WithSeatManagerProvider(seatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]) options.Option[SybilProtection] {
+	return func(o *SybilProtection) {
+		o.optsSeatManagerProvider = seatManagerProvider
 	}
 }
