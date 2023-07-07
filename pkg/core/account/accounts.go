@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -57,6 +58,7 @@ func (a *Accounts) IDs() []iotago.AccountID {
 
 	return ids
 }
+
 func (a *Accounts) IsReused() bool {
 	return a.reused.Load()
 }
@@ -173,7 +175,7 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 
 	var reused bool
 	if err = binary.Read(reader, binary.LittleEndian, &reused); err != nil {
-		return n, errors.Wrap(err, "unable to read reused flag")
+		return n, ierrors.Wrap(err, "unable to read reused flag")
 	}
 	a.reused.Store(reused)
 	n++

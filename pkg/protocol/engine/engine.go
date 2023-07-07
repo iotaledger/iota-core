@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -94,7 +95,6 @@ func New(
 	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
-
 	var needsToImportSnapshot bool
 	var file *os.File
 	var fileErr error
@@ -304,7 +304,7 @@ func (e *Engine) ImportContents(reader io.ReadSeeker) (err error) {
 	} else if err = e.Ledger.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import ledger")
 	} else if err := e.SybilProtection.Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import epoch gadget")
+		return ierrors.Wrap(err, "failed to import sybil protection")
 	} else if err = e.EvictionState.Import(reader); err != nil {
 		return errors.Wrap(err, "failed to import eviction state")
 	} else if err = e.Attestations.Import(reader); err != nil {
@@ -327,7 +327,7 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 	} else if err = e.Ledger.Export(writer, targetSlot); err != nil {
 		return errors.Wrap(err, "failed to export ledger")
 	} else if err := e.SybilProtection.Export(writer, targetSlot); err != nil {
-		return errors.Wrap(err, "failed to export epoch gadget")
+		return ierrors.Wrap(err, "failed to export sybil protection")
 	} else if err = e.EvictionState.Export(writer, e.Storage.Settings().LatestFinalizedSlot(), targetSlot); err != nil {
 		// The rootcommitment is determined from the rootblocks. Therefore, we need to export starting from the last finalized slot.
 		return errors.Wrap(err, "failed to export eviction state")
