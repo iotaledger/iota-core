@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
@@ -72,10 +73,10 @@ type Manager struct {
 	startOnce         sync.Once
 	isStarted         atomic.Bool
 	stopOnce          sync.Once
-	stopMutex         sync.RWMutex
+	stopMutex         syncutils.RWMutex
 	isStopped         bool
 	reconnectInterval time.Duration
-	knownPeersMutex   sync.RWMutex
+	knownPeersMutex   syncutils.RWMutex
 	knownPeers        map[network.PeerID]*knownPeer
 	workerPool        *workerpool.WorkerPool
 

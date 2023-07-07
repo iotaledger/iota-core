@@ -2,7 +2,6 @@ package prunable
 
 import (
 	"os"
-	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/zyedidia/generic/cache"
@@ -10,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -17,10 +17,10 @@ import (
 
 type Manager struct {
 	openDBs      *cache.Cache[iotago.SlotIndex, *dbInstance]
-	openDBsMutex sync.Mutex
+	openDBsMutex syncutils.Mutex
 
 	lastPrunedSlot *model.EvictionIndex
-	pruningMutex   sync.RWMutex
+	pruningMutex   syncutils.RWMutex
 
 	dbConfig     database.Config
 	errorHandler func(error)

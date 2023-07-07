@@ -1,14 +1,13 @@
 package slotnotarization
 
 import (
-	"sync"
-
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -21,7 +20,7 @@ type SlotMutations struct {
 	// latestCommittedIndex stores the index of the latest committed slot.
 	latestCommittedIndex iotago.SlotIndex
 
-	evictionMutex sync.RWMutex
+	evictionMutex syncutils.RWMutex
 }
 
 // NewSlotMutations creates a new SlotMutations instance.

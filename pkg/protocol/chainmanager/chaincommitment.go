@@ -2,12 +2,12 @@ package chainmanager
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -22,7 +22,7 @@ type ChainCommitment struct {
 	children    *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *ChainCommitment]
 	chain       *Chain
 
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 }
 
 func NewChainCommitment(id iotago.CommitmentID) *ChainCommitment {

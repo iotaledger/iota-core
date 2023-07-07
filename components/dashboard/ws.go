@@ -3,7 +3,6 @@ package dashboard
 import (
 	"context"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -13,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
 	"github.com/iotaledger/iota-core/pkg/daemon"
@@ -23,7 +23,7 @@ var (
 	webSocketWriteTimeout = 3 * time.Second
 
 	// clients
-	wsClientsMu    sync.RWMutex
+	wsClientsMu    syncutils.RWMutex
 	wsClients      = make(map[uint64]*wsclient)
 	nextWsClientID uint64
 

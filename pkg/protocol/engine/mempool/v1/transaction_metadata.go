@@ -1,7 +1,6 @@
 package mempoolv1
 
 import (
-	"sync"
 	"sync/atomic"
 
 	"golang.org/x/xerrors"
@@ -10,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/promise"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	lpromise "github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -44,9 +44,9 @@ type TransactionMetadata struct {
 	allAttachmentsEvicted      *promise.Event
 
 	// mutex needed?
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 
-	attachmentsMutex sync.RWMutex
+	attachmentsMutex syncutils.RWMutex
 
 	*inclusionFlags
 }

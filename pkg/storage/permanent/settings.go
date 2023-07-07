@@ -3,13 +3,13 @@ package permanent
 import (
 	"fmt"
 	"io"
-	"sync"
 
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/core/api"
@@ -26,10 +26,10 @@ const (
 )
 
 type Settings struct {
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 	store kvstore.KVStore
 
-	apiMutex         sync.RWMutex
+	apiMutex         syncutils.RWMutex
 	apiByVersion     map[iotago.Version]iotago.API
 	protocolVersions []*protocolVersionEpochStart
 }
@@ -69,6 +69,10 @@ func (s *Settings) LatestAPI() iotago.API {
 	return s.APIForVersion(iotago.LatestProtocolVersion())
 }
 
+func (s *Settings) latestAPI() iotago.API {
+	return s.apiForVersion(iotago.LatestProtocolVersion())
+}
+
 func (s *Settings) APIForSlot(slot iotago.SlotIndex) iotago.API {
 	return s.APIForVersion(s.VersionForSlot(slot))
 }
@@ -84,6 +88,31 @@ func (s *Settings) APIForVersion(version iotago.Version) iotago.API {
 		return a
 	}
 	s.apiMutex.RUnlock()
+
+	protocolParams := s.protocolParameters(version)
+
+	if protocolParams == nil {
+		panic(fmt.Errorf("protocol parameters for version %d not found", version))
+	}
+
+	var a iotago.API
+	switch protocolParams.Version() {
+	case 3:
+		a = iotago.V3API(protocolParams)
+		s.apiMutex.Lock()
+		s.apiByVersion[3] = a
+		s.apiMutex.Unlock()
+
+		return a
+	default:
+		panic(ierrors.Errorf("unsupported protocol version %d", protocolParams.Version()))
+	}
+}
+
+func (s *Settings) apiForVersion(version iotago.Version) iotago.API {
+	if a, exists := s.apiByVersion[version]; exists {
+		return a
+	}
 
 	protocolParams := s.protocolParameters(version)
 
@@ -202,6 +231,19 @@ func (s *Settings) LatestCommitment() *model.Commitment {
 	return lo.PanicOnErr(model.CommitmentFromBytes(bytes, s))
 }
 
+func (s *Settings) latestCommitment() *model.Commitment {
+	bytes, err := s.store.Get([]byte{latestCommitmentKey})
+
+	if err != nil {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return model.NewEmptyCommitment(s.latestAPI())
+		}
+		panic(err)
+	}
+
+	return lo.PanicOnErr(model.CommitmentFromBytes(bytes, s))
+}
+
 func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -213,6 +255,10 @@ func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
+	return s.latestFinalizedSlot()
+}
+
+func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
 	bytes, err := s.store.Get([]byte{latestFinalizedSlotKey})
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
@@ -398,7 +444,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 		return ierrors.Wrap(err, "failed to stream read protocol parameters")
 	}
 
-	// Now that we parsed the protocol parameters we can parse the commitment since there will be an API available
+	// Now that we parsed the protocol parameters, we can parse the commitment since there will be an API available
 	commitment, err := model.CommitmentFromBytes(commitmentBytes, s)
 	if err != nil {
 		return ierrors.Wrap(err, "failed to parse commitment")
@@ -416,9 +462,9 @@ func (s *Settings) String() string {
 	defer s.mutex.RUnlock()
 
 	builder := stringify.NewStructBuilder("Settings")
-	builder.AddField(stringify.NewStructField("IsSnapshotImported", s.IsSnapshotImported()))
-	builder.AddField(stringify.NewStructField("LatestCommitment", s.LatestCommitment()))
-	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.LatestFinalizedSlot()))
+	builder.AddField(stringify.NewStructField("IsSnapshotImported", lo.PanicOnErr(s.store.Has([]byte{snapshotImportedKey}))))
+	builder.AddField(stringify.NewStructField("LatestCommitment", s.latestCommitment()))
+	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.latestFinalizedSlot()))
 	if err := s.store.Iterate([]byte{protocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
 		params, _, err := iotago.ProtocolParametersFromBytes(value)
 		if err != nil {

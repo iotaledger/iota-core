@@ -1,11 +1,10 @@
 package conflictdagv1
 
 import (
-	"sync"
-
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 )
@@ -20,7 +19,7 @@ type ConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 
 	allMembersEvicted *promise.Value[bool]
 
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 }
 
 // NewConflictSet creates a new ConflictSet of Conflicts that are conflicting with each other over the given Resource.

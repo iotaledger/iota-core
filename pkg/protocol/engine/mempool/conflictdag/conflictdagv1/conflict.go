@@ -3,7 +3,6 @@ package conflictdagv1
 import (
 	"bytes"
 	"errors"
-	"sync"
 
 	"go.uber.org/atomic"
 	"golang.org/x/xerrors"
@@ -66,7 +65,7 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	evicted atomic.Bool
 
 	// preferredInsteadMutex is used to synchronize access to the preferred instead value of the Conflict.
-	preferredInsteadMutex sync.RWMutex
+	preferredInsteadMutex syncutils.RWMutex
 
 	// likedInstead is the set of liked instead Conflicts.
 	likedInstead *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
@@ -75,10 +74,10 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	likedInsteadSources *shrinkingmap.ShrinkingMap[ConflictID, *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]]
 
 	// likedInsteadMutex is used to synchronize access to the liked instead value of the Conflict.
-	likedInsteadMutex sync.RWMutex
+	likedInsteadMutex syncutils.RWMutex
 
 	// structureMutex is used to synchronize access to the structure of the Conflict.
-	structureMutex sync.RWMutex
+	structureMutex syncutils.RWMutex
 
 	// acceptanceThreshold is the function that is used to retrieve the acceptance threshold of the committee.
 	acceptanceThreshold func() int64

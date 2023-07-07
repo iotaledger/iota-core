@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
 	"golang.org/x/xerrors"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
@@ -55,7 +55,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	lastEvictedSlot iotago.SlotIndex
 
 	// evictionMutex is used to synchronize the eviction of slots.
-	evictionMutex sync.RWMutex
+	evictionMutex syncutils.RWMutex
 
 	optForkAllTransactions bool
 
@@ -329,9 +329,6 @@ func (m *MemPool[VoteRank]) setup() {
 }
 
 func (m *MemPool[VoteRank]) stateDiff(slotIndex iotago.SlotIndex) (stateDiff *StateDiff, evicted bool) {
-	m.evictionMutex.RLock()
-	defer m.evictionMutex.RUnlock()
-
 	if m.lastEvictedSlot >= slotIndex {
 		return nil, true
 	}

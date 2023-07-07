@@ -4,13 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"sync"
 
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -20,7 +20,7 @@ var ErrOutputsSumNotEqualTotalSupply = errors.New("accumulated output balance is
 
 type Manager struct {
 	store     kvstore.KVStore
-	storeLock sync.RWMutex
+	storeLock syncutils.RWMutex
 
 	stateTree *ads.Map[iotago.OutputID, *stateTreeMetadata]
 
@@ -347,7 +347,7 @@ func (m *Manager) LedgerStateSHA256Sum() ([]byte, error) {
 	}
 
 	for _, outputID := range outputIDs.RemoveDupsAndSort() {
-		output, err := m.ReadOutputByOutputID(outputID)
+		output, err := m.ReadOutputByOutputIDWithoutLocking(outputID)
 		if err != nil {
 			return nil, err
 		}
