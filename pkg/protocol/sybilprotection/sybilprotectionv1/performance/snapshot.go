@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -360,7 +361,7 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 
 			committee, _, err := account.AccountsFromBytes(committeeBytes)
 			if err != nil {
-				innerErr = err // TODO: wrap the error
+				innerErr = ierrors.Wrapf(err, "failed to parse committee bytes for epoch %d", epoch)
 				return false
 			}
 

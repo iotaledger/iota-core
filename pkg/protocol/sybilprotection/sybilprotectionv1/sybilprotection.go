@@ -52,14 +52,10 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 				o.seatManager = o.optsSeatManagerProvider(e)
 
 				e.HookConstructed(func() {
-					// TODO: the following fields should be initialized after the engine is constructed,
-					//  otherwise we implicitly rely on the order of engine initialization which can change at any time.
 					o.ledger = e.Ledger
 
 					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e)
 					o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
-
-					// TODO: check if the following value is correctly set to twice eviction age
 
 					if o.optsInitialCommittee != nil {
 						if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
