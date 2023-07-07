@@ -156,9 +156,11 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		return isMarkedOrphaned || anyWeakParentWeaklyOrphaned
 	}, &t.isMarkedOrphaned, &t.anyWeakParentWeaklyOrphaned)
 
-	t.isMarkedOrphaned = reactive.DeriveVariableFromValue[bool, bool](onConstructed, func(isLivenessThresholdReached bool) bool {
-		return isLivenessThresholdReached /* TODO: && !accepted */
-	}, &t.isLivenessThresholdReached)
+	isAccepted := block.Accepted()
+
+	t.isMarkedOrphaned = reactive.DeriveVariableFrom2Values[bool, bool](onConstructed, func(isLivenessThresholdReached bool, isAccepted bool) bool {
+		return isLivenessThresholdReached && !isAccepted
+	}, &t.isLivenessThresholdReached, &isAccepted)
 
 	onConstructed.Trigger()
 

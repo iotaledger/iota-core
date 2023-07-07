@@ -461,9 +461,9 @@ func (b *Block) SetAccepted() (wasUpdated bool) {
 	return !b.accepted.Set(true)
 }
 
-// OnAccepted registers the given handler to be called when the Block was accepted.
-func (b *Block) OnAccepted(handler func()) (unsubscribe func()) {
-	return b.accepted.OnUpdate(func(_, _ bool) { handler() })
+// Accepted returns a reactive variable that is true if the Block was accepted.
+func (b *Block) Accepted() reactive.Variable[bool] {
+	return b.accepted
 }
 
 func (b *Block) AddConfirmationRatifier(seat account.SeatIndex) (added bool) {
