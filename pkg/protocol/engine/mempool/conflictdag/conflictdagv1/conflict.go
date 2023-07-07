@@ -3,6 +3,7 @@ package conflictdagv1
 import (
 	"bytes"
 	"errors"
+	"sync"
 
 	"go.uber.org/atomic"
 	"golang.org/x/xerrors"
@@ -73,11 +74,15 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	// likedInsteadSources is a mapping of liked instead Conflicts to the set of parents that inherited them.
 	likedInsteadSources *shrinkingmap.ShrinkingMap[ConflictID, *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]]
 
+	// TODO: likedInsteadMutex and structureMutex are sometimes locked in different order by different goroutines, which could result in a deadlock
+	//  however, it's impossible to deadlock if we fork all transactions upon booking
+	//  deadlock happens when the likedInstead conflict changes and parents are updated at the same time, which is impossible in the current setup
+	//  because we won't process votes on a conflict we're just creating.
 	// likedInsteadMutex is used to synchronize access to the liked instead value of the Conflict.
-	likedInsteadMutex syncutils.RWMutex
+	likedInsteadMutex sync.RWMutex
 
 	// structureMutex is used to synchronize access to the structure of the Conflict.
-	structureMutex syncutils.RWMutex
+	structureMutex sync.RWMutex
 
 	// acceptanceThreshold is the function that is used to retrieve the acceptance threshold of the committee.
 	acceptanceThreshold func() int64

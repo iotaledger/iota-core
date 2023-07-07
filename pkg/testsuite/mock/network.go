@@ -103,11 +103,11 @@ func (e *Endpoint) RegisterProtocol(protocolID string, _ func() proto.Message, h
 }
 
 func (e *Endpoint) UnregisterProtocol(protocolID string) {
-	e.handlersMutex.Lock()
-	defer e.handlersMutex.Unlock()
-
 	e.network.dispatchersMutex.Lock()
 	defer e.network.dispatchersMutex.Unlock()
+
+	e.handlersMutex.Lock()
+	defer e.handlersMutex.Unlock()
 
 	delete(e.handlers, protocolID)
 	delete(e.network.dispatchersByPartition[e.partition], e.id)

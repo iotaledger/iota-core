@@ -1,6 +1,8 @@
 package promise
 
-import "github.com/iotaledger/hive.go/runtime/syncutils"
+import (
+	"sync"
+)
 
 // Callback is a wrapper for a callback function that is extended by an ID and a mutex.
 type Callback[T any] struct {
@@ -17,7 +19,7 @@ type Callback[T any] struct {
 	lastUpdate UniqueID
 
 	// mutex is the mutex that is used to ensure that the callback is not triggered concurrently.
-	mutex syncutils.Mutex
+	mutex sync.Mutex
 }
 
 // NewCallback is the constructor for the Callback type.

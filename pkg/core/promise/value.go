@@ -1,6 +1,8 @@
 package promise
 
 import (
+	"sync"
+
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
@@ -26,7 +28,7 @@ type Value[T comparable] struct {
 	uniqueCallbackID UniqueID
 
 	// mutex is used to ensure that updating the value and registering/unregistering callbacks is thread safe.
-	mutex syncutils.RWMutex
+	mutex sync.RWMutex
 
 	// setOrderMutex is an additional mutex that is used to ensure that the order of updates is ensured.
 	setOrderMutex syncutils.Mutex
