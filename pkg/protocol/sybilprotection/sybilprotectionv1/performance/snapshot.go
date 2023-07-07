@@ -353,8 +353,8 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 		//  or should we explicitly limit that? Currently we use the implicit assumption.
 		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
 		if epoch > epochFromTargetSlot {
-			// FIXME: EvictionAge here should be MaxCommittableAge, but not available at the time of writing
-			if targetSlot+apiForSlot.ProtocolParameters().EvictionAge() < apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) {
+			// FIXME: EvictionAge*2 here should be MaxCommittableAge
+			if targetSlot+(apiForSlot.ProtocolParameters().EvictionAge()*2) < apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) {
 				return true
 			}
 
