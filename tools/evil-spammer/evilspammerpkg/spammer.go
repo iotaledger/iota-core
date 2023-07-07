@@ -11,7 +11,9 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/evilwallet"
+	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -54,6 +56,8 @@ type Spammer struct {
 	ErrCounter *ErrorCounter
 
 	log Logger
+	api iotago.API
+
 	// accessed from spamming functions
 	done     chan bool
 	shutdown chan types.Empty
@@ -65,6 +69,9 @@ type Spammer struct {
 
 // NewSpammer is a constructor of Spammer.
 func NewSpammer(options ...Options) *Spammer {
+	protocolParams := snapshotcreator.NewOptions(presets.Docker...).ProtocolParameters
+	api := iotago.V3API(protocolParams)
+
 	state := &State{
 		txSent:        atomic.NewInt64(0),
 		batchPrepared: atomic.NewInt64(0),
@@ -82,6 +89,7 @@ func NewSpammer(options ...Options) *Spammer {
 		done:           make(chan bool),
 		shutdown:       make(chan types.Empty),
 		NumberOfSpends: 2,
+		api:            api,
 	}
 
 	for _, opt := range options {
@@ -220,7 +228,7 @@ func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt evilwallet.Client)
 		return
 	}
 
-	txID := lo.PanicOnErr(tx.ID())
+	txID := lo.PanicOnErr(tx.ID(s.api))
 	allSolid := s.handleSolidityForReuseOutputs(clt, tx)
 	if !allSolid {
 		s.log.Debug(ErrInputsNotSolid)
