@@ -127,22 +127,15 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 			}
 			return iotago.PayloadType(0)
 		}(),
-		// TransactionID: func() string {
-		// 	if iotaBlk.Payload != nil && iotaBlk.Payload.PayloadType() == iotago.PayloadTransaction {
-		// 		tx := iotaBlk.Payload.(*iotago.Transaction)
-		// 		id, _ := tx.ID()
+		TransactionID: func() string {
+			if basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
+				tx := basicBlock.Payload.(*iotago.Transaction)
+				id, _ := tx.ID(deps.Protocol.APIForVersion(iotaBlk.ProtocolVersion))
 
-		// 		return id.ToHex()
-		// 	}
-		// 	return ""
-		// }(),
-		// CommitmentID: commitmentID.ToHex(),
-		// Commitment: CommitmentResponse{
-		// 	Index:            uint64(iotaBlk.SlotCommitment.Index),
-		// 	PrevID:           iotaBlk.SlotCommitment.PrevID.ToHex(),
-		// 	RootsID:          iotaBlk.SlotCommitment.RootsID.ToHex(),
-		// 	CumulativeWeight: iotaBlk.SlotCommitment.CumulativeWeight,
-		// },
+				return id.ToHex()
+			}
+			return ""
+		}(),
 		Payload:      payloadJSON,
 		CommitmentID: iotaBlk.SlotCommitmentID.ToHex(),
 		//TODO: remove from explorer or add link to a separate route
