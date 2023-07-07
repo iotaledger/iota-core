@@ -6,5 +6,5 @@ type Value[Type comparable] interface {
 	Get() Type
 
 	// OnUpdate registers the given callback that is triggered when the value changes.
-	OnUpdate(consumer func(oldValue, newValue Type)) (unsubscribe func())
+	OnUpdate(consumer func(oldValue, newValue Type), triggerWithInitialZeroValue ...bool) (unsubscribe func())
 }

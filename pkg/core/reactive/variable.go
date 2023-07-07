@@ -84,30 +84,30 @@ func (v *variable[T]) Compute(computeFunc func(currentValue T) T) (previousValue
 }
 
 // OnUpdate registers a callback that is triggered when the value changes.
-func (v *variable[T]) OnUpdate(callback func(prevValue, newValue T)) (unsubscribe func()) {
+func (v *variable[T]) OnUpdate(callback func(prevValue, newValue T), triggerWithInitialZeroValue ...bool) (unsubscribe func()) {
 	v.mutex.Lock()
 
 	currentValue := v.value
 
-	newCallback := newCallback[func(prevValue, newValue T)](v.uniqueCallbackID.Next(), callback)
-	v.registeredCallbacks.Set(newCallback.ID, newCallback)
+	createdCallback := newCallback[func(prevValue, newValue T)](v.uniqueCallbackID.Next(), callback)
+	v.registeredCallbacks.Set(createdCallback.ID, createdCallback)
 
 	// we intertwine the mutexes to ensure that the callback is guaranteed to be triggered with the current value from
 	// here first even if the value is updated in parallel.
-	newCallback.Lock(v.uniqueUpdateID)
-	defer newCallback.Unlock()
+	createdCallback.Lock(v.uniqueUpdateID)
+	defer createdCallback.Unlock()
 
 	v.mutex.Unlock()
 
 	var emptyValue T
-	if currentValue != emptyValue {
-		newCallback.Invoke(emptyValue, currentValue)
+	if currentValue != emptyValue || lo.First(triggerWithInitialZeroValue) {
+		createdCallback.Invoke(emptyValue, currentValue)
 	}
 
 	return func() {
-		v.registeredCallbacks.Delete(newCallback.ID)
+		v.registeredCallbacks.Delete(createdCallback.ID)
 
-		newCallback.MarkUnsubscribed()
+		createdCallback.MarkUnsubscribed()
 	}
 }
 

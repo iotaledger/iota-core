@@ -20,7 +20,7 @@ func DeriveVariableFromValue[Type, InputType1 comparable, InputValueType1 Value[
 	return newDerivedVariable[Type](onConstructed, func(d DerivedVariable[Type]) func() {
 		return (*input1).OnUpdate(func(_, input1 InputType1) {
 			d.Compute(func(_ Type) Type { return compute(input1) })
-		})
+		}, true)
 	})
 }
 
@@ -30,11 +30,11 @@ func DeriveVariableFrom2Values[Type, InputType1, InputType2 comparable, InputVal
 		return lo.Batch(
 			(*input1).OnUpdate(func(_, input1 InputType1) {
 				d.Compute(func(_ Type) Type { return compute(input1, (*input2).Get()) })
-			}),
+			}, true),
 
 			(*input2).OnUpdate(func(_, input2 InputType2) {
 				d.Compute(func(_ Type) Type { return compute((*input1).Get(), input2) })
-			}),
+			}, true),
 		)
 	})
 }
@@ -45,15 +45,15 @@ func DeriveVariableFrom3Values[Type, InputType1, InputType2, InputType3 comparab
 		return lo.Batch(
 			(*input1).OnUpdate(func(_, input1 InputType1) {
 				d.Compute(func(_ Type) Type { return compute(input1, (*input2).Get(), (*input3).Get()) })
-			}),
+			}, true),
 
 			(*input2).OnUpdate(func(_, input2 InputType2) {
 				d.Compute(func(_ Type) Type { return compute((*input1).Get(), input2, (*input3).Get()) })
-			}),
+			}, true),
 
 			(*input3).OnUpdate(func(_, input3 InputType3) {
 				d.Compute(func(_ Type) Type { return compute((*input1).Get(), (*input2).Get(), input3) })
-			}),
+			}, true),
 		)
 	})
 }
