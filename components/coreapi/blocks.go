@@ -79,7 +79,7 @@ func sendBlock(c echo.Context) (*submitBlockResponse, error) {
 		return nil, err
 	}
 
-	var iotaBlock *iotago.ProtocolBlock
+	var iotaBlock = &iotago.ProtocolBlock{}
 
 	if c.Request().Body == nil {
 		// bad request
