@@ -1,9 +1,8 @@
 package totalweightslotgadget
 
 import (
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -61,7 +60,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 
 			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
 				if err := e.Storage.Settings().SetLatestFinalizedSlot(index); err != nil {
-					g.errorHandler(errors.Wrap(err, "failed to set latest finalized slot"))
+					g.errorHandler(ierrors.Wrap(err, "failed to set latest finalized slot"))
 				}
 			}
 

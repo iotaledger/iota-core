@@ -1,8 +1,7 @@
 package prunable
 
 import (
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -21,7 +20,7 @@ func newDBInstance(index iotago.SlotIndex, dbConfig database.Config) *dbInstance
 	}
 	storeHealthTracker, err := kvstore.NewStoreHealthTracker(db, dbConfig.PrefixHealth, dbConfig.Version, nil)
 	if err != nil {
-		panic(errors.Wrapf(err, "database in %s is corrupted, delete database and resync node", dbConfig.Directory))
+		panic(ierrors.Wrapf(err, "database in %s is corrupted, delete database and resync node", dbConfig.Directory))
 	}
 	if err = storeHealthTracker.MarkCorrupted(); err != nil {
 		panic(err)

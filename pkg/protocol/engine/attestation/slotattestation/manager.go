@@ -1,10 +1,9 @@
 package slotattestation
 
 import (
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/memstorage"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -123,7 +122,7 @@ func (m *Manager) AttestationCommitmentOffset() iotago.SlotIndex {
 func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestation, err error) {
 	adsMap, err := m.GetMap(index)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get attestations for slot %d", index)
+		return nil, ierrors.Wrapf(err, "failed to get attestations for slot %d", index)
 	}
 
 	attestations = make([]*iotago.Attestation, 0)
@@ -132,7 +131,7 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 
 		return true
 	}); err != nil {
-		return nil, errors.Wrapf(err, "failed to stream attestations for slot %d", index)
+		return nil, ierrors.Wrapf(err, "failed to stream attestations for slot %d", index)
 	}
 
 	return attestations, nil
@@ -145,11 +144,11 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, *io
 	defer m.commitmentMutex.RUnlock()
 
 	if index > m.lastCommittedSlot {
-		return nil, errors.Errorf("slot %d is newer than last committed slot %d", index, m.lastCommittedSlot)
+		return nil, ierrors.Errorf("slot %d is newer than last committed slot %d", index, m.lastCommittedSlot)
 	}
 	cutoffIndex, isValid := m.computeAttestationCommitmentOffset(index)
 	if !isValid {
-		return nil, errors.Errorf("slot %d is smaller than attestation cutoffIndex %d thus we don't have attestations", index, cutoffIndex)
+		return nil, ierrors.Errorf("slot %d is smaller than attestation cutoffIndex %d thus we don't have attestations", index, cutoffIndex)
 	}
 
 	return m.adsMapStorage(cutoffIndex)
@@ -256,7 +255,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	// Store all attestations of cutoffIndex in bucketed storage via ads.Map / sparse merkle tree -> committed attestations.
 	tree, err := m.adsMapStorage(cutoffIndex)
 	if err != nil {
-		return 0, iotago.Identifier{}, errors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
+		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
 	}
 
 	// Add all attestations to the tree and calculate the new cumulative weight.

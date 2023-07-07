@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -117,11 +115,11 @@ func New(
 			if needsToImportSnapshot {
 				file, fileErr = os.Open(e.optsSnapshotPath)
 				if fileErr != nil {
-					panic(errors.Wrap(fileErr, "failed to open snapshot file"))
+					panic(ierrors.Wrap(fileErr, "failed to open snapshot file"))
 				}
 
 				if err := e.ImportSettings(file); err != nil {
-					panic(errors.Wrap(err, "failed to import snapshot settings"))
+					panic(ierrors.Wrap(err, "failed to import snapshot settings"))
 				}
 			}
 		},
@@ -151,7 +149,7 @@ func New(
 			// Import the rest of the snapshot if needed.
 			if needsToImportSnapshot {
 				if err := e.ImportContents(file); err != nil {
-					panic(errors.Wrap(err, "failed to import snapshot contents"))
+					panic(ierrors.Wrap(err, "failed to import snapshot contents"))
 				}
 
 				if closeErr := file.Close(); closeErr != nil {
@@ -164,7 +162,7 @@ func New(
 				}
 
 				if err := e.Storage.Settings().SetSnapshotImported(); err != nil {
-					panic(errors.Wrap(err, "failed to set snapshot imported"))
+					panic(ierrors.Wrap(err, "failed to set snapshot imported"))
 				}
 
 			} else {
@@ -173,7 +171,7 @@ func New(
 
 				e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
 				if err := e.Attestations.RestoreFromDisk(); err != nil {
-					panic(errors.Wrap(err, "failed to restore attestations from disk"))
+					panic(ierrors.Wrap(err, "failed to restore attestations from disk"))
 				}
 			}
 		},
@@ -276,15 +274,15 @@ func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) 
 	if len(targetSlot) == 0 {
 		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index())
 	} else if targetSlot[0] <= lo.Return1(e.Storage.LastPrunedSlot()) {
-		return errors.Errorf("impossible to create a snapshot for slot %d because it is pruned (last pruned slot %d)", targetSlot[0], lo.Return1(e.Storage.LastPrunedSlot()))
+		return ierrors.Errorf("impossible to create a snapshot for slot %d because it is pruned (last pruned slot %d)", targetSlot[0], lo.Return1(e.Storage.LastPrunedSlot()))
 	}
 
 	if fileHandle, err := os.Create(filePath); err != nil {
-		return errors.Wrap(err, "failed to create snapshot file")
+		return ierrors.Wrap(err, "failed to create snapshot file")
 	} else if err = e.Export(fileHandle, targetSlot[0]); err != nil {
-		return errors.Wrap(err, "failed to write snapshot")
+		return ierrors.Wrap(err, "failed to write snapshot")
 	} else if err = fileHandle.Close(); err != nil {
-		return errors.Wrap(err, "failed to close snapshot file")
+		return ierrors.Wrap(err, "failed to close snapshot file")
 	}
 
 	return
@@ -292,7 +290,7 @@ func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) 
 
 func (e *Engine) ImportSettings(reader io.ReadSeeker) (err error) {
 	if err = e.Storage.Settings().Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import settings")
+		return ierrors.Wrap(err, "failed to import settings")
 	}
 
 	return
@@ -300,15 +298,15 @@ func (e *Engine) ImportSettings(reader io.ReadSeeker) (err error) {
 
 func (e *Engine) ImportContents(reader io.ReadSeeker) (err error) {
 	if err = e.Storage.Commitments().Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import commitments")
+		return ierrors.Wrap(err, "failed to import commitments")
 	} else if err = e.Ledger.Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import ledger")
+		return ierrors.Wrap(err, "failed to import ledger")
 	} else if err := e.SybilProtection.Import(reader); err != nil {
 		return ierrors.Wrap(err, "failed to import sybil protection")
 	} else if err = e.EvictionState.Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import eviction state")
+		return ierrors.Wrap(err, "failed to import eviction state")
 	} else if err = e.Attestations.Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import attestation state")
+		return ierrors.Wrap(err, "failed to import attestation state")
 	}
 
 	return
@@ -317,22 +315,22 @@ func (e *Engine) ImportContents(reader io.ReadSeeker) (err error) {
 func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
 	targetCommitment, err := e.Storage.Commitments().Load(targetSlot)
 	if err != nil {
-		return errors.Wrapf(err, "failed to load target commitment at slot %d", targetSlot)
+		return ierrors.Wrapf(err, "failed to load target commitment at slot %d", targetSlot)
 	}
 
 	if err = e.Storage.Settings().Export(writer, targetCommitment.Commitment()); err != nil {
-		return errors.Wrap(err, "failed to export settings")
+		return ierrors.Wrap(err, "failed to export settings")
 	} else if err = e.Storage.Commitments().Export(writer, targetSlot); err != nil {
-		return errors.Wrap(err, "failed to export commitments")
+		return ierrors.Wrap(err, "failed to export commitments")
 	} else if err = e.Ledger.Export(writer, targetSlot); err != nil {
-		return errors.Wrap(err, "failed to export ledger")
+		return ierrors.Wrap(err, "failed to export ledger")
 	} else if err := e.SybilProtection.Export(writer, targetSlot); err != nil {
 		return ierrors.Wrap(err, "failed to export sybil protection")
 	} else if err = e.EvictionState.Export(writer, e.Storage.Settings().LatestFinalizedSlot(), targetSlot); err != nil {
 		// The rootcommitment is determined from the rootblocks. Therefore, we need to export starting from the last finalized slot.
-		return errors.Wrap(err, "failed to export eviction state")
+		return ierrors.Wrap(err, "failed to export eviction state")
 	} else if err = e.Attestations.Export(writer, targetSlot); err != nil {
-		return errors.Wrap(err, "failed to export attestation state")
+		return ierrors.Wrap(err, "failed to export attestation state")
 	}
 
 	return
@@ -367,11 +365,11 @@ func (e *Engine) setupBlockStorage() {
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		store := e.Storage.Blocks(block.ID().Index())
 		if store == nil {
-			e.errorHandler(errors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
+			e.errorHandler(ierrors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
 		}
 
 		if err := store.Store(block.ModelBlock()); err != nil {
-			e.errorHandler(errors.Wrapf(err, "failed to store block with %s", block.ID()))
+			e.errorHandler(ierrors.Wrapf(err, "failed to store block with %s", block.ID()))
 		}
 	}, event.WithWorkerPool(wp))
 }
@@ -388,7 +386,7 @@ func (e *Engine) setupEvictionState() {
 			if parent.ID.Index() < block.ID().Index() && !e.EvictionState.IsRootBlock(parent.ID) {
 				parentBlock, exists := e.Block(parent.ID)
 				if !exists {
-					e.errorHandler(errors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
+					e.errorHandler(ierrors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
 					return
 				}
 				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().SlotCommitmentID)
@@ -449,7 +447,7 @@ func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (ear
 
 func (e *Engine) ErrorHandler(componentName string) func(error) {
 	return func(err error) {
-		e.errorHandler(errors.Wrap(err, componentName))
+		e.errorHandler(ierrors.Wrap(err, componentName))
 	}
 }
 

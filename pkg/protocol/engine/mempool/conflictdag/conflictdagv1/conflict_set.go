@@ -1,9 +1,8 @@
 package conflictdagv1
 
 import (
-	"golang.org/x/xerrors"
-
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -37,7 +36,7 @@ func (c *ConflictSet[ConflictID, ResourceID, VoteRank]) Add(addedConflict *Confl
 	defer c.mutex.Unlock()
 
 	if c.allMembersEvicted.Get() {
-		return nil, xerrors.Errorf("cannot join a ConflictSet whose all members are evicted")
+		return nil, ierrors.New("cannot join a ConflictSet whose all members are evicted")
 	}
 
 	if otherMembers = c.members.Clone(); !c.members.Add(addedConflict) {

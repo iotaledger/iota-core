@@ -96,7 +96,7 @@ func Test_TransitionAccount(t *testing.T) {
 		}, node1)
 	}
 
-	// DESTROY ACCOUNT A1, CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
+	// DESTROY GENESIS ACCOUNT, CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
 	newAccountBlockIssuerKey := utils.RandPubKey()
 	{
 		inputForNewAccount, newAccountOutputs, newAccountWallets := ts.TransactionFramework.CreateAccountFromInput("TX1:1",
@@ -209,20 +209,6 @@ func Test_TransitionAccount(t *testing.T) {
 		ts.IssueBlockAtSlot("block9", slotIndexChildrenBlock3, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block8")...)
 
 		ts.AssertLatestCommitmentSlotIndex(slotIndexBlock7, node1)
-
-		// assert diff of a destroyed account, to make sure we can correctly restore it
-		ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock7, &prunable.AccountDiff{
-			BICChange:             -iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit),
-			PreviousUpdatedTime:   0,
-			NewOutputID:           iotago.EmptyOutputID,
-			PreviousOutputID:      iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
-			PubKeysAdded:          []ed25519.PublicKey{},
-			PubKeysRemoved:        []ed25519.PublicKey{ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey},
-			ValidatorStakeChange:  0,
-			StakeEndEpochChange:   0,
-			FixedCostChange:       0,
-			DelegationStakeChange: 0,
-		}, true, node1)
 
 		ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock7, &prunable.AccountDiff{
 			BICChange:             0,

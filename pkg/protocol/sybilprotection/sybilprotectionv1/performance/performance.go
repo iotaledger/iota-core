@@ -1,8 +1,6 @@
 package performance
 
 import (
-	"github.com/cockroachdb/errors"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -98,7 +96,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	}
 
 	if err := t.poolStatsStore.Set(epoch, poolsStats); err != nil {
-		panic(errors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
+		panic(ierrors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
 	rewardsTree := ads.NewMap[iotago.AccountID, *PoolRewards](t.rewardsStorage(epoch),
@@ -119,7 +117,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 			pf, err := performanceFactorStorage.Load(accountID)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to load performance factor for account %s", accountID))
+				panic(ierrors.Wrapf(err, "failed to load performance factor for account %s", accountID))
 			}
 
 			intermediateFactors = append(intermediateFactors, pf)
@@ -144,10 +142,10 @@ func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) *advancedset.
 func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
 	c, err := t.committeeStore.Get(epoch)
 	if err != nil {
-		if errors.Is(err, kvstore.ErrKeyNotFound) {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, false
 		}
-		panic(errors.Wrapf(err, "failed to load committee for epoch %d", epoch))
+		panic(ierrors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
 
 	return c, true

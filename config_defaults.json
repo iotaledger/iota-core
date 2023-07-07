@@ -78,9 +78,6 @@
     },
     "filter": {
       "maxAllowedClockDrift": "5s"
-    },
-    "sybilProtection": {
-      "committee": null
     }
   },
   "blockIssuer": {

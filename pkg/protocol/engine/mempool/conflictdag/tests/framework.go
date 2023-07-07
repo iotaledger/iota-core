@@ -1,10 +1,10 @@
 package tests
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -80,7 +80,7 @@ func (f *Framework) LikedInstead(conflictAliases ...string) *advancedset.Advance
 func (f *Framework) CastVotes(nodeAlias string, voteRank int, conflictAliases ...string) error {
 	seat, exists := f.Accounts.Get(nodeAlias)
 	if !exists {
-		return fmt.Errorf("node with alias '%s' does not have a seat in the committee", nodeAlias)
+		return ierrors.Errorf("node with alias '%s' does not have a seat in the committee", nodeAlias)
 	}
 
 	return f.Instance.CastVotes(vote.NewVote[vote.MockedRank](seat, vote.MockedRank(voteRank)), f.ConflictIDs(conflictAliases...))

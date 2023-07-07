@@ -1,12 +1,10 @@
 package conflictdagv1
 
 import (
-	"github.com/pkg/errors"
-	"golang.org/x/xerrors"
-
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/walker"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
@@ -114,14 +112,14 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictingResourc
 
 		conflict, exists := c.conflictsByID.Get(id)
 		if !exists {
-			return nil, xerrors.Errorf("conflict already evicted: %w", conflictdag.ErrEntityEvicted)
+			return nil, ierrors.Errorf("conflict already evicted: %w", conflictdag.ErrEntityEvicted)
 		}
 
 		return conflict.JoinConflictSets(c.conflictSets(resourceIDs))
 	}()
 
 	if err != nil {
-		return xerrors.Errorf("conflict %s failed to join conflict sets: %w", id, err)
+		return ierrors.Errorf("conflict %s failed to join conflict sets: %w", id, err)
 	}
 
 	if !joinedConflictSets.IsEmpty() {
@@ -151,7 +149,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictParents(co
 
 		currentConflict, currentConflictExists := c.conflictsByID.Get(conflictID)
 		if !currentConflictExists {
-			return false, xerrors.Errorf("tried to modify evicted conflict with %s: %w", conflictID, conflictdag.ErrEntityEvicted)
+			return false, ierrors.Errorf("tried to modify evicted conflict with %s: %w", conflictID, conflictdag.ErrEntityEvicted)
 		}
 
 		addedParents := advancedset.New[*Conflict[ConflictID, ResourceID, VoteRank]]()
@@ -162,10 +160,10 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictParents(co
 				if !currentConflict.IsRejected() {
 					// UpdateConflictParents is only called when a Conflict is forked, which means that the added parent
 					// must exist (unless it was forked on top of a rejected branch, just before eviction).
-					return xerrors.Errorf("tried to add non-existent parent with %s: %w", addedParentID, conflictdag.ErrFatal)
+					return ierrors.Errorf("tried to add non-existent parent with %s: %w", addedParentID, conflictdag.ErrFatal)
 				}
 
-				return xerrors.Errorf("tried to add evicted parent with %s to rejected conflict with %s: %w", addedParentID, conflictID, conflictdag.ErrEntityEvicted)
+				return ierrors.Errorf("tried to add evicted parent with %s to rejected conflict with %s: %w", addedParentID, conflictID, conflictdag.ErrEntityEvicted)
 			}
 
 			addedParents.Add(addedParent)
@@ -177,7 +175,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictParents(co
 
 		removedParents, err := c.conflicts(removedParentIDs, !currentConflict.IsRejected())
 		if err != nil {
-			return false, xerrors.Errorf("failed to update conflict parents: %w", err)
+			return false, ierrors.Errorf("failed to update conflict parents: %w", err)
 		}
 
 		updated := currentConflict.UpdateParents(addedParents, removedParents)
@@ -244,7 +242,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AllConflictsSupported(se
 	return lo.Return1(c.conflicts(conflictIDs, true)).ForEach(func(conflict *Conflict[ConflictID, ResourceID, VoteRank]) (err error) {
 		lastVote, exists := conflict.LatestVotes.Get(seat)
 
-		return lo.Cond(exists && lastVote.IsLiked(), nil, xerrors.Errorf("conflict with %s is not supported by seat %d", conflict.ID, seat))
+		return lo.Cond(exists && lastVote.IsLiked(), nil, ierrors.Errorf("conflict with %s is not supported by seat %d", conflict.ID, seat))
 	}) == nil
 }
 
@@ -333,7 +331,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) CastVotes(vote *vote.Vot
 
 	supportedConflicts, revokedConflicts, err := c.determineVotes(conflictIDs)
 	if err != nil {
-		return xerrors.Errorf("failed to determine votes: %w", err)
+		return ierrors.Errorf("failed to determine votes: %w", err)
 	}
 
 	for supportedConflict := supportedConflicts.Iterator(); supportedConflict.HasNext(); {
@@ -352,7 +350,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AcceptanceState(conflict
 	if err := conflictIDs.ForEach(func(conflictID ConflictID) error {
 		conflict, exists := c.conflictsByID.Get(conflictID)
 		if !exists {
-			return xerrors.Errorf("tried to retrieve non-existing conflict: %w", conflictdag.ErrFatal)
+			return ierrors.Errorf("tried to retrieve non-existing conflict: %w", conflictdag.ErrFatal)
 		}
 
 		if conflict.IsRejected() {
@@ -366,7 +364,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AcceptanceState(conflict
 		}
 
 		return nil
-	}); err != nil && !errors.Is(err, conflictdag.ErrExpected) {
+	}); err != nil && !ierrors.Is(err, conflictdag.ErrExpected) {
 		panic(err)
 	}
 
@@ -438,7 +436,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) conflicts(ids *advanceds
 			conflicts.Add(existingConflict)
 		}
 
-		return lo.Cond(exists || ignoreMissing, nil, xerrors.Errorf("tried to retrieve a non-existing conflict with %s: %w", id, conflictdag.ErrEntityEvicted))
+		return lo.Cond(exists || ignoreMissing, nil, ierrors.Errorf("tried to retrieve a non-existing conflict with %s: %w", id, conflictdag.ErrEntityEvicted))
 	})
 }
 
@@ -463,7 +461,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) determineVotes(conflictI
 	revokeConflict := func(revokedConflict *Conflict[ConflictID, ResourceID, VoteRank]) error {
 		if revokedConflicts.Add(revokedConflict) {
 			if supportedConflicts.Has(revokedConflict) {
-				return xerrors.Errorf("applied conflicting votes (%s is supported and revoked)", revokedConflict.ID)
+				return ierrors.Errorf("applied conflicting votes (%s is supported and revoked)", revokedConflict.ID)
 			}
 
 			revokedWalker.PushAll(revokedConflict.Children.Slice()...)
@@ -476,7 +474,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) determineVotes(conflictI
 	supportConflict := func(supportedConflict *Conflict[ConflictID, ResourceID, VoteRank]) error {
 		if supportedConflicts.Add(supportedConflict) {
 			if err := supportedConflict.ConflictingConflicts.ForEach(revokeConflict); err != nil {
-				return xerrors.Errorf("failed to collect conflicting conflicts: %w", err)
+				return ierrors.Errorf("failed to collect conflicting conflicts: %w", err)
 			}
 
 			supportedWalker.PushAll(supportedConflict.Parents.Slice()...)
@@ -487,7 +485,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) determineVotes(conflictI
 
 	for supportedWalker.PushAll(lo.Return1(c.conflicts(conflictIDs, true)).Slice()...); supportedWalker.HasNext(); {
 		if err := supportConflict(supportedWalker.Next()); err != nil {
-			return nil, nil, xerrors.Errorf("failed to collect supported conflicts: %w", err)
+			return nil, nil, ierrors.Errorf("failed to collect supported conflicts: %w", err)
 		}
 	}
 

@@ -1,9 +1,9 @@
 package testsuite
 
 import (
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
@@ -21,7 +21,7 @@ func (t *TestSuite) AssertStrongTips(expectedBlocks []*blocks.Block, nodes ...*m
 			storedTipsBlockIDs := lo.Map(storedTipsBlocks, tipmanager.TipMetadata.ID)
 
 			if !assert.ElementsMatch(t.fakeTesting, expectedBlockIDs, storedTipsBlockIDs) {
-				return errors.Errorf("AssertTips: %s: expected %s, got %s", node.Name, expectedBlockIDs, storedTipsBlockIDs)
+				return ierrors.Errorf("AssertTips: %s: expected %s, got %s", node.Name, expectedBlockIDs, storedTipsBlockIDs)
 			}
 
 			return nil

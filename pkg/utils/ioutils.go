@@ -2,10 +2,9 @@ package utils
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
+	"github.com/iotaledger/hive.go/ierrors"
 )
 
 func increaseOffsets(amount int64, offsets ...*int64) {
@@ -17,11 +16,11 @@ func increaseOffsets(amount int64, offsets ...*int64) {
 func WriteValueFunc(writeSeeker io.WriteSeeker, value any, offsetsToIncrease ...*int64) error {
 	length := binary.Size(value)
 	if length == -1 {
-		return fmt.Errorf("unable to determine length of value")
+		return ierrors.New("unable to determine length of value")
 	}
 
 	if err := binary.Write(writeSeeker, binary.LittleEndian, value); err != nil {
-		return errors.Wrap(err, "unable to write value")
+		return ierrors.Wrap(err, "unable to write value")
 	}
 
 	increaseOffsets(int64(length), offsetsToIncrease...)
@@ -32,7 +31,7 @@ func WriteValueFunc(writeSeeker io.WriteSeeker, value any, offsetsToIncrease ...
 func WriteBytesFunc(writeSeeker io.WriteSeeker, bytes []byte, offsetsToIncrease ...*int64) error {
 	length, err := writeSeeker.Write(bytes)
 	if err != nil {
-		return errors.Wrap(err, "unable to write bytes")
+		return ierrors.Wrap(err, "unable to write bytes")
 	}
 
 	increaseOffsets(int64(length), offsetsToIncrease...)
@@ -67,7 +66,7 @@ func (p *PositionedWriter) WriteValue(name string, value interface{}, saveBookma
 		p.bookmarks[name] = currentPosition
 	}
 	if err := WriteValueFunc(p.writer, value); err != nil {
-		return errors.Wrapf(err, "unable to write value %s", name)
+		return ierrors.Wrapf(err, "unable to write value %s", name)
 	}
 
 	return nil
@@ -76,23 +75,23 @@ func (p *PositionedWriter) WriteValue(name string, value interface{}, saveBookma
 func (p *PositionedWriter) WriteValueAtBookmark(name string, value interface{}) error {
 	bookmarkPosition, ok := p.bookmarks[name]
 	if !ok {
-		return errors.Errorf("unable to find saved position for bookmark %s", name)
+		return ierrors.Errorf("unable to find saved position for bookmark %s", name)
 	}
 	originalPosition, err := p.writer.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return errors.Wrap(err, "unable to obtain current seek position")
+		return ierrors.Wrap(err, "unable to obtain current seek position")
 	}
 	if bookmarkPosition >= originalPosition {
-		return errors.Errorf("cannot write into the future, current write position %d is greater than or equal to the bookmark position %d", originalPosition, bookmarkPosition)
+		return ierrors.Errorf("cannot write into the future, current write position %d is greater than or equal to the bookmark position %d", originalPosition, bookmarkPosition)
 	}
 	if _, err := p.writer.Seek(bookmarkPosition, io.SeekStart); err != nil {
-		return errors.Wrapf(err, "unable to seek back to bookmark %s position", name)
+		return ierrors.Wrapf(err, "unable to seek back to bookmark %s position", name)
 	}
 	if err := WriteValueFunc(p.writer, value); err != nil {
-		return errors.Wrapf(err, "unable to write value %s", name)
+		return ierrors.Wrapf(err, "unable to write value %s", name)
 	}
 	if _, err := p.writer.Seek(originalPosition, io.SeekStart); err != nil {
-		return errors.Wrap(err, "unable to seek to original position: %w")
+		return ierrors.Wrap(err, "unable to seek to original position")
 	}
 
 	return nil

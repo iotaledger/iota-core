@@ -2,14 +2,13 @@ package conflictdagv1
 
 import (
 	"bytes"
-	"errors"
 	"sync"
 
 	"go.uber.org/atomic"
-	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -132,7 +131,7 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 // JoinConflictSets registers the Conflict with the given ConflictSets.
 func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSets *advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VoteRank]]) (joinedConflictSets *advancedset.AdvancedSet[ResourceID], err error) {
 	if c.evicted.Load() {
-		return nil, xerrors.Errorf("tried to join conflict sets of evicted conflict: %w", conflictdag.ErrEntityEvicted)
+		return nil, ierrors.Errorf("tried to join conflict sets of evicted conflict: %w", conflictdag.ErrEntityEvicted)
 	}
 
 	registerConflictingConflict := func(c, conflict *Conflict[ConflictID, ResourceID, VoteRank]) {
@@ -150,7 +149,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSe
 
 	return joinedConflictSets, conflictSets.ForEach(func(conflictSet *ConflictSet[ConflictID, ResourceID, VoteRank]) error {
 		otherConflicts, err := conflictSet.Add(c)
-		if err != nil && !errors.Is(err, conflictdag.ErrAlreadyPartOfConflictSet) {
+		if err != nil && !ierrors.Is(err, conflictdag.ErrAlreadyPartOfConflictSet) {
 			return err
 		}
 
