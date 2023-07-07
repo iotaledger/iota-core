@@ -88,7 +88,7 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 
 	if evictedObjects, deleted := t.tipMetadataStorage.DeleteAndReturn(slotIndex); deleted {
 		evictedObjects.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
-			tipMetadata.isEvicted.Set(true)
+			tipMetadata.evicted.Trigger()
 
 			return true
 		})
