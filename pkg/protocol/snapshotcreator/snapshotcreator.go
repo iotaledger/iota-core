@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/blake2b"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -30,6 +29,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
 // CreateSnapshot creates a new snapshot. Genesis is defined by genesisTokenAmount and seedBytes, it
@@ -54,21 +54,21 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	defer s.Shutdown()
 
 	if err := s.Settings().StoreProtocolParameters(opt.ProtocolParameters); err != nil {
-		return errors.Wrap(err, "failed to store the protocol parameters")
+		return ierrors.Wrap(err, "failed to store the protocol parameters")
 	}
 
 	if err := s.Settings().StoreProtocolParametersEpochMapping(opt.ProtocolParameters.Version(), 0); err != nil {
-		return errors.Wrap(err, "failed to set the protocol parameters epoch mapping")
+		return ierrors.Wrap(err, "failed to set the protocol parameters epoch mapping")
 	}
 
 	api := s.Settings().LatestAPI()
 	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
-		return errors.Wrap(err, "failed to store empty commitment")
+		return ierrors.Wrap(err, "failed to store empty commitment")
 	}
 
 	accounts := account.NewAccounts()
 	for _, accountData := range opt.Accounts {
-		fmt.Println("account ID ", accountData.AccountID, hexutil.Encode(accountData.IssuerKey))
+		fmt.Println("account ID ", accountData.AccountID, hexutil.EncodeHex(accountData.IssuerKey))
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
 			accounts.Set(blake2b.Sum256(accountData.IssuerKey), &account.Pool{
@@ -106,11 +106,11 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		return accumulator + details.Amount
 	}, iotago.BaseToken(0))
 	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply()-totalAccountDeposit, opt.GenesisSeed, engineInstance); err != nil {
-		return errors.Wrap(err, "failed to create genesis outputs")
+		return ierrors.Wrap(err, "failed to create genesis outputs")
 	}
 
 	if err := createGenesisAccounts(opt.Accounts, engineInstance); err != nil {
-		return errors.Wrap(err, "failed to create genesis account outputs")
+		return ierrors.Wrap(err, "failed to create genesis account outputs")
 	}
 
 	return engineInstance.WriteSnapshot(opt.FilePath)
@@ -122,7 +122,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
 
 		if _, err = engineInstance.LatestAPI().ProtocolParameters().RentStructure().CoversStateRent(output, genesisTokenAmount); err != nil {
-			return errors.Wrap(err, "min rent not covered by Genesis output with index 0")
+			return ierrors.Wrap(err, "min rent not covered by Genesis output with index 0")
 		}
 
 		// Genesis output is on Genesis TX index 0
@@ -141,7 +141,7 @@ func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Eng
 		output := createAccount(account.AccountID, account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
 
 		if _, err = engineInstance.LatestAPI().ProtocolParameters().RentStructure().CoversStateRent(output, account.Amount); err != nil {
-			return errors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
+			return ierrors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
 		}
 
 		accountOutput := utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)

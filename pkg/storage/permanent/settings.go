@@ -88,7 +88,7 @@ func (s *Settings) APIForVersion(version iotago.Version) iotago.API {
 	protocolParams := s.protocolParameters(version)
 
 	if protocolParams == nil {
-		panic(fmt.Errorf("protocol parameters for version %d not found", version))
+		panic(ierrors.Errorf("protocol parameters for version %d not found", version))
 	}
 
 	var a iotago.API

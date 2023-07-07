@@ -3,8 +3,7 @@ package slotnotarization
 import (
 	"time"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -63,7 +62,7 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 
 			e.Events.Ledger.BlockProcessed.Hook(func(block *blocks.Block) {
 				if err := m.notarizeAcceptedBlock(block); err != nil {
-					m.errorHandler(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
+					m.errorHandler(ierrors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 				}
 				m.tryCommitUntil(block)
 			}, event.WithWorkerPool(wpBlocks))
@@ -111,7 +110,7 @@ func (m *Manager) IsBootstrapped() bool {
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 	if err = m.slotMutations.AddAcceptedBlock(block); err != nil {
-		return errors.Wrap(err, "failed to add accepted block to slot mutations")
+		return ierrors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
 	m.attestation.AddAttestationFromBlock(block)
@@ -151,7 +150,7 @@ func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool
 func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	latestCommitment := m.storage.Settings().LatestCommitment()
 	if index != latestCommitment.Index()+1 {
-		m.errorHandler(errors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
+		m.errorHandler(ierrors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
 		return false
 	}
 
@@ -160,13 +159,13 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 
 	cumulativeWeight, attestationsRoot, err := m.attestation.Commit(index)
 	if err != nil {
-		m.errorHandler(errors.Wrap(err, "failed to commit attestations"))
+		m.errorHandler(ierrors.Wrap(err, "failed to commit attestations"))
 		return false
 	}
 
 	stateRoot, mutationRoot, accountRoot, err := m.ledger.CommitSlot(index)
 	if err != nil {
-		m.errorHandler(errors.Wrap(err, "failed to commit ledger"))
+		m.errorHandler(ierrors.Wrap(err, "failed to commit ledger"))
 		return false
 	}
 
@@ -175,7 +174,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 
 	protocolParamsBytes, err := api.Encode(api.ProtocolParameters())
 	if err != nil {
-		m.errorHandler(errors.Wrap(err, "failed to encode protocol parameters"))
+		m.errorHandler(ierrors.Wrap(err, "failed to encode protocol parameters"))
 		return false
 	}
 
@@ -204,22 +203,22 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	if err = m.storage.Settings().SetLatestCommitment(newModelCommitment); err != nil {
-		m.errorHandler(errors.Wrap(err, "failed to set latest commitment"))
+		m.errorHandler(ierrors.Wrap(err, "failed to set latest commitment"))
 		return false
 	}
 
 	if err = m.storage.Commitments().Store(newModelCommitment); err != nil {
-		m.errorHandler(errors.Wrapf(err, "failed to store latest commitment %s", newModelCommitment.ID()))
+		m.errorHandler(ierrors.Wrapf(err, "failed to store latest commitment %s", newModelCommitment.ID()))
 		return false
 	}
 
 	rootsStorage := m.storage.Roots(index)
 	if rootsStorage == nil {
-		m.errorHandler(errors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
+		m.errorHandler(ierrors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
 		return false
 	}
 	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(api.Encode(roots))); err != nil {
-		m.errorHandler(errors.Wrapf(err, "failed to store latest roots for commitment %s", newModelCommitment.ID()))
+		m.errorHandler(ierrors.Wrapf(err, "failed to store latest roots for commitment %s", newModelCommitment.ID()))
 		return false
 	}
 
@@ -230,7 +229,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	})
 
 	if err = m.slotMutations.Evict(index); err != nil {
-		m.errorHandler(errors.Wrapf(err, "failed to evict slotMutations at index: %d", index))
+		m.errorHandler(ierrors.Wrapf(err, "failed to evict slotMutations at index: %d", index))
 	}
 
 	return true

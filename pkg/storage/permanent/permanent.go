@@ -1,8 +1,7 @@
 package permanent
 
 import (
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
@@ -54,7 +53,7 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 
 		p.healthTracker, err = kvstore.NewStoreHealthTracker(p.store, dbConfig.PrefixHealth, dbConfig.Version, nil)
 		if err != nil {
-			panic(errors.Wrapf(err, "database in %s is corrupted, delete database and resync node", dbConfig.Directory))
+			panic(ierrors.Wrapf(err, "database in %s is corrupted, delete database and resync node", dbConfig.Directory))
 		}
 		if err = p.healthTracker.MarkCorrupted(); err != nil {
 			panic(err)
@@ -148,7 +147,7 @@ func (p *Permanent) Ledger(optRealm ...byte) kvstore.KVStore {
 func (p *Permanent) Size() int64 {
 	dbSize, err := ioutils.FolderSize(p.dbConfig.Directory)
 	if err != nil {
-		p.errorHandler(errors.Wrapf(err, "dbDirectorySize failed for %s", p.dbConfig.Directory))
+		p.errorHandler(ierrors.Wrapf(err, "dbDirectorySize failed for %s", p.dbConfig.Directory))
 		return 0
 	}
 

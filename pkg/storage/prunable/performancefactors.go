@@ -1,9 +1,8 @@
 package prunable
 
 import (
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/core/storable"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -26,17 +25,17 @@ func NewPerformanceFactors(slot iotago.SlotIndex, store kvstore.KVStore) *Perfor
 func (p *PerformanceFactors) Load(accountID iotago.AccountID) (pf uint64, err error) {
 	performanceFactorsBytes, err := p.store.Get(accountID[:])
 	if err != nil {
-		if errors.Is(err, kvstore.ErrKeyNotFound) {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return 0, nil
 		}
 
-		return 0, errors.Wrapf(err, "failed to get performance factor for account %s", accountID)
+		return 0, ierrors.Wrapf(err, "failed to get performance factor for account %s", accountID)
 	}
 
 	var serializablePf storable.SerializableInt64
 	_, err = serializablePf.FromBytes(performanceFactorsBytes)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to deserialize performance factor for account %s", accountID)
+		return 0, ierrors.Wrapf(err, "failed to deserialize performance factor for account %s", accountID)
 	}
 
 	return uint64(serializablePf), nil
@@ -66,11 +65,11 @@ func (p *PerformanceFactors) ForEachPerformanceFactor(consumer func(accountID io
 
 		return consumer(accountID, uint64(*serializablePf)) == nil
 	}); err != nil {
-		return errors.Wrapf(err, "failed to stream performance factors for slot %s", p.slot)
+		return ierrors.Wrapf(err, "failed to stream performance factors for slot %s", p.slot)
 	}
 
 	if innerErr != nil {
-		return errors.Wrapf(innerErr, "failed to deserialize performance factor for slot %s", p.slot)
+		return ierrors.Wrapf(innerErr, "failed to deserialize performance factor for slot %s", p.slot)
 	}
 
 	return nil

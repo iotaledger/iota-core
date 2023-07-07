@@ -2,9 +2,9 @@ package mana
 
 import (
 	"github.com/zyedidia/generic/cache"
-	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -43,7 +43,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	if !exists {
 		output, err := m.accountOutputResolveFunc(accountID, currentSlot)
 		if err != nil {
-			return 0, xerrors.Errorf("failed to resolve AccountOutput for %s in  slot %s: %w", accountID, currentSlot, err)
+			return 0, ierrors.Errorf("failed to resolve AccountOutput for %s in slot %s: %w", accountID, currentSlot, err)
 		}
 
 		mana = accounts.NewMana(output.StoredMana(), output.Deposit(), output.CreationTime())

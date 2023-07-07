@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
@@ -131,7 +131,7 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 
 	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
 		require.Equal(t, "tooFarAheadFuture", event.Block.ID().Alias())
-		require.True(t, errors.Is(event.Reason, ErrBlockTimeTooFarAheadInFuture))
+		require.True(t, ierrors.Is(event.Reason, ErrBlockTimeTooFarAheadInFuture))
 	})
 
 	tf.IssueUnsignedBlockAtTime("past", time.Now().Add(-allowedDrift))
@@ -154,7 +154,7 @@ func TestFilter_WithSignatureValidation(t *testing.T) {
 
 	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
 		require.Contains(t, []string{"incorrectSignature", "pubkeysMissing"}, event.Block.ID().Alias())
-		require.True(t, errors.Is(event.Reason, ErrInvalidSignature))
+		require.True(t, ierrors.Is(event.Reason, ErrInvalidSignature))
 	})
 
 	tf.IssueUnsignedBlockAtTime("pubkeysMissing", time.Now())
@@ -189,7 +189,7 @@ func TestFilter_ExpiryThreshold(t *testing.T) {
 
 	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
 		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
-		require.True(t, errors.Is(event.Reason, ErrCommitmentNotCommittable))
+		require.True(t, ierrors.Is(event.Reason, ErrCommitmentNotCommittable))
 	})
 
 	tf.IssueUnsignedBlockAtSlot("valid-1-0", 1, 0)
@@ -240,10 +240,10 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 		require.Contains(t, []string{"commitmentInputTooOld", "commitmentInputNewerThanBlockCommitment"}, event.Block.ID().Alias())
 
 		if strings.Contains(event.Block.ID().Alias(), "commitmentInputTooOld") {
-			require.True(t, errors.Is(event.Reason, ErrTransactionCommitmentInputTooFarInThePast))
+			require.True(t, ierrors.Is(event.Reason, ErrTransactionCommitmentInputTooFarInThePast))
 		}
 		if strings.Contains(event.Block.ID().Alias(), "commitmentInputNewerThanBlockCommitment") {
-			require.True(t, errors.Is(event.Reason, ErrTransactionCommitmentInputInTheFuture))
+			require.True(t, ierrors.Is(event.Reason, ErrTransactionCommitmentInputInTheFuture))
 		}
 	})
 

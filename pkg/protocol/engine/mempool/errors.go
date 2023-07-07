@@ -1,7 +1,7 @@
 package mempool
 
-import "golang.org/x/xerrors"
+import "github.com/iotaledger/hive.go/ierrors"
 
 var (
-	ErrStateNotFound = xerrors.New("state not found")
+	ErrStateNotFound = ierrors.New("state not found")
 )

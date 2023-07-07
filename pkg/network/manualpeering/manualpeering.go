@@ -8,12 +8,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/crypto/identity"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -196,14 +195,14 @@ func (m *Manager) Start() {
 // Stop terminates internal background workers. Calling multiple times has no effect.
 func (m *Manager) Stop() (err error) {
 	if !m.isStarted.Load() {
-		return errors.New("can't stop the manager: it hasn't been started yet")
+		return ierrors.New("can't stop the manager: it hasn't been started yet")
 	}
 	m.stopOnce.Do(func() {
 		m.stopMutex.Lock()
 		defer m.stopMutex.Unlock()
 
 		m.isStopped = true
-		err = errors.WithStack(m.removeAllKnownPeers())
+		err = ierrors.WithStack(m.removeAllKnownPeers())
 		m.onGossipNeighborRemovedHook.Unhook()
 		m.onGossipNeighborAddedHook.Unhook()
 	})
@@ -223,7 +222,7 @@ type knownPeer struct {
 func newKnownPeer(p *KnownPeerToAdd, connDirection ConnectionDirection) (*knownPeer, error) {
 	tcpAddress, err := net.ResolveTCPAddr("tcp", p.Address)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse peer address")
+		return nil, ierrors.Wrap(err, "failed to parse peer address")
 	}
 	services := service.New()
 	// Peering key is required in order to initialize a peer,
@@ -254,14 +253,14 @@ func (kp *knownPeer) setConnStatus(cs ConnectionStatus) {
 
 func (m *Manager) addPeer(p *KnownPeerToAdd) error {
 	if !m.isStarted.Load() {
-		return errors.New("manual peering manager hasn't been started yet")
+		return ierrors.New("manual peering manager hasn't been started yet")
 	}
 
 	m.stopMutex.RLock()
 	defer m.stopMutex.RUnlock()
 
 	if m.isStopped {
-		return errors.New("manual peering manager was stopped")
+		return ierrors.New("manual peering manager was stopped")
 	}
 
 	m.knownPeersMutex.Lock()
@@ -269,11 +268,11 @@ func (m *Manager) addPeer(p *KnownPeerToAdd) error {
 
 	connDirection, err := m.connectionDirection(p.PublicKey)
 	if err != nil {
-		return errors.WithStack(err)
+		return ierrors.WithStack(err)
 	}
 	kp, err := newKnownPeer(p, connDirection)
 	if err != nil {
-		return errors.WithStack(err)
+		return ierrors.WithStack(err)
 	}
 	if _, exists := m.knownPeers[kp.peer.ID()]; exists {
 		return nil
@@ -297,7 +296,7 @@ func (m *Manager) removePeer(key ed25519.PublicKey) error {
 	peerID := identity.NewID(key)
 	err := m.removePeerByID(peerID)
 
-	return errors.WithStack(err)
+	return ierrors.WithStack(err)
 }
 
 func (m *Manager) removeAllKnownPeers() error {
@@ -322,8 +321,8 @@ func (m *Manager) removePeerByID(peerID network.PeerID) error {
 	delete(m.knownPeers, peerID)
 	close(kp.removeCh)
 	<-kp.doneCh
-	if err := m.p2pm.DropNeighbor(peerID, p2p.NeighborsGroupManual); err != nil && !errors.Is(err, p2p.ErrUnknownNeighbor) {
-		return errors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID)
+	if err := m.p2pm.DropNeighbor(peerID, p2p.NeighborsGroupManual); err != nil && !ierrors.Is(err, p2p.ErrUnknownNeighbor) {
+		return ierrors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID)
 	}
 
 	return nil
@@ -353,7 +352,7 @@ func (m *Manager) keepPeerConnected(kp *knownPeer) {
 			} else if kp.connDirection == ConnDirectionInbound {
 				err = m.p2pm.AddInbound(ctx, kp.peer, p2p.NeighborsGroupManual, p2p.WithNoDefaultTimeout())
 			}
-			if err != nil && !errors.Is(err, p2p.ErrDuplicateNeighbor) && !errors.Is(err, context.Canceled) {
+			if err != nil && !ierrors.Is(err, p2p.ErrDuplicateNeighbor) && !ierrors.Is(err, context.Canceled) {
 				m.log.Errorw(
 					"Failed to connect a neighbor in the gossip layer",
 					"peerID", peerID, "connectionDirection", kp.connDirection, "err", err,
@@ -409,7 +408,7 @@ func (m *Manager) connectionDirection(peerPK ed25519.PublicKey) (ConnectionDirec
 	} else if result > 0 {
 		return ConnDirectionInbound, nil
 	} else {
-		return "", errors.Errorf(
+		return "", ierrors.Errorf(
 			"manual peering: provided neighbor public key %s is the same as the local %s: can't compare lexicographically",
 			peerPK,
 			m.local.PublicKey(),
