@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -136,7 +137,15 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 			}
 			return ""
 		}(),
-		Payload:      payloadJSON,
+		Payload: func() json.RawMessage {
+			if basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
+				tx := NewTransaction(basicBlock.Payload.(*iotago.Transaction))
+				bytes, _ := json.Marshal(tx)
+
+				return bytes
+			}
+			return payloadJSON
+		}(),
 		CommitmentID: iotaBlk.SlotCommitmentID.ToHex(),
 		//TODO: remove from explorer or add link to a separate route
 		//Commitment: CommitmentResponse{
