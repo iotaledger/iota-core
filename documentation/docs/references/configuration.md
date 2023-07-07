@@ -251,11 +251,10 @@ Example:
 
 ## <a id="protocol"></a> 8. Protocol
 
-| Name                                         | Description                       | Type   | Default value |
-| -------------------------------------------- | --------------------------------- | ------ | ------------- |
-| [snapshot](#protocol_snapshot)               | Configuration for snapshot        | object |               |
-| [filter](#protocol_filter)                   | Configuration for filter          | object |               |
-| [sybilProtection](#protocol_sybilprotection) | Configuration for sybilProtection | object |               |
+| Name                           | Description                | Type   | Default value |
+| ------------------------------ | -------------------------- | ------ | ------------- |
+| [snapshot](#protocol_snapshot) | Configuration for snapshot | object |               |
+| [filter](#protocol_filter)     | Configuration for filter   | object |               |
 
 ### <a id="protocol_snapshot"></a> Snapshot
 
@@ -270,12 +269,6 @@ Example:
 | -------------------- | ------------------------------------------------------------------------------------------ | ------ | ------------- |
 | maxAllowedClockDrift | The maximum drift our wall clock can have to future blocks being received from the network | string | "5s"          |
 
-### <a id="protocol_sybilprotection"></a> SybilProtection
-
-| Name      | Description                     | Type  | Default value |
-| --------- | ------------------------------- | ----- | ------------- |
-| committee | The identities of the validator | array |               |
-
 Example:
 
 ```json
@@ -287,9 +280,6 @@ Example:
       },
       "filter": {
         "maxAllowedClockDrift": "5s"
-      },
-      "sybilProtection": {
-        "committee": null
       }
     }
   }
