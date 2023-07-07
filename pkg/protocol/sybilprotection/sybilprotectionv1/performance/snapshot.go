@@ -343,27 +343,23 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 	apiForSlot := t.apiProvider.APIForSlot(targetSlot)
 	epochFromTargetSlot := apiForSlot.TimeProvider().EpochFromSlot(targetSlot)
 
+	pointOfNoReturn := apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) - apiForSlot.ProtocolParameters().EvictionAge()*2
+
 	var innerErr error
 	err := t.committeeStore.KVStore().Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {
-		// TODO: committees for all available epochs should be included in the snapshot,
-		//  because if snapshot is generated after the committee has been selected,
-		//  then there is no way for the node to determine the committee.
-		//  There will be at most one epoch more in the store than targetEpoch,
-		//  so the question is whether we should explicitly make sure to only include one more committee,
-		//  or should we explicitly limit that? Currently we use the implicit assumption.
 		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
-		if epoch > epochFromTargetSlot {
-			// FIXME: EvictionAge*2 here should be MaxCommittableAge
-			if targetSlot+(apiForSlot.ProtocolParameters().EvictionAge()*2) < apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) {
-				return true
-			}
 
+		// We have a committee for an epoch higher than the targetSlot
+		// 1. we trust the point of no return, we export the committee for the next epoch
+		// 2. if we don't trust the point-of-no-return
+		// - we were able to rotate a committee, then we export it
+		// - we were not able to rotate a committee (reused), then we don't export it
+		if epoch > epochFromTargetSlot && targetSlot < pointOfNoReturn {
 			committee, _, err := account.AccountsFromBytes(committeeBytes)
 			if err != nil {
 				innerErr = err // TODO: wrap the error
 				return false
 			}
-
 			if committee.IsReused() {
 				return true
 			}
