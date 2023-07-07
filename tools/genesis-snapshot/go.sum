@@ -66,8 +66,8 @@ github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230706083020-ef6c324
 github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230706083020-ef6c3248369d/go.mod h1:2dzHxEpppULFjMRn0iyuQW81sLUuJ0Y/9zCHsRuLUvI=
 github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d h1:l1kGmeSD7dvARG4vBOYLoYKX1nN9GMzZbqVP0vT1lo0=
 github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d/go.mod h1:l/F3cA/+67QdNj+sohv2v4HhmsdOcWScoA+sVYoAE4c=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230706125103-ab2eb9242508 h1:bRYSInkbkr8Gh/Dfgn18KJ3RJVh2aKEK52CJU54bPRI=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230706125103-ab2eb9242508/go.mod h1:NC48ByX78DwdkGj5YjqI2ADHAY+S2idcIRZaEuWDe1Q=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230706153653-c6886556058b h1:DD9ownM/Ajr/RhWyBCvo04yyzQsiVBmNkOx1oYM4t7k=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230706153653-c6886556058b/go.mod h1:NC48ByX78DwdkGj5YjqI2ADHAY+S2idcIRZaEuWDe1Q=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
