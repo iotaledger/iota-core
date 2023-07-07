@@ -17,9 +17,6 @@ type TipMetadata interface {
 	// TipPool exposes a variable that stores the current TipPool of the block.
 	TipPool() reactive.Variable[TipPool]
 
-	// IsLivenessThresholdReached exposes a variable that stores if the liveness threshold was reached.
-	IsLivenessThresholdReached() reactive.Variable[bool]
-
 	// IsStrongTip returns a Value that indicates if the block is a strong tip.
 	IsStrongTip() reactive.Value[bool]
 
@@ -29,6 +26,9 @@ type TipMetadata interface {
 	// IsOrphaned returns a Value that indicates if the block was orphaned.
 	IsOrphaned() reactive.Value[bool]
 
-	// IsEvicted returns a Value that indicates if the block was evicted.
-	IsEvicted() reactive.Value[bool]
+	// LivenessThresholdReached exposes an event that is triggered when the liveness threshold is reached.
+	LivenessThresholdReached() reactive.Event
+
+	// Evicted exposes an event that is triggered when the block is evicted.
+	Evicted() reactive.Event
 }

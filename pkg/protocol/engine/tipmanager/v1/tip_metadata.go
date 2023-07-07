@@ -180,8 +180,8 @@ func (t *TipMetadata) TipPool() reactive.Variable[tipmanager.TipPool] {
 	return t.tipPool
 }
 
-// IsLivenessThresholdReached exposes a variable that stores if the liveness threshold was reached.
-func (t *TipMetadata) IsLivenessThresholdReached() reactive.Variable[bool] {
+// LivenessThresholdReached exposes an event that is triggered when the liveness threshold is reached.
+func (t *TipMetadata) LivenessThresholdReached() reactive.Event {
 	return t.isLivenessThresholdReached
 }
 
@@ -200,8 +200,8 @@ func (t *TipMetadata) IsOrphaned() reactive.Value[bool] {
 	return t.isOrphaned
 }
 
-// IsEvicted returns true if the block was evicted from the TipManager.
-func (t *TipMetadata) IsEvicted() reactive.Value[bool] {
+// Evicted exposes an event that is triggered when the block is evicted.
+func (t *TipMetadata) Evicted() reactive.Event {
 	return t.isEvicted
 }
 

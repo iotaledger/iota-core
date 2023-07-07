@@ -71,7 +71,7 @@ func runVisualizer(component *app.Component) {
 			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
 				sendTipInfo(tipMetadata.Block(), true)
 
-				tipMetadata.IsEvicted().OnUpdate(func(_, _ bool) {
+				tipMetadata.Evicted().OnTrigger(func() {
 					sendTipInfo(tipMetadata.Block(), false)
 				})
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
