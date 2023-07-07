@@ -30,7 +30,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("docker", "rms"),
-			iotago.WithSupplyOptions(1_000_0000, 100, 1, 10),
+			iotago.WithSupplyOptions(100_000_0000, 1, 1, 10),
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
 			iotago.WithLivenessOptions(6, 5, 30),
 		),
