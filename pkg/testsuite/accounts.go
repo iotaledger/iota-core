@@ -51,7 +51,7 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 		if has, err := accountsDiffStorage.Has(accountID); err != nil {
 			return errors.Wrapf(err, "AssertAccountDiff: %s: failed to load accounts diff for slot %d", node.Name, index)
 		} else if !has {
-			return errors.Wrapf(err, "AssertAccountDiff: %s: accounts diff for slot %d does not contain account %s", node.Name, index, accountID)
+			return errors.Errorf("AssertAccountDiff: %s: accounts diff for slot %d does not contain account %s", node.Name, index, accountID)
 		}
 
 		actualAccountDiff, actualDestroyed, err := accountsDiffStorage.Load(accountID)
