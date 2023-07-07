@@ -154,7 +154,8 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 		o.performanceTracker.ApplyEpoch(currentEpoch, committee)
 	}
 	var targetCommitteeEpoch iotago.EpochIndex
-	if o.timeProvider.EpochEnd(currentEpoch) > slot+o.maxCommittableAge {
+	// FIXME: EvictionAge*2 should be MaxCommittableAge
+	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) > slot+(apiForSlot.ProtocolParameters().EvictionAge()*2) {
 		targetCommitteeEpoch = currentEpoch
 	} else {
 		targetCommitteeEpoch = nextEpoch
@@ -163,7 +164,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 	committeeRoot = o.committeeRoot(targetCommitteeEpoch)
 
 	var targetRewardsEpoch iotago.EpochIndex
-	if o.timeProvider.EpochEnd(currentEpoch) == slot {
+	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) == slot {
 		targetRewardsEpoch = nextEpoch
 	} else {
 		targetRewardsEpoch = currentEpoch
@@ -182,7 +183,11 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		panic(fmt.Sprintf("committee for a finished epoch %d not found", targetCommitteeEpoch))
 	}
 
-	comitteeTree := ads.NewSet[iotago.AccountID, *iotago.AccountID](mapdb.NewMapDB())
+	comitteeTree := ads.NewSet[iotago.AccountID](
+		mapdb.NewMapDB(),
+		iotago.AccountID.Bytes,
+		iotago.IdentifierFromBytes,
+	)
 	committee.ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
 		comitteeTree.Add(accountID)
 
