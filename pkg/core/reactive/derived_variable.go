@@ -16,17 +16,17 @@ type DerivedVariable[Type comparable] interface {
 }
 
 // DeriveVariableFromValue creates a DerivedVariable that transforms an input value into a different one.
-func DeriveVariableFromValue[Type, InputType1 comparable, InputValueType1 Value[InputType1]](onConstructed Event, compute func(InputType1) Type, input1 *InputValueType1) DerivedVariable[Type] {
-	return newDerivedVariable[Type](onConstructed, func(d DerivedVariable[Type]) func() {
+func DeriveVariableFromValue[Type, InputType1 comparable, InputValueType1 Value[InputType1]](compute func(InputType1) Type, input1 *InputValueType1, lazyInitEvent ...Event) DerivedVariable[Type] {
+	return newDerivedVariable[Type](func(d DerivedVariable[Type]) func() {
 		return (*input1).OnUpdate(func(_, input1 InputType1) {
 			d.Compute(func(_ Type) Type { return compute(input1) })
 		}, true)
-	})
+	}, lo.First(lazyInitEvent))
 }
 
 // DeriveVariableFrom2Values creates a DerivedVariable that transforms two input values into a different one.
-func DeriveVariableFrom2Values[Type, InputType1, InputType2 comparable, InputValueType1 Value[InputType1], InputValueType2 Value[InputType2]](onConstructed Event, compute func(InputType1, InputType2) Type, input1 *InputValueType1, input2 *InputValueType2) DerivedVariable[Type] {
-	return newDerivedVariable[Type](onConstructed, func(d DerivedVariable[Type]) func() {
+func DeriveVariableFrom2Values[Type, InputType1, InputType2 comparable, InputValueType1 Value[InputType1], InputValueType2 Value[InputType2]](compute func(InputType1, InputType2) Type, input1 *InputValueType1, input2 *InputValueType2, lazyInitEvent ...Event) DerivedVariable[Type] {
+	return newDerivedVariable[Type](func(d DerivedVariable[Type]) func() {
 		return lo.Batch(
 			(*input1).OnUpdate(func(_, input1 InputType1) {
 				d.Compute(func(_ Type) Type { return compute(input1, (*input2).Get()) })
@@ -36,12 +36,12 @@ func DeriveVariableFrom2Values[Type, InputType1, InputType2 comparable, InputVal
 				d.Compute(func(_ Type) Type { return compute((*input1).Get(), input2) })
 			}, true),
 		)
-	})
+	}, lo.First(lazyInitEvent))
 }
 
 // DeriveVariableFrom3Values creates a DerivedVariable that transforms three input values into a different one.
-func DeriveVariableFrom3Values[Type, InputType1, InputType2, InputType3 comparable, InputValueType1 Value[InputType1], InputValueType2 Value[InputType2], InputValueType3 Value[InputType3]](onConstructed Event, compute func(InputType1, InputType2, InputType3) Type, input1 *InputValueType1, input2 *InputValueType2, input3 *InputValueType3) DerivedVariable[Type] {
-	return newDerivedVariable[Type](onConstructed, func(d DerivedVariable[Type]) func() {
+func DeriveVariableFrom3Values[Type, InputType1, InputType2, InputType3 comparable, InputValueType1 Value[InputType1], InputValueType2 Value[InputType2], InputValueType3 Value[InputType3]](compute func(InputType1, InputType2, InputType3) Type, input1 *InputValueType1, input2 *InputValueType2, input3 *InputValueType3, lazyInitEvent ...Event) DerivedVariable[Type] {
+	return newDerivedVariable[Type](func(d DerivedVariable[Type]) func() {
 		return lo.Batch(
 			(*input1).OnUpdate(func(_, input1 InputType1) {
 				d.Compute(func(_ Type) Type { return compute(input1, (*input2).Get(), (*input3).Get()) })
@@ -55,7 +55,7 @@ func DeriveVariableFrom3Values[Type, InputType1, InputType2, InputType3 comparab
 				d.Compute(func(_ Type) Type { return compute((*input1).Get(), (*input2).Get(), input3) })
 			}, true),
 		)
-	})
+	}, lo.First(lazyInitEvent))
 }
 
 // derivedVariable implements the DerivedVariable interface.
@@ -71,21 +71,25 @@ type derivedVariable[ValueType comparable] struct {
 }
 
 // newDerivedVariable creates a new derivedVariable instance.
-func newDerivedVariable[ValueType comparable](onConstructed Event, subscribe func(DerivedVariable[ValueType]) func()) *derivedVariable[ValueType] {
+func newDerivedVariable[ValueType comparable](subscribe func(DerivedVariable[ValueType]) func(), lazyInitEvent Event) *derivedVariable[ValueType] {
 	d := &derivedVariable[ValueType]{
 		Variable: NewVariable[ValueType](),
 	}
 
-	d.unsubscribe = onConstructed.OnTrigger(func() {
-		d.unsubscribeMutex.Lock()
-		defer d.unsubscribeMutex.Unlock()
-
-		if d.unsubscribe == nil {
-			return
-		}
-
+	if lazyInitEvent == nil {
 		d.unsubscribe = subscribe(d)
-	})
+	} else {
+		d.unsubscribe = lazyInitEvent.OnTrigger(func() {
+			d.unsubscribeMutex.Lock()
+			defer d.unsubscribeMutex.Unlock()
+
+			if d.unsubscribe == nil {
+				return
+			}
+
+			d.unsubscribe = subscribe(d)
+		})
+	}
 
 	return d
 }
@@ -95,10 +99,8 @@ func (d *derivedVariable[ValueType]) Unsubscribe() {
 	d.unsubscribeMutex.Lock()
 	defer d.unsubscribeMutex.Unlock()
 
-	if d.unsubscribe == nil {
-		return
+	if d.unsubscribe != nil {
+		d.unsubscribe()
+		d.unsubscribe = nil
 	}
-
-	d.unsubscribe()
-	d.unsubscribe = nil
 }
