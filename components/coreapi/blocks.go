@@ -36,12 +36,19 @@ func blockMetadataResponseByID(c echo.Context) (*nodeclient.BlockMetadataRespons
 		return nil, err
 	}
 
+	txState := txStatePending.String()
+	txMetadata, exist := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadataByAttachment(block.ID())
+	if exist {
+		txState = resolveTxState(txMetadata)
+	}
+
 	// TODO: fill in blockReason, TxState, TxReason.
 	bmResponse := &nodeclient.BlockMetadataResponse{
 		BlockID:            block.ID().ToHex(),
 		StrongParents:      block.ProtocolBlock().Block.StrongParentIDs().ToHex(),
 		WeakParents:        block.ProtocolBlock().Block.WeakParentIDs().ToHex(),
 		ShallowLikeParents: block.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
+		TxState:            txState,
 		BlockState:         blockStatePending.String(),
 	}
 
