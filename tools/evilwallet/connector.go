@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
@@ -174,10 +175,11 @@ type Client interface {
 
 // WebClient contains a GoShimmer web API to interact with a node.
 type WebClient struct {
-	api *nodeclient.Client
-	url string
+	api      *nodeclient.Client
+	serixAPI iotago.API
+	url      string
 
-	optsProtocolParams *iotago.ProtocolParameters
+	optsProtocolParams iotago.ProtocolParameters
 }
 
 // URL returns a client API Url.
@@ -191,15 +193,15 @@ func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
 		url:                url,
 		optsProtocolParams: dockerProtocolParams(),
 	}, opts, func(w *WebClient) {
-		v3API := iotago.V3API(w.optsProtocolParams)
-		w.api, _ = nodeclient.New(w.url, nodeclient.WithIOTAGoAPI(v3API))
+		w.serixAPI = iotago.V3API(w.optsProtocolParams)
+		w.api, _ = nodeclient.New(w.url, nodeclient.WithIOTAGoAPI(w.serixAPI))
 	})
 }
 
 // PostTransaction sends a transaction to the Tangle via a given client.
 func (c *WebClient) PostTransaction(tx *iotago.Transaction) (blockID iotago.BlockID, err error) {
-	blockBuilder := builder.NewBlockBuilder()
-	blockBuilder.ProtocolVersion(c.optsProtocolParams.Version)
+	blockBuilder := builder.NewBasicBlockBuilder(c.serixAPI)
+	blockBuilder.ProtocolVersion(c.optsProtocolParams.Version())
 
 	blockBuilder.Payload(tx)
 
@@ -218,8 +220,8 @@ func (c *WebClient) PostTransaction(tx *iotago.Transaction) (blockID iotago.Bloc
 
 // PostData sends the given data (payload) by creating a block in the backend.
 func (c *WebClient) PostData(data []byte) (blkID string, err error) {
-	blockBuilder := builder.NewBlockBuilder()
-	blockBuilder.ProtocolVersion(c.optsProtocolParams.Version)
+	blockBuilder := builder.NewBasicBlockBuilder(c.serixAPI)
+	blockBuilder.ProtocolVersion(c.optsProtocolParams.Version())
 
 	blockBuilder.Payload(&iotago.TaggedData{
 		Tag: data,
@@ -272,7 +274,14 @@ func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.Transa
 		return
 	}
 
-	return resp.Payload.(*iotago.Transaction), nil
+	modelBlk, err := model.BlockFromBlock(resp, c.serixAPI)
+	if err != nil {
+		return
+	}
+
+	tx, _ = modelBlk.Transaction()
+
+	return tx, nil
 }
 
 func (c *WebClient) GetBlockIssuance() (resp *nodeclient.BlockIssuanceResponse, err error) {
@@ -286,7 +295,7 @@ func (c *WebClient) GetBlockIssuance() (resp *nodeclient.BlockIssuanceResponse, 
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func WithProtoParameters(protoParams *iotago.ProtocolParameters) options.Option[WebClient] {
+func WithProtoParameters(protoParams iotago.ProtocolParameters) options.Option[WebClient] {
 	return func(opts *WebClient) {
 		opts.optsProtocolParams = protoParams
 	}
