@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/pkg/errors"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
+	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -196,7 +196,7 @@ func configure() error {
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		if err := deps.Protocol.Run(ctx); err != nil {
-			if !errors.Is(err, context.Canceled) {
+			if !ierrors.Is(err, context.Canceled) {
 				Component.LogErrorfAndExit("Error running the Protocol: %s", err.Error())
 			}
 		}

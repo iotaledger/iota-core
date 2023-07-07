@@ -3,10 +3,9 @@ package slotnotarization
 import (
 	"sync"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -39,7 +38,7 @@ func (m *SlotMutations) AddAcceptedBlock(block *blocks.Block) (err error) {
 
 	blockID := block.ID()
 	if blockID.Index() <= m.latestCommittedIndex {
-		return errors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
+		return ierrors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
 	}
 
 	m.AcceptedBlocks(blockID.Index(), true).Add(blockID)
@@ -53,7 +52,7 @@ func (m *SlotMutations) Evict(index iotago.SlotIndex) error {
 	defer m.evictionMutex.Unlock()
 
 	if index <= m.latestCommittedIndex {
-		return errors.Errorf("cannot commit slot %d: already committed", index)
+		return ierrors.Errorf("cannot commit slot %d: already committed", index)
 	}
 
 	m.evictUntil(index)

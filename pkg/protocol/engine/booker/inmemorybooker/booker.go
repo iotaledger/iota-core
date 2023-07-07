@@ -1,10 +1,9 @@
 package inmemorybooker
 
 import (
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -92,7 +91,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	}
 
 	if transactionMetadata == nil {
-		return errors.Errorf("transaction in %s was not attached", block.ID())
+		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
 	// Based on the assumption that we always fork and the UTXO and Tangle paste cones are always fully known.
@@ -116,7 +115,7 @@ func (b *Booker) evict(slotIndex iotago.SlotIndex) {
 func (b *Booker) book(block *blocks.Block) error {
 	conflictsToInherit, err := b.inheritConflicts(block)
 	if err != nil {
-		return errors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
+		return ierrors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
 	}
 
 	block.SetConflictIDs(conflictsToInherit)
@@ -128,7 +127,7 @@ func (b *Booker) book(block *blocks.Block) error {
 
 func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	if block.SetInvalid() {
-		b.events.BlockInvalid.Trigger(block, errors.Wrap(err, "block marked as invalid in Booker"))
+		b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "block marked as invalid in Booker"))
 	}
 }
 
@@ -139,7 +138,7 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset
 	for _, parent := range block.ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
-			return nil, errors.Errorf("parent %s does not exist", parent.ID)
+			return nil, ierrors.Errorf("parent %s does not exist", parent.ID)
 		}
 
 		switch parent.Type {
@@ -171,7 +170,7 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset
 // isReferenceValid checks if the reference between the child and its parent is valid.
 func isReferenceValid(child *blocks.Block, parent *blocks.Block) (err error) {
 	if parent.IsInvalid() {
-		return errors.Errorf("parent %s of child %s is marked as invalid", parent.ID(), child.ID())
+		return ierrors.Errorf("parent %s of child %s is marked as invalid", parent.ID(), child.ID())
 	}
 
 	return nil

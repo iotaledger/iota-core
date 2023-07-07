@@ -1,9 +1,8 @@
 package tipselectionv1
 
 import (
-	"golang.org/x/xerrors"
-
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -117,7 +116,7 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.Advanc
 	if err = t.conflictDAG.LikedInstead(tipMetadata.Block().ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
 		transactionMetadata, exists := t.memPool.TransactionMetadata(likedConflictID)
 		if !exists {
-			return xerrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedConflictID)
+			return ierrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedConflictID)
 		}
 
 		necessaryReferences[likedConflictID] = lo.First(transactionMetadata.Attachments())
@@ -135,7 +134,7 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.Advanc
 	}
 
 	if len(references) > t.optMaxLikedInsteadReferencesPerParent {
-		return nil, nil, xerrors.Errorf("too many liked instead references (%d) for block %s", len(references), tipMetadata.ID())
+		return nil, nil, ierrors.Errorf("too many liked instead references (%d) for block %s", len(references), tipMetadata.ID())
 	}
 
 	return references, updatedLikedConflicts, nil

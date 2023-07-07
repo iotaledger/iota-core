@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/xerrors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/api"
@@ -278,7 +277,7 @@ func (t *TransactionFramework) TransitionAccount(alias string, opts ...options.O
 func (t *TransactionFramework) Output(alias string) *utxoledger.Output {
 	output, exists := t.states[alias]
 	if !exists {
-		panic(xerrors.Errorf("output with given alias does not exist %s", alias))
+		panic(ierrors.Errorf("output with given alias does not exist %s", alias))
 	}
 
 	return output
@@ -291,7 +290,7 @@ func (t *TransactionFramework) OutputID(alias string) iotago.OutputID {
 func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
 	transaction, exists := t.transactions[alias]
 	if !exists {
-		panic(xerrors.Errorf("transaction with given alias does not exist %s", alias))
+		panic(ierrors.Errorf("transaction with given alias does not exist %s", alias))
 	}
 
 	return transaction

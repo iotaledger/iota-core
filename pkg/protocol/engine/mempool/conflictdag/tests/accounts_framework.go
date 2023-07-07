@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"golang.org/x/crypto/blake2b"
-	"golang.org/x/xerrors"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -31,7 +31,7 @@ func NewAccountsTestFramework(test *testing.T, instance *account.Accounts) *Acco
 func (f *AccountsTestFramework) Add(alias string) {
 	validatorID, exists := f.identitiesByAlias[alias]
 	if !exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
 	f.Committee.Set(account.SeatIndex(f.Committee.SeatCount()), validatorID)
@@ -40,7 +40,7 @@ func (f *AccountsTestFramework) Add(alias string) {
 func (f *AccountsTestFramework) Delete(alias string) bool {
 	validatorID, exists := f.identitiesByAlias[alias]
 	if !exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
 	return f.Committee.Delete(validatorID)
@@ -49,7 +49,7 @@ func (f *AccountsTestFramework) Delete(alias string) bool {
 func (f *AccountsTestFramework) Get(alias string) (seat account.SeatIndex, exists bool) {
 	validatorID, exists := f.identitiesByAlias[alias]
 	if !exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
 	return f.Committee.GetSeat(validatorID)
@@ -58,7 +58,7 @@ func (f *AccountsTestFramework) Get(alias string) (seat account.SeatIndex, exist
 func (f *AccountsTestFramework) Has(alias string) bool {
 	validatorID, exists := f.identitiesByAlias[alias]
 	if !exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
 	return f.Committee.HasAccount(validatorID)
@@ -67,7 +67,7 @@ func (f *AccountsTestFramework) Has(alias string) bool {
 func (f *AccountsTestFramework) CreateID(alias string) iotago.AccountID {
 	_, exists := f.identitiesByAlias[alias]
 	if exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' already exists", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' already exists", alias))
 	}
 
 	hashedAlias := blake2b.Sum256([]byte(alias))
@@ -85,7 +85,7 @@ func (f *AccountsTestFramework) CreateID(alias string) iotago.AccountID {
 func (f *AccountsTestFramework) ID(alias string) iotago.AccountID {
 	id, exists := f.identitiesByAlias[alias]
 	if !exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
 	return id

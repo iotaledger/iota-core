@@ -2,7 +2,6 @@ package dashboard
 
 import (
 	"context"
-	"errors"
 	"net"
 	"net/http"
 	"runtime"
@@ -11,12 +10,12 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/labstack/gommon/log"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
@@ -76,8 +75,8 @@ func run() error {
 		go func() {
 			Component.LogInfof("%s started, bind-address=%s, basic-auth=%v", Component.Name, ParamsDashboard.BindAddress, ParamsDashboard.BasicAuth.Enabled)
 			if err := server.Start(ParamsDashboard.BindAddress); err != nil {
-				if !errors.Is(err, http.ErrServerClosed) {
-					log.Errorf("Error serving: %s", err)
+				if !ierrors.Is(err, http.ErrServerClosed) {
+					Component.LogErrorf("Error serving: %w", err)
 				}
 				close(stopped)
 			}
