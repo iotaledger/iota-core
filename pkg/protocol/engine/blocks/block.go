@@ -92,9 +92,10 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		solid:       true,
 		booked:      true,
 		preAccepted: true,
-		accepted:    reactive.NewVariable[bool](), // This should be true since we commit and evict on acceptance.
+		accepted:    reactive.NewVariable[bool](),
 	}
 
+	// This should be true since we commit and evict on acceptance.
 	b.accepted.Set(true)
 
 	return b
