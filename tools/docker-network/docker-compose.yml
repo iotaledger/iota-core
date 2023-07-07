@@ -15,7 +15,6 @@ services:
       --blockIssuer.privateKey=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
       --activity.ignoreBootstrapped=true
       --restAPI.allowIncompleteBlock=true
-      --restAPI.pow.enabled=true
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -37,7 +36,6 @@ services:
       --blockIssuer.privateKey=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064
       --activity.ignoreBootstrapped=true
       --restAPI.allowIncompleteBlock=true
-      --restAPI.pow.enabled=true
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -59,7 +57,6 @@ services:
       --blockIssuer.privateKey=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
       --activity.ignoreBootstrapped=true
       --restAPI.allowIncompleteBlock=true
-      --restAPI.pow.enabled=true
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
