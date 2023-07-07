@@ -10,13 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -41,8 +43,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	nodesP1 := []*mock.Node{node0, node1, node2, node3, node4}
 	nodesP2 := []*mock.Node{node5, node6}
 
-	validators := ts.Validators()
-
 	nodeOptions := []options.Option[protocol.Protocol]{
 		protocol.WithNotarizationProvider(
 			slotnotarization.NewProvider(),
@@ -60,18 +60,26 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	nodeP1Options := append(nodeOptions,
 		protocol.WithSybilProtectionProvider(
-			poa.NewProvider(validators,
-				poa.WithOnlineCommitteeStartup(node0.AccountID, node1.AccountID, node2.AccountID, node3.AccountID, node4.AccountID),
-				poa.WithActivityWindow(1*time.Minute),
+			sybilprotectionv1.NewProvider(
+				sybilprotectionv1.WithSeatManagerProvider(
+					poa.NewProvider(
+						poa.WithOnlineCommitteeStartup(node0.AccountID, node1.AccountID, node2.AccountID, node3.AccountID, node4.AccountID),
+						poa.WithActivityWindow(1*time.Minute),
+					),
+				),
 			),
 		),
 	)
 
 	nodeP2Options := append(nodeOptions,
 		protocol.WithSybilProtectionProvider(
-			poa.NewProvider(validators,
-				poa.WithOnlineCommitteeStartup(node5.AccountID, node6.AccountID),
-				poa.WithActivityWindow(1*time.Minute),
+			sybilprotectionv1.NewProvider(
+				sybilprotectionv1.WithSeatManagerProvider(
+					poa.NewProvider(
+						poa.WithOnlineCommitteeStartup(node5.AccountID, node6.AccountID),
+						poa.WithActivityWindow(1*time.Minute),
+					),
+				),
 			),
 		),
 	)
@@ -97,15 +105,15 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		node6.AccountID,
 	}
 	expectedP1Committee := []account.SeatIndex{
-		node0.ValidatorSeat,
-		node1.ValidatorSeat,
-		node2.ValidatorSeat,
-		node3.ValidatorSeat,
-		node4.ValidatorSeat,
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node4.AccountID)),
 	}
 	expectedP2Committee := []account.SeatIndex{
-		node5.ValidatorSeat,
-		node6.ValidatorSeat,
+		lo.Return1(node5.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node5.AccountID)),
+		lo.Return1(node5.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node6.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.

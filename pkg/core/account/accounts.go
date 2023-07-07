@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"sync/atomic"
 
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -19,6 +21,7 @@ type Accounts struct {
 
 	totalStake          iotago.BaseToken
 	totalValidatorStake iotago.BaseToken
+	reused              atomic.Bool
 
 	mutex syncutils.RWMutex
 }
@@ -54,6 +57,14 @@ func (a *Accounts) IDs() []iotago.AccountID {
 	})
 
 	return ids
+}
+
+func (a *Accounts) IsReused() bool {
+	return a.reused.Load()
+}
+
+func (a *Accounts) SetReused() {
+	a.reused.Store(true)
 }
 
 // Get returns the weight of the given identity.
@@ -162,6 +173,13 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 		a.setWithoutLocking(accountID, pool)
 	}
 
+	var reused bool
+	if err = binary.Read(reader, binary.LittleEndian, &reused); err != nil {
+		return n, ierrors.Wrap(err, "unable to read reused flag")
+	}
+	a.reused.Store(reused)
+	n++
+
 	return n, nil
 }
 
@@ -184,6 +202,8 @@ func (a *Accounts) Bytes() (bytes []byte, err error) {
 
 		return true
 	})
+
+	m.WriteBool(a.reused.Load())
 
 	if innerErr != nil {
 		return nil, innerErr

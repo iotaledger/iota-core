@@ -19,14 +19,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -52,10 +51,9 @@ type EngineManager struct {
 	blockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
 	bookerProvider          module.Provider[*engine.Engine, booker.Booker]
 	clockProvider           module.Provider[*engine.Engine, clock.Clock]
-	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	slotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
-	epochGadgetProvider     module.Provider[*engine.Engine, epochgadget.Gadget]
+	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	attestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
@@ -76,10 +74,9 @@ func New(
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],
 	clockProvider module.Provider[*engine.Engine, clock.Clock],
-	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection],
 	blockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget],
-	epochGadgetProvider module.Provider[*engine.Engine, epochgadget.Gadget],
+	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection],
 	notarizationProvider module.Provider[*engine.Engine, notarization.Notarization],
 	attestationProvider module.Provider[*engine.Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
@@ -97,10 +94,9 @@ func New(
 		blockDAGProvider:        blockDAGProvider,
 		bookerProvider:          bookerProvider,
 		clockProvider:           clockProvider,
-		sybilProtectionProvider: sybilProtectionProvider,
 		blockGadgetProvider:     blockGadgetProvider,
 		slotGadgetProvider:      slotGadgetProvider,
-		epochGadgetProvider:     epochGadgetProvider,
+		sybilProtectionProvider: sybilProtectionProvider,
 		notarizationProvider:    notarizationProvider,
 		attestationProvider:     attestationProvider,
 		ledgerProvider:          ledgerProvider,
@@ -185,10 +181,9 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.blockDAGProvider,
 		e.bookerProvider,
 		e.clockProvider,
-		e.sybilProtectionProvider,
 		e.blockGadgetProvider,
 		e.slotGadgetProvider,
-		e.epochGadgetProvider,
+		e.sybilProtectionProvider,
 		e.notarizationProvider,
 		e.attestationProvider,
 		e.ledgerProvider,

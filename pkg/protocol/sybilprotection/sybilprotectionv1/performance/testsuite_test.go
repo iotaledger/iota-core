@@ -107,8 +107,8 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 		totalValidatorsStake += action.ValidatorStake
 	}
 	// TODO: finish and assert profit margin
-	//profitMarging := (1 << 8) * totalValidatorsStake / (totalValidatorsStake + totalStake)
-	//require.Equal(t.T, profitMarging, expectedStats.ProfitMargin)
+	// profitMarging := (1 << 8) * totalValidatorsStake / (totalValidatorsStake + totalStake)
+	// require.Equal(t.T, profitMarging, expectedStats.ProfitMargin)
 	for alias, action := range actions {
 		accountID := t.Account(alias, false)
 		performanceFactor := action.ValidationBlocksSent
@@ -124,9 +124,8 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 		actualDelegatorReward, err := t.Instance.DelegatorReward(accountID, delegatorStake, epochIndex, epochIndex)
 		require.NoError(t.T, err)
 		fmt.Printf("expected: %d, actual: %d\n", expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
-		//TODO: require.EqualValues(t.T, expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
+		// TODO: require.EqualValues(t.T, expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
 	}
-
 }
 
 func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochIndex iotago.EpochIndex, performanceFactor uint64) {

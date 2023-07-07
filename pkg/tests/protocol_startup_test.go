@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -71,8 +71,8 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		node1.ValidatorSeat,
-		node2.ValidatorSeat,
+		lo.Return1(node1.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
+		lo.Return1(node1.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -406,7 +406,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		node21.Initialize(
 			protocol.WithBaseDirectory(ts.Directory.Path(node2.Name)),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(ts.Validators()),
+				sybilprotectionv1.NewProvider(),
 			),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
@@ -455,7 +455,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithSnapshotPath(snapshotPath),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node3.Name)),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(ts.Validators()),
+				sybilprotectionv1.NewProvider(),
 			),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),

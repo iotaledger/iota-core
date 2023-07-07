@@ -11,7 +11,7 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 	ratifier := votingBlock.ProtocolBlock().IssuerID
 
 	// Only track ratifier weight for issuers that are part of the committee.
-	seat, exists := g.sybilProtection.Committee(votingBlock.ID().Index()).GetSeat(ratifier)
+	seat, exists := g.seatManager.Committee(votingBlock.ID().Index()).GetSeat(ratifier)
 	if !exists {
 		return
 	}
@@ -56,7 +56,7 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 
 func (g *Gadget) shouldAccept(block *blocks.Block) bool {
 	blockSeats := len(block.AcceptanceRatifiers())
-	onlineCommitteeTotalSeats := g.sybilProtection.OnlineCommittee().Size()
+	onlineCommitteeTotalSeats := g.seatManager.OnlineCommittee().Size()
 
 	return votes.IsThresholdReached(blockSeats, onlineCommitteeTotalSeats, g.optsAcceptanceThreshold)
 }

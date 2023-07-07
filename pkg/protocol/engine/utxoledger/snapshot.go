@@ -257,7 +257,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	}
 
 	for _, outputID := range outputIDs.RemoveDupsAndSort() {
-		output, err := m.ReadOutputByOutputID(outputID)
+		output, err := m.ReadOutputByOutputIDWithoutLocking(outputID)
 		if err != nil {
 			return err
 		}

@@ -67,6 +67,7 @@ func (t *Tracker) BlockAccepted(block *blocks.Block) {
 	defer t.performanceFactorsMutex.Unlock()
 
 	// TODO: check if this block is a validator block
+	// TODO: include wannabe validator performance in the snapshot
 
 	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
 	pf, err := performanceFactors.Load(block.ProtocolBlock().IssuerID)

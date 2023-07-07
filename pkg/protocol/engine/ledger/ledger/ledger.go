@@ -23,14 +23,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/mana"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -45,14 +44,11 @@ type Ledger struct {
 	utxoLedger       *utxoledger.Manager
 	accountsLedger   *accountsledger.Manager
 	manaManager      *mana.Manager
-	epochGadget      epochgadget.Gadget
+	sybilProtection  sybilprotection.SybilProtection
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
-
-	sybilProtection sybilprotection.SybilProtection
-
-	memPool      mempool.MemPool[ledger.BlockVoteRank]
-	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
-	errorHandler func(error)
+	memPool          mempool.MemPool[ledger.BlockVoteRank]
+	conflictDAG      conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
+	errorHandler     func(error)
 
 	module.Module
 }
@@ -67,7 +63,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.AccountDiffs,
 			e,
 			e.SybilProtection,
-			e.EpochGadget,
 			e.ErrorHandler("ledger"),
 		)
 
@@ -76,7 +71,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 		e.HookConstructed(func() {
 			// TODO: create an Init method that is called with all additional dependencies on e.HookInitialized()
 			e.Events.Ledger.LinkTo(l.events)
-			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.OnlineCommittee().Size)
+			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
 			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
@@ -92,7 +87,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 				l.accountsLedger.TrackBlock(block)
 				l.BlockAccepted(block)
-				l.epochGadget.BlockAccepted(block)
+				l.sybilProtection.BlockAccepted(block)
 				l.events.BlockProcessed.Trigger(block)
 			}, event.WithWorkerPool(wp))
 
@@ -114,7 +109,6 @@ func New(
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
 	apiProvider api.Provider,
 	sybilProtection sybilprotection.SybilProtection,
-	epochGadget epochgadget.Gadget,
 	errorHandler func(error),
 ) *Ledger {
 	return &Ledger{
@@ -124,9 +118,8 @@ func New(
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
-		epochGadget:      epochGadget,
 		errorHandler:     errorHandler,
-		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](sybilProtection.OnlineCommittee().Size),
+		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](sybilProtection.SeatManager().OnlineCommittee().Size),
 	}
 }
 
@@ -282,10 +275,6 @@ func (l *Ledger) Import(reader io.ReadSeeker) error {
 		return errors.Wrap(err, "failed to import accountsLedger")
 	}
 
-	if err := l.epochGadget.Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import epochGadget")
-	}
-
 	return nil
 }
 
@@ -296,10 +285,6 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 
 	if err := l.accountsLedger.Export(writer, targetIndex); err != nil {
 		return errors.Wrap(err, "failed to export accountsLedger")
-	}
-
-	if err := l.epochGadget.Export(writer, targetIndex); err != nil {
-		return errors.Wrap(err, "failed to export epochGadget")
 	}
 
 	return nil
@@ -620,7 +605,7 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().IssuingTime)
 
-	seat, exists := l.sybilProtection.Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
+	seat, exists := l.sybilProtection.SeatManager().Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return
 	}

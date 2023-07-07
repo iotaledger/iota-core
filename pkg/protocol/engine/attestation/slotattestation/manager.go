@@ -80,7 +80,7 @@ func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*
 			latestCommitment.CumulativeWeight(),
 			attestationCommitmentOffset,
 			e.Storage.Prunable.Attestations,
-			e.SybilProtection.Committee,
+			e.SybilProtection.SeatManager().Committee,
 			e,
 		)
 	})
