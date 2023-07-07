@@ -152,9 +152,10 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 
 		o.performanceTracker.ApplyEpoch(currentEpoch, committee)
 	}
+
 	var targetCommitteeEpoch iotago.EpochIndex
-	// FIXME: EvictionAge*2 should be MaxCommittableAge
-	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) > slot+(apiForSlot.ProtocolParameters().EvictionAge()*2) {
+	// TODO: check if it is correct to check against EvictionAge here
+	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) > slot+apiForSlot.ProtocolParameters().EvictionAge() {
 		targetCommitteeEpoch = currentEpoch
 	} else {
 		targetCommitteeEpoch = nextEpoch
