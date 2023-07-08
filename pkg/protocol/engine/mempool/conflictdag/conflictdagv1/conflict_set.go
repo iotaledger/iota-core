@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/iota-core/pkg/core/reactive"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 )
@@ -16,7 +16,7 @@ type ConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 	ID ResourceID
 
 	// members is the set of Conflicts that are conflicting over the shared resource.
-	members *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
+	members ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]
 
 	allMembersEvicted reactive.Variable[bool]
 
@@ -28,12 +28,12 @@ func NewConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflict
 	return &ConflictSet[ConflictID, ResourceID, VoteRank]{
 		ID:                id,
 		allMembersEvicted: reactive.NewVariable[bool](),
-		members:           advancedset.New[*Conflict[ConflictID, ResourceID, VoteRank]](),
+		members:           ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]](),
 	}
 }
 
 // Add adds a Conflict to the ConflictSet and returns all other members of the set.
-func (c *ConflictSet[ConflictID, ResourceID, VoteRank]) Add(addedConflict *Conflict[ConflictID, ResourceID, VoteRank]) (otherMembers *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]], err error) {
+func (c *ConflictSet[ConflictID, ResourceID, VoteRank]) Add(addedConflict *Conflict[ConflictID, ResourceID, VoteRank]) (otherMembers ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]], err error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 

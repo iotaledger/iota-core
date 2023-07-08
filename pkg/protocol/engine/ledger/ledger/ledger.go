@@ -9,7 +9,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -330,7 +330,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.PreviousOutputID = consumedOutput.OutputID()
 
 		oldPubKeysSet := accountData.PubKeys
-		newPubKeysSet := advancedset.New[ed25519.PublicKey]()
+		newPubKeysSet := ds.NewSet[ed25519.PublicKey]()
 		for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
 			newPubKeysSet.Add(ed25519.PublicKey(pubKey))
 		}
@@ -338,12 +338,12 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		// Add public keys that are not in the old set
 		accountDiff.PubKeysAdded = newPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
 			return !oldPubKeysSet.Has(key)
-		}).Slice()
+		}).ToSlice()
 
 		// Remove the keys that are not in the new set
 		accountDiff.PubKeysRemoved = oldPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
 			return !newPubKeysSet.Has(key)
-		}).Slice()
+		}).ToSlice()
 
 		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
 			// staking feature is created or updated - create the diff between the account data and new account
@@ -382,10 +382,10 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 	}
 }
 
-func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], err error) {
+func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts ds.Set[iotago.AccountID], err error) {
 	createdAccounts = make(map[iotago.AccountID]*utxoledger.Output)
 	consumedAccounts = make(map[iotago.AccountID]*utxoledger.Output)
-	destroyedAccounts = advancedset.New[iotago.AccountID]()
+	destroyedAccounts = ds.NewSet[iotago.AccountID]()
 
 	createdAccountDelegation := make(map[iotago.ChainID]*iotago.DelegationOutput)
 

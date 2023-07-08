@@ -1,7 +1,7 @@
 package slottracker
 
 import (
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -9,19 +9,19 @@ import (
 
 type SlotTracker struct {
 	votesPerIdentity *shrinkingmap.ShrinkingMap[iotago.AccountID, iotago.SlotIndex]
-	votersPerSlot    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.AccountID]]
+	votersPerSlot    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.AccountID]]
 }
 
 func NewSlotTracker() *SlotTracker {
 	return &SlotTracker{
 		votesPerIdentity: shrinkingmap.New[iotago.AccountID, iotago.SlotIndex](),
-		votersPerSlot:    shrinkingmap.New[iotago.SlotIndex, *advancedset.AdvancedSet[iotago.AccountID]](),
+		votersPerSlot:    shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.AccountID]](),
 	}
 }
 
-func (s *SlotTracker) slotVoters(slotIndex iotago.SlotIndex) *advancedset.AdvancedSet[iotago.AccountID] {
-	slotVoters, _ := s.votersPerSlot.GetOrCreate(slotIndex, func() *advancedset.AdvancedSet[iotago.AccountID] {
-		return advancedset.New[iotago.AccountID]()
+func (s *SlotTracker) slotVoters(slotIndex iotago.SlotIndex) ds.Set[iotago.AccountID] {
+	slotVoters, _ := s.votersPerSlot.GetOrCreate(slotIndex, func() ds.Set[iotago.AccountID] {
+		return ds.NewSet[iotago.AccountID]()
 	})
 
 	return slotVoters
@@ -64,7 +64,7 @@ func (s *SlotTracker) Voters(slotIndex iotago.SlotIndex) []iotago.AccountID {
 		return nil
 	}
 
-	return slotVoters.Slice()
+	return slotVoters.ToSlice()
 }
 
 func (s *SlotTracker) EvictSlot(indexToEvict iotago.SlotIndex) {

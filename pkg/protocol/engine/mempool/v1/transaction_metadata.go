@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/promise"
@@ -98,11 +98,11 @@ func (t *TransactionMetadata) Transaction() mempool.Transaction {
 	return t.transaction
 }
 
-func (t *TransactionMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateMetadata] {
+func (t *TransactionMetadata) Inputs() ds.Set[mempool.StateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	inputs := advancedset.New[mempool.StateMetadata]()
+	inputs := ds.NewSet[mempool.StateMetadata]()
 	for _, input := range t.inputs {
 		inputs.Add(input)
 	}
@@ -110,11 +110,11 @@ func (t *TransactionMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateMet
 	return inputs
 }
 
-func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMetadata] {
+func (t *TransactionMetadata) Outputs() ds.Set[mempool.StateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	outputs := advancedset.New[mempool.StateMetadata]()
+	outputs := ds.NewSet[mempool.StateMetadata]()
 	for _, output := range t.outputs {
 		outputs.Add(output)
 	}
@@ -286,7 +286,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	t.OnConflicting(func() {
 		cancelConflictInheritance()
 
-		t.conflictIDs.Set(advancedset.New(t.id))
+		t.conflictIDs.Set(ds.NewSet(t.id))
 	})
 
 	t.allAttachmentsEvicted.OnTrigger(func() {

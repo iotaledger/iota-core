@@ -4,7 +4,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -132,8 +132,8 @@ func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	}
 }
 
-func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset.AdvancedSet[iotago.TransactionID], err error) {
-	conflictIDsToInherit := advancedset.New[iotago.TransactionID]()
+func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotago.TransactionID], err error) {
+	conflictIDsToInherit := ds.NewSet[iotago.TransactionID]()
 
 	// Inherit conflictIDs from parents based on the parent type.
 	for _, parent := range block.ParentsWithType() {
@@ -152,7 +152,7 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset
 
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
 			//  remove all conflicting conflicts from conflictIDsToInherit
-			for _, conflictID := range parentBlock.PayloadConflictIDs().Slice() {
+			for _, conflictID := range parentBlock.PayloadConflictIDs().ToSlice() {
 				if conflictingConflicts, exists := b.conflictDAG.ConflictingConflicts(conflictID); exists {
 					conflictIDsToInherit.DeleteAll(conflictingConflicts)
 				}

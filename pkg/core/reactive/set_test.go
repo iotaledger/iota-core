@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 )
 
 func TestSet(t *testing.T) {
@@ -15,8 +15,8 @@ func TestSet(t *testing.T) {
 	inheritedSet := NewSet[int]()
 	inheritedSet.InheritFrom(source1, source2)
 
-	source1.Add(advancedset.New(1, 2, 4))
-	source2.Add(advancedset.New(7, 9))
+	source1.Add(ds.NewSet(1, 2, 4))
+	source2.Add(ds.NewSet(7, 9))
 
 	require.True(t, inheritedSet.Get().Has(1))
 	require.True(t, inheritedSet.Get().Has(2))

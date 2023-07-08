@@ -8,7 +8,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
-// Variable is a reactive component that acts as a thread-safe variable that informs subscribed consumers about updates.
+// Variable defines an interface for a reactive component that acts as a thread-safe variable that informs subscribed
+// consumers about updates.
 type Variable[T comparable] interface {
 	// Set sets the new value and triggers the registered callbacks if the value has changed.
 	Set(newValue T) (previousValue T)

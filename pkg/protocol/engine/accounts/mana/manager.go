@@ -4,7 +4,7 @@ import (
 	"github.com/zyedidia/generic/cache"
 	"golang.org/x/xerrors"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -74,7 +74,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	return mana.Value(), nil
 }
 
-func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], accountOutputs map[iotago.AccountID]*utxoledger.Output) {
+func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts ds.Set[iotago.AccountID], accountOutputs map[iotago.AccountID]*utxoledger.Output) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

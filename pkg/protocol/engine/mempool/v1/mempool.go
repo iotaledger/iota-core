@@ -9,7 +9,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -226,11 +226,11 @@ func (m *MemPool[VoteRank]) executeTransaction(transaction *TransactionMetadata)
 
 func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	if m.optForkAllTransactions {
-		m.forkTransaction(transaction, advancedset.New(lo.Map(transaction.inputs, (*StateMetadata).ID)...))
+		m.forkTransaction(transaction, ds.NewSet(lo.Map(transaction.inputs, (*StateMetadata).ID)...))
 	} else {
 		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 			input.OnDoubleSpent(func() {
-				m.forkTransaction(transaction, advancedset.New(input.ID()))
+				m.forkTransaction(transaction, ds.NewSet(input.ID()))
 			})
 		})
 	}
@@ -240,7 +240,7 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	}
 }
 
-func (m *MemPool[VoteRank]) forkTransaction(transaction *TransactionMetadata, resourceIDs *advancedset.AdvancedSet[iotago.OutputID]) {
+func (m *MemPool[VoteRank]) forkTransaction(transaction *TransactionMetadata, resourceIDs ds.Set[iotago.OutputID]) {
 	transaction.setConflicting()
 
 	if err := m.conflictDAG.UpdateConflictingResources(transaction.ID(), resourceIDs); err != nil {
@@ -352,7 +352,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnConflicting(func() {
 		m.conflictDAG.CreateConflict(transaction.ID())
 
-		unsubscribe := transaction.parentConflictIDs.OnUpdate(func(_ *advancedset.AdvancedSet[iotago.TransactionID], appliedMutations reactive.SetMutations[iotago.TransactionID]) {
+		unsubscribe := transaction.parentConflictIDs.OnUpdate(func(_ ds.Set[iotago.TransactionID], appliedMutations reactive.SetMutations[iotago.TransactionID]) {
 			if err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements); err != nil {
 				panic(err)
 			}

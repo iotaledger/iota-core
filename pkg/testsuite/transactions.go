@@ -5,7 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -127,7 +127,7 @@ func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*
 					return errors.Errorf("AssertTransactionInCacheConflicts: %s: block %s does not exist", node.Name, transactionID)
 				}
 
-				expectedConflictIDs := advancedset.New(lo.Map(conflictAliases, t.TransactionFramework.TransactionID)...)
+				expectedConflictIDs := ds.NewSet(lo.Map(conflictAliases, t.TransactionFramework.TransactionID)...)
 				actualConflictIDs := transactionFromCache.ConflictIDs().Get()
 
 				if expectedConflictIDs.Size() != actualConflictIDs.Size() {
