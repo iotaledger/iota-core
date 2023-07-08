@@ -3,9 +3,9 @@ package utxoledger
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 	"sort"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -13,7 +13,7 @@ import (
 
 // SlotDiff represents the generated and spent outputs by a slot's confirmation.
 type SlotDiff struct {
-	// The index of the milestone.
+	// The index of the slot.
 	Index iotago.SlotIndex
 	// The outputs newly generated with this diff.
 	Outputs Outputs
@@ -29,20 +29,20 @@ func slotDiffKeyForIndex(index iotago.SlotIndex) []byte {
 	return m.Bytes()
 }
 
-func (ms *SlotDiff) KVStorableKey() []byte {
-	return slotDiffKeyForIndex(ms.Index)
+func (sd *SlotDiff) KVStorableKey() []byte {
+	return slotDiffKeyForIndex(sd.Index)
 }
 
-func (ms *SlotDiff) KVStorableValue() []byte {
+func (sd *SlotDiff) KVStorableValue() []byte {
 	m := marshalutil.New(9)
 
-	m.WriteUint32(uint32(len(ms.Outputs)))
-	for _, output := range ms.sortedOutputs() {
+	m.WriteUint32(uint32(len(sd.Outputs)))
+	for _, output := range sd.sortedOutputs() {
 		m.WriteBytes(output.outputID[:])
 	}
 
-	m.WriteUint32(uint32(len(ms.Spents)))
-	for _, spent := range ms.sortedSpents() {
+	m.WriteUint32(uint32(len(sd.Spents)))
+	for _, spent := range sd.sortedSpents() {
 		m.WriteBytes(spent.output.outputID[:])
 	}
 
@@ -50,7 +50,7 @@ func (ms *SlotDiff) KVStorableValue() []byte {
 }
 
 // note that this method relies on the data being available within other "tables".
-func (ms *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) error {
+func (sd *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) error {
 	index, _, err := iotago.SlotIndexFromBytes(key[1:])
 	if err != nil {
 		return err
@@ -98,45 +98,45 @@ func (ms *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) e
 		spents[i] = spent
 	}
 
-	ms.Index = index
-	ms.Outputs = outputs
-	ms.Spents = spents
+	sd.Index = index
+	sd.Outputs = outputs
+	sd.Spents = spents
 
 	return nil
 }
 
-func (ms *SlotDiff) sortedOutputs() LexicalOrderedOutputs {
+func (sd *SlotDiff) sortedOutputs() LexicalOrderedOutputs {
 	// do not sort in place
-	sortedOutputs := make(LexicalOrderedOutputs, len(ms.Outputs))
-	copy(sortedOutputs, ms.Outputs)
+	sortedOutputs := make(LexicalOrderedOutputs, len(sd.Outputs))
+	copy(sortedOutputs, sd.Outputs)
 	sort.Sort(sortedOutputs)
 
 	return sortedOutputs
 }
 
-func (ms *SlotDiff) sortedSpents() LexicalOrderedSpents {
+func (sd *SlotDiff) sortedSpents() LexicalOrderedSpents {
 	// do not sort in place
-	sortedSpents := make(LexicalOrderedSpents, len(ms.Spents))
-	copy(sortedSpents, ms.Spents)
+	sortedSpents := make(LexicalOrderedSpents, len(sd.Spents))
+	copy(sortedSpents, sd.Spents)
 	sort.Sort(sortedSpents)
 
 	return sortedSpents
 }
 
-// SHA256Sum computes the sha256 of the milestone diff byte representation.
-func (ms *SlotDiff) SHA256Sum() ([]byte, error) {
-	msDiffHash := sha256.New()
+// SHA256Sum computes the sha256 of the slot diff byte representation.
+func (sd *SlotDiff) SHA256Sum() ([]byte, error) {
+	sdDiffHash := sha256.New()
 
-	if err := binary.Write(msDiffHash, binary.LittleEndian, ms.KVStorableKey()); err != nil {
-		return nil, fmt.Errorf("unable to serialize milestone diff: %w", err)
+	if err := binary.Write(sdDiffHash, binary.LittleEndian, sd.KVStorableKey()); err != nil {
+		return nil, ierrors.Errorf("unable to serialize slot diff: %w", err)
 	}
 
-	if err := binary.Write(msDiffHash, binary.LittleEndian, ms.KVStorableValue()); err != nil {
-		return nil, fmt.Errorf("unable to serialize milestone diff: %w", err)
+	if err := binary.Write(sdDiffHash, binary.LittleEndian, sd.KVStorableValue()); err != nil {
+		return nil, ierrors.Errorf("unable to serialize slot diff: %w", err)
 	}
 
 	// calculate sha256 hash
-	return msDiffHash.Sum(nil), nil
+	return sdDiffHash.Sum(nil), nil
 }
 
 // DB helper functions.

@@ -6,8 +6,6 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -143,7 +141,7 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 
 	var accountCount uint32
 	if err = binary.Read(reader, binary.LittleEndian, &accountCount); err != nil {
-		return n, errors.Wrap(err, "unable to read accounts count")
+		return n, ierrors.Wrap(err, "unable to read accounts count")
 	}
 	n += 4
 
@@ -151,23 +149,23 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 		var accountID iotago.AccountID
 
 		if _, err = io.ReadFull(reader, accountID[:]); err != nil {
-			return 0, errors.Wrap(err, "unable to read accountID")
+			return 0, ierrors.Wrap(err, "unable to read accountID")
 		}
 		n += iotago.AccountIDLength
 
 		poolBytes := make([]byte, poolBytesLength)
 		if _, err = io.ReadFull(reader, poolBytes); err != nil {
-			return 0, errors.Wrap(err, "unable to read pool bytes")
+			return 0, ierrors.Wrap(err, "unable to read pool bytes")
 		}
 		n += poolBytesLength
 
 		pool, c, err := PoolFromBytes(poolBytes)
 		if err != nil {
-			return 0, errors.Wrap(err, "failed to parse pool")
+			return 0, ierrors.Wrap(err, "failed to parse pool")
 		}
 
 		if c != poolBytesLength {
-			return 0, errors.Wrap(err, "invalid pool bytes length")
+			return 0, ierrors.Wrap(err, "invalid pool bytes length")
 		}
 
 		a.setWithoutLocking(accountID, pool)

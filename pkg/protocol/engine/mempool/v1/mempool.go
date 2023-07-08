@@ -2,15 +2,13 @@ package mempoolv1
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
-
-	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -83,7 +81,7 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolv
 func (m *MemPool[VoteRank]) AttachTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (metadata mempool.TransactionMetadata, err error) {
 	storedTransaction, isNew, err := m.storeTransaction(transaction, blockID)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to store transaction: %w", err)
+		return nil, ierrors.Errorf("failed to store transaction: %w", err)
 	}
 
 	if isNew {
@@ -126,7 +124,7 @@ func (m *MemPool[VoteRank]) StateMetadata(stateReference iotago.IndexedUTXORefer
 	}
 
 	stateRequest.OnSuccess(func(loadedState *StateMetadata) { state = loadedState })
-	stateRequest.OnError(func(requestErr error) { err = xerrors.Errorf("failed to request state: %w", requestErr) })
+	stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
 	stateRequest.WaitComplete()
 
 	return state, err
@@ -171,12 +169,12 @@ func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, bl
 	defer m.evictionMutex.RUnlock()
 
 	if m.lastEvictedSlot >= blockID.Index() {
-		return nil, false, xerrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
+		return nil, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
 	}
 
 	newTransaction, err := NewTransactionWithMetadata(m.apiProvider.APIForSlot(blockID.Index()), transaction)
 	if err != nil {
-		return nil, false, xerrors.Errorf("failed to create transaction metadata: %w", err)
+		return nil, false, ierrors.Errorf("failed to create transaction metadata: %w", err)
 	}
 
 	storedTransaction, isNew = m.cachedTransactions.GetOrCreate(newTransaction.ID(), func() *TransactionMetadata { return newTransaction })
@@ -275,7 +273,7 @@ func (m *MemPool[VoteRank]) requestStateWithMetadata(stateRef iotago.IndexedUTXO
 		})
 
 		request.OnError(func(err error) {
-			if !lo.First(waitIfMissing) || !errors.Is(err, mempool.ErrStateNotFound) {
+			if !lo.First(waitIfMissing) || !ierrors.Is(err, mempool.ErrStateNotFound) {
 				p.Reject(err)
 			}
 		})

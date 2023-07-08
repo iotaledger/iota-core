@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -58,19 +57,19 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil && candidateEngine.ChainID() == fork.ForkingPoint.ID() {
 		//TODO: log instead of error
-		p.ErrorHandler()(errors.Errorf("we are already processing the fork at forkingPoint %s", fork.ForkingPoint.ID()))
+		p.ErrorHandler()(ierrors.Errorf("we are already processing the fork at forkingPoint %s", fork.ForkingPoint.ID()))
 		return
 	}
 
 	if p.MainEngineInstance().ChainID() == fork.ForkingPoint.ID() {
 		//TODO: log instead of error
-		p.ErrorHandler()(errors.Errorf("we already switched our main engine to the fork at forkingPoint %s", fork.ForkingPoint.ID()))
+		p.ErrorHandler()(ierrors.Errorf("we already switched our main engine to the fork at forkingPoint %s", fork.ForkingPoint.ID()))
 		return
 	}
 
 	blockIDs, shouldSwitch, banSrc, err := p.processFork(fork)
 	if err != nil {
-		p.ErrorHandler()(errors.Wrapf(err, "failed to handle fork %s at forking point %s from source %s", fork.ForkedChain.LatestCommitment().ID(), fork.ForkingPoint.ID(), fork.Source))
+		p.ErrorHandler()(ierrors.Wrapf(err, "failed to handle fork %s at forking point %s from source %s", fork.ForkedChain.LatestCommitment().ID(), fork.ForkingPoint.ID(), fork.Source))
 		return
 	}
 
@@ -88,7 +87,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	snapshotTargetIndex := fork.ForkingPoint.Index() - 1
 	candidateEngine, err := p.engineManager.ForkEngineAtSlot(snapshotTargetIndex)
 	if err != nil {
-		p.ErrorHandler()(errors.Wrap(err, "error creating new candidate engine"))
+		p.ErrorHandler()(ierrors.Wrap(err, "error creating new candidate engine"))
 		return
 	}
 
@@ -125,7 +124,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	if oldCandidateEngine != nil {
 		oldCandidateEngine.Shutdown()
 		if err := oldCandidateEngine.RemoveFromFilesystem(); err != nil {
-			p.ErrorHandler()(errors.Wrap(err, "error cleaning up replaced candidate engine from file system"))
+			p.ErrorHandler()(ierrors.Wrap(err, "error cleaning up replaced candidate engine from file system"))
 		}
 	}
 }
@@ -205,7 +204,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 		select {
 		case result := <-ch:
 			if result.err != nil {
-				return nil, false, true, errors.Wrapf(result.err, "failed to verify commitment %s", result.commitment.ID())
+				return nil, false, true, ierrors.Wrapf(result.err, "failed to verify commitment %s", result.commitment.ID())
 			}
 
 			anchorBlockIDs = append(anchorBlockIDs, result.blockIDs...)
@@ -224,7 +223,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 				return anchorBlockIDs, doSwitch, false, nil
 			}
 		case <-ctx.Done():
-			return nil, false, false, errors.Wrapf(ctx.Err(), "failed to verify commitment for slot %d", i)
+			return nil, false, false, ierrors.Wrapf(ctx.Err(), "failed to verify commitment for slot %d", i)
 		}
 	}
 
@@ -244,13 +243,13 @@ func (p *Protocol) switchEngines() {
 
 		// Try to re-org the chain manager
 		if err := p.ChainManager.SwitchMainChain(p.candidateEngine.Storage.Settings().LatestCommitment().ID()); err != nil {
-			p.ErrorHandler()(errors.Wrap(err, "switching main chain failed"))
+			p.ErrorHandler()(ierrors.Wrap(err, "switching main chain failed"))
 
 			return false
 		}
 
 		if err := p.engineManager.SetActiveInstance(p.candidateEngine); err != nil {
-			p.ErrorHandler()(errors.Wrap(err, "error switching engines"))
+			p.ErrorHandler()(ierrors.Wrap(err, "error switching engines"))
 
 			return false
 		}
@@ -274,7 +273,7 @@ func (p *Protocol) switchEngines() {
 
 		// Cleanup filesystem
 		if err := oldEngine.RemoveFromFilesystem(); err != nil {
-			p.ErrorHandler()(errors.Wrap(err, "error removing storage directory after switching engines"))
+			p.ErrorHandler()(ierrors.Wrap(err, "error removing storage directory after switching engines"))
 		}
 	}
 }

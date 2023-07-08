@@ -10,7 +10,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/pkg/errors"
+
+	"github.com/iotaledger/hive.go/ierrors"
 )
 
 var (
@@ -27,12 +28,12 @@ type Auth struct {
 func NewAuth(subject string, sessionTimeout time.Duration, nodeID string, secret crypto.PrivKey) (*Auth, error) {
 
 	if len(subject) == 0 {
-		return nil, errors.New("subject must not be empty")
+		return nil, ierrors.New("subject must not be empty")
 	}
 
 	secretBytes, err := crypto.MarshalPrivateKey(secret)
 	if err != nil {
-		return nil, fmt.Errorf("unable to convert private key: %w", err)
+		return nil, ierrors.Errorf("unable to convert private key: %w", err)
 	}
 
 	return &Auth{
@@ -92,12 +93,12 @@ func (j *Auth) Middleware(skipper middleware.Skipper, allow func(c echo.Context,
 
 			token, ok := c.Get("jwt").(*jwt.Token)
 			if !ok {
-				return fmt.Errorf("expected *jwt.Token, got %T", c.Get("jwt"))
+				return ierrors.Errorf("expected *jwt.Token, got %T", c.Get("jwt"))
 			}
 
 			// validate the signing method we expect
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				return ierrors.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 
 			// read the claims set by the JWT middleware on the context
@@ -153,7 +154,7 @@ func (j *Auth) VerifyJWT(token string, allow func(claims *AuthClaims) bool) bool
 	t, err := jwt.ParseWithClaims(token, &AuthClaims{}, func(token *jwt.Token) (interface{}, error) {
 		// validate the signing method we expect
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			return nil, ierrors.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 
 		return j.secret, nil

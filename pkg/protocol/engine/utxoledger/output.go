@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"sync"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
@@ -142,7 +141,7 @@ func NewOutput(apiProvider api.Provider, blockID iotago.BlockID, slotIndexBooked
 
 	var output iotago.Output
 	if len(transaction.Essence.Outputs) <= int(index) {
-		return nil, errors.New("output not found")
+		return nil, ierrors.New("output not found")
 	}
 	output = transaction.Essence.Outputs[int(index)]
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(txID, index)
@@ -251,7 +250,7 @@ func (m *Manager) ReadRawOutputBytesByOutputIDWithoutLocking(outputID iotago.Out
 	// blockID + slotIndex + timestampCreated
 	offset := iotago.BlockIDLength + serializer.UInt64ByteSize + serializer.UInt64ByteSize
 	if len(value) <= offset {
-		return nil, errors.New("invalid UTXO output length")
+		return nil, ierrors.New("invalid UTXO output length")
 	}
 
 	return value[offset:], nil

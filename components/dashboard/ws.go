@@ -8,7 +8,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/gommon/log"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/lo"
@@ -62,7 +61,7 @@ func runWebSocketStreams(component *app.Component) {
 	}
 
 	if err := component.Daemon().BackgroundWorker("Dashboard[StatusUpdate]", func(ctx context.Context) {
-		defer log.Info("Stopping Dashboard[StatusUpdate] ... done")
+		defer Component.LogInfo("Stopping Dashboard[StatusUpdate] ... done")
 
 		unhook := lo.Batch(
 			dashboardmetrics.Events.ComponentCounterUpdated.Hook(func(event *dashboardmetrics.ComponentCounterUpdatedEvent) {
@@ -80,11 +79,11 @@ func runWebSocketStreams(component *app.Component) {
 		}, 2*time.Second, ctx)
 
 		<-ctx.Done()
-		log.Info("Stopping Dashboard[StatusUpdate] ...")
+		Component.LogInfo("Stopping Dashboard[StatusUpdate] ...")
 		unhook()
-		log.Info("Stopping Dashboard[StatusUpdate] ... done")
+		Component.LogInfo("Stopping Dashboard[StatusUpdate] ... done")
 	}, daemon.PriorityDashboard); err != nil {
-		log.Panicf("Failed to start as daemon: %s", err)
+		Component.LogPanicf("Failed to start as daemon: %s", err)
 	}
 }
 
@@ -137,7 +136,7 @@ func broadcastWsBlock(blk interface{}, dontDrop ...bool) {
 func websocketRoute(c echo.Context) error {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("recovered from websocket handle func: %s", r)
+			Component.LogErrorf("recovered from websocket handle func: %s", r)
 		}
 	}()
 

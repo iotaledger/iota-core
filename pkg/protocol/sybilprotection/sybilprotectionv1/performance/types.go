@@ -1,8 +1,7 @@
 package performance
 
 import (
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -19,19 +18,19 @@ func PoolsStatsFromBytes(bytes []byte) (*PoolsStats, int, error) {
 	m := marshalutil.New(bytes)
 	totalStake, err := m.ReadUint64()
 	if err != nil {
-		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse total stake")
+		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse total stake")
 	}
 	p.TotalStake = iotago.BaseToken(totalStake)
 
 	totalValidatorStake, err := m.ReadUint64()
 	if err != nil {
-		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse total validator stake")
+		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse total validator stake")
 	}
 	p.TotalValidatorStake = iotago.BaseToken(totalValidatorStake)
 
 	p.ProfitMargin, err = m.ReadUint64()
 	if err != nil {
-		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse profit margin")
+		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse profit margin")
 	}
 
 	return p, m.ReadOffset(), nil
@@ -61,19 +60,19 @@ func PoolRewardsFromBytes(bytes []byte) (*PoolRewards, int, error) {
 
 	poolStake, err := m.ReadUint64()
 	if err != nil {
-		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse pool stake")
+		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse pool stake")
 	}
 	p.PoolStake = iotago.BaseToken(poolStake)
 
 	poolRewards, err := m.ReadUint64()
 	if err != nil {
-		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse pool rewards")
+		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse pool rewards")
 	}
 	p.PoolRewards = iotago.Mana(poolRewards)
 
 	fixedCost, err := m.ReadUint64()
 	if err != nil {
-		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse fixed cost")
+		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse fixed cost")
 	}
 	p.FixedCost = iotago.Mana(fixedCost)
 

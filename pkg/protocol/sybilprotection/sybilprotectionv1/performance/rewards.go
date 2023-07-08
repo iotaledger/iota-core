@@ -1,9 +1,8 @@
 package performance
 
 import (
-	"github.com/cockroachdb/errors"
-
 	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -45,7 +44,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 
 		poolStats, err := t.poolStatsStore.Get(epochIndex)
 		if err != nil {
-			return 0, errors.Wrapf(err, "validator accountID %s", epochIndex, validatorID)
+			return 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 
 		unDecayedEpochRewards := uint64(rewardsForAccountInEpoch.FixedCost) +
@@ -57,7 +56,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
 		decayedEpochRewards, err2 := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
 		if err2 != nil {
-			return 0, errors.Wrapf(err2, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
+			return 0, ierrors.Wrapf(err2, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 
 		validatorReward += decayedEpochRewards
@@ -83,7 +82,7 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 
 		poolStats, err := t.poolStatsStore.Get(epochIndex)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get pool stats for epoch %d and validator account ID %s", epochIndex, validatorID)
+			return 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator account ID %s", epochIndex, validatorID)
 		}
 
 		unDecayedEpochRewards := decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, profitMarginExponent)*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent) *
@@ -93,7 +92,7 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 		decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
 		decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
+			return 0, ierrors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 
 		delegatorsReward += decayedEpochRewards

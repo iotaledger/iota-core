@@ -5,8 +5,7 @@ import (
 	"crypto/ed25519"
 	"time"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -20,9 +19,9 @@ import (
 )
 
 var (
-	ErrBlockAttacherInvalidBlock              = errors.New("invalid block")
-	ErrBlockAttacherAttachingNotPossible      = errors.New("attaching not possible")
-	ErrBlockAttacherIncompleteBlockNotAllowed = errors.New("incomplete block is not allowed on this node")
+	ErrBlockAttacherInvalidBlock              = ierrors.New("invalid block")
+	ErrBlockAttacherAttachingNotPossible      = ierrors.New("attaching not possible")
+	ErrBlockAttacherIncompleteBlockNotAllowed = ierrors.New("incomplete block is not allowed on this node")
 )
 
 // TODO: make sure an honest validator does not issue blocks within the same slot ratification period in two conflicting chains.
@@ -80,7 +79,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	if blockParams.references == nil {
 		references, err := i.getReferences(ctx, blockParams.payload, blockParams.parentsCount)
 		if err != nil {
-			return nil, errors.Wrap(err, "error building block")
+			return nil, ierrors.Wrap(err, "error building block")
 		}
 		blockParams.references = references
 	}
@@ -90,7 +89,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	}
 
 	if err := i.validateReferences(*blockParams.issuingTime, blockParams.slotCommitment.Index, blockParams.references); err != nil {
-		return nil, errors.Wrap(err, "block references invalid")
+		return nil, ierrors.Wrap(err, "block references invalid")
 	}
 
 	var api iotago.API
@@ -113,7 +112,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	if strongParents, exists := blockParams.references[iotago.StrongParentType]; exists && len(strongParents) > 0 {
 		blockBuilder.StrongParents(strongParents)
 	} else {
-		return nil, errors.New("cannot create a block without strong parents")
+		return nil, ierrors.New("cannot create a block without strong parents")
 	}
 
 	if weakParents, exists := blockParams.references[iotago.WeakParentType]; exists {
@@ -128,12 +127,12 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 
 	block, err := blockBuilder.Build()
 	if err != nil {
-		return nil, errors.Wrap(err, "error building block")
+		return nil, ierrors.Wrap(err, "error building block")
 	}
 
 	modelBlock, err := model.BlockFromBlock(block, api)
 	if err != nil {
-		return nil, errors.Wrap(err, "error serializing block to model block")
+		return nil, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
 	i.events.BlockConstructed.Trigger(modelBlock)
@@ -163,12 +162,12 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
 
 	if err := i.issueBlock(block); err != nil {
-		return errors.Wrapf(err, "failed to issue block %s", block.ID())
+		return ierrors.Wrapf(err, "failed to issue block %s", block.ID())
 	}
 
 	select {
 	case <-ctx.Done():
-		return errors.Errorf("context canceled whilst waiting for event on block %s", block.ID())
+		return ierrors.Errorf("context canceled whilst waiting for event on block %s", block.ID())
 	case <-triggered:
 		return nil
 	}
@@ -182,7 +181,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	protoParams := api.ProtocolParameters()
 
 	if iotaBlock.ProtocolVersion != protoParams.Version() {
-		return iotago.EmptyBlockID(), errors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
+		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
 	}
 
 	if iotaBlock.NetworkID == 0 {
@@ -206,14 +205,14 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		switch payload := innerBlock.Payload.(type) {
 		case *iotago.Transaction:
 			if payload.Essence.NetworkID != protoParams.NetworkID() {
-				return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Essence.NetworkID)
+				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Essence.NetworkID)
 			}
 		}
 
 		if len(iotaBlock.Parents()) == 0 {
 			references, err := i.getReferences(ctx, innerBlock.Payload)
 			if err != nil {
-				return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %s", err.Error())
+				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %w", err)
 			}
 
 			innerBlock.StrongParents = references[iotago.StrongParentType]
@@ -235,7 +234,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	references[iotago.ShallowLikeParentType] = iotaBlock.Block.ShallowLikeParentIDs()
 
 	if err := i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Index(), references); err != nil {
-		return iotago.EmptyBlockID(), errors.WithMessagef(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %s", err.Error())
+		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
 	if iotaBlock.IssuerID.Empty() || resign {
@@ -245,29 +244,29 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 			prvKey := i.Account.PrivateKey()
 			signature, err := iotaBlock.Sign(api, iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
 			if err != nil {
-				return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, err.Error())
+				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", err)
 			}
 
 			edSig, isEdSig := signature.(*iotago.Ed25519Signature)
 			if !isEdSig {
-				return iotago.EmptyBlockID(), errors.WithMessage(ErrBlockAttacherInvalidBlock, "unsupported signature type")
+				return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "unsupported signature type")
 			}
 
 			iotaBlock.Signature = edSig
 		} else {
-			return iotago.EmptyBlockID(), errors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
+			return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
 		}
 	}
 
 	modelBlock, err := model.BlockFromBlock(iotaBlock, api)
 	if err != nil {
-		return iotago.EmptyBlockID(), errors.Wrap(err, "error serializing block to model block")
+		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error serializing block to model block")
 	}
 
 	i.events.BlockConstructed.Trigger(modelBlock)
 
 	if err := i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
-		return iotago.EmptyBlockID(), errors.Wrap(err, "error issuing model block")
+		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error issuing model block")
 	}
 
 	return modelBlock.ID(), nil
@@ -286,10 +285,10 @@ func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIn
 	for _, parent := range lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds })) {
 		if b, exists := i.protocol.MainEngineInstance().BlockFromCache(parent); exists {
 			if b.IssuingTime().After(issuingTime) {
-				return errors.Errorf("cannot issue block if the parents issuingTime is ahead block's issuingTime: %s vs %s", b.IssuingTime(), issuingTime)
+				return ierrors.Errorf("cannot issue block if the parents issuingTime is ahead block's issuingTime: %s vs %s", b.IssuingTime(), issuingTime)
 			}
 			if b.SlotCommitmentID().Index() > slotCommitmentIndex {
-				return errors.Errorf("cannot issue block if the commitment is ahead of its parents' commitment: %s vs %s", b.SlotCommitmentID().Index(), slotCommitmentIndex)
+				return ierrors.Errorf("cannot issue block if the commitment is ahead of its parents' commitment: %s vs %s", b.SlotCommitmentID().Index(), slotCommitmentIndex)
 
 			}
 
@@ -324,12 +323,12 @@ func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, _ iotago.Paylo
 
 		select {
 		case <-interval.C:
-			i.events.Error.Trigger(errors.Wrap(err, "could not get references"))
+			i.events.Error.Trigger(ierrors.Wrap(err, "could not get references"))
 			continue
 		case <-timeout.C:
-			return nil, errors.Errorf("timeout while trying to select tips and determine references")
+			return nil, ierrors.New("timeout while trying to select tips and determine references")
 		case <-ctx.Done():
-			return nil, errors.Errorf("context canceled whilst trying to select tips and determine references: %s", ctx.Err().Error())
+			return nil, ierrors.Errorf("context canceled whilst trying to select tips and determine references: %w", ctx.Err())
 		}
 	}
 }

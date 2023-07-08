@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -108,8 +108,8 @@ func New(
 func (e *EngineManager) LoadActiveEngine(snapshotPath string) (*engine.Engine, error) {
 	info := &engineInfo{}
 	if err := ioutils.ReadJSONFromFile(e.infoFilePath(), info); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("unable to read engine info file: %w", err)
+		if !ierrors.Is(err, os.ErrNotExist) {
+			return nil, ierrors.Errorf("unable to read engine info file: %w", err)
 		}
 	}
 
@@ -141,14 +141,14 @@ func (e *EngineManager) CleanupNonActive() error {
 
 	dirs, err := e.directory.SubDirs()
 	if err != nil {
-		return errors.Wrapf(err, "unable to list subdirectories of %s", e.directory.Path())
+		return ierrors.Wrapf(err, "unable to list subdirectories of %s", e.directory.Path())
 	}
 	for _, dir := range dirs {
 		if dir == activeDir {
 			continue
 		}
 		if err := e.directory.RemoveSubdir(dir); err != nil {
-			return errors.Wrapf(err, "unable to remove subdirectory %s", dir)
+			return ierrors.Wrapf(err, "unable to remove subdirectory %s", dir)
 		}
 	}
 
@@ -171,7 +171,7 @@ func (e *EngineManager) SetActiveInstance(instance *engine.Engine) error {
 
 func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) *engine.Engine {
 	errorHandler := func(err error) {
-		e.errorHandler(errors.Wrapf(err, "engine (%s)", dirName[0:8]))
+		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", dirName[0:8]))
 	}
 
 	return engine.New(e.workers.CreateGroup(dirName),
@@ -202,7 +202,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	// Dump a snapshot at the target index
 	snapshotPath := filepath.Join(os.TempDir(), fmt.Sprintf("snapshot_%d_%s.bin", index, lo.PanicOnErr(uuid.NewUUID())))
 	if err := e.activeInstance.WriteSnapshot(snapshotPath, index); err != nil {
-		return nil, errors.Wrapf(err, "error exporting snapshot for index %s", index)
+		return nil, ierrors.Wrapf(err, "error exporting snapshot for index %s", index)
 	}
 
 	return e.newEngineInstance(snapshotPath), nil

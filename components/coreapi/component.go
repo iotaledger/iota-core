@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/pkg/errors"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/restapi"
@@ -303,7 +303,7 @@ func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			if !deps.Protocol.SyncManager.IsNodeSynced() {
-				return errors.WithMessage(echo.ErrServiceUnavailable, "node is not synced")
+				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
 			}
 
 			return next(c)
@@ -316,7 +316,7 @@ func checkUpcomingUnsupportedProtocolVersion() echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			// todo update with protocol upgrades support
 			// if !deps.ProtocolManager.NextPendingSupported() {
-			//	return errors.WithMessage(echo.ErrServiceUnavailable, "node does not support the upcoming protocol upgrade")
+			//	return ierrors.Wrap(echo.ErrServiceUnavailable, "node does not support the upcoming protocol upgrade")
 			// }
 
 			return next(c)

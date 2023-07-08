@@ -3,12 +3,11 @@ package accountsledger
 import (
 	"sync"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -100,12 +99,12 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountID) (*prunable.AccountDiff, bool, error) {
 	s := m.slotDiff(index)
 	if s == nil {
-		return nil, false, errors.Errorf("slot %d already pruned", index)
+		return nil, false, ierrors.Errorf("slot %d already pruned", index)
 	}
 
 	accDiff, destroyed, err := s.Load(accountID)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "failed to load slot diff for account %s", accountID)
+		return nil, false, ierrors.Wrapf(err, "failed to load slot diff for account %s", accountID)
 	}
 
 	return accDiff, destroyed, nil
@@ -130,20 +129,20 @@ func (m *Manager) ApplyDiff(
 
 	// sanity-check if the slotIndex is the next slot to commit
 	if slotIndex != m.latestCommittedSlot+1 {
-		return errors.Errorf("cannot apply the next diff, there is a gap in committed slots, account vector index: %d, slot to commit: %d", m.latestCommittedSlot, slotIndex)
+		return ierrors.Errorf("cannot apply the next diff, there is a gap in committed slots, account vector index: %d, slot to commit: %d", m.latestCommittedSlot, slotIndex)
 	}
 
 	// load blocks burned in this slot
 	// TODO: move this to update slot diff
 	burns, err := m.computeBlockBurnsForSlot(slotIndex)
 	if err != nil {
-		return errors.Wrap(err, "could not create block burns for slot")
+		return ierrors.Wrap(err, "could not create block burns for slot")
 	}
 	m.updateSlotDiffWithBurns(burns, accountDiffs)
 
 	// store the diff and apply it to the account vector tree, obtaining the new root
 	if err = m.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
-		return errors.Wrap(err, "could not apply diff to account tree")
+		return ierrors.Wrap(err, "could not apply diff to account tree")
 	}
 
 	// set the index where the tree is now at
@@ -162,10 +161,10 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 
 	// if m.latestCommittedSlot < m.commitmentEvictionAge we should have all history
 	if m.latestCommittedSlot >= m.commitmentEvictionAge && targetIndex < m.latestCommittedSlot-m.commitmentEvictionAge {
-		return nil, false, errors.Errorf("can't calculate account, target slot index older than allowed (%d<%d)", targetIndex, m.latestCommittedSlot-m.commitmentEvictionAge)
+		return nil, false, ierrors.Errorf("can't calculate account, target slot index older than allowed (%d<%d)", targetIndex, m.latestCommittedSlot-m.commitmentEvictionAge)
 	}
 	if targetIndex > m.latestCommittedSlot {
-		return nil, false, errors.Errorf("can't retrieve account, slot %d is not committed yet, latest committed slot: %d", targetIndex, m.latestCommittedSlot)
+		return nil, false, ierrors.Errorf("can't retrieve account, slot %d is not committed yet, latest committed slot: %d", targetIndex, m.latestCommittedSlot)
 	}
 
 	// read initial account data at the latest committed slot
@@ -195,7 +194,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 
 	accountOutput, ok := output.Output().(*iotago.AccountOutput)
 	if !ok {
-		return errors.Errorf("can't add account, output is not an account output")
+		return ierrors.New("can't add account, output is not an account output")
 	}
 
 	var stakingOpts []options.Option[accounts.AccountData]
@@ -229,12 +228,12 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 	for diffIndex := m.latestCommittedSlot; diffIndex > targetIndex; diffIndex-- {
 		diffStore := m.slotDiff(diffIndex)
 		if diffStore == nil {
-			return false, errors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
+			return false, ierrors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
 		}
 
 		found, err := diffStore.Has(accountData.ID)
 		if err != nil {
-			return false, errors.Wrapf(err, "can't retrieve account, could not check if diff store for slot (%d) has account (%s)", diffIndex, accountData.ID)
+			return false, ierrors.Wrapf(err, "can't retrieve account, could not check if diff store for slot (%d) has account (%s)", diffIndex, accountData.ID)
 		}
 
 		// no changes for this account in this slot
@@ -244,7 +243,7 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 
 		diffChange, destroyed, err := diffStore.Load(accountData.ID)
 		if err != nil {
-			return false, errors.Wrapf(err, "can't retrieve account, could not load diff for account (%s) in slot (%d)", accountData.ID, diffIndex)
+			return false, ierrors.Wrapf(err, "can't retrieve account, could not load diff for account (%s) in slot (%d)", accountData.ID, diffIndex)
 		}
 
 		// update the account data with the diff
@@ -300,7 +299,7 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 			blockID := it.Next()
 			block, blockLoaded := m.block(blockID)
 			if !blockLoaded {
-				return nil, errors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
+				return nil, ierrors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
 			}
 			if basicBlock, isBasicBlock := block.BasicBlock(); isBasicBlock {
 				burns[block.ProtocolBlock().IssuerID] += basicBlock.BurnedMana
@@ -322,7 +321,7 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 		}
 		err := diffStore.Store(accountID, accountDiff, destroyed)
 		if err != nil {
-			return errors.Wrapf(err, "could not store diff to slot %d", slotIndex)
+			return ierrors.Wrapf(err, "could not store diff to slot %d", slotIndex)
 		}
 	}
 

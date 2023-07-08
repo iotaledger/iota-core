@@ -3,8 +3,7 @@ package blockfilter
 import (
 	"time"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/api"
@@ -16,11 +15,11 @@ import (
 )
 
 var (
-	ErrCommitmentNotCommittable                  = errors.New("a block cannot commit to a slot that cannot objectively be committable yet")
-	ErrBlockTimeTooFarAheadInFuture              = errors.New("a block cannot be too far ahead in the future")
-	ErrInvalidSignature                          = errors.New("block has invalid signature")
-	ErrTransactionCommitmentInputTooFarInThePast = errors.New("transaction in a block references too old CommitmentInput")
-	ErrTransactionCommitmentInputInTheFuture     = errors.New("transaction in a block references a CommitmentInput in the future")
+	ErrCommitmentNotCommittable                  = ierrors.New("a block cannot commit to a slot that cannot objectively be committable yet")
+	ErrBlockTimeTooFarAheadInFuture              = ierrors.New("a block cannot be too far ahead in the future")
+	ErrInvalidSignature                          = ierrors.New("block has invalid signature")
+	ErrTransactionCommitmentInputTooFarInThePast = ierrors.New("transaction in a block references too old CommitmentInput")
+	ErrTransactionCommitmentInputInTheFuture     = ierrors.New("transaction in a block references a CommitmentInput in the future")
 )
 
 // Filter filters blocks.
@@ -75,7 +74,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	if block.ProtocolBlock().SlotCommitmentID.Index() > 0 && block.ProtocolBlock().SlotCommitmentID.Index()+protocolParams.EvictionAge() > block.ID().Index() {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
+			Reason: ierrors.Wrapf(ErrCommitmentNotCommittable, "block at slot %d committing to slot %d", block.ID().Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
 			Source: source,
 		})
 
@@ -87,7 +86,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
 		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
+			Reason: ierrors.Wrapf(ErrBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
 			Source: source,
 		})
 
@@ -111,7 +110,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 				if commitmentInput.CommitmentID.Index()+(protocolParams.EvictionAge()<<1) < block.ID().Index() {
 					f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 						Block:  block,
-						Reason: errors.WithMessagef(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while min allowed is %d", commitmentInput.CommitmentID.Index(), block.ID().Index()-(protocolParams.EvictionAge()<<1)),
+						Reason: ierrors.Wrapf(ErrTransactionCommitmentInputTooFarInThePast, "transaction in a block contains CommitmentInput to slot %d while min allowed is %d", commitmentInput.CommitmentID.Index(), block.ID().Index()-(protocolParams.EvictionAge()<<1)),
 						Source: source,
 					})
 
@@ -120,7 +119,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 				if commitmentInput.CommitmentID.Index() > block.ProtocolBlock().SlotCommitmentID.Index() {
 					f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 						Block:  block,
-						Reason: errors.WithMessagef(ErrTransactionCommitmentInputInTheFuture, "transaction in a block contains CommitmentInput to slot %d while max allowed is %d", commitmentInput.CommitmentID.Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
+						Reason: ierrors.Wrapf(ErrTransactionCommitmentInputInTheFuture, "transaction in a block contains CommitmentInput to slot %d while max allowed is %d", commitmentInput.CommitmentID.Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
 						Source: source,
 					})
 
@@ -136,7 +135,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 			if err != nil {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,
-					Reason: errors.WithMessagef(ErrInvalidSignature, "error: %s", err.Error()),
+					Reason: ierrors.Wrapf(ErrInvalidSignature, "%w", err),
 					Source: source,
 				})
 

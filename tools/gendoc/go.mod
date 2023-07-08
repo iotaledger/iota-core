@@ -7,7 +7,7 @@ replace github.com/iotaledger/iota-core => ../../
 require (
 	github.com/iotaledger/hive.go/app v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/apputils v0.0.0-20230706083020-ef6c3248369d
-	github.com/iotaledger/iota-core v0.0.0-20230414140919-e676d4aef341
+	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -17,9 +17,6 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/celestiaorg/smt v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/cockroachdb/errors v1.10.0 // indirect
-	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
-	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -35,7 +32,6 @@ require (
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/getsentry/sentry-go v0.22.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -66,8 +62,8 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230706083020-ef6c3248369d // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230706083020-ef6c3248369d // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d // indirect
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230620163422-3926cc7ad264 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230706125103-ab2eb9242508 // indirect
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230707105354-f311af5f5e25 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
@@ -76,7 +72,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
-	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/labstack/echo/v4 v4.10.2 // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
@@ -131,7 +126,6 @@ require (
 	github.com/quic-go/quic-go v0.33.0 // indirect
 	github.com/quic-go/webtransport-go v0.5.3 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
-	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
@@ -155,7 +149,6 @@ require (
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
-	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

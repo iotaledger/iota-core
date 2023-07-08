@@ -5,10 +5,9 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
@@ -91,7 +90,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 
 	bytesRead, err := io.ReadFull(reader, a.ID[:])
 	if err != nil {
-		return bytesConsumed, errors.Wrap(err, "unable to read accountID")
+		return bytesConsumed, ierrors.Wrap(err, "unable to read accountID")
 	}
 
 	bytesConsumed += bytesRead
@@ -99,23 +98,23 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	a.Credits = &BlockIssuanceCredits{}
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.Value); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read account balance value for accountID %s", a.ID)
+		return bytesConsumed, ierrors.Wrapf(err, "unable to read account balance value for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.UpdateTime); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read updatedTime for account balance for accountID %s", a.ID)
+		return bytesConsumed, ierrors.Wrapf(err, "unable to read updatedTime for account balance for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.OutputID); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read OutputID for account for accountID %s", a.ID)
+		return bytesConsumed, ierrors.Wrapf(err, "unable to read outputID for accountID %s", a.ID)
 	}
 	bytesConsumed += len(a.OutputID)
 
 	var pubKeyCount uint8
 	if err := binary.Read(reader, binary.LittleEndian, &pubKeyCount); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read pubKeyCount count for accountID %s", a.ID)
+		return bytesConsumed, ierrors.Wrapf(err, "unable to read pubKeyCount count for accountID %s", a.ID)
 	}
 	bytesConsumed++
 
@@ -124,7 +123,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 		var pubKey ed25519.PublicKey
 		bytesRead, err = io.ReadFull(reader, pubKey[:])
 		if err != nil {
-			return bytesConsumed, errors.Wrapf(err, "unable to read public key index %d for accountID %s", i, a.ID)
+			return bytesConsumed, ierrors.Wrapf(err, "unable to read public key index %d for accountID %s", i, a.ID)
 		}
 		bytesConsumed += bytesRead
 
@@ -133,22 +132,22 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	a.PubKeys = ds.NewSet(pubKeys...)
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.ValidatorStake)); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read validator stake for accountID %s", a.ID)
+		return bytesConsumed, ierrors.Wrapf(err, "unable to read validator stake for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.DelegationStake)); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read delegation stake for accountID %s", a.ID)
+		return bytesConsumed, ierrors.Wrapf(err, "unable to read delegation stake for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.FixedCost)); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read fixed cost for accountID %s", a.ID)
+		return bytesConsumed, ierrors.Wrapf(err, "unable to read fixed cost for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.StakeEndEpoch)); err != nil {
-		return bytesConsumed, errors.Wrapf(err, "unable to read stake end epoch for accountID %s", a.ID)
+		return bytesConsumed, ierrors.Wrapf(err, "unable to read stake end epoch for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
 
@@ -158,7 +157,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 func (a AccountData) Bytes() ([]byte, error) {
 	idBytes, err := a.ID.Bytes()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal account id")
+		return nil, ierrors.Wrap(err, "failed to marshal account id")
 	}
 	m := marshalutil.New()
 	m.WriteBytes(idBytes)

@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -255,16 +254,16 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	mainEngine := p.MainEngineInstance()
 
 	if !mainEngine.WasInitialized() {
-		return errors.Errorf("protocol engine not yet initialized")
+		return ierrors.New("protocol engine not yet initialized")
 	}
 
 	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
 	if chainCommitment == nil {
-		return errors.Errorf("protocol ProcessBlock failed. Unknown commitment: %s", block.ProtocolBlock().SlotCommitmentID)
+		return ierrors.Errorf("protocol ProcessBlock failed. Unknown commitment: %s", block.ProtocolBlock().SlotCommitmentID)
 	}
 
 	if !chainCommitment.IsSolid() {
-		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
+		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
 
 	processed := false
@@ -286,7 +285,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	if !processed {
-		return errors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.ProtocolBlock().SlotCommitmentID)
+		return ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.ProtocolBlock().SlotCommitmentID)
 	}
 
 	return nil

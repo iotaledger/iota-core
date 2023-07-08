@@ -1,9 +1,8 @@
 package testsuite
 
 import (
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 )
@@ -17,7 +16,7 @@ func (t *TestSuite) AssertConflictsInCacheAcceptanceState(expectedConflictAliase
 				acceptanceState := node.Protocol.MainEngineInstance().Ledger.ConflictDAG().AcceptanceState(ds.NewSet(t.TransactionFramework.TransactionID(conflictAlias)))
 
 				if acceptanceState != expectedState {
-					return errors.Errorf("assertTransactionsInCacheWithFunc: %s: conflict %s is %s, but expected %s", node.Name, conflictAlias, acceptanceState, expectedState)
+					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: conflict %s is %s, but expected %s", node.Name, conflictAlias, acceptanceState, expectedState)
 				}
 
 				return nil

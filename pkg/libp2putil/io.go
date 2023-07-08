@@ -5,9 +5,9 @@ import (
 	"io"
 
 	"github.com/multiformats/go-varint"
-	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -62,7 +62,7 @@ func (ur *UvarintReader) ReadBlk(blk proto.Message) error {
 	}
 
 	if length64 > iotago.MaxBlockSize {
-		return errors.Errorf("max block size exceeded: %d", length64)
+		return ierrors.Errorf("max block size exceeded: %d", length64)
 	}
 	buf := make([]byte, length64)
 	if _, err := io.ReadFull(ur.r, buf); err != nil {

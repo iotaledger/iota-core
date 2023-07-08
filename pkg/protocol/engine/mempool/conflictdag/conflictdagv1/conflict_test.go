@@ -1,7 +1,6 @@
 package conflictdagv1
 
 import (
-	"errors"
 	"math/rand"
 	"sort"
 	"sync"
@@ -11,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
@@ -567,7 +567,7 @@ func assertCorrectOrder(t *testing.T, conflicts ...TestConflict) {
 			if conflictingConflict != unPreferredConflict && conflictingConflict.IsPreferred() {
 				require.Equal(t, conflictingConflict, unPreferredConflict.PreferredInstead())
 
-				return errors.New("break the loop")
+				return ierrors.New("break the loop")
 			}
 
 			return nil

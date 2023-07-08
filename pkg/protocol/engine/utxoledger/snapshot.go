@@ -2,11 +2,9 @@ package utxoledger
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/core/api"
@@ -31,37 +29,37 @@ func (o *Output) SnapshotBytes() []byte {
 func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider) (*Output, error) {
 	outputID := iotago.OutputID{}
 	if _, err := io.ReadFull(reader, outputID[:]); err != nil {
-		return nil, fmt.Errorf("unable to read LS output ID: %w", err)
+		return nil, ierrors.Errorf("unable to read LS output ID: %w", err)
 	}
 
 	blockID := iotago.BlockID{}
 	if _, err := io.ReadFull(reader, blockID[:]); err != nil {
-		return nil, fmt.Errorf("unable to read LS block ID: %w", err)
+		return nil, ierrors.Errorf("unable to read LS block ID: %w", err)
 	}
 
 	var indexBooked iotago.SlotIndex
 	if err := binary.Read(reader, binary.LittleEndian, &indexBooked); err != nil {
-		return nil, fmt.Errorf("unable to read LS output milestone index booked: %w", err)
+		return nil, ierrors.Errorf("unable to read LS output milestone index booked: %w", err)
 	}
 
 	var indexCreated iotago.SlotIndex
 	if err := binary.Read(reader, binary.LittleEndian, &indexCreated); err != nil {
-		return nil, fmt.Errorf("unable to read LS output index created: %w", err)
+		return nil, ierrors.Errorf("unable to read LS output index created: %w", err)
 	}
 
 	var outputLength uint32
 	if err := binary.Read(reader, binary.LittleEndian, &outputLength); err != nil {
-		return nil, fmt.Errorf("unable to read LS output length: %w", err)
+		return nil, ierrors.Errorf("unable to read LS output length: %w", err)
 	}
 
 	outputBytes := make([]byte, outputLength)
 	if _, err := io.ReadFull(reader, outputBytes); err != nil {
-		return nil, fmt.Errorf("unable to read LS output bytes: %w", err)
+		return nil, ierrors.Errorf("unable to read LS output bytes: %w", err)
 	}
 
 	var output iotago.TxEssenceOutput
 	if _, err := apiProvider.APIForSlot(blockID.Index()).Decode(outputBytes, &output, serix.WithValidation()); err != nil {
-		return nil, fmt.Errorf("invalid LS output address: %w", err)
+		return nil, ierrors.Errorf("invalid LS output address: %w", err)
 	}
 
 	return CreateOutput(apiProvider, outputID, blockID, indexBooked, indexCreated, output, outputBytes), nil
@@ -84,12 +82,12 @@ func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider, ind
 
 	transactionIDSpent := iotago.TransactionID{}
 	if _, err := io.ReadFull(reader, transactionIDSpent[:]); err != nil {
-		return nil, fmt.Errorf("unable to read LS transaction ID spent: %w", err)
+		return nil, ierrors.Errorf("unable to read LS transaction ID spent: %w", err)
 	}
 
 	var timestampSpent int64
 	if err := binary.Read(reader, binary.LittleEndian, &timestampSpent); err != nil {
-		return nil, fmt.Errorf("unable to read LS output milestone timestamp booked: %w", err)
+		return nil, ierrors.Errorf("unable to read LS output milestone timestamp booked: %w", err)
 	}
 
 	return NewSpent(output, transactionIDSpent, indexSpent), nil
@@ -100,13 +98,13 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider
 
 	var diffIndex uint64
 	if err := binary.Read(reader, binary.LittleEndian, &diffIndex); err != nil {
-		return nil, fmt.Errorf("unable to read slot diff index: %w", err)
+		return nil, ierrors.Errorf("unable to read slot diff index: %w", err)
 	}
 	slotDiff.Index = iotago.SlotIndex(diffIndex)
 
 	var createdCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &createdCount); err != nil {
-		return nil, fmt.Errorf("unable to read slot diff created count: %w", err)
+		return nil, ierrors.Errorf("unable to read slot diff created count: %w", err)
 	}
 
 	slotDiff.Outputs = make(Outputs, createdCount)
@@ -115,13 +113,13 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider
 		var err error
 		slotDiff.Outputs[i], err = OutputFromSnapshotReader(reader, apiProvider)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read slot diff output: %w", err)
+			return nil, ierrors.Errorf("unable to read slot diff output: %w", err)
 		}
 	}
 
 	var consumedCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &consumedCount); err != nil {
-		return nil, fmt.Errorf("unable to read slot diff consumed count: %w", err)
+		return nil, ierrors.Errorf("unable to read slot diff consumed count: %w", err)
 	}
 
 	slotDiff.Spents = make(Spents, consumedCount)
@@ -130,7 +128,7 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider
 		var err error
 		slotDiff.Spents[i], err = SpentFromSnapshotReader(reader, apiProvider, slotDiff.Index)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read slot diff spent: %w", err)
+			return nil, ierrors.Errorf("unable to read slot diff spent: %w", err)
 		}
 	}
 
@@ -141,26 +139,26 @@ func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *SlotDiff) (writt
 	var totalBytesWritten int64
 
 	if err := utils.WriteValueFunc(writer, uint64(diff.Index), &totalBytesWritten); err != nil {
-		return 0, errors.Wrap(err, "unable to write slot diff index")
+		return 0, ierrors.Wrap(err, "unable to write slot diff index")
 	}
 
 	if err := utils.WriteValueFunc(writer, uint64(len(diff.Outputs)), &totalBytesWritten); err != nil {
-		return 0, errors.Wrap(err, "unable to write slot diff created count")
+		return 0, ierrors.Wrap(err, "unable to write slot diff created count")
 	}
 
 	for _, output := range diff.sortedOutputs() {
 		if err := utils.WriteBytesFunc(writer, output.SnapshotBytes(), &totalBytesWritten); err != nil {
-			return 0, errors.Wrap(err, "unable to write slot diff created output")
+			return 0, ierrors.Wrap(err, "unable to write slot diff created output")
 		}
 	}
 
 	if err := utils.WriteValueFunc(writer, uint64(len(diff.Spents)), &totalBytesWritten); err != nil {
-		return 0, errors.Wrap(err, "unable to write slot diff consumed count")
+		return 0, ierrors.Wrap(err, "unable to write slot diff consumed count")
 	}
 
 	for _, spent := range diff.sortedSpents() {
 		if err := utils.WriteBytesFunc(writer, spent.SnapshotBytes(), &totalBytesWritten); err != nil {
-			return 0, errors.Wrap(err, "unable to write slot diff created output")
+			return 0, ierrors.Wrap(err, "unable to write slot diff created output")
 		}
 	}
 
@@ -174,7 +172,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 
 	var snapshotLedgerIndex uint64
 	if err := binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex); err != nil {
-		return fmt.Errorf("unable to read LS ledger index: %w", err)
+		return ierrors.Errorf("unable to read LS ledger index: %w", err)
 	}
 
 	if err := m.StoreLedgerIndexWithoutLocking(iotago.SlotIndex(snapshotLedgerIndex)); err != nil {
@@ -183,18 +181,18 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 
 	var outputCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &outputCount); err != nil {
-		return fmt.Errorf("unable to read LS output count: %w", err)
+		return ierrors.Errorf("unable to read LS output count: %w", err)
 	}
 
 	var slotDiffCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &slotDiffCount); err != nil {
-		return fmt.Errorf("unable to read LS slot diff count: %w", err)
+		return ierrors.Errorf("unable to read LS slot diff count: %w", err)
 	}
 
 	for i := uint64(0); i < outputCount; i++ {
 		output, err := OutputFromSnapshotReader(reader, m.apiProvider)
 		if err != nil {
-			return fmt.Errorf("at pos %d: %w", i, err)
+			return ierrors.Errorf("at pos %d: %w", i, err)
 		}
 
 		if err := m.AddUnspentOutputWithoutLocking(output); err != nil {
@@ -209,7 +207,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		}
 
 		if slotDiff.Index != iotago.SlotIndex(snapshotLedgerIndex-i) {
-			return fmt.Errorf("invalid LS slot index. %d vs %d", slotDiff.Index, snapshotLedgerIndex-i)
+			return ierrors.Errorf("invalid LS slot index. %d vs %d", slotDiff.Index, snapshotLedgerIndex-i)
 		}
 
 		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
@@ -230,7 +228,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 		return err
 	}
 	if err := utils.WriteValueFunc(writer, ledgerIndex); err != nil {
-		return errors.Wrap(err, "unable to write ledger index")
+		return ierrors.Wrap(err, "unable to write ledger index")
 	}
 
 	var relativeCountersPosition int64
@@ -241,13 +239,13 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	// Outputs Count
 	// The amount of UTXOs contained within this snapshot.
 	if err := utils.WriteValueFunc(writer, outputCount, &relativeCountersPosition); err != nil {
-		return errors.Wrap(err, "unable to write outputs count")
+		return ierrors.Wrap(err, "unable to write outputs count")
 	}
 
 	// Slot Diffs Count
 	// The amount of slot diffs contained within this snapshot.
 	if err := utils.WriteValueFunc(writer, slotDiffCount, &relativeCountersPosition); err != nil {
-		return errors.Wrap(err, "unable to write slot diffs count")
+		return ierrors.Wrap(err, "unable to write slot diffs count")
 	}
 
 	// Get all UTXOs and sort them by outputID
@@ -263,7 +261,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 		}
 
 		if err := utils.WriteBytesFunc(writer, output.SnapshotBytes(), &relativeCountersPosition); err != nil {
-			return errors.Wrap(err, "unable to write output ID")
+			return ierrors.Wrap(err, "unable to write output ID")
 		}
 
 		outputCount++
@@ -286,7 +284,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 
 	// seek back to the file position of the counters
 	if _, err := writer.Seek(-relativeCountersPosition, io.SeekCurrent); err != nil {
-		return fmt.Errorf("unable to seek to LS counter placeholders: %w", err)
+		return ierrors.Errorf("unable to seek to LS counter placeholders: %w", err)
 	}
 
 	var countersSize int64
@@ -294,18 +292,18 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	// Outputs Count
 	// The amount of UTXOs contained within this snapshot.
 	if err := utils.WriteValueFunc(writer, outputCount, &countersSize); err != nil {
-		return errors.Wrap(err, "unable to write outputs count")
+		return ierrors.Wrap(err, "unable to write outputs count")
 	}
 
 	// Slot Diffs Count
 	// The amount of slot diffs contained within this snapshot.
 	if err := utils.WriteValueFunc(writer, slotDiffCount, &countersSize); err != nil {
-		return errors.Wrap(err, "unable to write slot diffs count")
+		return ierrors.Wrap(err, "unable to write slot diffs count")
 	}
 
 	// seek back to the last write position
 	if _, err := writer.Seek(relativeCountersPosition-countersSize, io.SeekCurrent); err != nil {
-		return fmt.Errorf("unable to seek to LS last written position: %w", err)
+		return ierrors.Errorf("unable to seek to LS last written position: %w", err)
 	}
 
 	return nil
