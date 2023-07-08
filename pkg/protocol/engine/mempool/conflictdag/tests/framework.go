@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"

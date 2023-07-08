@@ -3,6 +3,7 @@ package mock
 import (
 	"fmt"
 
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"

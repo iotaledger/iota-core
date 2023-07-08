@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"

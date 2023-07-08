@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/iotaledger/hive.go/ds/set"
 )
 
 func TestSet(t *testing.T) {
@@ -13,8 +15,8 @@ func TestSet(t *testing.T) {
 	inheritedSet := NewSet[int]()
 	inheritedSet.InheritFrom(source1, source2)
 
-	source1.Add(setImpl.New(1, 2, 4))
-	source2.Add(setImpl.New(7, 9))
+	source1.Add(set.New(1, 2, 4))
+	source2.Add(set.New(7, 9))
 
 	require.True(t, inheritedSet.Get().Has(1))
 	require.True(t, inheritedSet.Get().Has(2))
