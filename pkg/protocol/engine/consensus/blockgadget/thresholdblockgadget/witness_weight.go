@@ -1,7 +1,7 @@
 package thresholdblockgadget
 
 import (
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/votes"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -17,10 +17,10 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 	}
 
 	var toPreAccept []*blocks.Block
-	toPreAcceptByID := ds.NewSet[iotago.BlockID]()
+	toPreAcceptByID := set.New[iotago.BlockID]()
 
 	var toPreConfirm []*blocks.Block
-	toPreConfirmByID := ds.NewSet[iotago.BlockID]()
+	toPreConfirmByID := set.New[iotago.BlockID]()
 
 	process := func(block *blocks.Block) bool {
 		shouldPreAccept, shouldPreConfirm := g.shouldPreAcceptAndPreConfirm(block)

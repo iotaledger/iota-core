@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -324,7 +323,7 @@ func JoinConflictSetTwice(t *testing.T, tf *Framework) {
 		conflictCreatedEventCount++
 	})
 
-	tf.Instance.Events().ConflictingResourcesAdded.Hook(func(id iotago.TransactionID, resourceID ds.Set[iotago.OutputID]) {
+	tf.Instance.Events().ConflictingResourcesAdded.Hook(func(id iotago.TransactionID, resourceID set.Set[iotago.OutputID]) {
 		fmt.Println("conflict joins conflictset", id, resourceID)
 		resourceAddedEventCount++
 	})

@@ -2,7 +2,7 @@ package inmemorybooker
 
 import (
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -131,8 +131,8 @@ func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	}
 }
 
-func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotago.TransactionID], err error) {
-	conflictIDsToInherit := ds.NewSet[iotago.TransactionID]()
+func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs set.Set[iotago.TransactionID], err error) {
+	conflictIDsToInherit := set.New[iotago.TransactionID]()
 
 	// Inherit conflictIDs from parents based on the parent type.
 	for _, parent := range block.ParentsWithType() {

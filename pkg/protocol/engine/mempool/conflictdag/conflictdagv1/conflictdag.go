@@ -3,7 +3,7 @@ package conflictdagv1
 import (
 	"sync"
 
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -107,8 +107,8 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) CreateConflict(id Confli
 	}
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictingResources(id ConflictID, resourceIDs ds.Set[ResourceID]) error {
-	joinedConflictSets, err := func() (ds.Set[ResourceID], error) {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictingResources(id ConflictID, resourceIDs set.Set[ResourceID]) error {
+	joinedConflictSets, err := func() (set.Set[ResourceID], error) {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
@@ -142,8 +142,8 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ReadConsistent(callback 
 }
 
 // UpdateConflictParents updates the parents of the given Conflict and returns an error if the operation failed.
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictParents(conflictID ConflictID, addedParentIDs, removedParentIDs ds.Set[ConflictID]) error {
-	newParents := ds.NewSet[ConflictID]()
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictParents(conflictID ConflictID, addedParentIDs, removedParentIDs set.Set[ConflictID]) error {
+	newParents := set.New[ConflictID]()
 
 	updated, err := func() (bool, error) {
 		c.mutex.RLock()
@@ -154,7 +154,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictParents(co
 			return false, ierrors.Errorf("tried to modify evicted conflict with %s: %w", conflictID, conflictdag.ErrEntityEvicted)
 		}
 
-		addedParents := ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]]()
+		addedParents := set.New[*Conflict[ConflictID, ResourceID, VoteRank]]()
 
 		if err := addedParentIDs.ForEach(func(addedParentID ConflictID) error {
 			addedParent, addedParentExists := c.conflictsByID.Get(addedParentID)
@@ -202,8 +202,8 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictParents(co
 }
 
 // LikedInstead returns the ConflictIDs of the Conflicts that are liked instead of the Conflicts.
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) LikedInstead(conflictIDs ds.Set[ConflictID]) ds.Set[ConflictID] {
-	likedInstead := ds.NewSet[ConflictID]()
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) LikedInstead(conflictIDs set.Set[ConflictID]) set.Set[ConflictID] {
+	likedInstead := set.New[ConflictID]()
 	conflictIDs.Range(func(conflictID ConflictID) {
 		if currentConflict, exists := c.conflictsByID.Get(conflictID); exists {
 			if likedConflict := heaviestConflict(currentConflict.LikedInstead()); likedConflict != nil {
@@ -215,8 +215,8 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) LikedInstead(conflictIDs
 	return likedInstead
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) FutureCone(conflictIDs ds.Set[ConflictID]) (futureCone ds.Set[ConflictID]) {
-	futureCone = ds.NewSet[ConflictID]()
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) FutureCone(conflictIDs set.Set[ConflictID]) (futureCone set.Set[ConflictID]) {
+	futureCone = set.New[ConflictID]()
 	for futureConeWalker := walker.New[*Conflict[ConflictID, ResourceID, VoteRank]]().PushAll(lo.Return1(c.conflicts(conflictIDs, true)).ToSlice()...); futureConeWalker.HasNext(); {
 		if conflict := futureConeWalker.Next(); futureCone.Add(conflict.ID) {
 			futureConeWalker.PushAll(conflict.Children.ToSlice()...)
@@ -226,13 +226,13 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) FutureCone(conflictIDs d
 	return futureCone
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictingConflicts(conflictID ConflictID) (conflictingConflicts ds.Set[ConflictID], exists bool) {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictingConflicts(conflictID ConflictID) (conflictingConflicts set.Set[ConflictID], exists bool) {
 	conflict, exists := c.conflictsByID.Get(conflictID)
 	if !exists {
 		return nil, false
 	}
 
-	conflictingConflicts = ds.NewSet[ConflictID]()
+	conflictingConflicts = set.New[ConflictID]()
 	conflict.ConflictingConflicts.Range(func(conflictingConflict *Conflict[ConflictID, ResourceID, VoteRank]) {
 		conflictingConflicts.Add(conflictingConflict.ID)
 	})
@@ -240,7 +240,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictingConflicts(con
 	return conflictingConflicts, true
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AllConflictsSupported(seat account.SeatIndex, conflictIDs ds.Set[ConflictID]) bool {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AllConflictsSupported(seat account.SeatIndex, conflictIDs set.Set[ConflictID]) bool {
 	return lo.Return1(c.conflicts(conflictIDs, true)).ForEach(func(conflict *Conflict[ConflictID, ResourceID, VoteRank]) (err error) {
 		lastVote, exists := conflict.LatestVotes.Get(seat)
 
@@ -248,21 +248,21 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AllConflictsSupported(se
 	}) == nil
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictVoters(conflictID ConflictID) (conflictVoters ds.Set[account.SeatIndex]) {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictVoters(conflictID ConflictID) (conflictVoters set.Set[account.SeatIndex]) {
 	if conflict, exists := c.conflictsByID.Get(conflictID); exists {
 		return conflict.Weight.Voters.Clone()
 	}
 
-	return ds.NewSet[account.SeatIndex]()
+	return set.New[account.SeatIndex]()
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictSets(conflictID ConflictID) (conflictSets ds.Set[ResourceID], exists bool) {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictSets(conflictID ConflictID) (conflictSets set.Set[ResourceID], exists bool) {
 	conflict, exists := c.conflictsByID.Get(conflictID)
 	if !exists {
 		return nil, false
 	}
 
-	conflictSets = ds.NewSet[ResourceID]()
+	conflictSets = set.New[ResourceID]()
 	_ = conflict.ConflictSets.ForEach(func(conflictSet *ConflictSet[ConflictID, ResourceID, VoteRank]) error {
 		conflictSets.Add(conflictSet.ID)
 		return nil
@@ -271,13 +271,13 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictSets(conflictID 
 	return conflictSets, true
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictParents(conflictID ConflictID) (conflictParents ds.Set[ConflictID], exists bool) {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictParents(conflictID ConflictID) (conflictParents set.Set[ConflictID], exists bool) {
 	conflict, exists := c.conflictsByID.Get(conflictID)
 	if !exists {
 		return nil, false
 	}
 
-	conflictParents = ds.NewSet[ConflictID]()
+	conflictParents = set.New[ConflictID]()
 	_ = conflict.Parents.ForEach(func(parent *Conflict[ConflictID, ResourceID, VoteRank]) error {
 		conflictParents.Add(parent.ID)
 		return nil
@@ -286,13 +286,13 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictParents(conflict
 	return conflictParents, true
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictChildren(conflictID ConflictID) (conflictChildren ds.Set[ConflictID], exists bool) {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictChildren(conflictID ConflictID) (conflictChildren set.Set[ConflictID], exists bool) {
 	conflict, exists := c.conflictsByID.Get(conflictID)
 	if !exists {
 		return nil, false
 	}
 
-	conflictChildren = ds.NewSet[ConflictID]()
+	conflictChildren = set.New[ConflictID]()
 	_ = conflict.Children.ForEach(func(parent *Conflict[ConflictID, ResourceID, VoteRank]) error {
 		conflictChildren.Add(parent.ID)
 		return nil
@@ -301,13 +301,13 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictChildren(conflic
 	return conflictChildren, true
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictSetMembers(conflictSetID ResourceID) (conflicts ds.Set[ConflictID], exists bool) {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictSetMembers(conflictSetID ResourceID) (conflicts set.Set[ConflictID], exists bool) {
 	conflictSet, exists := c.conflictSetsByID.Get(conflictSetID)
 	if !exists {
 		return nil, false
 	}
 
-	conflicts = ds.NewSet[ConflictID]()
+	conflicts = set.New[ConflictID]()
 	_ = conflictSet.ForEach(func(parent *Conflict[ConflictID, ResourceID, VoteRank]) error {
 		conflicts.Add(parent.ID)
 		return nil
@@ -325,7 +325,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ConflictWeight(conflictI
 }
 
 // CastVotes applies the given votes to the ConflictDAG.
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) CastVotes(vote *vote.Vote[VoteRank], conflictIDs ds.Set[ConflictID]) error {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) CastVotes(vote *vote.Vote[VoteRank], conflictIDs set.Set[ConflictID]) error {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	c.votingMutex.Lock(vote.Voter)
@@ -347,7 +347,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) CastVotes(vote *vote.Vot
 	return nil
 }
 
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AcceptanceState(conflictIDs ds.Set[ConflictID]) acceptance.State {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AcceptanceState(conflictIDs set.Set[ConflictID]) acceptance.State {
 	lowestObservedState := acceptance.Accepted
 	if err := conflictIDs.ForEach(func(conflictID ConflictID) error {
 		conflict, exists := c.conflictsByID.Get(conflictID)
@@ -375,13 +375,13 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AcceptanceState(conflict
 
 // UnacceptedConflicts takes a set of ConflictIDs and removes all the accepted Conflicts (leaving only the
 // pending or rejected ones behind).
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UnacceptedConflicts(conflictIDs ds.Set[ConflictID]) ds.Set[ConflictID] {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UnacceptedConflicts(conflictIDs set.Set[ConflictID]) set.Set[ConflictID] {
 	// TODO: introduce optsMergeToMaster
 	// if !c.optsMergeToMaster {
 	//	return conflictIDs.Clone()
 	// }
 
-	pendingConflictIDs := ds.NewSet[ConflictID]()
+	pendingConflictIDs := set.New[ConflictID]()
 	conflictIDs.Range(func(currentConflictID ConflictID) {
 		if conflict, exists := c.conflictsByID.Get(currentConflictID); exists && !conflict.IsAccepted() {
 			pendingConflictIDs.Add(currentConflictID)
@@ -429,8 +429,8 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) evictConflict(conflictID
 
 // conflicts returns the Conflicts that are associated with the given ConflictIDs. If ignoreMissing is set to true, it
 // will ignore missing Conflicts instead of returning an ErrEntityEvicted error.
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) conflicts(ids ds.Set[ConflictID], ignoreMissing bool) (ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]], error) {
-	conflicts := ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]]()
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) conflicts(ids set.Set[ConflictID], ignoreMissing bool) (set.Set[*Conflict[ConflictID, ResourceID, VoteRank]], error) {
+	conflicts := set.New[*Conflict[ConflictID, ResourceID, VoteRank]]()
 
 	return conflicts, ids.ForEach(func(id ConflictID) (err error) {
 		existingConflict, exists := c.conflictsByID.Get(id)
@@ -444,8 +444,8 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) conflicts(ids ds.Set[Con
 
 // conflictSets returns the ConflictSets that are associated with the given ResourceIDs. If createMissing is set to
 // true, it will create an empty ConflictSet for each missing ResourceID.
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) conflictSets(resourceIDs ds.Set[ResourceID]) ds.Set[*ConflictSet[ConflictID, ResourceID, VoteRank]] {
-	conflictSets := ds.NewSet[*ConflictSet[ConflictID, ResourceID, VoteRank]]()
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) conflictSets(resourceIDs set.Set[ResourceID]) set.Set[*ConflictSet[ConflictID, ResourceID, VoteRank]] {
+	conflictSets := set.New[*ConflictSet[ConflictID, ResourceID, VoteRank]]()
 
 	resourceIDs.Range(func(resourceID ResourceID) {
 		conflictSets.Add(lo.Return1(c.conflictSetsByID.GetOrCreate(resourceID, c.conflictSetFactory(resourceID))))
@@ -455,9 +455,9 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) conflictSets(resourceIDs
 }
 
 // determineVotes determines the Conflicts that are supported and revoked by the given ConflictIDs.
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) determineVotes(conflictIDs ds.Set[ConflictID]) (supportedConflicts, revokedConflicts ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]], err error) {
-	supportedConflicts = ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]]()
-	revokedConflicts = ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]]()
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) determineVotes(conflictIDs set.Set[ConflictID]) (supportedConflicts, revokedConflicts set.Set[*Conflict[ConflictID, ResourceID, VoteRank]], err error) {
+	supportedConflicts = set.New[*Conflict[ConflictID, ResourceID, VoteRank]]()
+	revokedConflicts = set.New[*Conflict[ConflictID, ResourceID, VoteRank]]()
 
 	revokedWalker := walker.New[*Conflict[ConflictID, ResourceID, VoteRank]]()
 	revokeConflict := func(revokedConflict *Conflict[ConflictID, ResourceID, VoteRank]) error {

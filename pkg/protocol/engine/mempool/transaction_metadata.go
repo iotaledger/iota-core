@@ -1,7 +1,7 @@
 package mempool
 
 import (
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/iota-core/pkg/core/reactive"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -11,9 +11,9 @@ type TransactionMetadata interface {
 
 	Transaction() Transaction
 
-	Inputs() ds.Set[StateMetadata]
+	Inputs() set.Set[StateMetadata]
 
-	Outputs() ds.Set[StateMetadata]
+	Outputs() set.Set[StateMetadata]
 
 	ConflictIDs() reactive.Set[iotago.TransactionID]
 

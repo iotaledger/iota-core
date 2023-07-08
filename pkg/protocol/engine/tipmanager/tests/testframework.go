@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -91,7 +90,7 @@ func (t *TestFramework) BlockID(alias string) iotago.BlockID {
 
 func (t *TestFramework) AssertStrongTips(aliases ...string) {
 	for _, alias := range aliases {
-		require.True(t.test, ds.NewSet(lo.Map(t.Instance.StrongTips(), tipmanager.TipMetadata.ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
+		require.True(t.test, set.New(lo.Map(t.Instance.StrongTips(), tipmanager.TipMetadata.ID)...).Has(t.BlockID(alias)), "strongTips does not contain block '%s'", alias)
 	}
 
 	require.Equal(t.test, len(aliases), len(t.Instance.StrongTips()), "strongTips size does not match")

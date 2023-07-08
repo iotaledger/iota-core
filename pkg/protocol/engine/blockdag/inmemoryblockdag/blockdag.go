@@ -6,7 +6,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -40,7 +40,7 @@ type BlockDAG struct {
 	commitmentFunc func(index iotago.SlotIndex) (*model.Commitment, error)
 
 	// futureBlocks contains blocks with a commitment in the future, that should not be passed to the booker yet.
-	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*blocks.Block]]
+	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, set.Set[*blocks.Block]]
 
 	nextIndexToPromote iotago.SlotIndex
 
@@ -97,7 +97,7 @@ func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *b
 		shouldParkFutureBlocksFunc: shouldParkBlocksFunc,
 		commitmentFunc:             latestCommitmentFunc,
 		blockCache:                 blockCache,
-		futureBlocks:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*blocks.Block]](),
+		futureBlocks:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, set.Set[*blocks.Block]](),
 		workers:                    workers,
 		workerPool:                 workers.CreatePool("Solidifier", 2),
 		errorHandler:               errorHandler,
@@ -217,8 +217,8 @@ func (b *BlockDAG) isFutureBlock(block *blocks.Block) (isFutureBlock bool) {
 		// We set the block as future block so that we can skip some checks when revisiting it later in markSolid via the solidifier.
 		block.SetFuture()
 
-		lo.Return1(b.futureBlocks.Get(block.SlotCommitmentID().Index(), true).GetOrCreate(block.SlotCommitmentID(), func() ds.Set[*blocks.Block] {
-			return ds.NewSet[*blocks.Block]()
+		lo.Return1(b.futureBlocks.Get(block.SlotCommitmentID().Index(), true).GetOrCreate(block.SlotCommitmentID(), func() set.Set[*blocks.Block] {
+			return set.New[*blocks.Block]()
 		})).Add(block)
 
 		return true

@@ -8,7 +8,6 @@ import (
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
@@ -88,7 +87,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 
 	// Commit an empty diff if no actions specified.
 	if len(actions) == 0 {
-		err := t.Instance.ApplyDiff(slotIndex, make(map[iotago.AccountID]*prunable.AccountDiff), ds.NewSet[iotago.AccountID]())
+		err := t.Instance.ApplyDiff(slotIndex, make(map[iotago.AccountID]*prunable.AccountDiff), set.New[iotago.AccountID]())
 		require.NoError(t.T, err)
 		return
 	}
@@ -114,7 +113,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 			prevAccountFields = &latestAccountFields{
 				OutputID:       iotago.EmptyOutputID,
 				BICUpdatedAt:   0,
-				UpdatedInSlots: ds.NewSet[iotago.SlotIndex](),
+				UpdatedInSlots: set.New[iotago.SlotIndex](),
 			}
 			t.latestFieldsPerAccount.Set(accountID, prevAccountFields)
 		}
@@ -212,7 +211,7 @@ func (t *TestSuite) AssertAccountLedgerUntil(slotIndex iotago.SlotIndex, account
 }
 
 func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
-	expectedPubKeys := ds.NewSet(t.PublicKeys(expectedState.PubKeys, false)...)
+	expectedPubKeys := set.New(t.PublicKeys(expectedState.PubKeys, false)...)
 	expectedCredits := accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(expectedState.BICAmount), expectedState.BICUpdatedTime)
 
 	actualState, exists, err := t.Instance.Account(accountID, slotIndex)
@@ -354,18 +353,18 @@ type AccountState struct {
 type latestAccountFields struct {
 	OutputID       iotago.OutputID
 	BICUpdatedAt   iotago.SlotIndex
-	UpdatedInSlots ds.Set[iotago.SlotIndex]
+	UpdatedInSlots set.Set[iotago.SlotIndex]
 }
 
 type slotData struct {
 	Burns             map[iotago.AccountID]iotago.Mana
 	SlotDiff          map[iotago.AccountID]*prunable.AccountDiff
-	DestroyedAccounts ds.Set[iotago.AccountID]
+	DestroyedAccounts set.Set[iotago.AccountID]
 }
 
 func newSlotData() *slotData {
 	return &slotData{
-		DestroyedAccounts: ds.NewSet[iotago.AccountID](),
+		DestroyedAccounts: set.New[iotago.AccountID](),
 		Burns:             make(map[iotago.AccountID]iotago.Mana),
 		SlotDiff:          make(map[iotago.AccountID]*prunable.AccountDiff),
 	}
