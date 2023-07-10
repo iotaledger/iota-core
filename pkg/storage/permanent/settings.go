@@ -464,12 +464,12 @@ func (s *Settings) protocolParameters(version iotago.Version) iotago.ProtocolPar
 		panic(err)
 	}
 
-	commitment, _, err := iotago.ProtocolParametersFromBytes(bytes)
+	protocolParameters, _, err := iotago.ProtocolParametersFromBytes(bytes)
 	if err != nil {
 		panic(err)
 	}
 
-	return commitment
+	return protocolParameters
 }
 
 type protocolVersionEpochStart struct {
