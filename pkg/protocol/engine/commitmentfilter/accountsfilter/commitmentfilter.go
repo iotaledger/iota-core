@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -30,6 +31,8 @@ type CommitmentFilter struct {
 	// futureBlocks contains blocks with a commitment in the future, that should not be passed to the blockdag yet.
 	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*model.Block]]
 
+	apiProvider api.Provider
+
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
 	commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error)
 
@@ -45,7 +48,7 @@ type CommitmentFilter struct {
 func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter] {
 	return module.Provide(func(e *engine.Engine) commitmentfilter.CommitmentFilter {
 		// TODO: check the accounts manager directly rather than loading the commitment from storage.
-		c := New(e.Storage.Commitments().Load, e.Ledger.Account, opts...)
+		c := New(e.Storage.Commitments().Load, e.Ledger.Account, e, opts...)
 		e.HookConstructed(func() {
 			e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				c.PromoteFutureBlocksUntil(details.Commitment.Index())
@@ -64,8 +67,9 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 	})
 }
 
-func New(commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error), opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
+func New(commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error), apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
 	return options.Apply(&CommitmentFilter{
+		apiProvider:         apiProvider,
 		futureBlocks:        memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*model.Block]](),
 		commitmentFunc:      commitmentFunc,
 		accountRetrieveFunc: accountRetrieveFunc,
@@ -101,8 +105,8 @@ func (c *CommitmentFilter) isFutureBlock(block *model.Block) (isFutureBlock bool
 	defer c.futureBlocksMutex.RUnlock()
 
 	// If we are not able to load the commitment for the block, it means we haven't committed this slot yet.
-	if _, err := c.commitmentFunc(block.SlotCommitment().Index()); err != nil {
-		lo.Return1(c.futureBlocks.Get(block.SlotCommitment().Index(), true).GetOrCreate(block.Block().SlotCommitment.MustID(), func() *advancedset.AdvancedSet[*model.Block] {
+	if _, err := c.commitmentFunc(block.ProtocolBlock().SlotCommitmentID.Index()); err != nil {
+		lo.Return1(c.futureBlocks.Get(block.ProtocolBlock().SlotCommitmentID.Index(), true).GetOrCreate(block.ProtocolBlock().SlotCommitmentID, func() *advancedset.AdvancedSet[*model.Block] {
 			return advancedset.New[*model.Block]()
 		})).Add(block)
 
@@ -119,11 +123,11 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	}
 
 	// check if the account exists in the specified slot.
-	accountData, exists, err := c.accountRetrieveFunc(block.Block().IssuerID, block.SlotCommitment().Index())
+	accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Index())
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(err, "could not retrieve account information for block issuer %s", block.Block().IssuerID),
+			Reason: errors.Wrapf(err, "could not retrieve account information for block issuer %s", block.ProtocolBlock().IssuerID),
 		})
 
 		return
@@ -131,18 +135,18 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if !exists {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(err, "block issuer account %s does not exist in slot commitment %s", block.Block().IssuerID, block.SlotCommitment().Index()),
+			Reason: errors.Wrapf(err, "block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Index()),
 		})
 
 		return
 	}
 
 	// Check that the issuer key is valid for this block issuer and that the signature is valid
-	edSig, isEdSig := block.Block().Signature.(*iotago.Ed25519Signature)
+	edSig, isEdSig := block.ProtocolBlock().Signature.(*iotago.Ed25519Signature)
 	if !isEdSig {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(ErrInvalidSignature, "only ed2519 signatures supported, got %s", block.Block().Signature.Type()),
+			Reason: errors.Wrapf(ErrInvalidSignature, "only ed2519 signatures supported, got %s", block.ProtocolBlock().Signature.Type()),
 		})
 
 		return
@@ -150,12 +154,12 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if !accountData.PubKeys.Has(edSig.PublicKey) {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.Block().IssuerID, edSig.PublicKey, block.SlotCommitment().Index()),
+			Reason: errors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.ProtocolBlock().IssuerID, edSig.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),
 		})
 
 		return
 	}
-	signingMessage, err := block.Block().SigningMessage()
+	signingMessage, err := block.ProtocolBlock().SigningMessage(c.apiProvider.LatestAPI())
 	hiveEd25519.Verify(edSig.PublicKey[:], signingMessage, edSig.Signature[:])
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
@@ -178,7 +182,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if accountData.Credits.Value < 0 {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(ErrNegativeBIC, "block issuer account %s is locked due to negative BIC", block.Block().IssuerID),
+			Reason: errors.Wrapf(ErrNegativeBIC, "block issuer account %s is locked due to negative BIC", block.ProtocolBlock().IssuerID),
 		})
 
 		return

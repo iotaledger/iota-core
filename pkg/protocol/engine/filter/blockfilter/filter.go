@@ -70,33 +70,6 @@ func New(apiProvider api.Provider, opts ...options.Option[Filter]) *Filter {
 
 // ProcessReceivedBlock processes block from the given source.
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID) {
-	// TODO: if TX add check for TX timestamp
-
-	protocolParams := f.protocolParamsFunc()
-	if protocolParams.MinPoWScore > 0 {
-		// Check if the block has enough PoW score.
-		score, _, err := block.Block().POW()
-		if err != nil {
-			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
-				Block:  block,
-				Reason: errors.WithMessage(ErrInvalidProofOfWork, "error calculating PoW score"),
-				Source: source,
-			})
-
-			return
-		}
-
-		if score < float64(protocolParams.MinPoWScore) {
-			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
-				Block:  block,
-				Reason: errors.WithMessagef(ErrInvalidProofOfWork, "score %f is less than min score %d", score, protocolParams.MinPoWScore),
-				Source: source,
-			})
-
-			return
-		}
-	}
-
 	// Verify the timestamp is not too far in the future.
 	timeDelta := time.Since(block.ProtocolBlock().IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
@@ -111,33 +84,31 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 	// check that commitment is within allowed range.
 	if f.optsMinCommittableAge > 0 &&
-		block.SlotCommitment().Index() > 0 &&
-		(block.SlotCommitment().Index() > block.ID().Index() ||
-			block.ID().Index()-block.SlotCommitment().Index() < f.optsMinCommittableAge) {
+		block.ProtocolBlock().SlotCommitmentID.Index() > 0 &&
+		(block.ProtocolBlock().SlotCommitmentID.Index() > block.ID().Index() ||
+			block.ID().Index()-block.ProtocolBlock().SlotCommitmentID.Index() < f.optsMinCommittableAge) {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrCommitmentTooRecent, "block at slot %d committing to slot %d", block.ID().Index(), block.SlotCommitment().Index()),
+			Reason: errors.WithMessagef(ErrCommitmentTooRecent, "block at slot %d committing to slot %d", block.ID().Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
 			Source: source,
 		})
 
 		return
 	}
-	if block.ID().Index()-block.SlotCommitment().Index() > f.optsMaxCommittableAge {
+	if block.ID().Index()-block.ProtocolBlock().SlotCommitmentID.Index() > f.optsMaxCommittableAge {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrCommitmentTooOld, "block at slot %d committing to slot %d", block.ID().Index(), block.SlotCommitment().Index()),
+			Reason: errors.WithMessagef(ErrCommitmentTooOld, "block at slot %d committing to slot %d", block.ID().Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
 			Source: source,
 		})
 
 		return
 	}
 
-	// check that commitment inputs (if any) are within allowed range.
-	tx, isTX := block.Block().Payload.(*iotago.Transaction)
-	if isTX {
-		cInputs, err := tx.CommitmentInputs()
-		if err == nil {
-			for _, cInput := range cInputs {
+	// check that commitment input (if any) is within allowed range.
+	if basicBlock, isBasic := block.BasicBlock(); isBasic {
+		if tx, isTX := basicBlock.Payload.(*iotago.Transaction); isTX {
+			if cInput := tx.CommitmentInput(); cInput != nil {
 				if f.optsMinCommittableAge > 0 &&
 					cInput.CommitmentID.Index() > 0 &&
 					(cInput.CommitmentID.Index() > block.ID().Index() ||
@@ -159,6 +130,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 					return
 				}
+
 			}
 		}
 	}

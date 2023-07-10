@@ -141,11 +141,10 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 }
 
 func TestFilter_MinCommittableAge(t *testing.T) {
-	params := protoParams
-	params.GenesisUnixTimestamp = time.Now().Add(-5 * time.Minute).Unix()
+	api := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
-		&params,
+		api,
 		WithMinCommittableAge(3),
 	)
 
@@ -194,7 +193,7 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 	)
 
 	tf := NewTestFramework(t,
-		&params,
+		api,
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {

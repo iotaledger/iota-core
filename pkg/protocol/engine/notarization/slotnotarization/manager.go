@@ -105,7 +105,7 @@ func (m *Manager) IsBootstrapped() bool {
 	// All slots smaller than 4 are committable, so in order to check if slot 3 is committed it's necessary to do m.minCommittableAge-1,
 	// otherwise we'd expect slot 4 to be committed in order to be fully committed, which is impossible.
 	latestIndex := m.storage.Settings().LatestCommitment().Index()
-	return latestIndex >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())-m.minCommittableSlotAge-1
+	return latestIndex >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())-m.minCommittableAge-1
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
