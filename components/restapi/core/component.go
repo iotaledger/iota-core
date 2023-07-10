@@ -92,24 +92,6 @@ const (
 	// RouteAccountMana is the route for getting an account mana by its accountID.
 	// GET returns the account mana details.
 	RouteAccountMana = "/accounts/:" + restapipkg.ParameterAccountID + "/mana"
-
-	// RoutePeer is the route for getting peers by their peerID.
-	// GET returns the peer
-	// DELETE deletes the peer.
-	RoutePeer = "/peers/:" + restapipkg.ParameterPeerID
-
-	// RoutePeers is the route for getting all peers of the node.
-	// GET returns a list of all peers.
-	// POST adds a new peer.
-	RoutePeers = "/peers"
-
-	// RouteControlDatabasePrune is the control route to manually prune the database.
-	// POST prunes the database.
-	RouteControlDatabasePrune = "/control/database/prune"
-
-	// RouteControlSnapshotsCreate is the control route to manually create a snapshot files.
-	// POST creates a full snapshot.
-	RouteControlSnapshotsCreate = "/control/snapshots/create"
 )
 
 func init() {
@@ -143,7 +125,7 @@ type dependencies struct {
 func configure() error {
 	// check if RestAPI plugin is disabled
 	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanic("RestAPI plugin needs to be enabled to use the CoreAPIV3 plugin")
+		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
 	}
 
 	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
