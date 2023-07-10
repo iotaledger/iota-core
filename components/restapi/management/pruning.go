@@ -3,10 +3,10 @@ package management
 import (
 	"github.com/labstack/echo/v4"
 
-	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
-func pruneDatabase(c echo.Context) (*nodeclient.PruneDatabaseResponse, error) {
+func pruneDatabase(c echo.Context) (*models.PruneDatabaseResponse, error) {
 	/*
 		if deps.SnapshotManager.IsSnapshotting() || deps.PruningManager.IsPruning() {
 			return nil, errors.WithMessage(echo.ErrServiceUnavailable, "node is already creating a snapshot or pruning is running")

@@ -4,12 +4,12 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/logger"
-	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
 /*
 // WrapInfoSnapshot wraps the given peer info snapshot with additional metadata, such as gossip protocol information.
-func WrapInfoSnapshot(info *p2p.PeerInfoSnapshot) *nodeclient.PeerResponse {
+func WrapInfoSnapshot(info *p2p.PeerInfoSnapshot) *models.PeerResponse {
 	var alias *string
 
 	if info.Alias != "" {
@@ -39,7 +39,7 @@ func WrapInfoSnapshot(info *p2p.PeerInfoSnapshot) *nodeclient.PeerResponse {
 }
 */
 
-func getPeer(c echo.Context) (*nodeclient.PeerResponse, error) {
+func getPeer(c echo.Context) (*models.PeerResponse, error) {
 	/*
 		peerID, err := restapipkg.ParsePeerIDParam(c)
 		if err != nil {
@@ -72,7 +72,7 @@ func removePeer(c echo.Context) error {
 }
 
 //nolint:unparam // even if the error is never used, the structure of all routes should be the same
-func listPeers(_ echo.Context) ([]*nodeclient.PeerResponse, error) {
+func listPeers(_ echo.Context) ([]*models.PeerResponse, error) {
 	/*
 		peerInfos := deps.PeeringManager.PeerInfoSnapshots()
 		results := make([]*PeerResponse, len(peerInfos))
@@ -85,7 +85,7 @@ func listPeers(_ echo.Context) ([]*nodeclient.PeerResponse, error) {
 	return nil, nil
 }
 
-func addPeer(c echo.Context, logger *logger.Logger) (*nodeclient.PeerResponse, error) {
+func addPeer(c echo.Context, logger *logger.Logger) (*models.PeerResponse, error) {
 	/*
 
 		request := &addPeerRequest{}

@@ -1,7 +1,13 @@
 package core
 
+import (
+	"encoding/json"
+
+	"github.com/iotaledger/iota.go/v4/nodeclient/models"
+)
+
 //nolint:unparam // we have no error case right now
-func info() (*infoResponse, error) {
+func info() (*models.InfoResponse, error) {
 	cl := deps.Protocol.MainEngineInstance().Clock
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
@@ -11,30 +17,31 @@ func info() (*infoResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	protoParamsBytesRaw := json.RawMessage(protoParamsBytes)
 
-	return &infoResponse{
-		Name:     deps.AppInfo.Name,
-		Version:  deps.AppInfo.Version,
-		IssuerID: deps.BlockIssuer.Account.ID().ToHex(),
-		Status: nodeStatus{
-			IsHealthy:            syncStatus.NodeSynced,
-			ATT:                  cl.Accepted().Time(),
-			RATT:                 cl.Accepted().RelativeTime(),
-			CTT:                  cl.Confirmed().Time(),
-			RCTT:                 cl.Confirmed().RelativeTime(),
-			LatestCommittedSlot:  syncStatus.LatestCommittedSlot,
-			FinalizedSlot:        syncStatus.FinalizedSlot,
-			LastAcceptedBlockID:  syncStatus.LastAcceptedBlockID.ToHex(),
-			LastConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
+	return &models.InfoResponse{
+		Name:    deps.AppInfo.Name,
+		Version: deps.AppInfo.Version,
+		Status: &models.InfoResNodeStatus{
+			IsHealthy:                   syncStatus.NodeSynced,
+			AcceptedTangleTime:          uint64(cl.Accepted().Time().Unix()),
+			RelativeAcceptedTangleTime:  uint64(cl.Accepted().RelativeTime().Unix()),
+			ConfirmedTangleTime:         uint64(cl.Confirmed().Time().Unix()),
+			RelativeConfirmedTangleTime: uint64(cl.Confirmed().RelativeTime().Unix()),
 			// TODO: fill in pruningSlot
+			LatestCommittedSlot:    syncStatus.LatestCommittedSlot,
+			LatestFinalizedSlot:    syncStatus.FinalizedSlot,
+			PruningSlot:            0,
+			LatestAcceptedBlockID:  syncStatus.LastAcceptedBlockID.ToHex(),
+			LatestConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
 		},
-		Metrics: nodeMetrics{
+		Metrics: &models.InfoResNodeMetrics{
 			BlocksPerSecond:          metrics.BlocksPerSecond,
 			ConfirmedBlocksPerSecond: metrics.ConfirmedBlocksPerSecond,
-			ConfirmedRate:            metrics.ConfirmedRate,
+			ConfirmationRate:         metrics.ConfirmedRate,
 		},
 		SupportedProtocolVersions: deps.Protocol.SupportedVersions(),
-		ProtocolParameters:        protoParamsBytes,
+		ProtocolParameters:        &protoParamsBytesRaw,
 		Features:                  features,
 	}, nil
 }

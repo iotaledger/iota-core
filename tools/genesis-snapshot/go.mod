@@ -9,7 +9,7 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230710120021-31d7d74cb077
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230710154843-0a56d07c2e45
 	github.com/mr-tron/base58 v1.2.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.11.0
@@ -21,11 +21,9 @@ require (
 	github.com/celestiaorg/smt v0.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
-	github.com/eclipse/paho.mqtt.golang v1.4.2 // indirect
 	github.com/ethereum/go-ethereum v1.12.0 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/holiman/uint256 v1.2.2 // indirect
 	github.com/iancoleman/orderedmap v0.2.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
@@ -48,8 +46,6 @@ require (
 	github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/net v0.11.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

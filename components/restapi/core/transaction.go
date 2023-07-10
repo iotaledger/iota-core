@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
 func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
@@ -42,19 +43,19 @@ func blockByTransactionID(c echo.Context) (*model.Block, error) {
 	return block, nil
 }
 
-func blockMetadataFromTransactionID(c echo.Context) (*blockMetadataResponse, error) {
+func blockMetadataFromTransactionID(c echo.Context) (*models.BlockMetadataResponse, error) {
 	block, err := blockByTransactionID(c)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: fill in blockReason, TxState, TxReason.
-	bmResponse := &blockMetadataResponse{
+	bmResponse := &models.BlockMetadataResponse{
 		BlockID:            block.ID().ToHex(),
 		StrongParents:      block.ProtocolBlock().Block.StrongParentIDs().ToHex(),
 		WeakParents:        block.ProtocolBlock().Block.WeakParentIDs().ToHex(),
 		ShallowLikeParents: block.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
-		BlockState:         blockStatePending.String(),
+		BlockState:         models.BlockStatePending,
 	}
 
 	return bmResponse, nil

@@ -24,7 +24,6 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/eclipse/paho.mqtt.golang v1.4.2 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/ethereum/go-ethereum v1.12.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
@@ -63,7 +62,7 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230706083020-ef6c3248369d // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230710120021-31d7d74cb077 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230710154843-0a56d07c2e45 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect

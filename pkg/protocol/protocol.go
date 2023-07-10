@@ -45,7 +45,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
 type Protocol struct {
@@ -58,7 +58,7 @@ type Protocol struct {
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
 	networkProtocol *core.Protocol
-	supportVersions nodeclient.Versions
+	supportVersions models.Versions
 
 	activeEngineMutex syncutils.RWMutex
 	mainEngine        *engine.Engine
@@ -91,7 +91,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	return options.Apply(&Protocol{
 		Events:                      NewEvents(),
 		Workers:                     workers,
-		supportVersions:             nodeclient.Versions{3},
+		supportVersions:             models.Versions{3},
 		dispatcher:                  dispatcher,
 		optsFilterProvider:          blockfilter.NewProvider(),
 		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
@@ -327,7 +327,7 @@ func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 
 var _ api.Provider = &Protocol{}
 
-func (p *Protocol) SupportedVersions() nodeclient.Versions {
+func (p *Protocol) SupportedVersions() models.Versions {
 	return p.supportVersions
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
 func blockByID(c echo.Context) (*model.Block, error) {
@@ -28,49 +29,49 @@ func blockByID(c echo.Context) (*model.Block, error) {
 	return block, nil
 }
 
-func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
+func blockMetadataByID(c echo.Context) (*models.BlockMetadataResponse, error) {
 	block, err := blockByID(c)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: fill in blockReason, TxState, TxReason.
-	bmResponse := &blockMetadataResponse{
+	bmResponse := &models.BlockMetadataResponse{
 		BlockID:            block.ID().ToHex(),
 		StrongParents:      block.ProtocolBlock().Block.StrongParentIDs().ToHex(),
 		WeakParents:        block.ProtocolBlock().Block.WeakParentIDs().ToHex(),
 		ShallowLikeParents: block.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
-		BlockState:         blockStatePending.String(),
+		BlockState:         models.BlockStatePending,
 	}
 
 	return bmResponse, nil
 }
 
-func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
+func blockIssuance(_ echo.Context) (*models.IssuanceBlockHeaderResponse, error) {
 	references := deps.Protocol.MainEngineInstance().TipSelection.SelectTips(iotago.BlockMaxParents)
-	slotCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	slotCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 
 	if len(references[iotago.StrongParentType]) == 0 {
 		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "get references failed")
 	}
 
-	cBytes, err := deps.Protocol.APIForSlot(slotCommitment.Index()).JSONEncode(slotCommitment.Commitment())
-	if err != nil {
-		return nil, err
-	}
-
-	resp := &blockIssuanceResponse{
+	resp := &models.IssuanceBlockHeaderResponse{
 		StrongParents:       references[iotago.StrongParentType].ToHex(),
 		WeakParents:         references[iotago.WeakParentType].ToHex(),
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType].ToHex(),
 		LatestFinalizedSlot: deps.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot(),
-		Commitment:          cBytes,
+		Commitment: &models.CommitmentDetailsResponse{
+			Index:            slotCommitment.Index,
+			PrevID:           slotCommitment.PrevID.String(),
+			RootsID:          slotCommitment.RootsID.String(),
+			CumulativeWeight: slotCommitment.CumulativeWeight,
+		},
 	}
 
 	return resp, nil
 }
 
-func sendBlock(c echo.Context) (*blockCreatedResponse, error) {
+func sendBlock(c echo.Context) (*models.BlockCreatedResponse, error) {
 	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
 	if err != nil {
 		return nil, err
@@ -122,7 +123,7 @@ func sendBlock(c echo.Context) (*blockCreatedResponse, error) {
 		}
 	}
 
-	return &blockCreatedResponse{
+	return &models.BlockCreatedResponse{
 		BlockID: blockID.ToHex(),
 	}, nil
 }

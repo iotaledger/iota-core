@@ -154,7 +154,7 @@ func configure() error {
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
 		// TODO: fill in blockReason, TxState, TxReason.
-		resp, err := blockMetadataResponseByID(c)
+		resp, err := blockMetadataByID(c)
 		if err != nil {
 			return err
 		}
@@ -187,7 +187,7 @@ func configure() error {
 			return err
 		}
 
-		resp, err := getCommitment(index)
+		resp, err := getCommitmentDetails(index)
 		if err != nil {
 			return err
 		}
@@ -201,7 +201,7 @@ func configure() error {
 			return err
 		}
 
-		resp, err := getSlotUTXOChanges(index)
+		resp, err := getUTXOChanges(index)
 		if err != nil {
 			return err
 		}
@@ -215,7 +215,7 @@ func configure() error {
 			return err
 		}
 
-		resp, err := getCommitment(iotago.SlotIndex(indexUint64))
+		resp, err := getCommitmentDetails(iotago.SlotIndex(indexUint64))
 		if err != nil {
 			return err
 		}
@@ -229,7 +229,7 @@ func configure() error {
 			return err
 		}
 
-		resp, err := getSlotUTXOChanges(iotago.SlotIndex(index))
+		resp, err := getUTXOChanges(iotago.SlotIndex(index))
 		if err != nil {
 			return err
 		}
