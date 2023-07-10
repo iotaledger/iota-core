@@ -1,4 +1,4 @@
-package coreapi
+package core
 
 import (
 	"encoding/json"

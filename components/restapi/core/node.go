@@ -1,4 +1,4 @@
-package coreapi
+package core
 
 //nolint:unparam // we have no error case right now
 func info() (*infoResponse, error) {
