@@ -152,12 +152,12 @@ func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) 
 	return b.modelBlock.BasicBlock()
 }
 
-func (b *Block) ValidatorBlock() (validatorBlock *iotago.ValidatorBlock, isValidatorBlock bool) {
+func (b *Block) ValidationBlock() (validationBlock *iotago.ValidationBlock, isValidationBlock bool) {
 	if b.modelBlock == nil {
 		return nil, false
 	}
 
-	return b.modelBlock.ValidatorBlock()
+	return b.modelBlock.ValidationBlock()
 }
 
 func (b *Block) ID() iotago.BlockID {
