@@ -69,10 +69,6 @@ func (s *Settings) LatestAPI() iotago.API {
 	return s.APIForVersion(iotago.LatestProtocolVersion())
 }
 
-func (s *Settings) latestAPI() iotago.API {
-	return s.apiForVersion(iotago.LatestProtocolVersion())
-}
-
 func (s *Settings) APIForSlot(slot iotago.SlotIndex) iotago.API {
 	return s.APIForVersion(s.VersionForSlot(slot))
 }
@@ -83,75 +79,19 @@ func (s *Settings) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 
 func (s *Settings) APIForVersion(version iotago.Version) iotago.API {
 	s.apiMutex.RLock()
-	if a, exists := s.apiByVersion[version]; exists {
+	if api, exists := s.apiByVersion[version]; exists {
 		s.apiMutex.RUnlock()
-		return a
+		return api
 	}
 	s.apiMutex.RUnlock()
 
-	protocolParams := s.protocolParameters(version)
+	api := s.apiFromProtocolParameters(version)
 
-	if protocolParams == nil {
-		panic(ierrors.Errorf("protocol parameters for version %d not found", version))
-	}
+	s.apiMutex.Lock()
+	s.apiByVersion[version] = api
+	s.apiMutex.Unlock()
 
-	var a iotago.API
-	switch protocolParams.Version() {
-	case 3:
-		a = iotago.V3API(protocolParams)
-		s.apiMutex.Lock()
-		s.apiByVersion[3] = a
-		s.apiMutex.Unlock()
-
-		return a
-	default:
-		panic(ierrors.Errorf("unsupported protocol version %d", protocolParams.Version()))
-	}
-}
-
-func (s *Settings) apiForVersion(version iotago.Version) iotago.API {
-	if a, exists := s.apiByVersion[version]; exists {
-		return a
-	}
-
-	protocolParams := s.protocolParameters(version)
-
-	if protocolParams == nil {
-		panic(fmt.Errorf("protocol parameters for version %d not found", version))
-	}
-
-	var a iotago.API
-	switch protocolParams.Version() {
-	case 3:
-		a = iotago.V3API(protocolParams)
-		s.apiMutex.Lock()
-		s.apiByVersion[3] = a
-		s.apiMutex.Unlock()
-
-		return a
-	default:
-		panic(ierrors.Errorf("unsupported protocol version %d", protocolParams.Version()))
-	}
-}
-
-func (s *Settings) protocolParameters(version iotago.Version) iotago.ProtocolParameters {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	bytes, err := s.store.Get([]byte{protocolParametersKey, version})
-	if err != nil {
-		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return nil
-		}
-		panic(err)
-	}
-
-	commitment, _, err := iotago.ProtocolParametersFromBytes(bytes)
-	if err != nil {
-		panic(err)
-	}
-
-	return commitment
+	return api
 }
 
 func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) error {
@@ -231,19 +171,6 @@ func (s *Settings) LatestCommitment() *model.Commitment {
 	return lo.PanicOnErr(model.CommitmentFromBytes(bytes, s))
 }
 
-func (s *Settings) latestCommitment() *model.Commitment {
-	bytes, err := s.store.Get([]byte{latestCommitmentKey})
-
-	if err != nil {
-		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return model.NewEmptyCommitment(s.latestAPI())
-		}
-		panic(err)
-	}
-
-	return lo.PanicOnErr(model.CommitmentFromBytes(bytes, s))
-}
-
 func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -256,22 +183,6 @@ func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 	defer s.mutex.RUnlock()
 
 	return s.latestFinalizedSlot()
-}
-
-func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
-	bytes, err := s.store.Get([]byte{latestFinalizedSlotKey})
-	if err != nil {
-		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return 0
-		}
-		panic(err)
-	}
-	i, _, err := iotago.SlotIndexFromBytes(bytes)
-	if err != nil {
-		panic(err)
-	}
-
-	return i
 }
 
 func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
@@ -478,6 +389,87 @@ func (s *Settings) String() string {
 	}
 
 	return builder.String()
+}
+
+func (s *Settings) latestAPI() iotago.API {
+	return s.apiForVersion(iotago.LatestProtocolVersion())
+}
+
+func (s *Settings) latestCommitment() *model.Commitment {
+	bytes, err := s.store.Get([]byte{latestCommitmentKey})
+
+	if err != nil {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return model.NewEmptyCommitment(s.latestAPI())
+		}
+		panic(err)
+	}
+
+	return lo.PanicOnErr(model.CommitmentFromBytes(bytes, s))
+}
+
+func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
+	bytes, err := s.store.Get([]byte{latestFinalizedSlotKey})
+	if err != nil {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return 0
+		}
+		panic(err)
+	}
+	i, _, err := iotago.SlotIndexFromBytes(bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return i
+}
+
+func (s *Settings) apiForVersion(version iotago.Version) iotago.API {
+	if api, exists := s.apiByVersion[version]; exists {
+		return api
+	}
+
+	api := s.apiFromProtocolParameters(version)
+
+	s.apiMutex.Lock()
+	s.apiByVersion[version] = api
+	s.apiMutex.Unlock()
+
+	return api
+}
+
+func (s *Settings) apiFromProtocolParameters(version iotago.Version) iotago.API {
+	protocolParams := s.protocolParameters(version)
+	if protocolParams == nil {
+		panic(fmt.Errorf("protocol parameters for version %d not found", version))
+	}
+
+	switch protocolParams.Version() {
+	case 3:
+		return iotago.V3API(protocolParams)
+	default:
+		panic(ierrors.Errorf("unsupported protocol version %d", protocolParams.Version()))
+	}
+}
+
+func (s *Settings) protocolParameters(version iotago.Version) iotago.ProtocolParameters {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	bytes, err := s.store.Get([]byte{protocolParametersKey, version})
+	if err != nil {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil
+		}
+		panic(err)
+	}
+
+	commitment, _, err := iotago.ProtocolParametersFromBytes(bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return commitment
 }
 
 type protocolVersionEpochStart struct {
