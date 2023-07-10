@@ -96,9 +96,9 @@ func (blk *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool
 	return basicBlock, isBasicBlock
 }
 
-func (blk *Block) ValidatorBlock() (validatorBlock *iotago.ValidatorBlock, isValidatorBlock bool) {
-	validatorBlock, isValidatorBlock = blk.ProtocolBlock().Block.(*iotago.ValidatorBlock)
-	return validatorBlock, isValidatorBlock
+func (blk *Block) ValidationBlock() (validationBlock *iotago.ValidationBlock, isValidationBlock bool) {
+	validationBlock, isValidationBlock = blk.ProtocolBlock().Block.(*iotago.ValidationBlock)
+	return validationBlock, isValidationBlock
 }
 
 func (blk *Block) String() string {
