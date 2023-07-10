@@ -170,11 +170,11 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	committeeRoot, rewardsRoot := m.sybilProtection.CommitSlot(index)
-	api := m.apiProvider.APIForSlot(index)
+	apiForSlot := m.apiProvider.APIForSlot(index)
 
-	protocolParamsBytes, err := api.Encode(api.ProtocolParameters())
+	protocolParamsHash, err := m.storage.Settings().ProtocolParametersAndVersionsHash()
 	if err != nil {
-		m.errorHandler(ierrors.Wrap(err, "failed to encode protocol parameters"))
+		m.errorHandler(ierrors.Wrap(err, "failed to get protocol parameters hash"))
 		return false
 	}
 
@@ -186,18 +186,18 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		accountRoot,
 		committeeRoot,
 		rewardsRoot,
-		iotago.IdentifierFromData(protocolParamsBytes),
+		protocolParamsHash,
 	)
 
 	newCommitment := iotago.NewCommitment(
-		api.ProtocolParameters().Version(),
+		apiForSlot.ProtocolParameters().Version(),
 		index,
 		latestCommitment.ID(),
 		roots.ID(),
 		cumulativeWeight,
 	)
 
-	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, api, serix.WithValidation())
+	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, apiForSlot, serix.WithValidation())
 	if err != nil {
 		return false
 	}
@@ -217,7 +217,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		m.errorHandler(ierrors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
 		return false
 	}
-	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(api.Encode(roots))); err != nil {
+	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(apiForSlot.Encode(roots))); err != nil {
 		m.errorHandler(ierrors.Wrapf(err, "failed to store latest roots for commitment %s", newModelCommitment.ID()))
 		return false
 	}

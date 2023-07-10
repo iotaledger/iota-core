@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/core/api"
@@ -188,12 +189,15 @@ func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
 }
 
 func (s *Settings) ProtocolParametersAndVersionsHash() ([32]byte, error) {
-	// TODO: concatenate and hash protocol parameters and protocol versions
-	// bytes, err := p.Bytes()
-	// if err != nil {
-	// 	return [32]byte{}, err
-	// }
-	return blake2b.Sum256([]byte{}), nil
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	protocolParametersBytes, err := s.LatestAPI().ProtocolParameters().Bytes()
+	if err != nil {
+		return [32]byte{}, ierrors.Wrap(err, "failed to get protocol parameters bytes")
+	}
+
+	return blake2b.Sum256(byteutils.ConcatBytes(protocolParametersBytes, s.protocolVersions.Bytes())), nil
 }
 
 func (s *Settings) VersionForEpoch(epoch iotago.EpochIndex) iotago.Version {
