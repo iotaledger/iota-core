@@ -226,7 +226,7 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Outp
 	case *ExecutionOutput:
 		txWithMetadata, exists := l.memPool.TransactionMetadata(stateRef.Ref().TransactionID())
 		if !exists {
-			return nil, errors.Wrapf(ErrTransactionMetadataNotFOund, "error in getting output for %v", stateWithMetadata.ID())
+			return nil, ierrors.Wrapf(ErrTransactionMetadataNotFOund, "error in getting output for %v", stateWithMetadata.ID())
 		}
 
 		earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
