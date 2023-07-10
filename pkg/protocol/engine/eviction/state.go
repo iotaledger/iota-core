@@ -3,13 +3,13 @@ package eviction
 import (
 	"io"
 	"math"
-	"sync"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -23,7 +23,7 @@ type State struct {
 	latestRootBlocks     *ringbuffer.RingBuffer[iotago.BlockID]
 	rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks
 	lastEvictedSlot      iotago.SlotIndex
-	evictionMutex        sync.RWMutex
+	evictionMutex        syncutils.RWMutex
 
 	optsRootBlocksEvictionDelay iotago.SlotIndex
 }

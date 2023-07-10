@@ -1,15 +1,14 @@
 package restapi
 
 import (
-	"sync"
-
 	"github.com/labstack/echo/v4"
 
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
 type RestRouteManager struct {
-	sync.RWMutex
+	syncutils.RWMutex
 	routes []string
 	proxy  *restapipkg.DynamicProxy
 }

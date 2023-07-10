@@ -1,14 +1,13 @@
 package totalweightslotgadget
 
 import (
-	"sync"
-
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -31,7 +30,7 @@ type Gadget struct {
 	lastFinalizedSlot          iotago.SlotIndex
 	storeLastFinalizedSlotFunc func(index iotago.SlotIndex)
 
-	mutex        sync.RWMutex
+	mutex        syncutils.RWMutex
 	errorHandler func(error)
 
 	optsSlotFinalizationThreshold float64

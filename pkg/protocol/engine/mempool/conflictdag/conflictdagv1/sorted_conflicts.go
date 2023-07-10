@@ -34,7 +34,7 @@ type SortedConflicts[ConflictID, ResourceID conflictdag.IDType, VoteRank conflic
 	pendingWeightUpdatesSignal *sync.Cond
 
 	// pendingWeightUpdatesMutex is a mutex that is used to synchronize access to the pendingWeightUpdates.
-	pendingWeightUpdatesMutex sync.RWMutex
+	pendingWeightUpdatesMutex syncutils.RWMutex
 
 	// pendingPreferredInsteadUpdates is a collection of Conflicts that have a pending preferred instead update.
 	pendingPreferredInsteadUpdates *shrinkingmap.ShrinkingMap[ConflictID, *sortedConflict[ConflictID, ResourceID, VoteRank]]
@@ -44,7 +44,7 @@ type SortedConflicts[ConflictID, ResourceID conflictdag.IDType, VoteRank conflic
 	pendingPreferredInsteadSignal *sync.Cond
 
 	// pendingPreferredInsteadMutex is a mutex that is used to synchronize access to the pendingPreferredInsteadUpdates.
-	pendingPreferredInsteadMutex sync.RWMutex
+	pendingPreferredInsteadMutex syncutils.RWMutex
 
 	// pendingUpdatesCounter is a counter that keeps track of the number of pending weight updates.
 	pendingUpdatesCounter *syncutils.Counter
@@ -53,7 +53,7 @@ type SortedConflicts[ConflictID, ResourceID conflictdag.IDType, VoteRank conflic
 	isShutdown atomic.Bool
 
 	// mutex is used to synchronize access to the SortedConflicts.
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 }
 
 // NewSortedConflicts creates a new SortedConflicts that is owned by the given Conflict.

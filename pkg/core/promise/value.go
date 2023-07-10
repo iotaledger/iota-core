@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
 
 // Value is a thread safe value that allows multiple consumers to subscribe to changes by registering callbacks that are
@@ -30,7 +31,7 @@ type Value[T comparable] struct {
 	mutex sync.RWMutex
 
 	// setOrderMutex is an additional mutex that is used to ensure that the order of updates is ensured.
-	setOrderMutex sync.Mutex
+	setOrderMutex syncutils.Mutex
 
 	// optTriggerWithInitialZeroValue is an option that can be set to make the OnUpdate callbacks trigger immediately
 	// on subscription even if the current value is the zero value.

@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/json"
-	"sync"
 
 	"google.golang.org/protobuf/proto"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/core/api"
@@ -36,7 +36,7 @@ type Protocol struct {
 	duplicateBlockBytesFilter *bytesfilter.BytesFilter
 
 	requestedBlockHashes      *shrinkingmap.ShrinkingMap[types.Identifier, types.Empty]
-	requestedBlockHashesMutex sync.Mutex
+	requestedBlockHashesMutex syncutils.Mutex
 }
 
 func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, apiProvider api.Provider, opts ...options.Option[Protocol]) (protocol *Protocol) {

@@ -2,11 +2,11 @@ package mock
 
 import (
 	"fmt"
-	"sync"
 
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/network"
 )
 
@@ -16,7 +16,7 @@ const NetworkMainPartition = "main"
 
 type Network struct {
 	dispatchersByPartition map[string]map[network.PeerID]*Endpoint
-	dispatchersMutex       sync.RWMutex
+	dispatchersMutex       syncutils.RWMutex
 }
 
 func NewNetwork() *Network {
@@ -79,7 +79,7 @@ type Endpoint struct {
 	network       *Network
 	partition     string
 	handlers      map[string]func(network.PeerID, proto.Message) error
-	handlersMutex sync.RWMutex
+	handlersMutex syncutils.RWMutex
 }
 
 func newMockedEndpoint(id network.PeerID, n *Network, partition string) *Endpoint {
@@ -103,11 +103,11 @@ func (e *Endpoint) RegisterProtocol(protocolID string, _ func() proto.Message, h
 }
 
 func (e *Endpoint) UnregisterProtocol(protocolID string) {
-	e.handlersMutex.Lock()
-	defer e.handlersMutex.Unlock()
-
 	e.network.dispatchersMutex.Lock()
 	defer e.network.dispatchersMutex.Unlock()
+
+	e.handlersMutex.Lock()
+	defer e.handlersMutex.Unlock()
 
 	delete(e.handlers, protocolID)
 	delete(e.network.dispatchersByPartition[e.partition], e.id)

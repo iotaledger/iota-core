@@ -1,12 +1,11 @@
 package promise
 
 import (
-	"sync"
-
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
 
 // Set is a wrapper for an AdvancedSet that is extended by the ability to register callbacks that are
@@ -25,10 +24,10 @@ type Set[T comparable] struct {
 	uniqueCallbackID UniqueID
 
 	// mutex is the mutex that is used to synchronize the access to the value.
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 
 	// applyOrderMutex is an additional mutex that is used to ensure that the application order of mutations is ensured.
-	applyOrderMutex sync.Mutex
+	applyOrderMutex syncutils.Mutex
 
 	// optTriggerWithInitialEmptyValue is an option that can be set to make the OnUpdate callbacks trigger immediately
 	// on subscription even if the current value is empty.

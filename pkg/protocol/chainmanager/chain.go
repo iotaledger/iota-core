@@ -1,10 +1,9 @@
 package chainmanager
 
 import (
-	"sync"
-
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/stringify"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -15,7 +14,7 @@ type Chain struct {
 	latestCommitmentIndex iotago.SlotIndex
 	commitmentsByIndex    *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ChainCommitment]
 
-	sync.RWMutex
+	syncutils.RWMutex
 }
 
 func NewChain(forkingPoint *ChainCommitment) (fork *Chain) {
@@ -77,7 +76,7 @@ func (c *Chain) String() string {
 	defer c.RUnlock()
 
 	builder := stringify.NewStructBuilder("Chain",
-		stringify.NewStructField("ForkingPoint", c.ForkingPoint.ID()),
+		stringify.NewStructField("ForkingPoint", c.ForkingPoint.id),
 		stringify.NewStructField("LatestCommitmentIndex", c.latestCommitmentIndex),
 	)
 

@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"sync"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
 
 type DynamicProxy struct {
@@ -16,7 +17,7 @@ type DynamicProxy struct {
 }
 
 type balancer struct {
-	mutex   sync.RWMutex
+	mutex   syncutils.RWMutex
 	prefix  string
 	targets map[string]*middleware.ProxyTarget
 }

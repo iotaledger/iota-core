@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"sync"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
@@ -12,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/network"
 )
 
@@ -51,19 +51,19 @@ type Manager struct {
 	local      *peer.Local
 	libp2pHost host.Host
 
-	acceptMutex sync.RWMutex
+	acceptMutex syncutils.RWMutex
 	acceptMap   map[libp2ppeer.ID]*AcceptMatcher
 
 	log                 *logger.Logger
 	neighborGroupEvents map[NeighborsGroup]*NeighborGroupEvents
 
-	stopMutex sync.RWMutex
+	stopMutex syncutils.RWMutex
 	isStopped bool
 
 	neighbors      map[network.PeerID]*Neighbor
-	neighborsMutex sync.RWMutex
+	neighborsMutex syncutils.RWMutex
 
-	registeredProtocolsMutex sync.RWMutex
+	registeredProtocolsMutex syncutils.RWMutex
 	registeredProtocols      map[protocol.ID]*ProtocolHandler
 }
 
