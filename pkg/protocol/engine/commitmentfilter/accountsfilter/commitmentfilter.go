@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/core/memstorage"
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -17,12 +18,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/pkg/errors"
 )
 
 var (
-	ErrInvalidSignature = errors.New("invalid signature")
-	ErrNegativeBIC      = errors.New("negative BIC")
+	ErrInvalidSignature = ierrors.New("invalid signature")
+	ErrNegativeBIC      = ierrors.New("negative BIC")
 )
 
 type CommitmentFilter struct {
@@ -127,7 +127,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(err, "could not retrieve account information for block issuer %s", block.ProtocolBlock().IssuerID),
+			Reason: ierrors.Wrapf(err, "could not retrieve account information for block issuer %s", block.ProtocolBlock().IssuerID),
 		})
 
 		return
@@ -135,7 +135,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if !exists {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(err, "block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Index()),
+			Reason: ierrors.Wrapf(err, "block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Index()),
 		})
 
 		return
@@ -146,7 +146,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if !isEdSig {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(ErrInvalidSignature, "only ed2519 signatures supported, got %s", block.ProtocolBlock().Signature.Type()),
+			Reason: ierrors.Wrapf(ErrInvalidSignature, "only ed2519 signatures supported, got %s", block.ProtocolBlock().Signature.Type()),
 		})
 
 		return
@@ -154,7 +154,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if !accountData.PubKeys.Has(edSig.PublicKey) {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.ProtocolBlock().IssuerID, edSig.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),
+			Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.ProtocolBlock().IssuerID, edSig.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),
 		})
 
 		return
@@ -164,7 +164,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrInvalidSignature, "error: %s", err.Error()),
+			Reason: ierrors.Wrapf(ErrInvalidSignature, "error: %s", err.Error()),
 		})
 
 		return
@@ -182,7 +182,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	if accountData.Credits.Value < 0 {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: errors.Wrapf(ErrNegativeBIC, "block issuer account %s is locked due to negative BIC", block.ProtocolBlock().IssuerID),
+			Reason: ierrors.Wrapf(ErrNegativeBIC, "block issuer account %s is locked due to negative BIC", block.ProtocolBlock().IssuerID),
 		})
 
 		return

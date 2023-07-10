@@ -1,7 +1,6 @@
 package blockfilter
 
 import (
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -154,7 +153,7 @@ func TestFilter_MinCommittableAge(t *testing.T) {
 
 	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
-		require.True(t, errors.Is(event.Reason, ErrCommitmentTooRecent))
+		require.True(t, ierrors.Is(event.Reason, ErrCommitmentTooRecent))
 	})
 
 	tf.IssueUnsignedBlockAtSlot("valid-1-0", 1, 0)
@@ -202,7 +201,7 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 
 	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
-		require.True(t, errors.Is(event.Reason, ErrInvalidProofOfWork))
+		require.True(t, ierrors.Is(event.Reason, ErrInvalidProofOfWork))
 	})
 
 	commitmentInputTooOld, err := builder.NewTransactionBuilder(api).
