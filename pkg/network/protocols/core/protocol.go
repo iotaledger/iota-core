@@ -137,6 +137,7 @@ func (p *Protocol) onBlock(blockData []byte, id network.PeerID) {
 	blockIdentifier, err := iotago.BlockIdentifierFromBlockBytes(blockData)
 	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize block"), id)
+		return
 	}
 
 	isNew := p.duplicateBlockBytesFilter.AddIdentifier(types.Identifier(blockIdentifier))
@@ -152,6 +153,7 @@ func (p *Protocol) onBlock(blockData []byte, id network.PeerID) {
 	block, err := model.BlockFromBytes(blockData, p.apiProvider, serix.WithValidation())
 	if err != nil {
 		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize block"), id)
+		return
 	}
 
 	p.Events.BlockReceived.Trigger(block, id)
