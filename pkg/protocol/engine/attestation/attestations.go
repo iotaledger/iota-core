@@ -4,7 +4,6 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -19,7 +18,7 @@ type Attestations interface {
 	// If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
 	GetMap(index iotago.SlotIndex) (attestations *ads.Map[iotago.AccountID, *iotago.Attestation], err error)
 	AddAttestationFromBlock(block *blocks.Block)
-	Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot types.Identifier, err error)
+	Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot iotago.Identifier, err error)
 
 	Import(reader io.ReadSeeker) (err error)
 	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error)

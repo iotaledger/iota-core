@@ -2,16 +2,16 @@ package core
 
 import (
 	"encoding/json"
-	"sync"
 
-	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/ds/bytesfilter"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/core/api"
@@ -36,7 +36,7 @@ type Protocol struct {
 	duplicateBlockBytesFilter *bytesfilter.BytesFilter
 
 	requestedBlockHashes      *shrinkingmap.ShrinkingMap[types.Identifier, types.Empty]
-	requestedBlockHashesMutex sync.Mutex
+	requestedBlockHashesMutex syncutils.Mutex
 }
 
 func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, apiProvider api.Provider, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -127,7 +127,7 @@ func (p *Protocol) handlePacket(nbr network.PeerID, packet proto.Message) (err e
 			p.onAttestationsRequest(packetBody.AttestationsRequest.GetCommitmentId(), nbr)
 		})
 	default:
-		return errors.Errorf("unsupported packet; packet=%+v, packetBody=%T-%+v", packet, packetBody, packetBody)
+		return ierrors.Errorf("unsupported packet; packet=%+v, packetBody=%T-%+v", packet, packetBody, packetBody)
 	}
 
 	return
@@ -136,7 +136,7 @@ func (p *Protocol) handlePacket(nbr network.PeerID, packet proto.Message) (err e
 func (p *Protocol) onBlock(blockData []byte, id network.PeerID) {
 	blockIdentifier, err := iotago.BlockIdentifierFromBlockBytes(blockData)
 	if err != nil {
-		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize block"), id)
+		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize block"), id)
 		return
 	}
 
@@ -152,7 +152,7 @@ func (p *Protocol) onBlock(blockData []byte, id network.PeerID) {
 
 	block, err := model.BlockFromBytes(blockData, p.apiProvider, serix.WithValidation())
 	if err != nil {
-		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize block"), id)
+		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize block"), id)
 		return
 	}
 
@@ -161,7 +161,7 @@ func (p *Protocol) onBlock(blockData []byte, id network.PeerID) {
 
 func (p *Protocol) onBlockRequest(idBytes []byte, id network.PeerID) {
 	if len(idBytes) != iotago.BlockIDLength {
-		p.Events.Error.Trigger(errors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize block request"), id)
+		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize block request"), id)
 
 		return
 	}
@@ -172,7 +172,7 @@ func (p *Protocol) onBlockRequest(idBytes []byte, id network.PeerID) {
 func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id network.PeerID) {
 	receivedCommitment, err := model.CommitmentFromBytes(commitmentBytes, p.apiProvider, serix.WithValidation())
 	if err != nil {
-		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize slot commitment"), id)
+		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize slot commitment"), id)
 
 		return
 	}
@@ -182,7 +182,7 @@ func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id network.PeerID) {
 
 func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id network.PeerID) {
 	if len(idBytes) != iotago.CommitmentIDLength {
-		p.Events.Error.Trigger(errors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize slot commitment request"), id)
+		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize slot commitment request"), id)
 
 		return
 	}
@@ -193,21 +193,21 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id network.PeerID) {
 func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []byte, merkleProof []byte, id network.PeerID) {
 	cm, err := model.CommitmentFromBytes(commitmentBytes, p.apiProvider, serix.WithValidation())
 	if err != nil {
-		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize commitment"), id)
+		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize commitment"), id)
 
 		return
 	}
 
 	var attestations []*iotago.Attestation
 	if _, err := p.apiProvider.APIForVersion(commitmentBytes[0]).Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
-		p.Events.Error.Trigger(errors.Wrap(err, "failed to deserialize attestations"), id)
+		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
 
 		return
 	}
 
 	proof := new(merklehasher.Proof[iotago.Identifier])
 	if err := json.Unmarshal(merkleProof, proof); err != nil {
-		p.Events.Error.Trigger(errors.Wrapf(err, "failed to deserialize merkle proof when receiving attestations for commitment %s", cm.ID()), id)
+		p.Events.Error.Trigger(ierrors.Wrapf(err, "failed to deserialize merkle proof when receiving attestations for commitment %s", cm.ID()), id)
 
 		return
 	}
@@ -217,7 +217,7 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 
 func (p *Protocol) onAttestationsRequest(commitmentIDBytes []byte, id network.PeerID) {
 	if len(commitmentIDBytes) != iotago.CommitmentIDLength {
-		p.Events.Error.Trigger(errors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize commitmentID in attestations request"), id)
+		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize commitmentID in attestations request"), id)
 
 		return
 	}

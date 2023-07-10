@@ -2,11 +2,9 @@ package database
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
@@ -32,7 +30,7 @@ var (
 
 var (
 	// ErrNothingToCleanUp is returned when nothing is there to clean up in the database.
-	ErrNothingToCleanUp = errors.New("Nothing to clean up in the databases")
+	ErrNothingToCleanUp = ierrors.New("Nothing to clean up in the databases")
 )
 
 type Cleanup struct {
@@ -143,11 +141,11 @@ func CheckEngine(dbPath string, createDatabaseIfNotExists bool, dbEngine hivedb.
 
 	targetEngine, err := hivedb.CheckEngine(dbPath, createDatabaseIfNotExists, dbEngine, tmpAllowedEngines)
 	if err != nil {
-		if errors.Is(err, hivedb.ErrEngineMismatch) {
+		if ierrors.Is(err, hivedb.ErrEngineMismatch) {
 			//nolint:stylecheck,revive // this error message is shown to the user
-			return hivedb.EngineUnknown, fmt.Errorf(`database (%s) engine does not match the configuration: '%v' != '%v'
+			return hivedb.EngineUnknown, ierrors.Errorf(`database (%s) engine does not match the configuration: '%v' != '%v'
 
-			If you want to use another database engine, you can use the tool './hornet tool db-migration' to convert the current database.`, dbPath, targetEngine, dbEngine[0])
+			If you want to use another database engine, you can use the tool './iota-core tool db-migration' to convert the current database.`, dbPath, targetEngine, dbEngine[0])
 		}
 
 		return hivedb.EngineUnknown, err
@@ -183,6 +181,6 @@ func StoreWithDefaultSettings(path string, createDatabaseIfNotExists bool, dbEng
 		return mapdb.NewMapDB(), nil
 
 	default:
-		return nil, fmt.Errorf("unknown database engine: %s, supported engines: pebble/rocksdb/mapdb", dbEngine)
+		return nil, ierrors.Errorf("unknown database engine: %s, supported engines: pebble/rocksdb/mapdb", dbEngine)
 	}
 }

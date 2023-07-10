@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/labstack/echo/v4"
-	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/contextutils"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
@@ -19,12 +19,12 @@ import (
 func blockByID(c echo.Context) (*model.Block, error) {
 	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
+		return nil, ierrors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
 	}
 
 	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
 	if !exists {
-		return nil, errors.Errorf("block not found: %s", blockID.ToHex())
+		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
 	}
 
 	return block, nil
@@ -60,7 +60,7 @@ func blockIssuance(_ echo.Context) (*nodeclient.BlockIssuanceResponse, error) {
 	slotCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
 	if len(references[iotago.StrongParentType]) == 0 {
-		return nil, errors.Wrap(echo.ErrServiceUnavailable, "get references failed")
+		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "get references failed")
 	}
 
 	cBytes, err := deps.Protocol.APIForSlot(slotCommitment.Index()).JSONEncode(slotCommitment.Commitment())
@@ -90,25 +90,25 @@ func sendBlock(c echo.Context) (*submitBlockResponse, error) {
 
 	if c.Request().Body == nil {
 		// bad request
-		return nil, errors.WithMessage(httpserver.ErrInvalidParameter, "invalid block, error: request body missing")
+		return nil, ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid block, error: request body missing")
 	}
 
 	bytes, err := io.ReadAll(c.Request().Body)
 	if err != nil {
-		return nil, errors.WithMessagef(httpserver.ErrInvalidParameter, "invalid block, error: %s", err)
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 	}
 
 	switch mimeType {
 	case echo.MIMEApplicationJSON:
 		// Do not validate here, the parents might need to be set
 		if err := deps.Protocol.LatestAPI().JSONDecode(bytes, iotaBlock); err != nil {
-			return nil, errors.WithMessagef(httpserver.ErrInvalidParameter, "invalid block, error: %s", err)
+			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 
 	case httpserver.MIMEApplicationVendorIOTASerializerV1:
 		// Do not validate here, the parents might need to be set
 		if _, err := deps.Protocol.LatestAPI().Decode(bytes, iotaBlock); err != nil {
-			return nil, errors.WithMessagef(httpserver.ErrInvalidParameter, "invalid block, error: %s", err)
+			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 
 	default:
@@ -121,14 +121,14 @@ func sendBlock(c echo.Context) (*submitBlockResponse, error) {
 	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, iotaBlock)
 	if err != nil {
 		switch {
-		case errors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
-			return nil, errors.WithMessagef(httpserver.ErrInvalidParameter, "failed to attach block: %s", err.Error())
+		case ierrors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
+			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to attach block: %w", err)
 
-		case errors.Is(err, blockfactory.ErrBlockAttacherAttachingNotPossible):
-			return nil, errors.WithMessagef(echo.ErrInternalServerError, "failed to attach block: %s", err.Error())
+		case ierrors.Is(err, blockfactory.ErrBlockAttacherAttachingNotPossible):
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to attach block: %w", err)
 
 		default:
-			return nil, errors.WithMessagef(echo.ErrInternalServerError, "failed to attach block: %s", err.Error())
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to attach block: %w", err)
 		}
 	}
 

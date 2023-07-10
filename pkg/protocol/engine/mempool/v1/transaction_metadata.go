@@ -1,15 +1,14 @@
 package mempoolv1
 
 import (
-	"sync"
 	"sync/atomic"
-
-	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/promise"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	lpromise "github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -44,9 +43,9 @@ type TransactionMetadata struct {
 	allAttachmentsEvicted      *promise.Event
 
 	// mutex needed?
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 
-	attachmentsMutex sync.RWMutex
+	attachmentsMutex syncutils.RWMutex
 
 	*inclusionFlags
 }
@@ -54,12 +53,12 @@ type TransactionMetadata struct {
 func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction) (*TransactionMetadata, error) {
 	transactionID, transactionIDErr := transaction.ID(api)
 	if transactionIDErr != nil {
-		return nil, xerrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
+		return nil, ierrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
 	}
 
 	inputReferences, inputsErr := transaction.Inputs()
 	if inputsErr != nil {
-		return nil, xerrors.Errorf("failed to retrieve inputReferences of transaction %s: %w", transactionID, inputsErr)
+		return nil, ierrors.Errorf("failed to retrieve inputReferences of transaction %s: %w", transactionID, inputsErr)
 	}
 
 	return (&TransactionMetadata{

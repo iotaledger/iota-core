@@ -2,14 +2,11 @@ package ledger
 
 import (
 	cryptoed25519 "crypto/ed25519"
-	"fmt"
 	"io"
-
-	"github.com/pkg/errors"
-	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -23,21 +20,20 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/mana"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 var (
-	ErrUnexpectedUnderlyingType    = errors.New("unexpected underlying type provided by the interface")
-	ErrTransactionMetadataNotFOund = errors.New("TransactionMetadata not found")
+	ErrUnexpectedUnderlyingType    = ierrors.New("unexpected underlying type provided by the interface")
+	ErrTransactionMetadataNotFOund = ierrors.New("TransactionMetadata not found")
 )
 
 type Ledger struct {
@@ -48,14 +44,11 @@ type Ledger struct {
 	utxoLedger       *utxoledger.Manager
 	accountsLedger   *accountsledger.Manager
 	manaManager      *mana.Manager
-	epochGadget      epochgadget.Gadget
+	sybilProtection  sybilprotection.SybilProtection
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
-
-	sybilProtection sybilprotection.SybilProtection
-
-	memPool      mempool.MemPool[ledger.BlockVoteRank]
-	conflictDAG  conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
-	errorHandler func(error)
+	memPool          mempool.MemPool[ledger.BlockVoteRank]
+	conflictDAG      conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
+	errorHandler     func(error)
 
 	module.Module
 }
@@ -70,7 +63,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Storage.AccountDiffs,
 			e,
 			e.SybilProtection,
-			e.EpochGadget,
 			e.ErrorHandler("ledger"),
 		)
 
@@ -79,7 +71,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 		e.HookConstructed(func() {
 			// TODO: create an Init method that is called with all additional dependencies on e.HookInitialized()
 			e.Events.Ledger.LinkTo(l.events)
-			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.OnlineCommittee().Size)
+			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
 			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
@@ -95,7 +87,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 				l.accountsLedger.TrackBlock(block)
 				l.BlockAccepted(block)
-				l.epochGadget.BlockAccepted(block)
+				l.sybilProtection.BlockAccepted(block)
 				l.events.BlockProcessed.Trigger(block)
 			}, event.WithWorkerPool(wp))
 
@@ -117,7 +109,6 @@ func New(
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
 	apiProvider api.Provider,
 	sybilProtection sybilprotection.SybilProtection,
-	epochGadget epochgadget.Gadget,
 	errorHandler func(error),
 ) *Ledger {
 	return &Ledger{
@@ -127,9 +118,8 @@ func New(
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
-		epochGadget:      epochGadget,
 		errorHandler:     errorHandler,
-		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](sybilProtection.OnlineCommittee().Size),
+		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](sybilProtection.SeatManager().OnlineCommittee().Size),
 	}
 }
 
@@ -159,7 +149,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	}
 
 	if index != ledgerIndex+1 {
-		panic(fmt.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex, index))
+		panic(ierrors.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex, index))
 	}
 
 	stateDiff := l.memPool.StateDiff(index)
@@ -169,7 +159,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	// and retrieve intermediate outputs to show to the user
 	spends, outputs, accountDiffs, err := l.processStateDiffTransactions(stateDiff)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, xerrors.Errorf("failed to process state diff transactions in slot %d: %w", index, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to process state diff transactions in slot %d: %w", index, err)
 	}
 
 	// Now we process the collected account changes, for that we consume the "compacted" state diff to get the overall
@@ -178,7 +168,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	// output side
 	createdAccounts, consumedAccounts, destroyedAccounts, err := l.processCreatedAndConsumedAccountOutputs(stateDiff, accountDiffs)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, xerrors.Errorf("failed to process outputs consumed and created in slot %d: %w", index, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to process outputs consumed and created in slot %d: %w", index, err)
 	}
 
 	l.prepareAccountDiffs(accountDiffs, index, consumedAccounts, createdAccounts)
@@ -189,12 +179,12 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 
 	// Update the UTXO ledger
 	if err = l.utxoLedger.ApplyDiff(index, outputs, spends); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, xerrors.Errorf("failed to apply diff to UTXO ledger for index %d: %w", index, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to UTXO ledger for index %d: %w", index, err)
 	}
 
 	// Update the Accounts ledger
 	if err = l.accountsLedger.ApplyDiff(index, accountDiffs, destroyedAccounts); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, xerrors.Errorf("failed to apply diff to Accounts ledger for index %d: %w", index, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for index %d: %w", index, err)
 	}
 
 	// Mark each transaction as committed so the mempool can evict it
@@ -282,15 +272,11 @@ func (l *Ledger) MemPool() mempool.MemPool[ledger.BlockVoteRank] {
 
 func (l *Ledger) Import(reader io.ReadSeeker) error {
 	if err := l.utxoLedger.Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import utxoLedger")
+		return ierrors.Wrap(err, "failed to import utxoLedger")
 	}
 
 	if err := l.accountsLedger.Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import accountsLedger")
-	}
-
-	if err := l.epochGadget.Import(reader); err != nil {
-		return errors.Wrap(err, "failed to import epochGadget")
+		return ierrors.Wrap(err, "failed to import accountsLedger")
 	}
 
 	return nil
@@ -298,15 +284,11 @@ func (l *Ledger) Import(reader io.ReadSeeker) error {
 
 func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error {
 	if err := l.utxoLedger.Export(writer, targetIndex); err != nil {
-		return errors.Wrap(err, "failed to export utxoLedger")
+		return ierrors.Wrap(err, "failed to export utxoLedger")
 	}
 
 	if err := l.accountsLedger.Export(writer, targetIndex); err != nil {
-		return errors.Wrap(err, "failed to export accountsLedger")
-	}
-
-	if err := l.epochGadget.Export(writer, targetIndex); err != nil {
-		return errors.Wrap(err, "failed to export epochGadget")
+		return ierrors.Wrap(err, "failed to export accountsLedger")
 	}
 
 	return nil
@@ -333,10 +315,10 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		// Obtain account state at the current latest committed slot, which is index-1
 		accountData, exists, err := l.accountsLedger.Account(consumedAccountID, index-1)
 		if err != nil {
-			panic(fmt.Errorf("error loading account %s in slot %d: %w", consumedAccountID, index-1, err))
+			panic(ierrors.Errorf("error loading account %s in slot %d: %w", consumedAccountID, index-1, err))
 		}
 		if !exists {
-			panic(fmt.Errorf("could not find destroyed account %s in slot %d", consumedAccountID, index-1))
+			panic(ierrors.Errorf("could not find destroyed account %s in slot %d", consumedAccountID, index-1))
 		}
 
 		// case 1. the account was destroyed, the diff will be created inside accountLedger on account deletion
@@ -414,7 +396,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	stateDiff.CreatedStates().ForEachKey(func(outputID iotago.OutputID) bool {
 		createdOutput, errOutput := l.Output(outputID.UTXOInput())
 		if errOutput != nil {
-			err = xerrors.Errorf("failed to retrieve output %s: %w", outputID, errOutput)
+			err = ierrors.Errorf("failed to retrieve output %s: %w", outputID, errOutput)
 			return false
 		}
 
@@ -446,14 +428,14 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	})
 
 	if err != nil {
-		return nil, nil, nil, xerrors.Errorf("error while processing created states: %w", err)
+		return nil, nil, nil, ierrors.Errorf("error while processing created states: %w", err)
 	}
 
 	// input side
 	stateDiff.DestroyedStates().ForEachKey(func(outputID iotago.OutputID) bool {
 		spentOutput, errOutput := l.Output(outputID.UTXOInput())
 		if errOutput != nil {
-			err = xerrors.Errorf("failed to retrieve output %s: %w", outputID, errOutput)
+			err = ierrors.Errorf("failed to retrieve output %s: %w", outputID, errOutput)
 			return false
 		}
 
@@ -496,7 +478,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	}
 
 	if err != nil {
-		return nil, nil, nil, xerrors.Errorf("error while processing created states: %w", err)
+		return nil, nil, nil, ierrors.Errorf("error while processing created states: %w", err)
 	}
 
 	return createdAccounts, consumedAccounts, destroyedAccounts, nil
@@ -515,7 +497,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 		inputRefs, errInput := tx.Inputs()
 		if errInput != nil {
-			err = xerrors.Errorf("failed to retrieve inputs of %s: %w", txID, errInput)
+			err = ierrors.Errorf("failed to retrieve inputs of %s: %w", txID, errInput)
 			return false
 		}
 
@@ -525,7 +507,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 			for _, inputRef := range inputRefs {
 				inputState, outputErr := l.Output(inputRef)
 				if outputErr != nil {
-					err = xerrors.Errorf("failed to retrieve outputs of %s: %w", txID, errInput)
+					err = ierrors.Errorf("failed to retrieve outputs of %s: %w", txID, errInput)
 					return false
 				}
 
@@ -549,7 +531,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID, stateDiff.Index()-1)
 				if accountErr != nil {
-					panic(fmt.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, stateDiff.Index()-1, accountErr))
+					panic(ierrors.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, stateDiff.Index()-1, accountErr))
 				}
 				// if the account does not exist in our AccountsLedger it means it doesn't have a BIC feature, so
 				// we burn this allotment.
@@ -575,7 +557,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (*utxoledger.Output, error) {
 	accountMetadata, _, err := l.accountsLedger.Account(accountID, slotIndex)
 	if err != nil {
-		return nil, xerrors.Errorf("could not get account information for account %s in slot %d: %w", accountID, slotIndex, err)
+		return nil, ierrors.Errorf("could not get account information for account %s in slot %d: %w", accountID, slotIndex, err)
 	}
 
 	l.utxoLedger.ReadLockLedger()
@@ -583,15 +565,15 @@ func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iota
 
 	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(accountMetadata.OutputID)
 	if err != nil {
-		return nil, xerrors.Errorf("error while checking account output %s is unspent: %w", accountMetadata.OutputID, err)
+		return nil, ierrors.Errorf("error while checking account output %s is unspent: %w", accountMetadata.OutputID, err)
 	}
 	if !isUnspent {
-		return nil, xerrors.Errorf("unspent account output %s not found: %w", accountMetadata.OutputID, mempool.ErrStateNotFound)
+		return nil, ierrors.Errorf("unspent account output %s not found: %w", accountMetadata.OutputID, mempool.ErrStateNotFound)
 	}
 
 	accountOutput, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(accountMetadata.OutputID)
 	if err != nil {
-		return nil, xerrors.Errorf("error while retrieving account output %s: %w", accountMetadata.OutputID, err)
+		return nil, ierrors.Errorf("error while retrieving account output %s: %w", accountMetadata.OutputID, err)
 	}
 
 	return accountOutput, nil
@@ -605,18 +587,18 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 
 	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
 	if err != nil {
-		p.Reject(xerrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
+		p.Reject(ierrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
 	}
 
 	if !isUnspent {
-		p.Reject(xerrors.Errorf("unspent output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+		p.Reject(ierrors.Errorf("unspent output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
 
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
-	output, err := l.utxoLedger.ReadOutputByOutputID(stateRef.Ref())
+	output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(stateRef.Ref())
 
 	if err != nil {
-		p.Reject(xerrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+		p.Reject(ierrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	} else {
 		p.Resolve(output)
 	}
@@ -627,7 +609,7 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().IssuingTime)
 
-	seat, exists := l.sybilProtection.Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
+	seat, exists := l.sybilProtection.SeatManager().Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return
 	}
@@ -635,7 +617,7 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 	if err := l.conflictDAG.CastVotes(vote.NewVote(seat, voteRank), block.ConflictIDs()); err != nil {
 		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
 		//  Do we track witness weight of invalid blocks?
-		l.errorHandler(errors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
+		l.errorHandler(ierrors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
 }
 

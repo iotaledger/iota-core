@@ -2,12 +2,11 @@ package chainmanager
 
 import (
 	"fmt"
-	"sync"
-
-	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -22,7 +21,7 @@ type ChainCommitment struct {
 	children    *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *ChainCommitment]
 	chain       *Chain
 
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 }
 
 func NewChainCommitment(id iotago.CommitmentID) *ChainCommitment {
@@ -123,7 +122,7 @@ func (c *ChainCommitment) setMainChild(commitment *ChainCommitment) error {
 	defer c.mutex.Unlock()
 
 	if !c.children.Has(commitment.ID()) {
-		return errors.Errorf("trying to set a main child %s before registering it as a child", commitment.ID())
+		return ierrors.Errorf("trying to set a main child %s before registering it as a child", commitment.ID())
 	}
 	c.mainChildID = commitment.ID()
 
@@ -149,6 +148,10 @@ func (c *ChainCommitment) replaceChain(chain *Chain) {
 }
 
 func (c *ChainCommitment) String() string {
+	// Generate chainString before locking c.mutex to avoid potential deadlock due to locking ChainCommitment and
+	// Chain mutexes in different order across different goroutines.
+	chainString := c.Chain().String()
+
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
@@ -156,7 +159,7 @@ func (c *ChainCommitment) String() string {
 		stringify.NewStructField("ID", c.id),
 		stringify.NewStructField("Commitment", c.commitment.String()),
 		stringify.NewStructField("Solid", c.solid),
-		stringify.NewStructField("Chain", c.chain),
+		stringify.NewStructField("Chain", chainString),
 		stringify.NewStructField("MainChildID", c.mainChildID),
 	)
 

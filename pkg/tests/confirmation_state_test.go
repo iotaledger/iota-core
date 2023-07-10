@@ -8,7 +8,8 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -38,7 +39,11 @@ func TestConfirmationFlags(t *testing.T) {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
+				sybilprotectionv1.NewProvider(
+					sybilprotectionv1.WithSeatManagerProvider(
+						poa.NewProvider(poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
+					),
+				),
 			),
 		},
 		"nodeB": {
@@ -46,7 +51,11 @@ func TestConfirmationFlags(t *testing.T) {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
+				sybilprotectionv1.NewProvider(
+					sybilprotectionv1.WithSeatManagerProvider(
+						poa.NewProvider(poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
+					),
+				),
 			),
 		},
 		"nodeC": {
@@ -54,7 +63,11 @@ func TestConfirmationFlags(t *testing.T) {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
+				sybilprotectionv1.NewProvider(
+					sybilprotectionv1.WithSeatManagerProvider(
+						poa.NewProvider(poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
+					),
+				),
 			),
 		},
 		"nodeD": {
@@ -62,7 +75,11 @@ func TestConfirmationFlags(t *testing.T) {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(expectedCommittee, poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
+				sybilprotectionv1.NewProvider(
+					sybilprotectionv1.WithSeatManagerProvider(
+						poa.NewProvider(poa.WithOnlineCommitteeStartup(nodeA.AccountID), poa.WithActivityWindow(2*time.Minute)),
+					),
+				),
 			),
 		},
 	})
@@ -77,7 +94,7 @@ func TestConfirmationFlags(t *testing.T) {
 		testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
-		testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat),
+		testsuite.WithSybilProtectionOnlineCommittee(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID))),
 		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -126,7 +143,10 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(2),
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(4, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat),
+			testsuite.WithSybilProtectionOnlineCommittee(
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
+			),
 			testsuite.WithEvictedSlot(2),
 		)
 	}
@@ -160,7 +180,11 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(2),
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(5, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat, nodeC.ValidatorSeat),
+			testsuite.WithSybilProtectionOnlineCommittee(
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeC.AccountID)),
+			),
 			testsuite.WithEvictedSlot(2),
 		)
 	}
@@ -212,7 +236,11 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(3),
 			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithSybilProtectionCommittee(6, expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(nodeA.ValidatorSeat, nodeB.ValidatorSeat, nodeC.ValidatorSeat),
+			testsuite.WithSybilProtectionOnlineCommittee(
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeC.AccountID)),
+			),
 			testsuite.WithEvictedSlot(3),
 		)
 	}

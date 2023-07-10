@@ -1,15 +1,12 @@
 package slotattestation
 
 import (
-	"sync"
-
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -65,7 +62,7 @@ type Manager struct {
 	lastCommittedSlot    iotago.SlotIndex
 	lastCumulativeWeight uint64
 
-	commitmentMutex sync.RWMutex
+	commitmentMutex syncutils.RWMutex
 
 	apiProvider api.Provider
 
@@ -80,7 +77,7 @@ func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*
 			latestCommitment.CumulativeWeight(),
 			attestationCommitmentOffset,
 			e.Storage.Prunable.Attestations,
-			e.SybilProtection.Committee,
+			e.SybilProtection.SeatManager().Committee,
 			e,
 		)
 	})
@@ -125,7 +122,7 @@ func (m *Manager) AttestationCommitmentOffset() iotago.SlotIndex {
 func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestation, err error) {
 	adsMap, err := m.GetMap(index)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get attestations for slot %d", index)
+		return nil, ierrors.Wrapf(err, "failed to get attestations for slot %d", index)
 	}
 
 	attestations = make([]*iotago.Attestation, 0)
@@ -134,7 +131,7 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 
 		return true
 	}); err != nil {
-		return nil, errors.Wrapf(err, "failed to stream attestations for slot %d", index)
+		return nil, ierrors.Wrapf(err, "failed to stream attestations for slot %d", index)
 	}
 
 	return attestations, nil
@@ -147,11 +144,11 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, *io
 	defer m.commitmentMutex.RUnlock()
 
 	if index > m.lastCommittedSlot {
-		return nil, errors.Errorf("slot %d is newer than last committed slot %d", index, m.lastCommittedSlot)
+		return nil, ierrors.Errorf("slot %d is newer than last committed slot %d", index, m.lastCommittedSlot)
 	}
 	cutoffIndex, isValid := m.computeAttestationCommitmentOffset(index)
 	if !isValid {
-		return nil, errors.Errorf("slot %d is smaller than attestation cutoffIndex %d thus we don't have attestations", index, cutoffIndex)
+		return nil, ierrors.Errorf("slot %d is smaller than attestation cutoffIndex %d thus we don't have attestations", index, cutoffIndex)
 	}
 
 	return m.adsMapStorage(cutoffIndex)
@@ -230,7 +227,7 @@ func (m *Manager) determineAttestationsFromWindow(slotIndex iotago.SlotIndex) []
 	return slotAttestors.Values()
 }
 
-func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot types.Identifier, err error) {
+func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot iotago.Identifier, err error) {
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 
@@ -248,7 +245,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 
 	if !valid {
 		m.lastCommittedSlot = index
-		return 0, types.Identifier{}, nil
+		return 0, iotago.Identifier{}, nil
 	}
 
 	// Get all attestations for the valid time window of cutoffIndex up to index (as we just applied the pending attestations).
@@ -258,7 +255,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	// Store all attestations of cutoffIndex in bucketed storage via ads.Map / sparse merkle tree -> committed attestations.
 	tree, err := m.adsMapStorage(cutoffIndex)
 	if err != nil {
-		return 0, types.Identifier{}, errors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
+		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
 	}
 
 	// Add all attestations to the tree and calculate the new cumulative weight.
@@ -273,7 +270,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 
 	m.lastCommittedSlot = index
 
-	return m.lastCumulativeWeight, tree.Root(), nil
+	return m.lastCumulativeWeight, iotago.Identifier(tree.Root()), nil
 }
 
 func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cutoffIndex iotago.SlotIndex, isValid bool) {

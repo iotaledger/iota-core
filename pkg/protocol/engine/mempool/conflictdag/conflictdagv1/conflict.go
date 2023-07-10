@@ -2,14 +2,13 @@ package conflictdagv1
 
 import (
 	"bytes"
-	"errors"
 	"sync"
 
 	"go.uber.org/atomic"
-	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -66,7 +65,7 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	evicted atomic.Bool
 
 	// preferredInsteadMutex is used to synchronize access to the preferred instead value of the Conflict.
-	preferredInsteadMutex sync.RWMutex
+	preferredInsteadMutex syncutils.RWMutex
 
 	// likedInstead is the set of liked instead Conflicts.
 	likedInstead *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
@@ -74,6 +73,10 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	// likedInsteadSources is a mapping of liked instead Conflicts to the set of parents that inherited them.
 	likedInsteadSources *shrinkingmap.ShrinkingMap[ConflictID, *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]]
 
+	// TODO: likedInsteadMutex and structureMutex are sometimes locked in different order by different goroutines, which could result in a deadlock
+	//  however, it's impossible to deadlock if we fork all transactions upon booking
+	//  deadlock happens when the likedInstead conflict changes and parents are updated at the same time, which is impossible in the current setup
+	//  because we won't process votes on a conflict we're just creating.
 	// likedInsteadMutex is used to synchronize access to the liked instead value of the Conflict.
 	likedInsteadMutex sync.RWMutex
 
@@ -128,7 +131,7 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 // JoinConflictSets registers the Conflict with the given ConflictSets.
 func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSets *advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VoteRank]]) (joinedConflictSets *advancedset.AdvancedSet[ResourceID], err error) {
 	if c.evicted.Load() {
-		return nil, xerrors.Errorf("tried to join conflict sets of evicted conflict: %w", conflictdag.ErrEntityEvicted)
+		return nil, ierrors.Errorf("tried to join conflict sets of evicted conflict: %w", conflictdag.ErrEntityEvicted)
 	}
 
 	registerConflictingConflict := func(c, conflict *Conflict[ConflictID, ResourceID, VoteRank]) {
@@ -146,7 +149,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSe
 
 	return joinedConflictSets, conflictSets.ForEach(func(conflictSet *ConflictSet[ConflictID, ResourceID, VoteRank]) error {
 		otherConflicts, err := conflictSet.Add(c)
-		if err != nil && !errors.Is(err, conflictdag.ErrAlreadyPartOfConflictSet) {
+		if err != nil && !ierrors.Is(err, conflictdag.ErrAlreadyPartOfConflictSet) {
 			return err
 		}
 

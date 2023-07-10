@@ -2,14 +2,14 @@ package prunable
 
 import (
 	"os"
-	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/zyedidia/generic/cache"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -17,10 +17,10 @@ import (
 
 type Manager struct {
 	openDBs      *cache.Cache[iotago.SlotIndex, *dbInstance]
-	openDBsMutex sync.Mutex
+	openDBsMutex syncutils.Mutex
 
 	lastPrunedSlot *model.EvictionIndex
-	pruningMutex   sync.RWMutex
+	pruningMutex   syncutils.RWMutex
 
 	dbConfig     database.Config
 	errorHandler func(error)
@@ -47,7 +47,7 @@ func NewManager(dbConfig database.Config, errorHandler func(error), opts ...opti
 
 			size, err := dbPrunableDirectorySize(dbConfig.Directory, baseIndex)
 			if err != nil {
-				errorHandler(errors.Wrapf(err, "failed to get size of prunable directory for base index %d", baseIndex))
+				errorHandler(ierrors.Wrapf(err, "failed to get size of prunable directory for base index %d", baseIndex))
 			}
 
 			m.dbSizes.Set(baseIndex, size)
@@ -130,7 +130,7 @@ func (m *Manager) PrunableStorageSize() int64 {
 	m.openDBs.Each(func(key iotago.SlotIndex, val *dbInstance) {
 		size, err := dbPrunableDirectorySize(m.dbConfig.Directory, key)
 		if err != nil {
-			m.errorHandler(errors.Wrapf(err, "dbPrunableDirectorySize failed for %s%s", m.dbConfig.Directory, key))
+			m.errorHandler(ierrors.Wrapf(err, "dbPrunableDirectorySize failed for %s: %s", m.dbConfig.Directory, key))
 			return
 		}
 		sum += size

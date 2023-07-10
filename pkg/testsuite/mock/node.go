@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -59,7 +60,7 @@ type Node struct {
 	candidateEngineActivatedCount atomic.Uint32
 	mainEngineSwitchedCount       atomic.Uint32
 
-	mutex          sync.RWMutex
+	mutex          syncutils.RWMutex
 	attachedBlocks []*blocks.Block
 }
 
@@ -232,7 +233,7 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] BlockDAG.MissingBlockAttached: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.SybilProtection.BlockProcessed.Hook(func(block *blocks.Block) {
+	events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] SybilProtection.BlockProcessed: %s\n", n.Name, engineName, block.ID())
 	})
 
@@ -294,11 +295,11 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
 	})
 
-	events.SybilProtection.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
+	events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
 		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatAdded: %d - %s\n", n.Name, engineName, seat, accountID)
 	})
 
-	events.SybilProtection.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
+	events.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
 		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatRemoved: %d\n", n.Name, engineName, seat)
 	})
 

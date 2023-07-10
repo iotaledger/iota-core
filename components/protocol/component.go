@@ -3,26 +3,25 @@ package protocol
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
+	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
 func init() {
@@ -82,12 +81,6 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
-		var validators []iotago.AccountID
-		for _, validator := range ParamsProtocol.SybilProtection.Committee {
-			hex := lo.PanicOnErr(hexutil.DecodeHex(validator))
-			validators = append(validators, iotago.AccountID(hex[:]))
-		}
-
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
@@ -102,7 +95,7 @@ func provide(c *dig.Container) error {
 			),
 			protocol.WithSnapshotPath(ParamsProtocol.Snapshot.Path),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(validators),
+				sybilprotectionv1.NewProvider(),
 			),
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(),
@@ -191,13 +184,17 @@ func configure() error {
 	// 	Component.LogInfof("SlotCommitmentReceived: %s", commitment.ID())
 	// })
 
+	deps.Protocol.Events.Engine.SybilProtection.CommitteeSelected.Hook(func(committee *account.Accounts, epoch iotago.EpochIndex) {
+		Component.LogInfof("CommitteeSelected: Epoch %d - %s (reused: %t)", epoch, committee.IDs(), committee.IsReused())
+	})
+
 	return nil
 }
 
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		if err := deps.Protocol.Run(ctx); err != nil {
-			if !errors.Is(err, context.Canceled) {
+			if !ierrors.Is(err, context.Canceled) {
 				Component.LogErrorfAndExit("Error running the Protocol: %s", err.Error())
 			}
 		}

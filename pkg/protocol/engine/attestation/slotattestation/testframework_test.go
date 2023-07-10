@@ -2,7 +2,6 @@ package slotattestation_test
 
 import (
 	"crypto/ed25519"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -39,7 +39,7 @@ type TestFramework struct {
 	issuerByAlias       *shrinkingmap.ShrinkingMap[string, *issuer]
 
 	uniqueCounter atomic.Int64
-	mutex         sync.RWMutex
+	mutex         syncutils.RWMutex
 }
 
 func NewTestFramework(test *testing.T) *TestFramework {
@@ -177,5 +177,5 @@ func (t *TestFramework) AssertCommit(slot iotago.SlotIndex, expectedCW uint64, e
 
 	require.ElementsMatchf(t.test, expectedAttestations, attestationFromTree, "attestations from tree do not match expected ones: expected: %v, got: %v", lo.Values(expectedAttestationsAliases), attestationBlockIDsFromTree)
 
-	require.Equal(t.test, expectedTree.Root(), root)
+	require.Equal(t.test, iotago.Identifier(expectedTree.Root()), root)
 }

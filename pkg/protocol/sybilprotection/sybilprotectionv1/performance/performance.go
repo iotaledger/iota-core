@@ -1,14 +1,11 @@
 package performance
 
 import (
-	"sync"
-
-	"github.com/cockroachdb/errors"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -25,8 +22,8 @@ type Tracker struct {
 
 	apiProvider api.Provider
 
-	performanceFactorsMutex sync.RWMutex
-	mutex                   sync.RWMutex
+	performanceFactorsMutex syncutils.RWMutex
+	mutex                   syncutils.RWMutex
 }
 
 func NewTracker(
@@ -67,6 +64,7 @@ func (t *Tracker) BlockAccepted(block *blocks.Block) {
 	defer t.performanceFactorsMutex.Unlock()
 
 	// TODO: check if this block is a validator block
+	// TODO: include wannabe validator performance in the snapshot
 
 	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
 	pf, err := performanceFactors.Load(block.ProtocolBlock().IssuerID)
@@ -98,8 +96,15 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	}
 
 	if err := t.poolStatsStore.Set(epoch, poolsStats); err != nil {
-		panic(errors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
+		panic(ierrors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
+
+	rewardsTree := ads.NewMap[iotago.AccountID, *PoolRewards](t.rewardsStorage(epoch),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		(*PoolRewards).Bytes,
+		PoolRewardsFromBytes,
+	)
 
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
 		intermediateFactors := make([]uint64, 0, epochEndSlot+1-epochStartSlot)
@@ -112,20 +117,13 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 			pf, err := performanceFactorStorage.Load(accountID)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to load performance factor for account %s", accountID))
+				panic(ierrors.Wrapf(err, "failed to load performance factor for account %s", accountID))
 			}
 
 			intermediateFactors = append(intermediateFactors, pf)
 		}
 
-		rewardsMap := ads.NewMap[iotago.AccountID, *PoolRewards](t.rewardsStorage(epoch),
-			iotago.Identifier.Bytes,
-			iotago.IdentifierFromBytes,
-			(*PoolRewards).Bytes,
-			PoolRewardsFromBytes,
-		)
-
-		rewardsMap.Set(accountID, &PoolRewards{
+		rewardsTree.Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
@@ -144,10 +142,10 @@ func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) *advancedset.
 func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
 	c, err := t.committeeStore.Get(epoch)
 	if err != nil {
-		if errors.Is(err, kvstore.ErrKeyNotFound) {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, false
 		}
-		panic(errors.Wrapf(err, "failed to load committee for epoch %d", epoch))
+		panic(ierrors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
 
 	return c, true

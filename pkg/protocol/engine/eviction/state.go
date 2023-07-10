@@ -3,14 +3,13 @@ package eviction
 import (
 	"io"
 	"math"
-	"sync"
-
-	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -24,7 +23,7 @@ type State struct {
 	latestRootBlocks     *ringbuffer.RingBuffer[iotago.BlockID]
 	rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks
 	lastEvictedSlot      iotago.SlotIndex
-	evictionMutex        sync.RWMutex
+	evictionMutex        syncutils.RWMutex
 
 	optsRootBlocksEvictionDelay iotago.SlotIndex
 }
@@ -154,7 +153,7 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 
 	if s.rootBlocks.Get(id.Index(), true).Set(id, commitmentID) {
 		if err := s.rootBlockStorageFunc(id.Index()).Store(id, commitmentID); err != nil {
-			panic(errors.Wrapf(err, "failed to store root block %s", id))
+			panic(ierrors.Wrapf(err, "failed to store root block %s", id))
 		}
 	}
 
@@ -232,18 +231,18 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 			}
 			if err = storage.Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
 				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
-					return errors.Wrapf(err, "failed to write root block ID %s", rootBlockID)
+					return ierrors.Wrapf(err, "failed to write root block ID %s", rootBlockID)
 				}
 
 				if err = stream.WriteSerializable(writer, commitmentID, iotago.CommitmentIDLength); err != nil {
-					return errors.Wrapf(err, "failed to write root block's %s commitment %s", rootBlockID, commitmentID)
+					return ierrors.Wrapf(err, "failed to write root block's %s commitment %s", rootBlockID, commitmentID)
 				}
 
 				elementsCount++
 
 				return
 			}); err != nil {
-				return 0, errors.Wrap(err, "failed to stream root blocks")
+				return 0, ierrors.Wrap(err, "failed to stream root blocks")
 			}
 		}
 
@@ -256,27 +255,27 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 	return stream.ReadCollection(reader, func(i int) error {
 		blockIDBytes, err := stream.ReadBytes(reader, iotago.BlockIDLength)
 		if err != nil {
-			return errors.Wrapf(err, "failed to read root block id %d", i)
+			return ierrors.Wrapf(err, "failed to read root block id %d", i)
 		}
 
 		rootBlockID, _, err := iotago.SlotIdentifierFromBytes(blockIDBytes)
 		if err != nil {
-			return errors.Wrapf(err, "failed to parse root block id %d", i)
+			return ierrors.Wrapf(err, "failed to parse root block id %d", i)
 		}
 
 		commitmentIDBytes, err := stream.ReadBytes(reader, iotago.CommitmentIDLength)
 		if err != nil {
-			return errors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
+			return ierrors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
 		}
 
 		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
 		if err != nil {
-			return errors.Wrapf(err, "failed to parse root block's %s commitment id", rootBlockID)
+			return ierrors.Wrapf(err, "failed to parse root block's %s commitment id", rootBlockID)
 		}
 
 		if s.rootBlocks.Get(rootBlockID.Index(), true).Set(rootBlockID, commitmentID) {
 			if err := s.rootBlockStorageFunc(rootBlockID.Index()).Store(rootBlockID, commitmentID); err != nil {
-				panic(errors.Wrapf(err, "failed to store root block %s", rootBlockID))
+				panic(ierrors.Wrapf(err, "failed to store root block %s", rootBlockID))
 			}
 		}
 
@@ -332,7 +331,7 @@ func (s *State) delayedBlockEvictionThreshold(slotIndex iotago.SlotIndex) (thres
 				found := false
 				_ = storedRootBlocks.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
 					found = true
-					return errors.New("no error, just stop")
+					return ierrors.New("no error, just stop")
 				})
 
 				if found {

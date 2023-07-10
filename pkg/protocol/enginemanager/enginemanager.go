@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -19,14 +19,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -52,10 +51,9 @@ type EngineManager struct {
 	blockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
 	bookerProvider          module.Provider[*engine.Engine, booker.Booker]
 	clockProvider           module.Provider[*engine.Engine, clock.Clock]
-	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	slotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
-	epochGadgetProvider     module.Provider[*engine.Engine, epochgadget.Gadget]
+	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	attestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
@@ -76,10 +74,9 @@ func New(
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],
 	clockProvider module.Provider[*engine.Engine, clock.Clock],
-	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection],
 	blockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget],
 	slotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget],
-	epochGadgetProvider module.Provider[*engine.Engine, epochgadget.Gadget],
+	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection],
 	notarizationProvider module.Provider[*engine.Engine, notarization.Notarization],
 	attestationProvider module.Provider[*engine.Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
@@ -97,10 +94,9 @@ func New(
 		blockDAGProvider:        blockDAGProvider,
 		bookerProvider:          bookerProvider,
 		clockProvider:           clockProvider,
-		sybilProtectionProvider: sybilProtectionProvider,
 		blockGadgetProvider:     blockGadgetProvider,
 		slotGadgetProvider:      slotGadgetProvider,
-		epochGadgetProvider:     epochGadgetProvider,
+		sybilProtectionProvider: sybilProtectionProvider,
 		notarizationProvider:    notarizationProvider,
 		attestationProvider:     attestationProvider,
 		ledgerProvider:          ledgerProvider,
@@ -112,8 +108,8 @@ func New(
 func (e *EngineManager) LoadActiveEngine(snapshotPath string) (*engine.Engine, error) {
 	info := &engineInfo{}
 	if err := ioutils.ReadJSONFromFile(e.infoFilePath(), info); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("unable to read engine info file: %w", err)
+		if !ierrors.Is(err, os.ErrNotExist) {
+			return nil, ierrors.Errorf("unable to read engine info file: %w", err)
 		}
 	}
 
@@ -145,14 +141,14 @@ func (e *EngineManager) CleanupNonActive() error {
 
 	dirs, err := e.directory.SubDirs()
 	if err != nil {
-		return errors.Wrapf(err, "unable to list subdirectories of %s", e.directory.Path())
+		return ierrors.Wrapf(err, "unable to list subdirectories of %s", e.directory.Path())
 	}
 	for _, dir := range dirs {
 		if dir == activeDir {
 			continue
 		}
 		if err := e.directory.RemoveSubdir(dir); err != nil {
-			return errors.Wrapf(err, "unable to remove subdirectory %s", dir)
+			return ierrors.Wrapf(err, "unable to remove subdirectory %s", dir)
 		}
 	}
 
@@ -175,7 +171,7 @@ func (e *EngineManager) SetActiveInstance(instance *engine.Engine) error {
 
 func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) *engine.Engine {
 	errorHandler := func(err error) {
-		e.errorHandler(errors.Wrapf(err, "engine (%s)", dirName[0:8]))
+		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", dirName[0:8]))
 	}
 
 	return engine.New(e.workers.CreateGroup(dirName),
@@ -185,10 +181,9 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.blockDAGProvider,
 		e.bookerProvider,
 		e.clockProvider,
-		e.sybilProtectionProvider,
 		e.blockGadgetProvider,
 		e.slotGadgetProvider,
-		e.epochGadgetProvider,
+		e.sybilProtectionProvider,
 		e.notarizationProvider,
 		e.attestationProvider,
 		e.ledgerProvider,
@@ -207,7 +202,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	// Dump a snapshot at the target index
 	snapshotPath := filepath.Join(os.TempDir(), fmt.Sprintf("snapshot_%d_%s.bin", index, lo.PanicOnErr(uuid.NewUUID())))
 	if err := e.activeInstance.WriteSnapshot(snapshotPath, index); err != nil {
-		return nil, errors.Wrapf(err, "error exporting snapshot for index %s", index)
+		return nil, ierrors.Wrapf(err, "error exporting snapshot for index %s", index)
 	}
 
 	return e.newEngineInstance(snapshotPath), nil

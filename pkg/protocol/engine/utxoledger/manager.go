@@ -3,24 +3,22 @@ package utxoledger
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
-	"sync"
-
-	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // ErrOutputsSumNotEqualTotalSupply is returned if the sum of the output deposits is not equal the total supply of tokens.
-var ErrOutputsSumNotEqualTotalSupply = errors.New("accumulated output balance is not equal to total supply")
+var ErrOutputsSumNotEqualTotalSupply = ierrors.New("accumulated output balance is not equal to total supply")
 
 type Manager struct {
 	store     kvstore.KVStore
-	storeLock sync.RWMutex
+	storeLock syncutils.RWMutex
 
 	stateTree *ads.Map[iotago.OutputID, *stateTreeMetadata]
 
@@ -127,12 +125,12 @@ func (m *Manager) StoreLedgerIndex(index iotago.SlotIndex) error {
 func (m *Manager) ReadLedgerIndexWithoutLocking() (iotago.SlotIndex, error) {
 	value, err := m.store.Get([]byte{StoreKeyPrefixLedgerSlotIndex})
 	if err != nil {
-		if errors.Is(err, kvstore.ErrKeyNotFound) {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			// there is no ledger milestone yet => return 0
 			return 0, nil
 		}
 
-		return 0, fmt.Errorf("failed to load ledger milestone index: %w", err)
+		return 0, ierrors.Errorf("failed to load ledger milestone index: %w", err)
 	}
 
 	return lo.DropCount(iotago.SlotIndexFromBytes(value))
@@ -347,7 +345,7 @@ func (m *Manager) LedgerStateSHA256Sum() ([]byte, error) {
 	}
 
 	for _, outputID := range outputIDs.RemoveDupsAndSort() {
-		output, err := m.ReadOutputByOutputID(outputID)
+		output, err := m.ReadOutputByOutputIDWithoutLocking(outputID)
 		if err != nil {
 			return nil, err
 		}

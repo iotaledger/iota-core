@@ -12,19 +12,20 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -61,7 +62,7 @@ type TestSuite struct {
 	optsTick                   time.Duration
 
 	uniqueCounter        atomic.Int64
-	mutex                sync.RWMutex
+	mutex                syncutils.RWMutex
 	TransactionFramework *TransactionFramework
 	genesisSeed          [32]byte
 }
@@ -383,6 +384,10 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 				accountDetails.Address = wallet.Address()
 			}
 
+			if accountDetails.AccountID.Empty() {
+				accountDetails.AccountID = blake2b.Sum256(accountDetails.IssuerKey)
+			}
+
 			return accountDetails
 		})...))
 	}
@@ -394,16 +399,12 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
 
-	validators := t.Validators()
 	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 		baseOpts := []options.Option[protocol.Protocol]{
 			protocol.WithSnapshotPath(t.snapshotPath),
 			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
-			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(validators),
-			),
 			protocol.WithEpochGadgetProvider(
-				epochorchestrator.NewProvider(),
+				sybilprotectionv1.NewProvider(),
 			),
 		}
 		if len(nodesOptions) == 1 {

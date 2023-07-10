@@ -1,8 +1,7 @@
 package account
 
 import (
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -23,19 +22,19 @@ func PoolFromBytes(bytes []byte) (*Pool, int, error) {
 	m := marshalutil.New(bytes)
 	poolStake, err := m.ReadUint64()
 	if err != nil {
-		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse pool stake")
+		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse pool stake")
 	}
 	p.PoolStake = iotago.BaseToken(poolStake)
 
 	validatorStake, err := m.ReadUint64()
 	if err != nil {
-		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse validator stake")
+		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse validator stake")
 	}
 	p.ValidatorStake = iotago.BaseToken(validatorStake)
 
 	fixedCost, err := m.ReadUint64()
 	if err != nil {
-		return nil, m.ReadOffset(), errors.Wrap(err, "failed to parse fixed cost")
+		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse fixed cost")
 	}
 	p.FixedCost = iotago.Mana(fixedCost)
 

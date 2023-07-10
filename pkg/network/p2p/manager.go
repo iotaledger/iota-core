@@ -2,16 +2,16 @@ package p2p
 
 import (
 	"context"
-	"sync"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/autopeering/peer"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/network"
 )
 
@@ -51,19 +51,19 @@ type Manager struct {
 	local      *peer.Local
 	libp2pHost host.Host
 
-	acceptMutex sync.RWMutex
+	acceptMutex syncutils.RWMutex
 	acceptMap   map[libp2ppeer.ID]*AcceptMatcher
 
 	log                 *logger.Logger
 	neighborGroupEvents map[NeighborsGroup]*NeighborGroupEvents
 
-	stopMutex sync.RWMutex
+	stopMutex syncutils.RWMutex
 	isStopped bool
 
 	neighbors      map[network.PeerID]*Neighbor
-	neighborsMutex sync.RWMutex
+	neighborsMutex syncutils.RWMutex
 
-	registeredProtocolsMutex sync.RWMutex
+	registeredProtocolsMutex syncutils.RWMutex
 	registeredProtocols      map[protocol.ID]*ProtocolHandler
 }
 
@@ -168,7 +168,7 @@ func (m *Manager) Neighbor(id network.PeerID) (*Neighbor, error) {
 func (m *Manager) DropNeighbor(id network.PeerID, group NeighborsGroup) error {
 	nbr, err := m.neighborWithGroup(id, group)
 	if err != nil {
-		return errors.WithStack(err)
+		return ierrors.WithStack(err)
 	}
 	nbr.Close()
 
@@ -247,7 +247,7 @@ func (m *Manager) addNeighbor(ctx context.Context, p *peer.Peer, group Neighbors
 	connectOpts []ConnectPeerOption,
 ) error {
 	if p.ID() == m.local.ID() {
-		return errors.WithStack(ErrLoopbackNeighbor)
+		return ierrors.WithStack(ErrLoopbackNeighbor)
 	}
 	m.stopMutex.RLock()
 	defer m.stopMutex.RUnlock()
@@ -255,12 +255,12 @@ func (m *Manager) addNeighbor(ctx context.Context, p *peer.Peer, group Neighbors
 		return ErrNotRunning
 	}
 	if m.neighborExists(p.ID()) {
-		return errors.WithStack(ErrDuplicateNeighbor)
+		return ierrors.WithStack(ErrDuplicateNeighbor)
 	}
 
 	streams, err := connectorFunc(ctx, p, connectOpts)
 	if err != nil {
-		return errors.WithStack(err)
+		return ierrors.WithStack(err)
 	}
 
 	// create and add the neighbor
@@ -286,7 +286,7 @@ func (m *Manager) addNeighbor(ctx context.Context, p *peer.Peer, group Neighbors
 			}
 		}
 
-		return errors.WithStack(err)
+		return ierrors.WithStack(err)
 	}
 	nbr.readLoop()
 	nbr.writeLoop()
@@ -314,7 +314,7 @@ func (m *Manager) setNeighbor(nbr *Neighbor) error {
 	m.neighborsMutex.Lock()
 	defer m.neighborsMutex.Unlock()
 	if _, exists := m.neighbors[nbr.ID()]; exists {
-		return errors.WithStack(ErrDuplicateNeighbor)
+		return ierrors.WithStack(ErrDuplicateNeighbor)
 	}
 	m.neighbors[nbr.ID()] = nbr
 

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/autopeering/peer"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
 )
 
@@ -213,7 +213,7 @@ func (n *Neighbor) disconnect() (err error) {
 		// Close all streams
 		for _, stream := range n.protocols {
 			if streamErr := stream.Close(); streamErr != nil {
-				err = errors.WithStack(streamErr)
+				err = ierrors.WithStack(streamErr)
 			}
 			n.Log.Infow("Stream closed", "protocol", stream.Protocol())
 		}

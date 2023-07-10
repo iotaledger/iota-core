@@ -13,12 +13,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
+	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/libp2putil"
 	pp "github.com/iotaledger/iota-core/pkg/network/p2p/proto"
 )
@@ -30,11 +31,11 @@ const (
 
 var (
 	// ErrTimeout is returned when an expected incoming connection was not received in time.
-	ErrTimeout = errors.New("accept timeout")
+	ErrTimeout = ierrors.New("accept timeout")
 	// ErrDuplicateAccept is returned when the server already registered an accept request for that peer ID.
-	ErrDuplicateAccept = errors.New("accept request for that peer already exists")
+	ErrDuplicateAccept = ierrors.New("accept request for that peer already exists")
 	// ErrNoP2P means that the given peer does not support the p2p service.
-	ErrNoP2P = errors.New("peer does not have a p2p service")
+	ErrNoP2P = ierrors.New("peer does not have a p2p service")
 )
 
 func (m *Manager) dialPeer(ctx context.Context, p *peer.Peer, opts []ConnectPeerOption) (map[protocol.ID]*PacketsStream, error) {
@@ -48,7 +49,7 @@ func (m *Manager) dialPeer(ctx context.Context, p *peer.Peer, opts []ConnectPeer
 	}
 	libp2pID, err := libp2putil.ToLibp2pPeerID(p)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, ierrors.WithStack(err)
 	}
 
 	addressStr := fmt.Sprintf("/ip4/%s/tcp/%d", p.IP(), p2pEndpoint.Port())
@@ -80,7 +81,7 @@ func (m *Manager) dialPeer(ctx context.Context, p *peer.Peer, opts []ConnectPeer
 	}
 
 	if len(streams) == 0 {
-		return nil, errors.Errorf("no streams initiated with peer %s / %s", address, p.ID())
+		return nil, ierrors.Errorf("no streams initiated with peer %s / %s", address, p.ID())
 	}
 
 	return streams, nil
@@ -103,10 +104,10 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 		}
 		amCtx, am, err := m.newAcceptMatcher(ctx, p, protocolID)
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, ierrors.WithStack(err)
 		}
 		if am == nil {
-			return nil, errors.WithStack(ErrDuplicateAccept)
+			return nil, ierrors.WithStack(ErrDuplicateAccept)
 		}
 		defer m.removeAcceptMatcher(am, protocolID)
 
@@ -117,19 +118,19 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 		select {
 		case ps := <-streamCh:
 			if ps.Protocol() != protocolID {
-				return nil, errors.Errorf("accepted stream has wrong protocol: %s != %s", ps.Protocol(), protocolID)
+				return nil, ierrors.Errorf("accepted stream has wrong protocol: %s != %s", ps.Protocol(), protocolID)
 			}
 
 			return ps, nil
 		case <-amCtx.Done():
 			err := amCtx.Err()
-			if errors.Is(err, context.DeadlineExceeded) {
+			if ierrors.Is(err, context.DeadlineExceeded) {
 				m.log.Debugw("accept timeout", "id", am.Peer.ID(), "proto", protocolID)
-				return nil, errors.WithStack(ErrTimeout)
+				return nil, ierrors.WithStack(ErrTimeout)
 			}
 			m.log.Debugw("context error", "id", am.Peer.ID(), "err", err)
 
-			return nil, errors.WithStack(err)
+			return nil, ierrors.WithStack(err)
 		}
 	}
 
@@ -168,7 +169,7 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 	}
 
 	if len(streams) == 0 {
-		return nil, errors.Errorf("no streams accepted from peer %s", p.ID())
+		return nil, ierrors.Errorf("no streams accepted from peer %s", p.ID())
 	}
 
 	return streams, nil
@@ -177,7 +178,7 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 func (m *Manager) initiateStream(ctx context.Context, libp2pID libp2ppeer.ID, protocolID protocol.ID) (*PacketsStream, error) {
 	protocolHandler, registered := m.registeredProtocols[protocolID]
 	if !registered {
-		return nil, errors.Errorf("cannot initiate stream protocol %s is not registered", protocolID)
+		return nil, ierrors.Errorf("cannot initiate stream protocol %s is not registered", protocolID)
 	}
 	stream, err := m.P2PHost().NewStream(ctx, libp2pID, protocolID)
 	if err != nil {
@@ -185,7 +186,7 @@ func (m *Manager) initiateStream(ctx context.Context, libp2pID libp2ppeer.ID, pr
 	}
 	ps := NewPacketsStream(stream, protocolHandler.PacketFactory)
 	if err := ps.sendNegotiation(); err != nil {
-		err = errors.Wrap(err, "failed to send negotiation block")
+		err = ierrors.Wrap(err, "failed to send negotiation block")
 		stream.Close()
 
 		return nil, err
@@ -237,7 +238,7 @@ func (m *Manager) handleStream(stream network.Stream) {
 type AcceptMatcher struct {
 	Peer          *peer.Peer // connecting peer
 	Libp2pID      libp2ppeer.ID
-	StreamChMutex sync.RWMutex
+	StreamChMutex syncutils.RWMutex
 	StreamCh      map[protocol.ID]chan *PacketsStream
 	Ctx           context.Context
 	CtxCancel     context.CancelFunc
@@ -249,7 +250,7 @@ func (m *Manager) newAcceptMatcher(ctx context.Context, p *peer.Peer, protocolID
 
 	libp2pID, err := libp2putil.ToLibp2pPeerID(p)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, ierrors.WithStack(err)
 	}
 
 	acceptMatcher, acceptExists := m.acceptMap[libp2pID]
@@ -317,9 +318,9 @@ type PacketsStream struct {
 	network.Stream
 	packetFactory func() proto.Message
 
-	readerLock     sync.Mutex
+	readerLock     syncutils.Mutex
 	reader         *libp2putil.UvarintReader
-	writerLock     sync.Mutex
+	writerLock     syncutils.Mutex
 	writer         *libp2putil.UvarintWriter
 	packetsRead    *atomic.Uint64
 	packetsWritten *atomic.Uint64
@@ -343,7 +344,7 @@ func (ps *PacketsStream) WritePacket(message proto.Message) error {
 	defer ps.writerLock.Unlock()
 	err := ps.writer.WriteBlk(message)
 	if err != nil {
-		return errors.WithStack(err)
+		return ierrors.WithStack(err)
 	}
 	ps.packetsWritten.Inc()
 
@@ -355,7 +356,7 @@ func (ps *PacketsStream) ReadPacket(message proto.Message) error {
 	ps.readerLock.Lock()
 	defer ps.readerLock.Unlock()
 	if err := ps.reader.ReadBlk(message); err != nil {
-		return errors.WithStack(err)
+		return ierrors.WithStack(err)
 	}
 	ps.packetsRead.Inc()
 
@@ -363,9 +364,9 @@ func (ps *PacketsStream) ReadPacket(message proto.Message) error {
 }
 
 func (ps *PacketsStream) sendNegotiation() error {
-	return errors.WithStack(ps.WritePacket(&pp.Negotiation{}))
+	return ierrors.WithStack(ps.WritePacket(&pp.Negotiation{}))
 }
 
 func (ps *PacketsStream) receiveNegotiation() (err error) {
-	return errors.WithStack(ps.ReadPacket(&pp.Negotiation{}))
+	return ierrors.WithStack(ps.ReadPacket(&pp.Negotiation{}))
 }
