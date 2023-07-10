@@ -3,6 +3,7 @@ package evilwallet
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -28,9 +29,9 @@ type Connector interface {
 	Clients(...bool) []Client
 	// GetClients returns the numOfClt client instances that were used the longest time ago.
 	GetClients(numOfClt int) []Client
-	// AddClient adds client to WebClients based on provided GoShimmerAPI url.
+	// AddClient adds a client to WebClients based on provided GoShimmerAPI url.
 	AddClient(url string, setters ...options.Option[WebClient])
-	// RemoveClient removes client with the provided url from the WebClients.
+	// RemoveClient removes a client with the provided url from the WebClients.
 	RemoveClient(url string)
 	// GetClient returns the client instance that was used the longest time ago.
 	GetClient() Client
@@ -68,6 +69,7 @@ func (c *WebClients) ServersStatuses() ServerInfos {
 	for i := range c.clients {
 		status[i], _ = c.ServerStatus(i)
 	}
+
 	return status
 }
 
@@ -91,6 +93,7 @@ func (c *WebClients) Clients(...bool) []Client {
 	for i, c := range c.clients {
 		clients[i] = c
 	}
+
 	return clients
 }
 
@@ -104,6 +107,7 @@ func (c *WebClients) GetClients(numOfClt int) []Client {
 	for i := range clts {
 		clts[i] = c.getClient()
 	}
+
 	return clts
 }
 
@@ -114,6 +118,7 @@ func (c *WebClients) getClient() Client {
 	} else {
 		c.lastUsed++
 	}
+
 	return c.clients[c.lastUsed]
 }
 
@@ -204,6 +209,7 @@ func (c *WebClient) PostTransaction(tx *iotago.Transaction) (blockID iotago.Bloc
 	blockBuilder.ProtocolVersion(c.optsProtocolParams.Version())
 
 	blockBuilder.Payload(tx)
+	blockBuilder.IssuingTime(time.Time{})
 
 	blk, err := blockBuilder.Build()
 	if err != nil {
@@ -222,6 +228,7 @@ func (c *WebClient) PostTransaction(tx *iotago.Transaction) (blockID iotago.Bloc
 func (c *WebClient) PostData(data []byte) (blkID string, err error) {
 	blockBuilder := builder.NewBasicBlockBuilder(c.serixAPI)
 	blockBuilder.ProtocolVersion(c.optsProtocolParams.Version())
+	blockBuilder.IssuingTime(time.Time{})
 
 	blockBuilder.Payload(&iotago.TaggedData{
 		Tag: data,

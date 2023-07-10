@@ -97,6 +97,7 @@ func NewSpammer(options ...Options) *Spammer {
 	}
 
 	s.setup()
+
 	return s
 }
 
@@ -182,6 +183,7 @@ func (s *Spammer) Spam() {
 			case <-timeExceeded:
 				s.log.Infof("Maximum spam duration exceeded, stopping spammer....")
 				s.StopSpamming()
+
 				return
 			case <-s.done:
 				s.StopSpamming()
@@ -225,6 +227,7 @@ func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt evilwallet.Client)
 	if tx == nil {
 		s.log.Debug(ErrTransactionIsNil)
 		s.ErrCounter.CountError(ErrTransactionIsNil)
+
 		return
 	}
 
@@ -233,13 +236,15 @@ func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt evilwallet.Client)
 	if !allSolid {
 		s.log.Debug(ErrInputsNotSolid)
 		s.ErrCounter.CountError(ierrors.Wrapf(ErrInputsNotSolid, "txID: %s", txID.ToHex()))
+
 		return
 	}
 
 	blockID, err := clt.PostTransaction(tx)
 	if err != nil {
-		s.log.Debug(ErrFailPostTransaction)
+		s.log.Debug(ierrors.Wrapf(ErrFailPostTransaction, err.Error()))
 		s.ErrCounter.CountError(ierrors.Wrapf(ErrFailPostTransaction, err.Error()))
+
 		return
 	}
 	if s.EvilScenario.OutputWallet.Type() == evilwallet.Reuse {
