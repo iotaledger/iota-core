@@ -135,7 +135,7 @@ type dependencies struct {
 
 	Protocol         *protocol.Protocol
 	AppInfo          *app.Info
-	RestRouteManager *restapi.RestRouteManager
+	RestRouteManager *restapipkg.RestRouteManager
 	BlockIssuer      *blockfactory.BlockIssuer `optional:"true"`
 	MetricsTracker   *metricstracker.MetricsTracker
 }
