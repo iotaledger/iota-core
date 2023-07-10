@@ -212,7 +212,7 @@ func (s *Settings) VersionForEpoch(epoch iotago.EpochIndex) iotago.Version {
 	}
 
 	// This means that the protocol versions are not properly configured.
-	panic(fmt.Sprintf("could not find a protocol version for epoch %d", epoch))
+	panic(ierrors.Errorf("could not find a protocol version for epoch %d", epoch))
 }
 
 func (s *Settings) VersionForSlot(slot iotago.SlotIndex) iotago.Version {
@@ -321,7 +321,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 		if prevProtocolVersionEpochStart != nil &&
 			(current.Version <= prevProtocolVersionEpochStart.Version ||
 				current.StartEpoch <= prevProtocolVersionEpochStart.StartEpoch) {
-			panic(fmt.Sprintf("protocol versions not ordered correctly, %v is bigger than %v", prevProtocolVersionEpochStart, current))
+			panic(ierrors.Errorf("protocol versions not ordered correctly, %v is bigger than %v", prevProtocolVersionEpochStart, current))
 		}
 
 		// We also store the versions into the DB so that we can load it when we start the node from disk without loading a snapshot.
@@ -441,7 +441,7 @@ func (s *Settings) apiForVersion(version iotago.Version) iotago.API {
 func (s *Settings) apiFromProtocolParameters(version iotago.Version) iotago.API {
 	protocolParams := s.protocolParameters(version)
 	if protocolParams == nil {
-		panic(fmt.Errorf("protocol parameters for version %d not found", version))
+		panic(ierrors.Errorf("protocol parameters for version %d not found", version))
 	}
 
 	switch protocolParams.Version() {
