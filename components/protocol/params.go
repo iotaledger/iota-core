@@ -19,6 +19,8 @@ type ParametersProtocol struct {
 	Filter struct {
 		// MaxAllowedClockDrift defines the maximum drift our wall clock can have to future blocks being received from the network.
 		MaxAllowedClockDrift time.Duration `default:"5s" usage:"the maximum drift our wall clock can have to future blocks being received from the network"`
+		MinCommittableAge    uint64        `default:"6" usage:"the minimum age of a commitment or commitment input, relative to block issuance time"`
+		MaxCommittableAge    uint64        `default:"12" usage:"the maximum age of a commitment or commitment input, relative to block issuance time"`
 	}
 }
 
