@@ -143,6 +143,14 @@ func (b *Block) IsRootBlock() bool {
 	return b.rootBlock != nil
 }
 
+func (b *Block) Payload() iotago.Payload {
+	if b.modelBlock == nil {
+		return nil
+	}
+
+	return b.modelBlock.Payload()
+}
+
 func (b *Block) Transaction() (tx *iotago.Transaction, hasTransaction bool) {
 	if b.modelBlock == nil {
 		return nil, false
@@ -650,7 +658,8 @@ func (b *Block) Work() int {
 	// TODO: define a work function which takes more than just payload size into account
 	// e.g. number of parents, payload type etc.
 	work := 1
-	payload := b.Block().Payload
+
+	payload := b.Payload()
 	if payload != nil {
 		work += payload.Size()
 	}
