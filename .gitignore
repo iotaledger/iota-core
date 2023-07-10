@@ -29,3 +29,6 @@ dist/
 
 # snapshot and settings file
 *.bin
+tools/docker-network/docker-network.snapshot
+
+
