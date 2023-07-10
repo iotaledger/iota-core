@@ -1,10 +1,9 @@
 package blocks
 
 import (
-	"sync"
-
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
@@ -16,7 +15,7 @@ type Blocks struct {
 	blocks        *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *Block]
 	evictionState *eviction.State
 	apiProvider   api.Provider
-	evictionMutex sync.RWMutex
+	evictionMutex syncutils.RWMutex
 }
 
 func New(evictionState *eviction.State, apiProvider api.Provider) *Blocks {

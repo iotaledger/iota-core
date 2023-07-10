@@ -1,9 +1,9 @@
 package metricstracker
 
 import (
-	"sync"
 	"time"
 
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/metrics"
 )
 
@@ -19,11 +19,11 @@ type MetricsTracker struct {
 	oldTime                int64
 
 	bps               float64
-	bpsLock           sync.RWMutex
+	bpsLock           syncutils.RWMutex
 	cbps              float64
-	cbpsLock          sync.RWMutex
+	cbpsLock          syncutils.RWMutex
 	confirmedRate     float64
-	confirmedRateLock sync.RWMutex
+	confirmedRateLock syncutils.RWMutex
 
 	isBootstrappedFunc isBootstrappedFunc
 }

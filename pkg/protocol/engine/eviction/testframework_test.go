@@ -3,12 +3,12 @@ package eviction_test
 import (
 	"encoding/binary"
 	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -23,7 +23,7 @@ type TestFramework struct {
 	commitmentIDs *shrinkingmap.ShrinkingMap[iotago.BlockID, iotago.CommitmentID]
 
 	idCounter uint64
-	mutex     sync.RWMutex
+	mutex     syncutils.RWMutex
 }
 
 func NewTestFramework(testing *testing.T, prunableStorage *prunable.Prunable, instance *eviction.State) *TestFramework {

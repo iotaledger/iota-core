@@ -65,7 +65,7 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	evicted atomic.Bool
 
 	// preferredInsteadMutex is used to synchronize access to the preferred instead value of the Conflict.
-	preferredInsteadMutex sync.RWMutex
+	preferredInsteadMutex syncutils.RWMutex
 
 	// likedInstead is the set of liked instead Conflicts.
 	likedInstead *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
@@ -73,6 +73,10 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	// likedInsteadSources is a mapping of liked instead Conflicts to the set of parents that inherited them.
 	likedInsteadSources *shrinkingmap.ShrinkingMap[ConflictID, *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]]
 
+	// TODO: likedInsteadMutex and structureMutex are sometimes locked in different order by different goroutines, which could result in a deadlock
+	//  however, it's impossible to deadlock if we fork all transactions upon booking
+	//  deadlock happens when the likedInstead conflict changes and parents are updated at the same time, which is impossible in the current setup
+	//  because we won't process votes on a conflict we're just creating.
 	// likedInsteadMutex is used to synchronize access to the liked instead value of the Conflict.
 	likedInsteadMutex sync.RWMutex
 

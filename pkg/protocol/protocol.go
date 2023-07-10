@@ -3,12 +3,12 @@ package protocol
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -60,7 +60,7 @@ type Protocol struct {
 	networkProtocol *core.Protocol
 	supportVersions nodeclient.Versions
 
-	activeEngineMutex sync.RWMutex
+	activeEngineMutex syncutils.RWMutex
 	mainEngine        *engine.Engine
 	candidateEngine   *engine.Engine
 

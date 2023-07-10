@@ -588,7 +588,7 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 	}
 
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
-	output, err := l.utxoLedger.ReadOutputByOutputID(stateRef.Ref())
+	output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(stateRef.Ref())
 
 	if err != nil {
 		p.Reject(ierrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))

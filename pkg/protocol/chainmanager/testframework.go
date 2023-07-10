@@ -1,7 +1,6 @@
 package chainmanager
 
 import (
-	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -27,7 +27,7 @@ type TestFramework struct {
 	missingCommitmentReceived int32
 	commitmentBelowRoot       int32
 
-	sync.RWMutex
+	syncutils.RWMutex
 }
 
 func NewTestFramework(test *testing.T, api iotago.API, opts ...options.Option[TestFramework]) (testFramework *TestFramework) {

@@ -2,7 +2,6 @@ package slotattestation_test
 
 import (
 	"crypto/ed25519"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -39,7 +39,7 @@ type TestFramework struct {
 	issuerByAlias       *shrinkingmap.ShrinkingMap[string, *issuer]
 
 	uniqueCounter atomic.Int64
-	mutex         sync.RWMutex
+	mutex         syncutils.RWMutex
 }
 
 func NewTestFramework(test *testing.T) *TestFramework {
