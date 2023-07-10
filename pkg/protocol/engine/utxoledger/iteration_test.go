@@ -7,14 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
+	iotago_tpkg "github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func TestUTXOComputeBalance(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), tpkg.API)
+	manager := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
 
 	initialOutput := tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, utils.RandAddress(iotago.AddressEd25519), 2_134_656_365)
 	require.NoError(t, manager.AddUnspentOutput(initialOutput))
@@ -46,11 +48,11 @@ func TestUTXOComputeBalance(t *testing.T) {
 	balance, count, err := manager.ComputeLedgerBalance()
 	require.NoError(t, err)
 	require.Equal(t, 5, count)
-	require.Equal(t, uint64(2_134_656_365+56_549_524+25_548_858+545_699_656+626_659_696), balance)
+	require.Equal(t, iotago.BaseToken(2_134_656_365+56_549_524+25_548_858+545_699_656+626_659_696), balance)
 }
 
 func TestUTXOIteration(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), tpkg.API)
+	manager := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
 
 	outputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, utils.RandAddress(iotago.AddressEd25519)),

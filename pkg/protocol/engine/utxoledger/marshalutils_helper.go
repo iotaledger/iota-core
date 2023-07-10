@@ -1,6 +1,7 @@
 package utxoledger
 
 import (
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -38,5 +39,5 @@ func parseSlotIndex(ms *marshalutil.MarshalUtil) (iotago.SlotIndex, error) {
 		return 0, err
 	}
 
-	return iotago.SlotIndexFromBytes(bytes)
+	return lo.DropCount(iotago.SlotIndexFromBytes(bytes))
 }

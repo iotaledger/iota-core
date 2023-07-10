@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -123,7 +122,7 @@ func (c *ChainCommitment) setMainChild(commitment *ChainCommitment) error {
 	defer c.mutex.Unlock()
 
 	if !c.children.Has(commitment.ID()) {
-		return errors.Errorf("trying to set a main child %s before registering it as a child", commitment.ID())
+		return ierrors.Errorf("trying to set a main child %s before registering it as a child", commitment.ID())
 	}
 	c.mainChildID = commitment.ID()
 

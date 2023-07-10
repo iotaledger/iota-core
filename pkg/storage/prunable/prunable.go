@@ -3,6 +3,7 @@ package prunable
 import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -12,6 +13,7 @@ const (
 	rootBlocksPrefix
 	attestationsPrefix
 	accountDiffsPrefix
+	performanceFactorsPrefix
 	rootsPrefix
 )
 
@@ -21,7 +23,7 @@ const (
 
 type Prunable struct {
 	pruningDelay iotago.SlotIndex
-	api          iotago.API
+	apiProvider  api.Provider
 	manager      *Manager
 	errorHandler func(error)
 }
@@ -34,8 +36,8 @@ func New(dbConfig database.Config, pruningDelay iotago.SlotIndex, errorHandler f
 	}
 }
 
-func (p *Prunable) Initialize(a iotago.API) {
-	p.api = a
+func (p *Prunable) Initialize(apiProvider api.Provider) {
+	p.apiProvider = apiProvider
 }
 
 func (p *Prunable) RestoreFromDisk() {
@@ -48,7 +50,7 @@ func (p *Prunable) Blocks(slot iotago.SlotIndex) *Blocks {
 		return nil
 	}
 
-	return NewBlocks(slot, store, p.api)
+	return NewBlocks(slot, store, p.apiProvider)
 }
 
 func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *RootBlocks {
@@ -70,7 +72,17 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
 		return nil
 	}
 
-	return NewAccountDiffs(slot, store, p.api)
+	return NewAccountDiffs(slot, store, p.apiProvider.APIForSlot(slot))
+}
+
+func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *PerformanceFactors {
+	// TODO: make sure that the minimum pruning delay for this is at least 1 epoch, otherwise we won't be able to calculate the reward pools
+	store := p.manager.Get(slot, kvstore.Realm{performanceFactorsPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewPerformanceFactors(slot, store)
 }
 
 func (p *Prunable) Roots(slot iotago.SlotIndex) kvstore.KVStore {

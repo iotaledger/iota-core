@@ -48,7 +48,7 @@ func (m *Manager) ForEachOutput(consumer OutputConsumer, options ...IterateOptio
 		i++
 
 		output := &Output{
-			api: m.apiProviderFunc(),
+			apiProvider: m.apiProvider,
 		}
 		if err := output.kvStorableLoad(m, key, value); err != nil {
 			innerErr = err
@@ -163,7 +163,7 @@ func (m *Manager) ForEachUnspentOutput(consumer OutputConsumer, options ...Itera
 		}
 
 		output := &Output{
-			api: m.apiProviderFunc(),
+			apiProvider: m.apiProvider,
 		}
 		if err := output.kvStorableLoad(m, outputKey, value); err != nil {
 			innerErr = err
@@ -209,7 +209,7 @@ func (m *Manager) UnspentOutputs(options ...IterateOption) (Outputs, error) {
 	return outputs, nil
 }
 
-func (m *Manager) ComputeLedgerBalance(options ...IterateOption) (balance uint64, count int, err error) {
+func (m *Manager) ComputeLedgerBalance(options ...IterateOption) (balance iotago.BaseToken, count int, err error) {
 	balance = 0
 	count = 0
 	consumerFunc := func(output *Output) bool {

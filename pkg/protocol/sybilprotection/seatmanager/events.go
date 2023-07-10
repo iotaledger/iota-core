@@ -1,8 +1,8 @@
-package sybilprotection
+package seatmanager
 
 import (
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )

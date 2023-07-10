@@ -5,8 +5,8 @@ import (
 
 	"github.com/mr-tron/base58"
 	flag "github.com/spf13/pflag"
-	"golang.org/x/xerrors"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
@@ -47,7 +47,7 @@ func parseFlags() (opt []options.Option[snapshotcreator.Options], conf string) {
 	if *genesisSeedStr != "" {
 		genesisSeed, err := base58.Decode(*genesisSeedStr)
 		if err != nil {
-			log.Fatal(xerrors.Errorf("failed to decode base58 seed, using the default one: %w", err))
+			log.Fatal(ierrors.Errorf("failed to decode base58 seed, using the default one: %w", err))
 		}
 		opt = append(opt, snapshotcreator.WithGenesisSeed(genesisSeed))
 	}

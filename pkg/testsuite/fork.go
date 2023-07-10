@@ -1,8 +1,7 @@
 package testsuite
 
 import (
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 )
 
@@ -14,7 +13,7 @@ func (t *TestSuite) AssertForkDetectedCount(expectedCount int, nodes ...*mock.No
 
 			actualCount := node.ForkDetectedCount()
 			if expectedCount != actualCount {
-				return errors.Errorf("AssertForkDetectedCount: %s: expected %v, got %v", node.Name, expectedCount, actualCount)
+				return ierrors.Errorf("AssertForkDetectedCount: %s: expected %v, got %v", node.Name, expectedCount, actualCount)
 			}
 
 			return nil
@@ -30,7 +29,7 @@ func (t *TestSuite) AssertCandidateEngineActivatedCount(expectedCount int, nodes
 
 			actualCount := node.CandidateEngineActivatedCount()
 			if expectedCount != actualCount {
-				return errors.Errorf("AssertCandidateEngineActivatedCount: %s: expected %v, got %v", node.Name, expectedCount, actualCount)
+				return ierrors.Errorf("AssertCandidateEngineActivatedCount: %s: expected %v, got %v", node.Name, expectedCount, actualCount)
 			}
 
 			return nil
@@ -46,7 +45,7 @@ func (t *TestSuite) AssertMainEngineSwitchedCount(expectedCount int, nodes ...*m
 
 			actualCount := node.MainEngineSwitchedCount()
 			if expectedCount != actualCount {
-				return errors.Errorf("AssertMainEngineSwitchedCount: %s: expected %v, got %v", node.Name, expectedCount, actualCount)
+				return ierrors.Errorf("AssertMainEngineSwitchedCount: %s: expected %v, got %v", node.Name, expectedCount, actualCount)
 			}
 
 			return nil

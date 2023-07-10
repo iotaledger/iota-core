@@ -44,11 +44,11 @@ func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("SyncManager", 1))
 
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
-			s.updateLastAcceptedBlock(b.Block().MustID(e.API().TimeProvider()), b.IssuingTime())
+			s.updateLastAcceptedBlock(b.ID(), b.IssuingTime())
 		}, asyncOpt)
 
 		e.Events.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
-			s.updateLastConfirmedBlock(b.Block().MustID(e.API().TimeProvider()), b.IssuingTime())
+			s.updateLastConfirmedBlock(b.ID(), b.IssuingTime())
 		}, asyncOpt)
 
 		e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {

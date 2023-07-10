@@ -14,8 +14,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -36,6 +37,7 @@ type Events struct {
 	Notarization     *notarization.Events
 	ConflictDAG      *conflictdag.Events[iotago.TransactionID, iotago.OutputID]
 	SybilProtection  *sybilprotection.Events
+	SeatManager      *seatmanager.Events
 
 	event.Group[Events, *Events]
 }
@@ -53,9 +55,10 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		Clock:           clock.NewEvents(),
 		BlockGadget:     blockgadget.NewEvents(),
 		SlotGadget:      slotgadget.NewEvents(),
+		SybilProtection: sybilprotection.NewEvents(),
 		Ledger:          ledger.NewEvents(),
 		Notarization:    notarization.NewEvents(),
 		ConflictDAG:     conflictdag.NewEvents[iotago.TransactionID, iotago.OutputID](),
-		SybilProtection: sybilprotection.NewEvents(),
+		SeatManager:     seatmanager.NewEvents(),
 	}
 })

@@ -2,19 +2,18 @@ package mempoolv1
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
-
-	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -57,10 +56,12 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	evictionMutex sync.RWMutex
 
 	optForkAllTransactions bool
+
+	apiProvider api.Provider
 }
 
 // New is the constructor of the MemPool.
-func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
+func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider api.Provider, opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
 	return options.Apply(&MemPool[VoteRank]{
 		transactionAttached:    event.New1[mempool.TransactionMetadata](),
 		executeStateTransition: vm,
@@ -71,6 +72,7 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolv
 		stateDiffs:             shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
 		executionWorkers:       workers.CreatePool("executionWorkers", 1),
 		conflictDAG:            conflictDAG,
+		apiProvider:            apiProvider,
 	}, opts, (*MemPool[VoteRank]).setup)
 }
 
@@ -78,7 +80,7 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolv
 func (m *MemPool[VoteRank]) AttachTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (metadata mempool.TransactionMetadata, err error) {
 	storedTransaction, isNew, err := m.storeTransaction(transaction, blockID)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to store transaction: %w", err)
+		return nil, ierrors.Errorf("failed to store transaction: %w", err)
 	}
 
 	if isNew {
@@ -121,7 +123,7 @@ func (m *MemPool[VoteRank]) StateMetadata(stateReference iotago.IndexedUTXORefer
 	}
 
 	stateRequest.OnSuccess(func(loadedState *StateMetadata) { state = loadedState })
-	stateRequest.OnError(func(requestErr error) { err = xerrors.Errorf("failed to request state: %w", requestErr) })
+	stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
 	stateRequest.WaitComplete()
 
 	return state, err
@@ -166,12 +168,12 @@ func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, bl
 	defer m.evictionMutex.RUnlock()
 
 	if m.lastEvictedSlot >= blockID.Index() {
-		return nil, false, xerrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
+		return nil, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
 	}
 
-	newTransaction, err := NewTransactionWithMetadata(transaction)
+	newTransaction, err := NewTransactionWithMetadata(m.apiProvider.APIForSlot(blockID.Index()), transaction)
 	if err != nil {
-		return nil, false, xerrors.Errorf("failed to create transaction metadata: %w", err)
+		return nil, false, ierrors.Errorf("failed to create transaction metadata: %w", err)
 	}
 
 	storedTransaction, isNew = m.cachedTransactions.GetOrCreate(newTransaction.ID(), func() *TransactionMetadata { return newTransaction })
@@ -270,7 +272,7 @@ func (m *MemPool[VoteRank]) requestStateWithMetadata(stateRef iotago.IndexedUTXO
 		})
 
 		request.OnError(func(err error) {
-			if !lo.First(waitIfMissing) || !errors.Is(err, mempool.ErrStateNotFound) {
+			if !lo.First(waitIfMissing) || !ierrors.Is(err, mempool.ErrStateNotFound) {
 				p.Reject(err)
 			}
 		})

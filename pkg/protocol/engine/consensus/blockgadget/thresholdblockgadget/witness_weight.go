@@ -8,10 +8,10 @@ import (
 )
 
 func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
-	witness := votingBlock.Block().IssuerID
+	witness := votingBlock.ProtocolBlock().IssuerID
 
 	// Only track witness weight for issuers that are part of the committee.
-	seat, exists := g.sybilProtection.Committee(votingBlock.ID().Index()).GetSeat(witness)
+	seat, exists := g.seatManager.Committee(votingBlock.ID().Index()).GetSeat(witness)
 	if !exists {
 		return
 	}
@@ -89,10 +89,10 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 }
 
 func (g *Gadget) shouldPreAcceptAndPreConfirm(block *blocks.Block) (preAccept bool, preConfirm bool) {
-	committeeTotalSeats := g.sybilProtection.SeatCount()
+	committeeTotalSeats := g.seatManager.SeatCount()
 	blockSeats := len(block.Witnesses())
 
-	onlineCommitteeTotalSeats := g.sybilProtection.OnlineCommittee().Size()
+	onlineCommitteeTotalSeats := g.seatManager.OnlineCommittee().Size()
 	blockSeatsOnline := len(block.Witnesses())
 
 	if votes.IsThresholdReached(blockSeats, committeeTotalSeats, g.optsConfirmationThreshold) {

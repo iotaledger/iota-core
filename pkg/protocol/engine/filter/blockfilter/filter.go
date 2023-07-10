@@ -3,15 +3,16 @@ package blockfilter
 import (
 	"time"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -27,7 +28,7 @@ var (
 type Filter struct {
 	events *filter.Events
 
-	protocolParamsFunc func() *iotago.ProtocolParameters
+	apiProvider api.Provider
 
 	optsMaxAllowedWallClockDrift time.Duration
 	optsMinCommittableAge        iotago.SlotIndex
@@ -39,10 +40,14 @@ type Filter struct {
 
 func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
 	return module.Provide(func(e *engine.Engine) filter.Filter {
-		f := New(e.Storage.Settings().ProtocolParameters, opts...)
+
+		f := New(e, opts...)
+		f.TriggerConstructed()
 
 		e.HookConstructed(func() {
 			e.Events.Filter.LinkTo(f.events)
+
+			f.TriggerInitialized()
 		})
 
 		return f
@@ -52,11 +57,11 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 var _ filter.Filter = new(Filter)
 
 // New creates a new Filter.
-func New(protocolParamsFunc func() *iotago.ProtocolParameters, opts ...options.Option[Filter]) *Filter {
+func New(apiProvider api.Provider, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
 		events:                  filter.NewEvents(),
-		protocolParamsFunc:      protocolParamsFunc,
 		optsSignatureValidation: true,
+		apiProvider:             apiProvider,
 	}, opts,
 		(*Filter).TriggerConstructed,
 		(*Filter).TriggerInitialized,
@@ -93,11 +98,11 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	}
 
 	// Verify the timestamp is not too far in the future.
-	timeDelta := time.Since(block.Block().IssuingTime)
+	timeDelta := time.Since(block.ProtocolBlock().IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
-			Reason: errors.WithMessagef(ErrBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
+			Reason: ierrors.Wrapf(ErrBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
 			Source: source,
 		})
 

@@ -4,24 +4,24 @@ import (
 	"testing"
 
 	"golang.org/x/crypto/blake2b"
-	"golang.org/x/xerrors"
 
-	"github.com/iotaledger/hive.go/core/account"
+	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type AccountsTestFramework struct {
-	Instance  *account.Accounts[iotago.AccountID, *iotago.AccountID]
-	Committee *account.SeatedAccounts[iotago.AccountID, *iotago.AccountID]
+	Instance  *account.Accounts
+	Committee *account.SeatedAccounts
 
 	test              *testing.T
 	identitiesByAlias map[string]iotago.AccountID
 }
 
-func NewAccountsTestFramework(test *testing.T, instance *account.Accounts[iotago.AccountID, *iotago.AccountID]) *AccountsTestFramework {
+func NewAccountsTestFramework(test *testing.T, instance *account.Accounts) *AccountsTestFramework {
 	return &AccountsTestFramework{
 		Instance:  instance,
-		Committee: instance.SelectAccounts(),
+		Committee: instance.SelectCommittee(),
 
 		test:              test,
 		identitiesByAlias: make(map[string]iotago.AccountID),
@@ -31,7 +31,7 @@ func NewAccountsTestFramework(test *testing.T, instance *account.Accounts[iotago
 func (f *AccountsTestFramework) Add(alias string) {
 	validatorID, exists := f.identitiesByAlias[alias]
 	if !exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
 	f.Committee.Set(account.SeatIndex(f.Committee.SeatCount()), validatorID)
@@ -40,7 +40,7 @@ func (f *AccountsTestFramework) Add(alias string) {
 func (f *AccountsTestFramework) Delete(alias string) bool {
 	validatorID, exists := f.identitiesByAlias[alias]
 	if !exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
 	return f.Committee.Delete(validatorID)
@@ -49,7 +49,7 @@ func (f *AccountsTestFramework) Delete(alias string) bool {
 func (f *AccountsTestFramework) Get(alias string) (seat account.SeatIndex, exists bool) {
 	validatorID, exists := f.identitiesByAlias[alias]
 	if !exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
 	return f.Committee.GetSeat(validatorID)
@@ -58,31 +58,23 @@ func (f *AccountsTestFramework) Get(alias string) (seat account.SeatIndex, exist
 func (f *AccountsTestFramework) Has(alias string) bool {
 	validatorID, exists := f.identitiesByAlias[alias]
 	if !exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
 	return f.Committee.HasAccount(validatorID)
 }
 
-func (f *AccountsTestFramework) ForEachWeighted(callback func(id iotago.AccountID, weight int64) bool) error {
-	return f.Instance.ForEach(callback)
-}
-
-func (f *AccountsTestFramework) TotalWeight() int64 {
-	return f.Instance.TotalWeight()
-}
-
 func (f *AccountsTestFramework) CreateID(alias string) iotago.AccountID {
 	_, exists := f.identitiesByAlias[alias]
 	if exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' already exists", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' already exists", alias))
 	}
 
 	hashedAlias := blake2b.Sum256([]byte(alias))
 	validatorID := iotago.IdentifierFromData(hashedAlias[:])
 	validatorID.RegisterAlias(alias)
 
-	f.Instance.Set(validatorID, 0) // we don't care about weights when doing PoA
+	f.Instance.Set(validatorID, &account.Pool{}) // we don't care about pools when doing PoA
 	f.Committee.Set(account.SeatIndex(f.Committee.SeatCount()), validatorID)
 
 	f.identitiesByAlias[alias] = validatorID
@@ -93,7 +85,7 @@ func (f *AccountsTestFramework) CreateID(alias string) iotago.AccountID {
 func (f *AccountsTestFramework) ID(alias string) iotago.AccountID {
 	id, exists := f.identitiesByAlias[alias]
 	if !exists {
-		f.test.Fatal(xerrors.Errorf("identity with alias '%s' does not exist", alias))
+		f.test.Fatal(ierrors.Errorf("identity with alias '%s' does not exist", alias))
 	}
 
 	return id

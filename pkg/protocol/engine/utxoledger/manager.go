@@ -3,39 +3,39 @@ package utxoledger
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // ErrOutputsSumNotEqualTotalSupply is returned if the sum of the output deposits is not equal the total supply of tokens.
-var ErrOutputsSumNotEqualTotalSupply = errors.New("accumulated output balance is not equal to total supply")
+var ErrOutputsSumNotEqualTotalSupply = ierrors.New("accumulated output balance is not equal to total supply")
 
 type Manager struct {
 	store     kvstore.KVStore
 	storeLock sync.RWMutex
 
-	stateTree *ads.Map[iotago.OutputID, stateTreeMetadata, *iotago.OutputID, *stateTreeMetadata]
+	stateTree *ads.Map[iotago.OutputID, *stateTreeMetadata]
 
-	apiProviderFunc func() iotago.API
+	apiProvider api.Provider
 }
 
-func New(store kvstore.KVStore, apiProviderFunc func() iotago.API) *Manager {
+func New(store kvstore.KVStore, apiProvider api.Provider) *Manager {
 	return &Manager{
-		store:           store,
-		stateTree:       ads.NewMap[iotago.OutputID, stateTreeMetadata](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree}))),
-		apiProviderFunc: apiProviderFunc,
+		store: store,
+		stateTree: ads.NewMap(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree})),
+			iotago.OutputID.Bytes,
+			iotago.OutputIDFromBytes,
+			(*stateTreeMetadata).Bytes,
+			stateMetadataFromBytes,
+		),
+		apiProvider: apiProvider,
 	}
-}
-
-func (m *Manager) API() iotago.API {
-	return m.apiProviderFunc()
 }
 
 // KVStore returns the underlying KVStore.
@@ -108,11 +108,11 @@ func (m *Manager) PruneSlotIndexWithoutLocking(index iotago.SlotIndex) error {
 }
 
 func storeLedgerIndex(index iotago.SlotIndex, mutations kvstore.BatchedMutations) error {
-	return mutations.Set([]byte{StoreKeyPrefixLedgerSlotIndex}, index.Bytes())
+	return mutations.Set([]byte{StoreKeyPrefixLedgerSlotIndex}, index.MustBytes())
 }
 
 func (m *Manager) StoreLedgerIndexWithoutLocking(index iotago.SlotIndex) error {
-	return m.store.Set([]byte{StoreKeyPrefixLedgerSlotIndex}, index.Bytes())
+	return m.store.Set([]byte{StoreKeyPrefixLedgerSlotIndex}, index.MustBytes())
 }
 
 func (m *Manager) StoreLedgerIndex(index iotago.SlotIndex) error {
@@ -125,15 +125,15 @@ func (m *Manager) StoreLedgerIndex(index iotago.SlotIndex) error {
 func (m *Manager) ReadLedgerIndexWithoutLocking() (iotago.SlotIndex, error) {
 	value, err := m.store.Get([]byte{StoreKeyPrefixLedgerSlotIndex})
 	if err != nil {
-		if errors.Is(err, kvstore.ErrKeyNotFound) {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			// there is no ledger milestone yet => return 0
 			return 0, nil
 		}
 
-		return 0, fmt.Errorf("failed to load ledger milestone index: %w", err)
+		return 0, ierrors.Errorf("failed to load ledger milestone index: %w", err)
 	}
 
-	return iotago.SlotIndexFromBytes(value)
+	return lo.DropCount(iotago.SlotIndexFromBytes(value))
 }
 
 func (m *Manager) ReadLedgerIndex() (iotago.SlotIndex, error) {
@@ -277,7 +277,7 @@ func (m *Manager) RollbackDiff(index iotago.SlotIndex, newOutputs Outputs, newSp
 	return m.RollbackDiffWithoutLocking(index, newOutputs, newSpents)
 }
 
-func (m *Manager) CheckLedgerState(tokenSupply uint64) error {
+func (m *Manager) CheckLedgerState(tokenSupply iotago.BaseToken) error {
 	total, _, err := m.ComputeLedgerBalance()
 	if err != nil {
 		return err

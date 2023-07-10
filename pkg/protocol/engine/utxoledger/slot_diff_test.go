@@ -9,22 +9,24 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
+	iotago_tpkg "github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func TestSimpleSlotDiffSerialization(t *testing.T) {
 	indexBooked := iotago.SlotIndex(255975)
 	slotCreated := utils.RandSlotIndex()
 
-	api := tpkg.API()
 	outputID := utils.RandOutputID()
 	blockID := utils.RandBlockID()
 	address := utils.RandAddress(iotago.AddressEd25519)
-	amount := uint64(832493)
+	amount := iotago.BaseToken(832493)
 	iotaOutput := &iotago.BasicOutput{
 		Amount: amount,
 		Conditions: iotago.BasicOutputUnlockConditions{
@@ -33,7 +35,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 			},
 		},
 	}
-	output := utxoledger.CreateOutput(api, outputID, blockID, indexBooked, slotCreated, iotaOutput)
+	output := utxoledger.CreateOutput(api.NewStaticProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput)
 
 	transactionIDSpent := utils.RandTransactionID()
 
@@ -47,7 +49,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 		Spents:  utxoledger.Spents{spent},
 	}
 
-	require.Equal(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixSlotDiffs}, indexSpent.Bytes()), diff.KVStorableKey())
+	require.Equal(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixSlotDiffs}, lo.PanicOnErr(indexSpent.Bytes())), diff.KVStorableKey())
 
 	value := diff.KVStorableValue()
 	require.Equal(t, len(value), 76)
@@ -58,7 +60,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 }
 
 func TestSlotDiffSerialization(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), tpkg.API)
+	manager := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
 
 	outputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),

@@ -9,12 +9,12 @@ import (
 	golibp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/pkg/errors"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
@@ -141,7 +141,7 @@ func provide(c *dig.Container) error {
 		}
 
 		if !peeringIP.IsGlobalUnicast() {
-			Component.LogWarnf("IP is not a global unicast address: %s", peeringIP.String())
+			Component.LogWarnf("IP is not a global unicast address: %s", peeringIP)
 		}
 
 		// TODO: remove requirement for PeeringKey in hive.go
@@ -212,7 +212,7 @@ func run() error {
 			}
 		}()
 
-		Component.LogInfof("started: bind-address=%s", localAddr.String())
+		Component.LogInfof("started: bind-address=%s", localAddr)
 
 		<-ctx.Done()
 	}, daemon.PriorityP2P); err != nil {
@@ -223,10 +223,10 @@ func run() error {
 		<-ctx.Done()
 		prvKey, _ := deps.PeerDB.LocalPrivateKey()
 		if err := deps.PeerDBKVSTore.Close(); err != nil {
-			Component.LogErrorfAndExit("unable to save identity %s: %s", prvKey.Public().String(), err)
+			Component.LogErrorfAndExit("unable to save identity %s: %s", prvKey.Public(), err)
 			return
 		}
-		Component.LogInfof("saved identity %s", prvKey.Public().String())
+		Component.LogInfof("saved identity %s", prvKey.Public())
 	}, daemon.PriorityPeerDatabase); err != nil {
 		Component.LogErrorfAndExit("Failed to start as daemon: %s", err)
 	}
@@ -253,7 +253,7 @@ func getKnownPeersFromConfig() ([]*manualpeering.KnownPeerToAdd, error) {
 	}
 	var peers []*manualpeering.KnownPeerToAdd
 	if err := json.Unmarshal([]byte(ParamsPeers.KnownPeers), &peers); err != nil {
-		return nil, errors.Wrap(err, "can't parse peers from json")
+		return nil, ierrors.Wrap(err, "can't parse peers from json")
 	}
 
 	return peers, nil

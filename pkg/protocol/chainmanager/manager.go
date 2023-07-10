@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/walker"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -17,8 +16,8 @@ import (
 )
 
 var (
-	ErrCommitmentUnknown  = errors.New("unknown commitment")
-	ErrCommitmentNotSolid = errors.New("commitment not solid")
+	ErrCommitmentUnknown  = ierrors.New("unknown commitment")
+	ErrCommitmentNotSolid = ierrors.New("commitment not solid")
 )
 
 type Manager struct {
@@ -168,6 +167,19 @@ func (m *Manager) Chain(ec iotago.CommitmentID) (chain *Chain) {
 	return nil
 }
 
+func (m *Manager) LoadCommitmentOrRequestMissing(id iotago.CommitmentID) *ChainCommitment {
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
+	if commitment, exists := m.commitment(id); exists {
+		return commitment
+	}
+
+	m.Events.CommitmentMissing.Trigger(id)
+
+	return nil
+}
+
 func (m *Manager) Commitments(id iotago.CommitmentID, amount int) (commitments []*ChainCommitment, err error) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
@@ -177,7 +189,7 @@ func (m *Manager) Commitments(id iotago.CommitmentID, amount int) (commitments [
 	for i := 0; i < amount; i++ {
 		currentCommitment, _ := m.commitment(id)
 		if currentCommitment == nil {
-			return nil, errors.Wrap(ErrCommitmentUnknown, "not all commitments in the given range are known")
+			return nil, ierrors.Wrap(ErrCommitmentUnknown, "not all commitments in the given range are known")
 		}
 
 		commitments[i] = currentCommitment
@@ -210,7 +222,7 @@ func (m *Manager) SwitchMainChain(head iotago.CommitmentID) error {
 
 	commitment, _ := m.commitment(head)
 	if commitment == nil {
-		return errors.Wrapf(ErrCommitmentUnknown, "unknown commitment %s", head)
+		return ierrors.Wrapf(ErrCommitmentUnknown, "unknown commitment %s", head)
 	}
 
 	return m.switchMainChainToCommitment(commitment)
@@ -298,7 +310,7 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 	// Note: we rely on the fact that the block filter will not let (not yet committable) commitments through.
 
 	forkedChainLatestCommitment := forkingPoint.Chain().LatestCommitment().Commitment()
-	mainChainLatestCommitment := m.RootCommitment().Chain().LatestCommitment().Commitment()
+	mainChainLatestCommitment := m.rootCommitment.Chain().LatestCommitment().Commitment()
 
 	// Check whether the chain is claiming to be heavier than the current main chain.
 	if forkedChainLatestCommitment.CumulativeWeight() <= mainChainLatestCommitment.CumulativeWeight() {
@@ -321,7 +333,7 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 
 		return &Fork{
 			Source:               source,
-			MainChain:            m.RootCommitment().Chain(),
+			MainChain:            m.rootCommitment.Chain(),
 			ForkedChain:          forkingPoint.Chain(),
 			ForkingPoint:         forkingPoint.Commitment(),
 			ForkLatestCommitment: forkedChainLatestCommitment,
@@ -335,7 +347,7 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 
 func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*ChainCommitment, error) {
 	if !commitment.IsSolid() || commitment.Chain() == nil {
-		return nil, errors.Wrapf(ErrCommitmentNotSolid, "commitment %s is not solid", commitment)
+		return nil, ierrors.Wrapf(ErrCommitmentNotSolid, "commitment %s is not solid", commitment)
 	}
 
 	var forkingCommitment *ChainCommitment
@@ -344,7 +356,7 @@ func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*Ch
 		forkingCommitment = chain.ForkingPoint
 
 		if commitment, _ = m.commitment(forkingCommitment.Commitment().PrevID()); commitment == nil {
-			return nil, errors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingCommitment.Commitment().ID())
+			return nil, ierrors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingCommitment.Commitment().ID())
 		}
 	}
 
@@ -385,7 +397,7 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 
 	parentCommitment, _ := m.commitment(forkingPoint.Commitment().PrevID())
 	if parentCommitment == nil {
-		return errors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingPoint.ID())
+		return ierrors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingPoint.ID())
 	}
 
 	// Separate the main chain by remove it from the parent

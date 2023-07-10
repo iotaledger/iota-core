@@ -4,12 +4,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"golang.org/x/xerrors"
-
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/core/promise"
+	"github.com/iotaledger/hive.go/runtime/promise"
+	lpromise "github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -20,8 +20,8 @@ type TransactionMetadata struct {
 	inputs            []*StateMetadata
 	outputs           []*StateMetadata
 	transaction       mempool.Transaction
-	parentConflictIDs *promise.Set[iotago.TransactionID]
-	conflictIDs       *promise.Set[iotago.TransactionID]
+	parentConflictIDs *lpromise.Set[iotago.TransactionID]
+	conflictIDs       *lpromise.Set[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -33,13 +33,13 @@ type TransactionMetadata struct {
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
-	allInputsAccepted     *promise.Value[bool]
+	allInputsAccepted     *lpromise.Value[bool]
 	conflicting           *promise.Event
 	conflictAccepted      *promise.Event
 
 	// attachments
 	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
-	earliestIncludedAttachment *promise.Value[iotago.BlockID]
+	earliestIncludedAttachment *lpromise.Value[iotago.BlockID]
 	allAttachmentsEvicted      *promise.Event
 
 	// mutex needed?
@@ -50,15 +50,15 @@ type TransactionMetadata struct {
 	*inclusionFlags
 }
 
-func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMetadata, error) {
-	transactionID, transactionIDErr := transaction.ID()
+func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction) (*TransactionMetadata, error) {
+	transactionID, transactionIDErr := transaction.ID(api)
 	if transactionIDErr != nil {
-		return nil, xerrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
+		return nil, ierrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
 	}
 
 	inputReferences, inputsErr := transaction.Inputs()
 	if inputsErr != nil {
-		return nil, xerrors.Errorf("failed to retrieve inputReferences of transaction %s: %w", transactionID, inputsErr)
+		return nil, ierrors.Errorf("failed to retrieve inputReferences of transaction %s: %w", transactionID, inputsErr)
 	}
 
 	return (&TransactionMetadata{
@@ -66,8 +66,8 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		inputReferences:   inputReferences,
 		inputs:            make([]*StateMetadata, len(inputReferences)),
 		transaction:       transaction,
-		parentConflictIDs: promise.NewSet[iotago.TransactionID](),
-		conflictIDs:       promise.NewSet[iotago.TransactionID](),
+		parentConflictIDs: lpromise.NewSet[iotago.TransactionID](),
+		conflictIDs:       lpromise.NewSet[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
 		booked:             promise.NewEvent(),
@@ -77,12 +77,12 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		evicted:            promise.NewEvent(),
 
 		unacceptedInputsCount: uint64(len(inputReferences)),
-		allInputsAccepted:     promise.NewValue[bool](),
+		allInputsAccepted:     lpromise.NewValue[bool](),
 		conflicting:           promise.NewEvent(),
 		conflictAccepted:      promise.NewEvent(),
 
 		attachments:                shrinkingmap.New[iotago.BlockID, bool](),
-		earliestIncludedAttachment: promise.NewValue[iotago.BlockID](),
+		earliestIncludedAttachment: lpromise.NewValue[iotago.BlockID](),
 		allAttachmentsEvicted:      promise.NewEvent(),
 
 		inclusionFlags: newInclusionFlags(),
@@ -121,7 +121,7 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	return outputs
 }
 
-func (t *TransactionMetadata) ConflictIDs() *promise.Set[iotago.TransactionID] {
+func (t *TransactionMetadata) ConflictIDs() *lpromise.Set[iotago.TransactionID] {
 	return t.conflictIDs
 }
 

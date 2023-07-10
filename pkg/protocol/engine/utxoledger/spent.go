@@ -58,7 +58,7 @@ func (s *Spent) OutputType() iotago.OutputType {
 	return s.output.OutputType()
 }
 
-func (s *Spent) Deposit() uint64 {
+func (s *Spent) Deposit() iotago.BaseToken {
 	return s.output.Deposit()
 }
 
@@ -97,8 +97,8 @@ func (s *Spent) KVStorableKey() (key []byte) {
 
 func (s *Spent) KVStorableValue() (value []byte) {
 	ms := marshalutil.New(48)
-	ms.WriteBytes(s.transactionIDSpent[:])  // 32 bytes
-	ms.WriteBytes(s.slotIndexSpent.Bytes()) // 8 bytes
+	ms.WriteBytes(s.transactionIDSpent[:])      // 32 bytes
+	ms.WriteBytes(s.slotIndexSpent.MustBytes()) // 8 bytes
 
 	return ms.Bytes()
 }

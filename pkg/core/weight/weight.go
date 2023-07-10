@@ -3,11 +3,11 @@ package weight
 import (
 	"sync"
 
-	"github.com/iotaledger/hive.go/core/account"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 )
 
 // Weight represents a mutable multi-tiered weight value that can be updated in-place.
