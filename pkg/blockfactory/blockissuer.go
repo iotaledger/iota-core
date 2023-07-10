@@ -62,18 +62,9 @@ func (i *BlockIssuer) Shutdown() {
 func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BlockParams{}, opts)
 
-	if blockParams.slotCommitment == nil {
-		blockParams.slotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
-	}
-
 	if blockParams.latestFinalizedSlot == nil {
 		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		blockParams.latestFinalizedSlot = &latestFinalizedSlot
-	}
-
-	if blockParams.issuingTime == nil {
-		issuingTime := time.Now()
-		blockParams.issuingTime = &issuingTime
 	}
 
 	if blockParams.references == nil {
@@ -82,6 +73,15 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 			return nil, ierrors.Wrap(err, "error building block")
 		}
 		blockParams.references = references
+	}
+
+	if blockParams.issuingTime == nil {
+		issuingTime := time.Now()
+		blockParams.issuingTime = &issuingTime
+	}
+
+	if blockParams.slotCommitment == nil {
+		blockParams.slotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 	}
 
 	if blockParams.issuer == nil {
