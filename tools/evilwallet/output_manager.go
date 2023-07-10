@@ -5,9 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -319,7 +318,7 @@ func (o *OutputManager) AwaitTransactionToBeAccepted(txID iotago.TransactionID, 
 		}
 	}
 	if !accepted {
-		return errors.Errorf("transaction %s not accepted in time", txID)
+		return ierrors.Errorf("transaction %s not accepted in time", txID)
 	}
 	return nil
 }
@@ -341,7 +340,7 @@ func (o *OutputManager) AwaitOutputToBeSolid(outID iotago.OutputID, clt Client, 
 		}
 	}
 	if !solid {
-		return errors.Errorf("output %s not solidified in time", outID)
+		return ierrors.Errorf("output %s not solidified in time", outID)
 	}
 	return nil
 }

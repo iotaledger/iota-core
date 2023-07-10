@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -82,12 +81,12 @@ func (o *Options) isBalanceProvided() bool {
 func (o *Options) isWalletProvidedForInputsOutputs() error {
 	if o.areInputsProvidedWithoutAliases() {
 		if o.inputWallet == nil {
-			return errors.New("no input wallet provided for inputs without aliases")
+			return ierrors.New("no input wallet provided for inputs without aliases")
 		}
 	}
 	if o.areOutputsProvidedWithoutAliases() {
 		if o.outputWallet == nil {
-			return errors.New("no output wallet provided for outputs without aliases")
+			return ierrors.New("no output wallet provided for outputs without aliases")
 		}
 	}
 	return nil
@@ -107,13 +106,13 @@ func (o *Options) checkInputsAndOutputs() error {
 	inLength, outLength, aliasInLength, aliasOutLength := len(o.inputs), len(o.outputs), len(o.aliasInputs), len(o.aliasOutputs)
 
 	if (inLength == 0 && aliasInLength == 0) || (outLength == 0 && aliasOutLength == 0) {
-		return errors.New("no inputs or outputs provided")
+		return ierrors.New("no inputs or outputs provided")
 	}
 
 	inputsOk := (inLength > 0 && aliasInLength == 0) || (aliasInLength > 0 && inLength == 0)
 	outputsOk := (outLength > 0 && aliasOutLength == 0) || (aliasOutLength > 0 && outLength == 0)
 	if !inputsOk || !outputsOk {
-		return errors.New("mixing providing inputs/outputs with and without aliases is not allowed")
+		return ierrors.New("mixing providing inputs/outputs with and without aliases is not allowed")
 	}
 	return nil
 }

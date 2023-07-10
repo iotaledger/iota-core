@@ -3,8 +3,9 @@ package evilwallet
 import (
 	"sync"
 
-	"github.com/pkg/errors"
 	"go.uber.org/atomic"
+
+	"github.com/iotaledger/hive.go/ierrors"
 )
 
 type walletID int
@@ -78,12 +79,12 @@ func (w *Wallets) GetNextWallet(walletType WalletType, minOutputsLeft int) (*Wal
 	switch walletType {
 	case Fresh:
 		if !w.IsFaucetWalletAvailable() {
-			return nil, errors.New("no faucet wallets available, need to request more funds")
+			return nil, ierrors.New("no faucet wallets available, need to request more funds")
 		}
 
 		wallet := w.wallets[w.faucetWallets[0]]
 		if wallet.IsEmpty() {
-			return nil, errors.New("wallet is empty, need to request more funds")
+			return nil, ierrors.New("wallet is empty, need to request more funds")
 		}
 		return wallet, nil
 	case Reuse:
@@ -99,10 +100,10 @@ func (w *Wallets) GetNextWallet(walletType WalletType, minOutputsLeft int) (*Wal
 				w.removeReuseWallet(id)
 			}
 		}
-		return nil, errors.New("no reuse wallets available")
+		return nil, ierrors.New("no reuse wallets available")
 	}
 
-	return nil, errors.New("wallet type not supported for ordered usage, use GetWallet by ID instead")
+	return nil, ierrors.New("wallet type not supported for ordered usage, use GetWallet by ID instead")
 }
 
 func (w *Wallets) UnspentOutputsLeft(walletType WalletType) int {

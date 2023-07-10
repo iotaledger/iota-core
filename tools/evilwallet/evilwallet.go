@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/mr-tron/base58"
-	"github.com/pkg/errors"
-	"golang.org/x/xerrors"
 
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
@@ -47,7 +46,7 @@ var (
 	dockerFaucetSeed = func() []byte {
 		genesisSeed, err := base58.Decode("7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih")
 		if err != nil {
-			log.Fatal(xerrors.Errorf("failed to decode base58 seed, using the default one: %w", err))
+			log.Fatal(ierrors.Errorf("failed to decode base58 seed, using the default one: %w", err))
 		}
 		return genesisSeed
 	}
@@ -308,7 +307,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 	// track output in output manager and make sure it's confirmed
 	ok := e.outputManager.Track([]iotago.OutputID{output.OutputID})
 	if !ok {
-		err = errors.New("not all outputs has been confirmed")
+		err = ierrors.New("not all outputs has been confirmed")
 		return
 	}
 	outputID = output.OutputID
@@ -319,7 +318,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 // splitOutputs splits faucet input to 100 outputs.
 func (e *EvilWallet) splitOutputs(inputWallet, outputWallet *Wallet) error {
 	if inputWallet.IsEmpty() {
-		return errors.New("inputWallet is empty")
+		return ierrors.New("inputWallet is empty")
 	}
 
 	addr := inputWallet.AddressOnIndex(0)
@@ -394,7 +393,7 @@ func (e *EvilWallet) SendCustomConflicts(conflictsMaps []ConflictSlice) (err err
 	for _, txs := range conflictBatch {
 		clients := e.connector.GetClients(len(txs))
 		if len(txs) > len(clients) {
-			return errors.New("insufficient clients to send conflicts")
+			return ierrors.New("insufficient clients to send conflicts")
 		}
 
 		// send transactions in parallel
@@ -561,7 +560,7 @@ func (e *EvilWallet) matchInputsWithAliases(buildOptions *Options) (inputs []*Ou
 			// No output found for given alias, use internal Fresh output if wallets are non-empty.
 			in = e.wallets.GetUnspentOutput(wallet)
 			if in == nil {
-				return nil, errors.New("could not get unspent output")
+				return nil, ierrors.New("could not get unspent output")
 			}
 			e.aliasManager.AddInputAlias(in, inputAlias)
 		}
@@ -583,7 +582,7 @@ func (e *EvilWallet) useFreshIfInputWalletNotProvided(buildOptions *Options) (*W
 		if wallet, err := e.wallets.freshWallet(); wallet != nil {
 			return wallet, nil
 		} else {
-			return nil, errors.Wrap(err, "no Fresh wallet is available")
+			return nil, ierrors.Wrap(err, "no Fresh wallet is available")
 		}
 	}
 	return buildOptions.inputWallet, nil
@@ -688,7 +687,7 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 			for inputAlias := range buildOptions.aliasInputs {
 				in, ok := e.aliasManager.GetInput(inputAlias)
 				if !ok {
-					err = errors.New("could not get input by input alias")
+					err = ierrors.New("could not get input by input alias")
 					return
 				}
 				totalBalance += in.Balance
@@ -741,7 +740,7 @@ func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[io
 func (e *EvilWallet) getAddressFromInput(input *Output) (addr *iotago.Ed25519Address, err error) {
 	out := e.outputManager.GetOutput(input.OutputID)
 	if out == nil {
-		err = errors.New("output not found in output manager")
+		err = ierrors.New("output not found in output manager")
 		return
 	}
 

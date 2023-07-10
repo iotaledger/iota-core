@@ -3,12 +3,12 @@ package evilspammerpkg
 import (
 	"time"
 
-	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/app/configuration"
 	appLogger "github.com/iotaledger/hive.go/app/logger"
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
@@ -232,14 +232,14 @@ func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt evilwallet.Client)
 	allSolid := s.handleSolidityForReuseOutputs(clt, tx)
 	if !allSolid {
 		s.log.Debug(ErrInputsNotSolid)
-		s.ErrCounter.CountError(errors.WithMessagef(ErrInputsNotSolid, "txID: %s", txID.ToHex()))
+		s.ErrCounter.CountError(ierrors.Wrapf(ErrInputsNotSolid, "txID: %s", txID.ToHex()))
 		return
 	}
 
 	blockID, err := clt.PostTransaction(tx)
 	if err != nil {
 		s.log.Debug(ErrFailPostTransaction)
-		s.ErrCounter.CountError(errors.WithMessage(ErrFailPostTransaction, err.Error()))
+		s.ErrCounter.CountError(ierrors.Wrapf(ErrFailPostTransaction, err.Error()))
 		return
 	}
 	if s.EvilScenario.OutputWallet.Type() == evilwallet.Reuse {

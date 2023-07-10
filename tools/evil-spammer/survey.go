@@ -4,7 +4,8 @@ import (
 	"strconv"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/pkg/errors"
+
+	"github.com/iotaledger/hive.go/ierrors"
 )
 
 // region survey  //////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,7 +115,7 @@ var spamDetailsQuestions = func(defaultDuration, defaultRate, defaultTimeUnit st
 					if err == nil {
 						return nil
 					}
-					return errors.New("Incorrect spam rate")
+					return ierrors.New("Incorrect spam rate")
 				}
 				return nil
 			},

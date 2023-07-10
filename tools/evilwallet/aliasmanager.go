@@ -3,8 +3,9 @@ package evilwallet
 import (
 	"sync"
 
-	"github.com/pkg/errors"
 	"go.uber.org/atomic"
+
+	"github.com/iotaledger/hive.go/ierrors"
 )
 
 // region AliasManager /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,7 +85,7 @@ func (a *AliasManager) ClearAliases(aliases ScenarioAlias) {
 // AddOutputAliases batch adds the outputs their respective aliases.
 func (a *AliasManager) AddOutputAliases(outputs []*Output, aliases []string) error {
 	if len(outputs) != len(aliases) {
-		return errors.New("mismatch outputs and aliases length")
+		return ierrors.New("mismatch outputs and aliases length")
 	}
 	for i, out := range outputs {
 		a.AddOutputAlias(out, aliases[i])
@@ -95,7 +96,7 @@ func (a *AliasManager) AddOutputAliases(outputs []*Output, aliases []string) err
 // AddInputAliases batch adds the inputs their respective aliases.
 func (a *AliasManager) AddInputAliases(inputs []*Output, aliases []string) error {
 	if len(inputs) != len(aliases) {
-		return errors.New("mismatch outputs and aliases length")
+		return ierrors.New("mismatch outputs and aliases length")
 	}
 	for i, out := range inputs {
 		a.AddInputAlias(out, aliases[i])

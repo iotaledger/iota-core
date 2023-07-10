@@ -5,8 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/tools/evilwallet"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -35,8 +34,8 @@ func DataSpammingFunction(s *Spammer) {
 func CustomConflictSpammingFunc(s *Spammer) {
 	conflictBatch, aliases, err := s.EvilWallet.PrepareCustomConflictsSpam(s.EvilScenario)
 	if err != nil {
-		s.log.Debugf(errors.WithMessage(ErrFailToPrepareBatch, err.Error()).Error())
-		s.ErrCounter.CountError(errors.WithMessage(ErrFailToPrepareBatch, err.Error()))
+		s.log.Debugf(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()).Error())
+		s.ErrCounter.CountError(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()))
 	}
 
 	for _, txs := range conflictBatch {
