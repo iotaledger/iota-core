@@ -197,7 +197,6 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 
 		request.OnSuccess(func(input *StateMetadata) {
 			if transaction.publishInputAndCheckSolidity(index, input) {
-				fmt.Println(">>>>>>>>>>>all inputs solid")
 				m.executeTransaction(transaction)
 			}
 
@@ -213,7 +212,6 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 func (m *MemPool[VoteRank]) executeTransaction(transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
 		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction(), lo.Map(transaction.inputs, (*StateMetadata).State)); err != nil {
-			fmt.Println(">>>>>>>>tx invalid!!!", err)
 			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)
@@ -235,7 +233,6 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	}
 
 	if !transaction.IsOrphaned() && transaction.setBooked() {
-		fmt.Println(">>>>>tx booked, publish outputs!")
 		m.publishOutputs(transaction)
 	}
 }
