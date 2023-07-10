@@ -224,7 +224,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	case *iotago.ValidatorBlock:
 		//nolint:revive,staticcheck //temporarily disable
 		if len(iotaBlock.Parents()) == 0 {
-			//TODO: implement tipselection for validator blocks
+			// TODO: implement tipselection for validator blocks
 		}
 	}
 
@@ -289,7 +289,6 @@ func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIn
 			}
 			if b.SlotCommitmentID().Index() > slotCommitmentIndex {
 				return ierrors.Errorf("cannot issue block if the commitment is ahead of its parents' commitment: %s vs %s", b.SlotCommitmentID().Index(), slotCommitmentIndex)
-
 			}
 
 		}

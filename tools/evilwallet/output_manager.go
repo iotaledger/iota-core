@@ -117,7 +117,7 @@ func (o *OutputManager) IssuerSolidOutIDMap(issuer string, outputID iotago.Outpu
 }
 
 // Track the confirmed statuses of the given outputIDs, it returns true if all of them are confirmed.
-func (o *OutputManager) Track(outputIDs []iotago.OutputID) (allConfirmed bool) {
+func (o *OutputManager) Track(outputIDs ...iotago.OutputID) (allConfirmed bool) {
 	var (
 		wg                     sync.WaitGroup
 		unconfirmedOutputFound atomic.Bool
@@ -260,7 +260,7 @@ func (o *OutputManager) AwaitWalletOutputsToBeConfirmed(wallet *Wallet) {
 		go func(outs iotago.OutputIDs) {
 			defer wg.Done()
 
-			o.Track(outs)
+			o.Track(outs...)
 		}(outs)
 	}
 	wg.Wait()
@@ -284,9 +284,9 @@ func (o *OutputManager) AwaitOutputToBeAccepted(outputID iotago.OutputID, waitFo
 }
 
 // AwaitTransactionsConfirmation awaits for transaction confirmation and updates wallet with outputIDs.
-func (o *OutputManager) AwaitTransactionsConfirmation(txIDs iotago.TransactionIDs, maxGoroutines int) {
+func (o *OutputManager) AwaitTransactionsConfirmation(txIDs ...iotago.TransactionID) {
 	wg := sync.WaitGroup{}
-	semaphore := make(chan bool, maxGoroutines)
+	semaphore := make(chan bool, 1)
 
 	for _, txID := range txIDs {
 		wg.Add(1)

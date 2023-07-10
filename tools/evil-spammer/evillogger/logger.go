@@ -20,5 +20,5 @@ func init() {
 	if err = appLogger.InitGlobalLogger(config); err != nil {
 		panic(err)
 	}
-	logger.SetLevel(logger.LevelInfo)
+	logger.SetLevel(logger.LevelDebug)
 }

@@ -31,8 +31,6 @@ const (
 	awaitSolidificationSleep = time.Millisecond * 500
 
 	WaitForTxSolid = 150 * time.Second
-
-	maxGoroutines = 5
 )
 
 var (
@@ -156,13 +154,12 @@ func (e *EvilWallet) RequestFundsFromFaucet(options ...FaucetRequestOption) (ini
 	initWallet = e.NewWallet(Fresh)
 	buildOptions := NewFaucetRequestOptions(options...)
 
-	outputID, err := e.requestFaucetFunds(initWallet)
+	output, err := e.requestFaucetFunds(initWallet)
 	if err != nil {
 		return
 	}
 
 	if buildOptions.outputAliasName != "" {
-		output := e.outputManager.GetOutput(outputID)
 		e.aliasManager.AddInputAlias(output, buildOptions.outputAliasName)
 	}
 
@@ -172,7 +169,7 @@ func (e *EvilWallet) RequestFundsFromFaucet(options ...FaucetRequestOption) (ini
 // RequestFreshBigFaucetWallets creates n new wallets, each wallet is created from one faucet request and contains 1000 outputs.
 func (e *EvilWallet) RequestFreshBigFaucetWallets(numberOfWallets int) {
 	// channel to block the number of concurrent goroutines
-	semaphore := make(chan bool, maxGoroutines)
+	semaphore := make(chan bool, 1)
 	wg := sync.WaitGroup{}
 
 	for reqNum := 0; reqNum < numberOfWallets; reqNum++ {
@@ -197,49 +194,57 @@ func (e *EvilWallet) RequestFreshBigFaucetWallets(numberOfWallets int) {
 
 // RequestFreshBigFaucetWallet creates a new wallet and fills the wallet with 1000 outputs created from funds
 // requested from the Faucet.
-func (e *EvilWallet) RequestFreshBigFaucetWallet() (err error) {
+func (e *EvilWallet) RequestFreshBigFaucetWallet() error {
 	initWallet := NewWallet()
 	// fmt.Println("Requesting funds from faucet...")
 
 	receiveWallet := e.NewWallet(Fresh)
 
+	txIDs := make(iotago.TransactionIDs, 0)
+	// TODO: calculate the exact number of required funds so we don't run out after a while
 	for i := 0; i < 10; i++ {
-		err = e.requestAndSplitFaucetFunds(initWallet, receiveWallet)
+		txID, err := e.requestAndSplitFaucetFunds(initWallet, receiveWallet)
 		if err != nil {
-			return
+			return ierrors.Wrap(err, "failed to request big funds from faucet")
 		}
+
+		txIDs = append(txIDs, txID)
 	}
+
+	e.outputManager.AwaitTransactionsConfirmation(txIDs...)
 
 	e.wallets.SetWalletReady(receiveWallet)
 
-	return
+	return nil
 }
 
 // RequestFreshFaucetWallet creates a new wallet and fills the wallet with 100 outputs created from funds
 // requested from the Faucet.
-func (e *EvilWallet) RequestFreshFaucetWallet() (err error) {
+func (e *EvilWallet) RequestFreshFaucetWallet() error {
 	initWallet := NewWallet()
 	receiveWallet := e.NewWallet(Fresh)
-	err = e.requestAndSplitFaucetFunds(initWallet, receiveWallet)
+	txID, err := e.requestAndSplitFaucetFunds(initWallet, receiveWallet)
 	if err != nil {
-		return
+		return ierrors.Wrap(err, "failed to request funds from faucet")
 	}
+
+	e.outputManager.AwaitTransactionsConfirmation(txID)
 
 	e.wallets.SetWalletReady(receiveWallet)
 
-	return
+	return err
 }
 
-func (e *EvilWallet) requestAndSplitFaucetFunds(initWallet, receiveWallet *Wallet) (err error) {
-	_, err = e.requestFaucetFunds(initWallet)
+func (e *EvilWallet) requestAndSplitFaucetFunds(initWallet, receiveWallet *Wallet) (txID iotago.TransactionID, err error) {
+	splitOutput, err := e.requestFaucetFunds(initWallet)
 	if err != nil {
-		return err
+		return iotago.EmptyOutputID.TransactionID(), err
 	}
 	// first split 1 to FaucetRequestSplitNumber outputs
-	return e.splitOutputs(initWallet, receiveWallet)
+	return e.splitOutputs(splitOutput, initWallet, receiveWallet)
 }
 
-func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputID, err error) {
+func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err error) {
 	receiveAddr := wallet.AddressOnIndex(0)
 	clt := e.connector.GetClient()
 
@@ -282,14 +287,14 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 
 	tx, err := txBuilder.Build(e.faucet.AddressSigner(faucetAddr))
 	if err != nil {
-		return iotago.OutputID{}, err
+		return nil, err
 	}
 
 	// send transaction
 	_, err = clt.PostTransaction(tx)
 	if err != nil {
 		// fmt.Println("post faucet request failed", err)
-		return iotago.OutputID{}, err
+		return nil, err
 	}
 	// fmt.Println("post faucet request success", blkID)
 	// fmt.Println("faucet new outputID:", iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 1).ToHex())
@@ -304,49 +309,37 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID iotago.OutputI
 		OutputStruct: tx.Essence.Outputs[1],
 	})
 
-	// track output in output manager and make sure it's confirmed
-	ok := e.outputManager.Track([]iotago.OutputID{output.OutputID})
-	if !ok {
-		err = ierrors.New("not all outputs has been confirmed")
-		return
-	}
-	outputID = output.OutputID
-
-	return
+	return output, nil
 }
 
 // splitOutputs splits faucet input to 100 outputs.
-func (e *EvilWallet) splitOutputs(inputWallet, outputWallet *Wallet) error {
+func (e *EvilWallet) splitOutputs(splitOutput *Output, inputWallet, outputWallet *Wallet) (iotago.TransactionID, error) {
 	if inputWallet.IsEmpty() {
-		return ierrors.New("inputWallet is empty")
+		return iotago.EmptyOutputID.TransactionID(), ierrors.New("inputWallet is empty")
 	}
 
 	addr := inputWallet.AddressOnIndex(0)
-	input, outputs := e.handleInputOutputDuringSplitOutputs(FaucetRequestSplitNumber, inputWallet, outputWallet, addr.String())
+	input, outputs := e.handleInputOutputDuringSplitOutputs(splitOutput, FaucetRequestSplitNumber, inputWallet, outputWallet, addr.String())
 
 	tx, err := e.CreateTransaction(WithInputs(input), WithOutputs(outputs), WithIssuer(inputWallet), WithOutputWallet(outputWallet))
 	if err != nil {
-		return err
+		return iotago.EmptyOutputID.TransactionID(), err
 	}
 
 	_, err = e.connector.GetClient().PostTransaction(tx)
 	if err != nil {
 		fmt.Println(err)
-		return err
+		return iotago.EmptyOutputID.TransactionID(), err
 	}
 	// fmt.Println("split 100 outputs, blkID:", blkID)
 
-	// wait txs to be confirmed
-	e.outputManager.AwaitTransactionsConfirmation(iotago.TransactionIDs{lo.PanicOnErr(tx.ID(e.api))}, maxGoroutines)
-
-	return nil
+	return lo.PanicOnErr(tx.ID(e.api)), nil
 }
 
-func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitNumber int, inputWallet, receiveWallet *Wallet, inputAddr string) (input *Output, outputs []*OutputOption) {
-	evilInput := inputWallet.UnspentOutput(inputAddr)
-	input = evilInput
+func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitOutput *Output, splitNumber int, inputWallet, receiveWallet *Wallet, inputAddr string) (input *Output, outputs []*OutputOption) {
+	input = splitOutput
 
-	inputBalance := evilInput.Balance
+	inputBalance := input.Balance
 
 	balances := SplitBalanceEqually(splitNumber, inputBalance)
 	for _, bal := range balances {
