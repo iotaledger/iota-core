@@ -1,43 +1,49 @@
 package reactive
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
 // Set is a reactive data structure that represents a set of elements. It notifies its subscribers when the set is
 // updated.
 type Set[ElementType comparable] interface {
-	// Get returns the current value of the set.
-	Get() set.Set[ElementType]
+	// Add adds a new element to the set and returns true if the element was not present in the set before.
+	Add(element ElementType) bool
 
-	// Set sets the new value and triggers the registered callbacks if the value has changed.
-	Set(value set.Set[ElementType]) (appliedMutations SetMutations[ElementType])
+	// AddAll adds all elements to the set and returns true if any element has been added.
+	AddAll(elements set.ReadOnly[ElementType]) (addedElements set.Set[ElementType])
 
-	// Apply applies the given mutations to the current value and triggers the registered callbacks if the value has
-	// changed.
-	Apply(mutations SetMutations[ElementType]) (updatedSet set.Set[ElementType], appliedMutations SetMutations[ElementType])
+	// Delete deletes the given element from the set.
+	Delete(element ElementType) bool
 
-	// OnUpdate registers the given callback that is triggered when the value changes.
-	OnUpdate(callback func(updatedSet set.Set[ElementType], appliedMutations SetMutations[ElementType])) (unsubscribe func())
+	// DeleteAll deletes the given elements from the set.
+	DeleteAll(other set.ReadOnly[ElementType]) (removedElements set.Set[ElementType])
+
+	// Apply tries to apply the given mutations to the set atomically and returns the applied mutations.
+	Apply(mutations set.Mutations[ElementType]) (appliedMutations set.Mutations[ElementType])
+
+	// Decode decodes the set from a byte slice.
+	Decode(b []byte) (bytesRead int, err error)
+
+	// ToReadOnly returns a read-only version of the set.
+	ToReadOnly() set.ReadOnly[ElementType]
 
 	// Add adds the given elements to the set and triggers the registered callbacks if the value has changed.
-	Add(elements set.Set[ElementType]) (updatedSet set.Set[ElementType], appliedMutations SetMutations[ElementType])
-	Remove(elements set.Set[ElementType]) (updatedSet set.Set[ElementType], appliedMutations SetMutations[ElementType])
-	InheritFrom(sources ...Set[ElementType]) (unsubscribe func())
+	// InheritFrom(sources ...Set[ElementType]) (unsubscribe func())
+
+	SetValue[ElementType]
 }
 
 // NewSet is the constructor for the Set type.
 func NewSet[T comparable]() Set[T] {
 	return &setImpl[T]{
-		value:           set.New[T](),
-		updateCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(set.Set[T], SetMutations[T])]](),
+		Set:             set.New[T](),
+		updateCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(set.Mutations[T])]](),
 	}
 }
 
@@ -48,10 +54,10 @@ func NewSet[T comparable]() Set[T] {
 // callback is ever more than 1 round of updates ahead of other callbacks.
 type setImpl[ElementType comparable] struct {
 	// value is the current value of the set.
-	value set.Set[ElementType]
+	set.Set[ElementType]
 
 	// updateCallbacks are the registered callbacks that are triggered when the value changes.
-	updateCallbacks *shrinkingmap.ShrinkingMap[types.UniqueID, *callback[func(set.Set[ElementType], SetMutations[ElementType])]]
+	updateCallbacks *shrinkingmap.ShrinkingMap[types.UniqueID, *callback[func(set.Mutations[ElementType])]]
 
 	// uniqueUpdateID is the unique ID that is used to identify an update.
 	uniqueUpdateID types.UniqueID
@@ -66,23 +72,23 @@ type setImpl[ElementType comparable] struct {
 	applyOrderMutex sync.Mutex
 }
 
-// Get returns the current value of the set.
-func (s *setImpl[ElementType]) Get() set.Set[ElementType] {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
+func (s *setImpl[ElementType]) Add(element ElementType) bool {
+	mutations := set.NewMutations[ElementType]()
+	mutations.AddedElements().Add(element)
 
-	return s.value
+	return s.Apply(mutations).AddedElements().Has(element)
+
 }
 
-// Set sets the given value as the new value of the set.
-func (s *setImpl[ElementType]) Set(value set.Set[ElementType]) (appliedMutations SetMutations[ElementType]) {
+// Apply applies the given set.Mutations[] to the set.
+func (s *setImpl[ElementType]) Apply(mutations set.Mutations[ElementType]) (appliedMutations set.Mutations[ElementType]) {
 	s.applyOrderMutex.Lock()
 	defer s.applyOrderMutex.Unlock()
 
-	appliedMutations, updateID, callbacksToTrigger := s.set(value)
+	appliedMutations, updateID, callbacksToTrigger := s.applyMutations(mutations)
 	for _, callback := range callbacksToTrigger {
 		if callback.Lock(updateID) {
-			callback.Invoke(value, appliedMutations)
+			callback.Invoke(appliedMutations)
 			callback.Unlock()
 		}
 	}
@@ -90,29 +96,13 @@ func (s *setImpl[ElementType]) Set(value set.Set[ElementType]) (appliedMutations
 	return appliedMutations
 }
 
-// Apply applies the given SetMutations to the set.
-func (s *setImpl[ElementType]) Apply(mutations SetMutations[ElementType]) (updatedSet set.Set[ElementType], appliedMutations SetMutations[ElementType]) {
-	s.applyOrderMutex.Lock()
-	defer s.applyOrderMutex.Unlock()
-
-	updatedSet, appliedMutations, updateID, callbacksToTrigger := s.applyMutations(mutations)
-	for _, callback := range callbacksToTrigger {
-		if callback.Lock(updateID) {
-			callback.Invoke(updatedSet, appliedMutations)
-			callback.Unlock()
-		}
-	}
-
-	return updatedSet, appliedMutations
-}
-
 // OnUpdate registers the given callback to be triggered when the value of the set changes.
-func (s *setImpl[ElementType]) OnUpdate(callback func(updatedSet set.Set[ElementType], appliedMutations SetMutations[ElementType])) (unsubscribe func()) {
+func (s *setImpl[ElementType]) OnUpdate(callback func(appliedMutations set.Mutations[ElementType])) (unsubscribe func()) {
 	s.mutex.Lock()
 
-	currentValue := s.value
+	currentValue := set.NewMutations[ElementType]().WithAddedElements(s.Set)
 
-	newCallback := newCallback[func(set.Set[ElementType], SetMutations[ElementType])](s.uniqueCallbackID.Next(), callback)
+	newCallback := newCallback[func(set.Mutations[ElementType])](s.uniqueCallbackID.Next(), callback)
 	s.updateCallbacks.Set(newCallback.ID, newCallback)
 
 	// we intertwine the mutexes to ensure that the callback is guaranteed to be triggered with the current value from
@@ -123,7 +113,7 @@ func (s *setImpl[ElementType]) OnUpdate(callback func(updatedSet set.Set[Element
 	s.mutex.Unlock()
 
 	if !currentValue.IsEmpty() {
-		newCallback.Invoke(currentValue, NewSetMutations(WithAddedElements(currentValue)))
+		newCallback.Invoke(currentValue)
 	}
 
 	return func() {
@@ -133,14 +123,12 @@ func (s *setImpl[ElementType]) OnUpdate(callback func(updatedSet set.Set[Element
 	}
 }
 
-// Add adds the given elements to the set and returns the updated set and the applied mutations.
-func (s *setImpl[ElementType]) Add(elements set.Set[ElementType]) (updatedSet set.Set[ElementType], appliedMutations SetMutations[ElementType]) {
-	return s.Apply(NewSetMutations(WithAddedElements(elements)))
+func (s *setImpl[ElementType]) AddAll(elements set.ReadOnly[ElementType]) (addedElements set.Set[ElementType]) {
+	return s.Apply(set.NewMutations[ElementType]().WithAddedElements(elements)).AddedElements()
 }
 
-// Remove removes the given elements from the set and returns the updated set and the applied mutations.
-func (s *setImpl[ElementType]) Remove(elements set.Set[ElementType]) (updatedSet set.Set[ElementType], appliedMutations SetMutations[ElementType]) {
-	return s.Apply(NewSetMutations(WithRemovedElements(elements)))
+func (s *setImpl[ElementType]) DeleteAll(elements set.ReadOnly[ElementType]) (deletedElements set.Set[ElementType]) {
+	return s.Apply(set.NewMutations[ElementType]().WithDeletedElements(elements)).DeletedElements()
 }
 
 // InheritFrom registers the given sets to inherit their mutations to the set.
@@ -148,7 +136,7 @@ func (s *setImpl[ElementType]) InheritFrom(sources ...Set[ElementType]) (unsubsc
 	unsubscribeCallbacks := make([]func(), len(sources))
 
 	for i, source := range sources {
-		unsubscribeCallbacks[i] = source.OnUpdate(func(_ set.Set[ElementType], appliedMutations SetMutations[ElementType]) {
+		unsubscribeCallbacks[i] = source.OnUpdate(func(appliedMutations set.Mutations[ElementType]) {
 			if !appliedMutations.IsEmpty() {
 				s.Apply(appliedMutations)
 			}
@@ -158,82 +146,24 @@ func (s *setImpl[ElementType]) InheritFrom(sources ...Set[ElementType]) (unsubsc
 	return lo.Batch(unsubscribeCallbacks...)
 }
 
-// set sets the given value as the new value of the set.
-func (s *setImpl[ElementType]) set(value set.Set[ElementType]) (appliedMutations SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(set.Set[ElementType], SetMutations[ElementType])]) {
+// applyMutations applies the given mutations to the set.
+func (s *setImpl[ElementType]) applyMutations(mutations set.Mutations[ElementType]) (appliedMutations set.Mutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(set.Mutations[ElementType])]) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	appliedMutations = NewSetMutations[ElementType](WithRemovedElements(s.value), WithAddedElements(value))
-	s.value = value
+	appliedMutations = set.NewMutations[ElementType]()
+
+	mutations.DeletedElements().Range(func(element ElementType) {
+		if s.Set.Delete(element) {
+			appliedMutations.DeletedElements().Add(element)
+		}
+	})
+
+	mutations.AddedElements().Range(func(element ElementType) {
+		if s.Set.Add(element) && !appliedMutations.DeletedElements().Delete(element) {
+			appliedMutations.AddedElements().Add(element)
+		}
+	})
 
 	return appliedMutations, s.uniqueUpdateID.Next(), s.updateCallbacks.Values()
-}
-
-// applyMutations applies the given mutations to the set.
-func (s *setImpl[ElementType]) applyMutations(mutations SetMutations[ElementType]) (updatedSet set.Set[ElementType], appliedMutations SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(set.Set[ElementType], SetMutations[ElementType])]) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	countersPerElement := make(map[ElementType]int)
-	fmt.Println("countersPerElement", countersPerElement)
-
-	updatedSet = s.value.Clone()
-	appliedMutations = NewSetMutations[ElementType]()
-
-	mutations.RemovedElements.Range(func(element ElementType) {
-		if updatedSet.Delete(element) {
-			appliedMutations.RemovedElements.Add(element)
-		}
-	})
-
-	mutations.AddedElements.Range(func(element ElementType) {
-		if updatedSet.Add(element) && !appliedMutations.RemovedElements.Delete(element) {
-			appliedMutations.AddedElements.Add(element)
-		}
-	})
-
-	s.value = updatedSet
-
-	return updatedSet, appliedMutations, s.uniqueUpdateID.Next(), s.updateCallbacks.Values()
-}
-
-// SetMutations represents an atomic set of mutations that can be applied to a Set.
-type SetMutations[T comparable] struct {
-	// RemovedElements are the elements that are supposed to be removed.
-	RemovedElements set.Set[T]
-
-	// AddedElements are the elements that are supposed to be added.
-	AddedElements set.Set[T]
-}
-
-// NewSetMutations creates a new SetMutations instance.
-func NewSetMutations[T comparable](opts ...options.Option[SetMutations[T]]) SetMutations[T] {
-	return *options.Apply(new(SetMutations[T]), opts, func(s *SetMutations[T]) {
-		if s.RemovedElements == nil {
-			s.RemovedElements = set.New[T]()
-		}
-
-		if s.AddedElements == nil {
-			s.AddedElements = set.New[T]()
-		}
-	})
-}
-
-// IsEmpty returns true if the SetMutations instance is empty.
-func (s SetMutations[T]) IsEmpty() bool {
-	return s.RemovedElements.IsEmpty() && s.AddedElements.IsEmpty()
-}
-
-// WithAddedElements is an option that can be used to set the added elements of a SetMutations instance.
-func WithAddedElements[T comparable](elements set.Set[T]) options.Option[SetMutations[T]] {
-	return func(args *SetMutations[T]) {
-		args.AddedElements = elements
-	}
-}
-
-// WithRemovedElements is an option that can be used to set the removed elements of a SetMutations instance.
-func WithRemovedElements[T comparable](elements set.Set[T]) options.Option[SetMutations[T]] {
-	return func(args *SetMutations[T]) {
-		args.RemovedElements = elements
-	}
 }

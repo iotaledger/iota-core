@@ -13,7 +13,7 @@ require (
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d
-	github.com/iotaledger/hive.go/ds v0.0.0-20230708010617-178020346ac0
+	github.com/iotaledger/hive.go/ds v0.0.0-20230710032457-34a80f953d2d
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/lo v0.0.0-20230706083020-ef6c3248369d
