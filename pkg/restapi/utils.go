@@ -1,0 +1,34 @@
+package restapi
+
+import (
+	"regexp"
+	"strings"
+
+	"github.com/iotaledger/hive.go/ierrors"
+)
+
+func CompileRouteAsRegex(route string) *regexp.Regexp {
+	r := regexp.QuoteMeta(route)
+	r = strings.Replace(r, `\*`, "(.*?)", -1)
+	r = r + "$"
+
+	reg, err := regexp.Compile(r)
+	if err != nil {
+		return nil
+	}
+
+	return reg
+}
+
+func CompileRoutesAsRegexes(routes []string) ([]*regexp.Regexp, error) {
+	regexes := make([]*regexp.Regexp, len(routes))
+	for i, route := range routes {
+		reg := CompileRouteAsRegex(route)
+		if reg == nil {
+			return nil, ierrors.Errorf("Invalid route in config: %s", route)
+		}
+		regexes[i] = reg
+	}
+
+	return regexes, nil
+}
