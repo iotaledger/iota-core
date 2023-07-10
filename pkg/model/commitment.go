@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/hive.go/stringify"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -20,7 +21,7 @@ type Commitment struct {
 }
 
 func NewEmptyCommitment(api iotago.API) *Commitment {
-	return lo.PanicOnErr(CommitmentFromCommitment(iotago.NewEmptyCommitment(), api))
+	return lo.PanicOnErr(CommitmentFromCommitment(iotago.NewEmptyCommitment(api.ProtocolParameters().Version()), api))
 }
 
 func newCommitment(commitmentID iotago.CommitmentID, iotaCommitment *iotago.Commitment, data []byte, api iotago.API) (*Commitment, error) {
@@ -46,7 +47,9 @@ func CommitmentFromCommitment(iotaCommitment *iotago.Commitment, api iotago.API,
 	return newCommitment(commitmentID, iotaCommitment, data, api)
 }
 
-func CommitmentFromBytes(data []byte, api iotago.API, opts ...serix.Option) (*Commitment, error) {
+func CommitmentFromBytes(data []byte, apiProvider api.Provider, opts ...serix.Option) (*Commitment, error) {
+	api := apiProvider.APIForVersion(data[0])
+
 	iotaCommitment := new(iotago.Commitment)
 	if _, err := api.Decode(data, iotaCommitment, opts...); err != nil {
 		return nil, err

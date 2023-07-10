@@ -63,7 +63,6 @@ func provide(c *dig.Container) error {
 		return blockfactory.New(deps.Protocol, accountFromParam(ParamsBlockIssuer.IssuerAccount, ParamsBlockIssuer.PrivateKey),
 			blockfactory.WithTipSelectionTimeout(ParamsBlockIssuer.TipSelectionTimeout),
 			blockfactory.WithTipSelectionRetryInterval(ParamsBlockIssuer.TipSelectionRetryInterval),
-			blockfactory.WithPoWEnabled(restapi.ParamsRestAPI.PoW.Enabled),
 			blockfactory.WithIncompleteBlockAccepted(restapi.ParamsRestAPI.AllowIncompleteBlock),
 		)
 	})

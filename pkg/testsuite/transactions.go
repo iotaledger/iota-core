@@ -2,10 +2,10 @@ package testsuite
 
 import (
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -14,22 +14,22 @@ import (
 
 func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *mock.Node) mempool.Transaction {
 	var loadedTransaction mempool.TransactionMetadata
-	transactionID, err := transaction.ID()
+	transactionID, err := transaction.ID(t.API)
 	require.NoError(t.Testing, err)
 
 	t.Eventually(func() error {
 		var exists bool
 		loadedTransaction, exists = node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
 		if !exists {
-			return errors.Errorf("AssertTransaction: %s: transaction %s does not exist", node.Name, transactionID)
+			return ierrors.Errorf("AssertTransaction: %s: transaction %s does not exist", node.Name, transactionID)
 		}
 
 		if transactionID != loadedTransaction.ID() {
-			return errors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransaction.ID())
+			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransaction.ID())
 		}
 
 		if !cmp.Equal(transaction, loadedTransaction.Transaction()) {
-			return errors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, transaction, loadedTransaction.Transaction())
+			return ierrors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, transaction, loadedTransaction.Transaction())
 		}
 
 		return nil
@@ -43,7 +43,7 @@ func (t *TestSuite) AssertTransactionsExist(transactions []*iotago.Transaction, 
 
 	for _, node := range nodes {
 		for _, transaction := range transactions {
-			transactionID, err := transaction.ID()
+			transactionID, err := transaction.ID(t.API)
 			require.NoError(t.Testing, err)
 
 			t.Eventually(func() error {
@@ -52,7 +52,7 @@ func (t *TestSuite) AssertTransactionsExist(transactions []*iotago.Transaction, 
 				} else {
 					t.Eventually(func() error {
 						if lo.Return2(node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)) {
-							return errors.Errorf("AssertTransactionsExist: %s: transaction %s exists but should not", node.Name, transactionID)
+							return ierrors.Errorf("AssertTransactionsExist: %s: transaction %s exists but should not", node.Name, transactionID)
 						}
 
 						return nil
@@ -70,17 +70,17 @@ func (t *TestSuite) assertTransactionsInCacheWithFunc(expectedTransactions []*io
 
 	for _, node := range nodes {
 		for _, transaction := range expectedTransactions {
-			transactionID, err := transaction.ID()
+			transactionID, err := transaction.ID(t.API)
 			require.NoError(t.Testing, err)
 
 			t.Eventually(func() error {
 				blockFromCache, exists := node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
 				if !exists {
-					return errors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s does not exist", node.Name, transactionID)
+					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s does not exist", node.Name, transactionID)
 				}
 
 				if expectedPropertyState != propertyFunc(blockFromCache) {
-					return errors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s: expected %v, got %v", node.Name, blockFromCache.ID(), expectedPropertyState, propertyFunc(blockFromCache))
+					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s: expected %v, got %v", node.Name, blockFromCache.ID(), expectedPropertyState, propertyFunc(blockFromCache))
 				}
 
 				return nil
@@ -118,24 +118,24 @@ func (t *TestSuite) AssertTransactionsInCachePending(expectedTransactions []*iot
 func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*iotago.Transaction][]string, nodes ...*mock.Node) {
 	for _, node := range nodes {
 		for transaction, conflictAliases := range transactionConflicts {
-			transactionID, err := transaction.ID()
+			transactionID, err := transaction.ID(t.API)
 			require.NoError(t.Testing, err)
 
 			t.Eventually(func() error {
 				transactionFromCache, exists := node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
 				if !exists {
-					return errors.Errorf("AssertTransactionInCacheConflicts: %s: block %s does not exist", node.Name, transactionID)
+					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: block %s does not exist", node.Name, transactionID)
 				}
 
 				expectedConflictIDs := advancedset.New(lo.Map(conflictAliases, t.TransactionFramework.TransactionID)...)
 				actualConflictIDs := transactionFromCache.ConflictIDs().Get()
 
 				if expectedConflictIDs.Size() != actualConflictIDs.Size() {
-					return errors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s conflict count incorrect: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedConflictIDs, actualConflictIDs)
+					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s conflict count incorrect: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedConflictIDs, actualConflictIDs)
 				}
 
 				if !actualConflictIDs.HasAll(expectedConflictIDs) {
-					return errors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedConflictIDs, actualConflictIDs)
+					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedConflictIDs, actualConflictIDs)
 				}
 
 				return nil

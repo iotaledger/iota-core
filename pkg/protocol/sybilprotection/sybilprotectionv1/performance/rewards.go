@@ -1,9 +1,8 @@
 package performance
 
 import (
-	"github.com/cockroachdb/errors"
-
 	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -25,7 +24,7 @@ func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	return iotago.Identifier(ads.NewMap[iotago.AccountID, PoolRewards](t.rewardsStorage(epochIndex)).Root())
+	return iotago.Identifier(t.rewardsMap(epochIndex).Root())
 }
 
 func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, error) {
@@ -43,9 +42,9 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			continue
 		}
 
-		poolStats, err := t.poolStats(epochIndex)
+		poolStats, err := t.poolStatsStore.Get(epochIndex)
 		if err != nil {
-			return 0, errors.Wrapf(err, "validator accountID %s", epochIndex, validatorID)
+			return 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 
 		unDecayedEpochRewards := uint64(rewardsForAccountInEpoch.FixedCost) +
@@ -54,9 +53,10 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 				uint64(stakeAmount)/
 				uint64(rewardsForAccountInEpoch.PoolStake)
 
-		decayedEpochRewards, err2 := t.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
+		decayedEpochRewards, err2 := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
 		if err2 != nil {
-			return 0, errors.Wrapf(err2, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
+			return 0, ierrors.Wrapf(err2, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 
 		validatorReward += decayedEpochRewards
@@ -80,18 +80,19 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			continue
 		}
 
-		poolStats, err := t.poolStats(epochIndex)
+		poolStats, err := t.poolStatsStore.Get(epochIndex)
 		if err != nil {
-			return 0, errors.Wrapf(err, "validator accountID %s", epochIndex, validatorID)
+			return 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator account ID %s", epochIndex, validatorID)
 		}
 
 		unDecayedEpochRewards := decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, profitMarginExponent)*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent) *
 			uint64(delegatedAmount) /
 			uint64(rewardsForAccountInEpoch.PoolStake)
 
-		decayedEpochRewards, err := t.decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
+		decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
+			return 0, ierrors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 
 		delegatorsReward += decayedEpochRewards
@@ -101,11 +102,20 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 }
 
 func (t *Tracker) rewardsStorage(epochIndex iotago.EpochIndex) kvstore.KVStore {
-	return lo.PanicOnErr(t.rewardBaseStore.WithExtendedRealm(epochIndex.Bytes()))
+	return lo.PanicOnErr(t.rewardBaseStore.WithExtendedRealm(epochIndex.MustBytes()))
+}
+
+func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) *ads.Map[iotago.AccountID, *PoolRewards] {
+	return ads.NewMap(t.rewardsStorage(epochIndex),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		(*PoolRewards).Bytes,
+		PoolRewardsFromBytes,
+	)
 }
 
 func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *PoolRewards, exists bool) {
-	return ads.NewMap[iotago.AccountID, PoolRewards](t.rewardsStorage(epochIndex)).Get(accountID)
+	return t.rewardsMap(epochIndex).Get(accountID)
 }
 
 func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, fixedCost iotago.Mana, performanceFactor uint64) iotago.Mana {

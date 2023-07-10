@@ -9,10 +9,10 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/pkg/errors"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/jwt"
@@ -114,7 +114,7 @@ func run() error {
 
 		go func() {
 			Component.LogInfof("You can now access the API using: http://%s", bindAddr)
-			if err := deps.Echo.Start(bindAddr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			if err := deps.Echo.Start(bindAddr); err != nil && !ierrors.Is(err, http.ErrServerClosed) {
 				Component.LogWarnf("Stopped REST-API server due to an error (%s)", err)
 			}
 		}()

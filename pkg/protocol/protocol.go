@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -28,8 +28,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/passthrough"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -38,13 +36,13 @@ import (
 	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -82,10 +80,9 @@ type Protocol struct {
 	optsTipSelectionProvider    module.Provider[*engine.Engine, tipselection.TipSelection]
 	optsBookerProvider          module.Provider[*engine.Engine, booker.Booker]
 	optsClockProvider           module.Provider[*engine.Engine, clock.Clock]
-	optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
 	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
-	optsEpochGadgetProvider     module.Provider[*engine.Engine, epochgadget.Gadget]
+	optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
 	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
 	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
@@ -105,11 +102,10 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsTipSelectionProvider:    tipselectionv1.NewProvider(),
 		optsBookerProvider:          inmemorybooker.NewProvider(),
 		optsClockProvider:           blocktime.NewProvider(),
-		optsSybilProtectionProvider: poa.NewProvider([]iotago.AccountID{}),
 		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
 		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
-		optsEpochGadgetProvider:     epochorchestrator.NewProvider(),
-		optsNotarizationProvider:    slotnotarization.NewProvider(slotnotarization.DefaultMinSlotCommittableAge),
+		optsSybilProtectionProvider: sybilprotectionv1.NewProvider(),
+		optsNotarizationProvider:    slotnotarization.NewProvider(),
 		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          ledger1.NewProvider(),
@@ -131,11 +127,6 @@ func (p *Protocol) Run(ctx context.Context) error {
 	defer innerCtxCancel()
 
 	p.linkToEngine(p.mainEngine)
-
-	//nolint:contextcheck // false positive
-	if err := p.mainEngine.Initialize(p.optsSnapshotPath); err != nil {
-		return errors.Wrap(err, "mainEngine initialize failed")
-	}
 
 	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
 	if !valid {
@@ -184,6 +175,7 @@ func (p *Protocol) shutdown() {
 		p.networkProtocol.Shutdown()
 	}
 
+	p.ChainManager.Shutdown()
 	p.Workers.Shutdown()
 
 	p.activeEngineMutex.RLock()
@@ -193,7 +185,6 @@ func (p *Protocol) shutdown() {
 	}
 	p.activeEngineMutex.RUnlock()
 
-	p.ChainManager.Shutdown()
 	p.SyncManager.Shutdown()
 }
 
@@ -209,10 +200,9 @@ func (p *Protocol) initEngineManager() {
 		p.optsBlockDAGProvider,
 		p.optsBookerProvider,
 		p.optsClockProvider,
-		p.optsSybilProtectionProvider,
 		p.optsBlockGadgetProvider,
 		p.optsSlotGadgetProvider,
-		p.optsEpochGadgetProvider,
+		p.optsSybilProtectionProvider,
 		p.optsNotarizationProvider,
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,
@@ -221,7 +211,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsTipSelectionProvider,
 	)
 
-	mainEngine, err := p.engineManager.LoadActiveEngine()
+	mainEngine, err := p.engineManager.LoadActiveEngine(p.optsSnapshotPath)
 	if err != nil {
 		panic(fmt.Sprintf("could not load active engine: %s", err))
 	}
@@ -269,27 +259,27 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	mainEngine := p.MainEngineInstance()
 
 	if !mainEngine.WasInitialized() {
-		return errors.Errorf("protocol engine not yet initialized")
+		return ierrors.New("protocol engine not yet initialized")
 	}
 
-	isSolid, chain := p.ChainManager.ProcessCommitmentFromSource(block.SlotCommitment(), src)
-	if !isSolid {
-		if block.Block().SlotCommitment.PrevID == mainEngine.Storage.Settings().LatestCommitment().ID() {
-			return nil
-		}
+	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
+	if chainCommitment == nil {
+		return ierrors.Errorf("protocol ProcessBlock failed. Unknown commitment: %s", block.ProtocolBlock().SlotCommitmentID)
+	}
 
-		return errors.Errorf("protocol ProcessBlock failed. chain is not solid: %s, latest commitment: %s, block ID: %s", block.Block().SlotCommitment.MustID(), mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
+	if !chainCommitment.IsSolid() {
+		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
 
 	processed := false
 
-	if mainChain := mainEngine.ChainID(); chain.ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
+	if mainChain := mainEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
 		mainEngine.ProcessBlockFromPeer(block, src)
 		processed = true
 	}
 
 	if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
-		if candidateChain := candidateEngine.ChainID(); chain.ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
+		if candidateChain := candidateEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
 			candidateEngine.ProcessBlockFromPeer(block, src)
 			if candidateEngine.IsBootstrapped() &&
 				candidateEngine.Storage.Settings().LatestCommitment().CumulativeWeight() > mainEngine.Storage.Settings().LatestCommitment().CumulativeWeight() {
@@ -300,7 +290,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	if !processed {
-		return errors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.Block().SlotCommitment.MustID())
+		return ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.ProtocolBlock().SlotCommitmentID)
 	}
 
 	return nil
@@ -324,9 +314,23 @@ func (p *Protocol) Network() *core.Protocol {
 	return p.networkProtocol
 }
 
-func (p *Protocol) API() iotago.API {
-	return p.MainEngineInstance().API()
+func (p *Protocol) LatestAPI() iotago.API {
+	return p.MainEngineInstance().LatestAPI()
 }
+
+func (p *Protocol) APIForVersion(version iotago.Version) iotago.API {
+	return p.MainEngineInstance().APIForVersion(version)
+}
+
+func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
+	return p.MainEngineInstance().APIForSlot(slot)
+}
+
+func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
+	return p.MainEngineInstance().APIForEpoch(epoch)
+}
+
+var _ api.Provider = &Protocol{}
 
 func (p *Protocol) SupportedVersions() nodeclient.Versions {
 	return p.supportVersions

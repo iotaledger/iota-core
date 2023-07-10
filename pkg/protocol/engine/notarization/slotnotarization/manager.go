@@ -3,27 +3,24 @@ package slotnotarization
 import (
 	"time"
 
-	"github.com/pkg/errors"
-
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
-)
-
-const (
-	DefaultMinSlotCommittableAge = 6
 )
 
 // Manager is the component that manages the slot commitments.
@@ -34,38 +31,38 @@ type Manager struct {
 	workers      *workerpool.Group
 	errorHandler func(error)
 
-	attestation attestation.Attestations
-	ledger      ledger.Ledger
+	attestation     attestation.Attestations
+	ledger          ledger.Ledger
+	sybilProtection sybilprotection.SybilProtection
 
 	storage *storage.Storage
 
 	acceptedTimeFunc      func() time.Time
-	timeProviderFunc      func() *iotago.TimeProvider
 	minCommittableSlotAge iotago.SlotIndex
+	apiProvider           api.Provider
 
 	module.Module
 }
 
-func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine.Engine, notarization.Notarization] {
+func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
-		m := NewManager(minCommittableSlotAge, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
+		m := NewManager(e.LatestAPI().ProtocolParameters().EvictionAge(), e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
 
-		m.timeProviderFunc = func() *iotago.TimeProvider {
-			return e.API().TimeProvider()
-		}
+		m.apiProvider = e
 
 		e.HookConstructed(func() {
 			m.storage = e.Storage
 			m.acceptedTimeFunc = e.Clock.Accepted().Time
 
 			m.ledger = e.Ledger
+			m.sybilProtection = e.SybilProtection
 			m.attestation = e.Attestations
 
 			wpBlocks := m.workers.CreatePool("Blocks", 1) // Using just 1 worker to avoid contention
 
 			e.Events.Ledger.BlockProcessed.Hook(func(block *blocks.Block) {
 				if err := m.notarizeAcceptedBlock(block); err != nil {
-					m.errorHandler(errors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
+					m.errorHandler(ierrors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 				}
 				m.tryCommitUntil(block)
 			}, event.WithWorkerPool(wpBlocks))
@@ -73,12 +70,8 @@ func NewProvider(minCommittableSlotAge iotago.SlotIndex) module.Provider[*engine
 			e.Events.Notarization.LinkTo(m.events)
 
 			m.TriggerInitialized()
-		})
-
-		e.Storage.Settings().HookInitialized(func() {
 			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Index())
 			m.TriggerConstructed()
-			m.TriggerInitialized()
 		})
 
 		return m
@@ -111,12 +104,13 @@ func (m *Manager) IsBootstrapped() bool {
 	// If acceptance time is in slot 10, then the latest committable index is 3 (with minCommittableSlotAge=6), because there are 6 full slots between slot 10 and slot 3.
 	// All slots smaller than 4 are committable, so in order to check if slot 3 is committed it's necessary to do m.minCommittableSlotAge-1,
 	// otherwise we'd expect slot 4 to be committed in order to be fully committed, which is impossible.
-	return m.storage.Settings().LatestCommitment().Index() >= m.timeProviderFunc().SlotFromTime(m.acceptedTimeFunc())-m.minCommittableSlotAge-1
+	latestIndex := m.storage.Settings().LatestCommitment().Index()
+	return latestIndex >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())-m.minCommittableSlotAge-1
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 	if err = m.slotMutations.AddAcceptedBlock(block); err != nil {
-		return errors.Wrap(err, "failed to add accepted block to slot mutations")
+		return ierrors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
 	m.attestation.AddAttestationFromBlock(block)
@@ -156,7 +150,7 @@ func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool
 func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	latestCommitment := m.storage.Settings().LatestCommitment()
 	if index != latestCommitment.Index()+1 {
-		m.errorHandler(errors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
+		m.errorHandler(ierrors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
 		return false
 	}
 
@@ -165,53 +159,66 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 
 	cumulativeWeight, attestationsRoot, err := m.attestation.Commit(index)
 	if err != nil {
-		m.errorHandler(errors.Wrap(err, "failed to commit attestations"))
+		m.errorHandler(ierrors.Wrap(err, "failed to commit attestations"))
 		return false
 	}
 
 	stateRoot, mutationRoot, accountRoot, err := m.ledger.CommitSlot(index)
 	if err != nil {
-		m.errorHandler(errors.Wrap(err, "failed to commit ledger"))
+		m.errorHandler(ierrors.Wrap(err, "failed to commit ledger"))
+		return false
+	}
+
+	committeeRoot, rewardsRoot := m.sybilProtection.CommitSlot(index)
+	api := m.apiProvider.APIForSlot(index)
+
+	protocolParamsBytes, err := api.Encode(api.ProtocolParameters())
+	if err != nil {
+		m.errorHandler(ierrors.Wrap(err, "failed to encode protocol parameters"))
 		return false
 	}
 
 	roots := iotago.NewRoots(
 		iotago.Identifier(acceptedBlocks.Root()),
 		mutationRoot,
-		iotago.Identifier(attestationsRoot),
+		attestationsRoot,
 		stateRoot,
 		accountRoot,
+		committeeRoot,
+		rewardsRoot,
+		iotago.IdentifierFromData(protocolParamsBytes),
 	)
 
 	newCommitment := iotago.NewCommitment(
+		api.ProtocolParameters().Version(),
 		index,
 		latestCommitment.ID(),
 		roots.ID(),
 		cumulativeWeight,
 	)
 
-	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, m.storage.Settings().API(), serix.WithValidation())
+	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, api, serix.WithValidation())
 	if err != nil {
 		return false
 	}
 
 	if err = m.storage.Settings().SetLatestCommitment(newModelCommitment); err != nil {
-		m.errorHandler(errors.Wrap(err, "failed to set latest commitment"))
+		m.errorHandler(ierrors.Wrap(err, "failed to set latest commitment"))
 		return false
 	}
 
 	if err = m.storage.Commitments().Store(newModelCommitment); err != nil {
-		m.errorHandler(errors.Wrapf(err, "failed to store latest commitment %s", newModelCommitment.ID()))
+		m.errorHandler(ierrors.Wrapf(err, "failed to store latest commitment %s", newModelCommitment.ID()))
 		return false
 	}
 
 	rootsStorage := m.storage.Roots(index)
 	if rootsStorage == nil {
-		m.errorHandler(errors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
+		m.errorHandler(ierrors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
 		return false
 	}
-	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(m.storage.Settings().API().Encode(roots))); err != nil {
-		m.errorHandler(errors.Wrapf(err, "failed to store latest roots for commitment %s", newModelCommitment.ID()))
+	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(api.Encode(roots))); err != nil {
+		m.errorHandler(ierrors.Wrapf(err, "failed to store latest roots for commitment %s", newModelCommitment.ID()))
 		return false
 	}
 
@@ -222,7 +229,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	})
 
 	if err = m.slotMutations.Evict(index); err != nil {
-		m.errorHandler(errors.Wrapf(err, "failed to evict slotMutations at index: %d", index))
+		m.errorHandler(ierrors.Wrapf(err, "failed to evict slotMutations at index: %d", index))
 	}
 
 	return true

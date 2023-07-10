@@ -1,14 +1,12 @@
 package inmemorybooker
 
 import (
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -45,7 +43,7 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 				b.conflictDAG = b.ledger.ConflictDAG()
 			})
 
-			e.Events.SybilProtection.BlockProcessed.Hook(func(block *blocks.Block) {
+			e.Events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {
 				if err := b.Queue(block); err != nil {
 					b.errorHandler(err)
 				}
@@ -93,7 +91,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	}
 
 	if transactionMetadata == nil {
-		return errors.Errorf("transaction in %s was not attached", block.ID())
+		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
 	// Based on the assumption that we always fork and the UTXO and Tangle paste cones are always fully known.
@@ -117,7 +115,7 @@ func (b *Booker) evict(slotIndex iotago.SlotIndex) {
 func (b *Booker) book(block *blocks.Block) error {
 	conflictsToInherit, err := b.inheritConflicts(block)
 	if err != nil {
-		return errors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
+		return ierrors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
 	}
 
 	block.SetConflictIDs(conflictsToInherit)
@@ -129,7 +127,7 @@ func (b *Booker) book(block *blocks.Block) error {
 
 func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	if block.SetInvalid() {
-		b.events.BlockInvalid.Trigger(block, errors.Wrap(err, "block marked as invalid in Booker"))
+		b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "block marked as invalid in Booker"))
 	}
 }
 
@@ -137,18 +135,18 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset
 	conflictIDsToInherit := advancedset.New[iotago.TransactionID]()
 
 	// Inherit conflictIDs from parents based on the parent type.
-	for _, parent := range block.ModelBlock().ParentsWithType() {
+	for _, parent := range block.ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
-			return nil, errors.Errorf("parent %s does not exist", parent.ID)
+			return nil, ierrors.Errorf("parent %s does not exist", parent.ID)
 		}
 
 		switch parent.Type {
-		case model.StrongParentType:
+		case iotago.StrongParentType:
 			conflictIDsToInherit.AddAll(parentBlock.ConflictIDs())
-		case model.WeakParentType:
+		case iotago.WeakParentType:
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
-		case model.ShallowLikeParentType:
+		case iotago.ShallowLikeParentType:
 			// TODO: check whether it contains a TX, otherwise shallow like reference is invalid?
 
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
@@ -172,7 +170,7 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset
 // isReferenceValid checks if the reference between the child and its parent is valid.
 func isReferenceValid(child *blocks.Block, parent *blocks.Block) (err error) {
 	if parent.IsInvalid() {
-		return errors.Errorf("parent %s of child %s is marked as invalid", parent.ID(), child.ID())
+		return ierrors.Errorf("parent %s of child %s is marked as invalid", parent.ID(), child.ID())
 	}
 
 	return nil

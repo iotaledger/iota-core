@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-
-	"github.com/pkg/errors"
+	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -20,6 +19,7 @@ type Accounts struct {
 
 	totalStake          iotago.BaseToken
 	totalValidatorStake iotago.BaseToken
+	reused              atomic.Bool
 
 	mutex syncutils.RWMutex
 }
@@ -55,6 +55,14 @@ func (a *Accounts) IDs() []iotago.AccountID {
 	})
 
 	return ids
+}
+
+func (a *Accounts) IsReused() bool {
+	return a.reused.Load()
+}
+
+func (a *Accounts) SetReused() {
+	a.reused.Store(true)
 }
 
 // Get returns the weight of the given identity.
@@ -114,12 +122,15 @@ func (a *Accounts) SelectCommittee(members ...iotago.AccountID) *SeatedAccounts 
 	return NewSeatedAccounts(a, members...)
 }
 
-func (a *Accounts) FromBytes(b []byte) (n int, err error) {
-	return a.readFromReadSeeker(bytes.NewReader(b))
+func AccountsFromBytes(b []byte) (*Accounts, int, error) {
+	return AccountsFromReader(bytes.NewReader(b))
 }
 
-func (a *Accounts) FromReader(readSeeker io.ReadSeeker) error {
-	return lo.Return2(a.readFromReadSeeker(readSeeker))
+func AccountsFromReader(readSeeker io.ReadSeeker) (*Accounts, int, error) {
+	a := new(Accounts)
+	n, err := a.readFromReadSeeker(readSeeker)
+
+	return a, n, err
 }
 
 func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
@@ -130,7 +141,7 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 
 	var accountCount uint32
 	if err = binary.Read(reader, binary.LittleEndian, &accountCount); err != nil {
-		return n, errors.Wrap(err, "unable to read accounts count")
+		return n, ierrors.Wrap(err, "unable to read accounts count")
 	}
 	n += 4
 
@@ -138,23 +149,34 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 		var accountID iotago.AccountID
 
 		if _, err = io.ReadFull(reader, accountID[:]); err != nil {
-			return 0, errors.Wrap(err, "unable to read accountID")
+			return 0, ierrors.Wrap(err, "unable to read accountID")
 		}
 		n += iotago.AccountIDLength
 
 		poolBytes := make([]byte, poolBytesLength)
 		if _, err = io.ReadFull(reader, poolBytes); err != nil {
-			return 0, errors.Wrap(err, "unable to read pool bytes")
+			return 0, ierrors.Wrap(err, "unable to read pool bytes")
 		}
 		n += poolBytesLength
 
-		pool := new(Pool)
-		if _, err := pool.FromBytes(poolBytes); err != nil {
-			return n, errors.Wrap(err, "failed to parse pool")
+		pool, c, err := PoolFromBytes(poolBytes)
+		if err != nil {
+			return 0, ierrors.Wrap(err, "failed to parse pool")
+		}
+
+		if c != poolBytesLength {
+			return 0, ierrors.Wrap(err, "invalid pool bytes length")
 		}
 
 		a.setWithoutLocking(accountID, pool)
 	}
+
+	var reused bool
+	if err = binary.Read(reader, binary.LittleEndian, &reused); err != nil {
+		return n, ierrors.Wrap(err, "unable to read reused flag")
+	}
+	a.reused.Store(reused)
+	n++
 
 	return n, nil
 }
@@ -178,6 +200,8 @@ func (a *Accounts) Bytes() (bytes []byte, err error) {
 
 		return true
 	})
+
+	m.WriteBool(a.reused.Load())
 
 	if innerErr != nil {
 		return nil, innerErr

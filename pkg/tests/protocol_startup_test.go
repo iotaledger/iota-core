@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -42,7 +42,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				storage.WithPruningDelay(3),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(3),
@@ -54,7 +54,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				storage.WithPruningDelay(4),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(3),
@@ -71,18 +71,18 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		node1.ValidatorSeat,
-		node2.ValidatorSeat,
+		lo.Return1(node1.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
+		lo.Return1(node1.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),
-		testsuite.WithProtocolParameters(ts.ProtocolParameters),
-		testsuite.WithLatestCommitment(iotago.NewEmptyCommitment()),
+		testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+		testsuite.WithLatestCommitment(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())),
 		testsuite.WithLatestFinalizedSlot(0),
-		testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
-		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment()}),
+		testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
+		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 		testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 		testsuite.WithEvictedSlot(0),
@@ -93,13 +93,13 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	// Slot 1-2
 	{
 		// Slot 1
-		ts.IssueBlockAtSlot("1.1", 1, iotago.NewEmptyCommitment(), node1, iotago.EmptyBlockID())
-		ts.IssueBlockAtSlot("1.2", 1, iotago.NewEmptyCommitment(), node2, iotago.EmptyBlockID())
-		ts.IssueBlockAtSlot("1.1*", 1, iotago.NewEmptyCommitment(), node1, ts.BlockID("1.2"))
+		ts.IssueBlockAtSlot("1.1", 1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, iotago.EmptyBlockID())
+		ts.IssueBlockAtSlot("1.2", 1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, iotago.EmptyBlockID())
+		ts.IssueBlockAtSlot("1.1*", 1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.BlockID("1.2"))
 
 		// Slot 2
-		ts.IssueBlockAtSlot("2.2", 2, iotago.NewEmptyCommitment(), node2, ts.BlockID("1.1"))
-		ts.IssueBlockAtSlot("2.2*", 2, iotago.NewEmptyCommitment(), node2, ts.BlockID("1.1*"))
+		ts.IssueBlockAtSlot("2.2", 2, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, ts.BlockID("1.1"))
+		ts.IssueBlockAtSlot("2.2*", 2, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, ts.BlockID("1.1*"))
 
 		ts.AssertBlocksExist(ts.Blocks("1.1", "1.2", "1.1*", "2.2", "2.2*"), true, ts.Nodes()...)
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("1.1", "1.2", "1.1*"), true, ts.Nodes()...)
@@ -109,7 +109,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	// Slot 3-6
 	{
 		// Slot 3
-		ts.IssueBlockAtSlot("3.1", 3, iotago.NewEmptyCommitment(), node1, ts.BlockIDs("2.2", "2.2*")...)
+		ts.IssueBlockAtSlot("3.1", 3, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.BlockIDs("2.2", "2.2*")...)
 
 		ts.AssertBlocksExist(ts.Blocks("3.1"), true, ts.Nodes()...)
 
@@ -122,7 +122,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("1.2"), true, ts.Nodes()...)
 
 		// Slot 4
-		ts.IssueBlockAtSlot("4.2", 4, iotago.NewEmptyCommitment(), node2, ts.BlockID("3.1"))
+		ts.IssueBlockAtSlot("4.2", 4, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, ts.BlockID("3.1"))
 
 		ts.AssertBlocksExist(ts.Blocks("4.2"), true, ts.Nodes()...)
 
@@ -135,7 +135,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("1.1", "1.1*"), false, ts.Nodes()...) // too old. confirmation ratification threshold = 2
 
 		// Slot 5
-		ts.IssueBlockAtSlot("5.1", 5, iotago.NewEmptyCommitment(), node1, ts.BlockID("4.2"))
+		ts.IssueBlockAtSlot("5.1", 5, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.BlockID("4.2"))
 
 		ts.AssertBlocksExist(ts.Blocks("5.1"), true, ts.Nodes()...)
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("4.2"), true, ts.Nodes()...)
@@ -147,7 +147,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("2.2", "2.2*"), false, ts.Nodes()...) // too old. confirmation ratification threshold = 2
 
 		// Slot 6
-		ts.IssueBlockAtSlot("6.2", 6, iotago.NewEmptyCommitment(), node2, ts.BlockID("5.1"))
+		ts.IssueBlockAtSlot("6.2", 6, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node2, ts.BlockID("5.1"))
 
 		ts.AssertBlocksExist(ts.Blocks("6.2"), true, ts.Nodes()...)
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("5.1"), true, ts.Nodes()...)
@@ -161,11 +161,11 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// Verify nodes' states: Slot 1 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 3.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
-			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitmentSlotIndex(1),
 			testsuite.WithEqualStoredCommitmentAtIndex(1),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 			testsuite.WithSybilProtectionCommittee(6, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(1),
@@ -200,11 +200,11 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - slot 1 is still not finalized: there is no supermajority of confirmed blocks that commits to it.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
-			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitmentSlotIndex(3),
 			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 			testsuite.WithSybilProtectionCommittee(8, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(3),
@@ -240,11 +240,11 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - Slot 3 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 5.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
-			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitmentSlotIndex(7),
 			testsuite.WithEqualStoredCommitmentAtIndex(7),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 			testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(7),
@@ -283,11 +283,11 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - slot 3 is finalized as "9.1.2", "9.2.2", "9.1.3", "9.2.3" are confirmed within slot 9 being a supermajority.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
-			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitmentSlotIndex(7),
 			testsuite.WithEqualStoredCommitmentAtIndex(7),
 			testsuite.WithLatestFinalizedSlot(3),
-			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 			testsuite.WithSybilProtectionCommittee(12, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(7),
@@ -328,11 +328,11 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - Slot 7 is finalized: there is a supermajority of confirmed blocks that commits to it.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
-			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitmentSlotIndex(10),
 			testsuite.WithEqualStoredCommitmentAtIndex(10),
 			testsuite.WithLatestFinalizedSlot(7),
-			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 			testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
@@ -368,11 +368,11 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - Slot 10 should be committed as the MinCommittableSlotAge is 1, and we accepted a block at slot 12.
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
-			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitmentSlotIndex(10),
 			testsuite.WithEqualStoredCommitmentAtIndex(10),
 			testsuite.WithLatestFinalizedSlot(7),
-			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 			testsuite.WithSybilProtectionCommittee(14, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
@@ -406,14 +406,14 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		node21.Initialize(
 			protocol.WithBaseDirectory(ts.Directory.Path(node2.Name)),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(ts.Validators()),
+				sybilprotectionv1.NewProvider(),
 			),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 				storage.WithPruningDelay(4),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(3),
@@ -423,11 +423,11 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 		ts.AssertNodeState(ts.Nodes("node2.1"),
 			testsuite.WithSnapshotImported(true),
-			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitmentSlotIndex(10),
 			testsuite.WithEqualStoredCommitmentAtIndex(10),
 			testsuite.WithLatestFinalizedSlot(7),
-			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 			testsuite.WithSybilProtectionCommittee(10, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
@@ -455,14 +455,14 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			protocol.WithSnapshotPath(snapshotPath),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node3.Name)),
 			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(ts.Validators()),
+				sybilprotectionv1.NewProvider(),
 			),
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 				storage.WithPruningDelay(4),
 			),
 			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(1),
+				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(3),
@@ -478,11 +478,11 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		// - slot 3 is finalized as per snapshot.
 		ts.AssertNodeState(ts.Nodes("node3"),
 			testsuite.WithSnapshotImported(true),
-			testsuite.WithProtocolParameters(ts.ProtocolParameters),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 			testsuite.WithLatestCommitmentSlotIndex(10),
 			testsuite.WithLatestCommitment(latestCommitment),
 			testsuite.WithLatestFinalizedSlot(7),
-			testsuite.WithChainID(iotago.NewEmptyCommitment().MustID()),
+			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
 			testsuite.WithSybilProtectionCommittee(10, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(10),
@@ -520,7 +520,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 			ts.AssertNodeState(ts.Nodes(),
 				testsuite.WithSnapshotImported(true),
-				testsuite.WithProtocolParameters(ts.ProtocolParameters),
+				testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
 				testsuite.WithLatestCommitmentSlotIndex(11),
 				testsuite.WithLatestFinalizedSlot(7),
 				testsuite.WithSybilProtectionCommittee(16, expectedCommittee),

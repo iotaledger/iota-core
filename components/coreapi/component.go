@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/pkg/errors"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/restapi"
@@ -136,7 +136,7 @@ type dependencies struct {
 	Protocol         *protocol.Protocol
 	AppInfo          *app.Info
 	RestRouteManager *restapi.RestRouteManager
-	BlockIssuer      *blockfactory.BlockIssuer
+	BlockIssuer      *blockfactory.BlockIssuer `optional:"true"`
 	MetricsTracker   *metricstracker.MetricsTracker
 }
 
@@ -147,11 +147,6 @@ func configure() error {
 	}
 
 	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
-
-	// Check for features
-	if restapi.ParamsRestAPI.PoW.Enabled {
-		AddFeature("pow")
-	}
 
 	if restapi.ParamsRestAPI.AllowIncompleteBlock {
 		AddFeature("allowIncompleteBlock")
@@ -172,7 +167,7 @@ func configure() error {
 			return err
 		}
 
-		return responseByHeader(c, block.Block())
+		return responseByHeader(c, block.ProtocolBlock())
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
@@ -284,7 +279,7 @@ func configure() error {
 			return err
 		}
 
-		return responseByHeader(c, block.Block())
+		return responseByHeader(c, block.ProtocolBlock())
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteTransactionsIncludedBlockMetadata, func(c echo.Context) error {
@@ -308,7 +303,7 @@ func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			if !deps.Protocol.SyncManager.IsNodeSynced() {
-				return errors.WithMessage(echo.ErrServiceUnavailable, "node is not synced")
+				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
 			}
 
 			return next(c)
@@ -321,7 +316,7 @@ func checkUpcomingUnsupportedProtocolVersion() echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			// todo update with protocol upgrades support
 			// if !deps.ProtocolManager.NextPendingSupported() {
-			//	return errors.WithMessage(echo.ErrServiceUnavailable, "node does not support the upcoming protocol upgrade")
+			//	return ierrors.Wrap(echo.ErrServiceUnavailable, "node does not support the upcoming protocol upgrade")
 			// }
 
 			return next(c)
@@ -338,7 +333,7 @@ func responseByHeader(c echo.Context, obj any) error {
 	// default to echo.MIMEApplicationJSON
 	switch mimeType {
 	case httpserver.MIMEApplicationVendorIOTASerializerV1:
-		b, err := deps.Protocol.API().Encode(obj)
+		b, err := deps.Protocol.LatestAPI().Encode(obj)
 		if err != nil {
 			return err
 		}
@@ -346,7 +341,7 @@ func responseByHeader(c echo.Context, obj any) error {
 		return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, b)
 
 	default:
-		j, err := deps.Protocol.API().JSONEncode(obj)
+		j, err := deps.Protocol.LatestAPI().JSONEncode(obj)
 		if err != nil {
 			return err
 		}

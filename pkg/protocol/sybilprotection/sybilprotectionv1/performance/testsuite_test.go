@@ -2,7 +2,6 @@ package performance
 
 import (
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -11,10 +10,10 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -24,7 +23,7 @@ type TestSuite struct {
 
 	accounts map[string]iotago.AccountID
 
-	ProtocolParameters *iotago.ProtocolParameters
+	API iotago.API
 
 	Instance *Tracker
 }
@@ -33,35 +32,19 @@ func NewTestSuite(t *testing.T) *TestSuite {
 	ts := &TestSuite{
 		T:        t,
 		accounts: make(map[string]iotago.AccountID),
-
-		ProtocolParameters: &iotago.ProtocolParameters{
-			Version:     3,
-			NetworkName: utils.RandString(255),
-			Bech32HRP:   iotago.NetworkPrefix(utils.RandString(3)),
-			MinPoWScore: utils.RandUint32(50000),
-			RentStructure: iotago.RentStructure{
-				VByteCost:    100,
-				VBFactorData: 1,
-				VBFactorKey:  10,
-			},
-			TokenSupply:           tpkg.RandBaseToken(math.MaxUint64),
-			GenesisUnixTimestamp:  time.Now().Unix(),
-			SlotDurationInSeconds: 10,
-			SlotsPerEpochExponent: 1,
-			// TODO: add mana decay, so we actually test if the performance calculations take the mana decay into account
-			ManaDecayFactors:                 []uint32{},
-			ManaDecayFactorEpochsSum:         0,
-			ManaDecayFactorEpochsSumExponent: 0,
-			ManaDecayFactorsExponent:         0,
-		},
+		API: iotago.V3API(
+			iotago.NewV3ProtocolParameters(
+				iotago.WithTimeProviderOptions(
+					time.Now().Unix(),
+					10,
+					1,
+				),
+			),
+		),
 	}
 	ts.InitRewardManager()
 
 	return ts
-}
-
-func (t *TestSuite) API() iotago.API {
-	return iotago.LatestAPI(t.ProtocolParameters)
 }
 
 func (t *TestSuite) InitRewardManager() {
@@ -79,7 +62,7 @@ func (t *TestSuite) InitRewardManager() {
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
 	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, t.API().TimeProvider(), t.API().ManaDecayProvider())
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, api.NewStaticProvider(t.API))
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -124,8 +107,8 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 		totalValidatorsStake += action.ValidatorStake
 	}
 	// TODO: finish and assert profit margin
-	//profitMarging := (1 << 8) * totalValidatorsStake / (totalValidatorsStake + totalStake)
-	//require.Equal(t.T, profitMarging, expectedStats.ProfitMargin)
+	// profitMarging := (1 << 8) * totalValidatorsStake / (totalValidatorsStake + totalStake)
+	// require.Equal(t.T, profitMarging, expectedStats.ProfitMargin)
 	for alias, action := range actions {
 		accountID := t.Account(alias, false)
 		performanceFactor := action.ValidationBlocksSent
@@ -141,19 +124,18 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 		actualDelegatorReward, err := t.Instance.DelegatorReward(accountID, delegatorStake, epochIndex, epochIndex)
 		require.NoError(t.T, err)
 		fmt.Printf("expected: %d, actual: %d\n", expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
-		//TODO: require.EqualValues(t.T, expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
+		// TODO: require.EqualValues(t.T, expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
 	}
-
 }
 
 func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochIndex iotago.EpochIndex, performanceFactor uint64) {
-	startSlot := t.API().TimeProvider().EpochStart(epochIndex)
-	endSlot := t.API().TimeProvider().EpochEnd(epochIndex)
+	startSlot := t.API.TimeProvider().EpochStart(epochIndex)
+	endSlot := t.API.TimeProvider().EpochEnd(epochIndex)
 	for slot := startSlot; slot <= endSlot; slot++ {
 		for i := uint64(0); i < performanceFactor; i++ {
-			block := tpkg.RandBlockWithIssuerAndBurnedMana(accountID, 10)
-			block.IssuingTime = t.API().TimeProvider().SlotStartTime(slot)
-			modelBlock, err := model.BlockFromBlock(block, t.API())
+			block := tpkg.RandBasicBlockWithIssuerAndBurnedMana(accountID, 10)
+			block.IssuingTime = t.API.TimeProvider().SlotStartTime(slot)
+			modelBlock, err := model.BlockFromBlock(block, t.API)
 			t.Instance.BlockAccepted(blocks.NewBlock(modelBlock))
 
 			require.NoError(t.T, err)

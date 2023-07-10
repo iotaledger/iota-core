@@ -10,7 +10,7 @@ import (
 )
 
 func (p *Protocol) runNetworkProtocol() {
-	p.networkProtocol = core.NewProtocol(p.dispatcher, p.Workers.CreatePool("NetworkProtocol"), p.API()) // Use max amount of workers for networking
+	p.networkProtocol = core.NewProtocol(p.dispatcher, p.Workers.CreatePool("NetworkProtocol"), p) // Use max amount of workers for networking
 	p.Events.Network.LinkTo(p.networkProtocol.Events)
 
 	// TODO: the distinction between different worker pools as it is right now does not make much sense:

@@ -34,10 +34,9 @@ type Options struct {
 
 func NewOptions(opts ...options.Option[Options]) *Options {
 	return options.Apply(&Options{
-		FilePath:           "snapshot.bin",
-		DataBaseVersion:    1,
-		ProtocolParameters: iotago.ProtocolParameters{},
-		LedgerProvider:     ledger1.NewProvider,
+		FilePath:        "snapshot.bin",
+		DataBaseVersion: 1,
+		LedgerProvider:  ledger1.NewProvider,
 	}, opts)
 }
 
@@ -83,6 +82,8 @@ func WithGenesisSeed(genesisSeed []byte) options.Option[Options] {
 // AccountDetails is a struct that specifies details of accounts created in the Genesis snapshot.
 // AccountID is derived from IssuerKey, therefore, this value must be unique for each account.
 type AccountDetails struct {
+	AccountID iotago.AccountID
+
 	Address   iotago.Address
 	Amount    iotago.BaseToken
 	Mana      iotago.Mana

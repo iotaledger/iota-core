@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -73,7 +72,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 
 			e.Events.Filter.BlockAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
-					b.errorHandler(errors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.Block().IssuerID))
+					b.errorHandler(ierrors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.ProtocolBlock().IssuerID))
 				}
 			}, event.WithWorkerPool(wp))
 
@@ -218,7 +217,7 @@ func (b *BlockDAG) isFutureBlock(block *blocks.Block) (isFutureBlock bool) {
 		// We set the block as future block so that we can skip some checks when revisiting it later in markSolid via the solidifier.
 		block.SetFuture()
 
-		lo.Return1(b.futureBlocks.Get(block.Block().SlotCommitment.Index, true).GetOrCreate(block.Block().SlotCommitment.MustID(), func() *advancedset.AdvancedSet[*blocks.Block] {
+		lo.Return1(b.futureBlocks.Get(block.SlotCommitmentID().Index(), true).GetOrCreate(block.SlotCommitmentID(), func() *advancedset.AdvancedSet[*blocks.Block] {
 			return advancedset.New[*blocks.Block]()
 		})).Add(block)
 
@@ -237,12 +236,12 @@ func (b *BlockDAG) checkParents(block *blocks.Block) (err error) {
 
 		// check timestamp monotonicity
 		if parent.IssuingTime().After(block.IssuingTime()) {
-			return errors.Errorf("timestamp monotonicity check failed for parent %s with timestamp %s. block timestamp %s", parent.ID(), parent.IssuingTime(), block.IssuingTime())
+			return ierrors.Errorf("timestamp monotonicity check failed for parent %s with timestamp %s. block timestamp %s", parent.ID(), parent.IssuingTime(), block.IssuingTime())
 		}
 
 		// check commitment monotonicity
 		if parent.SlotCommitmentID().Index() > block.SlotCommitmentID().Index() {
-			return errors.Errorf("commitment monotonicity check failed for parent %s with commitment index %d. block commitment index %d", parentID, parent.SlotCommitmentID().Index(), block.SlotCommitmentID().Index())
+			return ierrors.Errorf("commitment monotonicity check failed for parent %s with commitment index %d. block commitment index %d", parentID, parent.SlotCommitmentID().Index(), block.SlotCommitmentID().Index())
 		}
 	}
 
@@ -250,7 +249,7 @@ func (b *BlockDAG) checkParents(block *blocks.Block) (err error) {
 }
 
 func (b *BlockDAG) markInvalid(block *blocks.Block, reason error) {
-	b.SetInvalid(block, errors.Wrap(reason, "block marked as invalid in BlockDAG"))
+	b.SetInvalid(block, ierrors.Wrap(reason, "block marked as invalid in BlockDAG"))
 }
 
 // attach tries to attach the given Block to the BlockDAG.
@@ -264,14 +263,14 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	block, evicted, updated := b.blockCache.StoreOrUpdate(data)
 
 	if evicted {
-		return block, false, errors.New("block is too old")
+		return block, false, ierrors.New("block is too old")
 	}
 
 	if updated {
 		b.events.MissingBlockAttached.Trigger(block)
 	}
 
-	block.ForEachParent(func(parent model.Parent) {
+	block.ForEachParent(func(parent iotago.Parent) {
 		b.registerChild(block, parent)
 	})
 
@@ -281,7 +280,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 // canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
 func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
 	if b.evictionState.InRootBlockSlot(data.ID()) && !b.evictionState.IsRootBlock(data.ID()) {
-		return false, errors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.Block().IssuingTime)
+		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().IssuingTime)
 	}
 
 	storedBlock, storedBlockExists := b.blockCache.Block(data.ID())
@@ -301,10 +300,10 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 
 // canAttachToParents determines if the Block references parents in a non-pruned slot. If a Block is found to violate
 // this condition but exists as a missing entry, we mark it as invalid.
-func (b *BlockDAG) canAttachToParents(data *model.Block) (parentsValid bool, err error) {
-	for _, parentID := range data.Parents() {
+func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid bool, err error) {
+	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
 		if b.evictionState.InRootBlockSlot(parentID) && !b.evictionState.IsRootBlock(parentID) {
-			return false, errors.Errorf("parent %s of block %s is too old", parentID, data.ID())
+			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
 		}
 	}
 
@@ -313,7 +312,7 @@ func (b *BlockDAG) canAttachToParents(data *model.Block) (parentsValid bool, err
 
 // registerChild registers the given Block as a child of the parent. It triggers a BlockMissing event if the referenced
 // Block does not exist, yet.
-func (b *BlockDAG) registerChild(child *blocks.Block, parent model.Parent) {
+func (b *BlockDAG) registerChild(child *blocks.Block, parent iotago.Parent) {
 	if b.evictionState.IsRootBlock(parent.ID) {
 		return
 	}
@@ -333,7 +332,7 @@ func (b *BlockDAG) registerChild(child *blocks.Block, parent model.Parent) {
 // checkReference checks if the reference between the child and its parent is valid.
 func checkReference(child *blocks.Block, parent *blocks.Block) (err error) {
 	if parent.IsInvalid() {
-		return errors.Errorf("parent %s of child %s is marked as invalid", parent.ID(), child.ID())
+		return ierrors.Errorf("parent %s of child %s is marked as invalid", parent.ID(), child.ID())
 	}
 
 	return nil

@@ -3,13 +3,11 @@ package prunable
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
-
-	"github.com/pkg/errors"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
@@ -107,26 +105,26 @@ func (d *AccountDiff) FromReader(readSeeker io.ReadSeeker) error {
 
 func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err error) {
 	if err = binary.Read(reader, binary.LittleEndian, &d.BICChange); err != nil {
-		return offset, errors.Wrap(err, "unable to read account BIC balance value in the diff")
+		return offset, ierrors.Wrap(err, "unable to read account BIC balance value in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousUpdatedTime); err != nil {
-		return offset, errors.Wrap(err, "unable to read previous updated time in the diff")
+		return offset, ierrors.Wrap(err, "unable to read previous updated time in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.NewOutputID); err != nil {
-		return offset, errors.Wrap(err, "unable to read new outputID in the diff")
+		return offset, ierrors.Wrap(err, "unable to read new outputID in the diff")
 	}
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousOutputID); err != nil {
-		return offset, errors.Wrap(err, "unable to read previous outputID in the diff")
+		return offset, ierrors.Wrap(err, "unable to read previous outputID in the diff")
 	}
 
 	keysAdded, bytesRead, err := readPubKeys(reader)
 	if err != nil {
-		return offset, errors.Wrap(err, "unable to read added pubKeys in the diff")
+		return offset, ierrors.Wrap(err, "unable to read added pubKeys in the diff")
 	}
 	offset += bytesRead
 
@@ -134,29 +132,29 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 
 	keysRemoved, bytesRead, err := readPubKeys(reader)
 	if err != nil {
-		return offset, errors.Wrap(err, "unable to read removed pubKeys in the diff")
+		return offset, ierrors.Wrap(err, "unable to read removed pubKeys in the diff")
 	}
 	offset += bytesRead
 
 	d.PubKeysRemoved = keysRemoved
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.ValidatorStakeChange); err != nil {
-		return offset, errors.Wrap(err, "unable to read validator stake change in the diff")
+		return offset, ierrors.Wrap(err, "unable to read validator stake change in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.DelegationStakeChange); err != nil {
-		return offset, errors.Wrap(err, "unable to read delegation stake change in the diff")
+		return offset, ierrors.Wrap(err, "unable to read delegation stake change in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.FixedCostChange); err != nil {
-		return offset, errors.Wrap(err, "unable to read fixed cost change in the diff")
+		return offset, ierrors.Wrap(err, "unable to read fixed cost change in the diff")
 	}
 	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.StakeEndEpochChange); err != nil {
-		return offset, errors.Wrap(err, "unable to read new stake end epoch in the diff")
+		return offset, ierrors.Wrap(err, "unable to read new stake end epoch in the diff")
 	}
 	offset += 8
 
@@ -168,7 +166,7 @@ func readPubKeys(reader io.ReadSeeker) ([]ed25519.PublicKey, int, error) {
 
 	var pubKeysLength uint8
 	if err := binary.Read(reader, binary.LittleEndian, &pubKeysLength); err != nil {
-		return nil, bytesConsumed, errors.Wrap(err, "unable to read pubKeys length in the diff")
+		return nil, bytesConsumed, ierrors.Wrap(err, "unable to read pubKeys length in the diff")
 	}
 	bytesConsumed++
 
@@ -188,7 +186,7 @@ func readPubKeys(reader io.ReadSeeker) ([]ed25519.PublicKey, int, error) {
 
 func readPubKey(reader io.ReadSeeker) (pubKey ed25519.PublicKey, offset int, err error) {
 	if offset, err = io.ReadFull(reader, pubKey[:]); err != nil {
-		return ed25519.PublicKey{}, offset, fmt.Errorf("unable to read public key: %w", err)
+		return ed25519.PublicKey{}, offset, ierrors.Errorf("unable to read public key: %w", err)
 	}
 
 	return pubKey, offset, nil
@@ -198,42 +196,56 @@ func readPubKey(reader io.ReadSeeker) (pubKey ed25519.PublicKey, offset int, err
 type AccountDiffs struct {
 	api               iotago.API
 	slot              iotago.SlotIndex
-	diffChangeStore   *kvstore.TypedStore[iotago.AccountID, AccountDiff, *iotago.AccountID, *AccountDiff]
-	destroyedAccounts *kvstore.TypedStore[iotago.AccountID, types.Empty, *iotago.AccountID, *types.Empty] // TODO is there any store for set of keys only?
+	diffChangeStore   *kvstore.TypedStore[iotago.AccountID, *AccountDiff]
+	destroyedAccounts *kvstore.TypedStore[iotago.AccountID, types.Empty] // TODO is there any store for set of keys only?
 }
 
 // NewAccountDiffs creates a new AccountDiffs instance.
 func NewAccountDiffs(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.API) *AccountDiffs {
 	return &AccountDiffs{
-		api:               api,
-		slot:              slot,
-		diffChangeStore:   kvstore.NewTypedStore[iotago.AccountID, AccountDiff](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{diffChangePrefix}))),
-		destroyedAccounts: kvstore.NewTypedStore[iotago.AccountID, types.Empty](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{destroyedAccountsPrefix}))),
+		api:  api,
+		slot: slot,
+		diffChangeStore: kvstore.NewTypedStore[iotago.AccountID, *AccountDiff](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{diffChangePrefix})),
+			iotago.Identifier.Bytes,
+			iotago.IdentifierFromBytes,
+			(*AccountDiff).Bytes,
+			func(bytes []byte) (object *AccountDiff, consumed int, err error) {
+				diff := new(AccountDiff)
+				n, err := diff.FromBytes(bytes)
+
+				return diff, n, err
+			}),
+		destroyedAccounts: kvstore.NewTypedStore[iotago.AccountID, types.Empty](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{destroyedAccountsPrefix})),
+			iotago.Identifier.Bytes,
+			iotago.IdentifierFromBytes,
+			types.Empty.Bytes,
+			func(bytes []byte) (object types.Empty, consumed int, err error) {
+				return types.Void, 0, nil
+			}),
 	}
 }
 
 // Store stores the given accountID as a root block.
-func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff AccountDiff, destroyed bool) (err error) {
+func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff *AccountDiff, destroyed bool) (err error) {
 	if destroyed {
 		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
-			return errors.Wrap(err, "failed to set destroyed account")
+			return ierrors.Wrap(err, "failed to set destroyed account")
 		}
-
 	}
 
 	return b.diffChangeStore.Set(accountID, accountDiff)
 }
 
 // Load loads accountID and commitmentID for the given blockID.
-func (b *AccountDiffs) Load(accountID iotago.AccountID) (accountDiff AccountDiff, destroyed bool, err error) {
+func (b *AccountDiffs) Load(accountID iotago.AccountID) (accountDiff *AccountDiff, destroyed bool, err error) {
 	destroyed, err = b.destroyedAccounts.Has(accountID)
 	if err != nil {
-		return accountDiff, false, errors.Wrap(err, "failed to get destroyed account")
+		return accountDiff, false, ierrors.Wrap(err, "failed to get destroyed account")
 	} // load diff for a destroyed account to recreate the state
 
 	accountDiff, err = b.diffChangeStore.Get(accountID)
 	if err != nil {
-		return accountDiff, false, errors.Wrapf(err, "failed to get account diff for account %s", accountID)
+		return accountDiff, false, ierrors.Wrapf(err, "failed to get account diff for account %s", accountID)
 	}
 
 	return accountDiff, destroyed, err
@@ -250,19 +262,19 @@ func (b *AccountDiffs) Delete(accountID iotago.AccountID) (err error) {
 }
 
 // Stream streams all accountIDs changes for a slot index.
-func (b *AccountDiffs) Stream(consumer func(accountID iotago.AccountID, accountDiff AccountDiff, destroyed bool) bool) error {
+func (b *AccountDiffs) Stream(consumer func(accountID iotago.AccountID, accountDiff *AccountDiff, destroyed bool) bool) error {
 	// We firstly iterate over the destroyed accounts, as they won't have a corresponding accountDiff.
 	if storageErr := b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, empty types.Empty) bool {
-		return consumer(accountID, AccountDiff{}, true)
+		return consumer(accountID, nil, true)
 	}); storageErr != nil {
-		return errors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)
+		return ierrors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)
 	}
 
 	// For those accounts that still exist, we might have an accountDiff.
-	if storageErr := b.diffChangeStore.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, accountDiff AccountDiff) bool {
+	if storageErr := b.diffChangeStore.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, accountDiff *AccountDiff) bool {
 		return consumer(accountID, accountDiff, false)
 	}); storageErr != nil {
-		return errors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)
+		return ierrors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)
 	}
 
 	return nil

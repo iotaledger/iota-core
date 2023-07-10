@@ -32,23 +32,23 @@ func TestBlockGadget(t *testing.T) {
 	tf.Events.BlockPreConfirmed.Hook(checkOrder(&expectedPreConfirmationOrder, "pre-confirmation"))
 	tf.Events.BlockConfirmed.Hook(checkOrder(&expectedConfirmationOrder, "confirmation"))
 
-	tf.SybilProtection.AddAccount("A")
-	tf.SybilProtection.AddAccount("B")
+	tf.SeatManager.AddAccount("A")
+	tf.SeatManager.AddAccount("B")
 
-	tf.SybilProtection.SetOnline("A")
-	tf.SybilProtection.SetOnline("B")
+	tf.SeatManager.SetOnline("A")
+	tf.SeatManager.SetOnline("B")
 
 	tf.CreateBlockAndTrackWitnessWeight("A.1", "A", "Genesis")
 	tf.CreateBlockAndTrackWitnessWeight("A.2", "A", "A.1")
 
 	tf.AssertBlocksPreAccepted(tf.Blocks("A.1", "A.2"), false)
-	tf.SybilProtection.SetOffline("B")
+	tf.SeatManager.SetOffline("B")
 
 	tf.CreateBlockAndTrackWitnessWeight("A.3", "A", "A.2")
 	tf.AssertBlocksPreAccepted(tf.Blocks("A.1", "A.2", "A.3"), true)
 	tf.AssertBlocksAccepted(tf.Blocks("A.1", "A.2"), true)
 
-	tf.SybilProtection.SetOnline("B")
+	tf.SeatManager.SetOnline("B")
 	tf.CreateBlockAndTrackWitnessWeight("B.1", "B", "A.3")
 
 	tf.AssertBlocksPreAccepted(tf.Blocks("B.1"), false)

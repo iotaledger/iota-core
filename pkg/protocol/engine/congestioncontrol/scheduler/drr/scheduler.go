@@ -6,13 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/xerrors"
-
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
@@ -147,9 +145,9 @@ func (s *Scheduler) getDeficit(accountID iotago.AccountID) (uint64, error) {
 	if !exists {
 		_, err := s.manaRetrieveFunc(accountID)
 		if err != nil {
-			return 0, xerrors.Errorf("%w: no deficit or Mana available for issuer %s", err, accountID)
+			return 0, ierrors.Errorf("%w: no deficit or Mana available for issuer %s", err, accountID)
 		}
-		// laod with max deficit if the issuer has Mana but has been removed from the deficits map
+		// load with max deficit if the issuer has Mana but has been removed from the deficits map
 		return s.optsMaxDeficit, nil
 	}
 
@@ -270,7 +268,7 @@ func (s *Scheduler) selectBlockToSchedule() {
 		fmt.Println("Buffer is empty")
 	}
 	block := s.buffer.PopFront()
-	issuerID := block.Block().IssuerID
+	issuerID := block.ProtocolBlock().IssuerID
 	err := s.updateDeficit(issuerID, int64(-block.Work()))
 	if err != nil {
 		// if something goes wrong with deficit update, drop the block instead of scheduling it.
@@ -298,21 +296,23 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 				continue
 			}
 
+			issuerID := block.ProtocolBlock().IssuerID
+
 			// compute how often the deficit needs to be incremented until the block can be scheduled
-			deficit, err := s.getDeficit(block.Block().IssuerID)
+			deficit, err := s.getDeficit(issuerID)
 			if err != nil {
 				// no deficit exists for this issuer queue, so remove it
-				s.buffer.RemoveIssuer(block.Block().IssuerID)
+				s.buffer.RemoveIssuer(issuerID)
 				issuerRemoved = true
 
 				break
 			}
 			remainingDeficit := int64(block.Work()) - int64(deficit)
 			// calculate how many rounds we need to skip to accumulate enough deficit.
-			quantum, err := s.quantum(block.Block().IssuerID)
+			quantum, err := s.quantum(issuerID)
 			if err != nil {
 				// if quantum, can't be retrieved, we need to remove this issuer.
-				s.buffer.RemoveIssuer(block.Block().IssuerID)
+				s.buffer.RemoveIssuer(issuerID)
 				issuerRemoved = true
 
 				break
@@ -346,10 +346,10 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error
 
 	deficit, err := s.getDeficit(accountID)
 	if err != nil {
-		return xerrors.Errorf("could not get deficit for issuer %s", accountID)
+		return ierrors.Errorf("could not get deficit for issuer %s", accountID)
 	}
 	if int64(deficit)+delta < 0 {
-		return xerrors.Errorf("tried to decrease deficit to a negative value %d for issuer %s", int64(deficit)+delta, accountID)
+		return ierrors.Errorf("tried to decrease deficit to a negative value %d for issuer %s", int64(deficit)+delta, accountID)
 	}
 	s.deficitsMutex.Lock()
 	defer s.deficitsMutex.Unlock()
@@ -374,7 +374,7 @@ func (s *Scheduler) isEligible(block *blocks.Block) (eligible bool) {
 // isReady returns true if the given blockID's parents are eligible.
 func (s *Scheduler) isReady(block *blocks.Block) bool {
 	ready := true
-	block.ForEachParent(func(parent model.Parent) {
+	block.ForEachParent(func(parent iotago.Parent) {
 		if parentBlock, parentExists := s.blockCache.Block(parent.ID); !parentExists || !s.isEligible(parentBlock) {
 			// if parents are evicted and orphaned (not root blocks), or have not been received yet they will not exist.
 			// if parents are evicted, they will be returned as root blocks with scheduled==true here.

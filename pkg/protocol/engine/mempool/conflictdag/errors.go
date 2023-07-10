@@ -1,10 +1,10 @@
 package conflictdag
 
-import "golang.org/x/xerrors"
+import "github.com/iotaledger/hive.go/ierrors"
 
 var (
-	ErrExpected                 = xerrors.New("expected error")
-	ErrAlreadyPartOfConflictSet = xerrors.New("conflict already part of ConflictSet")
-	ErrEntityEvicted            = xerrors.New("tried to operate on evicted entity")
-	ErrFatal                    = xerrors.New("fatal error")
+	ErrExpected                 = ierrors.New("expected error")
+	ErrAlreadyPartOfConflictSet = ierrors.New("conflict already part of ConflictSet")
+	ErrEntityEvicted            = ierrors.New("tried to operate on evicted entity")
+	ErrFatal                    = ierrors.New("fatal error")
 )

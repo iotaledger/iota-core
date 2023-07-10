@@ -4,17 +4,15 @@ import (
 	"container/ring"
 	"math"
 
-	"github.com/pkg/errors"
-	"golang.org/x/xerrors"
-
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // ErrInsufficientMana is returned when the mana is insufficient.
-var ErrInsufficientMana = errors.New("insufficient issuer's mana to schedule the block")
+var ErrInsufficientMana = ierrors.New("insufficient issuer's mana to schedule the block")
 
 // region BufferQueue /////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -70,7 +68,7 @@ func (b *BufferQueue) GetOrCreateIssuerQueue(issuerID iotago.AccountID) (*Issuer
 	if issuerActive {
 		issuerQueue, isIQ := element.Value.(*IssuerQueue)
 		if !isIQ {
-			return nil, errors.Errorf("buffer contains elements that are not issuer queues")
+			return nil, ierrors.New("buffer contains elements that are not issuer queues")
 		}
 
 		return issuerQueue, nil
@@ -84,15 +82,15 @@ func (b *BufferQueue) GetOrCreateIssuerQueue(issuerID iotago.AccountID) (*Issuer
 // Submit submits a block. Return blocks dropped from the scheduler to make room for the submitted block.
 // The submitted block can also be returned as dropped if the issuer does not have enough access mana.
 func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.AccountID) (iotago.Mana, error)) (elements []*blocks.Block, err error) {
-	issuerID := blk.Block().IssuerID
+	issuerID := blk.ProtocolBlock().IssuerID
 	issuerQueue, err := b.GetOrCreateIssuerQueue(issuerID)
 	if err != nil {
-		return nil, xerrors.Errorf("%w: could not get or create issuer queue for issuer %s", err, issuerID)
+		return nil, ierrors.Errorf("%w: could not get or create issuer queue for issuer %s", err, issuerID)
 	}
 
 	// first we submit the block, and if it turns out that the issuer doesn't have enough bandwidth to submit, it will be removed by dropTail
 	if !issuerQueue.Submit(blk) {
-		return nil, errors.Errorf("block already submitted %s", blk.String())
+		return nil, ierrors.Errorf("block already submitted %s", blk)
 	}
 
 	b.size++
@@ -141,7 +139,7 @@ func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (iotago.Mana
 // Unsubmit removes a block from the submitted blocks.
 // If that block is already marked as ready, Unsubmit has no effect.
 func (b *BufferQueue) Unsubmit(block *blocks.Block) bool {
-	issuerID := block.Block().IssuerID
+	issuerID := block.ProtocolBlock().IssuerID
 
 	issuerQueue := b.IssuerQueue(issuerID)
 	if issuerQueue == nil {
@@ -158,7 +156,7 @@ func (b *BufferQueue) Unsubmit(block *blocks.Block) bool {
 
 // Ready marks a previously submitted block as ready to be scheduled.
 func (b *BufferQueue) Ready(block *blocks.Block) bool {
-	issuerQueue := b.IssuerQueue(block.Block().IssuerID)
+	issuerQueue := b.IssuerQueue(block.ProtocolBlock().IssuerID)
 	if issuerQueue == nil {
 		return false
 	}

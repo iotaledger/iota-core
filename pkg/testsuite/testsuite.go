@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -21,10 +22,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/epochgadget/epochorchestrator"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/sybilprotection/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -48,7 +48,7 @@ type TestSuite struct {
 	snapshotPath   string
 	blocks         *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 
-	ProtocolParameters iotago.ProtocolParameters
+	API iotago.API
 
 	optsGenesisTimestampOffset int64
 	optsLivenessThreshold      iotago.SlotIndex
@@ -85,35 +85,42 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsEpochNearingThreshold:  16,
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name())
-		t.ProtocolParameters = iotago.ProtocolParameters{
-			Version:     3,
-			NetworkName: testingT.Name(),
-			Bech32HRP:   "rms",
-			MinPoWScore: 0,
-			RentStructure: iotago.RentStructure{
-				VByteCost:    100,
-				VBFactorData: 1,
-				VBFactorKey:  10,
-			},
-			TokenSupply:           1_000_0000,
-			GenesisUnixTimestamp:  time.Now().Truncate(10*time.Second).Unix() - t.optsGenesisTimestampOffset,
-			SlotDurationInSeconds: 10,
-			SlotsPerEpochExponent: t.optsSlotsPerEpochExponent,
-			EvictionAge:           t.optsEvictionAge,
-			LivenessThreshold:     t.optsLivenessThreshold,
-			EpochNearingThreshold: t.optsEpochNearingThreshold,
-		}
+		t.API = iotago.V3API(
+			iotago.NewV3ProtocolParameters(
+				iotago.WithNetworkOptions(
+					testingT.Name(),
+					"rms",
+				),
+				iotago.WithSupplyOptions(
+					1_000_0000,
+					100,
+					1,
+					10,
+				),
+				iotago.WithTimeProviderOptions(
+					time.Now().Truncate(10*time.Second).Unix()-t.optsGenesisTimestampOffset,
+					10,
+					t.optsSlotsPerEpochExponent,
+				),
+				iotago.WithLivenessOptions(
+					t.optsEvictionAge,
+					t.optsLivenessThreshold,
+					t.optsEpochNearingThreshold,
+				),
+				iotago.WithStakingOptions(1),
+			),
+		)
 
-		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment().MustID(), time.Unix(t.ProtocolParameters.GenesisUnixTimestamp, 0))
+		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(), time.Unix(t.API.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
 
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
 		defaultSnapshotOptions := []options.Option[snapshotcreator.Options]{
 			snapshotcreator.WithDatabaseVersion(protocol.DatabaseVersion),
 			snapshotcreator.WithFilePath(t.snapshotPath),
-			snapshotcreator.WithProtocolParameters(t.ProtocolParameters),
+			snapshotcreator.WithProtocolParameters(t.API.ProtocolParameters()),
 			snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
-				iotago.EmptyBlockID(): iotago.NewEmptyCommitment().MustID(),
+				iotago.EmptyBlockID(): iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(),
 			}),
 		}
 		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
@@ -187,7 +194,7 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	timeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
+	timeProvider := t.API.TimeProvider()
 	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
 	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
@@ -204,7 +211,7 @@ func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIn
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	timeProvider := node.Protocol.MainEngineInstance().Storage.Settings().API().TimeProvider()
+	timeProvider := t.API.TimeProvider()
 	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
 	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
@@ -377,6 +384,10 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 				accountDetails.Address = wallet.Address()
 			}
 
+			if accountDetails.AccountID.Empty() {
+				accountDetails.AccountID = blake2b.Sum256(accountDetails.IssuerKey)
+			}
+
 			return accountDetails
 		})...))
 	}
@@ -388,16 +399,12 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
 
-	validators := t.Validators()
 	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 		baseOpts := []options.Option[protocol.Protocol]{
 			protocol.WithSnapshotPath(t.snapshotPath),
 			protocol.WithBaseDirectory(t.Directory.PathWithCreate(node.Name)),
-			protocol.WithSybilProtectionProvider(
-				poa.NewProvider(validators),
-			),
 			protocol.WithEpochGadgetProvider(
-				epochorchestrator.NewProvider(),
+				sybilprotectionv1.NewProvider(),
 			),
 		}
 		if len(nodesOptions) == 1 {
