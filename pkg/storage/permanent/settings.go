@@ -31,13 +31,14 @@ type Settings struct {
 
 	apiMutex         syncutils.RWMutex
 	apiByVersion     map[iotago.Version]iotago.API
-	protocolVersions []*protocolVersionEpochStart
+	protocolVersions *api.ProtocolEpochVersions
 }
 
 func NewSettings(store kvstore.KVStore) (settings *Settings) {
 	s := &Settings{
-		store:        store,
-		apiByVersion: make(map[iotago.Version]iotago.API),
+		store:            store,
+		apiByVersion:     make(map[iotago.Version]iotago.API),
+		protocolVersions: api.NewProtocolEpochVersions(),
 	}
 
 	s.loadProtocolParametersEpochMappings()
@@ -121,10 +122,7 @@ func (s *Settings) loadProtocolParametersEpochMappings() {
 			panic(err)
 		}
 
-		s.protocolVersions = append(s.protocolVersions, &protocolVersionEpochStart{
-			Version:    version,
-			StartEpoch: epoch,
-		})
+		s.protocolVersions.Add(version, epoch)
 
 		return true
 	}); err != nil {
@@ -148,10 +146,7 @@ func (s *Settings) StoreProtocolParametersEpochMapping(version iotago.Version, e
 		return err
 	}
 
-	s.protocolVersions = append(s.protocolVersions, &protocolVersionEpochStart{
-		Version:    version,
-		StartEpoch: epoch,
-	})
+	s.protocolVersions.Add(version, epoch)
 
 	return nil
 }
@@ -205,14 +200,7 @@ func (s *Settings) VersionForEpoch(epoch iotago.EpochIndex) iotago.Version {
 	s.apiMutex.RLock()
 	defer s.apiMutex.RUnlock()
 
-	for i := len(s.protocolVersions) - 1; i >= 0; i-- {
-		if s.protocolVersions[i].StartEpoch <= epoch {
-			return s.protocolVersions[i].Version
-		}
-	}
-
-	// This means that the protocol versions are not properly configured.
-	panic(ierrors.Errorf("could not find a protocol version for epoch %d", epoch))
+	return s.protocolVersions.VersionForEpoch(epoch)
 }
 
 func (s *Settings) VersionForSlot(slot iotago.SlotIndex) iotago.Version {
@@ -243,7 +231,8 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		s.apiMutex.RLock()
 		defer s.apiMutex.RUnlock()
 
-		for _, versionEpochStart := range s.protocolVersions {
+		protocolVersions := s.protocolVersions.Slice()
+		for _, versionEpochStart := range protocolVersions {
 			if err := stream.Write(writer, versionEpochStart.Version); err != nil {
 				return 0, ierrors.Wrap(err, "failed to encode version")
 			}
@@ -253,7 +242,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 			}
 		}
 
-		return uint64(len(s.protocolVersions)), nil
+		return uint64(len(protocolVersions)), nil
 	}); err != nil {
 		return ierrors.Wrap(err, "failed to stream write protocol parameters")
 	}
@@ -302,7 +291,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 		return ierrors.Wrap(err, "failed to set latest finalized slot")
 	}
 
-	var prevProtocolVersionEpochStart *protocolVersionEpochStart
+	var prevProtocolVersionEpochStart *api.ProtocolEpochVersion
 	if err := stream.ReadCollection(reader, func(i int) error {
 		version, err := stream.Read[iotago.Version](reader)
 		if err != nil {
@@ -314,7 +303,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 			return ierrors.Wrap(err, "failed to parse version")
 		}
 
-		current := &protocolVersionEpochStart{
+		current := &api.ProtocolEpochVersion{
 			Version:    version,
 			StartEpoch: epoch,
 		}
@@ -392,7 +381,7 @@ func (s *Settings) String() string {
 }
 
 func (s *Settings) latestAPI() iotago.API {
-	return s.apiForVersion(iotago.LatestProtocolVersion())
+	return s.APIForVersion(iotago.LatestProtocolVersion())
 }
 
 func (s *Settings) latestCommitment() *model.Commitment {
@@ -422,20 +411,6 @@ func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
 	}
 
 	return i
-}
-
-func (s *Settings) apiForVersion(version iotago.Version) iotago.API {
-	if api, exists := s.apiByVersion[version]; exists {
-		return api
-	}
-
-	api := s.apiFromProtocolParameters(version)
-
-	s.apiMutex.Lock()
-	s.apiByVersion[version] = api
-	s.apiMutex.Unlock()
-
-	return api
 }
 
 func (s *Settings) apiFromProtocolParameters(version iotago.Version) iotago.API {
@@ -470,9 +445,4 @@ func (s *Settings) protocolParameters(version iotago.Version) iotago.ProtocolPar
 	}
 
 	return protocolParameters
-}
-
-type protocolVersionEpochStart struct {
-	Version    iotago.Version
-	StartEpoch iotago.EpochIndex
 }
