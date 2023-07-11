@@ -6,6 +6,7 @@ import (
 
 	"github.com/iotaledger/iota-core/tools/evil-spammer/evilspammerpkg"
 	"github.com/iotaledger/iota-core/tools/evilwallet"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type CustomSpamParams struct {
@@ -20,10 +21,17 @@ type CustomSpamParams struct {
 	Scenario              evilwallet.EvilBatch
 	DeepSpam              bool
 	EnableRateSetter      bool
+
+	config *BasicConfig
 }
 
-func CustomSpam(params *CustomSpamParams) {
-	wallet := evilwallet.NewEvilWallet(evilwallet.WithClients(params.ClientURLs...))
+func CustomSpam(params *CustomSpamParams) *BasicConfig {
+	outputID := iotago.EmptyOutputID
+	if params.config.LastFaucetUnspentOutputID != "" {
+		outputID, _ = iotago.OutputIDFromHex(params.config.LastFaucetUnspentOutputID)
+	}
+
+	wallet := evilwallet.NewEvilWallet(evilwallet.WithClients(params.ClientURLs...), evilwallet.WithFaucetOutputID(outputID))
 	wg := sync.WaitGroup{}
 
 	fundsNeeded := false
@@ -88,6 +96,10 @@ func CustomSpam(params *CustomSpamParams) {
 
 	wg.Wait()
 	log.Info("Basic spamming finished!")
+
+	return &BasicConfig{
+		LastFaucetUnspentOutputID: wallet.LastFaucetUnspentOutput().ToHex(),
+	}
 }
 
 func SpamTransaction(wallet *evilwallet.EvilWallet, rate int, timeUnit, duration time.Duration, deepSpam, enableRateSetter bool) {

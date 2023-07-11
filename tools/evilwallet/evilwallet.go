@@ -98,6 +98,13 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		faucetOutput := clt.GetOutput(w.optFaucetUnspentOutputID)
 		if faucetOutput != nil {
 			faucetDeposit = faucetOutput.Deposit()
+		} else {
+			// use the genesis output ID instead, if we relaunch the docker network
+			w.optFaucetUnspentOutputID = iotago.EmptyOutputID
+			faucetOutput = clt.GetOutput(w.optFaucetUnspentOutputID)
+			if faucetOutput != nil {
+				faucetDeposit = faucetOutput.Deposit()
+			}
 		}
 
 		w.faucet.AddUnspentOutput(&Output{
@@ -108,6 +115,13 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 			OutputStruct: faucetOutput,
 		})
 	})
+}
+
+func (e *EvilWallet) LastFaucetUnspentOutput() iotago.OutputID {
+	faucetAddr := e.faucet.AddressOnIndex(0)
+	unspentFaucet := e.faucet.UnspentOutput(faucetAddr.String())
+
+	return unspentFaucet.OutputID
 }
 
 // NewWallet creates a new wallet of the given wallet type.
