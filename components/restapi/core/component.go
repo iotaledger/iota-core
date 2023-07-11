@@ -25,6 +25,8 @@ const (
 
 	// RouteBlockIssuance is the route for getting all needed information for block creation.
 	// GET returns the data needed toa attach block.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
 	RouteBlockIssuance = "/blocks/issuance"
 
 	// RouteBlock is the route for getting a block by its blockID.
@@ -178,7 +180,7 @@ func configure() error {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteCommitmentByID, func(c echo.Context) error {

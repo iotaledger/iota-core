@@ -57,12 +57,7 @@ func blockIssuance(_ echo.Context) (*models.IssuanceBlockHeaderResponse, error) 
 		WeakParents:         references[iotago.WeakParentType].ToHex(),
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType].ToHex(),
 		LatestFinalizedSlot: deps.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot(),
-		Commitment: &models.CommitmentDetailsResponse{
-			Index:            slotCommitment.Index,
-			PrevID:           slotCommitment.PrevID.String(),
-			RootsID:          slotCommitment.RootsID.String(),
-			CumulativeWeight: slotCommitment.CumulativeWeight,
-		},
+		Commitment:          *slotCommitment,
 	}
 
 	return resp, nil
