@@ -63,7 +63,6 @@ type EvilWallet struct {
 	api           iotago.API
 
 	optFaucetSeed            []byte
-	optFaucetIndex           uint64
 	optFaucetUnspentOutputID iotago.OutputID
 	optsClientURLs           []string
 	optsProtocolParams       iotago.ProtocolParameters
@@ -75,37 +74,54 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		wallets:                  NewWallets(),
 		aliasManager:             NewAliasManager(),
 		optFaucetSeed:            dockerFaucetSeed(),
-		optFaucetIndex:           0,
 		optFaucetUnspentOutputID: iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0),
 		optsClientURLs:           defaultClientsURLs,
 		optsProtocolParams:       dockerProtocolParams(),
 	}, opts, func(w *EvilWallet) {
-		w.api = iotago.V3API(w.optsProtocolParams)
-
 		connector := NewWebClients(w.optsClientURLs)
 		w.connector = connector
+
+		// TODO: bc we're using docker protoparams, so need too update genesis time in protocol params
+		// consider remove this in the future
+		clt := w.connector.GetClient()
+		w.optsProtocolParams = clt.ProtocolParameters()
+
+		w.api = iotago.V3API(w.optsProtocolParams)
 		w.outputManager = NewOutputManager(connector, w.wallets)
 
 		w.faucet = NewWallet()
 		w.faucet.seed = [32]byte(w.optFaucetSeed)
 
 		// get faucet output and deposit
-		clt := w.connector.GetClient()
 		faucetDeposit := faucetBalance
+
 		faucetOutput := clt.GetOutput(w.optFaucetUnspentOutputID)
 		if faucetOutput != nil {
 			faucetDeposit = faucetOutput.Deposit()
+		} else {
+			// use the genesis output ID instead, if we relaunch the docker network
+			w.optFaucetUnspentOutputID = iotago.EmptyOutputID
+			faucetOutput = clt.GetOutput(w.optFaucetUnspentOutputID)
+			if faucetOutput != nil {
+				faucetDeposit = faucetOutput.Deposit()
+			}
 		}
 
 		w.faucet.AddUnspentOutput(&Output{
 			Address:      w.faucet.AddressOnIndex(0),
-			Index:        w.optFaucetIndex,
+			Index:        0,
 			OutputID:     w.optFaucetUnspentOutputID,
 			Balance:      faucetDeposit,
-			CreationTime: iotago.SlotIndex(0),
 			OutputStruct: faucetOutput,
 		})
 	})
+}
+
+func (e *EvilWallet) LastFaucetUnspentOutput() iotago.OutputID {
+	faucetAddr := e.faucet.AddressOnIndex(0)
+	unspentFaucet := e.faucet.UnspentOutput(faucetAddr.String())
+
+	return unspentFaucet.OutputID
 }
 
 // NewWallet creates a new wallet of the given wallet type.
@@ -248,7 +264,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	receiveAddr := wallet.AddressOnIndex(0)
 	clt := e.connector.GetClient()
 
-	faucetAddr := e.faucet.AddressOnIndex(e.optFaucetIndex)
+	faucetAddr := e.faucet.AddressOnIndex(0)
 	unspentFaucet := e.faucet.UnspentOutput(faucetAddr.String())
 	if unspentFaucet.OutputStruct == nil {
 		clt := e.connector.GetClient()
@@ -816,12 +832,6 @@ func (e *EvilWallet) SetTxOutputsSolid(outputs iotago.OutputIDs, clientID string
 func WithFaucetSeed(seed []byte) options.Option[EvilWallet] {
 	return func(opts *EvilWallet) {
 		copy(opts.optFaucetSeed[:], seed[:])
-	}
-}
-
-func WithFaucetIndex(index uint64) options.Option[EvilWallet] {
-	return func(opts *EvilWallet) {
-		opts.optFaucetIndex = index
 	}
 }
 

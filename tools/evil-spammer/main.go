@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -33,7 +34,8 @@ func main() {
 	case "interactive":
 		Run()
 	case "basic":
-		CustomSpam(&customSpamParams)
+		config := CustomSpam(&customSpamParams)
+		saveConfigsToFile(config)
 	case "quick":
 		QuickTest(&quickTestParams)
 	// case "commitments":
@@ -129,6 +131,8 @@ func parseBasicSpamFlags() {
 	if *blkNum == "" && *duration != "" {
 		customSpamParams.BlkToBeSent = make([]int, len(customSpamParams.Durations))
 	}
+
+	customSpamParams.config = loadBasicConfig()
 }
 
 func parseQuickTestFlags() {
@@ -195,4 +199,58 @@ func parseDurations(durations string) []time.Duration {
 		parsed[i], _ = time.ParseDuration(dur)
 	}
 	return parsed
+}
+
+type BasicConfig struct {
+	LastFaucetUnspentOutputID string `json:"lastFaucetUnspentOutputID"`
+}
+
+var basicConfigJSON = `{
+	"lastFaucetUnspentOutputID": ""
+}`
+
+var basicConfigFile = "basic_config.json"
+
+// load the config file.
+func loadBasicConfig() *BasicConfig {
+	// open config file
+	config := new(BasicConfig)
+	file, err := os.Open(basicConfigFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			panic(err)
+		}
+
+		//nolint:gosec // users should be able to read the file
+		if err = os.WriteFile(basicConfigFile, []byte(basicConfigJSON), 0o644); err != nil {
+			panic(err)
+		}
+		if file, err = os.Open(basicConfigFile); err != nil {
+			panic(err)
+		}
+	}
+	defer file.Close()
+
+	// decode config file
+	if err = json.NewDecoder(file).Decode(config); err != nil {
+		panic(err)
+	}
+
+	return config
+}
+
+func saveConfigsToFile(config *BasicConfig) {
+	// open config file
+	file, err := os.Open(basicConfigFile)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	jsonConfigs, _ := json.MarshalIndent(config, "", "    ")
+
+	//nolint:gosec // users should be able to read the file
+	if err = os.WriteFile(basicConfigFile, jsonConfigs, 0o644); err != nil {
+		panic(err)
+	}
 }

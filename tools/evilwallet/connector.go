@@ -162,6 +162,7 @@ func (c *WebClients) RemoveClient(url string) {
 type Client interface {
 	// URL returns a client API url.
 	URL() (cltID string)
+	ProtocolParameters() iotago.ProtocolParameters
 	// PostTransaction sends a transaction to the Tangle via a given client.
 	PostTransaction(tx *iotago.Transaction) (iotago.BlockID, error)
 	// PostData sends the given data (payload) by creating a block in the backend.
@@ -198,9 +199,23 @@ func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
 		url:                url,
 		optsProtocolParams: dockerProtocolParams(),
 	}, opts, func(w *WebClient) {
+		// TODO: bc we're using docker protoparams, so need too update genesis time in protocol params
+		// consider remove this in the future
+		tmpAPI := iotago.V3API(w.optsProtocolParams)
+		tmpClient, _ := nodeclient.New(w.url, nodeclient.WithIOTAGoAPI(tmpAPI))
+
+		info, err := tmpClient.Info(context.Background())
+		if err == nil {
+			tmpAPI.JSONDecode(*info.ProtocolParameters, &w.optsProtocolParams)
+		}
+
 		w.serixAPI = iotago.V3API(w.optsProtocolParams)
-		w.api, _ = nodeclient.New(w.url, nodeclient.WithIOTAGoAPI(w.serixAPI))
+		w.api, _ = nodeclient.New(w.url, nodeclient.WithIOTAGoAPI(tmpAPI))
 	})
+}
+
+func (c *WebClient) ProtocolParameters() iotago.ProtocolParameters {
+	return c.optsProtocolParams
 }
 
 // PostTransaction sends a transaction to the Tangle via a given client.

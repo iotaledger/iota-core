@@ -23,11 +23,10 @@ type Input struct {
 
 // Output contains details of an output ID.
 type Output struct {
-	OutputID     iotago.OutputID
-	Address      *iotago.Ed25519Address
-	Index        uint64
-	Balance      iotago.BaseToken
-	CreationTime iotago.SlotIndex
+	OutputID iotago.OutputID
+	Address  *iotago.Ed25519Address
+	Index    uint64
+	Balance  iotago.BaseToken
 
 	OutputStruct iotago.Output
 }
@@ -164,7 +163,6 @@ func (o *OutputManager) AddOutput(w *Wallet, output *Output) *Output {
 		Index:        idx,
 		OutputID:     output.OutputID,
 		Balance:      output.Balance,
-		CreationTime: output.CreationTime,
 		OutputStruct: output.OutputStruct,
 	}
 	w.AddUnspentOutput(out)
