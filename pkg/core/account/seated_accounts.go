@@ -5,10 +5,23 @@ import (
 	"sort"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type SeatIndex int
+type SeatIndex byte
+
+func (s SeatIndex) Bytes() ([]byte, error) {
+	return []byte{byte(s)}, nil
+}
+
+func SeatIndexFromBytes(b []byte) (SeatIndex, int, error) {
+	if len(b) != 1 {
+		return 0, 0, ierrors.New("invalid seat index bytes length")
+	}
+
+	return SeatIndex(b[0]), 1, nil
+}
 
 type SeatedAccounts struct {
 	accounts       *Accounts
