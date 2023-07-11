@@ -5,7 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
@@ -22,7 +22,7 @@ import (
 type Manager struct {
 	// blockBurns keep tracks of the block issues up to the LatestCommittedSlot. They are used to deduct the burned
 	// amount from the account's credits upon slot commitment.
-	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, set.Set[iotago.BlockID]]
+	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.BlockID]]
 	// TODO: add in memory shrink version of the slot diffs
 
 	// latestCommittedSlot is where the Account tree is kept at.
@@ -51,7 +51,7 @@ func New(
 	accountsStore kvstore.KVStore,
 ) *Manager {
 	return &Manager{
-		blockBurns: shrinkingmap.New[iotago.SlotIndex, set.Set[iotago.BlockID]](),
+		blockBurns: shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
 		accountsTree: ads.NewMap(accountsStore,
 			iotago.Identifier.Bytes,
 			iotago.IdentifierFromBytes,
@@ -90,8 +90,8 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	set, _ := m.blockBurns.GetOrCreate(block.ID().Index(), func() set.Set[iotago.BlockID] {
-		return set.New[iotago.BlockID]()
+	set, _ := m.blockBurns.GetOrCreate(block.ID().Index(), func() ds.Set[iotago.BlockID] {
+		return ds.NewSet[iotago.BlockID]()
 	})
 	set.Add(block.ID())
 }
@@ -122,7 +122,7 @@ func (m *Manager) AccountsTreeRoot() iotago.Identifier {
 func (m *Manager) ApplyDiff(
 	slotIndex iotago.SlotIndex,
 	accountDiffs map[iotago.AccountID]*prunable.AccountDiff,
-	destroyedAccounts set.Set[iotago.AccountID],
+	destroyedAccounts ds.Set[iotago.AccountID],
 ) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -310,7 +310,7 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 	return burns, nil
 }
 
-func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts set.Set[iotago.AccountID]) error {
+func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
 	// Load diffs storage for the slot. The storage can never be nil (pruned) because we are just committing the slot.
 	diffStore := m.slotDiff(slotIndex)
 	for accountID, accountDiff := range accountDiffs {
@@ -330,7 +330,7 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 	return nil
 }
 
-func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts set.Set[iotago.AccountID]) {
+func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
 		// remove a destroyed account, no need to update with diffs

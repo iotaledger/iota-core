@@ -4,7 +4,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -97,11 +97,11 @@ func (t *TransactionMetadata) Transaction() mempool.Transaction {
 	return t.transaction
 }
 
-func (t *TransactionMetadata) Inputs() set.Set[mempool.StateMetadata] {
+func (t *TransactionMetadata) Inputs() ds.Set[mempool.StateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	inputs := set.New[mempool.StateMetadata]()
+	inputs := ds.NewSet[mempool.StateMetadata]()
 	for _, input := range t.inputs {
 		inputs.Add(input)
 	}
@@ -109,11 +109,11 @@ func (t *TransactionMetadata) Inputs() set.Set[mempool.StateMetadata] {
 	return inputs
 }
 
-func (t *TransactionMetadata) Outputs() set.Set[mempool.StateMetadata] {
+func (t *TransactionMetadata) Outputs() ds.Set[mempool.StateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	outputs := set.New[mempool.StateMetadata]()
+	outputs := ds.NewSet[mempool.StateMetadata]()
 	for _, output := range t.outputs {
 		outputs.Add(output)
 	}
@@ -285,8 +285,8 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	t.OnConflicting(func() {
 		cancelConflictInheritance()
 
-		t.conflictIDs.Set(set.New(t.id))
-	})
+		t.conflictIDs.Set(ds.NewSet(t.id))
+	})git
 
 	t.allAttachmentsEvicted.OnTrigger(func() {
 		if !t.IsCommitted() {

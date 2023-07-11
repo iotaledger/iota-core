@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
-	"github.com/iotaledger/iota-core/pkg/core/reactive"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -224,11 +223,11 @@ func (m *MemPool[VoteRank]) executeTransaction(transaction *TransactionMetadata)
 
 func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	if m.optForkAllTransactions {
-		m.forkTransaction(transaction, set.New(lo.Map(transaction.inputs, (*StateMetadata).ID)...))
+		m.forkTransaction(transaction, ds.NewSet(lo.Map(transaction.inputs, (*StateMetadata).ID)...))
 	} else {
 		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 			input.OnDoubleSpent(func() {
-				m.forkTransaction(transaction, set.New(input.ID()))
+				m.forkTransaction(transaction, ds.NewSet(input.ID()))
 			})
 		})
 	}
@@ -238,7 +237,7 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	}
 }
 
-func (m *MemPool[VoteRank]) forkTransaction(transaction *TransactionMetadata, resourceIDs set.Set[iotago.OutputID]) {
+func (m *MemPool[VoteRank]) forkTransaction(transaction *TransactionMetadata, resourceIDs ds.Set[iotago.OutputID]) {
 	transaction.setConflicting()
 
 	if err := m.conflictDAG.UpdateConflictingResources(transaction.ID(), resourceIDs); err != nil {
@@ -350,8 +349,8 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnConflicting(func() {
 		m.conflictDAG.CreateConflict(transaction.ID())
 
-		unsubscribe := transaction.parentConflictIDs.OnUpdate(func(_ set.Set[iotago.TransactionID], appliedMutations reactive.SetMutations[iotago.TransactionID]) {
-			if err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements, appliedMutations.RemovedElements); err != nil {
+		unsubscribe := transaction.parentConflictIDs.OnUpdate(func(appliedMutations ds.SetMutations[iotago.TransactionID]) {
+			if err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements(), appliedMutations.DeletedElements()); err != nil {
 				panic(err)
 			}
 		})

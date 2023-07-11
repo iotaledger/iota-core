@@ -3,7 +3,7 @@ package tipselectionv1
 import (
 	"time"
 
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -84,7 +84,7 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
 	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]) error {
-		previousLikedInsteadConflicts := set.New[iotago.TransactionID]()
+		previousLikedInsteadConflicts := ds.NewSet[iotago.TransactionID]()
 
 		if t.collectReferences(references, iotago.StrongParentType, t.tipManager.StrongTips, func(tip tipmanager.TipMetadata) {
 			addedLikedInsteadReferences, updatedLikedInsteadConflicts, err := t.likedInsteadReferences(previousLikedInsteadConflicts, tip)
@@ -140,7 +140,7 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 }
 
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
-func (t *TipSelection) likedInsteadReferences(likedConflicts set.Set[iotago.TransactionID], tipMetadata tipmanager.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts set.Set[iotago.TransactionID], err error) {
+func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.TransactionID], tipMetadata tipmanager.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts ds.Set[iotago.TransactionID], err error) {
 	necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
 	if err = t.conflictDAG.LikedInstead(tipMetadata.Block().ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
 		transactionMetadata, exists := t.memPool.TransactionMetadata(likedConflictID)
@@ -172,7 +172,7 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts set.Set[iotago.Tran
 // collectReferences collects tips from a tip selector (and calls the callback for each tip) until the amount of
 // references of the given type is reached.
 func (t *TipSelection) collectReferences(references model.ParentReferences, parentsType iotago.ParentsType, tipSelector func(optAmount ...int) []tipmanager.TipMetadata, callback func(tipmanager.TipMetadata), amount int) {
-	seenTips := set.New[iotago.BlockID]()
+	seenTips := ds.NewSet[iotago.BlockID]()
 	selectUniqueTips := func(amount int) (uniqueTips []tipmanager.TipMetadata) {
 		if amount > 0 {
 			for _, tip := range tipSelector(amount + seenTips.Size()) {

@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -327,7 +327,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.PreviousOutputID = consumedOutput.OutputID()
 
 		oldPubKeysSet := accountData.PubKeys
-		newPubKeysSet := set.New[ed25519.PublicKey]()
+		newPubKeysSet := ds.NewSet[ed25519.PublicKey]()
 		for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
 			newPubKeysSet.Add(ed25519.PublicKey(pubKey))
 		}
@@ -379,10 +379,10 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 	}
 }
 
-func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts set.Set[iotago.AccountID], err error) {
+func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts ds.Set[iotago.AccountID], err error) {
 	createdAccounts = make(map[iotago.AccountID]*utxoledger.Output)
 	consumedAccounts = make(map[iotago.AccountID]*utxoledger.Output)
-	destroyedAccounts = set.New[iotago.AccountID]()
+	destroyedAccounts = ds.NewSet[iotago.AccountID]()
 
 	createdAccountDelegation := make(map[iotago.ChainID]*iotago.DelegationOutput)
 

@@ -1,7 +1,7 @@
 package conflictdag
 
 import (
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/runtime/event"
 )
 
@@ -16,10 +16,10 @@ type Events[ConflictID, ResourceID comparable] struct {
 	ConflictEvicted *event.Event1[ConflictID]
 
 	// ConflictingResourcesAdded is triggered when the Conflict is added to a new ConflictSet.
-	ConflictingResourcesAdded *event.Event2[ConflictID, set.Set[ResourceID]]
+	ConflictingResourcesAdded *event.Event2[ConflictID, ds.Set[ResourceID]]
 
 	// ConflictParentsUpdated is triggered when the parents of a Conflict are updated.
-	ConflictParentsUpdated *event.Event2[ConflictID, set.Set[ConflictID]]
+	ConflictParentsUpdated *event.Event2[ConflictID, ds.Set[ConflictID]]
 
 	// ConflictAccepted is an event that gets triggered whenever a Conflict is confirmed.
 	ConflictAccepted *event.Event1[ConflictID]
@@ -36,8 +36,8 @@ func NewEvents[ConflictID, ResourceID comparable](optsLinkTarget ...*Events[Conf
 		return &Events[ConflictID, ResourceID]{
 			ConflictCreated:           event.New1[ConflictID](),
 			ConflictEvicted:           event.New1[ConflictID](),
-			ConflictingResourcesAdded: event.New2[ConflictID, set.Set[ResourceID]](),
-			ConflictParentsUpdated:    event.New2[ConflictID, set.Set[ConflictID]](),
+			ConflictingResourcesAdded: event.New2[ConflictID, ds.Set[ResourceID]](),
+			ConflictParentsUpdated:    event.New2[ConflictID, ds.Set[ConflictID]](),
 			ConflictAccepted:          event.New1[ConflictID](),
 			ConflictRejected:          event.New1[ConflictID](),
 		}

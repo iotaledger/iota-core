@@ -3,15 +3,18 @@ package reactive
 import (
 	"sync"
 
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
+// region Set ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Set is a reactive Set implementation that allows consumers to subscribe to its changes.
 type Set[ElementType comparable] interface {
-	// Writeable imports the write methods of the Set interface.
-	set.Writeable[ElementType]
+	// WriteableSet imports the write methods of the Set interface.
+	ds.WriteableSet[ElementType]
 
 	// ReadableSet imports the read methods of the Set interface.
 	ReadableSet[ElementType]
@@ -19,13 +22,33 @@ type Set[ElementType comparable] interface {
 
 // NewSet creates a new Set with the given elements.
 func NewSet[T comparable](elements ...T) Set[T] {
-	return &setImpl[T]{
-		readableSet: newReadableSet[T](elements...),
-	}
+	return newSet(elements...)
 }
 
-// setImpl is the standard implementation of the Set interface.
-type setImpl[ElementType comparable] struct {
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region ReadableSet //////////////////////////////////////////////////////////////////////////////////////////////////
+
+// ReadableSet is a reactive Set implementation that allows consumers to subscribe to its value.
+type ReadableSet[ElementType comparable] interface {
+	// OnUpdate registers the given callback that is triggered when the value changes.
+	OnUpdate(callback func(appliedMutations ds.SetMutations[ElementType]), triggerWithInitialZeroValue ...bool) (unsubscribe func())
+
+	// ReadableSet imports the read methods of the Set interface.
+	ds.ReadableSet[ElementType]
+}
+
+// NewReadableSet creates a new ReadableSet with the given elements.
+func NewReadableSet[ElementType comparable](elements ...ElementType) ReadableSet[ElementType] {
+	return newReadableSet(elements...)
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region set //////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// set is the standard implementation of the Set interface.
+type set[ElementType comparable] struct {
 	// readableSet embeds the ReadableSet implementation.
 	*readableSet[ElementType]
 
@@ -33,30 +56,37 @@ type setImpl[ElementType comparable] struct {
 	applyMutex sync.Mutex
 }
 
+// newSet creates a new set with the given elements.
+func newSet[ElementType comparable](elements ...ElementType) *set[ElementType] {
+	return &set[ElementType]{
+		readableSet: newReadableSet[ElementType](elements...),
+	}
+}
+
 // Add adds a new element to the set and returns true if the element was not present in the set before.
-func (s *setImpl[ElementType]) Add(element ElementType) bool {
-	return s.Apply(set.NewMutations[ElementType](element)).AddedElements().Has(element)
+func (s *set[ElementType]) Add(element ElementType) bool {
+	return s.Apply(ds.NewSetMutations[ElementType](element)).AddedElements().Has(element)
 }
 
 // AddAll adds all elements to the set and returns true if any element has been added.
-func (s *setImpl[ElementType]) AddAll(elements set.Readable[ElementType]) (addedElements set.Set[ElementType]) {
-	return s.Apply(set.NewMutations[ElementType]().WithAddedElements(elements)).AddedElements()
+func (s *set[ElementType]) AddAll(elements ds.ReadableSet[ElementType]) (addedElements ds.Set[ElementType]) {
+	return s.Apply(ds.NewSetMutations[ElementType]().WithAddedElements(elements)).AddedElements()
 }
 
 // Delete deletes the given element from the set.
-func (s *setImpl[ElementType]) Delete(element ElementType) bool {
-	return s.Apply(set.NewMutations[ElementType](element)).DeletedElements().Has(element)
+func (s *set[ElementType]) Delete(element ElementType) bool {
+	return s.Apply(ds.NewSetMutations[ElementType](element)).DeletedElements().Has(element)
 }
 
 // DeleteAll deletes the given elements from the set.
-func (s *setImpl[ElementType]) DeleteAll(elements set.Readable[ElementType]) (deletedElements set.Set[ElementType]) {
-	return s.Apply(set.NewMutations[ElementType]().WithDeletedElements(elements)).DeletedElements()
+func (s *set[ElementType]) DeleteAll(elements ds.ReadableSet[ElementType]) (deletedElements ds.Set[ElementType]) {
+	return s.Apply(ds.NewSetMutations[ElementType]().WithDeletedElements(elements)).DeletedElements()
 }
 
 // Apply applies the given mutations to the set atomically and returns the applied mutations.
-func (s *setImpl[ElementType]) Apply(mutations set.Mutations[ElementType]) (appliedMutations set.Mutations[ElementType]) {
+func (s *set[ElementType]) Apply(mutations ds.SetMutations[ElementType]) (appliedMutations ds.SetMutations[ElementType]) {
 	if mutations.IsEmpty() {
-		return set.NewMutations[ElementType]()
+		return ds.NewSetMutations[ElementType]()
 	}
 
 	s.applyMutex.Lock()
@@ -74,7 +104,7 @@ func (s *setImpl[ElementType]) Apply(mutations set.Mutations[ElementType]) (appl
 }
 
 // Decode decodes the set from a byte slice.
-func (s *setImpl[ElementType]) Decode(b []byte) (bytesRead int, err error) {
+func (s *set[ElementType]) Decode(b []byte) (bytesRead int, err error) {
 	s.valueMutex.Lock()
 	defer s.valueMutex.Unlock()
 
@@ -82,16 +112,16 @@ func (s *setImpl[ElementType]) Decode(b []byte) (bytesRead int, err error) {
 }
 
 // ToReadOnly returns a read-only version of the set.
-func (s *setImpl[ElementType]) ToReadOnly() set.Readable[ElementType] {
+func (s *set[ElementType]) ToReadOnly() ds.ReadableSet[ElementType] {
 	return s.readableSet
 }
 
 // InheritFrom registers the given sets to inherit their mutations to the set.
-func (s *setImpl[ElementType]) InheritFrom(sources ...Set[ElementType]) (unsubscribe func()) {
+func (s *set[ElementType]) InheritFrom(sources ...Set[ElementType]) (unsubscribe func()) {
 	unsubscribeCallbacks := make([]func(), len(sources))
 
 	for i, source := range sources {
-		unsubscribeCallbacks[i] = source.OnUpdate(func(appliedMutations set.Mutations[ElementType]) {
+		unsubscribeCallbacks[i] = source.OnUpdate(func(appliedMutations ds.SetMutations[ElementType]) {
 			s.Apply(appliedMutations)
 		})
 	}
@@ -100,9 +130,73 @@ func (s *setImpl[ElementType]) InheritFrom(sources ...Set[ElementType]) (unsubsc
 }
 
 // apply applies the given mutations to the set.
-func (s *setImpl[ElementType]) apply(mutations set.Mutations[ElementType]) (appliedMutations set.Mutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(set.Mutations[ElementType])]) {
+func (s *set[ElementType]) apply(mutations ds.SetMutations[ElementType]) (appliedMutations ds.SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(ds.SetMutations[ElementType])]) {
 	s.valueMutex.Lock()
 	defer s.valueMutex.Unlock()
 
 	return s.value.Apply(mutations), s.uniqueUpdateID.Next(), s.updateCallbacks.Values()
 }
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region readableSet //////////////////////////////////////////////////////////////////////////////////////////////////
+
+// readableSet is th standard implementation of the ReadableSet interface.
+type readableSet[ElementType comparable] struct {
+	// updateCallbacks are the registered callbacks that are triggered when the value changes.
+	updateCallbacks *shrinkingmap.ShrinkingMap[types.UniqueID, *callback[func(ds.SetMutations[ElementType])]]
+
+	// uniqueUpdateID is the unique ID that is used to identify an update.
+	uniqueUpdateID types.UniqueID
+
+	// uniqueCallbackID is the unique ID that is used to identify a callback.
+	uniqueCallbackID types.UniqueID
+
+	// value is the current value of the set.
+	value ds.Set[ElementType]
+
+	// valueMutex is the applyMutex that is used to synchronize the access to the value.
+	valueMutex sync.RWMutex
+
+	// Readable embeds the set.Readable interface.
+	ds.ReadableSet[ElementType]
+}
+
+// newReadableSet creates a new readableSet with the given elements.
+func newReadableSet[ElementType comparable](elements ...ElementType) *readableSet[ElementType] {
+	setInstance := ds.NewSet[ElementType](elements...)
+
+	return &readableSet[ElementType]{
+		ReadableSet:     setInstance.ToReadOnly(),
+		value:           setInstance,
+		updateCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(ds.SetMutations[ElementType])]](),
+	}
+}
+
+// OnUpdate registers the given callback to be triggered when the value of the set changes.
+func (r *readableSet[ElementType]) OnUpdate(callback func(appliedMutations ds.SetMutations[ElementType]), triggerWithInitialZeroValue ...bool) (unsubscribe func()) {
+	r.valueMutex.Lock()
+
+	mutations := ds.NewSetMutations[ElementType]().WithAddedElements(r)
+
+	createdCallback := newCallback[func(ds.SetMutations[ElementType])](r.uniqueCallbackID.Next(), callback)
+	r.updateCallbacks.Set(createdCallback.ID, createdCallback)
+
+	// grab the lock to make sure that the callback is not executed before we have called it with the initial value.
+	createdCallback.LockExecution(r.uniqueUpdateID)
+	defer createdCallback.UnlockExecution()
+
+	r.valueMutex.Unlock()
+
+	if !mutations.IsEmpty() || lo.First(triggerWithInitialZeroValue) {
+		createdCallback.Invoke(mutations)
+	}
+
+	return func() {
+		r.updateCallbacks.Delete(createdCallback.ID)
+
+		createdCallback.MarkUnsubscribed()
+	}
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

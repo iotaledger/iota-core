@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/stringify"
@@ -28,18 +28,18 @@ type Block struct {
 
 	// Booker block
 	booked    bool
-	witnesses set.Set[account.SeatIndex]
+	witnesses ds.Set[account.SeatIndex]
 	// conflictIDs are the all conflictIDs of the block inherited from the parents + payloadConflictIDs.
-	conflictIDs set.Set[iotago.TransactionID]
+	conflictIDs ds.Set[iotago.TransactionID]
 	// payloadConflictIDs are the conflictIDs of the block's payload (in case it is a transaction, otherwise empty).
-	payloadConflictIDs set.Set[iotago.TransactionID]
+	payloadConflictIDs ds.Set[iotago.TransactionID]
 
 	// BlockGadget block
 	preAccepted           bool
-	acceptanceRatifiers   set.Set[account.SeatIndex]
+	acceptanceRatifiers   ds.Set[account.SeatIndex]
 	accepted              reactive.Variable[bool]
 	preConfirmed          bool
-	confirmationRatifiers set.Set[account.SeatIndex]
+	confirmationRatifiers ds.Set[account.SeatIndex]
 	confirmed             bool
 
 	mutex sync.RWMutex
@@ -66,11 +66,11 @@ func (r *rootBlock) String() string {
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
 	return &Block{
-		witnesses:             set.New[account.SeatIndex](),
-		conflictIDs:           set.New[iotago.TransactionID](),
-		payloadConflictIDs:    set.New[iotago.TransactionID](),
-		acceptanceRatifiers:   set.New[account.SeatIndex](),
-		confirmationRatifiers: set.New[account.SeatIndex](),
+		witnesses:             ds.NewSet[account.SeatIndex](),
+		conflictIDs:           ds.NewSet[iotago.TransactionID](),
+		payloadConflictIDs:    ds.NewSet[iotago.TransactionID](),
+		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
+		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
 		modelBlock:            data,
 		accepted:              reactive.NewVariable[bool](),
 	}
@@ -78,11 +78,11 @@ func NewBlock(data *model.Block) *Block {
 
 func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issuingTime time.Time) *Block {
 	b := &Block{
-		witnesses:             set.New[account.SeatIndex](),
-		conflictIDs:           set.New[iotago.TransactionID](),
-		payloadConflictIDs:    set.New[iotago.TransactionID](),
-		acceptanceRatifiers:   set.New[account.SeatIndex](),
-		confirmationRatifiers: set.New[account.SeatIndex](),
+		witnesses:             ds.NewSet[account.SeatIndex](),
+		conflictIDs:           ds.NewSet[iotago.TransactionID](),
+		payloadConflictIDs:    ds.NewSet[iotago.TransactionID](),
+		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
+		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
 
 		rootBlock: &rootBlock{
 			blockID:      blockID,
@@ -105,11 +105,11 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 	return &Block{
 		missing:               true,
 		missingBlockID:        blockID,
-		witnesses:             set.New[account.SeatIndex](),
-		conflictIDs:           set.New[iotago.TransactionID](),
-		payloadConflictIDs:    set.New[iotago.TransactionID](),
-		acceptanceRatifiers:   set.New[account.SeatIndex](),
-		confirmationRatifiers: set.New[account.SeatIndex](),
+		witnesses:             ds.NewSet[account.SeatIndex](),
+		conflictIDs:           ds.NewSet[iotago.TransactionID](),
+		payloadConflictIDs:    ds.NewSet[iotago.TransactionID](),
+		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
+		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
 		accepted:              reactive.NewVariable[bool](),
 	}
 }
@@ -389,28 +389,28 @@ func (b *Block) Witnesses() []account.SeatIndex {
 	return b.witnesses.ToSlice()
 }
 
-func (b *Block) ConflictIDs() set.Set[iotago.TransactionID] {
+func (b *Block) ConflictIDs() ds.Set[iotago.TransactionID] {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
 	return b.conflictIDs
 }
 
-func (b *Block) SetConflictIDs(conflictIDs set.Set[iotago.TransactionID]) {
+func (b *Block) SetConflictIDs(conflictIDs ds.Set[iotago.TransactionID]) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
 	b.conflictIDs = conflictIDs
 }
 
-func (b *Block) PayloadConflictIDs() set.Set[iotago.TransactionID] {
+func (b *Block) PayloadConflictIDs() ds.Set[iotago.TransactionID] {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
 	return b.payloadConflictIDs
 }
 
-func (b *Block) SetPayloadConflictIDs(payloadConflictIDs set.Set[iotago.TransactionID]) {
+func (b *Block) SetPayloadConflictIDs(payloadConflictIDs ds.Set[iotago.TransactionID]) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 

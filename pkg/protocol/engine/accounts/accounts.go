@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -18,7 +18,7 @@ type AccountData struct {
 	ID       iotago.AccountID
 	Credits  *BlockIssuanceCredits
 	OutputID iotago.OutputID
-	PubKeys  set.Set[ed25519.PublicKey]
+	PubKeys  ds.Set[ed25519.PublicKey]
 
 	ValidatorStake  iotago.BaseToken
 	DelegationStake iotago.BaseToken
@@ -31,7 +31,7 @@ func NewAccountData(id iotago.AccountID, opts ...options.Option[AccountData]) *A
 		ID:              id,
 		Credits:         &BlockIssuanceCredits{},
 		OutputID:        iotago.EmptyOutputID,
-		PubKeys:         set.New[ed25519.PublicKey](),
+		PubKeys:         ds.NewSet[ed25519.PublicKey](),
 		ValidatorStake:  0,
 		DelegationStake: 0,
 		FixedCost:       0,
@@ -56,7 +56,7 @@ func (a *AccountData) RemovePublicKeys(pubKeys ...ed25519.PublicKey) {
 }
 
 func (a *AccountData) Clone() *AccountData {
-	keyCopy := set.New[ed25519.PublicKey]()
+	keyCopy := ds.NewSet[ed25519.PublicKey]()
 	a.PubKeys.Range(func(key ed25519.PublicKey) {
 		keyCopy.Add(key)
 	})
@@ -129,7 +129,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 
 		pubKeys[i] = pubKey
 	}
-	a.PubKeys = set.New(pubKeys...)
+	a.PubKeys = ds.NewSet(pubKeys...)
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.ValidatorStake)); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read validator stake for accountID %s", a.ID)

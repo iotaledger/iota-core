@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -134,10 +134,10 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	})
 }
 
-func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) set.Set[iotago.AccountID] {
+func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
 	// TODO: we should choose candidates we tracked performance for
 
-	return set.New[iotago.AccountID]()
+	return ds.NewSet[iotago.AccountID]()
 }
 
 func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
