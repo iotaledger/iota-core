@@ -14,6 +14,7 @@ const (
 	attestationsPrefix
 	accountDiffsPrefix
 	performanceFactorsPrefix
+	upgradeSignalsPrefix
 	rootsPrefix
 )
 
@@ -83,6 +84,16 @@ func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *PerformanceFactors
 	}
 
 	return NewPerformanceFactors(slot, store)
+}
+
+func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *UpgradeSignals {
+	// TODO: make sure that the minimum pruning delay for this is at least 1 epoch, otherwise we won't be able to calculate the reward pools
+	store := p.manager.Get(slot, kvstore.Realm{upgradeSignalsPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewUpgradeSignals(slot, store, p.apiProvider)
 }
 
 func (p *Prunable) Roots(slot iotago.SlotIndex) kvstore.KVStore {
