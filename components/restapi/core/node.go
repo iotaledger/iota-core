@@ -8,6 +8,7 @@ import (
 
 //nolint:unparam // we have no error case right now
 func info() (*models.InfoResponse, error) {
+	// TODO: maybe add a clock snapshot here to have consistent info in the response?
 	cl := deps.Protocol.MainEngineInstance().Clock
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()

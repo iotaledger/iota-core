@@ -85,9 +85,9 @@ const (
 	// GET returns the output IDs of all UTXO changes.
 	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
-	// RouteAccountsByAcciuntID is the route for getting an account by its accountID.
+	// RouteAccountsByAccountID is the route for getting an account by its accountID.
 	// GET returns the account details.
-	RouteAccountsByAcciuntID = "/accounts/:" + restapipkg.ParameterAccountID
+	RouteAccountsByAccountID = "/accounts/:" + restapipkg.ParameterAccountID
 
 	// RouteAccountMana is the route for getting an account mana by its accountID.
 	// GET returns the account mana details.
@@ -273,6 +273,18 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
+	routeGroup.GET(RouteAccountsByAccountID, func(c echo.Context) error {
+		// TODO
+
+		return httpserver.JSONResponse(c, http.StatusOK, nil)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteAccountMana, func(c echo.Context) error {
+		// TODO
+
+		return httpserver.JSONResponse(c, http.StatusOK, nil)
+	}, checkNodeSynced())
+
 	return nil
 }
 
@@ -312,7 +324,6 @@ func responseByHeader(c echo.Context, obj any) error {
 		return err
 	}
 
-	// default to echo.MIMEApplicationJSON
 	switch mimeType {
 	case httpserver.MIMEApplicationVendorIOTASerializerV1:
 		b, err := deps.Protocol.LatestAPI().Encode(obj)
@@ -322,6 +333,7 @@ func responseByHeader(c echo.Context, obj any) error {
 
 		return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, b)
 
+	// default to echo.MIMEApplicationJSON
 	default:
 		j, err := deps.Protocol.LatestAPI().JSONEncode(obj)
 		if err != nil {

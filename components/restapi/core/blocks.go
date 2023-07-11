@@ -37,11 +37,8 @@ func blockMetadataByID(c echo.Context) (*models.BlockMetadataResponse, error) {
 
 	// TODO: fill in blockReason, TxState, TxReason.
 	bmResponse := &models.BlockMetadataResponse{
-		BlockID:            block.ID().ToHex(),
-		StrongParents:      block.ProtocolBlock().Block.StrongParentIDs().ToHex(),
-		WeakParents:        block.ProtocolBlock().Block.WeakParentIDs().ToHex(),
-		ShallowLikeParents: block.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
-		BlockState:         models.BlockStatePending,
+		BlockID:    block.ID().ToHex(),
+		BlockState: models.BlockStatePending,
 	}
 
 	return bmResponse, nil
