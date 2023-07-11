@@ -587,23 +587,24 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 
 	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
 	if err != nil {
-		p.Reject(ierrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
+		// fmt.Println(">>>get output spent state error")
+		return p.Reject(ierrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
 	}
 
 	if !isUnspent {
-		p.Reject(ierrors.Errorf("unspent output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+		// fmt.Println(">>>get output spent already")
+		return p.Reject(ierrors.Errorf("unspent output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
 
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
 	output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(stateRef.Ref())
 
 	if err != nil {
-		p.Reject(ierrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
-	} else {
-		p.Resolve(output)
+		// fmt.Println(">>>output not found")
+		return p.Reject(ierrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
 
-	return p
+	return p.Resolve(output)
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
