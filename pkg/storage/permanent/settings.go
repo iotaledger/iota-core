@@ -6,6 +6,7 @@ import (
 
 	"golang.org/x/crypto/blake2b"
 
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -30,15 +31,14 @@ type Settings struct {
 	mutex syncutils.RWMutex
 	store kvstore.KVStore
 
-	apiMutex         syncutils.RWMutex
-	apiByVersion     map[iotago.Version]iotago.API
+	apiByVersion     *shrinkingmap.ShrinkingMap[iotago.Version, iotago.API]
 	protocolVersions *api.ProtocolEpochVersions
 }
 
 func NewSettings(store kvstore.KVStore) (settings *Settings) {
 	s := &Settings{
 		store:            store,
-		apiByVersion:     make(map[iotago.Version]iotago.API),
+		apiByVersion:     shrinkingmap.New[iotago.Version, iotago.API](),
 		protocolVersions: api.NewProtocolEpochVersions(),
 	}
 
@@ -80,20 +80,17 @@ func (s *Settings) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 }
 
 func (s *Settings) APIForVersion(version iotago.Version) iotago.API {
-	s.apiMutex.RLock()
-	if api, exists := s.apiByVersion[version]; exists {
-		s.apiMutex.RUnlock()
-		return api
+	// This is a hot path, so we first try to get (read only) the API from the map.
+	if apiForVersion, exists := s.apiByVersion.Get(version); exists {
+		return apiForVersion
 	}
-	s.apiMutex.RUnlock()
 
-	api := s.apiFromProtocolParameters(version)
+	// If the API is not in the map, we need to create it and store it in the map in a safe way (might have been created by another goroutine in the meantime).
+	apiForVersion, _ := s.apiByVersion.GetOrCreate(version, func() iotago.API {
+		return s.apiFromProtocolParameters(version)
+	})
 
-	s.apiMutex.Lock()
-	s.apiByVersion[version] = api
-	s.apiMutex.Unlock()
-
-	return api
+	return apiForVersion
 }
 
 func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) error {
@@ -109,11 +106,8 @@ func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) err
 }
 
 func (s *Settings) loadProtocolParametersEpochMappings() {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	s.apiMutex.Lock()
-	defer s.apiMutex.Unlock()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	if err := s.store.Iterate([]byte{protocolVersionEpochMappingKey}, func(key kvstore.Key, value kvstore.Value) bool {
 		version := key[1]
@@ -135,9 +129,6 @@ func (s *Settings) StoreProtocolParametersEpochMapping(version iotago.Version, e
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.apiMutex.Lock()
-	defer s.apiMutex.Unlock()
-
 	bytes, err := epoch.Bytes()
 	if err != nil {
 		return err
@@ -154,8 +145,9 @@ func (s *Settings) StoreProtocolParametersEpochMapping(version iotago.Version, e
 
 func (s *Settings) LatestCommitment() *model.Commitment {
 	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
 	bytes, err := s.store.Get([]byte{latestCommitmentKey})
-	s.mutex.RUnlock() // do not use defer because s.LatestAPI will also RLock the mutex
 
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
@@ -201,8 +193,8 @@ func (s *Settings) ProtocolParametersAndVersionsHash() ([32]byte, error) {
 }
 
 func (s *Settings) VersionForEpoch(epoch iotago.EpochIndex) iotago.Version {
-	s.apiMutex.RLock()
-	defer s.apiMutex.RUnlock()
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
 
 	return s.protocolVersions.VersionForEpoch(epoch)
 }
@@ -232,8 +224,8 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 	}
 
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
-		s.apiMutex.RLock()
-		defer s.apiMutex.RUnlock()
+		s.mutex.RLock()
+		defer s.mutex.RUnlock()
 
 		protocolVersions := s.protocolVersions.Slice()
 		for _, versionEpochStart := range protocolVersions {
@@ -384,16 +376,12 @@ func (s *Settings) String() string {
 	return builder.String()
 }
 
-func (s *Settings) latestAPI() iotago.API {
-	return s.APIForVersion(iotago.LatestProtocolVersion())
-}
-
 func (s *Settings) latestCommitment() *model.Commitment {
 	bytes, err := s.store.Get([]byte{latestCommitmentKey})
 
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return model.NewEmptyCommitment(s.latestAPI())
+			return model.NewEmptyCommitment(s.LatestAPI())
 		}
 		panic(err)
 	}
