@@ -18,18 +18,13 @@ func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
 	return commitmentID.Index(), nil
 }
 
-func getCommitmentDetails(index iotago.SlotIndex) (*models.CommitmentDetailsResponse, error) {
+func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {
 	commitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(index)
 	if err != nil {
 		return nil, err
 	}
 
-	return &models.CommitmentDetailsResponse{
-		Index:            commitment.Index(),
-		PrevID:           commitment.PrevID().ToHex(),
-		RootsID:          commitment.RootsID().ToHex(),
-		CumulativeWeight: commitment.CumulativeWeight(),
-	}, nil
+	return commitment.Commitment(), nil
 }
 
 func getUTXOChanges(index iotago.SlotIndex) (*models.UTXOChangesResponse, error) {

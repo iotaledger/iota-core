@@ -187,12 +187,12 @@ func configure() error {
 			return err
 		}
 
-		resp, err := getCommitmentDetails(index)
+		commitment, err := getCommitmentDetails(index)
 		if err != nil {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return responseByHeader(c, commitment)
 	})
 
 	routeGroup.GET(RouteCommitmentByIDUTXOChanges, func(c echo.Context) error {
@@ -220,7 +220,7 @@ func configure() error {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		return responseByHeader(c, resp)
 	})
 
 	routeGroup.GET(RouteCommitmentByIndexUTXOChanges, func(c echo.Context) error {
