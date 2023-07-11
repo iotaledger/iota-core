@@ -145,6 +145,8 @@ func (p *Protocol) Run(ctx context.Context) error {
 
 	p.runNetworkProtocol()
 
+	p.HookLogging()
+
 	p.Events.Started.Trigger()
 
 	<-p.context.Done()
@@ -323,6 +325,12 @@ func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
 
 func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return p.MainEngineInstance().APIForEpoch(epoch)
+}
+
+func (p *Protocol) HookLogging() {
+	p.Events.Error.Hook(func(err error) {
+		fmt.Printf("> Protocol.Error: %s\n", err.Error())
+	})
 }
 
 var _ api.Provider = &Protocol{}
