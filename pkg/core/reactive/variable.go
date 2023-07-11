@@ -75,9 +75,9 @@ func (v *variable[T]) Compute(computeFunc func(currentValue T) T) (previousValue
 
 	newValue, previousValue, updateID, callbacksToTrigger := v.prepareDynamicTrigger(computeFunc)
 	for _, callback := range callbacksToTrigger {
-		if callback.Lock(updateID) {
+		if callback.LockExecution(updateID) {
 			callback.Invoke(previousValue, newValue)
-			callback.Unlock()
+			callback.UnlockExecution()
 		}
 	}
 
@@ -93,10 +93,9 @@ func (v *variable[T]) OnUpdate(callback func(prevValue, newValue T), triggerWith
 	createdCallback := newCallback[func(prevValue, newValue T)](v.uniqueCallbackID.Next(), callback)
 	v.registeredCallbacks.Set(createdCallback.ID, createdCallback)
 
-	// we intertwine the mutexes to ensure that the callback is guaranteed to be triggered with the current value from
-	// here first even if the value is updated in parallel.
-	createdCallback.Lock(v.uniqueUpdateID)
-	defer createdCallback.Unlock()
+	// grab the lock to make sure that the callback is not executed before we have called it with the initial value.
+	createdCallback.LockExecution(v.uniqueUpdateID)
+	defer createdCallback.UnlockExecution()
 
 	v.mutex.Unlock()
 

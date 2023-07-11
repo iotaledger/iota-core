@@ -21,8 +21,8 @@ type callback[FuncType any] struct {
 	// lastUpdate is the last update that was applied to the callback.
 	lastUpdate types.UniqueID
 
-	// mutex is the mutex that is used to ensure that the callback is not triggered concurrently.
-	mutex sync.Mutex
+	// executionMutex is the mutex that is used to synchronize the execution of the callback.
+	executionMutex sync.Mutex
 }
 
 // newCallback is the constructor for the callback type.
@@ -33,12 +33,12 @@ func newCallback[FuncType any](id types.UniqueID, invoke FuncType) *callback[Fun
 	}
 }
 
-// Lock locks the callback for the given update and returns true if the callback was locked successfully.
-func (c *callback[FuncType]) Lock(updateID types.UniqueID) bool {
-	c.mutex.Lock()
+// LockExecution locks the callback for the given update and returns true if the callback was locked successfully.
+func (c *callback[FuncType]) LockExecution(updateID types.UniqueID) bool {
+	c.executionMutex.Lock()
 
 	if c.unsubscribed || updateID != 0 && updateID == c.lastUpdate {
-		c.mutex.Unlock()
+		c.executionMutex.Unlock()
 
 		return false
 	}
@@ -48,15 +48,15 @@ func (c *callback[FuncType]) Lock(updateID types.UniqueID) bool {
 	return true
 }
 
-// Unlock unlocks the callback.
-func (c *callback[FuncType]) Unlock() {
-	c.mutex.Unlock()
+// UnlockExecution unlocks the callback.
+func (c *callback[FuncType]) UnlockExecution() {
+	c.executionMutex.Unlock()
 }
 
 // MarkUnsubscribed marks the callback as unsubscribed (it will no longer trigger).
 func (c *callback[FuncType]) MarkUnsubscribed() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.executionMutex.Lock()
+	defer c.executionMutex.Unlock()
 
 	c.unsubscribed = true
 }

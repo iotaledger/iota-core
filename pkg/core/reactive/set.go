@@ -64,9 +64,9 @@ func (s *setImpl[ElementType]) Apply(mutations set.Mutations[ElementType]) (appl
 
 	appliedMutations, updateID, registeredCallbacks := s.apply(mutations)
 	for _, registeredCallback := range registeredCallbacks {
-		if registeredCallback.Lock(updateID) {
+		if registeredCallback.LockExecution(updateID) {
 			registeredCallback.Invoke(appliedMutations)
-			registeredCallback.Unlock()
+			registeredCallback.UnlockExecution()
 		}
 	}
 

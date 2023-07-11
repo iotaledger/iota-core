@@ -24,9 +24,9 @@ func NewCounter[InputType comparable](condition ...func(inputValue InputType) bo
 	}
 }
 
-// counter implements the Counter interface.
+// counter is the default implementation of the Counter interface.
 type counter[InputType comparable] struct {
-	// variable is the ValueReceptor that holds the output value of the counter.
+	// Variable holds the counter value.
 	Variable[int]
 
 	// condition is the condition that is used to determine whether the input value fulfills the counted criteria.

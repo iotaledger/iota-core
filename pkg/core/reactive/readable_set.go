@@ -65,8 +65,8 @@ func (r *readableSet[ElementType]) OnUpdate(callback func(appliedMutations set.M
 	r.updateCallbacks.Set(createdCallback.ID, createdCallback)
 
 	// grab the lock to make sure that the callback is not executed before we have called it with the initial value.
-	createdCallback.Lock(r.uniqueUpdateID)
-	defer createdCallback.Unlock()
+	createdCallback.LockExecution(r.uniqueUpdateID)
+	defer createdCallback.UnlockExecution()
 
 	r.valueMutex.Unlock()
 
