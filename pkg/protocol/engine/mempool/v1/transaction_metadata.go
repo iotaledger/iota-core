@@ -286,7 +286,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		cancelConflictInheritance()
 
 		t.conflictIDs.Set(ds.NewSet(t.id))
-	})git
+	})
 
 	t.allAttachmentsEvicted.OnTrigger(func() {
 		if !t.IsCommitted() {
