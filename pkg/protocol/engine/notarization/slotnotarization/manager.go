@@ -140,11 +140,7 @@ func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
 }
 
 func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool {
-	if acceptedBlockIndex < m.minCommittableSlotAge {
-		return false
-	}
-
-	return index < acceptedBlockIndex-m.minCommittableSlotAge
+	return index+m.minCommittableSlotAge < acceptedBlockIndex
 }
 
 func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {

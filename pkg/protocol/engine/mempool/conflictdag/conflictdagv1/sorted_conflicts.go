@@ -223,8 +223,9 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingWeightU
 	defer s.pendingWeightUpdatesMutex.Unlock()
 
 	if _, exists := s.pendingWeightUpdates.Get(member.ID); !exists {
-		s.pendingUpdatesCounter.Increase()
-		s.pendingWeightUpdates.Set(member.ID, member)
+		if s.pendingWeightUpdates.Set(member.ID, member) {
+			s.pendingUpdatesCounter.Increase()
+		}
 		s.pendingWeightUpdatesSignal.Signal()
 	}
 }
@@ -233,8 +234,6 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingWeightU
 func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) fixMemberPositionWorker() {
 	for member := s.nextPendingWeightUpdate(); member != nil; member = s.nextPendingWeightUpdate() {
 		s.applyWeightUpdate(member)
-
-		s.pendingUpdatesCounter.Decrease()
 	}
 }
 
@@ -249,6 +248,7 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) nextPendingWeightUpd
 
 	if !s.isShutdown.Load() {
 		if _, member, exists := s.pendingWeightUpdates.Pop(); exists {
+			s.pendingUpdatesCounter.Decrease()
 			return member
 		}
 	}
