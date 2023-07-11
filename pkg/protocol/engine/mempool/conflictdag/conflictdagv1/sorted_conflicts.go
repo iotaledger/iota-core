@@ -1,6 +1,7 @@
 package conflictdagv1
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -225,8 +226,9 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingWeightU
 	if _, exists := s.pendingWeightUpdates.Get(member.ID); !exists {
 		if s.pendingWeightUpdates.Set(member.ID, member) {
 			s.pendingUpdatesCounter.Increase()
+			fmt.Println(">> increased counter", s.pendingUpdatesCounter.Get())
+			s.pendingWeightUpdatesSignal.Signal()
 		}
-		s.pendingWeightUpdatesSignal.Signal()
 	}
 }
 
@@ -249,8 +251,10 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) nextPendingWeightUpd
 	if !s.isShutdown.Load() {
 		if _, member, exists := s.pendingWeightUpdates.Pop(); exists {
 			s.pendingUpdatesCounter.Decrease()
+			fmt.Println(">> decreased counter", s.pendingUpdatesCounter.Get())
 			return member
 		}
+		panic("W00t!")
 	}
 
 	return nil
@@ -298,9 +302,11 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingPreferr
 	defer s.pendingPreferredInsteadMutex.Unlock()
 
 	if _, exists := s.pendingPreferredInsteadUpdates.Get(member.ID); !exists {
-		s.pendingUpdatesCounter.Increase()
-		s.pendingPreferredInsteadUpdates.Set(member.ID, member)
-		s.pendingPreferredInsteadSignal.Signal()
+		if s.pendingPreferredInsteadUpdates.Set(member.ID, member) {
+			s.pendingUpdatesCounter.Increase()
+			fmt.Println(">> increased counter", s.pendingUpdatesCounter.Get())
+			s.pendingPreferredInsteadSignal.Signal()
+		}
 	}
 }
 
@@ -308,8 +314,6 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingPreferr
 func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) fixHeaviestPreferredMemberWorker() {
 	for member := s.nextPendingPreferredMemberUpdate(); member != nil; member = s.nextPendingPreferredMemberUpdate() {
 		s.applyPreferredInsteadUpdate(member)
-
-		s.pendingUpdatesCounter.Decrease()
 	}
 }
 
@@ -324,8 +328,11 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) nextPendingPreferred
 
 	if !s.isShutdown.Load() {
 		if _, member, exists := s.pendingPreferredInsteadUpdates.Pop(); exists {
+			s.pendingUpdatesCounter.Decrease()
+			fmt.Println(">> decreased counter", s.pendingUpdatesCounter.Get())
 			return member
 		}
+		panic("W00t!")
 	}
 
 	return nil
