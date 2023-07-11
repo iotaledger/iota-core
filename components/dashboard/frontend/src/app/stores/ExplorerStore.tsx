@@ -110,7 +110,7 @@ class TransactionMetadata {
     conflictIDs: string[];
     booked: boolean;
     bookedTime: number;
-    confirmationState: number;
+    confirmationState: string;
     confirmationStateTime: number;
 }
 

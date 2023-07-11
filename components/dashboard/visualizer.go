@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // var (
@@ -23,8 +24,9 @@ type vertex struct {
 	StrongParents       []string `json:"strongParents"`
 	WeakParents         []string `json:"weakParents"`
 	ShallowLikedParents []string `json:"shallowLikedParents"`
-	IsFinalized         bool     `json:"is_finalized"`
+	IsConfirmed         bool     `json:"is_blk_confirmed"`
 	IsTx                bool     `json:"is_tx"`
+	IsTxAccepted        bool     `json:"is_tx_accepted"`
 	IssuingTime         time.Time
 }
 
@@ -39,17 +41,35 @@ type tipinfo struct {
 // 	Vertices []vertex `json:"vertices"`
 // }
 
-func sendVertex(blk *blocks.Block, finalized bool) {
+func sendVertex(blk *blocks.Block, confirmed bool) {
 	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock(), deps.Protocol.LatestAPI())
-	_, isTx := modelBlk.Transaction()
+	tx, isTx := modelBlk.Transaction()
 
 	broadcastWsBlock(&wsblk{MsgTypeVertex, &vertex{
 		ID:                  blk.ID().ToHex(),
 		StrongParents:       blk.ProtocolBlock().Block.StrongParentIDs().ToHex(),
 		WeakParents:         blk.ProtocolBlock().Block.WeakParentIDs().ToHex(),
 		ShallowLikedParents: blk.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
-		IsFinalized:         finalized,
+		IsConfirmed:         confirmed,
 		IsTx:                isTx,
+		IsTxAccepted: func() bool {
+			if isTx {
+				api := deps.Protocol.APIForVersion(blk.ProtocolBlock().ProtocolVersion)
+				txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID(api)))
+				if exists {
+					return txMetadata.IsAccepted()
+				}
+			}
+			return false
+		}(),
+	}}, true)
+}
+
+func sendTxAccepted(blkID iotago.BlockID, accepted bool) {
+	broadcastWsBlock(&wsblk{MsgTypeTXAccepted, &vertex{
+		ID:           blkID.ToHex(),
+		IsTx:         true,
+		IsTxAccepted: accepted,
 	}}, true)
 }
 
@@ -65,6 +85,17 @@ func runVisualizer(component *app.Component) {
 		unhook := lo.Batch(
 			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 				sendVertex(block, false)
+
+				tx, hasTx := block.Transaction()
+				if hasTx {
+					api := deps.Protocol.APIForVersion(block.ProtocolBlock().ProtocolVersion)
+					txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID(api)))
+					if exists {
+						txMetadata.OnAccepted(func() {
+							sendTxAccepted(block.ID(), true)
+						})
+					}
+				}
 				// if block.ID().Index() > slot.Index(currentSlot.Load()) {
 				// 	currentSlot.Store(int64(block.ID().Index()))
 				// }

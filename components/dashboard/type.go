@@ -21,6 +21,8 @@ const (
 	MsgTypeTipsMetric
 	// MsgTypeVertex defines a vertex block.
 	MsgTypeVertex
+	// MsgTypeTXAccepted defines a tx is accepted.
+	MsgTypeTXAccepted
 	// MsgTypeTipInfo defines a tip info block.
 	MsgTypeTipInfo
 	// MsgTypeManaValue defines a mana value block.

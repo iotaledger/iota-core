@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -231,26 +232,33 @@ func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
 // region TransactionMetadata ///////////////////////////////////////////////////////////////////////////////////////////
 
 // TransactionMetadata represents the JSON model of the mempool.TransactionMetadata.
-// type TransactionMetadata struct {
-// 	TransactionID         string             `json:"transactionID"`
-// 	ConflictIDs           []string           `json:"conflictIDs"`
-// 	Booked                bool               `json:"booked"`
-// 	BookedTime            int64              `json:"bookedTime"`
-// 	ConfirmationState     confirmation.State `json:"confirmationState"`
-// 	ConfirmationStateTime int64              `json:"confirmationStateTime"`
-// }
+type TransactionMetadata struct {
+	TransactionID         string   `json:"transactionID"`
+	ConflictIDs           []string `json:"conflictIDs"`
+	Booked                bool     `json:"booked"`
+	BookedTime            int64    `json:"bookedTime"`
+	ConfirmationState     string   `json:"confirmationState"`
+	ConfirmationStateTime int64    `json:"confirmationStateTime"`
+}
 
-// // NewTransactionMetadata returns the TransactionMetadata from the given mempool.TransactionMetadata.
-// func NewTransactionMetadata(transactionMetadata *mempool.TransactionMetadata) *TransactionMetadata {
-// 	return &TransactionMetadata{
-// 		TransactionID:         transactionMetadata.ID().Base58(),
-// 		ConflictIDs:           lo.Map(lo.Map(transactionMetadata.ConflictIDs().Slice(), func(t utxo.TransactionID) []byte { return lo.PanicOnErr(t.Bytes()) }), base58.Encode),
-// 		Booked:                transactionMetadata.IsBooked(),
-// 		BookedTime:            transactionMetadata.BookingTime().Unix(),
-// 		ConfirmationState:     transactionMetadata.ConfirmationState(),
-// 		ConfirmationStateTime: transactionMetadata.ConfirmationStateTime().Unix(),
-// 	}
-// }
+// NewTransactionMetadata returns the TransactionMetadata from the given mempool.TransactionMetadata.
+func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata) *TransactionMetadata {
+	var confirmationState string
+	if transactionMetadata.IsAccepted() {
+		confirmationState = "accepted"
+	} else if transactionMetadata.IsPending() {
+		confirmationState = "pending"
+	} else if transactionMetadata.IsRejected() {
+		confirmationState = "rejected"
+	}
+
+	return &TransactionMetadata{
+		TransactionID: transactionMetadata.ID().ToHex(),
+		// ConflictIDs:           lo.Map(lo.Map(transactionMetadata.ConflictIDs().Slice(), func(t utxo.TransactionID) []byte { return lo.PanicOnErr(t.Bytes()) }), base58.Encode),
+		Booked:            transactionMetadata.IsBooked(),
+		ConfirmationState: confirmationState,
+	}
+}
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 

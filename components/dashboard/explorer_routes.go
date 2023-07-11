@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -39,7 +40,7 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 	})
 
 	routeGroup.GET("/transaction/:"+restapipkg.ParameterTransactionID, getTransaction)
-	// routeGroup.GET("/transaction/:transactionID/metadata", ledgerstateAPI.GetTransactionMetadata)
+	routeGroup.GET("/transaction/:transactionID/metadata", getTransactionMetadata)
 	// routeGroup.GET("/transaction/:transactionID/attachments", ledgerstateAPI.GetTransactionAttachments)
 	routeGroup.GET("/output/:"+restapipkg.ParameterOutputID, getOutput)
 	// routeGroup.GET("/output/:outputID/metadata", ledgerstateAPI.GetOutputMetadata)
@@ -78,20 +79,25 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
 	if !exists {
-		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
+		return nil, ierrors.Errorf("model block not found: %s", blockID.ToHex())
 	}
 
+	// TODO: metadata instead, or retainer
+	cachedBlock, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID)
+	if !exists {
+		cachedBlock = nil
+	}
 	// blockMetadata, exists := deps.Retainer.BlockMetadata(blockID)
 	// if !exists {
 	// 	return nil, ierrors.Wrapf(ErrNotFound, "block metadata %s", blockID.Base58())
 	// }
 
-	explorerBlk = createExplorerBlock(block)
+	explorerBlk = createExplorerBlock(block, cachedBlock)
 
 	return
 }
 
-func createExplorerBlock(block *model.Block) *ExplorerBlock {
+func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *ExplorerBlock {
 	// TODO: fill in missing fields
 	iotaBlk := block.ProtocolBlock()
 
@@ -155,6 +161,12 @@ func createExplorerBlock(block *model.Block) *ExplorerBlock {
 		LatestConfirmedSlot: uint64(iotaBlk.LatestFinalizedSlot),
 	}
 
+	if cachedBlock != nil {
+		t.Solid = cachedBlock.IsSolid()
+		t.Booked = cachedBlock.IsBooked()
+		t.Acceptance = cachedBlock.IsAccepted()
+	}
+
 	return t
 }
 
@@ -184,6 +196,23 @@ func getTransaction(c echo.Context) error {
 	}
 
 	return httpserver.JSONResponse(c, http.StatusOK, NewTransaction(iotaTX))
+}
+
+func getTransactionMetadata(c echo.Context) error {
+	txID, err := httpserver.ParseTransactionIDParam(c, restapipkg.ParameterTransactionID)
+	if err != nil {
+		return err
+	}
+
+	// Get the first output of that transaction (using index 0)
+	outputID := iotago.OutputID{}
+	copy(outputID[:], txID[:])
+	txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(txID)
+	if !exists {
+		return ierrors.Errorf("tx metadata not found: %s", txID.ToHex())
+	}
+
+	return httpserver.JSONResponse(c, http.StatusOK, NewTransactionMetadata(txMetadata))
 }
 
 func getOutput(c echo.Context) error {
