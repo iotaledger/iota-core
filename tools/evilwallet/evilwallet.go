@@ -80,18 +80,23 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		optsClientURLs:           defaultClientsURLs,
 		optsProtocolParams:       dockerProtocolParams(),
 	}, opts, func(w *EvilWallet) {
-		w.api = iotago.V3API(w.optsProtocolParams)
-
 		connector := NewWebClients(w.optsClientURLs)
 		w.connector = connector
+
+		// TODO: bc we're using docker protoparams, so need too update genesis time in protocol params
+		// consider remove this in the future
+		clt := w.connector.GetClient()
+		w.optsProtocolParams = clt.ProtocolParameters()
+
+		w.api = iotago.V3API(w.optsProtocolParams)
 		w.outputManager = NewOutputManager(connector, w.wallets)
 
 		w.faucet = NewWallet()
 		w.faucet.seed = [32]byte(w.optFaucetSeed)
 
 		// get faucet output and deposit
-		clt := w.connector.GetClient()
 		faucetDeposit := faucetBalance
+
 		faucetOutput := clt.GetOutput(w.optFaucetUnspentOutputID)
 		if faucetOutput != nil {
 			faucetDeposit = faucetOutput.Deposit()
