@@ -63,7 +63,6 @@ type EvilWallet struct {
 	api           iotago.API
 
 	optFaucetSeed            []byte
-	optFaucetIndex           uint64
 	optFaucetUnspentOutputID iotago.OutputID
 	optsClientURLs           []string
 	optsProtocolParams       iotago.ProtocolParameters
@@ -75,7 +74,6 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		wallets:                  NewWallets(),
 		aliasManager:             NewAliasManager(),
 		optFaucetSeed:            dockerFaucetSeed(),
-		optFaucetIndex:           0,
 		optFaucetUnspentOutputID: iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0),
 		optsClientURLs:           defaultClientsURLs,
 		optsProtocolParams:       dockerProtocolParams(),
@@ -104,10 +102,9 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 
 		w.faucet.AddUnspentOutput(&Output{
 			Address:      w.faucet.AddressOnIndex(0),
-			Index:        w.optFaucetIndex,
+			Index:        0,
 			OutputID:     w.optFaucetUnspentOutputID,
 			Balance:      faucetDeposit,
-			CreationTime: iotago.SlotIndex(0),
 			OutputStruct: faucetOutput,
 		})
 	})
@@ -253,7 +250,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	receiveAddr := wallet.AddressOnIndex(0)
 	clt := e.connector.GetClient()
 
-	faucetAddr := e.faucet.AddressOnIndex(e.optFaucetIndex)
+	faucetAddr := e.faucet.AddressOnIndex(0)
 	unspentFaucet := e.faucet.UnspentOutput(faucetAddr.String())
 	if unspentFaucet.OutputStruct == nil {
 		clt := e.connector.GetClient()
@@ -821,12 +818,6 @@ func (e *EvilWallet) SetTxOutputsSolid(outputs iotago.OutputIDs, clientID string
 func WithFaucetSeed(seed []byte) options.Option[EvilWallet] {
 	return func(opts *EvilWallet) {
 		copy(opts.optFaucetSeed[:], seed[:])
-	}
-}
-
-func WithFaucetIndex(index uint64) options.Option[EvilWallet] {
-	return func(opts *EvilWallet) {
-		opts.optFaucetIndex = index
 	}
 }
 
