@@ -1,6 +1,8 @@
 package clock
 
 import (
+	"time"
+
 	"github.com/iotaledger/hive.go/runtime/module"
 )
 
@@ -11,6 +13,17 @@ type Clock interface {
 
 	Confirmed() RelativeTime
 
+	// Snapshot returns a snapshot of all time values tracked in the clock read atomicaly.
+	Snapshot() *Snapshot
+
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface
+}
+
+// Snapshot contains the snapshot of all time values tracked in the clock.
+type Snapshot struct {
+	AcceptedTime          time.Time
+	RelativeAcceptedTime  time.Time
+	ConfirmedTime         time.Time
+	RelativeConfirmedTime time.Time
 }

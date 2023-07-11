@@ -8,8 +8,7 @@ import (
 
 //nolint:unparam // we have no error case right now
 func info() (*models.InfoResponse, error) {
-	// TODO: maybe add a clock snapshot here to have consistent info in the response?
-	cl := deps.Protocol.MainEngineInstance().Clock
+	clSnapshot := deps.Protocol.MainEngineInstance().Clock.Snapshot()
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
 	protoParams := deps.Protocol.LatestAPI().ProtocolParameters()
@@ -25,10 +24,10 @@ func info() (*models.InfoResponse, error) {
 		Version: deps.AppInfo.Version,
 		Status: &models.InfoResNodeStatus{
 			IsHealthy:                   syncStatus.NodeSynced,
-			AcceptedTangleTime:          uint64(cl.Accepted().Time().Unix()),
-			RelativeAcceptedTangleTime:  uint64(cl.Accepted().RelativeTime().Unix()),
-			ConfirmedTangleTime:         uint64(cl.Confirmed().Time().Unix()),
-			RelativeConfirmedTangleTime: uint64(cl.Confirmed().RelativeTime().Unix()),
+			AcceptedTangleTime:          uint64(clSnapshot.AcceptedTime.Unix()),
+			RelativeAcceptedTangleTime:  uint64(clSnapshot.RelativeAcceptedTime.Unix()),
+			ConfirmedTangleTime:         uint64(clSnapshot.ConfirmedTime.Unix()),
+			RelativeConfirmedTangleTime: uint64(clSnapshot.RelativeConfirmedTime.Unix()),
 			// TODO: fill in pruningSlot
 			LatestCommittedSlot:    syncStatus.LatestCommittedSlot,
 			LatestFinalizedSlot:    syncStatus.FinalizedSlot,

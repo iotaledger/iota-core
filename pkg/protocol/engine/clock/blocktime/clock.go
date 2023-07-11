@@ -1,9 +1,13 @@
 package blocktime
 
 import (
+	"sync"
+	"time"
+
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -18,6 +22,8 @@ type Clock struct {
 
 	// confirmedTime contains a notion of time that is anchored to the latest confirmed block.
 	confirmedTime *RelativeTime
+
+	sync.RWMutex
 
 	// Module embeds the required methods of the module.Interface.
 	module.Module
@@ -45,18 +51,18 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 				asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("Clock", 1))
 				c.HookStopped(lo.Batch(
 					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-						c.acceptedTime.Advance(block.IssuingTime())
+						c.advanceAccepted(block.IssuingTime())
 					}, asyncOpt).Unhook,
 
 					e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-						c.confirmedTime.Advance(block.IssuingTime())
+						c.advanceConfirmed(block.IssuingTime())
 					}, asyncOpt).Unhook,
 
 					e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 						timeProvider := e.APIForSlot(index).TimeProvider()
 						slotEndTime := timeProvider.SlotEndTime(index)
-						c.acceptedTime.Advance(slotEndTime)
-						c.confirmedTime.Advance(slotEndTime)
+
+						c.onSlotFinalised(slotEndTime)
 					}, asyncOpt).Unhook,
 				))
 			})
@@ -76,6 +82,40 @@ func (c *Clock) Confirmed() clock.RelativeTime {
 	return c.confirmedTime
 }
 
+func (c *Clock) Snapshot() *clock.Snapshot {
+	c.RLock()
+	defer c.RUnlock()
+
+	return &clock.Snapshot{
+		AcceptedTime:          c.acceptedTime.Time(),
+		RelativeAcceptedTime:  c.acceptedTime.RelativeTime(),
+		ConfirmedTime:         c.confirmedTime.Time(),
+		RelativeConfirmedTime: c.confirmedTime.RelativeTime(),
+	}
+}
+
 func (c *Clock) Shutdown() {
 	c.TriggerStopped()
+}
+
+func (c *Clock) advanceAccepted(time time.Time) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.acceptedTime.Advance(time)
+}
+
+func (c *Clock) advanceConfirmed(time time.Time) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.confirmedTime.Advance(time)
+}
+
+func (c *Clock) onSlotFinalised(slotEndTime time.Time) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.acceptedTime.Advance(slotEndTime)
+	c.confirmedTime.Advance(slotEndTime)
 }
