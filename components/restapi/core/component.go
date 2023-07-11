@@ -85,9 +85,9 @@ const (
 	// GET returns the output IDs of all UTXO changes.
 	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
-	// RouteAccountsByAccountID is the route for getting an account by its accountID.
+	// RouteAccount is the route for getting an account by its accountID.
 	// GET returns the account details.
-	RouteAccountsByAccountID = "/accounts/:" + restapipkg.ParameterAccountID
+	RouteAccount = "/accounts/:" + restapipkg.ParameterAccountID
 
 	// RouteAccountMana is the route for getting an account mana by its accountID.
 	// GET returns the account mana details.
@@ -179,7 +179,7 @@ func configure() error {
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	})
+	}, checkNodeSynced())
 
 	routeGroup.GET(RouteCommitmentByID, func(c echo.Context) error {
 		index, err := indexByCommitmentID(c)
@@ -193,7 +193,7 @@ func configure() error {
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteCommitmentByIDUTXOChanges, func(c echo.Context) error {
 		index, err := indexByCommitmentID(c)
@@ -207,7 +207,7 @@ func configure() error {
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteCommitmentByIndex, func(c echo.Context) error {
 		indexUint64, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
@@ -221,7 +221,7 @@ func configure() error {
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteCommitmentByIndexUTXOChanges, func(c echo.Context) error {
 		index, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
@@ -235,7 +235,7 @@ func configure() error {
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteOutput, func(c echo.Context) error {
 		output, err := getOutput(c)
@@ -244,7 +244,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, output.Output())
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteOutputMetadata, func(c echo.Context) error {
 		resp, err := getOutputMetadata(c)
@@ -253,7 +253,7 @@ func configure() error {
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteTransactionsIncludedBlock, func(c echo.Context) error {
 		block, err := blockByTransactionID(c)
@@ -262,7 +262,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, block.ProtocolBlock())
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteTransactionsIncludedBlockMetadata, func(c echo.Context) error {
 		resp, err := blockMetadataFromTransactionID(c)
@@ -273,7 +273,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteAccountsByAccountID, func(c echo.Context) error {
+	routeGroup.GET(RouteAccount, func(c echo.Context) error {
 		// TODO
 
 		return httpserver.JSONResponse(c, http.StatusOK, nil)
