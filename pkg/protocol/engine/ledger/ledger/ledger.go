@@ -225,8 +225,19 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Outp
 		return castState, nil
 	case *ExecutionOutput:
 		txWithMetadata, exists := l.memPool.TransactionMetadata(stateRef.Ref().TransactionID())
+		// If the transaction is not in the mempool, we need to load the output from the ledger
 		if !exists {
-			return nil, ierrors.Wrapf(ErrTransactionMetadataNotFOund, "error in getting output for %v", stateWithMetadata.ID())
+			var output *utxoledger.Output
+			stateRequest := l.resolveState(stateRef)
+			stateRequest.OnSuccess(func(loadedState mempool.State) { output = loadedState.(*utxoledger.Output) })
+			stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
+			stateRequest.WaitComplete()
+
+			if err != nil {
+				return nil, ierrors.Wrapf(ErrTransactionMetadataNotFOund, "error in getting output for %v", stateWithMetadata.ID())
+			}
+
+			return output, nil
 		}
 
 		earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
