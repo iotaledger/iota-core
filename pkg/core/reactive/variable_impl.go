@@ -16,8 +16,9 @@ type variable[Type comparable] struct {
 	// transformationFunc is the function that is used to transform the value before it is stored.
 	transformationFunc func(currentValue Type, newValue Type) Type
 
-	// mutex is used to make the Set and Compute methods atomic.
-	mutex sync.Mutex
+	// updateOrderMutex is used to make sure that write operations are executed sequentially (all subscribers are
+	// notified before the next write operation is executed).
+	updateOrderMutex sync.Mutex
 }
 
 // newVariable creates a new variable with an optional transformation function that can be used to rewrite the value
@@ -36,8 +37,8 @@ func (v *variable[Type]) Set(newValue Type) (previousValue Type) {
 
 // Compute computes the new value based on the current value and triggers the registered callbacks if the value changed.
 func (v *variable[Type]) Compute(computeFunc func(currentValue Type) Type) (previousValue Type) {
-	v.mutex.Lock()
-	defer v.mutex.Unlock()
+	v.updateOrderMutex.Lock()
+	defer v.updateOrderMutex.Unlock()
 
 	newValue, previousValue, updateID, registeredCallbacks := v.updateValue(computeFunc)
 
@@ -49,6 +50,21 @@ func (v *variable[Type]) Compute(computeFunc func(currentValue Type) Type) (prev
 	}
 
 	return previousValue
+}
+
+// updateValue atomically prepares the trigger by setting the new value and returning the new value, the previous value,
+// the triggerID and the callbacks to trigger.
+func (v *variable[Type]) updateValue(newValueGenerator func(Type) Type) (newValue, previousValue Type, triggerID uniqueID, callbacksToTrigger []*callback[func(prevValue, newValue Type)]) {
+	v.valueMutex.Lock()
+	defer v.valueMutex.Unlock()
+
+	if previousValue, newValue = v.value, newValueGenerator(previousValue); newValue == previousValue {
+		return newValue, previousValue, 0, nil
+	}
+
+	v.value = newValue
+
+	return newValue, previousValue, v.uniqueUpdateID.Next(), v.registeredCallbacks.Values()
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,8 +85,8 @@ type readableVariable[Type comparable] struct {
 	// uniqueCallbackID is used to derive a unique identifier for each callback.
 	uniqueCallbackID uniqueID
 
-	// mutex is used to ensure that updating the value and registering/unregistering callbacks is thread safe.
-	mutex sync.RWMutex
+	// valueMutex is used to ensure that access to the value is synchronized.
+	valueMutex sync.RWMutex
 }
 
 // newReadableVariable creates a new readableVariable instance with an optional initial value.
@@ -83,15 +99,15 @@ func newReadableVariable[Type comparable](initialValue ...Type) *readableVariabl
 
 // Get returns the current value.
 func (r *readableVariable[Type]) Get() Type {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
+	r.valueMutex.RLock()
+	defer r.valueMutex.RUnlock()
 
 	return r.value
 }
 
 // OnUpdate registers the given callback that is triggered when the value changes.
 func (r *readableVariable[Type]) OnUpdate(callback func(prevValue, newValue Type), triggerWithInitialZeroValue ...bool) (unsubscribe func()) {
-	r.mutex.Lock()
+	r.valueMutex.Lock()
 
 	currentValue := r.value
 	createdCallback := newCallback[func(prevValue, newValue Type)](r.uniqueCallbackID.Next(), callback)
@@ -102,7 +118,7 @@ func (r *readableVariable[Type]) OnUpdate(callback func(prevValue, newValue Type
 	createdCallback.LockExecution(r.uniqueUpdateID)
 	defer createdCallback.UnlockExecution()
 
-	r.mutex.Unlock()
+	r.valueMutex.Unlock()
 
 	var emptyValue Type
 	if currentValue != emptyValue || lo.First(triggerWithInitialZeroValue) {
@@ -114,21 +130,6 @@ func (r *readableVariable[Type]) OnUpdate(callback func(prevValue, newValue Type
 
 		createdCallback.MarkUnsubscribed()
 	}
-}
-
-// updateValue atomically prepares the trigger by setting the new value and returning the new value, the
-// previous value, the triggerID and the callbacks to trigger.
-func (r *readableVariable[Type]) updateValue(newValueGenerator func(Type) Type) (newValue, previousValue Type, triggerID uniqueID, callbacksToTrigger []*callback[func(prevValue, newValue Type)]) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	if previousValue, newValue = r.value, newValueGenerator(previousValue); newValue == previousValue {
-		return newValue, previousValue, 0, nil
-	}
-
-	r.value = newValue
-
-	return newValue, previousValue, r.uniqueUpdateID.Next(), r.registeredCallbacks.Values()
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,43 +144,24 @@ type derivedVariable[ValueType comparable] struct {
 	// unsubscribe is the function that is used to unsubscribe the derivedVariable from the inputs.
 	unsubscribe func()
 
-	// unsubscribeMutex is the mutex that is used to synchronize access to the unsubscribe function.
-	unsubscribeMutex sync.Mutex
+	// unsubscribeOnce is used to make sure that the unsubscribe function is only called once.
+	unsubscribeOnce sync.Once
 }
 
 // newDerivedVariable creates a new derivedVariable instance.
-func newDerivedVariable[ValueType comparable](subscribe func(DerivedVariable[ValueType]) func(), lazyInitEvent Event) *derivedVariable[ValueType] {
+func newDerivedVariable[ValueType comparable](subscribe func(DerivedVariable[ValueType]) func()) *derivedVariable[ValueType] {
 	d := &derivedVariable[ValueType]{
 		Variable: NewVariable[ValueType](),
 	}
 
-	if lazyInitEvent == nil {
-		d.unsubscribe = subscribe(d)
-	} else {
-		d.unsubscribe = lazyInitEvent.OnTrigger(func() {
-			d.unsubscribeMutex.Lock()
-			defer d.unsubscribeMutex.Unlock()
-
-			if d.unsubscribe == nil {
-				return
-			}
-
-			d.unsubscribe = subscribe(d)
-		})
-	}
+	d.unsubscribe = subscribe(d)
 
 	return d
 }
 
 // Unsubscribe unsubscribes the DerivedVariable from its input values.
 func (d *derivedVariable[ValueType]) Unsubscribe() {
-	d.unsubscribeMutex.Lock()
-	defer d.unsubscribeMutex.Unlock()
-
-	if d.unsubscribe != nil {
-		d.unsubscribe()
-		d.unsubscribe = nil
-	}
+	d.unsubscribeOnce.Do(d.unsubscribe)
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

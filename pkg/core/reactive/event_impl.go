@@ -1,6 +1,6 @@
 package reactive
 
-// event implements the Event interface.
+// event is the default implementation of the Event interface.
 type event struct {
 	Variable[bool]
 }

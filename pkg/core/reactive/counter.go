@@ -1,7 +1,7 @@
 package reactive
 
-// Counter is a Variable that derives its value from the number of times the monitored input values fulfill a certain
-// condition.
+// Counter is a Variable that derives its value from the number of times a set of monitored input values fulfill a
+// certain condition.
 type Counter[InputType comparable] interface {
 	// Variable holds the counter value.
 	Variable[int]

@@ -219,7 +219,7 @@ func (s *derivedSet[ElementType]) InheritFrom(sources ...ReadableSet[ElementType
 }
 
 // Apply triggers the update of the set with the given mutations.
-func (s *derivedSet[ElementType]) Apply(mutations ds.SetMutations[ElementType]) {
+func (s *derivedSet[ElementType]) Apply(mutations ds.SetMutations[ElementType]) (appliedMutations ds.SetMutations[ElementType]) {
 	if mutations.IsEmpty() {
 		return
 	}
@@ -235,6 +235,8 @@ func (s *derivedSet[ElementType]) Apply(mutations ds.SetMutations[ElementType]) 
 			registeredCallback.UnlockExecution()
 		}
 	}
+
+	return appliedMutations
 }
 
 // apply prepares the trigger by applying the given mutations to the set and returning the applied
