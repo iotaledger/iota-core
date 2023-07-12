@@ -1,8 +1,8 @@
 package mempoolv1
 
 import (
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/runtime/promise"
-	"github.com/iotaledger/iota-core/pkg/core/reactive"
 )
 
 // inclusionFlags represents important flags and events that relate to the inclusion of an entity in the distributed ledger.

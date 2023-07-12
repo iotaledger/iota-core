@@ -1,7 +1,7 @@
 package tipmanagerv1
 
 import (
-	"github.com/iotaledger/iota-core/pkg/core/reactive"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"

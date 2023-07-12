@@ -2,7 +2,7 @@ package mempool
 
 import (
 	"github.com/iotaledger/hive.go/ds"
-	"github.com/iotaledger/iota-core/pkg/core/reactive"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
