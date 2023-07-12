@@ -72,11 +72,10 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 	for walk.HasNext() {
 		blockID := walk.Next()
 		block, exists := g.blockCache.Block(blockID)
-		if !exists {
-			panic(fmt.Sprintf("parent %s does not exist", blockID))
-		}
 
-		if block.IsRootBlock() {
+		// If the block doesn't exist is either in the process of being evicted (accepted or orphaned), or we should
+		// find it as a root block.
+		if !exists || block.IsRootBlock() {
 			continue
 		}
 
