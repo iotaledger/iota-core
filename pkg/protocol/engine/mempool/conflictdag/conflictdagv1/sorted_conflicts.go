@@ -1,7 +1,6 @@
 package conflictdagv1
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -223,12 +222,10 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingWeightU
 	s.pendingWeightUpdatesMutex.Lock()
 	defer s.pendingWeightUpdatesMutex.Unlock()
 
-	if _, exists := s.pendingWeightUpdates.Get(member.ID); !exists {
-		if s.pendingWeightUpdates.Set(member.ID, member) {
-			s.pendingUpdatesCounter.Increase()
-			fmt.Println(">> increased counter", s.pendingUpdatesCounter.Get())
-			s.pendingWeightUpdatesSignal.Signal()
-		}
+	if _, exists := s.pendingWeightUpdates.Get(member.ID); !exists && !s.isShutdown.Load() {
+		s.pendingWeightUpdates.Set(member.ID, member)
+		s.pendingUpdatesCounter.Increase()
+		s.pendingWeightUpdatesSignal.Signal()
 	}
 }
 
@@ -251,10 +248,8 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) nextPendingWeightUpd
 	if !s.isShutdown.Load() {
 		if _, member, exists := s.pendingWeightUpdates.Pop(); exists {
 			s.pendingUpdatesCounter.Decrease()
-			fmt.Println(">> decreased counter", s.pendingUpdatesCounter.Get())
 			return member
 		}
-		panic("W00t!")
 	}
 
 	return nil
@@ -301,12 +296,10 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingPreferr
 	s.pendingPreferredInsteadMutex.Lock()
 	defer s.pendingPreferredInsteadMutex.Unlock()
 
-	if _, exists := s.pendingPreferredInsteadUpdates.Get(member.ID); !exists {
-		if s.pendingPreferredInsteadUpdates.Set(member.ID, member) {
-			s.pendingUpdatesCounter.Increase()
-			fmt.Println(">> increased counter", s.pendingUpdatesCounter.Get())
-			s.pendingPreferredInsteadSignal.Signal()
-		}
+	if _, exists := s.pendingPreferredInsteadUpdates.Get(member.ID); !exists && !s.isShutdown.Load() {
+		s.pendingPreferredInsteadUpdates.Set(member.ID, member)
+		s.pendingUpdatesCounter.Increase()
+		s.pendingPreferredInsteadSignal.Signal()
 	}
 }
 
@@ -329,10 +322,8 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) nextPendingPreferred
 	if !s.isShutdown.Load() {
 		if _, member, exists := s.pendingPreferredInsteadUpdates.Pop(); exists {
 			s.pendingUpdatesCounter.Decrease()
-			fmt.Println(">> decreased counter", s.pendingUpdatesCounter.Get())
 			return member
 		}
-		panic("W00t!")
 	}
 
 	return nil
@@ -399,16 +390,15 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) swapNeighbors(heavie
 func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) Shutdown() []*Conflict[ConflictID, ResourceID, VoteRank] {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	s.pendingWeightUpdatesMutex.Lock()
+	defer s.pendingWeightUpdatesMutex.Unlock()
+	s.pendingPreferredInsteadMutex.Lock()
+	defer s.pendingPreferredInsteadMutex.Unlock()
 
 	s.isShutdown.Store(true)
 
-	s.pendingWeightUpdatesMutex.Lock()
-	s.pendingWeightUpdates.Clear()
-	s.pendingWeightUpdatesMutex.Unlock()
-
-	s.pendingPreferredInsteadMutex.Lock()
-	s.pendingPreferredInsteadUpdates.Clear()
-	s.pendingPreferredInsteadMutex.Unlock()
+	s.pendingUpdatesCounter.Update(-s.pendingWeightUpdates.Size())
+	s.pendingUpdatesCounter.Update(-s.pendingPreferredInsteadUpdates.Size())
 
 	s.pendingPreferredInsteadSignal.Broadcast()
 	s.pendingWeightUpdatesSignal.Broadcast()
