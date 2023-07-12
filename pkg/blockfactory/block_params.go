@@ -14,7 +14,7 @@ type BlockParams struct {
 	payload               iotago.Payload
 	latestFinalizedSlot   *iotago.SlotIndex
 	issuingTime           *time.Time
-	protocolVersion       *byte
+	protocolVersion       *iotago.Version
 	issuer                Account
 	proofOfWorkDifficulty *float64
 }

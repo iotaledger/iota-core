@@ -197,7 +197,8 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 	}
 
 	var attestations []*iotago.Attestation
-	if _, err := p.apiProvider.APIForVersion(commitmentBytes[0]).Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
+	// TODO: there could be multiple versions of attestations in the same packet
+	if _, err := p.apiProvider.APIForVersion(iotago.Version(commitmentBytes[0])).Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
 
 		return

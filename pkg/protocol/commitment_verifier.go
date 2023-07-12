@@ -30,8 +30,13 @@ func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.
 			return c.engine.APIForVersion(attestation.ProtocolVersion).Encode(attestation)
 		},
 		func(bytes []byte) (*iotago.Attestation, int, error) {
+			version, _, err := iotago.VersionFromBytes(bytes)
+			if err != nil {
+				return nil, 0, ierrors.Wrap(err, "failed to determine version")
+			}
+
 			a := new(iotago.Attestation)
-			n, err := c.engine.APIForVersion(bytes[0]).Decode(bytes, a)
+			n, err := c.engine.APIForVersion(version).Decode(bytes, a)
 
 			return a, n, err
 		},

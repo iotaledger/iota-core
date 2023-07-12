@@ -252,6 +252,8 @@ github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d h1:
 github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d/go.mod h1:bvXXc6quBdERMMKnirr2+iQU4WnTz4KDbdHcusW9Ats=
 github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230706083020-ef6c3248369d h1:VBOXzrVDRjx+yYYSD5G38x9IdlJLfPADoo2svQVuXZM=
 github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230706083020-ef6c3248369d/go.mod h1:ALcO+4r6FMfENrMQ+jZZfHX7vDHQ42XLI8y7dt/IKxc=
+github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230711121610-7d024f7b5eb5 h1:K4dWLTZwURU7xVF5uePUk0oDViBDQrsdZ7ZHBCrTYOs=
+github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230711121610-7d024f7b5eb5/go.mod h1:ALcO+4r6FMfENrMQ+jZZfHX7vDHQ42XLI8y7dt/IKxc=
 github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d h1:6VVi5LZGAIXYFzb+/k3G6+T6dNkLi2beD0O6CccxdLg=
 github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d/go.mod h1:kkIoyWWDol9XTEuNy0wtUYQWx+Eb0Ak9XP8SS3g1/J8=
 github.com/iotaledger/hive.go/ds v0.0.0-20230706083020-ef6c3248369d h1:gcFTX8tNE5IGELuMnxD3sQYxerhLiZHQ1Zn0fTvbwRM=
@@ -274,6 +276,8 @@ github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813 h1:6/Ge9
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813/go.mod h1:d/oNTc8b3qnmdf70GzNFfAha9gZjXGYqImNxMGU96Eo=
 github.com/iotaledger/iota.go/v4 v4.0.0-20230710120021-31d7d74cb077 h1:ZFwWVojtc5s1xwvCcjeLQSuoerJTSdFHnydB3vUts44=
 github.com/iotaledger/iota.go/v4 v4.0.0-20230710120021-31d7d74cb077/go.mod h1:NC48ByX78DwdkGj5YjqI2ADHAY+S2idcIRZaEuWDe1Q=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230712101749-e877453129b0 h1:Tr7dChXQBMV7VVW5FUpG8zn9Ex+v/1CtFFNRmGobtIc=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230712101749-e877453129b0/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
 github.com/ipfs/go-cid v0.4.1/go.mod h1:uQHwDeX4c6CtyrFwdqyhpNcxVewur1M7l7fNU7LKwZk=
 github.com/ipfs/go-detect-race v0.0.1 h1:qX/xay2W3E4Q1U7d9lNs1sU9nvguX0a7319XbyQ6cOk=

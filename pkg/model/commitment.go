@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/hive.go/stringify"
@@ -48,10 +49,15 @@ func CommitmentFromCommitment(iotaCommitment *iotago.Commitment, api iotago.API,
 }
 
 func CommitmentFromBytes(data []byte, apiProvider api.Provider, opts ...serix.Option) (*Commitment, error) {
-	api := apiProvider.APIForVersion(data[0])
+	version, _, err := iotago.VersionFromBytes(data)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to determine version")
+	}
+
+	apiForVersion := apiProvider.APIForVersion(version)
 
 	iotaCommitment := new(iotago.Commitment)
-	if _, err := api.Decode(data, iotaCommitment, opts...); err != nil {
+	if _, err := apiForVersion.Decode(data, iotaCommitment, opts...); err != nil {
 		return nil, err
 	}
 
@@ -60,7 +66,7 @@ func CommitmentFromBytes(data []byte, apiProvider api.Provider, opts ...serix.Op
 		return nil, err
 	}
 
-	return newCommitment(commitmentID, iotaCommitment, data, api)
+	return newCommitment(commitmentID, iotaCommitment, data, apiForVersion)
 }
 
 func (c *Commitment) ID() iotago.CommitmentID {
