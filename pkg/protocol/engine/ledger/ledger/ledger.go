@@ -287,6 +287,10 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 	return nil
 }
 
+func (l *Ledger) ManaManager() *mana.Manager {
+	return l.manaManager
+}
+
 func (l *Ledger) Shutdown() {
 	l.TriggerStopped()
 	l.conflictDAG.Shutdown()
@@ -612,10 +616,6 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 		//  Do we track witness weight of invalid blocks?
 		l.errorHandler(ierrors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
-}
-
-func (l *Ledger) ManaManager() *mana.Manager {
-	return l.manaManager
 }
 
 func getAccountDiff(accountDiffs map[iotago.AccountID]*prunable.AccountDiff, accountID iotago.AccountID) *prunable.AccountDiff {

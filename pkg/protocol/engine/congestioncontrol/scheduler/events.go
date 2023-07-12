@@ -7,9 +7,8 @@ import (
 
 type Events struct {
 	BlockScheduled *event.Event1[*blocks.Block]
-	// TODO: BlockScheduled hook this up in engine
-	BlockSkipped *event.Event1[*blocks.Block]
-	BlockDropped *event.Event1[*blocks.Block]
+	BlockSkipped   *event.Event1[*blocks.Block]
+	BlockDropped   *event.Event1[*blocks.Block]
 
 	event.Group[Events, *Events]
 }

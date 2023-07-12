@@ -15,7 +15,7 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 		t := NewTipManager(e.BlockCache.Block, opts...)
 
 		e.HookConstructed(func() {
-			e.Events.Booker.BlockBooked.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
+			e.Events.Scheduler.BlockScheduled.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(e.Workers.CreatePool("AddTip", 2)))
 			e.BlockCache.Evict.Hook(t.Evict)
 			e.Events.TipManager.BlockAdded.LinkTo(t.blockAdded)
 

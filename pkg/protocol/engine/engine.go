@@ -201,9 +201,9 @@ func (e *Engine) Shutdown() {
 		e.Clock.Shutdown()
 		e.SybilProtection.Shutdown()
 		e.Filter.Shutdown()
+		e.Scheduler.Shutdown()
 		e.Storage.Shutdown()
 		e.Workers.Shutdown()
-		e.Scheduler.Shutdown()
 	}
 }
 

@@ -18,11 +18,13 @@ var ErrInsufficientMana = ierrors.New("insufficient issuer's mana to schedule th
 
 // BufferQueue represents a buffer of IssuerQueue.
 type BufferQueue struct {
+	// maxBuffer is the maximum buffer size in number of blocks.
 	maxBuffer int
 
 	activeIssuers *shrinkingmap.ShrinkingMap[iotago.AccountID, *ring.Ring]
 	ring          *ring.Ring
-	size          int
+	// size is the number of blocks in the buffer.
+	size int
 }
 
 // NewBufferQueue returns a new BufferQueue.
@@ -85,7 +87,7 @@ func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.Accoun
 	issuerID := blk.ProtocolBlock().IssuerID
 	issuerQueue, err := b.GetOrCreateIssuerQueue(issuerID)
 	if err != nil {
-		return nil, ierrors.Errorf("%w: could not get or create issuer queue for issuer %s", err, issuerID)
+		return nil, ierrors.Wrapf(err, "could not get or create issuer queue for issuer %s", issuerID)
 	}
 
 	// first we submit the block, and if it turns out that the issuer doesn't have enough bandwidth to submit, it will be removed by dropTail
@@ -105,6 +107,7 @@ func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.Accoun
 
 func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (iotago.Mana, error)) (droppedBlocks []*blocks.Block) {
 	start := b.Current()
+	ringStart := b.ring
 	// remove as many blocks as necessary to stay within max buffer size
 	for b.Size() > b.maxBuffer {
 		// TODO: extract to util func
@@ -113,14 +116,17 @@ func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (iotago.Mana
 		var maxIssuerID iotago.AccountID
 		for q := start; ; {
 			issuerMana, err := manaRetriever(q.IssuerID())
-			if issuerMana > 0 && err == nil {
+			if err == nil {
 				if scale := float64(q.Work()) / float64(issuerMana); scale > maxScale {
 					maxScale = scale
 					maxIssuerID = q.IssuerID()
 				}
 			} else if q.Size() > 0 {
-				maxScale = math.Inf(1)
 				maxIssuerID = q.IssuerID()
+				// return to the start of the issuer ring and break as this is the max value we can have.
+				b.ring = ringStart
+
+				break
 			}
 			q = b.Next()
 			if q == start {
@@ -258,23 +264,6 @@ func (b *BufferQueue) PopFront() (block *blocks.Block) {
 	b.size--
 
 	return block
-}
-
-// IDs returns the IDs of all submitted blocks (ready or not).
-func (b *BufferQueue) IDs() (ids []iotago.BlockID) {
-	start := b.Current()
-	if start == nil {
-		return nil
-	}
-	for q := start; ; {
-		ids = append(ids, q.IDs()...)
-		q = b.Next()
-		if q == start {
-			break
-		}
-	}
-
-	return ids
 }
 
 // IssuerIDs returns the issuerIDs of all issuers.

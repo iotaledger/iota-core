@@ -1,7 +1,6 @@
 package drr
 
 import (
-	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -32,8 +31,7 @@ type Scheduler struct {
 	buffer      *BufferQueue
 	bufferMutex sync.RWMutex
 
-	deficits      *shrinkingmap.ShrinkingMap[iotago.AccountID, uint64]
-	deficitsMutex sync.RWMutex
+	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, uint64]
 
 	tokenBucket      float64
 	lastScheduleTime time.Time
@@ -54,16 +52,15 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 		e.HookConstructed(func() {
 			s.blockCache = e.BlockCache
 			e.Events.Scheduler.LinkTo(s.events)
-			// hook to block scheduled event to check for another block ready to schedule
-			s.events.BlockScheduled.Hook(func(block *blocks.Block) {
-				s.selectBlockToSchedule()
-				s.updateChildren(block)
-			})
 			e.Ledger.HookInitialized(func() {
 				s.manaRetrieveFunc = func(accountID iotago.AccountID) (iotago.Mana, error) {
 					manaSlot := e.Storage.Settings().LatestCommitment().Index()
+					mana, err := e.Ledger.ManaManager().GetManaOnAccount(accountID, manaSlot)
+					if mana < s.optsMinMana {
+						return mana, ierrors.Errorf("account %s has insufficient Mana for block to be scheduled: account Mana %d, min Mana %d", accountID, mana, s.optsMinMana)
+					}
 
-					return e.Ledger.ManaManager().GetManaOnAccount(accountID, manaSlot)
+					return mana, err
 				}
 			})
 			s.TriggerConstructed()
@@ -82,10 +79,9 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 func New(opts ...options.Option[Scheduler]) *Scheduler {
 	return options.Apply(
 		&Scheduler{
-			events:           scheduler.NewEvents(),
-			lastScheduleTime: time.Now(),
-			deficits:         shrinkingmap.New[iotago.AccountID, uint64](),
-			// TODO: provide options properly rather than defaults here
+			events:                             scheduler.NewEvents(),
+			lastScheduleTime:                   time.Now(),
+			deficits:                           shrinkingmap.New[iotago.AccountID, uint64](),
 			optsRate:                           100,
 			optsMaxBufferSize:                  100,
 			optsAcceptedBlockScheduleThreshold: 10 * time.Second,
@@ -138,14 +134,12 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 }
 
 func (s *Scheduler) getDeficit(accountID iotago.AccountID) (uint64, error) {
-	s.deficitsMutex.RLock()
-	defer s.deficitsMutex.RUnlock()
-
 	d, exists := s.deficits.Get(accountID)
 	if !exists {
 		_, err := s.manaRetrieveFunc(accountID)
+		// manaRetrieveFunc return error if mana is less than MinMana or the Mana can not be retrieved for the account.
 		if err != nil {
-			return 0, ierrors.Errorf("%w: no deficit or Mana available for issuer %s", err, accountID)
+			return 0, ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
 		}
 		// load with max deficit if the issuer has Mana but has been removed from the deficits map
 		return s.optsMaxDeficit, nil
@@ -199,15 +193,21 @@ loop:
 
 func (s *Scheduler) scheduleBlock(block *blocks.Block) {
 	if block.SetScheduled() {
+		// deduct tokens from the token bucket according to the scheduled block's work.
+		s.tokenBucket -= float64(block.Work())
+		// check for another block ready to schedule
+		s.selectBlockToSchedule()
+		s.updateChildren(block)
 		s.events.BlockScheduled.Trigger(block)
-		fmt.Printf("Block Scheduled: %s\n", block.ID())
 	}
 }
 
 func (s *Scheduler) skipBlock(block *blocks.Block) {
 	if block.SetSkipped() && block.SetScheduled() {
+		s.selectBlockToSchedule()
+		s.updateChildren(block)
 		s.events.BlockScheduled.Trigger(block)
-		fmt.Printf("Block Skipped: %s\n", block.ID())
+		s.events.BlockScheduled.Trigger(block)
 	}
 }
 
@@ -264,9 +264,6 @@ func (s *Scheduler) selectBlockToSchedule() {
 	}
 
 	// remove the block from the buffer and adjust issuer's deficit
-	if s.buffer.Size() == 0 {
-		fmt.Println("Buffer is empty")
-	}
 	block := s.buffer.PopFront()
 	issuerID := block.ProtocolBlock().IssuerID
 	err := s.updateDeficit(issuerID, int64(-block.Work()))
@@ -343,7 +340,6 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 }
 
 func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error {
-
 	deficit, err := s.getDeficit(accountID)
 	if err != nil {
 		return ierrors.Errorf("could not get deficit for issuer %s", accountID)
@@ -351,8 +347,6 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error
 	if int64(deficit)+delta < 0 {
 		return ierrors.Errorf("tried to decrease deficit to a negative value %d for issuer %s", int64(deficit)+delta, accountID)
 	}
-	s.deficitsMutex.Lock()
-	defer s.deficitsMutex.Unlock()
 	s.deficits.Set(accountID, lo.Max(uint64(int64(deficit)+delta), s.optsMaxDeficit))
 
 	return nil
@@ -360,11 +354,11 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error
 
 func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds int64) error {
 	quantum, err := s.quantum(issuerID)
-	if err == nil {
-		err = s.updateDeficit(issuerID, int64(quantum)*rounds)
+	if err != nil {
+		return err
 	}
 
-	return err
+	return s.updateDeficit(issuerID, int64(quantum)*rounds)
 }
 
 func (s *Scheduler) isEligible(block *blocks.Block) (eligible bool) {
