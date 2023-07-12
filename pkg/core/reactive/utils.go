@@ -2,15 +2,15 @@ package reactive
 
 import (
 	"sync"
-
-	"github.com/iotaledger/iota-core/pkg/core/types"
 )
+
+// region callback /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // callback is an internal wrapper for a callback function that is extended by an ID and a mutex (for call order
 // synchronization).
 type callback[FuncType any] struct {
 	// ID is the unique identifier of the callback.
-	ID types.UniqueID
+	ID uniqueID
 
 	// Invoke is the callback function that is invoked when the callback is triggered.
 	Invoke FuncType
@@ -19,14 +19,14 @@ type callback[FuncType any] struct {
 	unsubscribed bool
 
 	// lastUpdate is the last update that was applied to the callback.
-	lastUpdate types.UniqueID
+	lastUpdate uniqueID
 
 	// executionMutex is the mutex that is used to synchronize the execution of the callback.
 	executionMutex sync.Mutex
 }
 
 // newCallback is the constructor for the callback type.
-func newCallback[FuncType any](id types.UniqueID, invoke FuncType) *callback[FuncType] {
+func newCallback[FuncType any](id uniqueID, invoke FuncType) *callback[FuncType] {
 	return &callback[FuncType]{
 		ID:     id,
 		Invoke: invoke,
@@ -34,7 +34,7 @@ func newCallback[FuncType any](id types.UniqueID, invoke FuncType) *callback[Fun
 }
 
 // LockExecution locks the callback for the given update and returns true if the callback was locked successfully.
-func (c *callback[FuncType]) LockExecution(updateID types.UniqueID) bool {
+func (c *callback[FuncType]) LockExecution(updateID uniqueID) bool {
 	c.executionMutex.Lock()
 
 	if c.unsubscribed || updateID != 0 && updateID == c.lastUpdate {
@@ -60,3 +60,19 @@ func (c *callback[FuncType]) MarkUnsubscribed() {
 
 	c.unsubscribed = true
 }
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region uniqueID /////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// UniqueID is a unique identifier.
+type uniqueID uint64
+
+// Next returns the next unique identifier.
+func (u *uniqueID) Next() uniqueID {
+	*u++
+
+	return *u
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
