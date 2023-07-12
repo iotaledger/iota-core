@@ -10,7 +10,7 @@ type Counter[InputType comparable] interface {
 
 	// Monitor adds the given input value as an input to the counter and returns a function that can be used to
 	// unsubscribe from the input value.
-	Monitor(input Value[InputType]) (unsubscribe func())
+	Monitor(input ReadableVariable[InputType]) (unsubscribe func())
 }
 
 // NewCounter creates a Counter that counts the number of times monitored input values fulfill a certain condition.
@@ -35,7 +35,7 @@ type counter[InputType comparable] struct {
 
 // Monitor adds the given input value as an input to the counter and returns a function that can be used to unsubscribe
 // from the input value.
-func (c *counter[InputType]) Monitor(input Value[InputType]) (unsubscribe func()) {
+func (c *counter[InputType]) Monitor(input ReadableVariable[InputType]) (unsubscribe func()) {
 	var conditionWasTrue bool
 
 	return input.OnUpdate(func(_, newInputValue InputType) {

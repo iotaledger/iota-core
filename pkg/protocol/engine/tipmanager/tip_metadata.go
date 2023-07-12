@@ -17,14 +17,14 @@ type TipMetadata interface {
 	// TipPool exposes a variable that stores the current TipPool of the block.
 	TipPool() reactive.Variable[TipPool]
 
-	// IsStrongTip returns a Value that indicates if the block is a strong tip.
-	IsStrongTip() reactive.Value[bool]
+	// IsStrongTip returns a ReadableVariable that indicates if the block is a strong tip.
+	IsStrongTip() reactive.ReadableVariable[bool]
 
-	// IsWeakTip returns a Value that indicates if the block is a weak tip.
-	IsWeakTip() reactive.Value[bool]
+	// IsWeakTip returns a ReadableVariable that indicates if the block is a weak tip.
+	IsWeakTip() reactive.ReadableVariable[bool]
 
-	// IsOrphaned returns a Value that indicates if the block was orphaned.
-	IsOrphaned() reactive.Value[bool]
+	// IsOrphaned returns a ReadableVariable that indicates if the block was orphaned.
+	IsOrphaned() reactive.ReadableVariable[bool]
 
 	// LivenessThresholdReached exposes an event that is triggered when the liveness threshold is reached.
 	LivenessThresholdReached() reactive.Event

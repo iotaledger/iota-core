@@ -15,8 +15,8 @@ type DerivedVariable[Type comparable] interface {
 	Unsubscribe()
 }
 
-// DeriveVariableFromValue creates a DerivedVariable that transforms an input value into a different one.
-func DeriveVariableFromValue[Type, InputType1 comparable, InputValueType1 Value[InputType1]](compute func(InputType1) Type, input1 *InputValueType1, lazyInitEvent ...Event) DerivedVariable[Type] {
+// DeriveVariableFromInput creates a DerivedVariable that transforms an input value into a different one.
+func DeriveVariableFromInput[Type, InputType1 comparable, InputValueType1 ReadableVariable[InputType1]](compute func(InputType1) Type, input1 *InputValueType1, lazyInitEvent ...Event) DerivedVariable[Type] {
 	return newDerivedVariable[Type](func(d DerivedVariable[Type]) func() {
 		return (*input1).OnUpdate(func(_, input1 InputType1) {
 			d.Compute(func(_ Type) Type { return compute(input1) })
@@ -24,8 +24,8 @@ func DeriveVariableFromValue[Type, InputType1 comparable, InputValueType1 Value[
 	}, lo.First(lazyInitEvent))
 }
 
-// DeriveVariableFrom2Values creates a DerivedVariable that transforms two input values into a different one.
-func DeriveVariableFrom2Values[Type, InputType1, InputType2 comparable, InputValueType1 Value[InputType1], InputValueType2 Value[InputType2]](compute func(InputType1, InputType2) Type, input1 *InputValueType1, input2 *InputValueType2, lazyInitEvent ...Event) DerivedVariable[Type] {
+// DeriveVariableFrom2Inputs creates a DerivedVariable that transforms two input values into a different one.
+func DeriveVariableFrom2Inputs[Type, InputType1, InputType2 comparable, InputValueType1 ReadableVariable[InputType1], InputValueType2 ReadableVariable[InputType2]](compute func(InputType1, InputType2) Type, input1 *InputValueType1, input2 *InputValueType2, lazyInitEvent ...Event) DerivedVariable[Type] {
 	return newDerivedVariable[Type](func(d DerivedVariable[Type]) func() {
 		return lo.Batch(
 			(*input1).OnUpdate(func(_, input1 InputType1) {
@@ -39,8 +39,8 @@ func DeriveVariableFrom2Values[Type, InputType1, InputType2 comparable, InputVal
 	}, lo.First(lazyInitEvent))
 }
 
-// DeriveVariableFrom3Values creates a DerivedVariable that transforms three input values into a different one.
-func DeriveVariableFrom3Values[Type, InputType1, InputType2, InputType3 comparable, InputValueType1 Value[InputType1], InputValueType2 Value[InputType2], InputValueType3 Value[InputType3]](compute func(InputType1, InputType2, InputType3) Type, input1 *InputValueType1, input2 *InputValueType2, input3 *InputValueType3, lazyInitEvent ...Event) DerivedVariable[Type] {
+// DeriveVariableFrom3Inputs creates a DerivedVariable that transforms three input values into a different one.
+func DeriveVariableFrom3Inputs[Type, InputType1, InputType2, InputType3 comparable, InputValueType1 ReadableVariable[InputType1], InputValueType2 ReadableVariable[InputType2], InputValueType3 ReadableVariable[InputType3]](compute func(InputType1, InputType2, InputType3) Type, input1 *InputValueType1, input2 *InputValueType2, input3 *InputValueType3, lazyInitEvent ...Event) DerivedVariable[Type] {
 	return newDerivedVariable[Type](func(d DerivedVariable[Type]) func() {
 		return lo.Batch(
 			(*input1).OnUpdate(func(_, input1 InputType1) {

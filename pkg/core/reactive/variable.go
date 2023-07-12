@@ -8,8 +8,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
-// Variable defines an interface for a reactive component that acts as a thread-safe variable that informs subscribed
-// consumers about updates.
+// region Variable /////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Variable represents a variable that can be read and written and that informs subscribed consumers about updates.
 type Variable[Type comparable] interface {
 	// Set sets the new value and triggers the registered callbacks if the value has changed.
 	Set(newValue Type) (previousValue Type)
@@ -18,26 +19,88 @@ type Variable[Type comparable] interface {
 	// callbacks if the value has changed.
 	Compute(computeFunc func(currentValue Type) Type) (previousValue Type)
 
-	// Value imports the interface that allows subscribers to read the value and to be notified when it changes.
-	Value[Type]
+	// ReadableVariable imports the interface that allows subscribers to read the value and to be notified when it changes.
+	ReadableVariable[Type]
 }
 
 // NewVariable creates a new Variable instance with an optional transformation function that can be used to rewrite the
-// set value before it is stored.
+// value before it is stored.
 func NewVariable[Type comparable](transformationFunc ...func(currentValue Type, newValue Type) Type) Variable[Type] {
-	return &variable[Type]{
-		transformationFunc:  lo.First(transformationFunc, func(_ Type, newValue Type) Type { return newValue }),
-		registeredCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(prevValue, newValue Type)]](),
-	}
+	return newVariable(transformationFunc...)
 }
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region ReadableVariable /////////////////////////////////////////////////////////////////////////////////////////////
+
+// ReadableVariable represents a variable that can be read and that informs subscribed consumers about updates.
+type ReadableVariable[Type comparable] interface {
+	// Get returns the current value.
+	Get() Type
+
+	// OnUpdate registers the given callback that is triggered when the value changes.
+	OnUpdate(consumer func(oldValue, newValue Type), triggerWithInitialZeroValue ...bool) (unsubscribe func())
+}
+
+// NewReadableVariable creates a new ReadableVariable instance with the given value.
+func NewReadableVariable[Type comparable](value Type) ReadableVariable[Type] {
+	return newReadableVariable(value)
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region variable /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // variable is the default implementation of the Variable interface.
 type variable[Type comparable] struct {
-	// value holds the current value.
-	value Type
+	*readableVariable[Type]
 
 	// transformationFunc is the function that is used to transform the value before it is stored.
 	transformationFunc func(currentValue Type, newValue Type) Type
+
+	// mutex is used to make the Set and Compute methods atomic.
+	mutex sync.Mutex
+}
+
+// newVariable creates a new variable with an optional transformation function that can be used to rewrite the value
+// before it is stored.
+func newVariable[Type comparable](transformationFunc ...func(currentValue Type, newValue Type) Type) *variable[Type] {
+	return &variable[Type]{
+		transformationFunc: lo.First(transformationFunc, func(_ Type, newValue Type) Type { return newValue }),
+		readableVariable:   newReadableVariable[Type](),
+	}
+}
+
+// Set sets the new value and triggers the registered callbacks if the value has changed.
+func (v *variable[Type]) Set(newValue Type) (previousValue Type) {
+	return v.Compute(func(Type) Type { return newValue })
+}
+
+// Compute computes the new value based on the current value and triggers the registered callbacks if the value changed.
+func (v *variable[Type]) Compute(computeFunc func(currentValue Type) Type) (previousValue Type) {
+	v.mutex.Lock()
+	defer v.mutex.Unlock()
+
+	newValue, previousValue, updateID, registeredCallbacks := v.updateValue(computeFunc)
+
+	for _, registeredCallback := range registeredCallbacks {
+		if registeredCallback.LockExecution(updateID) {
+			registeredCallback.Invoke(previousValue, newValue)
+			registeredCallback.UnlockExecution()
+		}
+	}
+
+	return previousValue
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region readableVariable /////////////////////////////////////////////////////////////////////////////////////////////
+
+// readableVariable is the default implementation of the ReadableVariable interface.
+type readableVariable[Type comparable] struct {
+	// value holds the current value.
+	value Type
 
 	// registeredCallbacks holds the callbacks that are triggered when the value changes.
 	registeredCallbacks *shrinkingmap.ShrinkingMap[types.UniqueID, *callback[func(prevValue, newValue Type)]]
@@ -50,54 +113,38 @@ type variable[Type comparable] struct {
 
 	// mutex is used to ensure that updating the value and registering/unregistering callbacks is thread safe.
 	mutex sync.RWMutex
+}
 
-	// setMutex is used to ensure that the order of updates is preserved.
-	setMutex sync.Mutex
+// newReadableVariable creates a new readableVariable instance with an optional initial value.
+func newReadableVariable[Type comparable](initialValue ...Type) *readableVariable[Type] {
+	return &readableVariable[Type]{
+		value:               lo.First(initialValue),
+		registeredCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(prevValue, newValue Type)]](),
+	}
 }
 
 // Get returns the current value.
-func (v *variable[Type]) Get() Type {
-	v.mutex.RLock()
-	defer v.mutex.RUnlock()
+func (r *readableVariable[Type]) Get() Type {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
 
-	return v.value
+	return r.value
 }
 
-// Set sets the new value and triggers the registered callbacks if the value has changed.
-func (v *variable[Type]) Set(newValue Type) (previousValue Type) {
-	return v.Compute(func(Type) Type { return newValue })
-}
+// OnUpdate registers the given callback that is triggered when the value changes.
+func (r *readableVariable[Type]) OnUpdate(callback func(prevValue, newValue Type), triggerWithInitialZeroValue ...bool) (unsubscribe func()) {
+	r.mutex.Lock()
 
-// Compute computes the new value based on the current value and triggers the registered callbacks if the value changed.
-func (v *variable[Type]) Compute(computeFunc func(currentValue Type) Type) (previousValue Type) {
-	v.setMutex.Lock()
-	defer v.setMutex.Unlock()
+	currentValue := r.value
+	createdCallback := newCallback[func(prevValue, newValue Type)](r.uniqueCallbackID.Next(), callback)
+	r.registeredCallbacks.Set(createdCallback.ID, createdCallback)
 
-	newValue, previousValue, updateID, callbacksToTrigger := v.prepareDynamicTrigger(computeFunc)
-	for _, callback := range callbacksToTrigger {
-		if callback.LockExecution(updateID) {
-			callback.Invoke(previousValue, newValue)
-			callback.UnlockExecution()
-		}
-	}
-
-	return previousValue
-}
-
-// OnUpdate registers a callback that is triggered when the value changes.
-func (v *variable[Type]) OnUpdate(callback func(prevValue, newValue Type), triggerWithInitialZeroValue ...bool) (unsubscribe func()) {
-	v.mutex.Lock()
-
-	currentValue := v.value
-
-	createdCallback := newCallback[func(prevValue, newValue Type)](v.uniqueCallbackID.Next(), callback)
-	v.registeredCallbacks.Set(createdCallback.ID, createdCallback)
-
-	// grab the lock to make sure that the callback is not executed before we have called it with the initial value.
-	createdCallback.LockExecution(v.uniqueUpdateID)
+	// grab the execution lock before we unlock the mutex, so the callback cannot be triggered by another
+	// thread updating the value before we have called the callback with the initial value
+	createdCallback.LockExecution(r.uniqueUpdateID)
 	defer createdCallback.UnlockExecution()
 
-	v.mutex.Unlock()
+	r.mutex.Unlock()
 
 	var emptyValue Type
 	if currentValue != emptyValue || lo.First(triggerWithInitialZeroValue) {
@@ -105,23 +152,25 @@ func (v *variable[Type]) OnUpdate(callback func(prevValue, newValue Type), trigg
 	}
 
 	return func() {
-		v.registeredCallbacks.Delete(createdCallback.ID)
+		r.registeredCallbacks.Delete(createdCallback.ID)
 
 		createdCallback.MarkUnsubscribed()
 	}
 }
 
-// prepareDynamicTrigger atomically prepares the trigger by setting the new value and returning the new value, the
+// updateValue atomically prepares the trigger by setting the new value and returning the new value, the
 // previous value, the triggerID and the callbacks to trigger.
-func (v *variable[Type]) prepareDynamicTrigger(newValueGenerator func(Type) Type) (newValue, previousValue Type, triggerID types.UniqueID, callbacksToTrigger []*callback[func(prevValue, newValue Type)]) {
-	v.mutex.Lock()
-	defer v.mutex.Unlock()
+func (r *readableVariable[Type]) updateValue(newValueGenerator func(Type) Type) (newValue, previousValue Type, triggerID types.UniqueID, callbacksToTrigger []*callback[func(prevValue, newValue Type)]) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
-	if previousValue, newValue = v.value, newValueGenerator(previousValue); newValue == previousValue {
+	if previousValue, newValue = r.value, newValueGenerator(previousValue); newValue == previousValue {
 		return newValue, previousValue, 0, nil
 	}
 
-	v.value = newValue
+	r.value = newValue
 
-	return newValue, previousValue, v.uniqueUpdateID.Next(), v.registeredCallbacks.Values()
+	return newValue, previousValue, r.uniqueUpdateID.Next(), r.registeredCallbacks.Values()
 }
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

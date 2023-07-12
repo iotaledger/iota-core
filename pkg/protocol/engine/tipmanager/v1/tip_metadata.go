@@ -100,64 +100,64 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 
 	initLazyOnConstructed := reactive.NewEvent()
 
-	t.isStrongTipPoolMember = reactive.DeriveVariableFrom3Values(func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
+	t.isStrongTipPoolMember = reactive.DeriveVariableFrom3Inputs(func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
 		return tipPool == tipmanager.StrongTipPool && !isOrphaned && !isEvicted
 	}, &t.tipPool, &t.isOrphaned, &t.evicted, initLazyOnConstructed)
 
-	t.isWeakTipPoolMember = reactive.DeriveVariableFrom3Values(func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
+	t.isWeakTipPoolMember = reactive.DeriveVariableFrom3Inputs(func(tipPool tipmanager.TipPool, isOrphaned bool, isEvicted bool) bool {
 		return tipPool == tipmanager.WeakTipPool && !isOrphaned && !isEvicted
 	}, &t.tipPool, &t.isOrphaned, &t.evicted, initLazyOnConstructed)
 
-	t.isStronglyConnectedToTips = reactive.DeriveVariableFrom2Values(func(isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
+	t.isStronglyConnectedToTips = reactive.DeriveVariableFrom2Inputs(func(isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
 		return isStrongTipPoolMember || isStronglyReferencedByTips
 	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByTips, initLazyOnConstructed)
 
-	t.isConnectedToTips = reactive.DeriveVariableFrom3Values(func(isReferencedByTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
+	t.isConnectedToTips = reactive.DeriveVariableFrom3Inputs(func(isReferencedByTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
 		return isReferencedByTips || isStrongTipPoolMember || isWeakTipPoolMember
 	}, &t.isReferencedByTips, &t.isStrongTipPoolMember, &t.isWeakTipPoolMember, initLazyOnConstructed)
 
-	t.isStronglyReferencedByTips = reactive.DeriveVariableFromValue[bool, int](func(stronglyConnectedStrongChildren int) bool {
+	t.isStronglyReferencedByTips = reactive.DeriveVariableFromInput[bool, int](func(stronglyConnectedStrongChildren int) bool {
 		return stronglyConnectedStrongChildren > 0
 	}, &t.stronglyConnectedStrongChildren, initLazyOnConstructed)
 
-	t.isWeaklyReferencedByTips = reactive.DeriveVariableFromValue[bool, int](func(connectedWeakChildren int) bool {
+	t.isWeaklyReferencedByTips = reactive.DeriveVariableFromInput[bool, int](func(connectedWeakChildren int) bool {
 		return connectedWeakChildren > 0
 	}, &t.connectedWeakChildren, initLazyOnConstructed)
 
-	t.isReferencedByTips = reactive.DeriveVariableFrom2Values[bool, bool, bool](func(isWeaklyReferencedByTips bool, isStronglyReferencedByTips bool) bool {
+	t.isReferencedByTips = reactive.DeriveVariableFrom2Inputs[bool, bool, bool](func(isWeaklyReferencedByTips bool, isStronglyReferencedByTips bool) bool {
 		return isWeaklyReferencedByTips || isStronglyReferencedByTips
 	}, &t.isWeaklyReferencedByTips, &t.isStronglyReferencedByTips, initLazyOnConstructed)
 
-	t.isStrongTip = reactive.DeriveVariableFrom2Values[bool, bool, bool](func(isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
+	t.isStrongTip = reactive.DeriveVariableFrom2Inputs[bool, bool, bool](func(isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
 		return isStrongTipPoolMember && !isStronglyReferencedByTips
 	}, &t.isStrongTipPoolMember, &t.isStronglyReferencedByTips, initLazyOnConstructed)
 
-	t.isWeakTip = reactive.DeriveVariableFrom2Values[bool, bool, bool](func(isWeakTipPoolMember bool, isReferencedByTips bool) bool {
+	t.isWeakTip = reactive.DeriveVariableFrom2Inputs[bool, bool, bool](func(isWeakTipPoolMember bool, isReferencedByTips bool) bool {
 		return isWeakTipPoolMember && !isReferencedByTips
 	}, &t.isWeakTipPoolMember, &t.isReferencedByTips, initLazyOnConstructed)
 
-	t.isOrphaned = reactive.DeriveVariableFrom2Values[bool, bool, bool](func(isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
+	t.isOrphaned = reactive.DeriveVariableFrom2Inputs[bool, bool, bool](func(isStronglyOrphaned bool, isWeaklyOrphaned bool) bool {
 		return isStronglyOrphaned || isWeaklyOrphaned
 	}, &t.isStronglyOrphaned, &t.isWeaklyOrphaned, initLazyOnConstructed)
 
-	t.anyStrongParentStronglyOrphaned = reactive.DeriveVariableFromValue[bool, int](func(stronglyOrphanedStrongParents int) bool {
+	t.anyStrongParentStronglyOrphaned = reactive.DeriveVariableFromInput[bool, int](func(stronglyOrphanedStrongParents int) bool {
 		return stronglyOrphanedStrongParents > 0
 	}, &t.stronglyOrphanedStrongParents, initLazyOnConstructed)
 
-	t.anyWeakParentWeaklyOrphaned = reactive.DeriveVariableFromValue[bool, int](func(weaklyOrphanedWeakParents int) bool {
+	t.anyWeakParentWeaklyOrphaned = reactive.DeriveVariableFromInput[bool, int](func(weaklyOrphanedWeakParents int) bool {
 		return weaklyOrphanedWeakParents > 0
 	}, &t.weaklyOrphanedWeakParents, initLazyOnConstructed)
 
-	t.isStronglyOrphaned = reactive.DeriveVariableFrom3Values[bool, bool, bool, bool](func(isMarkedOrphaned, anyStrongParentStronglyOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+	t.isStronglyOrphaned = reactive.DeriveVariableFrom3Inputs[bool, bool, bool, bool](func(isMarkedOrphaned, anyStrongParentStronglyOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
 		return isMarkedOrphaned || anyStrongParentStronglyOrphaned || anyWeakParentWeaklyOrphaned
 	}, &t.isMarkedOrphaned, &t.anyStrongParentStronglyOrphaned, &t.anyWeakParentWeaklyOrphaned, initLazyOnConstructed)
 
-	t.isWeaklyOrphaned = reactive.DeriveVariableFrom2Values[bool, bool, bool](func(isMarkedOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+	t.isWeaklyOrphaned = reactive.DeriveVariableFrom2Inputs[bool, bool, bool](func(isMarkedOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
 		return isMarkedOrphaned || anyWeakParentWeaklyOrphaned
 	}, &t.isMarkedOrphaned, &t.anyWeakParentWeaklyOrphaned, initLazyOnConstructed)
 
 	isAccepted := block.Accepted()
-	t.isMarkedOrphaned = reactive.DeriveVariableFrom2Values[bool, bool](func(isLivenessThresholdReached bool, isAccepted bool) bool {
+	t.isMarkedOrphaned = reactive.DeriveVariableFrom2Inputs[bool, bool](func(isLivenessThresholdReached bool, isAccepted bool) bool {
 		return isLivenessThresholdReached && !isAccepted
 	}, &t.livenessThresholdReached, &isAccepted, initLazyOnConstructed)
 
@@ -186,18 +186,18 @@ func (t *TipMetadata) LivenessThresholdReached() reactive.Event {
 	return t.livenessThresholdReached
 }
 
-// IsStrongTip returns a Value that indicates if the block is a strong tip.
-func (t *TipMetadata) IsStrongTip() reactive.Value[bool] {
+// IsStrongTip returns a ReadableVariable that indicates if the block is a strong tip.
+func (t *TipMetadata) IsStrongTip() reactive.ReadableVariable[bool] {
 	return t.isStrongTip
 }
 
-// IsWeakTip returns a Value that indicates if the block is a weak tip.
-func (t *TipMetadata) IsWeakTip() reactive.Value[bool] {
+// IsWeakTip returns a ReadableVariable that indicates if the block is a weak tip.
+func (t *TipMetadata) IsWeakTip() reactive.ReadableVariable[bool] {
 	return t.isWeakTip
 }
 
-// IsOrphaned returns a Value that indicates if the block was orphaned.
-func (t *TipMetadata) IsOrphaned() reactive.Value[bool] {
+// IsOrphaned returns a ReadableVariable that indicates if the block was orphaned.
+func (t *TipMetadata) IsOrphaned() reactive.ReadableVariable[bool] {
 	return t.isOrphaned
 }
 
