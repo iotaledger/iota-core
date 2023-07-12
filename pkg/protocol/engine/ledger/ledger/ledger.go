@@ -63,8 +63,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.ErrorHandler("ledger"),
 		)
 
-		// TODO: when should ledgerState be pruned?
-
 		e.HookConstructed(func() {
 			// TODO: create an Init method that is called with all additional dependencies on e.HookInitialized()
 			e.Events.Ledger.LinkTo(l.events)
@@ -89,6 +87,16 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			}, event.WithWorkerPool(wp))
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
+
+			e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+				l.utxoLedger.WriteLockLedger()
+				defer l.utxoLedger.WriteUnlockLedger()
+
+				// TODO: do we want to delay the pruning of the spent ledger state? We can't export pruned slots anyway.
+				if err := l.utxoLedger.PruneSlotIndexWithoutLocking(index); err != nil {
+					l.errorHandler(ierrors.Wrapf(err, "failed to prune ledger for index %d", index))
+				}
+			})
 
 			l.TriggerConstructed()
 			l.TriggerInitialized()
