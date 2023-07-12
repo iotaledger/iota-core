@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	"github.com/iotaledger/iota-core/pkg/retainer"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -117,9 +118,10 @@ var (
 type dependencies struct {
 	dig.In
 
-	Protocol         *protocol.Protocol
 	AppInfo          *app.Info
 	RestRouteManager *restapipkg.RestRouteManager
+	Protocol         *protocol.Protocol
+	Retainer         retainer.Retainer
 	BlockIssuer      *blockfactory.BlockIssuer `optional:"true"`
 	MetricsTracker   *metricstracker.MetricsTracker
 }
@@ -327,6 +329,7 @@ func responseByHeader(c echo.Context, obj any) error {
 	}
 
 	switch mimeType {
+	// TODO: should this maybe already be V2 ?
 	case httpserver.MIMEApplicationVendorIOTASerializerV1:
 		b, err := deps.Protocol.LatestAPI().Encode(obj)
 		if err != nil {

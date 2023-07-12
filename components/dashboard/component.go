@@ -20,6 +20,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/retainer"
 )
 
 func init() {
@@ -50,6 +51,7 @@ type dependencies struct {
 	dig.In
 
 	Protocol       *protocol.Protocol
+	Retainer       retainer.Retainer
 	LocalPeer      *peer.Local
 	AppInfo        *app.Info
 	P2PManager     *p2p.Manager

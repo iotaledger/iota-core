@@ -3,7 +3,6 @@ package core
 import (
 	"github.com/labstack/echo/v4"
 
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
@@ -35,9 +34,9 @@ func blockByTransactionID(c echo.Context) (*model.Block, error) {
 		return nil, err
 	}
 
-	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
-	if !exists {
-		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
+	block, err := deps.Retainer.Block(blockID)
+	if err != nil {
+		return nil, err
 	}
 
 	return block, nil
