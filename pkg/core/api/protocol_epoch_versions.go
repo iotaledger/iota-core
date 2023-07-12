@@ -72,7 +72,7 @@ type ProtocolEpochVersion struct {
 }
 
 func (p *ProtocolEpochVersion) Bytes() []byte {
-	return append([]byte{p.Version}, lo.PanicOnErr(p.StartEpoch.Bytes())...)
+	return append(lo.PanicOnErr(p.Version.Bytes()), lo.PanicOnErr(p.StartEpoch.Bytes())...)
 }
 
 func (p *ProtocolEpochVersion) String() string {

@@ -102,7 +102,7 @@ func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) err
 		return err
 	}
 
-	return s.store.Set([]byte{protocolParametersKey, params.Version()}, bytes)
+	return s.store.Set([]byte{protocolParametersKey, byte(params.Version())}, bytes)
 }
 
 func (s *Settings) loadProtocolParametersEpochMappings() {
@@ -110,7 +110,10 @@ func (s *Settings) loadProtocolParametersEpochMappings() {
 	defer s.mutex.Unlock()
 
 	if err := s.store.Iterate([]byte{protocolVersionEpochMappingKey}, func(key kvstore.Key, value kvstore.Value) bool {
-		version := key[1]
+		version, _, err := iotago.VersionFromBytes(key)
+		if err != nil {
+			panic(err)
+		}
 
 		epoch, _, err := iotago.EpochIndexFromBytes(value)
 		if err != nil {
@@ -134,7 +137,7 @@ func (s *Settings) StoreProtocolParametersEpochMapping(version iotago.Version, e
 		return err
 	}
 
-	if err := s.store.Set([]byte{protocolVersionEpochMappingKey, version}, bytes); err != nil {
+	if err := s.store.Set([]byte{protocolVersionEpochMappingKey, byte(version)}, bytes); err != nil {
 		return err
 	}
 
@@ -180,13 +183,13 @@ func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
 	return s.store.Set([]byte{latestFinalizedSlotKey}, index.MustBytes())
 }
 
-func (s *Settings) ProtocolParametersAndVersionsHash() ([32]byte, error) {
+func (s *Settings) ProtocolParametersAndVersionsHash() (iotago.Identifier, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	protocolParametersBytes, err := s.LatestAPI().ProtocolParameters().Bytes()
 	if err != nil {
-		return [32]byte{}, ierrors.Wrap(err, "failed to get protocol parameters bytes")
+		return iotago.Identifier{}, ierrors.Wrap(err, "failed to get protocol parameters bytes")
 	}
 
 	return blake2b.Sum256(byteutils.ConcatBytes(protocolParametersBytes, s.protocolVersions.Bytes())), nil
@@ -423,7 +426,7 @@ func (s *Settings) protocolParameters(version iotago.Version) iotago.ProtocolPar
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	bytes, err := s.store.Get([]byte{protocolParametersKey, version})
+	bytes, err := s.store.Get([]byte{protocolParametersKey, byte(version)})
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil
