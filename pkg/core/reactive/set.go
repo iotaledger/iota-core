@@ -52,8 +52,8 @@ type set[ElementType comparable] struct {
 	// readableSet embeds the ReadableSet implementation.
 	*readableSet[ElementType]
 
-	// applyMutex is a mutex that is used to make the Apply method atomic.
-	applyMutex sync.Mutex
+	// mutex is a mutex that is used to make write operations atomic.
+	mutex sync.Mutex
 }
 
 // newSet creates a new set with the given elements.
@@ -89,8 +89,8 @@ func (s *set[ElementType]) Apply(mutations ds.SetMutations[ElementType]) (applie
 		return ds.NewSetMutations[ElementType]()
 	}
 
-	s.applyMutex.Lock()
-	defer s.applyMutex.Unlock()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	appliedMutations, updateID, registeredCallbacks := s.apply(mutations)
 	for _, registeredCallback := range registeredCallbacks {
@@ -105,8 +105,8 @@ func (s *set[ElementType]) Apply(mutations ds.SetMutations[ElementType]) (applie
 
 // Replace replaces the current value of the set with the given elements.
 func (s *set[ElementType]) Replace(elements ds.ReadableSet[ElementType]) (removedElements ds.Set[ElementType]) {
-	s.applyMutex.Lock()
-	defer s.applyMutex.Unlock()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	appliedMutations, updateID, registeredCallbacks := s.replace(elements)
 	for _, registeredCallback := range registeredCallbacks {
@@ -166,7 +166,7 @@ type readableSet[ElementType comparable] struct {
 	// value is the current value of the set.
 	value ds.Set[ElementType]
 
-	// valueMutex is the applyMutex that is used to synchronize the access to the value.
+	// valueMutex is the mutex that is used to synchronize the access to the value.
 	valueMutex sync.RWMutex
 
 	// Readable embeds the set.Readable interface.
