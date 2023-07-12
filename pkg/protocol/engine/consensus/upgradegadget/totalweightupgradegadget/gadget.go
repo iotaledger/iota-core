@@ -1,11 +1,10 @@
 package totalweightupgradegadget
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -24,15 +23,20 @@ type Gadget struct {
 	evictionMutex syncutils.RWMutex
 	errorHandler  func(error)
 
-	latestSignals      *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignalledBlock]
-	upgradeSignalsFunc func(slot iotago.SlotIndex) *prunable.UpgradeSignals
+	latestSignals           *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignalledBlock]
+	upgradeSignalsFunc      func(slot iotago.SlotIndex) *prunable.UpgradeSignals
+	permanentUpgradeSignals *kvstore.TypedStore[iotago.EpochIndex, iotago.Version]
+
+	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.EpochIndex) error
+	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error)
 
 	apiProvider api.Provider
 	seatManager seatmanager.SeatManager
 
-	optsVersionSignallingThreshold float64
-	optsVersionSignallingWindow    iotago.EpochIndex
-	optsNewVersionStartOffset      iotago.EpochIndex
+	optsVersionSignallingThreshold       float64
+	optsVersionSignallingWindowSize      iotago.EpochIndex
+	optsVersionSignallingWindowThreshold int
+	optsNewVersionStartOffset            iotago.EpochIndex
 
 	module.Module
 }
@@ -40,14 +44,18 @@ type Gadget struct {
 func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine, upgradegadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) upgradegadget.Gadget {
 		return options.Apply(&Gadget{
-			optsVersionSignallingThreshold: 0.67,
-			optsVersionSignallingWindow:    7,
-			optsNewVersionStartOffset:      7,
-			errorHandler:                   e.ErrorHandler("upgradegadget"),
-			latestSignals:                  memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignalledBlock](),
+			optsVersionSignallingThreshold:       0.67,
+			optsVersionSignallingWindowSize:      7,
+			optsVersionSignallingWindowThreshold: 5,
+			optsNewVersionStartOffset:            7,
+			errorHandler:                         e.ErrorHandler("upgradegadget"),
+			latestSignals:                        memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignalledBlock](),
 		}, opts, func(g *Gadget) {
-			g.upgradeSignalsFunc = e.Storage.UpgradeSignals
+			g.upgradeSignalsFunc = e.Storage.Prunable.UpgradeSignals
+			g.permanentUpgradeSignals = kvstore.NewTypedStore[iotago.EpochIndex, iotago.Version](e.Storage.Permanent.UpgradeSignals(), iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, iotago.Version.Bytes, iotago.VersionFromBytes)
 			g.apiProvider = e.Storage.Settings()
+			g.setProtocolParametersEpochMappingFunc = e.Storage.Settings().StoreProtocolParametersEpochMapping
+			g.protocolParametersAndVersionsHashFunc = e.Storage.Settings().ProtocolParametersAndVersionsHash
 
 			e.Events.BlockGadget.BlockAccepted.Hook(g.trackHighestSupportedVersion)
 
@@ -82,9 +90,6 @@ func (g *Gadget) trackHighestSupportedVersion(block *blocks.Block) {
 
 	// TODO:
 	//  1. do we want to track the highest supported version also if it's the same as the current version?
-	// 	2. can a validator vote on 2 versions at the same time? does a vote on a higher version include a vote on a lower version?
-	//  	- can we skip a version?
-	// 		- are there going to be parallel votes on different versions going on at the same time?
 
 	// TODO: check whether hash of protocol parameters is the same
 
@@ -109,7 +114,7 @@ func (g *Gadget) addNewSignalledBlock(latestSignalsForEpoch *shrinkingmap.Shrink
 	})
 }
 
-func (g *Gadget) Commit(slot iotago.SlotIndex) {
+func (g *Gadget) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) {
 	apiForSlot := g.apiProvider.APIForSlot(slot)
 	currentEpoch := apiForSlot.TimeProvider().EpochFromSlot(slot)
 
@@ -146,29 +151,101 @@ func (g *Gadget) Commit(slot iotago.SlotIndex) {
 		return signalledBlockPerSeat
 	}()
 
+	g.tryUpgrade(currentEpoch, lastSlotInEpoch, signalledBlockPerSeat)
+
+	return g.protocolParametersAndVersionsHashFunc()
+}
+
+func (g *Gadget) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoch bool, signalledBlockPerSeat map[account.SeatIndex]*prunable.SignalledBlock) {
+	// If the threshold was reached in this epoch and this is the last slot of the epoch we want to evaluate whether the window threshold was reached potentially upgrade the version.
 	if signalledBlockPerSeat == nil || !lastSlotInEpoch {
 		return
 	}
 
-	// TODO: When this is the last slot of the epoch we want to evaluate whether the threshold was reached and export the version.
-
-	versionSupporters := make(map[iotago.Version][]account.SeatIndex)
-	for seat, signalledBlock := range signalledBlockPerSeat {
-		versionSupporters[signalledBlock.HighestSupportedVersion] = append(versionSupporters[signalledBlock.HighestSupportedVersion], seat)
+	versionSupporters := make(map[iotago.Version]int)
+	for _, signalledBlock := range signalledBlockPerSeat {
+		versionSupporters[signalledBlock.HighestSupportedVersion]++
 	}
 
-	totalSeatCount := g.seatManager.SeatCount()
-	for version, supporters := range versionSupporters {
-		if votes.IsThresholdReached(len(supporters), totalSeatCount, g.optsVersionSignallingThreshold) {
-			// TODO: write version to permanent storage
-			fmt.Println("threshold reached for version", version, "with supporters", supporters)
+	// Find version with most supporters. Since the threshold is a super-majority we can't have a tie and looking at the
+	// version with most supporters is sufficient.
+	versionWithMostSupporters, mostSupporters := g.mostSupportedVersion(versionSupporters)
 
-			//	- compress information whether threshold reached
-			//	- check whether threshold was reached 5/7 times before
-			//	-> if yes then add version number
+	// Check whether the threshold for version was reached.
+	totalSeatCount := g.seatManager.SeatCount()
+	if !votes.IsThresholdReached(mostSupporters, totalSeatCount, g.optsVersionSignallingThreshold) {
+		return
+	}
+
+	// Store information that threshold for version was reached for this epoch.
+	if err := g.permanentUpgradeSignals.Set(currentEpoch, versionWithMostSupporters); err != nil {
+		g.errorHandler(ierrors.Wrap(err, "failed to store permanent upgrade signals"))
+		return
+	}
+
+	// Check whether the signalling window threshold is reached.
+	versionTobeUpgraded, reached := g.signallingThresholdReached(currentEpoch)
+	if !reached {
+		return
+	}
+
+	// The version should be upgraded. We're adding the version to the settings.
+	// Effectively, this is a soft fork as it is contained in the hash of protocol parameters and versions.
+	if err := g.setProtocolParametersEpochMappingFunc(versionTobeUpgraded, currentEpoch+g.optsNewVersionStartOffset); err != nil {
+		g.errorHandler(ierrors.Wrap(err, "failed to set protocol parameters epoch mapping"))
+		return
+	}
+}
+
+func (g *Gadget) mostSupportedVersion(versionSupporters map[iotago.Version]int) (iotago.Version, int) {
+	var versionWithMostSupporters iotago.Version
+	var mostSupporters int
+	for version, supportersCount := range versionSupporters {
+		if supportersCount > mostSupporters {
+			versionWithMostSupporters = version
+			mostSupporters = supportersCount
+		}
+	}
+
+	return versionWithMostSupporters, mostSupporters
+}
+
+func (g *Gadget) signallingThresholdReached(currentEpoch iotago.EpochIndex) (iotago.Version, bool) {
+	epochVersions := make(map[iotago.Version]int)
+
+	for epoch := g.signallingWindowStart(currentEpoch); epoch <= currentEpoch; epoch++ {
+		version, err := g.permanentUpgradeSignals.Get(epoch)
+		if err != nil {
+			if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+				continue
+			}
+
+			g.errorHandler(ierrors.Wrap(err, "failed to get permanent upgrade signals"))
+
+			return 0, false
 		}
 
+		epochVersions[version]++
 	}
+
+	// Find version with most supporters. Since the optsVersionSignallingWindowThreshold is a super-majority we can't
+	// have a tie and looking at the version with most supporters is sufficient.
+	versionWithMostSupporters, mostSupporters := g.mostSupportedVersion(epochVersions)
+
+	// Check whether the signalling window threshold is reached.
+	if mostSupporters < g.optsVersionSignallingWindowThreshold {
+		return 0, false
+	}
+
+	return versionWithMostSupporters, true
+}
+
+func (g *Gadget) signallingWindowStart(epoch iotago.EpochIndex) iotago.EpochIndex {
+	if epoch < g.optsVersionSignallingWindowSize {
+		return 0
+	}
+
+	return epoch - g.optsVersionSignallingWindowSize
 }
 
 var _ upgradegadget.Gadget = new(Gadget)
