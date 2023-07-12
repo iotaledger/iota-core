@@ -59,7 +59,10 @@ func BlockFromBytes(data []byte, apiProvider api.Provider, opts ...serix.Option)
 		return nil, ierrors.Wrap(err, "failed to determine version")
 	}
 
-	apiForVersion := apiProvider.APIForVersion(version)
+	apiForVersion, err := apiProvider.APIForVersion(version)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get API for version %d", version)
+	}
 
 	iotaBlock := new(iotago.ProtocolBlock)
 	if _, err := apiForVersion.Decode(data, iotaBlock, opts...); err != nil {

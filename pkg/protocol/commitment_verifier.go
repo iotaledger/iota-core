@@ -5,6 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -27,7 +28,7 @@ func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
 		func(attestation *iotago.Attestation) ([]byte, error) {
-			return c.engine.APIForVersion(attestation.ProtocolVersion).Encode(attestation)
+			return lo.PanicOnErr(c.engine.APIForVersion(attestation.ProtocolVersion)).Encode(attestation)
 		},
 		func(bytes []byte) (*iotago.Attestation, int, error) {
 			version, _, err := iotago.VersionFromBytes(bytes)
@@ -36,7 +37,7 @@ func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.
 			}
 
 			a := new(iotago.Attestation)
-			n, err := c.engine.APIForVersion(version).Decode(bytes, a)
+			n, err := lo.PanicOnErr(c.engine.APIForVersion(version)).Decode(bytes, a)
 
 			return a, n, err
 		},
@@ -73,7 +74,10 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		//  First, this can be based on the latest commonly known ledger state.
 		//  Later, this needs to include a proof of added/removed public keys.
 
-		api := c.engine.APIForVersion(att.ProtocolVersion)
+		api, err := c.engine.APIForVersion(att.ProtocolVersion)
+		if err != nil {
+			return nil, 0, ierrors.Wrap(err, "error determining API for attestation")
+		}
 
 		// 2. Verify the signature of the attestation.
 		if valid, err := att.VerifySignature(api); !valid {

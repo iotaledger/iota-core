@@ -1,7 +1,6 @@
 package permanent
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -40,7 +39,6 @@ func (c *Commitments) Store(commitment *model.Commitment) error {
 }
 
 func (c *Commitments) Load(index iotago.SlotIndex) (commitment *model.Commitment, err error) {
-	fmt.Println("Commitments.Load", index)
 	return c.store.Get(index)
 }
 

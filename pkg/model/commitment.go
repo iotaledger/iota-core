@@ -54,7 +54,10 @@ func CommitmentFromBytes(data []byte, apiProvider api.Provider, opts ...serix.Op
 		return nil, ierrors.Wrap(err, "failed to determine version")
 	}
 
-	apiForVersion := apiProvider.APIForVersion(version)
+	apiForVersion, err := apiProvider.APIForVersion(version)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get API for version %d", version)
+	}
 
 	iotaCommitment := new(iotago.Commitment)
 	if _, err := apiForVersion.Decode(data, iotaCommitment, opts...); err != nil {

@@ -66,32 +66,59 @@ func (s *Settings) HighestSupportedProtocolVersion() iotago.Version {
 var _ api.Provider = &Settings{}
 
 func (s *Settings) LatestAPI() iotago.API {
-	return s.APIForVersion(iotago.LatestProtocolVersion())
+	// There can't be an error since we are using the latest protocol version which should always exist.
+	return lo.PanicOnErr(s.APIForVersion(iotago.LatestProtocolVersion()))
 }
 
 func (s *Settings) APIForSlot(slot iotago.SlotIndex) iotago.API {
-	return s.APIForVersion(s.VersionForSlot(slot))
+	apiForSlot, err := s.APIForVersion(s.VersionForSlot(slot))
+
+	// This means that the protocol version for the given slot is known but not supported yet. This could only happen after an upgrade
+	// has been scheduled at a future epoch but the node software not yet upgraded to support it AND while misusing the API.
+	// Before a slot can be determined APIForVersion must be called on said object which will already return an error that
+	// the protocol version is not supported.
+	if err != nil {
+		panic(err)
+	}
+
+	return apiForSlot
 }
 
 func (s *Settings) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
-	return s.APIForVersion(s.VersionForEpoch(epoch))
+	apiForEpoch, err := s.APIForVersion(s.VersionForEpoch(epoch))
+
+	// This means that the protocol version for the given epoch is known but not supported yet. This could only happen after an upgrade
+	// has been scheduled at a future epoch but the node software not yet upgraded to support it AND while misusing the API.
+	// Before a slot can be determined APIForVersion must be called on said object which will already return an error that
+	// the protocol version is not supported.
+	if err != nil {
+		panic(err)
+	}
+
+	return apiForEpoch
 }
 
-func (s *Settings) APIForVersion(version iotago.Version) iotago.API {
+// APIForVersion returns the API for the given protocol version.
+// This function is safe to be called with data received from the network. It will return an error if the protocol
+// version is not supported.
+func (s *Settings) APIForVersion(version iotago.Version) (iotago.API, error) {
 	s.apiMutex.RLock()
 	if api, exists := s.apiByVersion[version]; exists {
 		s.apiMutex.RUnlock()
-		return api
+		return api, nil
 	}
 	s.apiMutex.RUnlock()
 
-	api := s.apiFromProtocolParameters(version)
+	api, err := s.apiFromProtocolParameters(version)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to create API from protocol parameters")
+	}
 
 	s.apiMutex.Lock()
 	s.apiByVersion[version] = api
 	s.apiMutex.Unlock()
 
-	return api
+	return api, nil
 }
 
 func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) error {
@@ -226,7 +253,8 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 	var commitmentBytes []byte
 	var err error
 	if targetCommitment != nil {
-		commitmentBytes, err = s.APIForVersion(targetCommitment.Version).Encode(targetCommitment)
+		// We always know the version of the target commitment, so there can be no error.
+		commitmentBytes, err = lo.PanicOnErr(s.APIForVersion(targetCommitment.Version)).Encode(targetCommitment)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to encode target commitment")
 		}
@@ -394,16 +422,12 @@ func (s *Settings) String() string {
 	return builder.String()
 }
 
-func (s *Settings) latestAPI() iotago.API {
-	return s.apiForVersion(iotago.LatestProtocolVersion())
-}
-
 func (s *Settings) latestCommitment() *model.Commitment {
 	bytes, err := s.store.Get([]byte{latestCommitmentKey})
 
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return model.NewEmptyCommitment(s.latestAPI())
+			return model.NewEmptyCommitment(s.LatestAPI())
 		}
 		panic(err)
 	}
@@ -427,32 +451,18 @@ func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
 	return i
 }
 
-func (s *Settings) apiForVersion(version iotago.Version) iotago.API {
-	if api, exists := s.apiByVersion[version]; exists {
-		return api
-	}
-
-	api := s.apiFromProtocolParameters(version)
-
-	s.apiMutex.Lock()
-	s.apiByVersion[version] = api
-	s.apiMutex.Unlock()
-
-	return api
-}
-
-func (s *Settings) apiFromProtocolParameters(version iotago.Version) iotago.API {
+func (s *Settings) apiFromProtocolParameters(version iotago.Version) (iotago.API, error) {
 	protocolParams := s.protocolParameters(version)
 	if protocolParams == nil {
-		panic(ierrors.Errorf("protocol parameters for version %d not found", version))
+		return nil, ierrors.Errorf("protocol parameters for version %d not found", version)
 	}
 
 	switch protocolParams.Version() {
 	case 3:
-		return iotago.V3API(protocolParams)
-	default:
-		panic(ierrors.Errorf("unsupported protocol version %d", protocolParams.Version()))
+		return iotago.V3API(protocolParams), nil
 	}
+
+	return nil, ierrors.Errorf("unsupported protocol version %d", protocolParams.Version())
 }
 
 func (s *Settings) protocolParameters(version iotago.Version) iotago.ProtocolParameters {
