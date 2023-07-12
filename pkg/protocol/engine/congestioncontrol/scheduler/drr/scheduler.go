@@ -329,7 +329,6 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 			q = s.buffer.Current()
 		} else {
 			q = s.buffer.Next()
-			issuerRemoved = false
 		}
 		if q == start || q == nil {
 			break
