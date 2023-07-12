@@ -2,12 +2,12 @@ package blocks
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/reactive"
@@ -42,7 +42,7 @@ type Block struct {
 	confirmationRatifiers ds.Set[account.SeatIndex]
 	confirmed             bool
 
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 
 	modelBlock *model.Block
 	rootBlock  *rootBlock
@@ -160,18 +160,22 @@ func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) 
 	return b.modelBlock.BasicBlock()
 }
 
-func (b *Block) ValidatorBlock() (validatorBlock *iotago.ValidatorBlock, isValidatorBlock bool) {
+func (b *Block) ValidationBlock() (validationBlock *iotago.ValidationBlock, isValidationBlock bool) {
 	if b.modelBlock == nil {
 		return nil, false
 	}
 
-	return b.modelBlock.ValidatorBlock()
+	return b.modelBlock.ValidationBlock()
 }
 
 func (b *Block) ID() iotago.BlockID {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
+	return b.id()
+}
+
+func (b *Block) id() iotago.BlockID {
 	if b.missing {
 		return b.missingBlockID
 	}
@@ -520,7 +524,7 @@ func (b *Block) String() string {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	builder := stringify.NewStructBuilder("Engine.Block", stringify.NewStructField("id", b.ID()))
+	builder := stringify.NewStructBuilder("Engine.Block", stringify.NewStructField("id", b.id()))
 	builder.AddField(stringify.NewStructField("Missing", b.missing))
 	builder.AddField(stringify.NewStructField("Solid", b.solid))
 	builder.AddField(stringify.NewStructField("Invalid", b.invalid))

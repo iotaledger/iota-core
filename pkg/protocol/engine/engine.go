@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
@@ -14,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
@@ -61,10 +61,10 @@ type Engine struct {
 	BlockCache *blocks.Blocks
 
 	isBootstrapped      bool
-	isBootstrappedMutex sync.Mutex
+	isBootstrappedMutex syncutils.Mutex
 
 	chainID iotago.CommitmentID
-	mutex   sync.RWMutex
+	mutex   syncutils.RWMutex
 
 	optsBootstrappedThreshold time.Duration
 	optsSnapshotPath          string

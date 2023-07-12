@@ -1,8 +1,6 @@
 package conflictdagv1
 
 import (
-	"sync"
-
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/walker"
@@ -38,7 +36,7 @@ type ConflictDAG[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 	pendingTasks *syncutils.Counter
 
 	// mutex is used to synchronize access to the ConflictDAG.
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 
 	// votingMutex is used to synchronize voting for different identities.
 	votingMutex *syncutils.DAGMutex[account.SeatIndex]

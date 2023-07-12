@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/iotaledger/hive.go/ds/orderedmap"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/types"
 )
 
@@ -30,7 +31,7 @@ type Promise[T any] struct {
 	complete bool
 
 	// mutex is used to synchronize access to the promise.
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 }
 
 // New creates a new promise.

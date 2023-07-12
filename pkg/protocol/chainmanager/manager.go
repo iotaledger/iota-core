@@ -2,7 +2,6 @@ package chainmanager
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/core/memstorage"
@@ -29,7 +28,7 @@ type Manager struct {
 
 	forksByForkingPoint *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *Fork]
 
-	evictionMutex sync.RWMutex
+	evictionMutex syncutils.RWMutex
 
 	optsCommitmentRequester []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]
 

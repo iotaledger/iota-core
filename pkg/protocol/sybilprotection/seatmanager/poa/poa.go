@@ -1,13 +1,13 @@
 package poa
 
 import (
-	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -30,8 +30,8 @@ type SeatManager struct {
 	onlineCommittee   ds.Set[account.SeatIndex]
 	inactivityManager *timed.TaskExecutor[account.SeatIndex]
 	lastActivities    *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
-	activityMutex     sync.RWMutex
-	committeeMutex    sync.RWMutex
+	activityMutex     syncutils.RWMutex
+	committeeMutex    syncutils.RWMutex
 
 	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID

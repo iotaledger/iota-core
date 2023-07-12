@@ -1,10 +1,10 @@
 package blocktime
 
 import (
-	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
 
 // RelativeTime is a time value that monotonically advances with the system clock.
@@ -19,7 +19,7 @@ type RelativeTime struct {
 	timeUpdateOffset time.Time
 
 	// mutex is used to synchronize access to the time value.
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 }
 
 // NewRelativeTime creates a new RelativeTime.

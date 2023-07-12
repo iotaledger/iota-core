@@ -2,7 +2,6 @@ package inmemoryblockdag
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/core/memstorage"
@@ -12,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -51,9 +51,9 @@ type BlockDAG struct {
 	// promoteFutureBlocksMethod write-locks the futureBlocks mutex, and then read-locks the eviction mutex
 	// of the solidifier. As the locks are non-starving, and locks are interlocked in different orders a
 	// deadlock can occur only when an eviction is triggered while the above scenario unfolds.
-	solidifierMutex sync.RWMutex
+	solidifierMutex syncutils.RWMutex
 
-	futureBlocksMutex sync.RWMutex
+	futureBlocksMutex syncutils.RWMutex
 
 	workers    *workerpool.Group
 	workerPool *workerpool.WorkerPool

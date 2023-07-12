@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -61,7 +62,7 @@ type TestSuite struct {
 	optsTick                   time.Duration
 
 	uniqueCounter        atomic.Int64
-	mutex                sync.RWMutex
+	mutex                syncutils.RWMutex
 	TransactionFramework *TransactionFramework
 	genesisSeed          [32]byte
 }

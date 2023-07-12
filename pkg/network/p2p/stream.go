@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/libp2putil"
 	pp "github.com/iotaledger/iota-core/pkg/network/p2p/proto"
 )
@@ -237,7 +238,7 @@ func (m *Manager) handleStream(stream network.Stream) {
 type AcceptMatcher struct {
 	Peer          *peer.Peer // connecting peer
 	Libp2pID      libp2ppeer.ID
-	StreamChMutex sync.RWMutex
+	StreamChMutex syncutils.RWMutex
 	StreamCh      map[protocol.ID]chan *PacketsStream
 	Ctx           context.Context
 	CtxCancel     context.CancelFunc
@@ -317,9 +318,9 @@ type PacketsStream struct {
 	network.Stream
 	packetFactory func() proto.Message
 
-	readerLock     sync.Mutex
+	readerLock     syncutils.Mutex
 	reader         *libp2putil.UvarintReader
-	writerLock     sync.Mutex
+	writerLock     syncutils.Mutex
 	writer         *libp2putil.UvarintWriter
 	packetsRead    *atomic.Uint64
 	packetsWritten *atomic.Uint64
