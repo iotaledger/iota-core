@@ -78,8 +78,8 @@ func (s *derivedSet[ElementType]) triggerUpdate(mutations ds.SetMutations[Elemen
 // prepareTrigger prepares the trigger by applying the given mutations to the set and returning the applied mutations,
 // the trigger ID and the callbacks to trigger.
 func (s *derivedSet[ElementType]) prepareTrigger(mutations ds.SetMutations[ElementType]) (inheritedMutations ds.SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(ds.SetMutations[ElementType])]) {
-	s.valueMutex.Lock()
-	defer s.valueMutex.Unlock()
+	s.readableSet.mutex.Lock()
+	defer s.readableSet.mutex.Unlock()
 
 	inheritedMutations = ds.NewSetMutations[ElementType]()
 

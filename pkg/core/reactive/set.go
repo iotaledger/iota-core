@@ -121,8 +121,8 @@ func (s *set[ElementType]) Replace(elements ds.ReadableSet[ElementType]) (remove
 
 // Decode decodes the set from a byte slice.
 func (s *set[ElementType]) Decode(b []byte) (bytesRead int, err error) {
-	s.valueMutex.Lock()
-	defer s.valueMutex.Unlock()
+	s.readableSet.mutex.Lock()
+	defer s.readableSet.mutex.Unlock()
 
 	return s.value.Decode(b)
 }
@@ -134,16 +134,16 @@ func (s *set[ElementType]) ReadOnly() ds.ReadableSet[ElementType] {
 
 // apply applies the given mutations to the set.
 func (s *set[ElementType]) apply(mutations ds.SetMutations[ElementType]) (appliedMutations ds.SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(ds.SetMutations[ElementType])]) {
-	s.valueMutex.Lock()
-	defer s.valueMutex.Unlock()
+	s.readableSet.mutex.Lock()
+	defer s.readableSet.mutex.Unlock()
 
 	return s.value.Apply(mutations), s.uniqueUpdateID.Next(), s.updateCallbacks.Values()
 }
 
 // replace replaces the current value of the set with the given elements.
 func (s *set[ElementType]) replace(elements ds.ReadableSet[ElementType]) (appliedMutations ds.SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(ds.SetMutations[ElementType])]) {
-	s.valueMutex.Lock()
-	defer s.valueMutex.Unlock()
+	s.readableSet.mutex.Lock()
+	defer s.readableSet.mutex.Unlock()
 
 	return ds.NewSetMutations[ElementType](elements.ToSlice()...).WithDeletedElements(s.value.Replace(elements)), s.uniqueUpdateID.Next(), s.updateCallbacks.Values()
 }
@@ -166,8 +166,8 @@ type readableSet[ElementType comparable] struct {
 	// value is the current value of the set.
 	value ds.Set[ElementType]
 
-	// valueMutex is the mutex that is used to synchronize the access to the value.
-	valueMutex sync.RWMutex
+	// mutex is the mutex that is used to synchronize the access to the value.
+	mutex sync.RWMutex
 
 	// Readable embeds the set.Readable interface.
 	ds.ReadableSet[ElementType]
@@ -186,7 +186,7 @@ func newReadableSet[ElementType comparable](elements ...ElementType) *readableSe
 
 // OnUpdate registers the given callback to be triggered when the value of the set changes.
 func (r *readableSet[ElementType]) OnUpdate(callback func(appliedMutations ds.SetMutations[ElementType]), triggerWithInitialZeroValue ...bool) (unsubscribe func()) {
-	r.valueMutex.Lock()
+	r.mutex.Lock()
 
 	mutations := ds.NewSetMutations[ElementType]().WithAddedElements(r.Clone())
 
@@ -197,7 +197,7 @@ func (r *readableSet[ElementType]) OnUpdate(callback func(appliedMutations ds.Se
 	createdCallback.LockExecution(r.uniqueUpdateID)
 	defer createdCallback.UnlockExecution()
 
-	r.valueMutex.Unlock()
+	r.mutex.Unlock()
 
 	if !mutations.IsEmpty() || lo.First(triggerWithInitialZeroValue) {
 		createdCallback.Invoke(mutations)
