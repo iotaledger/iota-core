@@ -269,6 +269,9 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	if unspentFaucet.OutputStruct == nil {
 		clt := e.connector.GetClient()
 		faucetOutput := clt.GetOutput(e.optFaucetUnspentOutputID)
+		if faucetOutput == nil {
+			panic("no valid faucet unspent output")
+		}
 		unspentFaucet.OutputStruct = faucetOutput
 	}
 	remainderAmount := unspentFaucet.Balance - faucetTokensPerRequest
