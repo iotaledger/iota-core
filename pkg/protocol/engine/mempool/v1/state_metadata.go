@@ -22,7 +22,7 @@ type StateMetadata struct {
 	spendCommitted     reactive.Variable[*TransactionMetadata]
 	allSpendersRemoved *event.Event
 
-	conflictIDs reactive.Set[iotago.TransactionID]
+	conflictIDs reactive.DerivedSet[iotago.TransactionID]
 
 	*inclusionFlags
 }
@@ -38,7 +38,7 @@ func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *S
 		spendCommitted:     reactive.NewVariable[*TransactionMetadata](),
 		allSpendersRemoved: event.New(),
 
-		conflictIDs: reactive.NewSet[iotago.TransactionID](),
+		conflictIDs: reactive.NewDerivedSet[iotago.TransactionID](),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(optSource...)

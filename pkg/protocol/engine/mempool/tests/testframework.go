@@ -201,10 +201,10 @@ func (t *TestFramework) RequireConflictIDs(conflictMapping map[string][]string) 
 		require.True(t.test, exists, "transaction %s does not exist", transactionAlias)
 
 		conflictIDs := transactionMetadata.ConflictIDs()
-		require.Equal(t.test, len(conflictAliases), conflictIDs.Get().Size(), "%s has wrong number of ConflictIDs", transactionAlias)
+		require.Equal(t.test, len(conflictAliases), conflictIDs.Size(), "%s has wrong number of ConflictIDs", transactionAlias)
 
 		for _, conflictAlias := range conflictAliases {
-			require.True(t.test, conflictIDs.Get().Has(t.TransactionID(conflictAlias)), "transaction %s should have conflict %s, instead had %s", transactionAlias, conflictAlias, conflictIDs)
+			require.True(t.test, conflictIDs.Has(t.TransactionID(conflictAlias)), "transaction %s should have conflict %s, instead had %s", transactionAlias, conflictAlias, conflictIDs)
 		}
 	}
 }

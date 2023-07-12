@@ -3,7 +3,7 @@ package mock
 import (
 	"fmt"
 
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -15,7 +15,7 @@ import (
 type ManualPOA struct {
 	accounts  *account.Accounts
 	committee *account.SeatedAccounts
-	online    set.Set[account.SeatIndex]
+	online    ds.Set[account.SeatIndex]
 	aliases   *shrinkingmap.ShrinkingMap[string, iotago.AccountID]
 
 	module.Module
@@ -24,7 +24,7 @@ type ManualPOA struct {
 func NewManualPOA() *ManualPOA {
 	m := &ManualPOA{
 		accounts: account.NewAccounts(),
-		online:   set.New[account.SeatIndex](),
+		online:   ds.NewSet[account.SeatIndex](),
 		aliases:  shrinkingmap.New[string, iotago.AccountID](),
 	}
 	m.committee = m.accounts.SelectCommittee()
@@ -83,7 +83,7 @@ func (m *ManualPOA) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
 	return m.committee
 }
 
-func (m *ManualPOA) OnlineCommittee() set.Set[account.SeatIndex] {
+func (m *ManualPOA) OnlineCommittee() ds.Set[account.SeatIndex] {
 	return m.online
 }
 

@@ -20,8 +20,8 @@ type TransactionMetadata struct {
 	inputs            []*StateMetadata
 	outputs           []*StateMetadata
 	transaction       mempool.Transaction
-	parentConflictIDs reactive.Set[iotago.TransactionID]
-	conflictIDs       reactive.Set[iotago.TransactionID]
+	parentConflictIDs reactive.DerivedSet[iotago.TransactionID]
+	conflictIDs       reactive.DerivedSet[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -66,8 +66,8 @@ func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction)
 		inputReferences:   inputReferences,
 		inputs:            make([]*StateMetadata, len(inputReferences)),
 		transaction:       transaction,
-		parentConflictIDs: reactive.NewSet[iotago.TransactionID](),
-		conflictIDs:       reactive.NewSet[iotago.TransactionID](),
+		parentConflictIDs: reactive.NewDerivedSet[iotago.TransactionID](),
+		conflictIDs:       reactive.NewDerivedSet[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
 		booked:             promise.NewEvent(),
@@ -285,7 +285,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	t.OnConflicting(func() {
 		cancelConflictInheritance()
 
-		t.conflictIDs.Set(ds.NewSet(t.id))
+		t.conflictIDs.Replace(ds.NewSet(t.id))
 	})
 
 	t.allAttachmentsEvicted.OnTrigger(func() {

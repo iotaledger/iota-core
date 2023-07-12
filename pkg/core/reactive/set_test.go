@@ -12,7 +12,7 @@ func TestSet(t *testing.T) {
 	source1 := NewSet[int]()
 	source2 := NewSet[int]()
 
-	inheritedSet := NewSet[int]()
+	inheritedSet := NewDerivedSet[int]()
 	inheritedSet.InheritFrom(source1, source2)
 
 	source1.AddAll(ds.NewSet(1, 2, 4))
@@ -24,7 +24,7 @@ func TestSet(t *testing.T) {
 	require.True(t, inheritedSet.Has(7))
 	require.True(t, inheritedSet.Has(9))
 
-	inheritedSet1 := NewSet[int]()
+	inheritedSet1 := NewDerivedSet[int]()
 	inheritedSet1.InheritFrom(source1, source2)
 
 	require.True(t, inheritedSet1.Has(1))

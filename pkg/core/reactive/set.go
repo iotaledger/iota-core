@@ -70,7 +70,7 @@ func (s *set[ElementType]) Add(element ElementType) bool {
 
 // AddAll adds all elements to the set and returns true if any element has been added.
 func (s *set[ElementType]) AddAll(elements ds.ReadableSet[ElementType]) (addedElements ds.Set[ElementType]) {
-	return s.Apply(ds.NewSetMutations[ElementType]().WithAddedElements(elements)).AddedElements()
+	return s.Apply(ds.NewSetMutations[ElementType]().WithAddedElements(elements.Clone())).AddedElements()
 }
 
 // Delete deletes the given element from the set.
@@ -80,7 +80,7 @@ func (s *set[ElementType]) Delete(element ElementType) bool {
 
 // DeleteAll deletes the given elements from the set.
 func (s *set[ElementType]) DeleteAll(elements ds.ReadableSet[ElementType]) (deletedElements ds.Set[ElementType]) {
-	return s.Apply(ds.NewSetMutations[ElementType]().WithDeletedElements(elements)).DeletedElements()
+	return s.Apply(ds.NewSetMutations[ElementType]().WithDeletedElements(elements.Clone())).DeletedElements()
 }
 
 // Apply applies the given mutations to the set atomically and returns the applied mutations.
@@ -103,6 +103,22 @@ func (s *set[ElementType]) Apply(mutations ds.SetMutations[ElementType]) (applie
 	return appliedMutations
 }
 
+// Replace replaces the current value of the set with the given elements.
+func (s *set[ElementType]) Replace(elements ds.ReadableSet[ElementType]) (removedElements ds.Set[ElementType]) {
+	s.applyMutex.Lock()
+	defer s.applyMutex.Unlock()
+
+	appliedMutations, updateID, registeredCallbacks := s.replace(elements)
+	for _, registeredCallback := range registeredCallbacks {
+		if registeredCallback.LockExecution(updateID) {
+			registeredCallback.Invoke(appliedMutations)
+			registeredCallback.UnlockExecution()
+		}
+	}
+
+	return appliedMutations.DeletedElements()
+}
+
 // Decode decodes the set from a byte slice.
 func (s *set[ElementType]) Decode(b []byte) (bytesRead int, err error) {
 	s.valueMutex.Lock()
@@ -111,22 +127,9 @@ func (s *set[ElementType]) Decode(b []byte) (bytesRead int, err error) {
 	return s.value.Decode(b)
 }
 
-// ToReadOnly returns a read-only version of the set.
-func (s *set[ElementType]) ToReadOnly() ds.ReadableSet[ElementType] {
+// ReadOnly returns a read-only version of the set.
+func (s *set[ElementType]) ReadOnly() ds.ReadableSet[ElementType] {
 	return s.readableSet
-}
-
-// InheritFrom registers the given sets to inherit their mutations to the set.
-func (s *set[ElementType]) InheritFrom(sources ...Set[ElementType]) (unsubscribe func()) {
-	unsubscribeCallbacks := make([]func(), len(sources))
-
-	for i, source := range sources {
-		unsubscribeCallbacks[i] = source.OnUpdate(func(appliedMutations ds.SetMutations[ElementType]) {
-			s.Apply(appliedMutations)
-		})
-	}
-
-	return lo.Batch(unsubscribeCallbacks...)
 }
 
 // apply applies the given mutations to the set.
@@ -135,6 +138,14 @@ func (s *set[ElementType]) apply(mutations ds.SetMutations[ElementType]) (applie
 	defer s.valueMutex.Unlock()
 
 	return s.value.Apply(mutations), s.uniqueUpdateID.Next(), s.updateCallbacks.Values()
+}
+
+// replace replaces the current value of the set with the given elements.
+func (s *set[ElementType]) replace(elements ds.ReadableSet[ElementType]) (appliedMutations ds.SetMutations[ElementType], triggerID types.UniqueID, callbacksToTrigger []*callback[func(ds.SetMutations[ElementType])]) {
+	s.valueMutex.Lock()
+	defer s.valueMutex.Unlock()
+
+	return ds.NewSetMutations[ElementType](elements.ToSlice()...).WithDeletedElements(s.value.Replace(elements)), s.uniqueUpdateID.Next(), s.updateCallbacks.Values()
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -167,7 +178,7 @@ func newReadableSet[ElementType comparable](elements ...ElementType) *readableSe
 	setInstance := ds.NewSet[ElementType](elements...)
 
 	return &readableSet[ElementType]{
-		ReadableSet:     setInstance.ToReadOnly(),
+		ReadableSet:     setInstance.ReadOnly(),
 		value:           setInstance,
 		updateCallbacks: shrinkingmap.New[types.UniqueID, *callback[func(ds.SetMutations[ElementType])]](),
 	}
@@ -177,7 +188,7 @@ func newReadableSet[ElementType comparable](elements ...ElementType) *readableSe
 func (r *readableSet[ElementType]) OnUpdate(callback func(appliedMutations ds.SetMutations[ElementType]), triggerWithInitialZeroValue ...bool) (unsubscribe func()) {
 	r.valueMutex.Lock()
 
-	mutations := ds.NewSetMutations[ElementType]().WithAddedElements(r)
+	mutations := ds.NewSetMutations[ElementType]().WithAddedElements(r.Clone())
 
 	createdCallback := newCallback[func(ds.SetMutations[ElementType])](r.uniqueCallbackID.Next(), callback)
 	r.updateCallbacks.Set(createdCallback.ID, createdCallback)

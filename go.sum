@@ -270,6 +270,10 @@ github.com/iotaledger/hive.go/ds v0.0.0-20230710212720-5fa10a9113b0 h1:KeSrwWS/L
 github.com/iotaledger/hive.go/ds v0.0.0-20230710212720-5fa10a9113b0/go.mod h1:FAz9zehG2JYIW67wUrbV4OrJFlKaaMLqUChEDimP9Js=
 github.com/iotaledger/hive.go/ds v0.0.0-20230711014515-69e9e2fb23ca h1:LqU7gpfiycRoaVy87xIb2si79nN2nPYLhJN4oSf14mA=
 github.com/iotaledger/hive.go/ds v0.0.0-20230711014515-69e9e2fb23ca/go.mod h1:FAz9zehG2JYIW67wUrbV4OrJFlKaaMLqUChEDimP9Js=
+github.com/iotaledger/hive.go/ds v0.0.0-20230712115947-ed258ec0d9e8 h1:NiAXxV/cZ0WZsmA+p2PGBnCsz/xOLUiu52DWhzEP1dc=
+github.com/iotaledger/hive.go/ds v0.0.0-20230712115947-ed258ec0d9e8/go.mod h1:FAz9zehG2JYIW67wUrbV4OrJFlKaaMLqUChEDimP9Js=
+github.com/iotaledger/hive.go/ds v0.0.0-20230712121247-48740b8a80c3 h1:H1DC33Jpl0ArlQGnr7oymY2I4+bpHWLzGKxHlj2JOyk=
+github.com/iotaledger/hive.go/ds v0.0.0-20230712121247-48740b8a80c3/go.mod h1:FAz9zehG2JYIW67wUrbV4OrJFlKaaMLqUChEDimP9Js=
 github.com/iotaledger/hive.go/ierrors v0.0.0-20230706083020-ef6c3248369d h1:USj27KfaNTE4HD99HAv9heagQ6puR/iquHp/MQXXMbw=
 github.com/iotaledger/hive.go/ierrors v0.0.0-20230706083020-ef6c3248369d/go.mod h1:aMfXyyUB+ODjZB2Q1CdSUSWIFbhvIWnVlBZWkJ2T0Uw=
 github.com/iotaledger/hive.go/kvstore v0.0.0-20230706083020-ef6c3248369d h1:XrmUeuR3JMRhkonRhe5yTbd9KZ6AQkif8/5d3Soy/Cw=

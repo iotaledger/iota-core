@@ -4,7 +4,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -127,8 +127,8 @@ func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*
 					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: block %s does not exist", node.Name, transactionID)
 				}
 
-				expectedConflictIDs := set.New(lo.Map(conflictAliases, t.TransactionFramework.TransactionID)...)
-				actualConflictIDs := transactionFromCache.ConflictIDs().Get()
+				expectedConflictIDs := ds.NewSet(lo.Map(conflictAliases, t.TransactionFramework.TransactionID)...)
+				actualConflictIDs := transactionFromCache.ConflictIDs()
 
 				if expectedConflictIDs.Size() != actualConflictIDs.Size() {
 					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s conflict count incorrect: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedConflictIDs, actualConflictIDs)
