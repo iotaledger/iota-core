@@ -212,7 +212,9 @@ func getTransactionMetadata(c echo.Context) error {
 		return ierrors.Errorf("tx metadata not found: %s", txID.ToHex())
 	}
 
-	return httpserver.JSONResponse(c, http.StatusOK, NewTransactionMetadata(txMetadata))
+	conflicts, _ := deps.Protocol.MainEngineInstance().Ledger.ConflictDAG().ConflictingConflicts(txID)
+
+	return httpserver.JSONResponse(c, http.StatusOK, NewTransactionMetadata(txMetadata, conflicts))
 }
 
 func getOutput(c echo.Context) error {

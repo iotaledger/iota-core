@@ -3,6 +3,7 @@ package dashboard
 import (
 	"encoding/json"
 
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -242,7 +243,7 @@ type TransactionMetadata struct {
 }
 
 // NewTransactionMetadata returns the TransactionMetadata from the given mempool.TransactionMetadata.
-func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata) *TransactionMetadata {
+func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata, conflicts *advancedset.AdvancedSet[iotago.Identifier]) *TransactionMetadata {
 	var confirmationState string
 	if transactionMetadata.IsAccepted() {
 		confirmationState = "accepted"
@@ -254,7 +255,13 @@ func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata) *Tr
 
 	return &TransactionMetadata{
 		TransactionID: transactionMetadata.ID().ToHex(),
-		// ConflictIDs:           lo.Map(lo.Map(transactionMetadata.ConflictIDs().Slice(), func(t utxo.TransactionID) []byte { return lo.PanicOnErr(t.Bytes()) }), base58.Encode),
+		ConflictIDs: func() []string {
+			var strIDs []string
+			for _, txID := range conflicts.Slice() {
+				strIDs = append(strIDs, txID.ToHex())
+			}
+			return strIDs
+		}(),
 		Booked:            transactionMetadata.IsBooked(),
 		ConfirmationState: confirmationState,
 	}
