@@ -18,7 +18,6 @@ type Commitments struct {
 }
 
 func NewCommitments(store kvstore.KVStore, apiProvider api.Provider) *Commitments {
-
 	return &Commitments{
 		apiProvider: apiProvider,
 		store: kvstore.NewTypedStore(store,
