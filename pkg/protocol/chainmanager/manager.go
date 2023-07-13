@@ -417,6 +417,10 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 			childWalker.PushAll(m.propagateReplaceChainToMainChild(childWalker.Next(), newChildChain)...)
 		}
 
+		for childWalker := walker.New[*ChainCommitment]().Push(fp); childWalker.HasNext(); {
+			childWalker.PushAll(m.propagateReplaceChainToMainChild(childWalker.Next(), parentCommitment.Chain())...)
+		}
+
 		if fp == forkingPoint {
 			break
 		}

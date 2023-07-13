@@ -295,6 +295,78 @@ func TestManagerForkDetectedAgain(t *testing.T) {
 	}
 }
 
+func TestManagerForkDetectedReorgChains(t *testing.T) {
+	tf := NewTestFramework(t, tpkg.TestAPI)
+	tf.CreateCommitment("1", "Genesis", 10)
+	tf.CreateCommitment("2", "1", 20)
+	tf.CreateCommitment("3", "2", 30)
+	tf.CreateCommitment("4", "3", 40)
+	tf.CreateCommitment("5", "4", 80)
+	tf.CreateCommitment("4*", "3", 45)
+	tf.CreateCommitment("5*", "4*", 55)
+	tf.CreateCommitment("6*", "5*", 65)
+	tf.CreateCommitment("7*", "6*", 75)
+	tf.CreateCommitment("8*", "7*", 85)
+
+	forkRedetected := make(chan struct{}, 1)
+	expectedForks := map[iotago.CommitmentID]types.Empty{
+		tf.SlotCommitment("4*"): types.Void,
+		tf.SlotCommitment("5*"): types.Void,
+		tf.SlotCommitment("6*"): types.Void,
+		tf.SlotCommitment("7*"): types.Void,
+		tf.SlotCommitment("8*"): types.Void,
+	}
+	tf.Instance.Events.ForkDetected.Hook(func(fork *Fork) {
+		if _, has := expectedForks[fork.ForkLatestCommitment.ID()]; !has {
+			t.Fatalf("unexpected fork at: %s", fork.ForkLatestCommitment.ID())
+		}
+		t.Logf("fork detected at %s", fork.ForkingPoint.ID())
+		delete(expectedForks, fork.ForkLatestCommitment.ID())
+
+		require.Equal(t, fork.ForkingPoint.ID(), tf.SlotCommitment("4*"))
+		if len(expectedForks) == 0 {
+			forkRedetected <- struct{}{}
+		}
+	})
+
+	{
+		tf.ProcessCommitment("1")
+		tf.ProcessCommitmentFromOtherSource("2")
+		tf.ProcessCommitmentFromOtherSource("3")
+		tf.ProcessCommitmentFromOtherSource("4")
+		tf.ProcessCommitmentFromOtherSource("5")
+
+		tf.ProcessCommitmentFromOtherSource("5*")
+		tf.ProcessCommitmentFromOtherSource("6*")
+		tf.ProcessCommitmentFromOtherSource("7*")
+		tf.ProcessCommitmentFromOtherSource("8*")
+		tf.ProcessCommitment("4*")
+	}
+
+	oldCommitments, err := tf.Instance.Commitments(tf.SlotCommitment("5"), 4)
+	require.NoError(t, err)
+
+	require.Equalf(t, tf.ChainCommitment("4").ID(), oldCommitments[0].Chain().ForkingPoint.ID(), "expected %s; got %s", "4", oldCommitments[0].Chain().ForkingPoint.ID().String())
+
+	newMainCommitments, err := tf.Instance.Commitments(tf.SlotCommitment("8*"), 9)
+	require.NoError(t, err)
+
+	require.Equalf(t, tf.ChainCommitment("Genesis").ID(), newMainCommitments[0].Chain().ForkingPoint.ID(), "expected %s; got %s", "Genesis", newMainCommitments[0].Chain().ForkingPoint.ID().String())
+
+	tf.AssertEqualChainCommitments(newMainCommitments,
+		"8*",
+		"7*",
+		"6*",
+		"5*",
+		"4*",
+		"3",
+		"2",
+		"1",
+		"Genesis",
+	)
+
+}
+
 func TestEvaluateAgainstRootCommitment(t *testing.T) {
 	rootCommitment := iotago.NewCommitment(tpkg.TestAPI.Version(), 1, iotago.SlotIdentifierRepresentingData(1, []byte{9}), iotago.Identifier{}, 0)
 
