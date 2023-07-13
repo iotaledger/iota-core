@@ -98,16 +98,14 @@ func (m *Manager) ProcessCommitment(commitment *model.Commitment) (isSolid bool,
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	isNew, isSolid, chainCommitment := m.processCommitment(commitment)
+	_, isSolid, chainCommitment := m.processCommitment(commitment)
 
 	if chainCommitment == nil {
 		return false, nil
 	}
 
-	if !isNew {
-		if err := m.switchMainChainToCommitment(chainCommitment); err != nil {
-			panic(err)
-		}
+	if err := m.switchMainChainToCommitment(chainCommitment); err != nil {
+		panic(err)
 	}
 
 	return isSolid, chainCommitment.Chain()
