@@ -259,6 +259,7 @@ func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *u
 	if !unspent {
 		spent, err := l.utxoLedger.ReadSpentForOutputIDWithoutLocking(outputID)
 		l.utxoLedger.ReadUnlockLedger()
+
 		return nil, spent, err
 	}
 
