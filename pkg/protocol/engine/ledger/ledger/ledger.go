@@ -187,6 +187,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to UTXO ledger for index %d: %w", index, err)
 	}
 
+	l.events.StateDiffApplied.Trigger(&utxoledger.SlotDiff{Index: index, Outputs: outputs, Spents: spends})
+
 	// Update the Accounts ledger
 	if err = l.accountsLedger.ApplyDiff(index, accountDiffs, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for index %d: %w", index, err)

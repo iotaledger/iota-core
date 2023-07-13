@@ -26,9 +26,9 @@ type Ledger interface {
 	OutputOrSpent(id iotago.OutputID) (output *utxoledger.Output, spent *utxoledger.Spent, err error)
 	ForEachUnspentOutput(func(output *utxoledger.Output) bool) error
 	AddUnspentOutput(unspentOutput *utxoledger.Output) error
+	StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, BlockVoteRank]
-	StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 
 	CommitSlot(index iotago.SlotIndex) (stateRoot, mutationRoot, accountRoot iotago.Identifier, err error)
 
