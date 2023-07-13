@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
@@ -59,6 +60,8 @@ func configure() error {
 
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v3")
 
+	deps.Protocol.MainEngineInstance().Events.Notarization.SlotCommitted.Hook(storeTransactionsPerSlot)
+
 	routeGroup.GET(RouteValidators, func(c echo.Context) error {
 		resp, err := validatorsSummary()
 		if err != nil {
@@ -77,33 +80,34 @@ func configure() error {
 	//	return httpserver.JSONResponse(c, http.StatusOK, resp)
 	//}, checkNodeSynced())
 	//
-	//routeGroup.GET(RouteCommitmentByIndexBlockIDs, func(c echo.Context) error {
-	//	indexUint64, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	resp, err := getSlotBlockIDs(iotago.SlotIndex(indexUint64))
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	return httpserver.JSONResponse(c, http.StatusOK, resp)
-	//}, checkNodeSynced())
-	//
-	//routeGroup.GET(RouteCommitmentByIndexTransactionIDs, func(c echo.Context) error {
-	//	index, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	resp, err := getSlotTransactionIDs(iotago.SlotIndex(index))
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	return httpserver.JSONResponse(c, http.StatusOK, resp)
-	//}, checkNodeSynced())
+
+	routeGroup.GET(RouteCommitmentByIndexBlockIDs, func(c echo.Context) error {
+		indexUint64, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
+		if err != nil {
+			return err
+		}
+
+		resp, err := getSlotBlockIDs(iotago.SlotIndex(indexUint64))
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteCommitmentByIndexTransactionIDs, func(c echo.Context) error {
+		index, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
+		if err != nil {
+			return err
+		}
+
+		resp, err := getSlotTransactionIDs(iotago.SlotIndex(index))
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
 
 	return nil
 }
