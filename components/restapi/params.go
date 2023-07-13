@@ -34,6 +34,7 @@ type ParametersRestAPI struct {
 
 var ParamsRestAPI = &ParametersRestAPI{
 	PublicRoutes: []string{
+		"*",
 		"/health",
 		"/api/routes",
 		"/api/core/v3/info",
