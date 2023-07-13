@@ -172,7 +172,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	committeeRoot, rewardsRoot := m.sybilProtection.CommitSlot(index)
 	apiForSlot := m.apiProvider.APIForSlot(index)
 
-	protocolParamsHash, err := m.storage.Settings().ProtocolParametersAndVersionsHash()
+	protocolParamsHash, err := m.storage.Settings().VersionsAndProtocolParametersHash(index)
 	if err != nil {
 		m.errorHandler(ierrors.Wrap(err, "failed to get protocol parameters hash"))
 		return false
