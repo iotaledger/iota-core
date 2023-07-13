@@ -7,20 +7,19 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
-var transactionsPerSlot map[iotago.SlotIndex]*nodeclient.TransactionsChangesResponse
+var transactionsPerSlot map[iotago.SlotIndex]*TransactionsChangesResponse
 
 func init() {
-	transactionsPerSlot = make(map[iotago.SlotIndex]*nodeclient.TransactionsChangesResponse)
+	transactionsPerSlot = make(map[iotago.SlotIndex]*TransactionsChangesResponse)
 }
 
 func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) {
 	slot := scd.Commitment.Index()
 	stateDiff := deps.Protocol.MainEngineInstance().Ledger.MemPool().StateDiff(slot)
 	mutationsTree := ads.NewSet(mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes)
-	tcs := &nodeclient.TransactionsChangesResponse{
+	tcs := &TransactionsChangesResponse{
 		Index:                slot,
 		IncludedTransactions: make([]string, 0),
 	}
@@ -37,7 +36,7 @@ func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) {
 	transactionsPerSlot[slot] = tcs
 }
 
-func getSlotTransactionIDs(slot iotago.SlotIndex) (*nodeclient.TransactionsChangesResponse, error) {
+func getSlotTransactionIDs(slot iotago.SlotIndex) (*TransactionsChangesResponse, error) {
 	if slotDiff, exists := transactionsPerSlot[slot]; exists {
 		return slotDiff, nil
 	}
