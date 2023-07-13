@@ -261,7 +261,7 @@ func (l *Ledger) Spent(outputID iotago.OutputID) (*utxoledger.Spent, error) {
 	return l.utxoLedger.ReadSpentForOutputIDWithoutLocking(outputID)
 }
 
-func (l *Ledger) StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error) {
+func (l *Ledger) SlotDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error) {
 	return l.utxoLedger.SlotDiffWithoutLocking(index)
 }
 
