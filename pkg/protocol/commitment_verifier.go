@@ -5,7 +5,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/set"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -28,7 +27,12 @@ func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
 		func(attestation *iotago.Attestation) ([]byte, error) {
-			return lo.PanicOnErr(c.engine.APIForVersion(attestation.ProtocolVersion)).Encode(attestation)
+			apiForVersion, err := c.engine.APIForVersion(attestation.ProtocolVersion)
+			if err != nil {
+				return nil, ierrors.Wrapf(err, "failed to get API for version %d", attestation.ProtocolVersion)
+			}
+
+			return apiForVersion.Encode(attestation)
 		},
 		func(bytes []byte) (*iotago.Attestation, int, error) {
 			version, _, err := iotago.VersionFromBytes(bytes)
@@ -37,7 +41,11 @@ func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.
 			}
 
 			a := new(iotago.Attestation)
-			n, err := lo.PanicOnErr(c.engine.APIForVersion(version)).Decode(bytes, a)
+			apiForVersion, err := c.engine.APIForVersion(version)
+			if err != nil {
+				return nil, 0, ierrors.Wrapf(err, "failed to get API for version %d", version)
+			}
+			n, err := apiForVersion.Decode(bytes, a)
 
 			return a, n, err
 		},
