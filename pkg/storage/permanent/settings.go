@@ -104,22 +104,22 @@ func (s *Settings) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 // This function is safe to be called with data received from the network. It will return an error if the protocol
 // version is not supported.
 func (s *Settings) APIForVersion(version iotago.Version) (iotago.API, error) {
-	s.apiMutex.RLock()
-	if api, exists := s.apiByVersion[version]; exists {
-		s.apiMutex.RUnlock()
-		return api, nil
+	// This is a hot path, so we first try to get (read only) the API from the map.
+	if apiForVersion, exists := s.apiByVersion.Get(version); exists {
+		return apiForVersion, nil
 	}
 
-	api, err := s.apiFromProtocolParameters(version)
+	apiForVersion, err := s.apiFromProtocolParameters(version)
 	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to create API from protocol parameters")
+		return nil, ierrors.Wrapf(err, "failed to create API from protocol parameters for version %d", version)
 	}
 
-	s.apiMutex.Lock()
-	s.apiByVersion[version] = api
-	s.apiMutex.Unlock()
+	// If the API is not in the map, we need to create it and store it in the map in a safe way (might have been created by another goroutine in the meantime).
+	apiForVersion, _ = s.apiByVersion.GetOrCreate(version, func() iotago.API {
+		return apiForVersion
+	})
 
-	return api, nil
+	return apiForVersion, nil
 }
 
 func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) error {

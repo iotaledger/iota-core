@@ -46,7 +46,10 @@ func NewTestFramework(t *testing.T, apiProvider api.Provider, optsFilter ...opti
 }
 
 func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) {
-	modelBlock, err := model.BlockFromBlock(block, t.apiProvider.APIForVersion(block.ProtocolVersion))
+	apiForVersion, err := t.apiProvider.APIForVersion(block.ProtocolVersion)
+	require.NoError(t.Test, err)
+
+	modelBlock, err := model.BlockFromBlock(block, apiForVersion)
 	require.NoError(t.Test, err)
 
 	modelBlock.ID().RegisterAlias(alias)

@@ -1,9 +1,10 @@
 package api
 
 import (
-	"fmt"
 	"sync"
 
+	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -38,30 +39,30 @@ func (d *DynamicMockAPIProvider) AddProtocolParameters(epoch iotago.EpochIndex, 
 	}
 }
 
-func (d *DynamicMockAPIProvider) APIForVersion(version iotago.Version) iotago.API {
+func (d *DynamicMockAPIProvider) APIForVersion(version iotago.Version) (iotago.API, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
 	protocolParams, exists := d.protocolParametersByVersion[version]
 	if !exists {
-		panic(fmt.Sprintf("protocol parameters for version %d are not set", version))
+		return nil, ierrors.Errorf("protocol parameters for version %d are not set", version)
 	}
 
-	return NewAnyAPI(protocolParams)
+	return NewAnyAPI(protocolParams), nil
 }
 
 func (d *DynamicMockAPIProvider) APIForSlot(slot iotago.SlotIndex) iotago.API {
 	epoch := d.LatestAPI().TimeProvider().EpochFromSlot(slot)
-	return d.APIForVersion(d.protocolVersions.VersionForEpoch(epoch))
+	return lo.PanicOnErr(d.APIForVersion(d.protocolVersions.VersionForEpoch(epoch)))
 }
 
 func (d *DynamicMockAPIProvider) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
-	return d.APIForVersion(d.protocolVersions.VersionForEpoch(epoch))
+	return lo.PanicOnErr(d.APIForVersion(d.protocolVersions.VersionForEpoch(epoch)))
 }
 
 func (d *DynamicMockAPIProvider) LatestAPI() iotago.API {
 	d.latestVersionMutex.RLock()
 	defer d.latestVersionMutex.RUnlock()
 
-	return d.APIForVersion(d.latestVersion)
+	return lo.PanicOnErr(d.APIForVersion(d.latestVersion))
 }

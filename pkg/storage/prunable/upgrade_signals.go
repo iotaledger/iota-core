@@ -85,6 +85,7 @@ func (p *UpgradeSignals) Load(seat account.SeatIndex) (*SignalledBlock, error) {
 	signalledBlock, err := p.store.Get(seat)
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			//nolint:nilnil // expected behavior
 			return nil, nil
 		}
 

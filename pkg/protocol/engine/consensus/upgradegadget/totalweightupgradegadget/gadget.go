@@ -183,7 +183,7 @@ func (g *Gadget) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoch bool
 		return
 	}
 
-	// Check whether the signalling window threshold is reached.
+	// Check whether the signaling window threshold is reached.
 	versionTobeUpgraded, reached := g.signallingThresholdReached(currentEpoch)
 	if !reached {
 		return
@@ -232,7 +232,7 @@ func (g *Gadget) signallingThresholdReached(currentEpoch iotago.EpochIndex) (iot
 	// have a tie and looking at the version with most supporters is sufficient.
 	versionWithMostSupporters, mostSupporters := g.mostSupportedVersion(epochVersions)
 
-	// Check whether the signalling window threshold is reached.
+	// Check whether the signaling window threshold is reached.
 	if mostSupporters < g.optsVersionSignallingWindowThreshold {
 		return 0, false
 	}
