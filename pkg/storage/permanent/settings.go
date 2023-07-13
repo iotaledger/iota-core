@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"io"
 
-	"golang.org/x/crypto/blake2b"
-
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
+	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/core/api"
@@ -212,16 +210,29 @@ func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
 	return s.store.Set([]byte{latestFinalizedSlotKey}, index.MustBytes())
 }
 
-func (s *Settings) ProtocolParametersAndVersionsHash() (iotago.Identifier, error) {
+func (s *Settings) VersionsAndProtocolParametersHash(slot iotago.SlotIndex) (iotago.Identifier, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	protocolParametersBytes, err := s.LatestAPI().ProtocolParameters().Bytes()
-	if err != nil {
-		return iotago.Identifier{}, ierrors.Wrap(err, "failed to get protocol parameters bytes")
+	currentEpoch := s.LatestAPI().TimeProvider().EpochFromSlot(slot)
+
+	util := marshalutil.New()
+	for _, version := range s.protocolVersions.Slice() {
+		util.WriteBytes(lo.PanicOnErr(version.Version.Bytes()))
+		util.WriteUint64(uint64(version.StartEpoch))
+
+		// Only write the protocol parameters if the version is already active.
+		// TODO: this is not optimal: we are not committing to the protocol parameters that are going to be active.
+		if currentEpoch >= version.StartEpoch {
+			paramsBytes, err := s.protocolParameters(version.Version).Bytes()
+			if err != nil {
+				return iotago.Identifier{}, ierrors.Wrap(err, "failed to get protocol parameters bytes")
+			}
+			util.WriteBytes(paramsBytes)
+		}
 	}
 
-	return blake2b.Sum256(byteutils.ConcatBytes(protocolParametersBytes, s.protocolVersions.Bytes())), nil
+	return iotago.IdentifierFromData(util.Bytes()), nil
 }
 
 func (s *Settings) VersionForEpoch(epoch iotago.EpochIndex) iotago.Version {
