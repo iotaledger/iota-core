@@ -88,13 +88,29 @@ const (
 	// GET returns the output IDs of all UTXO changes.
 	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
-	// RouteAccount is the route for getting an account by its accountID.
-	// GET returns the account details.
-	RouteAccount = "/accounts/:" + restapipkg.ParameterAccountID
+	// RouteBlockIssuanceCredits is the route for getting block issuance credits balance for an account.
+	// GET returns the block issuance credits balance.
+	RouteBlockIssuanceCredits = "/accounts/:" + restapipkg.ParameterAccountID
 
-	// RouteAccountMana is the route for getting an account mana by its accountID.
-	// GET returns the account mana details.
-	RouteAccountMana = "/accounts/:" + restapipkg.ParameterAccountID + "/mana"
+	// RouteCongestion is the route for getting the current congestion state and all account related usefull details as block issuance credits.
+	// GET returns the congestion state raleted to the specified account.
+	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
+
+	//RouteStaking is the route for getting informations about the current stakers.
+	// GET returns the stakers.
+	RouteStaking = "/staking"
+
+	// RouteStakingAccount is the route for getting an account by its accountID.
+	// GET returns the account details.
+	RouteStakingAccount = "/staking/:" + restapipkg.ParameterAccountID
+
+	// RouteRewards is the route for getting the rewards for staking of delegation based on sstaking account or delegaion output.
+	// GET returns the rewards.
+	RouteRewards = "/rewards/:" + restapipkg.ParameterAccountID
+
+	// RouteCommittee is the route for getting the current committee.
+	// GET returns the committee.
+	RouteCommittee = "/committee"
 )
 
 func init() {
@@ -277,16 +293,56 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteAccount, func(c echo.Context) error {
-		// TODO
-
-		return httpserver.JSONResponse(c, http.StatusOK, nil)
+	routeGroup.GET(RouteBlockIssuanceCredits, func(c echo.Context) error {
+		resp, err := blockIssuanceCreditsForAccountID(c)
+		if err != nil {
+			return err
+		}
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteAccountMana, func(c echo.Context) error {
-		// TODO
+	routeGroup.GET(RouteCongestion, func(c echo.Context) error {
+		resp, err := congestionForAccountID(c)
+		if err != nil {
+			return err
+		}
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
 
-		return httpserver.JSONResponse(c, http.StatusOK, nil)
+	routeGroup.GET(RouteStaking, func(c echo.Context) error {
+		resp, err := staking()
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteStakingAccount, func(c echo.Context) error {
+		resp, err := stakingByAccountID(c)
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteRewards, func(c echo.Context) error {
+		resp, err := rewardsByAccountID(c)
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteCommittee, func(c echo.Context) error {
+		resp, err := selectedCommittee()
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
 	return nil

@@ -277,6 +277,40 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 	return weightedCommittee
 }
 
+// EligibleValidators returns the currently known list of recently active validator candidates for the given epoch.
+func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (account.Validators, error) {
+	candidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+	validators := make(map[iotago.AccountID]*account.Validator)
+
+	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
+		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
+		}
+		// TODO: not needed if EligibleValidatorsCandidates will take care of it
+		if accountData.StakeEndEpoch < epoch {
+			return nil
+		}
+		validators[accountData.ID] = &account.Validator{
+			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
+			ValidatorStake:                 accountData.ValidatorStake,
+			FixedCost:                      accountData.FixedCost,
+			StakingEnd:                     accountData.StakeEndEpoch,
+			LatestSupportedProtocolVersion: 1, // TODO: account data should provide this info
+		}
+
+		return nil
+	}); err != nil {
+
+		return nil, err
+	}
+
+	return validators, nil
+}
+
 // WithInitialCommittee registers the passed committee on a given slot.
 // This is needed to generate Genesis snapshot with some initial committee.
 func WithInitialCommittee(committee *account.Accounts) options.Option[SybilProtection] {
