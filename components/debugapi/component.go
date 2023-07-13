@@ -19,7 +19,8 @@ import (
 const (
 	RouteValidators = "/validators"
 
-	RouteChainManagerAllChains = "/all-chains"
+	RouteChainManagerAllChainsDot      = "/all-chains"
+	RouteChainManagerAllChainsRendered = "/all-chains/rendered"
 
 	RouteCommitmentByIndexBlockIDs = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/blocks"
 
@@ -71,14 +72,23 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
-	//routeGroup.GET(RouteChainManagerAllChains, func(c echo.Context) error {
-	//	resp, err := chainManagerAllChains(c)
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	return httpserver.JSONResponse(c, http.StatusOK, resp)
-	//}, checkNodeSynced())
+	routeGroup.GET(RouteChainManagerAllChainsDot, func(c echo.Context) error {
+		resp, err := chainManagerAllChainsDot()
+		if err != nil {
+			return err
+		}
+
+		return c.String(http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteChainManagerAllChainsRendered, func(c echo.Context) error {
+		renderedBytes, err := chainManagerAllChainsRendered()
+		if err != nil {
+			return err
+		}
+
+		return c.Blob(http.StatusOK, "image/png", renderedBytes)
+	}, checkNodeSynced())
 	//
 
 	routeGroup.GET(RouteCommitmentByIndexBlockIDs, func(c echo.Context) error {
