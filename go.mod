@@ -11,7 +11,7 @@ require (
 	github.com/iotaledger/hive.go/app v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/autopeering v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230706083020-ef6c3248369d
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230711121610-7d024f7b5eb5
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/ds v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230706083020-ef6c3248369d
@@ -22,7 +22,7 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230710120021-31d7d74cb077
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230713063811-939efa4b2298
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/libp2p/go-libp2p v0.28.1
 	github.com/multiformats/go-multiaddr v0.9.0
@@ -71,7 +71,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/holiman/uint256 v1.2.2 // indirect
 	github.com/huin/goupnp v1.2.0 // indirect
-	github.com/iancoleman/orderedmap v0.2.0 // indirect
+	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
