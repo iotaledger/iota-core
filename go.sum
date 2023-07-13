@@ -238,8 +238,6 @@ github.com/holiman/uint256 v1.2.2 h1:TXKcSGc2WaxPD2+bmzAsVthL4+pEN0YwXcL5qED83vk
 github.com/holiman/uint256 v1.2.2/go.mod h1:SC8Ryt4n+UBbPbIBKaG9zbbDlp4jOru9xFZmPzLUTxw=
 github.com/huin/goupnp v1.2.0 h1:uOKW26NG1hsSSbXIZ1IR7XP9Gjd1U8pnLaCMgntmkmY=
 github.com/huin/goupnp v1.2.0/go.mod h1:gnGPsThkYa7bFi/KWmEysQRf48l2dvR5bxr2OFckNX8=
-github.com/iancoleman/orderedmap v0.2.0 h1:sq1N/TFpYH++aViPcaKjys3bDClUEU7s5B+z6jq8pNA=
-github.com/iancoleman/orderedmap v0.2.0/go.mod h1:N0Wam8K1arqPXNWjMo21EXnBPOPp36vB07FNRdD2geA=
 github.com/iancoleman/orderedmap v0.3.0 h1:5cbR2grmZR/DiVt+VJopEhtVs9YGInGIxAoMJn+Ichc=
 github.com/iancoleman/orderedmap v0.3.0/go.mod h1:XuLcCUkdL5owUCQeF2Ue9uuw1EptkJDkXXS7VoV7XGE=
 github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 h1:dTrD7X2PTNgli6EbS4tV9qu3QAm/kBU3XaYZV2xdzys=
@@ -252,8 +250,7 @@ github.com/iotaledger/hive.go/autopeering v0.0.0-20230706083020-ef6c3248369d h1:
 github.com/iotaledger/hive.go/autopeering v0.0.0-20230706083020-ef6c3248369d/go.mod h1:UMlY0WBdBfahTLoFxEvziZQAZqUTVYd3mDigdC0r2RA=
 github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d h1:AE8Zcydin/3DRzT7A58ESmU60g8EtpnoFZ9MVkeMWgQ=
 github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d/go.mod h1:bvXXc6quBdERMMKnirr2+iQU4WnTz4KDbdHcusW9Ats=
-github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230706083020-ef6c3248369d h1:VBOXzrVDRjx+yYYSD5G38x9IdlJLfPADoo2svQVuXZM=
-github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230706083020-ef6c3248369d/go.mod h1:ALcO+4r6FMfENrMQ+jZZfHX7vDHQ42XLI8y7dt/IKxc=
+github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230711121610-7d024f7b5eb5 h1:K4dWLTZwURU7xVF5uePUk0oDViBDQrsdZ7ZHBCrTYOs=
 github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230711121610-7d024f7b5eb5/go.mod h1:ALcO+4r6FMfENrMQ+jZZfHX7vDHQ42XLI8y7dt/IKxc=
 github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d h1:6VVi5LZGAIXYFzb+/k3G6+T6dNkLi2beD0O6CccxdLg=
 github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d/go.mod h1:kkIoyWWDol9XTEuNy0wtUYQWx+Eb0Ak9XP8SS3g1/J8=
@@ -275,8 +272,6 @@ github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d h1:l1
 github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d/go.mod h1:l/F3cA/+67QdNj+sohv2v4HhmsdOcWScoA+sVYoAE4c=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813 h1:6/Ge9Gv9ZxEDn6f7dKAVEC30mkZBzE9SSktd/dyob6s=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813/go.mod h1:d/oNTc8b3qnmdf70GzNFfAha9gZjXGYqImNxMGU96Eo=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230710120021-31d7d74cb077 h1:ZFwWVojtc5s1xwvCcjeLQSuoerJTSdFHnydB3vUts44=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230710120021-31d7d74cb077/go.mod h1:NC48ByX78DwdkGj5YjqI2ADHAY+S2idcIRZaEuWDe1Q=
 github.com/iotaledger/iota.go/v4 v4.0.0-20230713063811-939efa4b2298 h1:pu8jRqIyz72u8TnphahKpGYZ9eC5vxWH0qKKweoQitA=
 github.com/iotaledger/iota.go/v4 v4.0.0-20230713063811-939efa4b2298/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
