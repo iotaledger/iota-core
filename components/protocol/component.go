@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/daemon"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
@@ -114,13 +115,13 @@ func provide(c *dig.Container) error {
 }
 
 func configure() error {
-	// deps.Protocol.Events.Error.Hook(func(err error) {
-	// 	Component.LogErrorf("Error in Protocol: %s", err)
-	// })
+	deps.Protocol.Events.Error.Hook(func(err error) {
+		Component.LogErrorf("Error in Protocol: %s", err)
+	})
 
-	// deps.Protocol.Events.Network.Error.Hook(func(err error, id network.PeerID) {
-	// 	Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
-	// })
+	deps.Protocol.Events.Network.Error.Hook(func(err error, id network.PeerID) {
+		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
+	})
 
 	// // TODO: check whether we hooked to all events
 
