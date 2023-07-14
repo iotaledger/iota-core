@@ -171,7 +171,7 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		Component.LogInfof("SlotConfirmed: %d", index)
+		Component.LogInfof("SlotFinalized: %d", index)
 	})
 
 	deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {

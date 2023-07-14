@@ -62,7 +62,7 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 						timeProvider := e.APIForSlot(index).TimeProvider()
 						slotEndTime := timeProvider.SlotEndTime(index)
 
-						c.onSlotFinalised(slotEndTime)
+						c.onSlotFinalized(slotEndTime)
 					}, asyncOpt).Unhook,
 				))
 			})
@@ -112,7 +112,7 @@ func (c *Clock) advanceConfirmed(time time.Time) {
 	c.confirmedTime.Advance(time)
 }
 
-func (c *Clock) onSlotFinalised(slotEndTime time.Time) {
+func (c *Clock) onSlotFinalized(slotEndTime time.Time) {
 	c.Lock()
 	defer c.Unlock()
 
