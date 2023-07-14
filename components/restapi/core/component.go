@@ -337,7 +337,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteCommittee, func(c echo.Context) error {
-		resp, err := selectedCommittee()
+		resp, err := selectedCommittee(c)
 		if err != nil {
 			return err
 		}

@@ -159,9 +159,18 @@ func rewardsByAccountID(c echo.Context) (*models.ManaRewardsResponse, error) {
 	}, nil
 }
 
-func selectedCommittee() (*models.CommitteeResponse, error) {
-	currentSlot := deps.Protocol.APIForSlot(deps.Protocol.SyncManager.LatestCommittedSlot()).TimeProvider().SlotFromTime(time.Now())
-	seatedAccounts := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(currentSlot)
+func selectedCommittee(c echo.Context) (*models.CommitteeResponse, error) {
+	timeProvider := deps.Protocol.APIForSlot(deps.Protocol.SyncManager.LatestCommittedSlot()).TimeProvider()
+	epochIndex, err := httpserver.ParseEpochQueryParam(c, restapipkg.ParameterEpochIndex)
+	slotIndex := timeProvider.SlotFromTime(time.Now())
+	if err != nil {
+		// by deafult we return current epoch
+		epochIndex = timeProvider.EpochFromSlot(slotIndex)
+	} else {
+		slotIndex = timeProvider.EpochEnd(epochIndex)
+	}
+
+	seatedAccounts := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(slotIndex)
 	committee := make([]models.CommitteeMemberResponse, 0, seatedAccounts.Accounts().Size())
 	seatedAccounts.Accounts().ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
 		committee = append(committee, models.CommitteeMemberResponse{
@@ -174,6 +183,7 @@ func selectedCommittee() (*models.CommitteeResponse, error) {
 	})
 
 	return &models.CommitteeResponse{
+		EpochIndex:          epochIndex,
 		Committee:           committee,
 		TotalStake:          uint64(seatedAccounts.Accounts().TotalStake()),
 		TotalValidatorStake: uint64(seatedAccounts.Accounts().TotalValidatorStake()),

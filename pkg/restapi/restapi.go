@@ -21,6 +21,9 @@ const (
 	// ParameterSlotIndex is used to identify a slot by index.
 	ParameterSlotIndex = "slotIndex"
 
+	// ParameterEpochIndex is used to identify an epoch by index.
+	ParameterEpochIndex = "epochIndex"
+
 	// ParameterCommitmentID is used to identify a slot commitment by its ID.
 	ParameterCommitmentID = "commitmentID"
 
