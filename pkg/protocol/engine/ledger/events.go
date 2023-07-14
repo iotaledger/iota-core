@@ -18,6 +18,6 @@ type Events struct {
 var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 	return &Events{
 		BlockProcessed:   event.New1[*blocks.Block](),
-		StateDiffApplied: event.New3[iotago.SlotIndex, utxoledger.Outputs, utxoledger.Spents](),,
+		StateDiffApplied: event.New3[iotago.SlotIndex, utxoledger.Outputs, utxoledger.Spents](),
 	}
 })
