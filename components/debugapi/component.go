@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
-	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
@@ -58,33 +57,6 @@ type dependencies struct {
 	Protocol         *protocol.Protocol
 	AppInfo          *app.Info
 	RestRouteManager *restapi.RestRouteManager
-}
-
-type BlockMetadataResponse struct {
-	// BlockID The hex encoded block ID of the block.
-	BlockID string `json:"blockId"`
-	// StrongParents are the strong parents of the block.
-	StrongParents []string `json:"strongParents"`
-	// WeakParents are the weak parents of the block.
-	WeakParents []string `json:"weakParents"`
-	// ShallowLikeParents are the shallow like parents of the block.
-	ShallowLikeParents []string `json:"shallowLikeParents"`
-
-	Solid        bool `json:"solid"`
-	Invalid      bool `json:"invalid"`
-	Booked       bool `json:"booked"`
-	Future       bool `json:"future"`
-	PreAccepted  bool `json:"preAccepted"`
-	Accepted     bool `json:"accepted"`
-	PreConfirmed bool `json:"preConfirmed"`
-	Confirmed    bool `json:"confirmed"`
-
-	Witnesses []account.SeatIndex `json:"witnesses"`
-	// conflictIDs are the all conflictIDs of the block inherited from the parents + payloadConflictIDs.
-	ConflictIDs []iotago.TransactionID `json:"conflictIDs"`
-	// payloadConflictIDs are the conflictIDs of the block's payload (in case it is a transaction, otherwise empty).
-	PayloadConflictIDs []iotago.TransactionID `json:"payloadConflictIDs"`
-	String             string                 `json:"string"`
 }
 
 func configure() error {
