@@ -108,9 +108,9 @@ type nodeStatus struct {
 	// Whether the node is healthy.
 	IsHealthy bool `json:"isHealthy"`
 	// The blockID of last accepted block.
-	LastAcceptedBlockID string `json:"lastAcceptedBlockId"`
+	LastAcceptedBlockSlot iotago.SlotIndex `json:"lastAcceptedBlockSlot"`
 	// The blockID of the last confirmed block
-	LastConfirmedBlockID string `json:"lastConfirmedBlockId"`
+	LastConfirmedBlockSlot iotago.SlotIndex `json:"lastConfirmedBlockSlot"`
 	// The latest finalized slot.
 	FinalizedSlot iotago.SlotIndex `json:"latestFinalizedSlot"`
 	// The Accepted Tangle Time

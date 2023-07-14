@@ -12,11 +12,13 @@ import (
 
 func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 	return &inx.NodeStatus{
-		IsHealthy:           status.NodeSynced, //TODO: check if we have peers
-		IsSynced:            status.NodeSynced,
-		IsAlmostSynced:      status.NodeSynced, //TODO: check if we are close to sync
-		LatestCommitment:    inxCommitment(status.LatestCommitment),
-		LatestFinalizedSlot: uint64(status.LatestFinalizedSlot),
+		IsHealthy:              status.NodeSynced, //TODO: check if we have peers
+		IsSynced:               status.NodeSynced,
+		IsAlmostSynced:         status.NodeSynced, //TODO: check if we are close to sync
+		LastAcceptedBlockSlot:  uint64(status.LastAcceptedBlockSlot),
+		LastConfirmedBlockSlot: uint64(status.LastConfirmedBlockSlot),
+		LatestCommitment:       inxCommitment(status.LatestCommitment),
+		LatestFinalizedSlot:    uint64(status.LatestFinalizedSlot),
 	}
 }
 

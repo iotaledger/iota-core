@@ -1,8 +1,6 @@
 package trivialsyncmanager
 
 import (
-	"time"
-
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -21,13 +19,11 @@ type (
 type SyncManager struct {
 	events *syncmanager.Events
 
-	lastAcceptedBlockID     iotago.BlockID
-	lastAcceptedIssuingTime time.Time
-	lastAcceptedBlockIDLock syncutils.RWMutex
+	lastAcceptedBlockSlot     iotago.SlotIndex
+	lastAcceptedBlockSlotLock syncutils.RWMutex
 
-	lastConfirmedBlockID     iotago.BlockID
-	lastConfirmedIssuingTime time.Time
-	lastConfirmedBlockIDLock syncutils.RWMutex
+	lastConfirmedBlockSlot     iotago.SlotIndex
+	lastConfirmedBlockSlotLock syncutils.RWMutex
 
 	latestCommitment     *model.Commitment
 	latestCommitmentLock syncutils.RWMutex
@@ -47,13 +43,13 @@ func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("SyncManager", 1))
 
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
-			if s.updateLastAcceptedBlock(b.ID(), b.IssuingTime()) {
+			if s.updateLastAcceptedBlock(b.ID()) {
 				s.triggerUpdate()
 			}
 		}, asyncOpt)
 
 		e.Events.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
-			if s.updateLastConfirmedBlock(b.ID(), b.IssuingTime()) {
+			if s.updateLastConfirmedBlock(b.ID()) {
 				s.triggerUpdate()
 			}
 		}, asyncOpt)
@@ -78,31 +74,31 @@ func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 
 func New(bootstrappedFunc isBootstrappedFunc, latestCommitment *model.Commitment, finalizedSlot iotago.SlotIndex) *SyncManager {
 	return &SyncManager{
-		events:               syncmanager.NewEvents(),
-		isBootstrappedFunc:   bootstrappedFunc,
-		lastAcceptedBlockID:  iotago.EmptyBlockID(),
-		lastConfirmedBlockID: iotago.EmptyBlockID(),
-		latestCommitment:     latestCommitment,
-		latestFinalizedSlot:  finalizedSlot,
+		events:                 syncmanager.NewEvents(),
+		isBootstrappedFunc:     bootstrappedFunc,
+		lastAcceptedBlockSlot:  latestCommitment.Index(),
+		lastConfirmedBlockSlot: latestCommitment.Index(),
+		latestCommitment:       latestCommitment,
+		latestFinalizedSlot:    finalizedSlot,
 	}
 }
 
 func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
-	s.lastAcceptedBlockIDLock.RLock()
-	s.lastConfirmedBlockIDLock.RLock()
+	s.lastAcceptedBlockSlotLock.RLock()
+	s.lastConfirmedBlockSlotLock.RLock()
 	s.latestCommitmentLock.RLock()
 	s.latestFinalizedSlotLock.RLock()
-	defer s.lastAcceptedBlockIDLock.RUnlock()
-	defer s.lastConfirmedBlockIDLock.RUnlock()
+	defer s.lastAcceptedBlockSlotLock.RUnlock()
+	defer s.lastConfirmedBlockSlotLock.RUnlock()
 	defer s.latestCommitmentLock.RUnlock()
 	defer s.latestFinalizedSlotLock.RUnlock()
 
 	return &syncmanager.SyncStatus{
-		NodeSynced:           s.isBootstrappedFunc(),
-		LastAcceptedBlockID:  s.lastAcceptedBlockID,
-		LastConfirmedBlockID: s.lastConfirmedBlockID,
-		LatestCommitment:     s.latestCommitment,
-		LatestFinalizedSlot:  s.latestFinalizedSlot,
+		NodeSynced:             s.isBootstrappedFunc(),
+		LastAcceptedBlockSlot:  s.lastAcceptedBlockSlot,
+		LastConfirmedBlockSlot: s.lastConfirmedBlockSlot,
+		LatestCommitment:       s.latestCommitment,
+		LatestFinalizedSlot:    s.latestFinalizedSlot,
 	}
 }
 
@@ -110,30 +106,28 @@ func (s *SyncManager) Shutdown() {
 	s.TriggerStopped()
 }
 
-func (s *SyncManager) updateLastAcceptedBlock(id iotago.BlockID, issuingTime time.Time) (changed bool) {
-	s.lastAcceptedBlockIDLock.Lock()
-	defer s.lastAcceptedBlockIDLock.Unlock()
+func (s *SyncManager) updateLastAcceptedBlock(id iotago.BlockID) (changed bool) {
+	s.lastAcceptedBlockSlotLock.Lock()
+	defer s.lastAcceptedBlockSlotLock.Unlock()
 
-	if s.lastAcceptedIssuingTime.After(issuingTime) {
-		return false
+	if id.Index() > s.lastAcceptedBlockSlot {
+		s.lastAcceptedBlockSlot = id.Index()
+		return true
 	}
 
-	s.lastAcceptedBlockID = id
-
-	return true
+	return false
 }
 
-func (s *SyncManager) updateLastConfirmedBlock(id iotago.BlockID, issuingTime time.Time) (changed bool) {
-	s.lastConfirmedBlockIDLock.Lock()
-	defer s.lastConfirmedBlockIDLock.Unlock()
+func (s *SyncManager) updateLastConfirmedBlock(id iotago.BlockID) (changed bool) {
+	s.lastConfirmedBlockSlotLock.Lock()
+	defer s.lastConfirmedBlockSlotLock.Unlock()
 
-	if s.lastConfirmedIssuingTime.After(issuingTime) {
-		return false
+	if id.Index() > s.lastConfirmedBlockSlot {
+		s.lastConfirmedBlockSlot = id.Index()
+		return true
 	}
 
-	s.lastConfirmedBlockID = id
-
-	return true
+	return false
 }
 
 func (s *SyncManager) updateLatestCommitment(commitment *model.Commitment) (changed bool) {
@@ -164,18 +158,18 @@ func (s *SyncManager) IsNodeSynced() bool {
 	return s.isBootstrappedFunc()
 }
 
-func (s *SyncManager) LastAcceptedBlock() iotago.BlockID {
-	s.lastAcceptedBlockIDLock.RLock()
-	defer s.lastAcceptedBlockIDLock.RUnlock()
+func (s *SyncManager) LastAcceptedBlockSlot() iotago.SlotIndex {
+	s.lastAcceptedBlockSlotLock.RLock()
+	defer s.lastAcceptedBlockSlotLock.RUnlock()
 
-	return s.lastAcceptedBlockID
+	return s.lastAcceptedBlockSlot
 }
 
-func (s *SyncManager) LastConfirmedBlock() iotago.BlockID {
-	s.lastConfirmedBlockIDLock.RLock()
-	defer s.lastConfirmedBlockIDLock.RUnlock()
+func (s *SyncManager) LastConfirmedBlockSlot() iotago.SlotIndex {
+	s.lastConfirmedBlockSlotLock.RLock()
+	defer s.lastConfirmedBlockSlotLock.RUnlock()
 
-	return s.lastConfirmedBlockID
+	return s.lastConfirmedBlockSlot
 }
 
 func (s *SyncManager) LatestCommitment() *model.Commitment {

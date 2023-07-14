@@ -8,11 +8,8 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -47,28 +44,4 @@ func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (
 	}
 
 	return inxCommitment(commitment), nil
-}
-
-func (s *Server) ListenToCommitments(_ *inx.NoParams, srv inx.INX_ListenToCommitmentsServer) error {
-	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
-
-	wp := workerpool.New("ListenToLatestCommitments", workerCount).Start()
-	unhook := deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		payload := inxCommitment(details.Commitment)
-		if err := srv.Send(payload); err != nil {
-			Component.LogErrorf("send error: %v", err)
-			cancel()
-		}
-	}, event.WithWorkerPool(wp)).Unhook
-
-	<-ctx.Done()
-	unhook()
-
-	// We need to wait until all tasks are done, otherwise we might call
-	// "SendMsg" and "CloseSend" in parallel on the grpc stream, which is
-	// not safe according to the grpc docs.
-	wp.Shutdown()
-	wp.ShutdownComplete.Wait()
-
-	return ctx.Err()
 }
