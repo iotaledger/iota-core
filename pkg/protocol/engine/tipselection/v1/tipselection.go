@@ -64,6 +64,8 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 // SelectTips selects the tips that should be used as references for a new block.
 func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
+	strongParents := advancedset.New[iotago.BlockID]()
+	shallowLikesParents := advancedset.New[iotago.BlockID]()
 	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]) error {
 		previousLikedInsteadConflicts := advancedset.New[iotago.TransactionID]()
 
@@ -74,6 +76,9 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 			} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[iotago.ShallowLikeParentType]) {
 				references[iotago.StrongParentType] = append(references[iotago.StrongParentType], tip.ID())
 				references[iotago.ShallowLikeParentType] = append(references[iotago.ShallowLikeParentType], addedLikedInsteadReferences...)
+
+				shallowLikesParents.AddAll(advancedset.New(addedLikedInsteadReferences...))
+				strongParents.Add(tip.ID())
 
 				previousLikedInsteadConflicts = updatedLikedInsteadConflicts
 			}
@@ -87,7 +92,12 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 			if !t.isValidWeakTip(tip.Block()) {
 				tip.SetTipPool(tipmanager.DroppedTipPool)
 			} else {
-				references[iotago.WeakParentType] = append(references[iotago.WeakParentType], tip.ID())
+				if strongParents.Has(tip.ID()) {
+					panic("race condition - tip both in StrongPool and WeakPool")
+				}
+				if !shallowLikesParents.Has(tip.ID()) {
+					references[iotago.WeakParentType] = append(references[iotago.WeakParentType], tip.ID())
+				}
 			}
 		}, t.optMaxWeakReferences)
 
@@ -162,8 +172,8 @@ func (t *TipSelection) collectReferences(references model.ParentReferences, pare
 	}
 
 	for tipCandidates := selectUniqueTips(amount); len(tipCandidates) != 0; tipCandidates = selectUniqueTips(amount - len(references[parentsType])) {
-		for _, strongTip := range tipCandidates {
-			callback(strongTip)
+		for _, tip := range tipCandidates {
+			callback(tip)
 		}
 	}
 }

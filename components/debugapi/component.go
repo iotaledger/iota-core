@@ -84,6 +84,7 @@ type BlockMetadataResponse struct {
 	ConflictIDs []iotago.TransactionID `json:"conflictIDs"`
 	// payloadConflictIDs are the conflictIDs of the block's payload (in case it is a transaction, otherwise empty).
 	PayloadConflictIDs []iotago.TransactionID `json:"payloadConflictIDs"`
+	String             string                 `json:"string"`
 }
 
 func configure() error {
@@ -127,6 +128,7 @@ func configure() error {
 			Witnesses:          block.Witnesses(),
 			ConflictIDs:        block.ConflictIDs().Slice(),
 			PayloadConflictIDs: block.PayloadConflictIDs().Slice(),
+			String:             block.String(),
 		})
 	}, checkNodeSynced())
 

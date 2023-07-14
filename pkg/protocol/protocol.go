@@ -331,6 +331,10 @@ func (p *Protocol) HookLogging() {
 	p.Events.Error.Hook(func(err error) {
 		fmt.Printf("> Protocol.Error: %s\n", err.Error())
 	})
+
+	p.networkProtocol.Events.Error.Hook(func(err error, peerID network.PeerID) {
+		fmt.Printf("> Network.Error: (peerID: %s) %s\n", peerID, err.Error())
+	})
 }
 
 var _ api.Provider = &Protocol{}
