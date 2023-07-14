@@ -84,8 +84,8 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 // SelectTips selects the tips that should be used as references for a new block.
 func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
-	strongParents := advancedset.New[iotago.BlockID]()
-	shallowLikesParents := advancedset.New[iotago.BlockID]()
+	strongParents := ds.NewSet[iotago.BlockID]()
+	shallowLikesParents := ds.NewSet[iotago.BlockID]()
 	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]) error {
 		previousLikedInsteadConflicts := ds.NewSet[iotago.TransactionID]()
 
@@ -97,7 +97,7 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 				references[iotago.StrongParentType] = append(references[iotago.StrongParentType], tip.ID())
 				references[iotago.ShallowLikeParentType] = append(references[iotago.ShallowLikeParentType], addedLikedInsteadReferences...)
 
-				shallowLikesParents.AddAll(advancedset.New(addedLikedInsteadReferences...))
+				shallowLikesParents.AddAll(ds.NewSet(addedLikedInsteadReferences...))
 				strongParents.Add(tip.ID())
 
 				previousLikedInsteadConflicts = updatedLikedInsteadConflicts

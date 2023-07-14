@@ -21,7 +21,7 @@ func validatorsSummary() (*ValidatorsSummaryResponse, error) {
 
 	return &ValidatorsSummaryResponse{
 		ValidatorSeats: validatorSeats,
-		ActiveSeats: lo.Map(seatManager.OnlineCommittee().Slice(), func(seatIndex account.SeatIndex) int {
+		ActiveSeats: lo.Map(seatManager.OnlineCommittee().ToSlice(), func(seatIndex account.SeatIndex) int {
 			return int(seatIndex)
 		}),
 	}, nil

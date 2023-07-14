@@ -48,7 +48,7 @@ var (
 
 	features = []string{}
 
-	blocksStored = shrinkingmap.New[iotago.BlockID, *blocks.Block]()
+	blocksStored = shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *blocks.Block]]()
 )
 
 type dependencies struct {
@@ -70,7 +70,13 @@ func configure() error {
 	deps.Protocol.MainEngineInstance().Events.Notarization.SlotCommitted.Hook(storeTransactionsPerSlot)
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
-		blocksStored.Set(block.ID(), block)
+		lo.Return1(blocksStored.GetOrCreate(block.ID().Index(), func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *blocks.Block] {
+			return shrinkingmap.New[iotago.BlockID, *blocks.Block]()
+		})).Set(block.ID(), block)
+	})
+
+	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		blocksStored.Delete(index)
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
@@ -79,7 +85,12 @@ func configure() error {
 			return err
 		}
 
-		block, exists := blocksStored.Get(blockID)
+		slotStorage, exists := blocksStored.Get(blockID.Index())
+		if !exists {
+			return httpserver.JSONResponse(c, http.StatusNotFound, BlockMetadataResponse{})
+		}
+
+		block, exists := slotStorage.Get(blockID)
 		if !exists {
 			return httpserver.JSONResponse(c, http.StatusNotFound, BlockMetadataResponse{})
 		}
@@ -98,8 +109,8 @@ func configure() error {
 			PreConfirmed:       block.IsPreConfirmed(),
 			Confirmed:          block.IsConfirmed(),
 			Witnesses:          block.Witnesses(),
-			ConflictIDs:        block.ConflictIDs().Slice(),
-			PayloadConflictIDs: block.PayloadConflictIDs().Slice(),
+			ConflictIDs:        block.ConflictIDs().ToSlice(),
+			PayloadConflictIDs: block.PayloadConflictIDs().ToSlice(),
 			String:             block.String(),
 		})
 	}, checkNodeSynced())

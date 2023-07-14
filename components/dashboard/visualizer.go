@@ -54,7 +54,7 @@ func sendVertex(blk *blocks.Block, confirmed bool) {
 		IsTx:                isTx,
 		IsTxAccepted: func() bool {
 			if isTx {
-				api := deps.Protocol.APIForVersion(blk.ProtocolBlock().ProtocolVersion)
+				api := lo.PanicOnErr(deps.Protocol.APIForVersion(blk.ProtocolBlock().ProtocolVersion))
 				txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID(api)))
 				if exists {
 					return txMetadata.IsAccepted()
@@ -88,7 +88,7 @@ func runVisualizer(component *app.Component) {
 
 				tx, hasTx := block.Transaction()
 				if hasTx {
-					api := deps.Protocol.APIForVersion(block.ProtocolBlock().ProtocolVersion)
+					api := lo.PanicOnErr(deps.Protocol.APIForVersion(block.ProtocolBlock().ProtocolVersion))
 					txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID(api)))
 					if exists {
 						txMetadata.OnAccepted(func() {
@@ -104,10 +104,12 @@ func runVisualizer(component *app.Component) {
 				sendVertex(block, block.IsConfirmed())
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
-				sendTipInfo(tipMetadata.Block(), true)
+				tipMetadata.IsStrongTip().OnUpdate(func(_, newValue bool) {
+					sendTipInfo(tipMetadata.Block(), newValue)
+				})
 
-				tipMetadata.Evicted().OnTrigger(func() {
-					sendTipInfo(tipMetadata.Block(), false)
+				tipMetadata.IsWeakTip().OnUpdate(func(_, newValue bool) {
+					sendTipInfo(tipMetadata.Block(), newValue)
 				})
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 		)
