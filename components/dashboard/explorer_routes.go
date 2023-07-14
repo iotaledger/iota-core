@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -109,7 +110,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *Explore
 	var payloadJSON []byte
 	basicBlock, isBasic := block.BasicBlock()
 	if isBasic {
-		payloadJSON, err = deps.Protocol.APIForVersion(iotaBlk.ProtocolVersion).JSONEncode(basicBlock.Payload)
+		payloadJSON, err = lo.PanicOnErr(deps.Protocol.APIForVersion(iotaBlk.ProtocolVersion)).JSONEncode(basicBlock.Payload)
 		if err != nil {
 			return nil
 		}
@@ -151,13 +152,13 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *Explore
 			return payloadJSON
 		}(),
 		CommitmentID: iotaBlk.SlotCommitmentID.ToHex(),
-		//TODO: remove from explorer or add link to a separate route
-		//Commitment: CommitmentResponse{
+		// TODO: remove from explorer or add link to a separate route
+		// Commitment: CommitmentResponse{
 		//	Index:            uint64(iotaBlk.SlotCommitmentID.Index()),
 		//	PrevID:           iotaBlk.SlotCommitment.PrevID.ToHex(),
 		//	RootsID:          iotaBlk.SlotCommitment.RootsID.ToHex(),
 		//	CumulativeWeight: iotaBlk.SlotCommitment.CumulativeWeight,
-		//},
+		// },
 		LatestConfirmedSlot: uint64(iotaBlk.LatestFinalizedSlot),
 	}
 
