@@ -15,6 +15,7 @@ const (
 	accountDiffsPrefix
 	performanceFactorsPrefix
 	rootsPrefix
+	retainerPrefix
 )
 
 const (
@@ -87,6 +88,15 @@ func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *PerformanceFactors
 
 func (p *Prunable) Roots(slot iotago.SlotIndex) kvstore.KVStore {
 	return p.manager.Get(slot, kvstore.Realm{rootsPrefix})
+}
+
+func (p *Prunable) Retainer(slot iotago.SlotIndex) *Retainer {
+	store := p.manager.Get(slot, kvstore.Realm{retainerPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewRetainer(slot, store)
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.

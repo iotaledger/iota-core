@@ -1,6 +1,7 @@
 package retainer
 
 import (
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -15,4 +16,7 @@ type RetainerStatus struct {
 type Retainer interface {
 	Block(iotago.BlockID) (*model.Block, error)
 	BlockMetadata(iotago.BlockID) (*model.Block, error)
+
+	// Interface embeds the required methods of the module.Interface.
+	module.Interface
 }

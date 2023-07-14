@@ -26,6 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -59,6 +60,7 @@ type EngineManager struct {
 	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
 	tipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
 	tipSelectionProvider    module.Provider[*engine.Engine, tipselection.TipSelection]
+	retainerProvider        module.Provider[*engine.Engine, retainer.Retainer]
 
 	activeInstance *engine.Engine
 }
@@ -82,6 +84,7 @@ func New(
 	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
 	tipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager],
 	tipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection],
+	retainerProvider module.Provider[*engine.Engine, retainer.Retainer],
 ) *EngineManager {
 	return &EngineManager{
 		workers:                 workers,
@@ -102,6 +105,7 @@ func New(
 		ledgerProvider:          ledgerProvider,
 		tipManagerProvider:      tipManagerProvider,
 		tipSelectionProvider:    tipSelectionProvider,
+		retainerProvider:        retainerProvider,
 	}
 }
 
@@ -189,6 +193,7 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.ledgerProvider,
 		e.tipManagerProvider,
 		e.tipSelectionProvider,
+		e.retainerProvider,
 		append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))...,
 	)
 }

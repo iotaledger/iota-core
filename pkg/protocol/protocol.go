@@ -43,6 +43,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
+	"github.com/iotaledger/iota-core/pkg/retainer"
+	retainer1 "github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/models"
@@ -85,6 +87,7 @@ type Protocol struct {
 	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsLedgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
+	optsRetainerProvider        module.Provider[*engine.Engine, retainer.Retainer]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -106,6 +109,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:          ledger1.NewProvider(),
+		optsRetainerProvider:        retainer1.NewProvider(),
 
 		optsBaseDirectory:           "",
 		optsChainSwitchingThreshold: 3,
@@ -204,6 +208,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsLedgerProvider,
 		p.optsTipManagerProvider,
 		p.optsTipSelectionProvider,
+		p.optsRetainerProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine(p.optsSnapshotPath)
