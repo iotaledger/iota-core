@@ -53,7 +53,7 @@ type Orchestrator struct {
 	evictionMutex syncutils.RWMutex
 	errorHandler  func(error)
 
-	latestSignals           *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignalledBlock]
+	latestSignals           *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignaledBlock]
 	upgradeSignalsFunc      func(slot iotago.SlotIndex) *prunable.UpgradeSignals
 	permanentUpgradeSignals *kvstore.TypedStore[iotago.EpochIndex, iotago.Version]
 
@@ -98,7 +98,7 @@ func NewOrchestrator(errorHandler func(error),
 	seatManager seatmanager.SeatManager, opts ...options.Option[Orchestrator]) *Orchestrator {
 	return options.Apply(&Orchestrator{
 		errorHandler:            errorHandler,
-		latestSignals:           memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignalledBlock](),
+		latestSignals:           memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignaledBlock](),
 		permanentUpgradeSignals: kvstore.NewTypedStore[iotago.EpochIndex, iotago.Version](permanentUpgradeSignal, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, iotago.Version.Bytes, iotago.VersionFromBytes),
 		upgradeSignalsFunc:      upgradeSignalsFunc,
 
@@ -130,7 +130,7 @@ func (o *Orchestrator) trackHighestSupportedVersion(block *blocks.Block) {
 	}
 
 	// Not a validation block.
-	newSignalledBlock, err := prunable.NewSignalledBlock(block.ID(), block.ProtocolBlock())
+	newSignaledBlock, err := prunable.NewSignaledBlock(block.ID(), block.ProtocolBlock())
 	if err != nil {
 		return
 	}
@@ -147,17 +147,17 @@ func (o *Orchestrator) trackHighestSupportedVersion(block *blocks.Block) {
 	defer o.evictionMutex.RUnlock()
 
 	latestSignalsForEpoch := o.latestSignals.Get(block.ID().Index(), true)
-	o.addNewSignalledBlock(latestSignalsForEpoch, seat, newSignalledBlock)
+	o.addNewSignaledBlock(latestSignalsForEpoch, seat, newSignaledBlock)
 }
 
-func (o *Orchestrator) addNewSignalledBlock(latestSignalsForEpoch *shrinkingmap.ShrinkingMap[account.SeatIndex, *prunable.SignalledBlock], seat account.SeatIndex, newSignalledBlock *prunable.SignalledBlock) {
-	latestSignalsForEpoch.Compute(seat, func(currentValue *prunable.SignalledBlock, exists bool) *prunable.SignalledBlock {
+func (o *Orchestrator) addNewSignaledBlock(latestSignalsForEpoch *shrinkingmap.ShrinkingMap[account.SeatIndex, *prunable.SignaledBlock], seat account.SeatIndex, newSignaledBlock *prunable.SignaledBlock) {
+	latestSignalsForEpoch.Compute(seat, func(currentValue *prunable.SignaledBlock, exists bool) *prunable.SignaledBlock {
 		if !exists {
-			return newSignalledBlock
+			return newSignaledBlock
 		}
 
-		if newSignalledBlock.Compare(currentValue) == 1 {
-			return newSignalledBlock
+		if newSignaledBlock.Compare(currentValue) == 1 {
+			return newSignaledBlock
 		}
 
 		return currentValue
@@ -170,7 +170,7 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 
 	lastSlotInEpoch := o.apiProvider.APIForSlot(slot).TimeProvider().EpochEnd(currentEpoch) == slot
 
-	signalledBlockPerSeat := func() map[account.SeatIndex]*prunable.SignalledBlock {
+	signaledBlockPerSeat := func() map[account.SeatIndex]*prunable.SignaledBlock {
 		o.evictionMutex.Lock()
 		defer o.evictionMutex.Unlock()
 
@@ -180,11 +180,11 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 			return nil
 		}
 
-		signalledBlockPerSeat := latestSignalsForSlot.AsMap()
+		signaledBlockPerSeat := latestSignalsForSlot.AsMap()
 
 		// Store upgrade signals for this slot.
 		upgradeSignals := o.upgradeSignalsFunc(slot)
-		if err := upgradeSignals.Store(signalledBlockPerSeat); err != nil {
+		if err := upgradeSignals.Store(signaledBlockPerSeat); err != nil {
 			o.errorHandler(ierrors.Wrap(err, "failed to store upgrade signals"))
 			return nil
 		}
@@ -193,28 +193,28 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 		// so that we can check whether the threshold was reached and export based on the latest signals only.
 		if !lastSlotInEpoch {
 			latestSignalsForNextSlot := o.latestSignals.Get(slot+1, true)
-			for seat, signalledBlock := range signalledBlockPerSeat {
-				o.addNewSignalledBlock(latestSignalsForNextSlot, seat, signalledBlock)
+			for seat, signaledBlock := range signaledBlockPerSeat {
+				o.addNewSignaledBlock(latestSignalsForNextSlot, seat, signaledBlock)
 			}
 		}
 
-		return signalledBlockPerSeat
+		return signaledBlockPerSeat
 	}()
 
-	o.tryUpgrade(currentEpoch, lastSlotInEpoch, signalledBlockPerSeat)
+	o.tryUpgrade(currentEpoch, lastSlotInEpoch, signaledBlockPerSeat)
 
 	return o.protocolParametersAndVersionsHashFunc(slot)
 }
 
-func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoch bool, signalledBlockPerSeat map[account.SeatIndex]*prunable.SignalledBlock) {
+func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoch bool, signaledBlockPerSeat map[account.SeatIndex]*prunable.SignaledBlock) {
 	// If the threshold was reached in this epoch and this is the last slot of the epoch we want to evaluate whether the window threshold was reached potentially upgrade the version.
-	if signalledBlockPerSeat == nil || !lastSlotInEpoch {
+	if signaledBlockPerSeat == nil || !lastSlotInEpoch {
 		return
 	}
 
 	versionSupporters := make(map[iotago.Version]int)
-	for _, signalledBlock := range signalledBlockPerSeat {
-		versionSupporters[signalledBlock.HighestSupportedVersion]++
+	for _, signaledBlock := range signaledBlockPerSeat {
+		versionSupporters[signaledBlock.HighestSupportedVersion]++
 	}
 
 	// Find version with most supporters. Since the threshold is a super-majority we can't have a tie and looking at the
@@ -263,7 +263,7 @@ func (o *Orchestrator) maxVersionByCount(versionSupporters map[iotago.Version]in
 func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex) (iotago.Version, bool) {
 	epochVersions := make(map[iotago.Version]int)
 
-	for epoch := o.signallingWindowStart(currentEpoch); epoch <= currentEpoch; epoch++ {
+	for epoch := o.signalingWindowStart(currentEpoch); epoch <= currentEpoch; epoch++ {
 		version, err := o.permanentUpgradeSignals.Get(epoch)
 		if err != nil {
 			if ierrors.Is(err, kvstore.ErrKeyNotFound) {
@@ -278,7 +278,7 @@ func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex)
 		epochVersions[version]++
 	}
 
-	// Find version with that was most signaled in the signalingWindow. Since the optsVersionSignallingWindowThreshold
+	// Find version with that was most signaled in the signalingWindow. Since the WindowTargetRatio
 	// is a super-majority we can't have a tie and looking at the version with most supporters is sufficient.
 	versionMostSignaled, signaledCount := o.maxVersionByCount(epochVersions)
 
@@ -290,7 +290,7 @@ func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex)
 	return versionMostSignaled, true
 }
 
-func (o *Orchestrator) signallingWindowStart(epoch iotago.EpochIndex) iotago.EpochIndex {
+func (o *Orchestrator) signalingWindowStart(epoch iotago.EpochIndex) iotago.EpochIndex {
 	windowSize := iotago.EpochIndex(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().WindowSize)
 
 	if epoch < windowSize {
