@@ -38,13 +38,15 @@ WORKDIR /scratch/iota-core
 # Ensure ca-certificates are up to date
 RUN update-ca-certificates
 
+ENV GOCACHE=/go/cache
+
 # Download go modules
-RUN go mod download
+RUN --mount=type=cache,target=/go go mod download
 # Do not verify modules if we have local modules coming from go.work
-RUN if [ "${WITH_GO_WORK}" = "0" ]; then go mod verify; fi
+RUN --mount=type=cache,target=/go if [ "${WITH_GO_WORK}" = "0" ]; then go mod verify; fi
 
 # Build the binary
-RUN go build -o /app/iota-core -a -tags="$BUILD_TAGS" -ldflags='-w -s'
+RUN --mount=type=cache,target=/go go build -o /app/iota-core -tags="$BUILD_TAGS" -ldflags='-w -s'
 
 # Copy the assets
 RUN cp ./config_defaults.json /app/config.json
