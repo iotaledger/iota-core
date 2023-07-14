@@ -12,12 +12,12 @@ import (
 
 func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, node *mock.Node) {
 	t.Eventually(func() error {
-		actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountData.ID, node.Protocol.SyncManager.LatestCommittedSlot())
+		actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountData.ID, node.Protocol.SyncManager.LatestCommitment().Index())
 		if err != nil {
 			return ierrors.Wrap(err, "AssertAccountData: failed to load account data")
 		}
 		if !exists {
-			return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.SyncManager.LatestCommittedSlot())
+			return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.SyncManager.LatestCommitment().Index())
 		}
 
 		if accountData.ID != actualAccountData.ID {

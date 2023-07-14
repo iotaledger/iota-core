@@ -22,8 +22,8 @@ func info() (*infoResponse, error) {
 			RATT:                 cl.Accepted().RelativeTime(),
 			CTT:                  cl.Confirmed().Time(),
 			RCTT:                 cl.Confirmed().RelativeTime(),
-			LatestCommittedSlot:  syncStatus.LatestCommittedSlot,
-			FinalizedSlot:        syncStatus.FinalizedSlot,
+			LatestCommittedSlot:  syncStatus.LatestCommitment.Index(),
+			FinalizedSlot:        syncStatus.LatestFinalizedSlot,
 			LastAcceptedBlockID:  syncStatus.LastAcceptedBlockID.ToHex(),
 			LastConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
 			// TODO: fill in pruningSlot
