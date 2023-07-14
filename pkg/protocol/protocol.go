@@ -313,6 +313,10 @@ func (p *Protocol) LatestAPI() iotago.API {
 	return p.MainEngineInstance().LatestAPI()
 }
 
+func (p *Protocol) CurrentAPI() iotago.API {
+	return p.MainEngineInstance().CurrentAPI()
+}
+
 func (p *Protocol) APIForVersion(version iotago.Version) (iotago.API, error) {
 	return p.MainEngineInstance().APIForVersion(version)
 }

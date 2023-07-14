@@ -428,6 +428,14 @@ func (m mockProtocolParameters) EpochNearingThreshold() iotago.SlotIndex {
 	panic("implement me")
 }
 
+func (m mockProtocolParameters) VersionSignaling() *iotago.VersionSignaling {
+	panic("implement me")
+}
+
 func (m mockProtocolParameters) Bytes() ([]byte, error) {
+	panic("implement me")
+}
+
+func (m mockProtocolParameters) Hash() (iotago.Identifier, error) {
 	panic("implement me")
 }

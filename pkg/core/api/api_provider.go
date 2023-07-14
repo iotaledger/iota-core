@@ -7,5 +7,6 @@ type Provider interface {
 	APIForSlot(iotago.SlotIndex) iotago.API
 	APIForEpoch(iotago.EpochIndex) iotago.API
 
+	CurrentAPI() iotago.API
 	LatestAPI() iotago.API
 }

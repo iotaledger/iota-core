@@ -27,3 +27,7 @@ func (t *staticAPIProvider) APIForEpoch(iotago.EpochIndex) iotago.API {
 func (t *staticAPIProvider) LatestAPI() iotago.API {
 	return t.api
 }
+
+func (t *staticAPIProvider) CurrentAPI() iotago.API {
+	return t.api
+}

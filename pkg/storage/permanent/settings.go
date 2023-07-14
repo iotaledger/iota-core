@@ -70,6 +70,11 @@ func (s *Settings) LatestAPI() iotago.API {
 	return lo.PanicOnErr(s.APIForVersion(iotago.LatestProtocolVersion()))
 }
 
+func (s *Settings) CurrentAPI() iotago.API {
+	// There can't be an error since we are using the latest protocol version which should always exist.
+	return s.APIForSlot(s.LatestCommitment().Index())
+}
+
 func (s *Settings) APIForSlot(slot iotago.SlotIndex) iotago.API {
 	apiForSlot, err := s.APIForVersion(s.VersionForSlot(slot))
 

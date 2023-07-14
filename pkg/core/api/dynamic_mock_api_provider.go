@@ -66,3 +66,7 @@ func (d *DynamicMockAPIProvider) LatestAPI() iotago.API {
 
 	return lo.PanicOnErr(d.APIForVersion(d.latestVersion))
 }
+
+func (d *DynamicMockAPIProvider) CurrentAPI() iotago.API {
+	return d.LatestAPI()
+}

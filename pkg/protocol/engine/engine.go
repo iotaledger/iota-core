@@ -270,6 +270,10 @@ func (e *Engine) LatestAPI() iotago.API {
 	return e.Storage.Settings().LatestAPI()
 }
 
+func (e *Engine) CurrentAPI() iotago.API {
+	return e.Storage.Settings().CurrentAPI()
+}
+
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
 	if len(targetSlot) == 0 {
 		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index())
