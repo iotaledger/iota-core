@@ -1,6 +1,8 @@
 package debugapi
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -10,12 +12,15 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -46,9 +51,17 @@ var (
 	Component *app.Component
 	deps      dependencies
 
-	features = []string{}
+	features      = []string{}
+	blocksPerSlot = shrinkingmap.New[iotago.SlotIndex, []*blocks.Block]()
 
-	blocksStored = shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *blocks.Block]]()
+	blocksPrunableStorage = prunable.NewManager(database.Config{
+		Engine:       hivedb.EngineRocksDB,
+		Directory:    "/tmp/",
+		Version:      1,
+		PrefixHealth: []byte{0},
+	}, func(err error) {
+		fmt.Printf(">> DebugAPI Error: %s\n", err)
+	}, prunable.WithGranularity(100), prunable.WithMaxOpenDBs(2))
 )
 
 type dependencies struct {
@@ -60,6 +73,7 @@ type dependencies struct {
 }
 
 func configure() error {
+
 	// check if RestAPI plugin is disabled
 	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
 		Component.LogPanic("RestAPI plugin needs to be enabled to use the DebugAPIV3 plugin")
@@ -67,16 +81,51 @@ func configure() error {
 
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v3")
 
-	deps.Protocol.MainEngineInstance().Events.Notarization.SlotCommitted.Hook(storeTransactionsPerSlot)
-
 	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
-		lo.Return1(blocksStored.GetOrCreate(block.ID().Index(), func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *blocks.Block] {
-			return shrinkingmap.New[iotago.BlockID, *blocks.Block]()
-		})).Set(block.ID(), block)
+		blocksPerSlot.Set(block.ID().Index(), append(lo.Return1(blocksPerSlot.GetOrCreate(block.ID().Index(), func() []*blocks.Block {
+			return make([]*blocks.Block, 0)
+		})), block))
 	})
+	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(storeTransactionsPerSlot)
 
-	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		blocksStored.Delete(index)
+	deps.Protocol.Events.Engine.EvictionState.SlotEvicted.Hook(func(index iotago.SlotIndex) {
+		blocksInSlot, exists := blocksPerSlot.Get(index)
+		if !exists {
+			return
+		}
+
+		for _, block := range blocksInSlot {
+			if block.ProtocolBlock() == nil {
+				fmt.Println("block is a root block", block.ID())
+				continue
+			}
+
+			blockStore := blocksPrunableStorage.Get(block.ID().Index(), []byte{1})
+
+			err := blockStore.Set(lo.PanicOnErr(block.ID().Bytes()), lo.PanicOnErr(json.Marshal(&BlockMetadataResponse{
+				BlockID:            block.ID().String(),
+				StrongParents:      lo.Map(block.StrongParents(), func(parentID iotago.BlockID) string { return parentID.String() }),
+				WeakParents:        lo.Map(block.ProtocolBlock().Block.WeakParentIDs(), func(parentID iotago.BlockID) string { return parentID.String() }),
+				ShallowLikeParents: lo.Map(block.ProtocolBlock().Block.ShallowLikeParentIDs(), func(parentID iotago.BlockID) string { return parentID.String() }),
+				Solid:              block.IsSolid(),
+				Invalid:            block.IsInvalid(),
+				Booked:             block.IsBooked(),
+				Future:             block.IsFuture(),
+				PreAccepted:        block.IsPreAccepted(),
+				Accepted:           block.IsAccepted(),
+				PreConfirmed:       block.IsPreConfirmed(),
+				Confirmed:          block.IsConfirmed(),
+				Witnesses:          block.Witnesses(),
+				ConflictIDs:        block.ConflictIDs().ToSlice(),
+				PayloadConflictIDs: block.PayloadConflictIDs().ToSlice(),
+				String:             block.String(),
+			})))
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		blocksPerSlot.Delete(index)
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
@@ -85,34 +134,44 @@ func configure() error {
 			return err
 		}
 
-		slotStorage, exists := blocksStored.Get(blockID.Index())
-		if !exists {
-			return httpserver.JSONResponse(c, http.StatusNotFound, BlockMetadataResponse{})
+		if block, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID); exists {
+			response := &BlockMetadataResponse{
+				BlockID:            block.ID().String(),
+				StrongParents:      lo.Map(block.StrongParents(), func(blockID iotago.BlockID) string { return blockID.String() }),
+				WeakParents:        lo.Map(block.ProtocolBlock().Block.WeakParentIDs(), func(blockID iotago.BlockID) string { return blockID.String() }),
+				ShallowLikeParents: lo.Map(block.ProtocolBlock().Block.ShallowLikeParentIDs(), func(blockID iotago.BlockID) string { return blockID.String() }),
+				Solid:              block.IsSolid(),
+				Invalid:            block.IsInvalid(),
+				Booked:             block.IsBooked(),
+				Future:             block.IsFuture(),
+				PreAccepted:        block.IsPreAccepted(),
+				Accepted:           block.IsAccepted(),
+				PreConfirmed:       block.IsPreConfirmed(),
+				Confirmed:          block.IsConfirmed(),
+				Witnesses:          block.Witnesses(),
+				ConflictIDs:        block.ConflictIDs().ToSlice(),
+				PayloadConflictIDs: block.PayloadConflictIDs().ToSlice(),
+				String:             block.String(),
+			}
+
+			return httpserver.JSONResponse(c, http.StatusOK, response)
+
 		}
 
-		block, exists := slotStorage.Get(blockID)
-		if !exists {
-			return httpserver.JSONResponse(c, http.StatusNotFound, BlockMetadataResponse{})
+		blockStore := blocksPrunableStorage.Get(blockID.Index(), []byte{1})
+
+		blockJSON, err := blockStore.Get(lo.PanicOnErr(blockID.Bytes()))
+		if err != nil {
+			return c.String(http.StatusInternalServerError, err.Error())
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, BlockMetadataResponse{
-			BlockID:            block.ID().String(),
-			StrongParents:      lo.Map(block.StrongParents(), func(blockID iotago.BlockID) string { return blockID.String() }),
-			WeakParents:        lo.Map(block.ProtocolBlock().Block.WeakParentIDs(), func(blockID iotago.BlockID) string { return blockID.String() }),
-			ShallowLikeParents: lo.Map(block.ProtocolBlock().Block.ShallowLikeParentIDs(), func(blockID iotago.BlockID) string { return blockID.String() }),
-			Solid:              block.IsSolid(),
-			Invalid:            block.IsInvalid(),
-			Booked:             block.IsBooked(),
-			Future:             block.IsFuture(),
-			PreAccepted:        block.IsPreAccepted(),
-			Accepted:           block.IsAccepted(),
-			PreConfirmed:       block.IsPreConfirmed(),
-			Confirmed:          block.IsConfirmed(),
-			Witnesses:          block.Witnesses(),
-			ConflictIDs:        block.ConflictIDs().ToSlice(),
-			PayloadConflictIDs: block.PayloadConflictIDs().ToSlice(),
-			String:             block.String(),
-		})
+		block := &BlockMetadataResponse{}
+		err = json.Unmarshal(blockJSON, block)
+		if err != nil {
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, block)
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteValidators, func(c echo.Context) error {
