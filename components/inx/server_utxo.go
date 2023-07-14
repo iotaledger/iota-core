@@ -227,7 +227,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 			return 0, nil
 		}
 
-		latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+		latestCommitment := deps.Protocol.SyncManager.LatestCommitment()
 
 		if startIndex > latestCommitment.Index() {
 			// no need to send previous milestone diffs
@@ -235,7 +235,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		}
 
 		// Stream all available milestone diffs first
-		pruningIndex := deps.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
+		pruningIndex := deps.Protocol.SyncManager.LatestFinalizedSlot()
 		if startIndex <= pruningIndex {
 			return 0, status.Errorf(codes.InvalidArgument, "given startMilestoneIndex %d is older than the current pruningIndex %d", startIndex, pruningIndex)
 		}

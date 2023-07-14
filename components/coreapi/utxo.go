@@ -41,7 +41,7 @@ func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
 }
 
 func newOutputMetadataResponse(output *utxoledger.Output) (*outputMetadataResponse, error) {
-	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	latestCommitment := deps.Protocol.SyncManager.LatestCommitment()
 
 	resp := &outputMetadataResponse{
 		BlockID:            output.BlockID().ToHex(),
@@ -64,7 +64,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*outputMetadataRespon
 }
 
 func newSpentMetadataResponse(spent *utxoledger.Spent) (*outputMetadataResponse, error) {
-	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	latestCommitment := deps.Protocol.SyncManager.LatestCommitment()
 
 	resp := &outputMetadataResponse{
 		BlockID:            spent.BlockID().ToHex(),

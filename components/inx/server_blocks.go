@@ -31,7 +31,7 @@ func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlo
 func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*inx.BlockMetadata, error) {
 	blkID := blockID.Unwrap()
 
-	finalizedSlot := deps.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
+	finalizedSlot := deps.Protocol.SyncManager.LatestFinalizedSlot()
 
 	// Check if the block is still in the cache and we have the proper flags
 	if cachedBlock, exists := deps.Protocol.MainEngineInstance().BlockFromCache(blkID); exists {

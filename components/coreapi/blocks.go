@@ -48,7 +48,7 @@ func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
 
 func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
 	references := deps.Protocol.MainEngineInstance().TipSelection.SelectTips(iotago.BlockMaxParents)
-	slotCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	slotCommitment := deps.Protocol.SyncManager.LatestCommitment()
 
 	if len(references[iotago.StrongParentType]) == 0 {
 		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "get references failed")
@@ -63,7 +63,7 @@ func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
 		StrongParents:       references[iotago.StrongParentType].ToHex(),
 		WeakParents:         references[iotago.WeakParentType].ToHex(),
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType].ToHex(),
-		LatestFinalizedSlot: deps.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot(),
+		LatestFinalizedSlot: deps.Protocol.SyncManager.LatestFinalizedSlot(),
 		Commitment:          cBytes,
 	}
 
