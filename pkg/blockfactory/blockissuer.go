@@ -216,7 +216,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 			resign = true
 		}
 
-	case *iotago.ValidatorBlock:
+	case *iotago.ValidationBlock:
 		//nolint:revive,staticcheck //temporarily disable
 		if len(iotaBlock.Parents()) == 0 {
 			// TODO: implement tipselection for validator blocks

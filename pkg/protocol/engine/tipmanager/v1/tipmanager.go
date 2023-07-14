@@ -87,7 +87,7 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 
 	if evictedObjects, deleted := t.tipMetadataStorage.DeleteAndReturn(slotIndex); deleted {
 		evictedObjects.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
-			tipMetadata.isEvicted.Trigger()
+			tipMetadata.evicted.Trigger()
 
 			return true
 		})
@@ -99,7 +99,7 @@ func (t *TipManager) Shutdown() {}
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
-	tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
+	tipMetadata.isStrongTip.OnUpdate(func(_, isStrongTip bool) {
 		if isStrongTip {
 			t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
 		} else {
@@ -107,7 +107,7 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 		}
 	})
 
-	tipMetadata.OnIsWeakTipUpdated(func(isWeakTip bool) {
+	tipMetadata.isWeakTip.OnUpdate(func(_, isWeakTip bool) {
 		if isWeakTip {
 			t.weakTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
 		} else {
@@ -117,9 +117,9 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 
 	t.forEachParentByType(tipMetadata.Block(), func(parentType iotago.ParentsType, parentMetadata *TipMetadata) {
 		if parentType == iotago.StrongParentType {
-			tipMetadata.setupStrongParent(parentMetadata)
+			tipMetadata.connectStrongParent(parentMetadata)
 		} else {
-			tipMetadata.setupWeakParent(parentMetadata)
+			tipMetadata.connectWeakParent(parentMetadata)
 		}
 	})
 

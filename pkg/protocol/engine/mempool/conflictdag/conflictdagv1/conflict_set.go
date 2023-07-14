@@ -1,10 +1,10 @@
 package conflictdagv1
 
 import (
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 )
 
@@ -14,9 +14,9 @@ type ConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 	ID ResourceID
 
 	// members is the set of Conflicts that are conflicting over the shared resource.
-	members *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
+	members ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]
 
-	allMembersEvicted *promise.Value[bool]
+	allMembersEvicted reactive.Variable[bool]
 
 	mutex syncutils.RWMutex
 }
@@ -25,13 +25,13 @@ type ConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 func NewConflictSet[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.VoteRankType[VoteRank]](id ResourceID) *ConflictSet[ConflictID, ResourceID, VoteRank] {
 	return &ConflictSet[ConflictID, ResourceID, VoteRank]{
 		ID:                id,
-		allMembersEvicted: promise.NewValue[bool](),
-		members:           advancedset.New[*Conflict[ConflictID, ResourceID, VoteRank]](),
+		allMembersEvicted: reactive.NewVariable[bool](),
+		members:           ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]](),
 	}
 }
 
 // Add adds a Conflict to the ConflictSet and returns all other members of the set.
-func (c *ConflictSet[ConflictID, ResourceID, VoteRank]) Add(addedConflict *Conflict[ConflictID, ResourceID, VoteRank]) (otherMembers *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]], err error) {
+func (c *ConflictSet[ConflictID, ResourceID, VoteRank]) Add(addedConflict *Conflict[ConflictID, ResourceID, VoteRank]) (otherMembers ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]], err error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 

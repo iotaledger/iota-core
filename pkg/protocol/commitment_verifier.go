@@ -2,7 +2,7 @@ package protocol
 
 import (
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -59,7 +59,7 @@ func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.
 }
 
 func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestation) (iotago.BlockIDs, uint64, error) {
-	visitedIdentities := set.New[iotago.AccountID]()
+	visitedIdentities := ds.NewSet[iotago.AccountID]()
 	var blockIDs iotago.BlockIDs
 	var seatCount uint64
 
