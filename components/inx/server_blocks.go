@@ -28,6 +28,34 @@ func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlo
 	}, nil
 }
 
+func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*inx.BlockMetadata, error) {
+	blkID := blockID.Unwrap()
+
+	finalizedSlot := deps.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
+
+	// Check if the block is still in the cache and we have the proper flags
+	if cachedBlock, exists := deps.Protocol.MainEngineInstance().BlockFromCache(blkID); exists {
+		return &inx.BlockMetadata{
+			BlockId:   blockID,
+			Accepted:  cachedBlock.IsAccepted(),
+			Confirmed: cachedBlock.IsConfirmed(),
+			Finalized: cachedBlock.ID().Index() <= finalizedSlot,
+		}, nil
+	}
+
+	block, exists := deps.Protocol.MainEngineInstance().Block(blkID) // block +1
+	if !exists {
+		return nil, status.Errorf(codes.NotFound, "block %s not found", blkID.ToHex())
+	}
+
+	return &inx.BlockMetadata{
+		BlockId:   blockID,
+		Accepted:  true,  // we only store accepted blocks
+		Confirmed: false, // TODO: ask the retainer for this information
+		Finalized: block.ID().Index() <= finalizedSlot,
+	}, nil
+}
+
 func (s *Server) ListenToBlocks(_ *inx.NoParams, srv inx.INX_ListenToBlocksServer) error {
 	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
 
