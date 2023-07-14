@@ -3,6 +3,8 @@ module github.com/iotaledger/iota-core
 go 1.20
 
 require (
+	github.com/AlecAivazis/survey/v2 v2.3.7
+	github.com/goccy/go-graphviz v0.1.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
@@ -11,7 +13,7 @@ require (
 	github.com/iotaledger/hive.go/app v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/autopeering v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230706083020-ef6c3248369d
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230711121610-7d024f7b5eb5
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/ds v0.0.0-20230713110520-ba24b71ff7ab
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230706083020-ef6c3248369d
@@ -22,9 +24,11 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230710124538-f0f2af1011af
+	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-20230714130714-580a4c17e9bd
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230712172022-22fba04771d0
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/libp2p/go-libp2p v0.28.1
+	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.9.0
 	github.com/multiformats/go-varint v0.0.7
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
@@ -61,7 +65,6 @@ require (
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
-	github.com/goccy/go-graphviz v0.1.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
@@ -80,6 +83,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.16.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
@@ -99,6 +103,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
+	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/miekg/dns v1.1.55 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
@@ -106,7 +111,6 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.3.1 // indirect
@@ -150,6 +154,7 @@ require (
 	golang.org/x/net v0.11.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/term v0.10.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
