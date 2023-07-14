@@ -31,7 +31,6 @@ type Retainer struct {
 //
 // maybe also store the orphaned block there as well?
 
-// TODO write provider
 func New(retainerFunc func(iotago.SlotIndex) *prunable.Retainer) *Retainer {
 	return &Retainer{
 		retainerFunc: retainerFunc,
@@ -75,8 +74,39 @@ func (r *Retainer) Block(blockID iotago.BlockID) (*model.Block, error) {
 	return block, nil
 }
 
-func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*model.Block, error) {
-	return nil, nil
+func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
+	status, err := r.blockStatus(blockID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get block status for %s", blockID.ToHex())
+	}
+
+	return &retainer.BlockMetadata{Status: status}, nil
+}
+
+func (r *Retainer) blockStatus(blockID iotago.BlockID) (retainer.BlockStatus, error) {
+	_, blockStorageErr := r.protocol.MainEngineInstance().Storage.Blocks(blockID.Index()).Load(blockID)
+	// block was for sure accepted
+	if blockStorageErr == nil {
+		// check if finalized
+		if blockID.Index() <= r.protocol.SyncManager.FinalizedSlot() {
+			return retainer.BlockFinalized, nil
+		}
+		// check if confirmed
+		if confirmed, err := r.retainerFunc(blockID.Index()).WasConfirmed(blockID); err != nil {
+			return retainer.BlockUnknown, err
+		} else if confirmed {
+			return retainer.BlockConfirmed, nil
+		}
+		return retainer.BlockAccepted, nil
+	}
+	// orphaned (attached, but never accepeted)
+	if orphaned, err := r.retainerFunc(blockID.Index()).WasOrphaned(blockID); err != nil {
+		return retainer.BlockUnknown, err
+	} else if orphaned {
+		return retainer.BlockOrphaned, nil
+	}
+
+	return retainer.BlockUnknown, nil
 }
 
 func (r *Retainer) onBlockAttached(blockID iotago.BlockID) {

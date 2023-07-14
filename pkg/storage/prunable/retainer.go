@@ -12,18 +12,10 @@ const (
 	confirmedPrefix
 )
 
-type BlockStatus int
-
-const (
-	Unknown BlockStatus = iota
-	Accepted
-	Confirmed
-	Orphaned
-)
-
 type Retainer struct {
-	slot           iotago.SlotIndex
-	orphanedStore  *kvstore.TypedStore[iotago.BlockID, types.Empty]
+	slot          iotago.SlotIndex
+	orphanedStore *kvstore.TypedStore[iotago.BlockID, types.Empty]
+
 	confirmedStore *kvstore.TypedStore[iotago.BlockID, types.Empty]
 }
 
@@ -56,24 +48,20 @@ func (r *Retainer) Store(blockID iotago.BlockID) error {
 	return nil
 }
 
-func (r *Retainer) Load(blockID iotago.BlockID) (BlockStatus, error) {
+func (r *Retainer) WasConfirmed(blockID iotago.BlockID) (bool, error) {
 	exists, err := r.confirmedStore.Has(blockID)
 	if err != nil {
-		return 0, err
+		return false, err
 	}
-	if exists {
-		return Confirmed, nil
-	}
+	return exists, nil
+}
 
-	exists, err = r.orphanedStore.Has(blockID)
+func (r *Retainer) WasOrphaned(blockID iotago.BlockID) (bool, error) {
+	exists, err := r.orphanedStore.Has(blockID)
 	if err != nil {
-		return 0, err
+		return false, err
 	}
-	if exists {
-		return Orphaned, nil
-	}
-
-	return Unknown, nil
+	return exists, nil
 }
 
 func (r *Retainer) StoreAccepted(blockID iotago.BlockID) error {
