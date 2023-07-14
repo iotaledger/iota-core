@@ -13,9 +13,10 @@ import (
 )
 
 type SignaledBlock struct {
-	ID                      iotago.BlockID `serix:"0"`
-	IssuingTime             time.Time      `serix:"1"`
-	HighestSupportedVersion iotago.Version `serix:"2"`
+	ID                      iotago.BlockID    `serix:"0"`
+	IssuingTime             time.Time         `serix:"1"`
+	HighestSupportedVersion iotago.Version    `serix:"2"`
+	ProtocolParametersHash  iotago.Identifier `serix:"3"`
 }
 
 func NewSignaledBlock(blockID iotago.BlockID, block *iotago.ProtocolBlock) (*SignaledBlock, error) {
@@ -28,6 +29,7 @@ func NewSignaledBlock(blockID iotago.BlockID, block *iotago.ProtocolBlock) (*Sig
 		ID:                      blockID,
 		IssuingTime:             block.IssuingTime,
 		HighestSupportedVersion: validationBlock.HighestSupportedVersion,
+		ProtocolParametersHash:  validationBlock.ProtocolParametersHash,
 	}, nil
 }
 
