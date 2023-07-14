@@ -14,6 +14,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+type AccountsData []*AccountData
+
 type AccountData struct {
 	ID       iotago.AccountID
 	Credits  *BlockIssuanceCredits

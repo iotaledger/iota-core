@@ -4,7 +4,7 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -12,7 +12,7 @@ import (
 
 type SybilProtection interface {
 	BlockAccepted(block *blocks.Block)
-	EligibleValidators(epoch iotago.EpochIndex) (account.Validators, error)
+	EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error)
 	ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error)
 	DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error)
 	SeatManager() seatmanager.SeatManager

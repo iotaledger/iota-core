@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
@@ -278,9 +279,9 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 }
 
 // EligibleValidators returns the currently known list of recently active validator candidates for the given epoch.
-func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (account.Validators, error) {
+func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error) {
 	candidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
-	validators := make(map[iotago.AccountID]*account.Validator)
+	validators := make(accounts.AccountsData, 0)
 
 	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
 		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
@@ -294,13 +295,7 @@ func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (account.V
 		if accountData.StakeEndEpoch < epoch {
 			return nil
 		}
-		validators[accountData.ID] = &account.Validator{
-			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
-			ValidatorStake:                 accountData.ValidatorStake,
-			FixedCost:                      accountData.FixedCost,
-			StakingEnd:                     accountData.StakeEndEpoch,
-			LatestSupportedProtocolVersion: 1, // TODO: account data should provide this info
-		}
+		validators = append(validators, accountData.Clone())
 
 		return nil
 	}); err != nil {

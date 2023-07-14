@@ -75,13 +75,13 @@ func staking() (*models.AccountStakingListResponse, error) {
 		return nil, err
 	}
 
-	for accountID, validator := range activeValidators {
+	for _, accountData := range activeValidators {
 		resp.Stakers = append(resp.Stakers, models.ValidatorResponse{
-			AccountID:                      accountID.ToHex(),
-			PoolStake:                      uint64(validator.PoolStake),
-			ValidatorStake:                 uint64(validator.ValidatorStake),
-			StakingEpochEnd:                validator.StakingEnd,
-			LatestSupportedProtocolVersion: uint64(validator.LatestSupportedProtocolVersion),
+			AccountID:                      accountData.ID.ToHex(),
+			PoolStake:                      uint64(accountData.ValidatorStake + accountData.DelegationStake),
+			ValidatorStake:                 uint64(accountData.ValidatorStake),
+			StakingEpochEnd:                accountData.StakeEndEpoch,
+			LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
 		})
 	}
 	return resp, nil
