@@ -13,11 +13,13 @@ import (
 
 type ProtocolEpochVersions struct {
 	versionsPerEpoch []ProtocolEpochVersion
+	knownVersions    map[iotago.Version]iotago.EpochIndex
 }
 
 func NewProtocolEpochVersions() *ProtocolEpochVersions {
 	return &ProtocolEpochVersions{
 		versionsPerEpoch: make([]ProtocolEpochVersion, 0),
+		knownVersions:    make(map[iotago.Version]iotago.EpochIndex),
 	}
 }
 
@@ -38,6 +40,8 @@ func (p *ProtocolEpochVersions) Add(version iotago.Version, epoch iotago.EpochIn
 		StartEpoch: epoch,
 	})
 
+	p.knownVersions[version] = epoch
+
 	slices.SortFunc(p.versionsPerEpoch, func(a, b ProtocolEpochVersion) bool {
 		return a.Version < b.Version
 	})
@@ -45,6 +49,11 @@ func (p *ProtocolEpochVersions) Add(version iotago.Version, epoch iotago.EpochIn
 
 func (p *ProtocolEpochVersions) Slice() []ProtocolEpochVersion {
 	return lo.CopySlice(p.versionsPerEpoch)
+}
+
+func (p *ProtocolEpochVersions) EpochForVersion(version iotago.Version) (iotago.EpochIndex, bool) {
+	startEpoch, exists := p.knownVersions[version]
+	return startEpoch, exists
 }
 
 func (p *ProtocolEpochVersions) Bytes() []byte {

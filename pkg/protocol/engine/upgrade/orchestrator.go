@@ -59,6 +59,7 @@ type Orchestrator struct {
 
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.EpochIndex) error
 	protocolParametersAndVersionsHashFunc func(iotago.SlotIndex) (iotago.Identifier, error)
+	epochForVersionFunc                   func(iotago.Version) (iotago.EpochIndex, bool)
 
 	apiProvider api.Provider
 	seatManager seatmanager.SeatManager
@@ -86,6 +87,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 			o.apiProvider = e.Storage.Settings()
 			o.setProtocolParametersEpochMappingFunc = e.Storage.Settings().StoreProtocolParametersEpochMapping
 			o.protocolParametersAndVersionsHashFunc = e.Storage.Settings().VersionsAndProtocolParametersHash
+			o.epochForVersionFunc = e.Storage.Settings().EpochForVersion
 
 			e.Events.BlockGadget.BlockAccepted.Hook(o.trackHighestSupportedVersion)
 
@@ -119,8 +121,11 @@ func (o *Orchestrator) trackHighestSupportedVersion(block *blocks.Block) {
 		return
 	}
 
-	// TODO:
-	//  do not track any version that we already know about. This includes past, current and future versions that are already successfully signaled.
+	// Do not track any version that we already know about. This includes past, current and future versions that are already
+	// successfully signaled and scheduled to start in a future epoch.
+	if _, exists := o.epochForVersionFunc(block.ProtocolBlock().ProtocolVersion); exists {
+		return
+	}
 
 	// TODO: track version+hash of protocol parameters as there could be the same version with different protocol parameters
 

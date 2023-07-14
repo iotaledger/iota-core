@@ -235,6 +235,13 @@ func (s *Settings) VersionsAndProtocolParametersHash(slot iotago.SlotIndex) (iot
 	return iotago.IdentifierFromData(util.Bytes()), nil
 }
 
+func (s *Settings) EpochForVersion(version iotago.Version) (iotago.EpochIndex, bool) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	return s.protocolVersions.EpochForVersion(version)
+}
+
 func (s *Settings) VersionForEpoch(epoch iotago.EpochIndex) iotago.Version {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
