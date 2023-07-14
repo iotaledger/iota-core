@@ -64,39 +64,53 @@ type Orchestrator struct {
 	apiProvider api.Provider
 	seatManager seatmanager.SeatManager
 
-	optsVersionSignallingThreshold       float64
-	optsVersionSignallingWindowSize      iotago.EpochIndex
-	optsVersionSignallingWindowThreshold int
-	optsNewVersionStartOffset            iotago.EpochIndex
-
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.Engine, *Orchestrator] {
 	return module.Provide(func(e *engine.Engine) *Orchestrator {
-		return options.Apply(&Orchestrator{
-			optsVersionSignallingThreshold:       0.67,
-			optsVersionSignallingWindowSize:      7,
-			optsVersionSignallingWindowThreshold: 5,
-			optsNewVersionStartOffset:            7,
-			errorHandler:                         e.ErrorHandler("upgradegadget"),
-			latestSignals:                        memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignalledBlock](),
-		}, opts, func(o *Orchestrator) {
-			o.upgradeSignalsFunc = e.Storage.Prunable.UpgradeSignals
-			o.permanentUpgradeSignals = kvstore.NewTypedStore[iotago.EpochIndex, iotago.Version](e.Storage.Permanent.UpgradeSignals(), iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, iotago.Version.Bytes, iotago.VersionFromBytes)
-			o.apiProvider = e.Storage.Settings()
-			o.setProtocolParametersEpochMappingFunc = e.Storage.Settings().StoreProtocolParametersEpochMapping
-			o.protocolParametersAndVersionsHashFunc = e.Storage.Settings().VersionsAndProtocolParametersHash
-			o.epochForVersionFunc = e.Storage.Settings().EpochForVersion
-
-			e.Events.BlockGadget.BlockAccepted.Hook(o.trackHighestSupportedVersion)
-
-			// TODO: fill options from protocol parameters
-		},
-			(*Orchestrator).TriggerConstructed,
-			(*Orchestrator).TriggerInitialized,
+		o := NewOrchestrator(
+			e.ErrorHandler("upgradegadget"),
+			e.Storage.Permanent.UpgradeSignals(),
+			e.Storage.Prunable.UpgradeSignals,
+			e.Storage.Settings(),
+			e.Storage.Settings().StoreProtocolParametersEpochMapping,
+			e.Storage.Settings().VersionsAndProtocolParametersHash,
+			e.Storage.Settings().EpochForVersion,
+			e.SybilProtection.SeatManager(),
+			opts...,
 		)
+
+		e.Events.BlockGadget.BlockAccepted.Hook(o.trackHighestSupportedVersion)
+		o.TriggerInitialized()
+
+		return o
 	})
+}
+
+func NewOrchestrator(errorHandler func(error),
+	permanentUpgradeSignal kvstore.KVStore,
+	upgradeSignalsFunc func(slot iotago.SlotIndex) *prunable.UpgradeSignals,
+	apiProvider api.Provider,
+	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.EpochIndex) error,
+	protocolParametersAndVersionsHashFunc func(iotago.SlotIndex) (iotago.Identifier, error),
+	epochForVersionFunc func(iotago.Version) (iotago.EpochIndex, bool),
+	seatManager seatmanager.SeatManager, opts ...options.Option[Orchestrator]) *Orchestrator {
+	return options.Apply(&Orchestrator{
+		errorHandler:            errorHandler,
+		latestSignals:           memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignalledBlock](),
+		permanentUpgradeSignals: kvstore.NewTypedStore[iotago.EpochIndex, iotago.Version](permanentUpgradeSignal, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, iotago.Version.Bytes, iotago.VersionFromBytes),
+		upgradeSignalsFunc:      upgradeSignalsFunc,
+
+		setProtocolParametersEpochMappingFunc: setProtocolParametersEpochMappingFunc,
+		protocolParametersAndVersionsHashFunc: protocolParametersAndVersionsHashFunc,
+		epochForVersionFunc:                   epochForVersionFunc,
+
+		apiProvider: apiProvider,
+		seatManager: seatManager,
+	}, opts,
+		(*Orchestrator).TriggerConstructed,
+	)
 }
 
 // TODO
@@ -205,11 +219,11 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 
 	// Find version with most supporters. Since the threshold is a super-majority we can't have a tie and looking at the
 	// version with most supporters is sufficient.
-	versionWithMostSupporters, mostSupporters := o.mostSupportedVersion(versionSupporters)
+	versionWithMostSupporters, mostSupporters := o.maxVersionByCount(versionSupporters)
 
 	// Check whether the threshold for version was reached.
 	totalSeatCount := o.seatManager.SeatCount()
-	if !votes.IsThresholdReached(mostSupporters, totalSeatCount, o.optsVersionSignallingThreshold) {
+	if !votes.IsThresholdReached(mostSupporters, totalSeatCount, votes.SuperMajority) {
 		return
 	}
 
@@ -220,20 +234,20 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 	}
 
 	// Check whether the signaling window threshold is reached.
-	versionTobeUpgraded, reached := o.signallingThresholdReached(currentEpoch)
+	versionTobeUpgraded, reached := o.signalingThresholdReached(currentEpoch)
 	if !reached {
 		return
 	}
 
 	// The version should be upgraded. We're adding the version to the settings.
 	// Effectively, this is a soft fork as it is contained in the hash of protocol parameters and versions.
-	if err := o.setProtocolParametersEpochMappingFunc(versionTobeUpgraded, currentEpoch+o.optsNewVersionStartOffset); err != nil {
+	if err := o.setProtocolParametersEpochMappingFunc(versionTobeUpgraded, currentEpoch+iotago.EpochIndex(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().ActivationOffset)); err != nil {
 		o.errorHandler(ierrors.Wrap(err, "failed to set protocol parameters epoch mapping"))
 		return
 	}
 }
 
-func (o *Orchestrator) mostSupportedVersion(versionSupporters map[iotago.Version]int) (iotago.Version, int) {
+func (o *Orchestrator) maxVersionByCount(versionSupporters map[iotago.Version]int) (iotago.Version, int) {
 	var versionWithMostSupporters iotago.Version
 	var mostSupporters int
 	for version, supportersCount := range versionSupporters {
@@ -246,7 +260,7 @@ func (o *Orchestrator) mostSupportedVersion(versionSupporters map[iotago.Version
 	return versionWithMostSupporters, mostSupporters
 }
 
-func (o *Orchestrator) signallingThresholdReached(currentEpoch iotago.EpochIndex) (iotago.Version, bool) {
+func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex) (iotago.Version, bool) {
 	epochVersions := make(map[iotago.Version]int)
 
 	for epoch := o.signallingWindowStart(currentEpoch); epoch <= currentEpoch; epoch++ {
@@ -264,22 +278,24 @@ func (o *Orchestrator) signallingThresholdReached(currentEpoch iotago.EpochIndex
 		epochVersions[version]++
 	}
 
-	// Find version with most supporters. Since the optsVersionSignallingWindowThreshold is a super-majority we can't
-	// have a tie and looking at the version with most supporters is sufficient.
-	versionWithMostSupporters, mostSupporters := o.mostSupportedVersion(epochVersions)
+	// Find version with that was most signaled in the signalingWindow. Since the optsVersionSignallingWindowThreshold
+	// is a super-majority we can't have a tie and looking at the version with most supporters is sufficient.
+	versionMostSignaled, signaledCount := o.maxVersionByCount(epochVersions)
 
 	// Check whether the signaling window threshold is reached.
-	if mostSupporters < o.optsVersionSignallingWindowThreshold {
+	if signaledCount < int(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().WindowTargetRatio) {
 		return 0, false
 	}
 
-	return versionWithMostSupporters, true
+	return versionMostSignaled, true
 }
 
 func (o *Orchestrator) signallingWindowStart(epoch iotago.EpochIndex) iotago.EpochIndex {
-	if epoch < o.optsVersionSignallingWindowSize {
+	windowSize := iotago.EpochIndex(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().WindowSize)
+
+	if epoch < windowSize {
 		return 0
 	}
 
-	return epoch - o.optsVersionSignallingWindowSize
+	return epoch - windowSize
 }
