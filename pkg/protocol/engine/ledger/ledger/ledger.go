@@ -66,8 +66,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.ErrorHandler("ledger"),
 		)
 
-		// TODO: when should ledgerState be pruned?
-
 		e.HookConstructed(func() {
 			// TODO: create an Init method that is called with all additional dependencies on e.HookInitialized()
 			e.Events.Ledger.LinkTo(l.events)
@@ -78,9 +76,9 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			// TODO: how do we want to handle changing API here?
-			api := l.apiProvider.LatestAPI()
-			l.manaManager = mana.NewManager(api.ManaDecayProvider(), l.resolveAccountOutput)
-			l.accountsLedger.SetCommitmentEvictionAge(api.ProtocolParameters().EvictionAge())
+			iotagoAPI := l.apiProvider.LatestAPI()
+			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), l.resolveAccountOutput)
+			l.accountsLedger.SetCommitmentEvictionAge(iotagoAPI.ProtocolParameters().EvictionAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)
@@ -92,6 +90,16 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			}, event.WithWorkerPool(wp))
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
+
+			e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+				l.utxoLedger.WriteLockLedger()
+				defer l.utxoLedger.WriteUnlockLedger()
+
+				// TODO: do we want to delay the pruning of the spent ledger state? We can't export pruned slots anyway.
+				if err := l.utxoLedger.PruneSlotIndexWithoutLocking(index); err != nil {
+					l.errorHandler(ierrors.Wrapf(err, "failed to prune ledger for index %d", index))
+				}
+			})
 
 			l.TriggerConstructed()
 			l.TriggerInitialized()
@@ -214,8 +222,8 @@ func (l *Ledger) Account(accountID iotago.AccountID, targetIndex iotago.SlotInde
 	return l.accountsLedger.Account(accountID, targetIndex)
 }
 
-func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Output, error) {
-	stateWithMetadata, err := l.memPool.StateMetadata(stateRef)
+func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
+	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
 	if err != nil {
 		return nil, err
 	}
@@ -224,11 +232,11 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Outp
 	case *utxoledger.Output:
 		return castState, nil
 	case *ExecutionOutput:
-		txWithMetadata, exists := l.memPool.TransactionMetadata(stateRef.Ref().TransactionID())
+		txWithMetadata, exists := l.memPool.TransactionMetadata(outputID.TransactionID())
 		// If the transaction is not in the mempool, we need to load the output from the ledger
 		if !exists {
 			var output *utxoledger.Output
-			stateRequest := l.resolveState(stateRef)
+			stateRequest := l.resolveState(outputID.UTXOInput())
 			stateRequest.OnSuccess(func(loadedState mempool.State) { output = loadedState.(*utxoledger.Output) })
 			stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
 			stateRequest.WaitComplete()
@@ -253,12 +261,32 @@ func (l *Ledger) Output(stateRef iotago.IndexedUTXOReferencer) (*utxoledger.Outp
 	}
 }
 
-func (l *Ledger) IsOutputUnspent(outputID iotago.OutputID) (bool, error) {
-	return l.utxoLedger.IsOutputIDUnspentWithoutLocking(outputID)
+func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *utxoledger.Spent, error) {
+	l.utxoLedger.ReadLockLedger()
+
+	unspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(outputID)
+	if err != nil {
+		l.utxoLedger.ReadUnlockLedger()
+		return nil, nil, err
+	}
+
+	if !unspent {
+		spent, err := l.utxoLedger.ReadSpentForOutputIDWithoutLocking(outputID)
+		l.utxoLedger.ReadUnlockLedger()
+
+		return nil, spent, err
+	}
+
+	l.utxoLedger.ReadUnlockLedger()
+
+	// l.Output might read-lock the ledger again if the mem-pool needs to resolve the output, so we cannot be in a locked state
+	output, err := l.Output(outputID)
+
+	return output, nil, err
 }
 
-func (l *Ledger) Spent(outputID iotago.OutputID) (*utxoledger.Spent, error) {
-	return l.utxoLedger.ReadSpentForOutputIDWithoutLocking(outputID)
+func (l *Ledger) ForEachUnspentOutput(consumer func(output *utxoledger.Output) bool) error {
+	return l.utxoLedger.ForEachUnspentOutput(consumer)
 }
 
 func (l *Ledger) SlotDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error) {
@@ -405,7 +433,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	createdAccountDelegation := make(map[iotago.ChainID]*iotago.DelegationOutput)
 
 	stateDiff.CreatedStates().ForEachKey(func(outputID iotago.OutputID) bool {
-		createdOutput, errOutput := l.Output(outputID.UTXOInput())
+		createdOutput, errOutput := l.Output(outputID)
 		if errOutput != nil {
 			err = ierrors.Errorf("failed to retrieve output %s: %w", outputID, errOutput)
 			return false
@@ -444,7 +472,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 
 	// input side
 	stateDiff.DestroyedStates().ForEachKey(func(outputID iotago.OutputID) bool {
-		spentOutput, errOutput := l.Output(outputID.UTXOInput())
+		spentOutput, errOutput := l.Output(outputID)
 		if errOutput != nil {
 			err = ierrors.Errorf("failed to retrieve output %s: %w", outputID, errOutput)
 			return false
@@ -516,7 +544,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 		{
 			// input side
 			for _, inputRef := range inputRefs {
-				inputState, outputErr := l.Output(inputRef)
+				inputState, outputErr := l.Output(inputRef.Ref())
 				if outputErr != nil {
 					err = ierrors.Errorf("failed to retrieve outputs of %s: %w", txID, errInput)
 					return false
