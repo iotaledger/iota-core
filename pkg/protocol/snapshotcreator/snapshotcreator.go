@@ -26,6 +26,7 @@ import (
 	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
+	"github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -94,6 +95,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		opt.LedgerProvider(),
 		tipmanagerv1.NewProvider(),
 		tipselectionv1.NewProvider(),
+		retainer.NewProvider(),
 		engine.WithSnapshotPath(""), // magic to disable loading snapshot
 	)
 	defer engineInstance.Shutdown()

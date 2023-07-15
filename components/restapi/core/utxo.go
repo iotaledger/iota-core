@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
 func getOutput(c echo.Context) (*utxoledger.Output, error) {
@@ -66,7 +67,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*models.OutputMetadat
 func newSpentMetadataResponse(spent *utxoledger.Spent) (*models.OutputMetadataResponse, error) {
 	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
-	resp := &outputMetadataResponse{
+	resp := &models.OutputMetadataResponse{
 		BlockID:            spent.BlockID().ToHex(),
 		TransactionID:      spent.OutputID().TransactionID().ToHex(),
 		OutputIndex:        spent.OutputID().Index(),

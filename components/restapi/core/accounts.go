@@ -118,7 +118,7 @@ func rewardsByAccountID(c echo.Context) (*models.ManaRewardsResponse, error) {
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommittedSlot()
 	latestRewardsReadyEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 
-	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID.UTXOInput())
+	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get output %s from ledger", outputID)
 	}
