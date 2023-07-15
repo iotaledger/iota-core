@@ -266,7 +266,7 @@ func (e *Engine) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return e.Storage.Settings().APIForEpoch(epoch)
 }
 
-func (e *Engine) APIForVersion(version iotago.Version) iotago.API {
+func (e *Engine) APIForVersion(version iotago.Version) (iotago.API, error) {
 	return e.Storage.Settings().APIForVersion(version)
 }
 

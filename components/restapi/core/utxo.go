@@ -4,11 +4,8 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
 func getOutput(c echo.Context) (*utxoledger.Output, error) {
@@ -17,7 +14,7 @@ func getOutput(c echo.Context) (*utxoledger.Output, error) {
 		return nil, err
 	}
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID.UTXOInput())
+	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
 		return nil, err
 	}
@@ -31,35 +28,30 @@ func getOutputMetadata(c echo.Context) (*models.OutputMetadataResponse, error) {
 		return nil, err
 	}
 
-	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
-
-	unspent, err := deps.Protocol.MainEngineInstance().Ledger.IsOutputUnspent(outputID)
+	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return nil, err
 	}
 
-	if unspent {
-		return newOutputMetadataResponse(outputID, latestCommitment)
+	if spent != nil {
+		return newSpentMetadataResponse(spent)
 	}
 
-	return newSpentMetadataResponse(outputID, latestCommitment)
+	return newOutputMetadataResponse(output)
 }
 
-func newOutputMetadataResponse(outputID iotago.OutputID, latestCommitment *model.Commitment) (*models.OutputMetadataResponse, error) {
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID.UTXOInput())
-	if err != nil {
-		return nil, err
-	}
+func newOutputMetadataResponse(output *utxoledger.Output) (*models.OutputMetadataResponse, error) {
+	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
 	resp := &models.OutputMetadataResponse{
 		BlockID:            output.BlockID().ToHex(),
-		TransactionID:      outputID.TransactionID().ToHex(),
-		OutputIndex:        outputID.Index(),
+		TransactionID:      output.OutputID().TransactionID().ToHex(),
+		OutputIndex:        output.OutputID().Index(),
 		IsSpent:            false,
 		LatestCommitmentID: latestCommitment.ID().ToHex(),
 	}
 
-	includedSlotIndex := output.SlotIndexBooked()
+	includedSlotIndex := output.SlotBooked()
 	if includedSlotIndex <= latestCommitment.Index() {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedSlotIndex)
 		if err != nil {
@@ -71,22 +63,19 @@ func newOutputMetadataResponse(outputID iotago.OutputID, latestCommitment *model
 	return resp, nil
 }
 
-func newSpentMetadataResponse(outputID iotago.OutputID, latestCommitment *model.Commitment) (*models.OutputMetadataResponse, error) {
-	ledgerOutput, err := deps.Protocol.MainEngineInstance().Ledger.Spent(outputID)
-	if err != nil {
-		return nil, err
-	}
+func newSpentMetadataResponse(spent *utxoledger.Spent) (*models.OutputMetadataResponse, error) {
+	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
-	resp := &models.OutputMetadataResponse{
-		BlockID:            ledgerOutput.BlockID().ToHex(),
-		TransactionID:      outputID.TransactionID().ToHex(),
-		OutputIndex:        outputID.Index(),
+	resp := &outputMetadataResponse{
+		BlockID:            spent.BlockID().ToHex(),
+		TransactionID:      spent.OutputID().TransactionID().ToHex(),
+		OutputIndex:        spent.OutputID().Index(),
 		IsSpent:            true,
-		TransactionIDSpent: ledgerOutput.TransactionIDSpent().ToHex(),
+		TransactionIDSpent: spent.TransactionIDSpent().ToHex(),
 		LatestCommitmentID: latestCommitment.ID().ToHex(),
 	}
 
-	includedSlotIndex := ledgerOutput.Output().SlotIndexBooked()
+	includedSlotIndex := spent.Output().SlotBooked()
 	if includedSlotIndex <= latestCommitment.Index() {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedSlotIndex)
 		if err != nil {
@@ -95,7 +84,7 @@ func newSpentMetadataResponse(outputID iotago.OutputID, latestCommitment *model.
 		resp.IncludedCommitmentID = includedCommitment.ID().ToHex()
 	}
 
-	spentSlotIndex := ledgerOutput.SlotIndexSpent()
+	spentSlotIndex := spent.SlotIndexSpent()
 	if spentSlotIndex <= latestCommitment.Index() {
 		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(spentSlotIndex)
 		if err != nil {

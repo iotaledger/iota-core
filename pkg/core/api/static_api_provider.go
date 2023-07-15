@@ -12,8 +12,8 @@ type staticAPIProvider struct {
 	api iotago.API
 }
 
-func (t *staticAPIProvider) APIForVersion(iotago.Version) iotago.API {
-	return t.api
+func (t *staticAPIProvider) APIForVersion(iotago.Version) (iotago.API, error) {
+	return t.api, nil
 }
 
 func (t *staticAPIProvider) APIForSlot(iotago.SlotIndex) iotago.API {

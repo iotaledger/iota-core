@@ -31,8 +31,8 @@ github.com/iotaledger/hive.go/ads v0.0.0-20230706083020-ef6c3248369d h1:NN8dQohB
 github.com/iotaledger/hive.go/ads v0.0.0-20230706083020-ef6c3248369d/go.mod h1:LnGcXngTfpdV+JUkmUdnI6ivaq7bFfK1Gm3/wakgkbc=
 github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d h1:AE8Zcydin/3DRzT7A58ESmU60g8EtpnoFZ9MVkeMWgQ=
 github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d/go.mod h1:bvXXc6quBdERMMKnirr2+iQU4WnTz4KDbdHcusW9Ats=
-github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230706083020-ef6c3248369d h1:VBOXzrVDRjx+yYYSD5G38x9IdlJLfPADoo2svQVuXZM=
-github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230706083020-ef6c3248369d/go.mod h1:ALcO+4r6FMfENrMQ+jZZfHX7vDHQ42XLI8y7dt/IKxc=
+github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230711121610-7d024f7b5eb5 h1:K4dWLTZwURU7xVF5uePUk0oDViBDQrsdZ7ZHBCrTYOs=
+github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230711121610-7d024f7b5eb5/go.mod h1:ALcO+4r6FMfENrMQ+jZZfHX7vDHQ42XLI8y7dt/IKxc=
 github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d h1:6VVi5LZGAIXYFzb+/k3G6+T6dNkLi2beD0O6CccxdLg=
 github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d/go.mod h1:kkIoyWWDol9XTEuNy0wtUYQWx+Eb0Ak9XP8SS3g1/J8=
 github.com/iotaledger/hive.go/ds v0.0.0-20230706083020-ef6c3248369d h1:gcFTX8tNE5IGELuMnxD3sQYxerhLiZHQ1Zn0fTvbwRM=
@@ -49,8 +49,8 @@ github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230706083020-ef6c324
 github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230706083020-ef6c3248369d/go.mod h1:2dzHxEpppULFjMRn0iyuQW81sLUuJ0Y/9zCHsRuLUvI=
 github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d h1:l1kGmeSD7dvARG4vBOYLoYKX1nN9GMzZbqVP0vT1lo0=
 github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d/go.mod h1:l/F3cA/+67QdNj+sohv2v4HhmsdOcWScoA+sVYoAE4c=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230710154843-0a56d07c2e45 h1:pA+bcK+CG0nqbQHDKaclxJF1qyjKDPuJsXVTRdmynO8=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230710154843-0a56d07c2e45/go.mod h1:NC48ByX78DwdkGj5YjqI2ADHAY+S2idcIRZaEuWDe1Q=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230712172022-22fba04771d0 h1:/iR++QN0IrMecLikaxwhgpIGldaUncwgooz59pOXNtA=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230712172022-22fba04771d0/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
