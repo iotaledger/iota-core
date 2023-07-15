@@ -76,7 +76,7 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 }
 
 func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
-	block, err := deps.Retainer.Block(blockID)
+	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func getTransaction(c echo.Context) error {
 		return err
 	}
 
-	block, err := deps.Retainer.Block(output.BlockID())
+	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(output.BlockID())
 	if err != nil {
 		return err
 	}

@@ -21,7 +21,7 @@ func blockByID(c echo.Context) (*model.Block, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
 	}
 
-	block, err := deps.Retainer.Block(blockID)
+	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
 	if err != nil {
 		return nil, err
 	}

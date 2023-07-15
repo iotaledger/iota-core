@@ -34,7 +34,7 @@ func blockByTransactionID(c echo.Context) (*model.Block, error) {
 		return nil, err
 	}
 
-	block, err := deps.Retainer.Block(blockID)
+	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
 	if err != nil {
 		return nil, err
 	}

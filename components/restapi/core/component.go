@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	"github.com/iotaledger/iota-core/pkg/retainer"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -137,7 +136,6 @@ type dependencies struct {
 	AppInfo          *app.Info
 	RestRouteManager *restapipkg.RestRouteManager
 	Protocol         *protocol.Protocol
-	Retainer         retainer.Retainer
 	BlockIssuer      *blockfactory.BlockIssuer `optional:"true"`
 	MetricsTracker   *metricstracker.MetricsTracker
 }
