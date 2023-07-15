@@ -1,15 +1,7 @@
 package retainer
 
-type BlockStatus uint8
-
-const (
-	BlockUnknown BlockStatus = iota
-	BlockAccepted
-	BlockConfirmed
-	BlockFinalized
-	BlockOrphaned
-)
+import "github.com/iotaledger/iota.go/v4/nodeclient/models"
 
 type BlockMetadata struct {
-	Status BlockStatus `serix:"0"`
+	Status models.BlockState `serix:"0"`
 }

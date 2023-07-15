@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
 type (
@@ -91,33 +92,35 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 		return nil, ierrors.Wrapf(err, "failed to get block status for %s", blockID.ToHex())
 	}
 
+	// TODO: fill in blockReason, TxState, TxReason.
+
 	return &retainer.BlockMetadata{Status: status}, nil
 }
 
-func (r *Retainer) blockStatus(blockID iotago.BlockID) (retainer.BlockStatus, error) {
+func (r *Retainer) blockStatus(blockID iotago.BlockID) (models.BlockState, error) {
 	_, blockStorageErr := r.blockDiskFunc(blockID.Index()).Load(blockID)
 	// block was for sure accepted
 	if blockStorageErr == nil {
 		// check if finalized
 		if blockID.Index() <= r.finalizedSlotFunc() {
-			return retainer.BlockFinalized, nil
+			return models.BlockStateFinalized, nil
 		}
 		// check if confirmed
 		if confirmed, err := r.retainerFunc(blockID.Index()).WasConfirmed(blockID); err != nil {
-			return retainer.BlockUnknown, err
+			return models.BlockStateUnknown, err
 		} else if confirmed {
-			return retainer.BlockConfirmed, nil
+			return models.BlockStateConfirmed, nil
 		}
-		return retainer.BlockAccepted, nil
+		return models.BlockStateAccepted, nil
 	}
 	// orphaned (attached, but never accepeted)
 	if orphaned, err := r.retainerFunc(blockID.Index()).WasOrphaned(blockID); err != nil {
-		return retainer.BlockUnknown, err
+		return models.BlockStateUnknown, err
 	} else if orphaned {
-		return retainer.BlockOrphaned, nil
+		return models.BlockStateOrphaned, nil
 	}
 
-	return retainer.BlockUnknown, nil
+	return models.BlockStateUnknown, nil
 }
 
 func (r *Retainer) onBlockAttached(blockID iotago.BlockID) {

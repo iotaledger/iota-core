@@ -35,10 +35,15 @@ func blockMetadataByID(c echo.Context) (*models.BlockMetadataResponse, error) {
 		return nil, err
 	}
 
+	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(block.ID())
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO: fill in blockReason, TxState, TxReason.
 	bmResponse := &models.BlockMetadataResponse{
 		BlockID:    block.ID().ToHex(),
-		BlockState: models.BlockStatePending,
+		BlockState: metadata.Status.String(),
 	}
 
 	return bmResponse, nil
