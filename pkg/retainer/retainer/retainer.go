@@ -5,7 +5,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/retainer"
@@ -13,10 +12,19 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+type (
+	BlockRetrieveFunc func(iotago.BlockID) (*model.Block, bool)
+	BlockDiskFunc     func(iotago.SlotIndex) *prunable.Blocks
+	FinalizedSlotFunc func() iotago.SlotIndex
+	RetainerFunc      func(iotago.SlotIndex) *prunable.Retainer
+)
+
 // Retainer keeps and resolves all the information needed in the API and INX.
 type Retainer struct {
-	protocol     *protocol.Protocol
-	retainerFunc func(iotago.SlotIndex) *prunable.Retainer
+	blockRetrieveFunc BlockRetrieveFunc
+	blockDiskFunc     BlockDiskFunc
+	finalizedSlotFunc FinalizedSlotFunc
+	retainerFunc      RetainerFunc
 
 	module.Module
 }
@@ -31,16 +39,19 @@ type Retainer struct {
 //
 // maybe also store the orphaned block there as well?
 
-func New(retainerFunc func(iotago.SlotIndex) *prunable.Retainer) *Retainer {
+func New(retainerFunc RetainerFunc, blockRetrieveFunc BlockRetrieveFunc, blockDiskFunc BlockDiskFunc, finalizedSlotIndex FinalizedSlotFunc) *Retainer {
 	return &Retainer{
-		retainerFunc: retainerFunc,
+		blockRetrieveFunc: blockRetrieveFunc,
+		blockDiskFunc:     blockDiskFunc,
+		finalizedSlotFunc: finalizedSlotIndex,
+		retainerFunc:      retainerFunc,
 	}
 }
 
 // NewProvider creates a new SyncManager provider.
 func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	return module.Provide(func(e *engine.Engine) retainer.Retainer {
-		r := New(e.Storage.Retainer)
+		r := New(e.Storage.Retainer, e.Block, e.Storage.Blocks, e.Storage.Settings().LatestFinalizedSlot)
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("Retainer", 1))
 
 		e.Events.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
@@ -66,7 +77,7 @@ func (r *Retainer) Shutdown() {
 }
 
 func (r *Retainer) Block(blockID iotago.BlockID) (*model.Block, error) {
-	block, _ := r.protocol.MainEngineInstance().Block(blockID)
+	block, _ := r.blockRetrieveFunc(blockID)
 	if block == nil {
 		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
 	}
@@ -84,11 +95,11 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 }
 
 func (r *Retainer) blockStatus(blockID iotago.BlockID) (retainer.BlockStatus, error) {
-	_, blockStorageErr := r.protocol.MainEngineInstance().Storage.Blocks(blockID.Index()).Load(blockID)
+	_, blockStorageErr := r.blockDiskFunc(blockID.Index()).Load(blockID)
 	// block was for sure accepted
 	if blockStorageErr == nil {
 		// check if finalized
-		if blockID.Index() <= r.protocol.SyncManager.FinalizedSlot() {
+		if blockID.Index() <= r.finalizedSlotFunc() {
 			return retainer.BlockFinalized, nil
 		}
 		// check if confirmed
