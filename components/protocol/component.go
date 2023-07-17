@@ -16,7 +16,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -187,6 +189,17 @@ func configure() error {
 
 	deps.Protocol.Events.Engine.SybilProtection.CommitteeSelected.Hook(func(committee *account.Accounts, epoch iotago.EpochIndex) {
 		Component.LogInfof("CommitteeSelected: Epoch %d - %s (reused: %t)", epoch, committee.IDs(), committee.IsReused())
+	})
+
+	deps.Protocol.Events.Engine.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+		Component.LogInfof("Booker BlockInvalid: Block %s - %s", block.ID(), err.Error())
+	})
+
+	// TODO: create a transaction invalid event in the booker instead of hooking to a specific engine instance
+	deps.Protocol.MainEngineInstance().Ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
+		transaction.OnInvalid(func(err error) {
+			Component.LogInfof("TransactionInvalid: transaction %s - %s", transaction.ID(), err.Error())
+		})
 	})
 
 	return nil
