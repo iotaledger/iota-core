@@ -1,7 +1,6 @@
 package conflictdagv1
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -226,7 +225,6 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingWeightU
 	if _, exists := s.pendingWeightUpdates.Get(member.ID); !exists {
 		if s.pendingWeightUpdates.Set(member.ID, member) {
 			s.pendingUpdatesCounter.Increase()
-			fmt.Println(">> increased counter", s.pendingUpdatesCounter.Get())
 			s.pendingWeightUpdatesSignal.Signal()
 		}
 	}
@@ -303,7 +301,6 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingPreferr
 	if _, exists := s.pendingPreferredInsteadUpdates.Get(member.ID); !exists {
 		if s.pendingPreferredInsteadUpdates.Set(member.ID, member) {
 			s.pendingUpdatesCounter.Increase()
-			fmt.Println(">> increased counter", s.pendingUpdatesCounter.Get())
 			s.pendingPreferredInsteadSignal.Signal()
 		}
 	}

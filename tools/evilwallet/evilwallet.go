@@ -212,8 +212,6 @@ func (e *EvilWallet) RequestFreshBigFaucetWallets(numberOfWallets int) {
 // requested from the Faucet.
 func (e *EvilWallet) RequestFreshBigFaucetWallet() error {
 	initWallet := NewWallet()
-	// fmt.Println("Requesting funds from faucet...")
-
 	receiveWallet := e.NewWallet(Fresh)
 
 	txIDs := make(iotago.TransactionIDs, 0)
@@ -302,7 +300,6 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
 	txBuilder.SetCreationTime(e.api.TimeProvider().SlotFromTime(time.Now()))
-	// fmt.Println(">>>>>>>>is slot time provider working:", e.optsProtocolParams.SlotTimeProvider().IndexFromTime(time.Now()))
 
 	tx, err := txBuilder.Build(e.faucet.AddressSigner(faucetAddr))
 	if err != nil {
@@ -312,11 +309,8 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	// send transaction
 	_, err = clt.PostTransaction(tx)
 	if err != nil {
-		// fmt.Println("post faucet request failed", err)
 		return nil, err
 	}
-	// fmt.Println("post faucet request success", blkID)
-	// fmt.Println("faucet new outputID:", iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 1).ToHex())
 
 	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID(e.api)), 0), tx.Essence.Outputs[0])
 
@@ -350,7 +344,6 @@ func (e *EvilWallet) splitOutputs(splitOutput *Output, inputWallet, outputWallet
 		fmt.Println(err)
 		return iotago.EmptyOutputID.TransactionID(), err
 	}
-	// fmt.Println("split 100 outputs, blkID:", blkID)
 
 	return lo.PanicOnErr(tx.ID(e.api)), nil
 }
