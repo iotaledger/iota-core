@@ -122,7 +122,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX2", append(newAccountWallets, destroyWallets...),
 			testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
-				&iotago.BICInput{
+				&iotago.BlockIssuanceCreditInput{
 					AccountID: genesisAccountOutput.AccountID,
 				},
 				&iotago.CommitmentInput{

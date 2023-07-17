@@ -94,7 +94,11 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 
 	var api iotago.API
 	if blockParams.protocolVersion != nil {
-		api = i.protocol.APIForVersion(*blockParams.protocolVersion)
+		var err error
+		api, err = i.protocol.APIForVersion(*blockParams.protocolVersion)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.protocolVersion)
+		}
 	} else {
 		api = i.protocol.MainEngineInstance().Storage.Settings().LatestAPI()
 	}
@@ -221,10 +225,10 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 			resign = true
 		}
 
-	case *iotago.ValidatorBlock:
+	case *iotago.ValidationBlock:
 		//nolint:revive,staticcheck //temporarily disable
 		if len(iotaBlock.Parents()) == 0 {
-			//TODO: implement tipselection for validator blocks
+			// TODO: implement tipselection for validator blocks
 		}
 	}
 
