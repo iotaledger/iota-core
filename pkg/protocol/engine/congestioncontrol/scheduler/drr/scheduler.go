@@ -206,8 +206,7 @@ func (s *Scheduler) skipBlock(block *blocks.Block) {
 	if block.SetSkipped() && block.SetScheduled() {
 		s.selectBlockToSchedule()
 		s.updateChildren(block)
-		s.events.BlockScheduled.Trigger(block)
-		s.events.BlockScheduled.Trigger(block)
+		s.events.BlockSkipped.Trigger(block)
 	}
 }
 

@@ -38,6 +38,10 @@ func (p *Protocol) runNetworkProtocol() {
 		p.networkProtocol.SendBlock(block.ModelBlock())
 	}, event.WithWorkerPool(wpBlocks))
 
+	p.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+		p.networkProtocol.SendBlock(block.ModelBlock())
+	}, event.WithWorkerPool(wpBlocks))
+
 	wpCommitments := p.Workers.CreatePool("NetworkEvents.SlotCommitments")
 
 	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source network.PeerID) {
