@@ -30,6 +30,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -38,22 +39,23 @@ import (
 // region Engine /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Engine struct {
-	Events          *Events
-	Storage         *storage.Storage
-	Filter          filter.Filter
-	EvictionState   *eviction.State
-	BlockRequester  *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
-	BlockDAG        blockdag.BlockDAG
-	Booker          booker.Booker
-	Clock           clock.Clock
-	BlockGadget     blockgadget.Gadget
-	SlotGadget      slotgadget.Gadget
-	SybilProtection sybilprotection.SybilProtection
-	Notarization    notarization.Notarization
-	Attestations    attestation.Attestations
-	Ledger          ledger.Ledger
-	TipManager      tipmanager.TipManager
-	TipSelection    tipselection.TipSelection
+	Events              *Events
+	Storage             *storage.Storage
+	Filter              filter.Filter
+	EvictionState       *eviction.State
+	BlockRequester      *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
+	BlockDAG            blockdag.BlockDAG
+	Booker              booker.Booker
+	Clock               clock.Clock
+	BlockGadget         blockgadget.Gadget
+	SlotGadget          slotgadget.Gadget
+	SybilProtection     sybilprotection.SybilProtection
+	Notarization        notarization.Notarization
+	Attestations        attestation.Attestations
+	Ledger              ledger.Ledger
+	TipManager          tipmanager.TipManager
+	TipSelection        tipselection.TipSelection
+	UpgradeOrchestrator upgrade.Orchestrator
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -91,6 +93,7 @@ func New(
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
 	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
+	upgradeOrchestratorProvider module.Provider[*Engine, upgrade.Orchestrator],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	var needsToImportSnapshot bool
@@ -139,6 +142,7 @@ func New(
 			e.Ledger = ledgerProvider(e)
 			e.TipManager = tipManagerProvider(e)
 			e.TipSelection = tipSelectionProvider(e)
+			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
@@ -172,6 +176,9 @@ func New(
 				e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
 				if err := e.Attestations.RestoreFromDisk(); err != nil {
 					panic(ierrors.Wrap(err, "failed to restore attestations from disk"))
+				}
+				if err := e.UpgradeOrchestrator.RestoreFromDisk(e.Storage.Settings().LatestCommitment().Index()); err != nil {
+					panic(ierrors.Wrap(err, "failed to restore upgrade orchestrator from disk"))
 				}
 			}
 		},
@@ -311,6 +318,8 @@ func (e *Engine) ImportContents(reader io.ReadSeeker) (err error) {
 		return ierrors.Wrap(err, "failed to import eviction state")
 	} else if err = e.Attestations.Import(reader); err != nil {
 		return ierrors.Wrap(err, "failed to import attestation state")
+	} else if err = e.UpgradeOrchestrator.Import(reader); err != nil {
+		return ierrors.Wrap(err, "failed to import upgrade orchestrator")
 	}
 
 	return
@@ -335,6 +344,8 @@ func (e *Engine) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err
 		return ierrors.Wrap(err, "failed to export eviction state")
 	} else if err = e.Attestations.Export(writer, targetSlot); err != nil {
 		return ierrors.Wrap(err, "failed to export attestation state")
+	} else if err = e.UpgradeOrchestrator.Export(writer, targetSlot); err != nil {
+		return ierrors.Wrap(err, "failed to export upgrade orchestrator")
 	}
 
 	return

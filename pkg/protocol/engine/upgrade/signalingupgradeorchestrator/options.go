@@ -1,4 +1,4 @@
-package upgrade
+package signalingupgradeorchestrator
 
 import (
 	"github.com/iotaledger/hive.go/runtime/options"

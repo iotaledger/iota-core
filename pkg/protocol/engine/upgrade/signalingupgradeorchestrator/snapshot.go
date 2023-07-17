@@ -1,4 +1,4 @@
-package upgrade
+package signalingupgradeorchestrator
 
 import (
 	"io"
