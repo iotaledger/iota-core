@@ -64,13 +64,11 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
 					// recover if no node was part of the online committee anymore.
 					e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+						// Only track identities that are part of the committee.
 						seat, exists := s.Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
-						if !exists {
-							// Only track identities that are part of the committee.
-							return
+						if exists {
+							s.markSeatActive(seat, block.ProtocolBlock().IssuerID, block.IssuingTime())
 						}
-
-						s.markSeatActive(seat, block.ProtocolBlock().IssuerID, block.IssuingTime())
 
 						s.events.BlockProcessed.Trigger(block)
 					})
