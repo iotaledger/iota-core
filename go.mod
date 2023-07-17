@@ -24,7 +24,7 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813
 	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-20230710070637-2ceb814217d8
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230713071150-2fcd7c1fb9a0
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230717090149-97501b7fcb93
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/libp2p/go-libp2p v0.28.1
 	github.com/mr-tron/base58 v1.2.0
@@ -72,7 +72,7 @@ require (
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
-	github.com/holiman/uint256 v1.2.2 // indirect
+	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/huin/goupnp v1.2.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
