@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -134,7 +135,8 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 		return nil, ierrors.Wrap(err, "error building block")
 	}
 
-	modelBlock, err := model.BlockFromBlock(block, api)
+	// Make sure we only create syntactically valid blocks.
+	modelBlock, err := model.BlockFromBlock(block, api, serix.WithValidation())
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error serializing block to model block")
 	}
