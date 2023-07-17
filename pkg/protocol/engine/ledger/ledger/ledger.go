@@ -235,7 +235,7 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 		txWithMetadata, exists := l.memPool.TransactionMetadata(outputID.TransactionID())
 		if !exists {
 			var output *utxoledger.Output
-			stateRequest := l.resolveState(stateRef)
+			stateRequest := l.resolveState(outputID.UTXOInput())
 			stateRequest.OnSuccess(func(loadedState mempool.State) { output = loadedState.(*utxoledger.Output) })
 			stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
 			stateRequest.WaitComplete()
