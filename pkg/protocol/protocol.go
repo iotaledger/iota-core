@@ -263,10 +263,6 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
-	if chainCommitment == nil {
-		return ierrors.Errorf("protocol ProcessBlock failed. Unknown commitment: %s", block.ProtocolBlock().SlotCommitmentID)
-	}
-
 	if !chainCommitment.IsSolid() {
 		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
