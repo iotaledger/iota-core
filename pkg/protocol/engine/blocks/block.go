@@ -495,7 +495,7 @@ func (b *Block) SetScheduled() (wasUpdated bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if wasUpdated = !b.scheduled; wasUpdated {
+	if wasUpdated = !b.scheduled; wasUpdated && b.enqueued {
 		b.scheduled = true
 		b.enqueued = false
 	}
@@ -516,7 +516,7 @@ func (b *Block) SetSkipped() (wasUpdated bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if wasUpdated = !b.skipped; wasUpdated {
+	if wasUpdated = !b.skipped; wasUpdated && b.enqueued {
 		b.skipped = true
 		b.enqueued = false
 	}
@@ -537,7 +537,7 @@ func (b *Block) SetDropped() (wasUpdated bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if wasUpdated = !b.dropped; wasUpdated {
+	if wasUpdated = !b.dropped; wasUpdated && b.enqueued {
 		b.dropped = true
 		b.enqueued = false
 	}
