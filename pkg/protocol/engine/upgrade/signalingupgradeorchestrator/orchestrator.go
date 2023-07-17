@@ -145,14 +145,15 @@ func (o *Orchestrator) TrackBlock(block *blocks.Block) {
 	}
 
 	// Not a validation block.
-	newSignaledBlock, err := prunable.NewSignaledBlock(block.ID(), block.ProtocolBlock())
-	if err != nil {
+	validationBlock, isValidationBlock := block.ValidationBlock()
+	if !isValidationBlock {
 		return
 	}
+	newSignaledBlock := prunable.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
 
 	// Do not track any version that we already know about. This includes past, current and future versions that are already
 	// successfully signaled and scheduled to start in a future epoch.
-	if _, exists := o.epochForVersionFunc(block.ProtocolBlock().ProtocolVersion); exists {
+	if _, exists := o.epochForVersionFunc(validationBlock.HighestSupportedVersion); exists {
 		return
 	}
 
@@ -239,6 +240,11 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 	// Find version with most supporters. Since the threshold is a super-majority we can't have a tie and looking at the
 	// version with most supporters is sufficient.
 	versionAndHashWithMostSupporters, mostSupporters := o.maxVersionByCount(versionAndHashSupporters)
+
+	// The version has just been activated and will become active in the future. There's no need to continue.
+	if _, exists := o.epochForVersionFunc(versionAndHashWithMostSupporters.Version); exists {
+		return
+	}
 
 	// Check whether the threshold for version was reached.
 	totalSeatCount := o.seatManager.SeatCount()

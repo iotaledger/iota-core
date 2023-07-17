@@ -19,18 +19,13 @@ type SignaledBlock struct {
 	ProtocolParametersHash  iotago.Identifier `serix:"3"`
 }
 
-func NewSignaledBlock(blockID iotago.BlockID, block *iotago.ProtocolBlock) (*SignaledBlock, error) {
-	validationBlock, isValidationBlock := block.Block.(*iotago.ValidationBlock)
-	if !isValidationBlock {
-		return nil, ierrors.New("block is not a validation block")
-	}
-
+func NewSignaledBlock(blockID iotago.BlockID, block *iotago.ProtocolBlock, validationBlock *iotago.ValidationBlock) *SignaledBlock {
 	return &SignaledBlock{
 		ID:                      blockID,
 		IssuingTime:             block.IssuingTime,
 		HighestSupportedVersion: validationBlock.HighestSupportedVersion,
 		ProtocolParametersHash:  validationBlock.ProtocolParametersHash,
-	}, nil
+	}
 }
 
 func SignaledBlockFromBytesFunc(decodeAPI iotago.API) func([]byte) (*SignaledBlock, int, error) {

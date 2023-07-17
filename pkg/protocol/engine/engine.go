@@ -204,6 +204,8 @@ func (e *Engine) Shutdown() {
 		e.SlotGadget.Shutdown()
 		e.Clock.Shutdown()
 		e.SybilProtection.Shutdown()
+		e.UpgradeOrchestrator.Shutdown()
+		e.TipManager.Shutdown()
 		e.Filter.Shutdown()
 		e.Storage.Shutdown()
 		e.Workers.Shutdown()
