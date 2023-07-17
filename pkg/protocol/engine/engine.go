@@ -148,6 +148,7 @@ func New(
 		(*Engine).setupEvictionState,
 		(*Engine).setupBlockRequester,
 		(*Engine).setupPruning,
+		(*Engine).acceptanceHandler,
 		(*Engine).TriggerConstructed,
 		func(e *Engine) {
 			// Import the rest of the snapshot if needed.
@@ -372,6 +373,20 @@ func (e *Engine) SetChainID(chainID iotago.CommitmentID) {
 	defer e.mutex.Unlock()
 
 	e.chainID = chainID
+}
+
+func (e *Engine) acceptanceHandler() {
+	wp := e.Workers.CreatePool("BlockAccepted", 1)
+
+	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+		e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+			e.Ledger.BlockAccepted(block)
+			e.SybilProtection.BlockAccepted(block)
+			e.UpgradeOrchestrator.TrackBlock(block)
+
+			e.Events.AcceptedBlockProcessed.Trigger(block)
+		}, event.WithWorkerPool(wp))
+	})
 }
 
 func (e *Engine) setupBlockStorage() {

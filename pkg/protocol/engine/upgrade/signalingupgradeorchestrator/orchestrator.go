@@ -102,7 +102,6 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 			}
 		}
 
-		e.Events.BlockGadget.BlockAccepted.Hook(o.trackHighestSupportedVersion)
 		o.TriggerInitialized()
 
 		return o
@@ -138,7 +137,7 @@ func (o *Orchestrator) Shutdown() {
 	o.TriggerStopped()
 }
 
-func (o *Orchestrator) trackHighestSupportedVersion(block *blocks.Block) {
+func (o *Orchestrator) TrackBlock(block *blocks.Block) {
 	committee := o.seatManager.Committee(block.ID().Index())
 	seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {

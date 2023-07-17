@@ -80,14 +80,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.accountsLedger.SetCommitmentEvictionAge(api.ProtocolParameters().EvictionAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
-			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)
-			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-				l.accountsLedger.TrackBlock(block)
-				l.BlockAccepted(block)
-				l.sybilProtection.BlockAccepted(block)
-				l.events.BlockProcessed.Trigger(block)
-			}, event.WithWorkerPool(wp))
-
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
 			l.TriggerConstructed()
@@ -202,6 +194,8 @@ func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
+	l.accountsLedger.TrackBlock(block)
+
 	if _, hasTransaction := block.Transaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
 	}

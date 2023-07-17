@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -31,9 +32,10 @@ type Manager struct {
 	workers      *workerpool.Group
 	errorHandler func(error)
 
-	attestation     attestation.Attestations
-	ledger          ledger.Ledger
-	sybilProtection sybilprotection.SybilProtection
+	attestation         attestation.Attestations
+	ledger              ledger.Ledger
+	sybilProtection     sybilprotection.SybilProtection
+	upgradeOrchestrator upgrade.Orchestrator
 
 	storage *storage.Storage
 
@@ -57,10 +59,11 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 			m.ledger = e.Ledger
 			m.sybilProtection = e.SybilProtection
 			m.attestation = e.Attestations
+			m.upgradeOrchestrator = e.UpgradeOrchestrator
 
 			wpBlocks := m.workers.CreatePool("Blocks", 1) // Using just 1 worker to avoid contention
 
-			e.Events.Ledger.BlockProcessed.Hook(func(block *blocks.Block) {
+			e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
 				if err := m.notarizeAcceptedBlock(block); err != nil {
 					m.errorHandler(ierrors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 				}
@@ -172,9 +175,9 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	committeeRoot, rewardsRoot := m.sybilProtection.CommitSlot(index)
 	apiForSlot := m.apiProvider.APIForSlot(index)
 
-	protocolParamsHash, err := m.storage.Settings().VersionsAndProtocolParametersHash(index)
+	protocolParametersAndVersionsHash, err := m.upgradeOrchestrator.Commit(index)
 	if err != nil {
-		m.errorHandler(ierrors.Wrap(err, "failed to get protocol parameters hash"))
+		m.errorHandler(ierrors.Wrapf(err, "failed to commit protocol parameters and versions in upgrade orchestrator for slot %d", index))
 		return false
 	}
 
@@ -186,7 +189,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		accountRoot,
 		committeeRoot,
 		rewardsRoot,
-		protocolParamsHash,
+		protocolParametersAndVersionsHash,
 	)
 
 	newCommitment := iotago.NewCommitment(
