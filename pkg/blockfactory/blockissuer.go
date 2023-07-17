@@ -287,15 +287,16 @@ func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, stron
 
 func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIndex iotago.SlotIndex, references model.ParentReferences) error {
 	for _, parent := range lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds })) {
-		if b, exists := i.protocol.MainEngineInstance().BlockFromCache(parent); exists {
-			if b.IssuingTime().After(issuingTime) {
-				return ierrors.Errorf("cannot issue block if the parents issuingTime is ahead block's issuingTime: %s vs %s", b.IssuingTime(), issuingTime)
-			}
-			if b.SlotCommitmentID().Index() > slotCommitmentIndex {
-				return ierrors.Errorf("cannot issue block if the commitment is ahead of its parents' commitment: %s vs %s", b.SlotCommitmentID().Index(), slotCommitmentIndex)
+		b, exists := i.protocol.MainEngineInstance().BlockFromCache(parent)
+		if !exists {
+			return ierrors.Errorf("cannot issue block if the parents are not known: %s", parent)
+		}
 
-			}
-
+		if b.IssuingTime().After(issuingTime) {
+			return ierrors.Errorf("cannot issue block if the parents issuingTime is ahead block's issuingTime: %s vs %s", b.IssuingTime(), issuingTime)
+		}
+		if b.SlotCommitmentID().Index() > slotCommitmentIndex {
+			return ierrors.Errorf("cannot issue block if the commitment is ahead of its parents' commitment: %s vs %s", b.SlotCommitmentID().Index(), slotCommitmentIndex)
 		}
 	}
 
