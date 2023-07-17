@@ -1,6 +1,7 @@
 package tipselectionv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -11,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -54,12 +56,14 @@ type TipSelection struct {
 
 	// Module embeds the required methods of the module.Interface.
 	module.Module
+	engine *engine.Engine
 }
 
 // New is the constructor for the TipSelection.
-func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], memPool mempool.MemPool[ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
+func New(e *engine.Engine, tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], memPool mempool.MemPool[ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
 		tipManager:                   tipManager,
+		engine:                       e,
 		conflictDAG:                  conflictDAG,
 		memPool:                      memPool,
 		rootBlocks:                   rootBlocksRetriever,
@@ -96,7 +100,26 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 			} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[iotago.ShallowLikeParentType]) {
 				references[iotago.StrongParentType] = append(references[iotago.StrongParentType], tip.ID())
 				references[iotago.ShallowLikeParentType] = append(references[iotago.ShallowLikeParentType], addedLikedInsteadReferences...)
+				for _, likedInsteadID := range addedLikedInsteadReferences {
+					likedInstead, exists := t.engine.BlockFromCache(likedInsteadID)
+					if !exists {
+						continue
+					}
 
+					if len(likedInstead.ShallowLikeChildren()) > 50 {
+						likedInstead.PayloadConflictIDs().Range(func(element iotago.TransactionID) {
+							conflictsSummary := lo.Map(tip.Block().ConflictIDs().ToSlice(), func(conflictID iotago.TransactionID) string {
+								return fmt.Sprint("", conflictID, " -> ", t.conflictDAG.AcceptanceState(ds.NewSet(conflictID)).String(), lo.Return1(t.conflictDAG.ConflictingConflicts(conflictID)).String())
+							})
+							fmt.Println("conflict ", element, "(voters: ", t.conflictDAG.ConflictVoters(element).String(), " status: ",
+								t.conflictDAG.AcceptanceState(ds.NewSet(element)).String(), ") was liked instead more than 50 times through tip (", tip.ID(), "isStrongTip", tip.IsStrongTip().Get(), ") that contains following conflicts", conflictsSummary,
+							)
+						})
+
+						fmt.Println("tip isStrongTip", tip.IsStrongTip().Get(), "strongChildren", lo.Map(tip.Block().StrongChildren(), (*blocks.Block).ID))
+					}
+
+				}
 				shallowLikesParents.AddAll(ds.NewSet(addedLikedInsteadReferences...))
 				strongParents.Add(tip.ID())
 

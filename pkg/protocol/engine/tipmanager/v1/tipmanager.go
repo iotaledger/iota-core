@@ -1,6 +1,8 @@
 package tipmanagerv1
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ds/randommap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -53,6 +55,8 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
 func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
+	fmt.Println(">> arrived at tip manager", block.ID(), " parents ", block.Parents())
+
 	tipMetadata := NewBlockMetadata(block)
 
 	if storage := t.metadataStorage(block.ID().Index()); storage == nil || !storage.Set(block.ID(), tipMetadata) {
