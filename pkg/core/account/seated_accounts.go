@@ -9,7 +9,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type SeatIndex byte
+type SeatIndex uint8
 
 func (s SeatIndex) Bytes() ([]byte, error) {
 	return []byte{byte(s)}, nil

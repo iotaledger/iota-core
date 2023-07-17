@@ -66,6 +66,8 @@ type Orchestrator struct {
 	apiProvider api.Provider
 	seatManager seatmanager.SeatManager
 
+	optsProtocolParameters []iotago.ProtocolParameters
+
 	module.Module
 }
 
@@ -82,6 +84,21 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 			e.SybilProtection.SeatManager(),
 			opts...,
 		)
+
+		for _, protocolParams := range o.optsProtocolParameters {
+			storedProtocolParams := e.Storage.Settings().ProtocolParameters(protocolParams.Version())
+			if storedProtocolParams != nil {
+				if lo.PanicOnErr(storedProtocolParams.Hash()) == lo.PanicOnErr(protocolParams.Hash()) {
+					continue
+				}
+
+				panic(ierrors.Errorf("protocol parameters for version %d already exist with different hash", protocolParams.Version()))
+			}
+
+			if err := e.Storage.Settings().StoreProtocolParameters(protocolParams); err != nil {
+				panic(ierrors.Wrapf(err, "failed to store protocol parameters for version %d", protocolParams.Version()))
+			}
+		}
 
 		e.Events.BlockGadget.BlockAccepted.Hook(o.trackHighestSupportedVersion)
 		o.TriggerInitialized()
@@ -101,7 +118,7 @@ func NewOrchestrator(errorHandler func(error),
 	return options.Apply(&Orchestrator{
 		errorHandler:            errorHandler,
 		latestSignals:           memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignaledBlock](),
-		permanentUpgradeSignals: kvstore.NewTypedStore[iotago.EpochIndex, VersionAndHash](permanentUpgradeSignal, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, VersionAndHash.Bytes, VersionAndHashFromBytes),
+		permanentUpgradeSignals: kvstore.NewTypedStore(permanentUpgradeSignal, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, VersionAndHash.Bytes, VersionAndHashFromBytes),
 		upgradeSignalsFunc:      upgradeSignalsFunc,
 
 		setProtocolParametersEpochMappingFunc: setProtocolParametersEpochMappingFunc,
@@ -118,7 +135,6 @@ func NewOrchestrator(errorHandler func(error),
 // TODO
 //  - when creating snapshot we need to export latest committed slot's signals and permanentUpgradeSignals. starting from disk should be fine
 //  - when starting from disk/snapshot we need to fill up latestSignals
-//  - add option to NewProvider: slice of protocol parameters -> write to settings if not existent, panic if different
 
 func (o *Orchestrator) Shutdown() {
 	o.TriggerStopped()

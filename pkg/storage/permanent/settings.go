@@ -229,7 +229,7 @@ func (s *Settings) VersionsAndProtocolParametersHash(slot iotago.SlotIndex) (iot
 		// Only write the protocol parameters if the version is already active.
 		// TODO: this is not optimal: we are not committing to the protocol parameters that are going to be active.
 		if currentEpoch >= version.StartEpoch {
-			paramsBytes, err := s.protocolParameters(version.Version).Bytes()
+			paramsBytes, err := s.ProtocolParameters(version.Version).Bytes()
 			if err != nil {
 				return iotago.Identifier{}, ierrors.Wrap(err, "failed to get protocol parameters bytes")
 			}
@@ -422,7 +422,7 @@ func (s *Settings) String() string {
 		if err != nil {
 			panic(err)
 		}
-		builder.AddField(stringify.NewStructField(fmt.Sprintf("protocolParameters(%d)", key[1]), params))
+		builder.AddField(stringify.NewStructField(fmt.Sprintf("ProtocolParameters(%d)", key[1]), params))
 
 		return true
 	}); err != nil {
@@ -462,7 +462,7 @@ func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
 }
 
 func (s *Settings) apiFromProtocolParameters(version iotago.Version) (iotago.API, error) {
-	protocolParams := s.protocolParameters(version)
+	protocolParams := s.ProtocolParameters(version)
 	if protocolParams == nil {
 		return nil, ierrors.Errorf("protocol parameters for version %d not found", version)
 	}
@@ -475,7 +475,7 @@ func (s *Settings) apiFromProtocolParameters(version iotago.Version) (iotago.API
 	return nil, ierrors.Errorf("unsupported protocol version %d", protocolParams.Version())
 }
 
-func (s *Settings) protocolParameters(version iotago.Version) iotago.ProtocolParameters {
+func (s *Settings) ProtocolParameters(version iotago.Version) iotago.ProtocolParameters {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
