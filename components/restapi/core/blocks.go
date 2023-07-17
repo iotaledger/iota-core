@@ -40,10 +40,14 @@ func blockMetadataByID(c echo.Context) (*models.BlockMetadataResponse, error) {
 		return nil, err
 	}
 
-	// TODO: fill in blockReason, TxState, TxReason.
+	// TODO: fill in blockReason, TxReason.
 	bmResponse := &models.BlockMetadataResponse{
 		BlockID:    block.ID().ToHex(),
-		BlockState: metadata.Status.String(),
+		BlockState: metadata.BlockStatus.String(),
+	}
+
+	if metadata.HasTx {
+		bmResponse.TxState = metadata.TransactionStatus.String()
 	}
 
 	return bmResponse, nil

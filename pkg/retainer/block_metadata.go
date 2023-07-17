@@ -3,5 +3,9 @@ package retainer
 import "github.com/iotaledger/iota.go/v4/nodeclient/models"
 
 type BlockMetadata struct {
-	Status models.BlockState `serix:"0"`
+	BlockStatus       models.BlockState
+	BlockReason       int
+	HasTx             bool
+	TransactionStatus models.TransactionState
+	TransactionReason int
 }

@@ -56,7 +56,7 @@ func blockMetadataFromTransactionID(c echo.Context) (*models.BlockMetadataRespon
 	// TODO: fill in blockReason, TxState, TxReason.
 	bmResponse := &models.BlockMetadataResponse{
 		BlockID:    block.ID().ToHex(),
-		BlockState: metadata.Status.String(),
+		BlockState: metadata.BlockStatus.String(),
 	}
 
 	return bmResponse, nil

@@ -8,28 +8,45 @@ import (
 )
 
 const (
-	orphanedPrefix byte = iota
-	confirmedPrefix
+	blockOrphanedPrefix byte = iota
+	blockConfirmedPrefix
+	transactionPendingPrefix
+	transactionConfirmedPrefix
 )
 
 type Retainer struct {
-	slot          iotago.SlotIndex
-	orphanedStore *kvstore.TypedStore[iotago.BlockID, types.Empty]
-
-	confirmedStore *kvstore.TypedStore[iotago.BlockID, types.Empty]
+	slot                      iotago.SlotIndex
+	blockOrphanedStore        *kvstore.TypedStore[iotago.BlockID, types.Empty]
+	blockConfirmedStore       *kvstore.TypedStore[iotago.BlockID, types.Empty]
+	transactionPendingStore   *kvstore.TypedStore[iotago.BlockID, types.Empty]
+	transactionConfirmedStore *kvstore.TypedStore[iotago.BlockID, types.Empty]
 }
 
 func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Retainer) {
 	return &Retainer{
 		slot: slot,
-		orphanedStore: kvstore.NewTypedStore[iotago.BlockID, types.Empty](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{orphanedPrefix})),
+		blockOrphanedStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockOrphanedPrefix})),
 			iotago.SlotIdentifier.Bytes,
 			iotago.SlotIdentifierFromBytes,
 			types.Empty.Bytes,
 			func(bytes []byte) (object types.Empty, consumed int, err error) {
 				return types.Void, 0, nil
 			}),
-		confirmedStore: kvstore.NewTypedStore[iotago.BlockID, types.Empty](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{confirmedPrefix})),
+		blockConfirmedStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockConfirmedPrefix})),
+			iotago.SlotIdentifier.Bytes,
+			iotago.SlotIdentifierFromBytes,
+			types.Empty.Bytes,
+			func(bytes []byte) (object types.Empty, consumed int, err error) {
+				return types.Void, 0, nil
+			}),
+		transactionPendingStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionPendingPrefix})),
+			iotago.SlotIdentifier.Bytes,
+			iotago.SlotIdentifierFromBytes,
+			types.Empty.Bytes,
+			func(bytes []byte) (object types.Empty, consumed int, err error) {
+				return types.Void, 0, nil
+			}),
+		transactionConfirmedStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionConfirmedPrefix})),
 			iotago.SlotIdentifier.Bytes,
 			iotago.SlotIdentifierFromBytes,
 			types.Empty.Bytes,
@@ -39,43 +56,88 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 	}
 }
 
-func (r *Retainer) Store(blockID iotago.BlockID) error {
-	err := r.orphanedStore.Set(blockID, types.Void)
+func (r *Retainer) Store(blockID iotago.BlockID, hasTx bool) error {
+	err := r.blockOrphanedStore.Set(blockID, types.Void)
 	if err != nil {
 		return err
+	}
+
+	if hasTx {
+		r.transactionPendingStore.Set(blockID, types.Void)
 	}
 
 	return nil
 }
 
-func (r *Retainer) WasConfirmed(blockID iotago.BlockID) (bool, error) {
-	exists, err := r.confirmedStore.Has(blockID)
+func (r *Retainer) WasBlockConfirmed(blockID iotago.BlockID) (bool, error) {
+	exists, err := r.blockConfirmedStore.Has(blockID)
 	if err != nil {
 		return false, err
 	}
 	return exists, nil
 }
 
-func (r *Retainer) WasOrphaned(blockID iotago.BlockID) (bool, error) {
-	exists, err := r.orphanedStore.Has(blockID)
+func (r *Retainer) WasBlockOrphaned(blockID iotago.BlockID) (bool, error) {
+	exists, err := r.blockOrphanedStore.Has(blockID)
 	if err != nil {
 		return false, err
 	}
 	return exists, nil
 }
 
-func (r *Retainer) StoreAccepted(blockID iotago.BlockID) error {
-	err := r.orphanedStore.Delete(blockID)
+func (r *Retainer) StoreBlockAccepted(blockID iotago.BlockID) error {
+	err := r.blockOrphanedStore.Delete(blockID)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *Retainer) StoreConfirmed(blockID iotago.BlockID) error {
-	err := r.confirmedStore.Set(blockID, types.Void)
+func (r *Retainer) StoreBlockConfirmed(blockID iotago.BlockID) error {
+	err := r.blockConfirmedStore.Set(blockID, types.Void)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (r *Retainer) WasTransactionConfirmed(blockID iotago.BlockID) (bool, error) {
+	exists, err := r.transactionConfirmedStore.Has(blockID)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func (r *Retainer) WasTransactionPending(blockID iotago.BlockID) (bool, error) {
+	exists, err := r.transactionPendingStore.Has(blockID)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func (r *Retainer) StoreTransactionPending(blockID iotago.BlockID) error {
+	err := r.transactionPendingStore.Set(blockID, types.Void)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Retainer) StoreTransactionConfirmed(blockID iotago.BlockID) error {
+	err := r.transactionConfirmedStore.Set(blockID, types.Void)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Retainer) DeleteTransactionConfirmed(prevID iotago.BlockID) error {
+	err := r.transactionConfirmedStore.Delete(prevID)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
