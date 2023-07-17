@@ -127,7 +127,7 @@ type ExplorerBlock struct {
 	// NetworkID is the network ID of the block that attaches to.
 	NetworkID iotago.NetworkID `json:"networkID"`
 	// ProtocolVersion is the protocol that proccess the block.
-	ProtocolVersion byte `json:"protocolVersion"`
+	ProtocolVersion iotago.Version `json:"protocolVersion"`
 	// SolidificationTimestamp is the timestamp of the block.
 	SolidificationTimestamp int64 `json:"solidificationTimestamp"`
 	// The time when this block was issued

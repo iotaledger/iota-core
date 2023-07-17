@@ -27,11 +27,25 @@ func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
 		func(attestation *iotago.Attestation) ([]byte, error) {
-			return c.engine.APIForVersion(attestation.ProtocolVersion).Encode(attestation)
+			apiForVersion, err := c.engine.APIForVersion(attestation.ProtocolVersion)
+			if err != nil {
+				return nil, ierrors.Wrapf(err, "failed to get API for version %d", attestation.ProtocolVersion)
+			}
+
+			return apiForVersion.Encode(attestation)
 		},
 		func(bytes []byte) (*iotago.Attestation, int, error) {
+			version, _, err := iotago.VersionFromBytes(bytes)
+			if err != nil {
+				return nil, 0, ierrors.Wrap(err, "failed to determine version")
+			}
+
 			a := new(iotago.Attestation)
-			n, err := c.engine.APIForVersion(bytes[0]).Decode(bytes, a)
+			apiForVersion, err := c.engine.APIForVersion(version)
+			if err != nil {
+				return nil, 0, ierrors.Wrapf(err, "failed to get API for version %d", version)
+			}
+			n, err := apiForVersion.Decode(bytes, a)
 
 			return a, n, err
 		},
@@ -68,7 +82,10 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		//  First, this can be based on the latest commonly known ledger state.
 		//  Later, this needs to include a proof of added/removed public keys.
 
-		api := c.engine.APIForVersion(att.ProtocolVersion)
+		api, err := c.engine.APIForVersion(att.ProtocolVersion)
+		if err != nil {
+			return nil, 0, ierrors.Wrap(err, "error determining API for attestation")
+		}
 
 		// 2. Verify the signature of the attestation.
 		if valid, err := att.VerifySignature(api); !valid {
