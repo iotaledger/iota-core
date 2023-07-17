@@ -8,15 +8,16 @@ import (
 )
 
 type BlockParams struct {
-	parentsCount          int
-	references            model.ParentReferences
-	slotCommitment        *iotago.Commitment
-	payload               iotago.Payload
-	latestFinalizedSlot   *iotago.SlotIndex
-	issuingTime           *time.Time
-	protocolVersion       *iotago.Version
-	issuer                Account
-	proofOfWorkDifficulty *float64
+	parentsCount            int
+	references              model.ParentReferences
+	slotCommitment          *iotago.Commitment
+	payload                 iotago.Payload
+	latestFinalizedSlot     *iotago.SlotIndex
+	issuingTime             *time.Time
+	protocolVersion         *iotago.Version
+	issuer                  Account
+	highestSupportedVersion *iotago.Version
+	protocolParametersHash  *iotago.Identifier
 }
 
 func WithParentsCount(parentsCount int) func(builder *BlockParams) {
@@ -88,8 +89,15 @@ func WithIssuer(issuer Account) func(builder *BlockParams) {
 		builder.issuer = issuer
 	}
 }
-func WithProofOfWorkDifficulty(difficulty float64) func(builder *BlockParams) {
+
+func WithHighestSupportedVersion(highestSupportedVersion iotago.Version) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.proofOfWorkDifficulty = &difficulty
+		builder.highestSupportedVersion = &highestSupportedVersion
+	}
+}
+
+func WithProtocolParametersHash(protocolParametersHash iotago.Identifier) func(builder *BlockParams) {
+	return func(builder *BlockParams) {
+		builder.protocolParametersHash = &protocolParametersHash
 	}
 }

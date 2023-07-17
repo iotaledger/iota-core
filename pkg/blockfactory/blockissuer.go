@@ -59,6 +59,102 @@ func (i *BlockIssuer) Shutdown() {
 	i.workerPool.ShutdownComplete.Wait()
 }
 
+func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
+	blockParams := options.Apply(&BlockParams{}, opts)
+
+	if blockParams.slotCommitment == nil {
+		blockParams.slotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+	}
+
+	if blockParams.latestFinalizedSlot == nil {
+		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
+		blockParams.latestFinalizedSlot = &latestFinalizedSlot
+	}
+
+	if blockParams.issuingTime == nil {
+		issuingTime := time.Now()
+		blockParams.issuingTime = &issuingTime
+	}
+
+	if blockParams.references == nil {
+		references, err := i.getReferences(ctx, blockParams.payload, blockParams.parentsCount)
+		if err != nil {
+			return nil, ierrors.Wrap(err, "error building block")
+		}
+		blockParams.references = references
+	}
+
+	if blockParams.issuer == nil {
+		blockParams.issuer = NewEd25519Account(i.Account.ID(), i.Account.PrivateKey())
+	}
+
+	if blockParams.highestSupportedVersion == nil {
+		version := i.protocol.CurrentAPI().Version()
+		blockParams.highestSupportedVersion = &version
+	}
+
+	if blockParams.protocolParametersHash == nil {
+		protocolParametersHash, err := i.protocol.LatestAPI().ProtocolParameters().Hash()
+		if err != nil {
+			return nil, ierrors.Wrap(err, "error getting protocol parameters hash")
+		}
+		blockParams.protocolParametersHash = &protocolParametersHash
+	}
+
+	if err := i.validateReferences(*blockParams.issuingTime, blockParams.slotCommitment.Index, blockParams.references); err != nil {
+		return nil, ierrors.Wrap(err, "block references invalid")
+	}
+
+	var api iotago.API
+	if blockParams.protocolVersion != nil {
+		var err error
+		api, err = i.protocol.APIForVersion(*blockParams.protocolVersion)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.protocolVersion)
+		}
+	} else {
+		api = i.protocol.MainEngineInstance().Storage.Settings().CurrentAPI()
+	}
+
+	blockBuilder := builder.NewValidationBlockBuilder(api)
+	blockBuilder.SlotCommitmentID(blockParams.slotCommitment.MustID())
+	blockBuilder.LatestFinalizedSlot(*blockParams.latestFinalizedSlot)
+	blockBuilder.IssuingTime(*blockParams.issuingTime)
+	blockBuilder.HighestSupportedVersion(*blockParams.highestSupportedVersion)
+	blockBuilder.ProtocolParametersHash(*blockParams.protocolParametersHash)
+
+	if strongParents, exists := blockParams.references[iotago.StrongParentType]; exists && len(strongParents) > 0 {
+		blockBuilder.StrongParents(strongParents)
+	} else {
+		return nil, ierrors.New("cannot create a block without strong parents")
+	}
+
+	if weakParents, exists := blockParams.references[iotago.WeakParentType]; exists {
+		blockBuilder.WeakParents(weakParents)
+	}
+
+	if shallowLikeParents, exists := blockParams.references[iotago.ShallowLikeParentType]; exists {
+		blockBuilder.ShallowLikeParents(shallowLikeParents)
+	}
+
+	blockBuilder.Sign(i.Account.ID(), i.Account.PrivateKey())
+
+	block, err := blockBuilder.Build()
+	if err != nil {
+		return nil, ierrors.Wrap(err, "error building block")
+	}
+
+	// Make sure we only create syntactically valid blocks.
+	modelBlock, err := model.BlockFromBlock(block, api, serix.WithValidation())
+	if err != nil {
+		return nil, ierrors.Wrap(err, "error serializing block to model block")
+	}
+
+	i.events.BlockConstructed.Trigger(modelBlock)
+
+	return modelBlock, nil
+}
+
 // CreateBlock creates a new block with the options.
 func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BlockParams{}, opts)
@@ -101,17 +197,13 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 			return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.protocolVersion)
 		}
 	} else {
-		api = i.protocol.MainEngineInstance().Storage.Settings().LatestAPI()
+		api = i.protocol.MainEngineInstance().Storage.Settings().CurrentAPI()
 	}
 
 	blockBuilder := builder.NewBasicBlockBuilder(api)
-
 	blockBuilder.Payload(blockParams.payload)
-
 	blockBuilder.SlotCommitmentID(blockParams.slotCommitment.MustID())
-
 	blockBuilder.LatestFinalizedSlot(*blockParams.latestFinalizedSlot)
-
 	blockBuilder.IssuingTime(*blockParams.issuingTime)
 
 	if strongParents, exists := blockParams.references[iotago.StrongParentType]; exists && len(strongParents) > 0 {
