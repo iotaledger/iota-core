@@ -103,7 +103,7 @@ func (q *IssuerQueue) Ready(block *blocks.Block) bool {
 
 // IDs returns the IDs of all submitted blocks (ready or not).
 func (q *IssuerQueue) IDs() (ids []iotago.BlockID) {
-	ids = append(ids, q.submitted.Keys()...)
+	ids = q.submitted.Keys()
 
 	for _, block := range q.inbox {
 		ids = append(ids, block.Value.ID())
