@@ -26,6 +26,7 @@ type Retainer struct {
 	blockDiskFunc     BlockDiskFunc
 	finalizedSlotFunc FinalizedSlotFunc
 	retainerFunc      RetainerFunc
+	errorHandler      func(error)
 
 	module.Module
 }
@@ -40,31 +41,41 @@ type Retainer struct {
 //
 // maybe also store the orphaned block there as well?
 
-func New(retainerFunc RetainerFunc, blockRetrieveFunc BlockRetrieveFunc, blockDiskFunc BlockDiskFunc, finalizedSlotIndex FinalizedSlotFunc) *Retainer {
+func New(retainerFunc RetainerFunc, blockRetrieveFunc BlockRetrieveFunc, blockDiskFunc BlockDiskFunc, finalizedSlotIndex FinalizedSlotFunc, errorHandler func(error)) *Retainer {
 	return &Retainer{
 		blockRetrieveFunc: blockRetrieveFunc,
 		blockDiskFunc:     blockDiskFunc,
 		finalizedSlotFunc: finalizedSlotIndex,
 		retainerFunc:      retainerFunc,
+		errorHandler:      errorHandler,
 	}
 }
 
 // NewProvider creates a new SyncManager provider.
 func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	return module.Provide(func(e *engine.Engine) retainer.Retainer {
-		r := New(e.Storage.Retainer, e.Block, e.Storage.Blocks, e.Storage.Settings().LatestFinalizedSlot)
+		r := New(e.Storage.Retainer, e.Block, e.Storage.Blocks, e.Storage.Settings().LatestFinalizedSlot, e.ErrorHandler("retainer"))
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("Retainer", 1))
 
 		e.Events.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
-			r.onBlockAttached(b.ID())
+			err := r.onBlockAttached(b.ID())
+			if err != nil {
+				r.errorHandler(ierrors.Wrap(err, "failed to store on Block Attached in retainer"))
+			}
 		}, asyncOpt)
 
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
-			r.onBlockAccepted(b.ID())
+			err := r.onBlockAccepted(b.ID())
+			if err != nil {
+				r.errorHandler(ierrors.Wrap(err, "failed to store on Block Accepted in retainer"))
+			}
 		}, asyncOpt)
 
 		e.Events.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
-			r.onBlockConfirmed(b.ID())
+			err := r.onBlockConfirmed(b.ID())
+			if err != nil {
+				r.errorHandler(ierrors.Wrap(err, "failed to store on Block Confirmed in retainer"))
+			}
 		}, asyncOpt)
 
 		r.TriggerInitialized()
@@ -123,26 +134,17 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (models.BlockState, error
 	return models.BlockStateUnknown, nil
 }
 
-func (r *Retainer) onBlockAttached(blockID iotago.BlockID) {
+func (r *Retainer) onBlockAttached(blockID iotago.BlockID) error {
 	retainerStore := r.retainerFunc(blockID.Index())
-	err := retainerStore.Store(blockID)
-	if err != nil {
-
-	}
+	return retainerStore.Store(blockID)
 }
 
-func (r *Retainer) onBlockAccepted(blockID iotago.BlockID) {
+func (r *Retainer) onBlockAccepted(blockID iotago.BlockID) error {
 	retainerStore := r.retainerFunc(blockID.Index())
-	err := retainerStore.StoreAccepted(blockID)
-	if err != nil {
-
-	}
+	return retainerStore.StoreAccepted(blockID)
 }
 
-func (r *Retainer) onBlockConfirmed(blockID iotago.BlockID) {
+func (r *Retainer) onBlockConfirmed(blockID iotago.BlockID) error {
 	retainerStore := r.retainerFunc(blockID.Index())
-	err := retainerStore.StoreConfirmed(blockID)
-	if err != nil {
-
-	}
+	return retainerStore.StoreConfirmed(blockID)
 }
