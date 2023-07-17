@@ -52,8 +52,9 @@ import (
 // ensuring a smooth transition. The term "orchestrator" suggests a conductor-like function, coordinating the upgrade
 // activities and ensuring consensus before activating the changes.
 type Orchestrator struct {
-	evictionMutex syncutils.RWMutex
-	errorHandler  func(error)
+	evictionMutex     syncutils.RWMutex
+	errorHandler      func(error)
+	lastCommittedSlot iotago.SlotIndex
 
 	latestSignals           *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignaledBlock]
 	upgradeSignalsFunc      func(slot iotago.SlotIndex) *prunable.UpgradeSignals
@@ -132,10 +133,6 @@ func NewOrchestrator(errorHandler func(error),
 	)
 }
 
-// TODO
-//  - when creating snapshot we need to export latest committed slot's signals and permanentUpgradeSignals. starting from disk should be fine
-//  - when starting from disk/snapshot we need to fill up latestSignals
-
 func (o *Orchestrator) Shutdown() {
 	o.TriggerStopped()
 }
@@ -186,10 +183,10 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 
 	lastSlotInEpoch := o.apiProvider.APIForSlot(slot).TimeProvider().EpochEnd(currentEpoch) == slot
 
-	signaledBlockPerSeat := func() map[account.SeatIndex]*prunable.SignaledBlock {
-		o.evictionMutex.Lock()
-		defer o.evictionMutex.Unlock()
+	o.evictionMutex.Lock()
+	defer o.evictionMutex.Unlock()
 
+	signaledBlockPerSeat := func() map[account.SeatIndex]*prunable.SignaledBlock {
 		// Evict and get latest signals for slot.
 		latestSignalsForSlot := o.latestSignals.Evict(slot)
 		if latestSignalsForSlot == nil {
@@ -213,6 +210,8 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 				o.addNewSignaledBlock(latestSignalsForNextSlot, seat, signaledBlock)
 			}
 		}
+
+		o.lastCommittedSlot++
 
 		return signaledBlockPerSeat
 	}()
