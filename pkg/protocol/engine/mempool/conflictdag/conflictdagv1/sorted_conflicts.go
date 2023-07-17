@@ -251,10 +251,9 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) nextPendingWeightUpd
 	if !s.isShutdown.Load() {
 		if _, member, exists := s.pendingWeightUpdates.Pop(); exists {
 			s.pendingUpdatesCounter.Decrease()
-			fmt.Println(">> decreased counter", s.pendingUpdatesCounter.Get())
+
 			return member
 		}
-		panic("W00t!")
 	}
 
 	return nil
@@ -329,10 +328,9 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) nextPendingPreferred
 	if !s.isShutdown.Load() {
 		if _, member, exists := s.pendingPreferredInsteadUpdates.Pop(); exists {
 			s.pendingUpdatesCounter.Decrease()
-			fmt.Println(">> decreased counter", s.pendingUpdatesCounter.Get())
+
 			return member
 		}
-		panic("W00t!")
 	}
 
 	return nil
