@@ -7,7 +7,7 @@ replace github.com/iotaledger/iota-core => ../../
 require (
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230706083020-ef6c3248369d
 	github.com/iotaledger/hive.go/lo v0.0.0-20230706083020-ef6c3248369d
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230706083020-ef6c3248369d
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230706181250-4d386aa2d018
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230712172022-22fba04771d0
 	github.com/mr-tron/base58 v1.2.0
@@ -27,13 +27,13 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/holiman/uint256 v1.2.2 // indirect
-	github.com/iancoleman/orderedmap v0.2.0 // indirect
+	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
 	github.com/iotaledger/hive.go/ads v0.0.0-20230706083020-ef6c3248369d // indirect
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230706083020-ef6c3248369d // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230711121610-7d024f7b5eb5 // indirect
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230706083020-ef6c3248369d // indirect
-	github.com/iotaledger/hive.go/ds v0.0.0-20230706083020-ef6c3248369d // indirect
+	github.com/iotaledger/hive.go/ds v0.0.0-20230713110520-ba24b71ff7ab // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230706083020-ef6c3248369d // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230706083020-ef6c3248369d // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230706083020-ef6c3248369d // indirect
