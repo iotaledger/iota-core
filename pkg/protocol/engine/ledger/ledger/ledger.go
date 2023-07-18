@@ -326,6 +326,9 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.NewOutputID = createdOutput.OutputID()
 		accountDiff.PreviousOutputID = consumedOutput.OutputID()
 
+		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
+		accountDiff.PreviousExpirySlot = consumedOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
+
 		oldPubKeysSet := accountData.PubKeys
 		newPubKeysSet := advancedset.New[ed25519.PublicKey]()
 		for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
@@ -369,6 +372,8 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		// have some values from the allotment, so no need to set them explicitly.
 		accountDiff.NewOutputID = createdOutput.OutputID()
 		accountDiff.PreviousOutputID = iotago.EmptyOutputID
+		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
+		accountDiff.PreviousExpirySlot = 0
 		accountDiff.PubKeysAdded = lo.Map(createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
 
 		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
@@ -534,6 +539,10 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 				accountDiff.BICChange += iotago.BlockIssuanceCredits(allotment.Value)
 				accountDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
+
+				// we are not transitioning the allotted account, so the new and previous expiry slots are the same
+				accountDiff.PreviousExpirySlot = accountData.ExpirySlot
+				accountDiff.NewExpirySlot = accountData.ExpirySlot
 
 				// we are not transitioning the allotted account, so the new and previous outputIDs are the same
 				accountDiff.NewOutputID = accountData.OutputID

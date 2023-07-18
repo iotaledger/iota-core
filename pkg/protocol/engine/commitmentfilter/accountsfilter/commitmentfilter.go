@@ -188,6 +188,8 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 		return
 	}
 
+	// Check that the account is not expired
+
 	c.events.BlockAllowed.Trigger(block)
 }
 

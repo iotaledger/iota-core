@@ -71,6 +71,14 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 			return ierrors.Errorf("AssertAccountDiff: %s: expected previous updated time %d but actual %d for account %s at slot %d", node.Name, accountDiff.PreviousUpdatedTime, actualAccountDiff.PreviousUpdatedTime, accountID, index)
 		}
 
+		if accountDiff.NewExpirySlot != actualAccountDiff.NewExpirySlot {
+			return ierrors.Errorf("AssertAccountDiff: %s: expected new expiry slot %d but actual %d for account %s at slot %d", node.Name, accountDiff.NewExpirySlot, actualAccountDiff.NewExpirySlot, accountID, index)
+		}
+
+		if accountDiff.PreviousExpirySlot != actualAccountDiff.PreviousExpirySlot {
+			return ierrors.Errorf("AssertAccountDiff: %s: expected previous expiry slot %d but actual %d for account %s at slot %d", node.Name, accountDiff.PreviousExpirySlot, actualAccountDiff.PreviousExpirySlot, accountID, index)
+		}
+
 		if accountDiff.NewOutputID != actualAccountDiff.NewOutputID {
 			return ierrors.Errorf("AssertAccountDiff: %s: expected new output ID %s but actual %s for account %s at slot %d", node.Name, accountDiff.NewOutputID, actualAccountDiff.NewOutputID, accountID, index)
 		}
