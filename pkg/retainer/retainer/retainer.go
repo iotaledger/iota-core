@@ -18,7 +18,7 @@ type (
 	BlockCacheFunc          func(id iotago.BlockID) (*blocks.Block, bool)
 	BlockDiskFunc           func(iotago.SlotIndex) *prunable.Blocks
 	FinalizedSlotFunc       func() iotago.SlotIndex
-	RetainerFunc            func(iotago.SlotIndex) *prunable.Retainer
+	StoreFunc               func(iotago.SlotIndex) *prunable.Retainer
 	LatestCommittedSlotFunc func() iotago.SlotIndex
 )
 
@@ -27,7 +27,7 @@ type Retainer struct {
 	blockCacheFunc          BlockCacheFunc
 	blockDiskFunc           BlockDiskFunc
 	finalizedSlotFunc       FinalizedSlotFunc
-	retainerFunc            RetainerFunc
+	retainerFunc            StoreFunc
 	latestCommittedSlotFunc LatestCommittedSlotFunc
 	errorHandler            func(error)
 
@@ -51,7 +51,7 @@ type Retainer struct {
 // get block status: go through stores to check status
 // get tx status: confirmed store -> check slot index finalized? finalized -> pending store (error codes)
 
-func New(retainerFunc RetainerFunc, blockRetrieveFunc BlockCacheFunc, blockDiskFunc BlockDiskFunc, finalizedSlotIndex FinalizedSlotFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, errorHandler func(error)) *Retainer {
+func New(retainerFunc StoreFunc, blockRetrieveFunc BlockCacheFunc, blockDiskFunc BlockDiskFunc, finalizedSlotIndex FinalizedSlotFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, errorHandler func(error)) *Retainer {
 	return &Retainer{
 		blockCacheFunc:          blockRetrieveFunc,
 		blockDiskFunc:           blockDiskFunc,
@@ -133,6 +133,7 @@ func (r *Retainer) Block(blockID iotago.BlockID) (*model.Block, error) {
 	if err != nil {
 		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
 	}
+
 	return storedBlock, nil
 }
 
@@ -174,6 +175,7 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (models.BlockState, *mode
 		} else if confirmed {
 			return models.BlockStateConfirmed, block, nil
 		}
+
 		return models.BlockStatePending, block, nil
 	}
 
@@ -238,11 +240,13 @@ func (r *Retainer) onBlockConfirmed(blockID iotago.BlockID) error {
 
 func (r *Retainer) onTransactionAttached(blockID iotago.BlockID) error {
 	retainerStore := r.retainerFunc(blockID.Index())
+
 	return retainerStore.StoreTransactionPending(blockID)
 }
 
 func (r *Retainer) onTransactionConfirmed(blockID iotago.BlockID) error {
 	retainerStore := r.retainerFunc(blockID.Index())
+
 	return retainerStore.StoreTransactionConfirmed(blockID)
 }
 
@@ -254,5 +258,6 @@ func (r *Retainer) onAttachmentUpdated(prevID, newID iotago.BlockID) error {
 	}
 
 	newStore := r.retainerFunc(newID.Index())
+
 	return newStore.StoreTransactionConfirmed(newID)
 }
