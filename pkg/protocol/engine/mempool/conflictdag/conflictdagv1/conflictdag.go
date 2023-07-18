@@ -117,6 +117,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictingResourc
 
 		return conflict.JoinConflictSets(c.conflictSets(resourceIDs))
 	}()
+
 	if err != nil {
 		return ierrors.Errorf("conflict %s failed to join conflict sets: %w", id, err)
 	}
