@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/json"
-	"sync"
 
 	"google.golang.org/protobuf/proto"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/core/api"
@@ -36,7 +36,7 @@ type Protocol struct {
 	duplicateBlockBytesFilter *bytesfilter.BytesFilter
 
 	requestedBlockHashes      *shrinkingmap.ShrinkingMap[types.Identifier, types.Empty]
-	requestedBlockHashesMutex sync.Mutex
+	requestedBlockHashesMutex syncutils.Mutex
 }
 
 func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, apiProvider api.Provider, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -78,7 +78,8 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...network.PeerID
 func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
 	var iotagoAPI iotago.API
 	if len(attestations) > 0 {
-		iotagoAPI = p.apiProvider.APIForVersion(attestations[0].ProtocolVersion)
+		// TODO: there are multiple attestations potentially spanning multiple epochs/versions, we need to use the correct API for each one
+		iotagoAPI = lo.PanicOnErr(p.apiProvider.APIForVersion(attestations[0].ProtocolVersion))
 	} else {
 		iotagoAPI = p.apiProvider.APIForSlot(cm.Index()) // we need an api to serialize empty slices as well
 	}
@@ -197,7 +198,8 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 	}
 
 	var attestations []*iotago.Attestation
-	if _, err := p.apiProvider.APIForVersion(commitmentBytes[0]).Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
+	// TODO: there could be multiple versions of attestations in the same packet
+	if _, err := lo.PanicOnErr(p.apiProvider.APIForVersion(iotago.Version(commitmentBytes[0]))).Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
 
 		return

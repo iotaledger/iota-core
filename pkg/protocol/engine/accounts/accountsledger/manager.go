@@ -1,8 +1,6 @@
 package accountsledger
 
 import (
-	"sync"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/advancedset"
@@ -11,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -40,7 +39,7 @@ type Manager struct {
 
 	commitmentEvictionAge iotago.SlotIndex
 
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 
 	module.Module
 }

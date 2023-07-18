@@ -3,13 +3,13 @@ package eviction
 import (
 	"io"
 	"math"
-	"sync"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -23,7 +23,7 @@ type State struct {
 	latestRootBlocks     *ringbuffer.RingBuffer[iotago.BlockID]
 	rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks
 	lastEvictedSlot      iotago.SlotIndex
-	evictionMutex        sync.RWMutex
+	evictionMutex        syncutils.RWMutex
 
 	optsRootBlocksEvictionDelay iotago.SlotIndex
 }
@@ -229,6 +229,7 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 			if storage == nil {
 				continue
 			}
+			// TODO: here we should introduce a .StreamBytes() method to avoid deserialize and serialize again.
 			if err = storage.Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
 				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
 					return ierrors.Wrapf(err, "failed to write root block ID %s", rootBlockID)

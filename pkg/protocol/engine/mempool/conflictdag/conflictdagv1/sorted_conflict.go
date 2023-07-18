@@ -2,10 +2,10 @@ package conflictdagv1
 
 import (
 	"bytes"
-	"sync"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/core/weight"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -29,7 +29,7 @@ type sortedConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflict
 	queuedWeight *weight.Value
 
 	// weightMutex is used to protect the currentWeight and queuedWeight.
-	weightMutex sync.RWMutex
+	weightMutex syncutils.RWMutex
 
 	// currentPreferredInstead is the current PreferredInstead value of the Conflict.
 	currentPreferredInstead *Conflict[ConflictID, ResourceID, VoteRank]
@@ -38,7 +38,7 @@ type sortedConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflict
 	queuedPreferredInstead *Conflict[ConflictID, ResourceID, VoteRank]
 
 	// preferredMutex is used to protect the currentPreferredInstead and queuedPreferredInstead.
-	preferredInsteadMutex sync.RWMutex
+	preferredInsteadMutex syncutils.RWMutex
 
 	onAcceptanceStateUpdatedHook *event.Hook[func(acceptance.State, acceptance.State)]
 

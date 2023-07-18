@@ -2,7 +2,6 @@ package chainmanager
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/core/memstorage"
@@ -29,7 +28,7 @@ type Manager struct {
 
 	forksByForkingPoint *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *Fork]
 
-	evictionMutex sync.RWMutex
+	evictionMutex syncutils.RWMutex
 
 	optsCommitmentRequester []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]
 
@@ -171,13 +170,12 @@ func (m *Manager) LoadCommitmentOrRequestMissing(id iotago.CommitmentID) *ChainC
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	if commitment, exists := m.commitment(id); exists {
-		return commitment
+	chainCommitment, created := m.getOrCreateCommitment(id)
+	if created {
+		m.Events.CommitmentMissing.Trigger(id)
 	}
 
-	m.Events.CommitmentMissing.Trigger(id)
-
-	return nil
+	return chainCommitment
 }
 
 func (m *Manager) Commitments(id iotago.CommitmentID, amount int) (commitments []*ChainCommitment, err error) {
@@ -326,9 +324,13 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 				return currentValue
 			}
 
-			currentValue.ForkLatestCommitment = forkedChainLatestCommitment
-
-			return currentValue
+			return &Fork{
+				Source:               currentValue.Source,
+				MainChain:            currentValue.MainChain,
+				ForkedChain:          currentValue.ForkedChain,
+				ForkingPoint:         currentValue.ForkingPoint,
+				ForkLatestCommitment: forkedChainLatestCommitment,
+			}
 		}
 
 		return &Fork{

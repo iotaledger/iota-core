@@ -1,13 +1,13 @@
 package poa
 
 import (
-	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -30,8 +30,8 @@ type SeatManager struct {
 	onlineCommittee   *advancedset.AdvancedSet[account.SeatIndex]
 	inactivityManager *timed.TaskExecutor[account.SeatIndex]
 	lastActivities    *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
-	activityMutex     sync.RWMutex
-	committeeMutex    sync.RWMutex
+	activityMutex     syncutils.RWMutex
+	committeeMutex    syncutils.RWMutex
 
 	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID
@@ -58,7 +58,9 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				e.HookConstructed(func() {
 					s.clock = e.Clock
 
-					s.timeProviderFunc = e.LatestAPI().TimeProvider
+					s.timeProviderFunc = func() *iotago.TimeProvider {
+						return e.CurrentAPI().TimeProvider()
+					}
 					s.TriggerConstructed()
 
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to

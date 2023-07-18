@@ -2,13 +2,13 @@ package inmemoryblockdag
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -31,7 +31,7 @@ type BlockDAG struct {
 
 	blockCache *blocks.Blocks
 
-	solidifierMutex sync.RWMutex
+	solidifierMutex syncutils.RWMutex
 
 	workers    *workerpool.Group
 	workerPool *workerpool.WorkerPool

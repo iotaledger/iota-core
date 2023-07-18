@@ -1,12 +1,11 @@
 package performance
 
 import (
-	"sync"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -23,8 +22,8 @@ type Tracker struct {
 
 	apiProvider api.Provider
 
-	performanceFactorsMutex sync.RWMutex
-	mutex                   sync.RWMutex
+	performanceFactorsMutex syncutils.RWMutex
+	mutex                   syncutils.RWMutex
 }
 
 func NewTracker(

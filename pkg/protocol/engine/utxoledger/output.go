@@ -30,10 +30,10 @@ func (l LexicalOrderedOutputs) Swap(i, j int) {
 type Output struct {
 	apiProvider api.Provider
 
-	outputID        iotago.OutputID
-	blockID         iotago.BlockID
-	slotIndexBooked iotago.SlotIndex
-	slotCreated     iotago.SlotIndex
+	outputID    iotago.OutputID
+	blockID     iotago.BlockID
+	slotBooked  iotago.SlotIndex
+	slotCreated iotago.SlotIndex
 
 	encodedOutput []byte
 	outputOnce    sync.Once
@@ -56,8 +56,8 @@ func (o *Output) BlockID() iotago.BlockID {
 	return o.blockID
 }
 
-func (o *Output) SlotIndexBooked() iotago.SlotIndex {
-	return o.slotIndexBooked
+func (o *Output) SlotBooked() iotago.SlotIndex {
+	return o.slotBooked
 }
 
 func (o *Output) SlotCreated() iotago.SlotIndex {
@@ -118,12 +118,12 @@ func CreateOutput(apiProvider api.Provider, outputID iotago.OutputID, blockID io
 	}
 
 	o := &Output{
-		apiProvider:     apiProvider,
-		outputID:        outputID,
-		blockID:         blockID,
-		slotIndexBooked: slotIndexBooked,
-		slotCreated:     slotCreated,
-		encodedOutput:   encodedOutput,
+		apiProvider:   apiProvider,
+		outputID:      outputID,
+		blockID:       blockID,
+		slotBooked:    slotIndexBooked,
+		slotCreated:   slotCreated,
+		encodedOutput: encodedOutput,
 	}
 
 	o.outputOnce.Do(func() {
@@ -165,9 +165,9 @@ func (o *Output) KVStorableKey() (key []byte) {
 
 func (o *Output) KVStorableValue() (value []byte) {
 	ms := marshalutil.New(48)
-	ms.WriteBytes(o.blockID[:])                  // 32 bytes
-	ms.WriteBytes(o.slotIndexBooked.MustBytes()) // 8 bytes
-	ms.WriteBytes(o.slotCreated.MustBytes())     // 8 bytes
+	ms.WriteBytes(o.blockID[:])              // 32 bytes
+	ms.WriteBytes(o.slotBooked.MustBytes())  // 8 bytes
+	ms.WriteBytes(o.slotCreated.MustBytes()) // 8 bytes
 	ms.WriteBytes(o.encodedOutput)
 
 	return ms.Bytes()
@@ -197,7 +197,7 @@ func (o *Output) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
 	}
 
 	// Read SlotIndex
-	o.slotIndexBooked, err = parseSlotIndex(valueUtil)
+	o.slotBooked, err = parseSlotIndex(valueUtil)
 	if err != nil {
 		return err
 	}

@@ -1,10 +1,9 @@
 package weight
 
 import (
-	"sync"
-
 	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -22,7 +21,7 @@ type Weight struct {
 	value Value
 
 	// mutex is used to synchronize access to the weight value.
-	mutex sync.RWMutex
+	mutex syncutils.RWMutex
 }
 
 // New creates a new Weight instance.

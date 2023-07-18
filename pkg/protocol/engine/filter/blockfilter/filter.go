@@ -20,7 +20,6 @@ var (
 	ErrCommitmentInputTooOld        = ierrors.New("a block cannot contain a commitment input with index older than the block's slot minus maxCommittableAge")
 	ErrCommitmentInputTooRecent     = ierrors.New("a block cannot contain a commitment input with index more recent than the block's slot minus minCommittableAge")
 	ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
-	ErrInvalidProofOfWork           = ierrors.New("error validating PoW")
 )
 
 // Filter filters blocks.

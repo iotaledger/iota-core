@@ -73,7 +73,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 						// committee if we have one.
 
 						// TODO: how do we handle changing API here?
-						currentEpoch := e.LatestAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
+						currentEpoch := e.CurrentAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
 
 						committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 						if !exists {
