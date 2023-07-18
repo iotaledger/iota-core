@@ -77,7 +77,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			// TODO: how do we want to handle changing API here?
 			api := l.apiProvider.LatestAPI()
 			l.manaManager = mana.NewManager(api.ManaDecayProvider(), l.resolveAccountOutput)
-			l.accountsLedger.SetCommitmentEvictionAge(api.ProtocolParameters().EvictionAge())
+			l.accountsLedger.SetCommitmentEvictionAge(api.ProtocolParameters().MaxCommittableAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)

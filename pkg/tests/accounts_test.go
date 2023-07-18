@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"math"
 	"testing"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
@@ -19,6 +20,7 @@ import (
 
 // TODO: implement tests for staking and delegation transitions
 func Test_TransitionAccount(t *testing.T) {
+
 	oldGenesisOutputKey := utils.RandPubKey().ToEd25519()
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
 		// Nil address will be replaced with the address generated from genesis seed.
@@ -33,7 +35,7 @@ func Test_TransitionAccount(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
-	minSlotCommittableAge := ts.API.ProtocolParameters().EvictionAge()
+	minSlotCommittableAge := ts.API.ProtocolParameters().MinCommittableAge()
 
 	node1 := ts.AddValidatorNode("node1")
 
@@ -46,9 +48,10 @@ func Test_TransitionAccount(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID: genesisAccountOutput.AccountID,
 		// TODO: why do we use the deposit here as credits?
-		Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit), 0),
-		OutputID: genesisAccount.OutputID(),
-		PubKeys:  advancedset.New(ed25519.PublicKey(oldGenesisOutputKey)),
+		Credits:    accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit), 0),
+		OutputID:   genesisAccount.OutputID(),
+		ExpirySlot: math.MaxUint64,
+		PubKeys:    advancedset.New(ed25519.PublicKey(oldGenesisOutputKey)),
 	}, node1)
 
 	// MODIFY EXISTING GENESIS ACCOUNT AND PREPARE SOME BASIC OUTPUTS

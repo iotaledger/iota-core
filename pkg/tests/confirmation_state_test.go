@@ -16,8 +16,9 @@ import (
 
 func TestConfirmationFlags(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThreshold(1), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
-		testsuite.WithEvictionAge(1),       // TODO: remove this opt and use a proper value when refactoring the test with scheduler
+		testsuite.WithLivenessThreshold(1),  // TODO: remove this opt and use a proper value when refactoring the test with scheduler
+		testsuite.WithMinCommittableAge(10), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
+		testsuite.WithMaxCommittableAge(20), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
 		testsuite.WithGenesisTimestampOffset(100*10),
 	)
 	defer ts.Shutdown()

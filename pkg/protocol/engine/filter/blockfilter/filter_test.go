@@ -187,7 +187,7 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 	api := iotago.V3API(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithTimeProviderOptions(time.Now().Add(-20*time.Minute).Unix(), 10, 13),
-			iotago.WithLivenessOptions(10, 3, 4),
+			iotago.WithLivenessOptions(10, 20, 3, 4),
 		),
 	)
 

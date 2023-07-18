@@ -94,7 +94,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 		return
 	}
-	if block.ID().Index()-block.ProtocolBlock().SlotCommitmentID.Index() > f.optsMaxCommittableAge {
+	if block.ID().Index() >= block.ProtocolBlock().SlotCommitmentID.Index() && block.ID().Index()-block.ProtocolBlock().SlotCommitmentID.Index() > f.optsMaxCommittableAge {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
 			Reason: ierrors.Wrapf(ErrCommitmentTooOld, "block at slot %d committing to slot %d", block.ID().Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
@@ -120,7 +120,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 					return
 				}
-				if block.ID().Index()-cInput.CommitmentID.Index() > f.optsMaxCommittableAge {
+				if block.ID().Index() >= cInput.CommitmentID.Index() && block.ID().Index()-cInput.CommitmentID.Index() > f.optsMaxCommittableAge {
 					f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 						Block:  block,
 						Reason: ierrors.Wrapf(ErrCommitmentTooOld, "block at slot %d committing to slot %d", block.ID().Index(), cInput.CommitmentID.Index()),

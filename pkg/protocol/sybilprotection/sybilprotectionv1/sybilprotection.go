@@ -115,7 +115,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 
 	// TODO: check if the following value is correctly set to twice eviction age
 	// maxCommittableSlot = 2 * evictionAge
-	maxCommittableSlot := apiForSlot.ProtocolParameters().EvictionAge() << 1
+	maxCommittableSlot := apiForSlot.ProtocolParameters().MaxCommittableAge()
 
 	// If the committed slot is `maxCommittableSlot`
 	// away from the end of the epoch, then register a committee for the next epoch.
@@ -151,7 +151,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 
 	var targetCommitteeEpoch iotago.EpochIndex
 	// TODO: check if it is correct to check against EvictionAge here
-	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) > slot+apiForSlot.ProtocolParameters().EvictionAge() {
+	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) > slot+apiForSlot.ProtocolParameters().MaxCommittableAge() {
 		targetCommitteeEpoch = currentEpoch
 	} else {
 		targetCommitteeEpoch = nextEpoch
@@ -223,7 +223,7 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 
 	// TODO: check if the following value is correctly set to twice eviction age
 	// maxCommittableSlot = 2 * evictionAge
-	maxCommittableSlot := apiForSlot.ProtocolParameters().EvictionAge() << 1
+	maxCommittableSlot := apiForSlot.ProtocolParameters().MaxCommittableAge()
 
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
 	// committed slot is earlier than (the last slot of the epoch - maxCommittableAge).

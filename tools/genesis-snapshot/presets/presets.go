@@ -23,7 +23,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 			iotago.WithNetworkOptions("default", "rms"),
 			iotago.WithSupplyOptions(1_000_0000, 100, 1, 10),
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
-			iotago.WithLivenessOptions(6, 5, 30),
+			iotago.WithLivenessOptions(10, 20, 5, 30),
 		),
 	),
 	snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
@@ -67,7 +67,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			iotago.WithNetworkOptions("docker", "rms"),
 			iotago.WithSupplyOptions(1_000_0000, 100, 1, 10),
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
-			iotago.WithLivenessOptions(6, 5, 30),
+			iotago.WithLivenessOptions(10, 20, 5, 30),
 		),
 	),
 }
@@ -79,7 +79,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			iotago.WithNetworkOptions("feature", "rms"),
 			iotago.WithSupplyOptions(1_000_0000, 100, 1, 10),
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
-			iotago.WithLivenessOptions(6, 5, 30),
+			iotago.WithLivenessOptions(10, 20, 5, 30),
 		),
 	),
 }

@@ -52,7 +52,8 @@ type TestSuite struct {
 
 	optsGenesisTimestampOffset int64
 	optsLivenessThreshold      iotago.SlotIndex
-	optsEvictionAge            iotago.SlotIndex
+	optsMinCommittableAge      iotago.SlotIndex
+	optsMaxCommittableAge      iotago.SlotIndex
 	optsSlotsPerEpochExponent  uint8
 	optsEpochNearingThreshold  iotago.SlotIndex
 	optsAccounts               []snapshotcreator.AccountDetails
@@ -80,7 +81,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsTick:                   DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 		optsGenesisTimestampOffset: 0,
 		optsLivenessThreshold:      3,
-		optsEvictionAge:            6,
+		optsMinCommittableAge:      10,
+		optsMaxCommittableAge:      20,
 		optsSlotsPerEpochExponent:  5,
 		optsEpochNearingThreshold:  16,
 	}, opts, func(t *TestSuite) {
@@ -103,7 +105,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsSlotsPerEpochExponent,
 				),
 				iotago.WithLivenessOptions(
-					t.optsEvictionAge,
+					t.optsMinCommittableAge,
+					t.optsMaxCommittableAge,
 					t.optsLivenessThreshold,
 					t.optsEpochNearingThreshold,
 				),
@@ -533,11 +536,17 @@ func WithLivenessThreshold(livenessThreshold iotago.SlotIndex) options.Option[Te
 	}
 }
 
-func WithEvictionAge(evictionAge iotago.SlotIndex) options.Option[TestSuite] {
+func WithMinCommittableAge(minCommittableAge iotago.SlotIndex) options.Option[TestSuite] {
 	// TODO: eventually this should not be used and common parameters should be used
 
 	return func(opts *TestSuite) {
-		opts.optsEvictionAge = evictionAge
+		opts.optsMinCommittableAge = minCommittableAge
+	}
+}
+
+func WithMaxCommittableAge(maxCommittableAge iotago.SlotIndex) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsMaxCommittableAge = maxCommittableAge
 	}
 }
 
