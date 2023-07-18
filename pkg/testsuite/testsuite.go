@@ -42,10 +42,8 @@ type TestSuite struct {
 	nodes     *orderedmap.OrderedMap[string, *mock.Node]
 	running   bool
 
-	validators     []iotago.AccountID
-	validatorsOnce sync.Once
-	snapshotPath   string
-	blocks         *shrinkingmap.ShrinkingMap[string, *blocks.Block]
+	snapshotPath string
+	blocks       *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 
 	API iotago.API
 
@@ -189,7 +187,17 @@ func (t *TestSuite) BlocksWithPrefix(prefix string) []*blocks.Block {
 	return b
 }
 
+func (t *TestSuite) BlockIDsWithPrefix(prefix string) []iotago.BlockID {
+	blocksWithPrefix := t.BlocksWithPrefix(prefix)
+
+	return lo.Map(blocksWithPrefix, func(block *blocks.Block) iotago.BlockID {
+		return block.ID()
+	})
+}
+
 func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, node *mock.Node, parents ...iotago.BlockID) *blocks.Block {
+	t.AssertBlocksExist(t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...), true, node)
+
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -200,8 +208,25 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 
 	block := node.IssueBlock(context.Background(), alias, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...))
 
-	t.blocks.Set(alias, block)
-	block.ID().RegisterAlias(alias)
+	t.registerBlock(alias, block)
+
+	return block
+}
+
+func (t *TestSuite) IssueValidationBlockAtSlotWithinEpochWithOptions(alias string, epoch iotago.EpochIndex, slotWithinEpoch iotago.SlotIndex, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	timeProvider := t.API.TimeProvider()
+	actualSlot := timeProvider.EpochStart(epoch) + slotWithinEpoch
+
+	issuingTime := timeProvider.SlotStartTime(actualSlot).Add(time.Duration(t.uniqueCounter.Add(1)))
+
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, actualSlot, time.Now(), timeProvider.SlotFromTime(time.Now()))
+
+	block := node.IssueValidationBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime))...)
+
+	t.registerBlock(alias, block)
 
 	return block
 }

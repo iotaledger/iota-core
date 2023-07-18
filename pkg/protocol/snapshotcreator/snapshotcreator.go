@@ -2,7 +2,6 @@ package snapshotcreator
 
 import (
 	"crypto/ed25519"
-	"fmt"
 	"os"
 
 	"golang.org/x/crypto/blake2b"
@@ -30,7 +29,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
 // CreateSnapshot creates a new snapshot. Genesis is defined by genesisTokenAmount and seedBytes, it
@@ -69,7 +67,6 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 
 	accounts := account.NewAccounts()
 	for _, accountData := range opt.Accounts {
-		fmt.Println("account ID ", accountData.AccountID, hexutil.EncodeHex(accountData.IssuerKey))
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
 			accounts.Set(blake2b.Sum256(accountData.IssuerKey), &account.Pool{
