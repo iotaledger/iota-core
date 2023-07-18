@@ -221,6 +221,7 @@ func (t *TipMetadata) connectWeakParent(weakParent *TipMetadata) {
 	weakParent.evicted.OnUpdate(func(_, _ bool) { unsubscribe() })
 }
 
+// String returns a human-readable representation of the TipMetadata.
 func (t *TipMetadata) String() string {
 	return fmt.Sprintf(
 		"TipMetadata: [\n"+
