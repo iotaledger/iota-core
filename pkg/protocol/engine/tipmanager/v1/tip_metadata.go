@@ -1,6 +1,8 @@
 package tipmanagerv1
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
@@ -217,6 +219,55 @@ func (t *TipMetadata) connectWeakParent(weakParent *TipMetadata) {
 	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
 	unsubscribe := weakParent.connectedWeakChildren.Monitor(t.isConnectedToTips)
 	weakParent.evicted.OnUpdate(func(_, _ bool) { unsubscribe() })
+}
+
+func (t *TipMetadata) String() string {
+	return fmt.Sprintf(
+		"TipMetadata: [\n"+
+			"Block: %s\n"+
+			"TipPool: %s\n"+
+			"IsStrongTipPoolMember: %v\n"+
+			"IsWeakTipPoolMember: %v\n"+
+			"IsStronglyConnectedToTips: %v\n"+
+			"IsConnectedToTips: %v\n"+
+			"IsStronglyReferencedByTips: %v\n"+
+			"IsWeaklyReferencedByTips: %v\n"+
+			"IsReferencedByTips: %v\n"+
+			"IsStrongTip: %v\n"+
+			"IsWeakTip: %v\n"+
+			"IsMarkedOrphaned: %v\n"+
+			"IsOrphaned: %v\n"+
+			"AnyStrongParentStronglyOrphaned: %v\n"+
+			"AnyWeakParentWeaklyOrphaned: %v\n"+
+			"IsStronglyOrphaned: %v\n"+
+			"IsWeaklyOrphaned: %v\n"+
+			"StronglyConnectedStrongChildren: %d\n"+
+			"ConnectedWeakChildren: %d\n"+
+			"StronglyOrphanedStrongParents: %d\n"+
+			"WeaklyOrphanedWeakParents: %d\n"+
+			"]",
+		t.block,
+		t.tipPool.Get(),
+		t.isStrongTipPoolMember.Get(),
+		t.isWeakTipPoolMember.Get(),
+		t.isStronglyConnectedToTips.Get(),
+		t.isConnectedToTips.Get(),
+		t.isStronglyReferencedByTips.Get(),
+		t.isWeaklyReferencedByTips.Get(),
+		t.isReferencedByTips.Get(),
+		t.isStrongTip.Get(),
+		t.isWeakTip.Get(),
+		t.isMarkedOrphaned.Get(),
+		t.isOrphaned.Get(),
+		t.anyStrongParentStronglyOrphaned.Get(),
+		t.anyWeakParentWeaklyOrphaned.Get(),
+		t.isStronglyOrphaned.Get(),
+		t.isWeaklyOrphaned.Get(),
+		t.stronglyConnectedStrongChildren.Get(),
+		t.connectedWeakChildren.Get(),
+		t.stronglyOrphanedStrongParents.Get(),
+		t.weaklyOrphanedWeakParents.Get(),
+	)
 }
 
 // code contract (make sure the type implements all required methods).

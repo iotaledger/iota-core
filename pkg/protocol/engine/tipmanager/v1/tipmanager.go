@@ -55,7 +55,7 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
 func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
-	fmt.Println(">> arrived at tip manager", block.ID(), " parents ", block.Parents())
+	//fmt.Println(">> arrived at tip manager", block.ID(), " parents ", block.Parents())
 
 	tipMetadata := NewBlockMetadata(block)
 
@@ -64,6 +64,30 @@ func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
 	}
 
 	t.setupBlockMetadata(tipMetadata)
+
+	if tipMetadata.isStrongTip.Get() && func() bool {
+		var anyParentStillTip bool
+
+		for _, parentID := range tipMetadata.Block().Parents() {
+			storage := t.metadataStorage(parentID.Index())
+			if storage == nil {
+				continue
+			}
+
+			parentMetadata, exists := storage.Get(parentID)
+			if !exists {
+				continue
+			}
+			if parentMetadata.isStrongTip.Get() {
+				anyParentStillTip = true
+				fmt.Println("parent is still a tip", parentMetadata.String())
+			}
+		}
+
+		return anyParentStillTip
+	}() {
+		panic(fmt.Sprintf("block is a tip and its parent is as well: %s", tipMetadata.String()))
+	}
 
 	return tipMetadata
 }
@@ -111,6 +135,8 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 		}
 	})
 
+	t.blockAdded.Trigger(tipMetadata)
+
 	tipMetadata.isWeakTip.OnUpdate(func(_, isWeakTip bool) {
 		if isWeakTip {
 			t.weakTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
@@ -127,7 +153,6 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 		}
 	})
 
-	t.blockAdded.Trigger(tipMetadata)
 }
 
 // forEachParentByType iterates through the parents of the given block and calls the consumer for each parent.
@@ -139,11 +164,11 @@ func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(pare
 	for _, parent := range block.ParentsWithType() {
 		if metadataStorage := t.metadataStorage(parent.ID.Index()); metadataStorage != nil {
 			if parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) }); parentMetadata.Block() != nil {
-				consumer(parent.Type, parentMetadata)
-
 				if created {
 					t.setupBlockMetadata(parentMetadata)
 				}
+
+				consumer(parent.Type, parentMetadata)
 			}
 		}
 	}
