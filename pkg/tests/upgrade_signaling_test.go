@@ -19,7 +19,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func TestProtocol_Upgrade_Signaling(t *testing.T) {
+func Test_Upgrade_Signaling(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithLivenessThreshold(1),
 		testsuite.WithEvictionAge(1),

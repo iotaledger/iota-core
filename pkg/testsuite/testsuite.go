@@ -214,6 +214,8 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 }
 
 func (t *TestSuite) IssueValidationBlockAtSlotWithinEpochWithOptions(alias string, epoch iotago.EpochIndex, slotWithinEpoch iotago.SlotIndex, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockOpts, node)
+
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -232,6 +234,8 @@ func (t *TestSuite) IssueValidationBlockAtSlotWithinEpochWithOptions(alias strin
 }
 
 func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockOpts, node)
+
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -248,6 +252,8 @@ func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIn
 }
 
 func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockOpts, node)
+
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -256,6 +262,15 @@ func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...optio
 	t.registerBlock(alias, block)
 
 	return block
+}
+
+func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Option[blockfactory.BlockParams], node *mock.Node) {
+	params := options.Apply(&blockfactory.BlockParams{}, blockOpts)
+	parents := params.References[iotago.StrongParentType]
+	parents = append(parents, params.References[iotago.WeakParentType]...)
+	parents = append(parents, params.References[iotago.ShallowLikeParentType]...)
+
+	t.AssertBlocksExist(t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...), true, node)
 }
 
 func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {

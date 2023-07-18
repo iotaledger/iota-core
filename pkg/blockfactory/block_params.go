@@ -8,96 +8,96 @@ import (
 )
 
 type BlockParams struct {
-	parentsCount            int
-	references              model.ParentReferences
-	slotCommitment          *iotago.Commitment
-	payload                 iotago.Payload
-	latestFinalizedSlot     *iotago.SlotIndex
-	issuingTime             *time.Time
-	protocolVersion         *iotago.Version
-	issuer                  Account
-	highestSupportedVersion *iotago.Version
-	protocolParametersHash  *iotago.Identifier
+	ParentsCount            int
+	References              model.ParentReferences
+	SlotCommitment          *iotago.Commitment
+	Payload                 iotago.Payload
+	LatestFinalizedSlot     *iotago.SlotIndex
+	IssuingTime             *time.Time
+	ProtocolVersion         *iotago.Version
+	Issuer                  Account
+	HighestSupportedVersion *iotago.Version
+	ProtocolParametersHash  *iotago.Identifier
 }
 
 func WithParentsCount(parentsCount int) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.parentsCount = parentsCount
+		builder.ParentsCount = parentsCount
 	}
 }
 
 func WithStrongParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		if builder.references == nil {
-			builder.references = make(model.ParentReferences)
+		if builder.References == nil {
+			builder.References = make(model.ParentReferences)
 		}
 
-		builder.references[iotago.StrongParentType] = blockIDs
+		builder.References[iotago.StrongParentType] = blockIDs
 	}
 }
 func WithWeakParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		if builder.references == nil {
-			builder.references = make(model.ParentReferences)
+		if builder.References == nil {
+			builder.References = make(model.ParentReferences)
 		}
 
-		builder.references[iotago.WeakParentType] = blockIDs
+		builder.References[iotago.WeakParentType] = blockIDs
 	}
 }
 
 func WithShallowLikeParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		if builder.references == nil {
-			builder.references = make(model.ParentReferences)
+		if builder.References == nil {
+			builder.References = make(model.ParentReferences)
 		}
 
-		builder.references[iotago.ShallowLikeParentType] = blockIDs
+		builder.References[iotago.ShallowLikeParentType] = blockIDs
 	}
 }
 
 func WithSlotCommitment(commitment *iotago.Commitment) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.slotCommitment = commitment
+		builder.SlotCommitment = commitment
 	}
 }
 
 func WithLatestFinalizedSlot(commitmentIndex iotago.SlotIndex) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.latestFinalizedSlot = &commitmentIndex
+		builder.LatestFinalizedSlot = &commitmentIndex
 	}
 }
 
 func WithPayload(payload iotago.Payload) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.payload = payload
+		builder.Payload = payload
 	}
 }
 
 func WithIssuingTime(issuingTime time.Time) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.issuingTime = &issuingTime
+		builder.IssuingTime = &issuingTime
 	}
 }
 
 func WithProtocolVersion(version iotago.Version) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.protocolVersion = &version
+		builder.ProtocolVersion = &version
 	}
 }
 func WithIssuer(issuer Account) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.issuer = issuer
+		builder.Issuer = issuer
 	}
 }
 
 func WithHighestSupportedVersion(highestSupportedVersion iotago.Version) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.highestSupportedVersion = &highestSupportedVersion
+		builder.HighestSupportedVersion = &highestSupportedVersion
 	}
 }
 
 func WithProtocolParametersHash(protocolParametersHash iotago.Identifier) func(builder *BlockParams) {
 	return func(builder *BlockParams) {
-		builder.protocolParametersHash = &protocolParametersHash
+		builder.ProtocolParametersHash = &protocolParametersHash
 	}
 }
