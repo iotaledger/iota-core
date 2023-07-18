@@ -130,12 +130,17 @@ func (r *Retainer) Block(blockID iotago.BlockID) (*model.Block, error) {
 }
 
 func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
-	blockStatus, err := r.blockStatus(blockID)
+	block, blockStorageErr := r.blockDiskFunc(blockID.Index()).Load(blockID)
+	if blockStorageErr != nil {
+		return nil, ierrors.Wrap(blockStorageErr, "failed to get block from storage in retainer.")
+	}
+
+	blockStatus, err := r.blockStatus(blockID, block)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get block status for %s", blockID.ToHex())
 	}
 
-	hasTx, txStatus, err := r.transactionStatus(blockID)
+	hasTx, txStatus, err := r.transactionStatus(blockID, block)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get transaction status for %s", blockID.ToHex())
 	}
@@ -149,14 +154,9 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 	}, nil
 }
 
-func (r *Retainer) blockStatus(blockID iotago.BlockID) (models.BlockState, error) {
-	b, blockStorageErr := r.blockDiskFunc(blockID.Index()).Load(blockID)
-	if blockStorageErr != nil {
-		return models.BlockStateUnknown, ierrors.Wrap(blockStorageErr, "failed to get block state in retainer.")
-	}
-
+func (r *Retainer) blockStatus(blockID iotago.BlockID, block *model.Block) (models.BlockState, error) {
 	// block was for sure accepted
-	if b != nil {
+	if block != nil {
 		// check if finalized
 		if blockID.Index() <= r.finalizedSlotFunc() {
 			return models.BlockStateFinalized, nil
@@ -179,16 +179,11 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (models.BlockState, error
 	return models.BlockStateUnknown, ierrors.Errorf("failed to get block state in retainer.")
 }
 
-func (r *Retainer) transactionStatus(blockID iotago.BlockID) (bool, models.TransactionState, error) {
-	b, blockStorageErr := r.blockDiskFunc(blockID.Index()).Load(blockID)
-	if blockStorageErr != nil {
-		return false, models.TransactionStateFailed, ierrors.Wrap(blockStorageErr, "failed to get transaction state in retainer.")
-	}
-
+func (r *Retainer) transactionStatus(blockID iotago.BlockID, block *model.Block) (bool, models.TransactionState, error) {
 	// block was for sure accepted
-	if b != nil {
+	if block != nil {
 		// return if block does not have a transaction
-		if _, hasTx := b.Transaction(); !hasTx {
+		if _, hasTx := block.Transaction(); !hasTx {
 			return false, models.TransactionStatePending, nil
 		}
 
@@ -204,7 +199,7 @@ func (r *Retainer) transactionStatus(blockID iotago.BlockID) (bool, models.Trans
 	}
 
 	if pending, err := r.retainerFunc(blockID.Index()).WasTransactionPending(blockID); err != nil {
-		return true, models.TransactionStateFailed, ierrors.Wrap(err, "failed to get transaction state in retainer.")
+		return true, models.TransactionStateFailed, ierrors.Wrap(err, "failed to get transaction pending state in retainer.")
 	} else if pending {
 		return true, models.TransactionStatePending, nil
 	}
