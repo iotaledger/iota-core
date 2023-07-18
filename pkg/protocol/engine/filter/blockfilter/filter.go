@@ -20,6 +20,7 @@ var (
 	ErrInvalidSignature                          = ierrors.New("block has invalid signature")
 	ErrTransactionCommitmentInputTooFarInThePast = ierrors.New("transaction in a block references too old CommitmentInput")
 	ErrTransactionCommitmentInputInTheFuture     = ierrors.New("transaction in a block references a CommitmentInput in the future")
+	ErrInvalidBlockVersion                       = ierrors.New("block has invalid protocol version")
 )
 
 // Filter filters blocks.
@@ -66,8 +67,18 @@ func New(apiProvider api.Provider, opts ...options.Option[Filter]) *Filter {
 
 // ProcessReceivedBlock processes block from the given source.
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID) {
-	api := f.apiProvider.APIForSlot(block.ID().Index())
-	protocolParams := api.ProtocolParameters()
+	blockSlotAPI := f.apiProvider.APIForSlot(block.ID().Index())
+	protocolParams := blockSlotAPI.ProtocolParameters()
+
+	if blockSlotAPI.Version() != block.ProtocolBlock().ProtocolVersion {
+		f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().ProtocolVersion, blockSlotAPI.Version(), blockSlotAPI.TimeProvider().EpochFromSlot(block.ID().Index())),
+			Source: source,
+		})
+
+		return
+	}
 
 	// Check if the block is trying to commit to a slot that is not yet committable.
 	// This check, together with the optsMaxAllowedWallClockDrift makes sure that no one can issue blocks with commitments in the future.
@@ -131,7 +142,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 	if f.optsSignatureValidation {
 		// Verify the block signature.
-		if valid, err := block.ProtocolBlock().VerifySignature(api); !valid {
+		if valid, err := block.ProtocolBlock().VerifySignature(blockSlotAPI); !valid {
 			if err != nil {
 				f.events.BlockFiltered.Trigger(&filter.BlockFilteredEvent{
 					Block:  block,

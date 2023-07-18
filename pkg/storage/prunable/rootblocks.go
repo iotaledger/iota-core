@@ -54,7 +54,7 @@ func (r *RootBlocks) Stream(consumer func(id iotago.BlockID, commitmentID iotago
 	var innerErr error
 	if storageErr := r.store.Iterate(kvstore.EmptyPrefix, func(blockID iotago.BlockID, commitmentID iotago.CommitmentID) (advance bool) {
 		innerErr = consumer(blockID, commitmentID)
-		return innerErr != nil
+		return innerErr == nil
 	}); storageErr != nil {
 		return ierrors.Wrapf(storageErr, "failed to iterate over rootblocks for slot %s", r.slot)
 	}

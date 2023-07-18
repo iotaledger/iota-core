@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func (t *TestSuite) AssertBlock(block *blocks.Block, node *mock.Node) *model.Block {
@@ -38,6 +39,10 @@ func (t *TestSuite) AssertBlocksExist(blocks []*blocks.Block, expectedExist bool
 
 	for _, node := range nodes {
 		for _, block := range blocks {
+			if block.ID() == iotago.EmptyBlockID() {
+				continue
+			}
+
 			if expectedExist {
 				t.AssertBlock(block, node)
 			} else {

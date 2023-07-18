@@ -55,7 +55,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		resolvedInputs.CommitmentInput = loadedCommitment
 	}
 
-	bicInputSet := make(iotagovm.BICInputSet)
+	bicInputSet := make(iotagovm.BlockIssuanceCreditInputSet)
 	for _, inp := range bicInputs {
 		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, loadedCommitment.Index)
 		if accountErr != nil {
@@ -67,7 +67,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 		bicInputSet[inp.AccountID] = accountData.Credits.Value
 	}
-	resolvedInputs.BICInputSet = bicInputSet
+	resolvedInputs.BlockIssuanceCreditInputSet = bicInputSet
 
 	rewardInputSet := make(iotagovm.RewardsInputSet)
 	// TODO: when refactoring this to be resolved by the mempool, the function that resolves ContextInputs should

@@ -25,6 +25,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
@@ -46,19 +47,20 @@ type EngineManager struct {
 	workers        *workerpool.Group
 	errorHandler   func(error)
 
-	engineOptions           []options.Option[engine.Engine]
-	filterProvider          module.Provider[*engine.Engine, filter.Filter]
-	blockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
-	bookerProvider          module.Provider[*engine.Engine, booker.Booker]
-	clockProvider           module.Provider[*engine.Engine, clock.Clock]
-	blockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
-	slotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
-	sybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
-	notarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
-	attestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
-	ledgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
-	tipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
-	tipSelectionProvider    module.Provider[*engine.Engine, tipselection.TipSelection]
+	engineOptions               []options.Option[engine.Engine]
+	filterProvider              module.Provider[*engine.Engine, filter.Filter]
+	blockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
+	bookerProvider              module.Provider[*engine.Engine, booker.Booker]
+	clockProvider               module.Provider[*engine.Engine, clock.Clock]
+	blockGadgetProvider         module.Provider[*engine.Engine, blockgadget.Gadget]
+	slotGadgetProvider          module.Provider[*engine.Engine, slotgadget.Gadget]
+	sybilProtectionProvider     module.Provider[*engine.Engine, sybilprotection.SybilProtection]
+	notarizationProvider        module.Provider[*engine.Engine, notarization.Notarization]
+	attestationProvider         module.Provider[*engine.Engine, attestation.Attestations]
+	ledgerProvider              module.Provider[*engine.Engine, ledger.Ledger]
+	tipManagerProvider          module.Provider[*engine.Engine, tipmanager.TipManager]
+	tipSelectionProvider        module.Provider[*engine.Engine, tipselection.TipSelection]
+	upgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
 
 	activeInstance *engine.Engine
 }
@@ -82,26 +84,28 @@ func New(
 	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
 	tipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager],
 	tipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection],
+	upgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator],
 ) *EngineManager {
 	return &EngineManager{
-		workers:                 workers,
-		errorHandler:            errorHandler,
-		directory:               utils.NewDirectory(dir),
-		dbVersion:               dbVersion,
-		storageOptions:          storageOptions,
-		engineOptions:           engineOptions,
-		filterProvider:          filterProvider,
-		blockDAGProvider:        blockDAGProvider,
-		bookerProvider:          bookerProvider,
-		clockProvider:           clockProvider,
-		blockGadgetProvider:     blockGadgetProvider,
-		slotGadgetProvider:      slotGadgetProvider,
-		sybilProtectionProvider: sybilProtectionProvider,
-		notarizationProvider:    notarizationProvider,
-		attestationProvider:     attestationProvider,
-		ledgerProvider:          ledgerProvider,
-		tipManagerProvider:      tipManagerProvider,
-		tipSelectionProvider:    tipSelectionProvider,
+		workers:                     workers,
+		errorHandler:                errorHandler,
+		directory:                   utils.NewDirectory(dir),
+		dbVersion:                   dbVersion,
+		storageOptions:              storageOptions,
+		engineOptions:               engineOptions,
+		filterProvider:              filterProvider,
+		blockDAGProvider:            blockDAGProvider,
+		bookerProvider:              bookerProvider,
+		clockProvider:               clockProvider,
+		blockGadgetProvider:         blockGadgetProvider,
+		slotGadgetProvider:          slotGadgetProvider,
+		sybilProtectionProvider:     sybilProtectionProvider,
+		notarizationProvider:        notarizationProvider,
+		attestationProvider:         attestationProvider,
+		ledgerProvider:              ledgerProvider,
+		tipManagerProvider:          tipManagerProvider,
+		tipSelectionProvider:        tipSelectionProvider,
+		upgradeOrchestratorProvider: upgradeOrchestratorProvider,
 	}
 }
 
@@ -189,6 +193,7 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.ledgerProvider,
 		e.tipManagerProvider,
 		e.tipSelectionProvider,
+		e.upgradeOrchestratorProvider,
 		append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))...,
 	)
 }
