@@ -84,7 +84,18 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 
 func (s *Server) ReadNodeConfiguration(context.Context, *inx.NoParams) (*inx.NodeConfiguration, error) {
 	var protoParams []*inx.RawProtocolParameters
-	//TODO: add protocol parameters after the other PR is merged
+	for _, version := range deps.Protocol.MainEngineInstance().Storage.Settings().ProtocolVersions() {
+		apiForVersion, err := deps.Protocol.APIForVersion(version.Version)
+		if err != nil {
+			return nil, err
+		}
+
+		rawParams, err := inx.WrapProtocolParameters(version.StartEpoch, apiForVersion.ProtocolParameters())
+		if err != nil {
+			return nil, err
+		}
+		protoParams = append(protoParams, rawParams)
+	}
 
 	return &inx.NodeConfiguration{
 		BaseToken: &inx.BaseToken{

@@ -125,6 +125,10 @@ func (s *Settings) APIForVersion(version iotago.Version) (iotago.API, error) {
 	return apiForVersion, nil
 }
 
+func (s *Settings) ProtocolVersions() []api.ProtocolEpochVersion {
+	return s.protocolVersions.Slice()
+}
+
 func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
