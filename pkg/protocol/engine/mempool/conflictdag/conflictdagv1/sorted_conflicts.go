@@ -222,11 +222,10 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingWeightU
 	s.pendingWeightUpdatesMutex.Lock()
 	defer s.pendingWeightUpdatesMutex.Unlock()
 
-	if _, exists := s.pendingWeightUpdates.Get(member.ID); !exists {
-		if s.pendingWeightUpdates.Set(member.ID, member) {
-			s.pendingUpdatesCounter.Increase()
-			s.pendingWeightUpdatesSignal.Signal()
-		}
+	if _, exists := s.pendingWeightUpdates.Get(member.ID); !exists && !s.isShutdown.Load() {
+		s.pendingUpdatesCounter.Increase()
+		s.pendingWeightUpdates.Set(member.ID, member)
+		s.pendingWeightUpdatesSignal.Signal()
 	}
 }
 
@@ -234,6 +233,8 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingWeightU
 func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) fixMemberPositionWorker() {
 	for member := s.nextPendingWeightUpdate(); member != nil; member = s.nextPendingWeightUpdate() {
 		s.applyWeightUpdate(member)
+
+		s.pendingUpdatesCounter.Decrease()
 	}
 }
 
@@ -248,8 +249,6 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) nextPendingWeightUpd
 
 	if !s.isShutdown.Load() {
 		if _, member, exists := s.pendingWeightUpdates.Pop(); exists {
-			s.pendingUpdatesCounter.Decrease()
-
 			return member
 		}
 	}
@@ -298,11 +297,10 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingPreferr
 	s.pendingPreferredInsteadMutex.Lock()
 	defer s.pendingPreferredInsteadMutex.Unlock()
 
-	if _, exists := s.pendingPreferredInsteadUpdates.Get(member.ID); !exists {
-		if s.pendingPreferredInsteadUpdates.Set(member.ID, member) {
-			s.pendingUpdatesCounter.Increase()
-			s.pendingPreferredInsteadSignal.Signal()
-		}
+	if _, exists := s.pendingPreferredInsteadUpdates.Get(member.ID); !exists && !s.isShutdown.Load() {
+		s.pendingUpdatesCounter.Increase()
+		s.pendingPreferredInsteadUpdates.Set(member.ID, member)
+		s.pendingPreferredInsteadSignal.Signal()
 	}
 }
 
@@ -310,6 +308,8 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingPreferr
 func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) fixHeaviestPreferredMemberWorker() {
 	for member := s.nextPendingPreferredMemberUpdate(); member != nil; member = s.nextPendingPreferredMemberUpdate() {
 		s.applyPreferredInsteadUpdate(member)
+
+		s.pendingUpdatesCounter.Decrease()
 	}
 }
 
@@ -324,8 +324,6 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) nextPendingPreferred
 
 	if !s.isShutdown.Load() {
 		if _, member, exists := s.pendingPreferredInsteadUpdates.Pop(); exists {
-			s.pendingUpdatesCounter.Decrease()
-
 			return member
 		}
 	}
