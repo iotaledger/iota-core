@@ -276,12 +276,12 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	// if anything changes, need to make a new signature
 	var resign bool
 
-	api := i.protocol.LatestAPI()
-	protoParams := api.ProtocolParameters()
-
-	if iotaBlock.ProtocolVersion != protoParams.Version() {
+	apiForVesion, err := i.protocol.APIForVersion(iotaBlock.ProtocolVersion)
+	if err != nil {
 		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
 	}
+
+	protoParams := apiForVesion.ProtocolParameters()
 
 	if iotaBlock.NetworkID == 0 {
 		iotaBlock.NetworkID = protoParams.NetworkID()
@@ -341,7 +341,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 			iotaBlock.IssuerID = i.Account.ID()
 
 			prvKey := i.Account.PrivateKey()
-			signature, err := iotaBlock.Sign(api, iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
+			signature, err := iotaBlock.Sign(apiForVesion, iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
 			if err != nil {
 				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", err)
 			}
@@ -357,7 +357,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		}
 	}
 
-	modelBlock, err := model.BlockFromBlock(iotaBlock, api)
+	modelBlock, err := model.BlockFromBlock(iotaBlock, apiForVesion)
 	if err != nil {
 		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error serializing block to model block")
 	}

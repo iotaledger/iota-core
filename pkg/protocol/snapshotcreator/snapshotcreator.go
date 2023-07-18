@@ -120,7 +120,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 		genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
 		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
 
-		if _, err = engineInstance.LatestAPI().ProtocolParameters().RentStructure().CoversStateRent(output, genesisTokenAmount); err != nil {
+		if _, err = engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversStateRent(output, genesisTokenAmount); err != nil {
 			return ierrors.Wrap(err, "min rent not covered by Genesis output with index 0")
 		}
 
@@ -139,7 +139,7 @@ func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Eng
 	for idx, account := range accounts {
 		output := createAccount(account.AccountID, account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
 
-		if _, err = engineInstance.LatestAPI().ProtocolParameters().RentStructure().CoversStateRent(output, account.Amount); err != nil {
+		if _, err = engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversStateRent(output, account.Amount); err != nil {
 			return ierrors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
 		}
 

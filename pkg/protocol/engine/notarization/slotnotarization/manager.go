@@ -48,7 +48,7 @@ type Manager struct {
 
 func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
-		m := NewManager(e.LatestAPI().ProtocolParameters().EvictionAge(), e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
+		m := NewManager(e.CurrentAPI().ProtocolParameters().EvictionAge(), e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
 
 		m.apiProvider = e
 

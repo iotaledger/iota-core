@@ -58,26 +58,26 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 }
 
 func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.Transaction) {
-	api := t.apiProvider.LatestAPI()
-	(lo.PanicOnErr(transaction.ID(api))).RegisterAlias(alias)
+	currentAPI := t.apiProvider.CurrentAPI()
+	(lo.PanicOnErr(transaction.ID(currentAPI))).RegisterAlias(alias)
 
 	t.transactions[alias] = transaction
 
-	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet(api)) {
+	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet(currentAPI)) {
 		clonedOutput := output.Clone()
-		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID(api)), outputID.Index())
+		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID(currentAPI)), outputID.Index())
 		if clonedOutput.Type() == iotago.OutputAccount {
 			if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID() {
 				accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
 			}
 		}
 
-		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID(), 0, api.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
+		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID(), 0, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
 	}
 }
 
 func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signingWallets []*mock.HDWallet, opts ...options.Option[builder.TransactionBuilder]) (*iotago.Transaction, error) {
-	api := t.apiProvider.LatestAPI()
+	currentAPI := t.apiProvider.CurrentAPI()
 
 	walletKeys := make([]iotago.AddressKeys, len(signingWallets))
 	for i, wallet := range signingWallets {
@@ -85,7 +85,7 @@ func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signin
 		walletKeys[i] = iotago.AddressKeys{Address: wallet.Address(), Keys: inputPrivateKey}
 	}
 
-	txBuilder := builder.NewTransactionBuilder(api)
+	txBuilder := builder.NewTransactionBuilder(currentAPI)
 
 	// Always add a random payload to randomize transaction ID.
 	randomPayload := tpkg.Rand12ByteArray()
@@ -300,8 +300,7 @@ func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
 }
 
 func (t *TransactionFramework) TransactionID(alias string) iotago.TransactionID {
-	api := t.apiProvider.LatestAPI()
-	return lo.PanicOnErr(t.Transaction(alias).ID(api))
+	return lo.PanicOnErr(t.Transaction(alias).ID(t.apiProvider.CurrentAPI()))
 }
 
 func (t *TransactionFramework) Transactions(aliases ...string) []*iotago.Transaction {

@@ -73,7 +73,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			// TODO: how do we want to handle changing API here?
-			iotagoAPI := l.apiProvider.LatestAPI()
+			iotagoAPI := l.apiProvider.CurrentAPI()
 			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), l.resolveAccountOutput)
 			l.accountsLedger.SetCommitmentEvictionAge(iotagoAPI.ProtocolParameters().EvictionAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())

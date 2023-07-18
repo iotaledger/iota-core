@@ -65,7 +65,8 @@ func (t *TestFramework) processBlockWithAPI(alias string, block *iotago.Protocol
 }
 
 func (t *TestFramework) IssueUnsignedBlockAtTime(alias string, issuingTime time.Time) {
-	block, err := builder.NewBasicBlockBuilder(t.apiProvider.LatestAPI()).
+	slot := t.apiProvider.CurrentAPI().TimeProvider().SlotFromTime(issuingTime)
+	block, err := builder.NewBasicBlockBuilder(t.apiProvider.APIForSlot(slot)).
 		StrongParents(iotago.BlockIDs{}).
 		IssuingTime(issuingTime).
 		Build()
@@ -79,8 +80,8 @@ func (t *TestFramework) IssueUnsignedBlockAtSlotWithPayload(alias string, slot i
 
 	block, err := builder.NewBasicBlockBuilder(apiForSlot).
 		StrongParents(iotago.BlockIDs{}).
-		IssuingTime(t.apiProvider.LatestAPI().TimeProvider().SlotStartTime(slot)).
-		SlotCommitmentID(iotago.NewCommitment(t.apiProvider.LatestAPI().Version(), committing, iotago.CommitmentID{}, iotago.Identifier{}, 0).MustID()).
+		IssuingTime(apiForSlot.TimeProvider().SlotStartTime(slot)).
+		SlotCommitmentID(iotago.NewCommitment(apiForSlot.Version(), committing, iotago.CommitmentID{}, iotago.Identifier{}, 0).MustID()).
 		Payload(payload).
 		Build()
 	require.NoError(t.Test, err)

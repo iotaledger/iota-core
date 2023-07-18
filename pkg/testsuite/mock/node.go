@@ -241,11 +241,11 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
+		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.CurrentAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
 	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
+		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.CurrentAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
