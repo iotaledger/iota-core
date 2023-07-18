@@ -76,18 +76,10 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			// TODO: how do we want to handle changing API here?
-			iotagoAPI := l.apiProvider.LatestAPI()
+			iotagoAPI := l.apiProvider.CurrentAPI()
 			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), l.resolveAccountOutput)
 			l.accountsLedger.SetCommitmentEvictionAge(iotagoAPI.ProtocolParameters().EvictionAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
-
-			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)
-			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-				l.accountsLedger.TrackBlock(block)
-				l.BlockAccepted(block)
-				l.sybilProtection.BlockAccepted(block)
-				l.events.BlockProcessed.Trigger(block)
-			}, event.WithWorkerPool(wp))
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
@@ -213,6 +205,8 @@ func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
+	l.accountsLedger.TrackBlock(block)
+
 	if _, hasTransaction := block.Transaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
 	}

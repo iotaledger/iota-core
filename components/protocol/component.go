@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -109,6 +110,8 @@ func provide(c *dig.Container) error {
 					blockfilter.WithSignatureValidation(true),
 				),
 			),
+			// TODO: here we should pass the protocol parameters from the config.
+			protocol.WithUpgradeOrchestratorProvider(signalingupgradeorchestrator.NewProvider()),
 		)
 	})
 }

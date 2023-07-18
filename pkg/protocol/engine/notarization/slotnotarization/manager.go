@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -31,9 +32,10 @@ type Manager struct {
 	workers      *workerpool.Group
 	errorHandler func(error)
 
-	attestation     attestation.Attestations
-	ledger          ledger.Ledger
-	sybilProtection sybilprotection.SybilProtection
+	attestation         attestation.Attestations
+	ledger              ledger.Ledger
+	sybilProtection     sybilprotection.SybilProtection
+	upgradeOrchestrator upgrade.Orchestrator
 
 	storage *storage.Storage
 
@@ -46,7 +48,7 @@ type Manager struct {
 
 func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
-		m := NewManager(e.LatestAPI().ProtocolParameters().EvictionAge(), e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
+		m := NewManager(e.CurrentAPI().ProtocolParameters().EvictionAge(), e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
 
 		m.apiProvider = e
 
@@ -57,10 +59,11 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 			m.ledger = e.Ledger
 			m.sybilProtection = e.SybilProtection
 			m.attestation = e.Attestations
+			m.upgradeOrchestrator = e.UpgradeOrchestrator
 
 			wpBlocks := m.workers.CreatePool("Blocks", 1) // Using just 1 worker to avoid contention
 
-			e.Events.Ledger.BlockProcessed.Hook(func(block *blocks.Block) {
+			e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
 				if err := m.notarizeAcceptedBlock(block); err != nil {
 					m.errorHandler(ierrors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 				}
@@ -166,11 +169,11 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	}
 
 	committeeRoot, rewardsRoot := m.sybilProtection.CommitSlot(index)
-	api := m.apiProvider.APIForSlot(index)
+	apiForSlot := m.apiProvider.APIForSlot(index)
 
-	protocolParamsBytes, err := api.Encode(api.ProtocolParameters())
+	protocolParametersAndVersionsHash, err := m.upgradeOrchestrator.Commit(index)
 	if err != nil {
-		m.errorHandler(ierrors.Wrap(err, "failed to encode protocol parameters"))
+		m.errorHandler(ierrors.Wrapf(err, "failed to commit protocol parameters and versions in upgrade orchestrator for slot %d", index))
 		return false
 	}
 
@@ -182,18 +185,18 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		accountRoot,
 		committeeRoot,
 		rewardsRoot,
-		iotago.IdentifierFromData(protocolParamsBytes),
+		protocolParametersAndVersionsHash,
 	)
 
 	newCommitment := iotago.NewCommitment(
-		api.ProtocolParameters().Version(),
+		apiForSlot.ProtocolParameters().Version(),
 		index,
 		latestCommitment.ID(),
 		roots.ID(),
 		cumulativeWeight,
 	)
 
-	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, api, serix.WithValidation())
+	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, apiForSlot, serix.WithValidation())
 	if err != nil {
 		return false
 	}
@@ -213,7 +216,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		m.errorHandler(ierrors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
 		return false
 	}
-	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(api.Encode(roots))); err != nil {
+	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(apiForSlot.Encode(roots))); err != nil {
 		m.errorHandler(ierrors.Wrapf(err, "failed to store latest roots for commitment %s", newModelCommitment.ID()))
 		return false
 	}
