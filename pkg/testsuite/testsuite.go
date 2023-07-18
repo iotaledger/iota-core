@@ -6,7 +6,6 @@ import (
 	"math"
 	"os"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,7 +19,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
-	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -338,14 +336,18 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 		deposit = optDeposit[0]
 	}
 	if deposit > 0 {
-		t.optsAccounts = append(t.optsAccounts, snapshotcreator.AccountDetails{
-			Address:         iotago.Ed25519AddressFromPubKey(node.PubKey),
-			Amount:          deposit,
-			IssuerKey:       node.PubKey,
-			StakingEpochEnd: math.MaxUint64,
-			FixedCost:       iotago.Mana(0),
-			StakedAmount:    deposit,
-		})
+		accountDetails := snapshotcreator.AccountDetails{
+			Address:   iotago.Ed25519AddressFromPubKey(node.PubKey),
+			Amount:    deposit,
+			IssuerKey: node.PubKey,
+		}
+		if validator {
+			accountDetails.StakedAmount = accountDetails.Amount
+			accountDetails.StakingEpochEnd = math.MaxUint64
+			accountDetails.FixedCost = iotago.Mana(0)
+		}
+
+		t.optsAccounts = append(t.optsAccounts, accountDetails)
 	}
 
 	return node
@@ -425,28 +427,17 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 	t.running = true
 }
 
-func (t *TestSuite) Validators() []iotago.AccountID {
-	t.validatorsOnce.Do(func() {
-		if t.running {
-			panic("cannot create validators from nodes: framework already running")
+func (t *TestSuite) Validators() []*mock.Node {
+	validators := make([]*mock.Node, 0)
+	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
+		if node.Validator {
+			validators = append(validators, node)
 		}
 
-		validators := []iotago.AccountID{}
-		var seat account.SeatIndex
-		t.nodes.ForEach(func(_ string, node *mock.Node) bool {
-			if node.Validator {
-				node.ValidatorSeat = seat
-				validators = append(validators, node.AccountID)
-				seat++
-			}
-
-			return true
-		})
-
-		t.validators = validators
+		return true
 	})
 
-	return t.validators
+	return validators
 }
 
 func (t *TestSuite) HookLogging() {
