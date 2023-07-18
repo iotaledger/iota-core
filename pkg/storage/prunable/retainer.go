@@ -2,6 +2,7 @@ package prunable
 
 import (
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -63,7 +64,10 @@ func (r *Retainer) Store(blockID iotago.BlockID, hasTx bool) error {
 	}
 
 	if hasTx {
-		r.transactionPendingStore.Set(blockID, types.Void)
+		err2 := r.transactionPendingStore.Set(blockID, types.Void)
+		if err2 != nil {
+			return ierrors.Errorf("failed to retain transaction in pending store: %w", err)
+		}
 	}
 
 	return nil
@@ -74,6 +78,7 @@ func (r *Retainer) WasBlockConfirmed(blockID iotago.BlockID) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	return exists, nil
 }
 
@@ -82,6 +87,7 @@ func (r *Retainer) WasBlockOrphaned(blockID iotago.BlockID) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	return exists, nil
 }
 
@@ -90,6 +96,7 @@ func (r *Retainer) StoreBlockAccepted(blockID iotago.BlockID) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -98,6 +105,7 @@ func (r *Retainer) StoreBlockConfirmed(blockID iotago.BlockID) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -106,6 +114,7 @@ func (r *Retainer) WasTransactionConfirmed(blockID iotago.BlockID) (bool, error)
 	if err != nil {
 		return false, err
 	}
+
 	return exists, nil
 }
 
@@ -114,6 +123,7 @@ func (r *Retainer) WasTransactionPending(blockID iotago.BlockID) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	return exists, nil
 }
 
@@ -122,6 +132,7 @@ func (r *Retainer) StoreTransactionPending(blockID iotago.BlockID) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -130,6 +141,7 @@ func (r *Retainer) StoreTransactionConfirmed(blockID iotago.BlockID) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
