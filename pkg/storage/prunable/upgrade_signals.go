@@ -120,7 +120,7 @@ func (u *UpgradeSignals) StreamBytes(consumer func([]byte, []byte) error) error 
 	var innerErr error
 	if storageErr := u.store.KVStore().Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) (advance bool) {
 		innerErr = consumer(key, value)
-		return innerErr != nil
+		return innerErr == nil
 	}); storageErr != nil {
 		return ierrors.Wrap(storageErr, "failed to iterate over upgrade signals")
 	}
