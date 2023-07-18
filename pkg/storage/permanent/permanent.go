@@ -19,6 +19,7 @@ const (
 	rewardsPrefix
 	poolStatsPrefix
 	committeePrefix
+	upgradeSignalsPrefix
 )
 
 type Permanent struct {
@@ -37,6 +38,7 @@ type Permanent struct {
 	rewards         kvstore.KVStore
 	poolStats       kvstore.KVStore
 	committee       kvstore.KVStore
+	upgradeSignals  kvstore.KVStore
 }
 
 // New returns a new permanent storage instance.
@@ -68,6 +70,7 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 		p.rewards = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{rewardsPrefix}))
 		p.poolStats = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{poolStatsPrefix}))
 		p.committee = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{committeePrefix}))
+		p.upgradeSignals = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{upgradeSignalsPrefix}))
 	})
 }
 
@@ -115,6 +118,16 @@ func (p *Permanent) PoolStats(optRealm ...byte) kvstore.KVStore {
 	}
 
 	return lo.PanicOnErr(p.poolStats.WithExtendedRealm(optRealm))
+}
+
+// UpgradeSignals returns the UpgradeSignals storage.
+// TODO: this can be pruned after 7 epochs, so it is not really permanent.
+func (p *Permanent) UpgradeSignals(optRealm ...byte) kvstore.KVStore {
+	if len(optRealm) == 0 {
+		return p.upgradeSignals
+	}
+
+	return lo.PanicOnErr(p.upgradeSignals.WithExtendedRealm(optRealm))
 }
 
 func (p *Permanent) Committee(optRealm ...byte) kvstore.KVStore {
