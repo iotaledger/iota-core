@@ -15,7 +15,7 @@ import (
 func EqualOutput(t *testing.T, expected *utxoledger.Output, actual *utxoledger.Output) {
 	require.Equal(t, expected.OutputID(), actual.OutputID())
 	require.Equal(t, expected.BlockID(), actual.BlockID())
-	require.Equal(t, expected.SlotIndexBooked(), actual.SlotIndexBooked())
+	require.Equal(t, expected.SlotBooked(), actual.SlotBooked())
 	require.Equal(t, expected.SlotCreated(), actual.SlotCreated())
 	require.Equal(t, expected.OutputType(), actual.OutputType())
 

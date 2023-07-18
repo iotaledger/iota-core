@@ -324,9 +324,13 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 				return currentValue
 			}
 
-			currentValue.ForkLatestCommitment = forkedChainLatestCommitment
-
-			return currentValue
+			return &Fork{
+				Source:               currentValue.Source,
+				MainChain:            currentValue.MainChain,
+				ForkedChain:          currentValue.ForkedChain,
+				ForkingPoint:         currentValue.ForkingPoint,
+				ForkLatestCommitment: forkedChainLatestCommitment,
+			}
 		}
 
 		return &Fork{
