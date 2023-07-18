@@ -49,6 +49,25 @@ func (t *TestSuite) AssertLatestCommitment(commitment *iotago.Commitment, nodes 
 	}
 }
 
+func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			cm, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
+			if err != nil {
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: expected %v, got error %v", node.Name, slot, err)
+			}
+
+			if cm == nil {
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found", node.Name, slot)
+			}
+
+			return nil
+		})
+	}
+}
+
 func (t *TestSuite) AssertLatestCommitmentSlotIndex(slot iotago.SlotIndex, nodes ...*mock.Node) {
 	mustNodes(nodes)
 

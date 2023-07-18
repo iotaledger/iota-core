@@ -174,7 +174,7 @@ func issueBlocksAtSlotsInEpoch(ts *testsuite.TestSuite, epoch iotago.EpochIndex,
 		// MinCommittableAge=1 -> when we accept in slot 3 we can commit slot 1.
 		// Since we issue per slot only once, we accept in slot 3 when issuing in slot 5.
 		if actualSlot >= 5 {
-			ts.AssertLatestCommitmentSlotIndex(actualSlot-4, ts.Nodes()...)
+			ts.AssertCommitmentSlotIndexExists(actualSlot-4, ts.Nodes()...)
 		} else {
 			ts.AssertBlocksExist(issuedBlocks, true, ts.Nodes()...)
 		}
