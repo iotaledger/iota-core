@@ -230,7 +230,14 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 		if !exists {
 			var output *utxoledger.Output
 			stateRequest := l.resolveState(outputID.UTXOInput())
-			stateRequest.OnSuccess(func(loadedState mempool.State) { output = loadedState.(*utxoledger.Output) })
+			stateRequest.OnSuccess(func(loadedState mempool.State) {
+				concreteOutput, ok := loadedState.(*utxoledger.Output)
+				if !ok {
+					err = ErrUnexpectedUnderlyingType
+					return
+				}
+				output = concreteOutput
+			})
 			stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
 			stateRequest.WaitComplete()
 
@@ -628,7 +635,6 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
 	output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(stateRef.Ref())
-
 	if err != nil {
 		return p.Reject(ierrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
