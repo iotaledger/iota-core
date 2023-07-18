@@ -229,6 +229,7 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 			if storage == nil {
 				continue
 			}
+			// TODO: here we should introduce a .StreamBytes() method to avoid deserialize and serialize again.
 			if err = storage.Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
 				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
 					return ierrors.Wrapf(err, "failed to write root block ID %s", rootBlockID)

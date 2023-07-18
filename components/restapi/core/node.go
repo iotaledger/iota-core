@@ -11,9 +11,9 @@ func info() (*models.InfoResponse, error) {
 	clSnapshot := deps.Protocol.MainEngineInstance().Clock.Snapshot()
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
-	protoParams := deps.Protocol.LatestAPI().ProtocolParameters()
+	protoParams := deps.Protocol.CurrentAPI().ProtocolParameters()
 
-	protoParamsBytes, err := deps.Protocol.LatestAPI().JSONEncode(protoParams)
+	protoParamsBytes, err := deps.Protocol.CurrentAPI().JSONEncode(protoParams)
 	if err != nil {
 		return nil, err
 	}

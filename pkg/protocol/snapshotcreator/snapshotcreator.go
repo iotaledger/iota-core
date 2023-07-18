@@ -2,7 +2,6 @@ package snapshotcreator
 
 import (
 	"crypto/ed25519"
-	"fmt"
 	"os"
 
 	"golang.org/x/crypto/blake2b"
@@ -24,13 +23,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
 // CreateSnapshot creates a new snapshot. Genesis is defined by genesisTokenAmount and seedBytes, it
@@ -69,7 +68,6 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 
 	accounts := account.NewAccounts()
 	for _, accountData := range opt.Accounts {
-		fmt.Println("account ID ", accountData.AccountID, hexutil.EncodeHex(accountData.IssuerKey))
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
 			accounts.Set(blake2b.Sum256(accountData.IssuerKey), &account.Pool{
@@ -96,6 +94,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		tipmanagerv1.NewProvider(),
 		tipselectionv1.NewProvider(),
 		retainer.NewProvider(),
+		signalingupgradeorchestrator.NewProvider(),
 		engine.WithSnapshotPath(""), // magic to disable loading snapshot
 	)
 	defer engineInstance.Shutdown()
@@ -123,7 +122,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 		genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
 		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
 
-		if _, err = engineInstance.LatestAPI().ProtocolParameters().RentStructure().CoversStateRent(output, genesisTokenAmount); err != nil {
+		if _, err = engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversStateRent(output, genesisTokenAmount); err != nil {
 			return ierrors.Wrap(err, "min rent not covered by Genesis output with index 0")
 		}
 
@@ -142,7 +141,7 @@ func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Eng
 	for idx, account := range accounts {
 		output := createAccount(account.AccountID, account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
 
-		if _, err = engineInstance.LatestAPI().ProtocolParameters().RentStructure().CoversStateRent(output, account.Amount); err != nil {
+		if _, err = engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversStateRent(output, account.Amount); err != nil {
 			return ierrors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
 		}
 
