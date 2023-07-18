@@ -1,10 +1,13 @@
 package testsuite
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"encoding/binary"
 	"fmt"
 	"time"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -379,6 +382,10 @@ func AddBlockIssuerKey(key ed25519.PublicKey) options.Option[iotago.AccountOutpu
 			panic("cannot add block issuer key to account without BlockIssuer feature")
 		}
 		blockIssuer.BlockIssuerKeys = append(blockIssuer.BlockIssuerKeys, key)
+
+		slices.SortFunc(blockIssuer.BlockIssuerKeys, func(a, b ed25519.PublicKey) bool {
+			return bytes.Compare(a, b) < 0
+		})
 	}
 }
 
