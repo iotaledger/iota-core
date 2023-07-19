@@ -1,9 +1,9 @@
-package evilspammerpkg
+package spammer
 
 import (
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evilwallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 )
 
 type Options func(*Spammer)
@@ -85,14 +85,14 @@ func WithBatchesSent(maxBatchesSent int) Options {
 }
 
 // WithEvilWallet provides evil wallet instance, that will handle all spam logic according to provided EvilScenario.
-func WithEvilWallet(initWallets *evilwallet.EvilWallet) Options {
+func WithEvilWallet(initWallets *wallet.EvilWallet) Options {
 	return func(s *Spammer) {
 		s.EvilWallet = initWallets
 	}
 }
 
 // WithEvilScenario provides initWallet of spammer, if omitted spammer will prepare funds based on maxBlkSent parameter.
-func WithEvilScenario(scenario *evilwallet.EvilScenario) Options {
+func WithEvilScenario(scenario *wallet.EvilScenario) Options {
 	return func(s *Spammer) {
 		s.EvilScenario = scenario
 	}
@@ -118,7 +118,7 @@ func WithNumberOfSpends(n int) Options {
 
 func WithClientURL(clientURL string) Options {
 	return func(s *Spammer) {
-		s.Clients = evilwallet.NewWebClients([]string{clientURL})
+		s.Clients = wallet.NewWebClients([]string{clientURL})
 	}
 }
 

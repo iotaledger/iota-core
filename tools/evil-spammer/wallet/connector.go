@@ -1,4 +1,4 @@
-package evilwallet
+package wallet
 
 import (
 	"context"

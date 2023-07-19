@@ -1,4 +1,4 @@
-package evilwallet
+package wallet
 
 import (
 	"sync"
@@ -49,6 +49,7 @@ func (a *AliasManager) GetInput(aliasName string) (*Output, bool) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	in, ok := a.inputMap[aliasName]
+
 	return in, ok
 }
 
@@ -90,6 +91,7 @@ func (a *AliasManager) AddOutputAliases(outputs []*Output, aliases []string) err
 	for i, out := range outputs {
 		a.AddOutputAlias(out, aliases[i])
 	}
+
 	return nil
 }
 
@@ -101,6 +103,7 @@ func (a *AliasManager) AddInputAliases(inputs []*Output, aliases []string) error
 	for i, out := range inputs {
 		a.AddInputAlias(out, aliases[i])
 	}
+
 	return nil
 }
 

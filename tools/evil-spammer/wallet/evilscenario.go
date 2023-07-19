@@ -1,4 +1,4 @@
-package evilwallet
+package wallet
 
 import (
 	"fmt"
@@ -65,6 +65,7 @@ func NewEvilScenario(options ...ScenarioOption) *EvilScenario {
 	}
 	scenario.ID = base58.Encode([]byte(fmt.Sprintf("%v%v%v", scenario.ConflictBatch, scenario.Reuse, scenario.OutputWallet.ID)))[:11]
 	scenario.NumOfClientsNeeded = calculateNumofClientsNeeded(scenario)
+
 	return scenario
 }
 
@@ -74,6 +75,7 @@ func calculateNumofClientsNeeded(scenario *EvilScenario) (counter int) {
 			counter = len(conflictMap)
 		}
 	}
+
 	return
 }
 
@@ -100,6 +102,7 @@ func (e *EvilScenario) readCustomConflictsPattern(batch EvilBatch) (batchOutputs
 		}
 	}
 	batchOutputs = outputs
+
 	return
 }
 
@@ -130,5 +133,6 @@ func (e *EvilScenario) ConflictBatchWithPrefix() (prefixedBatch EvilBatch, allAl
 		prefixedBatch = append(prefixedBatch, scenarioAlias)
 	}
 	batchOutputs = e.readCustomConflictsPattern(prefixedBatch)
+
 	return
 }

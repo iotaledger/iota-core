@@ -1,4 +1,4 @@
-package evilwallet
+package wallet
 
 import (
 	"sync"
@@ -63,6 +63,7 @@ func (w *Wallets) NewWallet(walletType WalletType) *Wallet {
 	if walletType == Reuse {
 		w.addReuseWallet(wallet)
 	}
+
 	return wallet
 }
 
@@ -86,6 +87,7 @@ func (w *Wallets) GetNextWallet(walletType WalletType, minOutputsLeft int) (*Wal
 		if wallet.IsEmpty() {
 			return nil, ierrors.New("wallet is empty, need to request more funds")
 		}
+
 		return wallet, nil
 	case Reuse:
 		for id, ready := range w.reuseWallets {
@@ -100,6 +102,7 @@ func (w *Wallets) GetNextWallet(walletType WalletType, minOutputsLeft int) (*Wal
 				w.removeReuseWallet(id)
 			}
 		}
+
 		return nil, ierrors.New("no reuse wallets available")
 	}
 
@@ -121,6 +124,7 @@ func (w *Wallets) UnspentOutputsLeft(walletType WalletType) int {
 			outputsLeft += w.wallets[wID].UnspentOutputsLeft()
 		}
 	}
+
 	return outputsLeft
 }
 
@@ -145,6 +149,7 @@ func (w *Wallets) GetUnspentOutput(wallet *Wallet) *Output {
 	if wallet == nil {
 		return nil
 	}
+
 	return wallet.GetUnspentOutput()
 }
 
@@ -164,6 +169,7 @@ func (w *Wallets) freshWallet() (*Wallet, error) {
 			return nil, err
 		}
 	}
+
 	return wallet, nil
 }
 
@@ -174,6 +180,7 @@ func (w *Wallets) reuseWallet(outputsNeeded int) *Wallet {
 	if err != nil {
 		return nil
 	}
+
 	return wallet
 }
 

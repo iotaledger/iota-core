@@ -1,4 +1,4 @@
-package evilspammerpkg
+package spammer
 
 import (
 	"math/rand"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/iota-core/tools/evilwallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -14,7 +14,7 @@ func DataSpammingFunction(s *Spammer) {
 	clt := s.Clients.GetClient()
 	// sleep randomly to avoid issuing blocks in different goroutines at once
 	time.Sleep(time.Duration(rand.Float64()*20) * time.Millisecond)
-	// if err := evilwallet.RateSetterSleep(clt, s.UseRateSetter); err != nil {
+	// if err := wallet.RateSetterSleep(clt, s.UseRateSetter); err != nil {
 	// 	s.ErrCounter.CountError(err)
 	// }
 	blkID, err := clt.PostData([]byte("SPAM"))
@@ -49,12 +49,12 @@ func CustomConflictSpammingFunc(s *Spammer) {
 		wg := sync.WaitGroup{}
 		for i, tx := range txs {
 			wg.Add(1)
-			go func(clt evilwallet.Client, tx *iotago.Transaction) {
+			go func(clt wallet.Client, tx *iotago.Transaction) {
 				defer wg.Done()
 
 				// sleep randomly to avoid issuing blocks in different goroutines at once
 				time.Sleep(time.Duration(rand.Float64()*100) * time.Millisecond)
-				// if err = evilwallet.RateSetterSleep(clt, s.UseRateSetter); err != nil {
+				// if err = wallet.RateSetterSleep(clt, s.UseRateSetter); err != nil {
 				// 	s.ErrCounter.CountError(err)
 				// }
 				s.PostTransaction(tx, clt)
@@ -93,7 +93,7 @@ func CustomConflictSpammingFunc(s *Spammer) {
 // 		models.WithCommitment(commitment),
 // 		models.WithSignature(ed25519.EmptySignature),
 // 	)
-// 	signature, err := evilwallet.SignBlock(block, localID)
+// 	signature, err := wallet.SignBlock(block, localID)
 // 	if err != nil {
 // 		return
 // 	}
