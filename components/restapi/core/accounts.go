@@ -80,6 +80,7 @@ func staking() (*models.AccountStakingListResponse, error) {
 			AccountID:                      accountData.ID.ToHex(),
 			PoolStake:                      uint64(accountData.ValidatorStake + accountData.DelegationStake),
 			ValidatorStake:                 uint64(accountData.ValidatorStake),
+			FixedCost:                      uint64(accountData.FixedCost),
 			StakingEpochEnd:                accountData.StakeEndEpoch,
 			LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
 		})
@@ -101,11 +102,13 @@ func stakingByAccountID(c echo.Context) (*models.ValidatorResponse, error) {
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
+
 	return &models.ValidatorResponse{
 		AccountID:                      accountID.ToHex(),
 		PoolStake:                      uint64(accountData.ValidatorStake + accountData.DelegationStake),
 		ValidatorStake:                 uint64(accountData.ValidatorStake),
 		StakingEpochEnd:                accountData.StakeEndEpoch,
+		FixedCost:                      uint64(accountData.FixedCost),
 		LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
 	}, nil
 }
@@ -154,8 +157,8 @@ func rewardsByAccountID(c echo.Context) (*models.ManaRewardsResponse, error) {
 	}
 
 	return &models.ManaRewardsResponse{
-		EpochIndex:  latestRewardsReadyEpoch,
-		TotalReward: uint64(reward),
+		EpochIndex: latestRewardsReadyEpoch,
+		Rewards:    uint64(reward),
 	}, nil
 }
 
