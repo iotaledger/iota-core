@@ -4,6 +4,8 @@ go 1.20
 
 replace github.com/iotaledger/iota-core => ../../
 
+replace github.com/iotaledger/iota-core/tools/genesis-snapshot => ../genesis-snapshot/
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/iotaledger/hive.go/app v0.0.0-20230717094216-46222fa0ec69
@@ -12,9 +14,10 @@ require (
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230717094216-46222fa0ec69
 	github.com/iotaledger/hive.go/lo v0.0.0-20230717094216-46222fa0ec69
 	github.com/iotaledger/hive.go/logger v0.0.0-20230717094216-46222fa0ec69
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230717094216-46222fa0ec69
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-20230718111805-9d3cc4d584ef
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230714095119-326fc0683ede
+	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-00010101000000-000000000000
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230719093526-b8506bc4b24a
 	github.com/mr-tron/base58 v1.2.0
 	go.uber.org/atomic v1.11.0
 )
@@ -39,7 +42,6 @@ require (
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230717094216-46222fa0ec69 // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230717094216-46222fa0ec69 // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230717094216-46222fa0ec69 // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230717094216-46222fa0ec69 // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230717094216-46222fa0ec69 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect

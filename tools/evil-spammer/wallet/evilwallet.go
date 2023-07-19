@@ -1,4 +1,4 @@
-package evilwallet
+package wallet
 
 import (
 	"fmt"
@@ -46,6 +46,7 @@ var (
 		if err != nil {
 			log.Fatal(ierrors.Errorf("failed to decode base58 seed, using the default one: %w", err))
 		}
+
 		return genesisSeed
 	}
 )
@@ -130,6 +131,7 @@ func (e *EvilWallet) NewWallet(wType ...WalletType) *Wallet {
 	if len(wType) != 0 {
 		walletType = wType[0]
 	}
+
 	return e.wallets.NewWallet(walletType)
 }
 
@@ -331,8 +333,7 @@ func (e *EvilWallet) splitOutputs(splitOutput *Output, inputWallet, outputWallet
 		return iotago.EmptyOutputID.TransactionID(), ierrors.New("inputWallet is empty")
 	}
 
-	addr := inputWallet.AddressOnIndex(0)
-	input, outputs := e.handleInputOutputDuringSplitOutputs(splitOutput, FaucetRequestSplitNumber, inputWallet, outputWallet, addr.String())
+	input, outputs := e.handleInputOutputDuringSplitOutputs(splitOutput, FaucetRequestSplitNumber, outputWallet)
 
 	tx, err := e.CreateTransaction(WithInputs(input), WithOutputs(outputs), WithIssuer(inputWallet), WithOutputWallet(outputWallet))
 	if err != nil {
@@ -348,15 +349,14 @@ func (e *EvilWallet) splitOutputs(splitOutput *Output, inputWallet, outputWallet
 	return lo.PanicOnErr(tx.ID(e.api)), nil
 }
 
-func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitOutput *Output, splitNumber int, inputWallet, receiveWallet *Wallet, inputAddr string) (input *Output, outputs []*OutputOption) {
+func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitOutput *Output, splitNumber int, receiveWallet *Wallet) (input *Output, outputs []*OutputOption) {
 	input = splitOutput
 
-	inputBalance := input.Balance
-
-	balances := SplitBalanceEqually(splitNumber, inputBalance)
+	balances := SplitBalanceEqually(splitNumber, input.Balance)
 	for _, bal := range balances {
 		outputs = append(outputs, &OutputOption{amount: bal, address: receiveWallet.Address()})
 	}
+
 	return
 }
 
@@ -386,6 +386,7 @@ func (e *EvilWallet) PrepareCustomConflicts(conflictsMaps []ConflictSlice) (conf
 		}
 		conflictBatch = append(conflictBatch, txs)
 	}
+
 	return
 }
 
@@ -407,7 +408,7 @@ func (e *EvilWallet) SendCustomConflicts(conflictsMaps []ConflictSlice) (err err
 			wg.Add(1)
 			go func(clt Client, tx *iotago.Transaction) {
 				defer wg.Done()
-				clt.PostTransaction(tx)
+				_, _ = clt.PostTransaction(tx)
 			}(clients[i], tx)
 		}
 		wg.Wait()
@@ -415,6 +416,7 @@ func (e *EvilWallet) SendCustomConflicts(conflictsMaps []ConflictSlice) (err err
 		// wait until transactions are solid
 		time.Sleep(WaitForTxSolid)
 	}
+
 	return
 }
 
@@ -467,7 +469,7 @@ func (e *EvilWallet) CreateTransaction(options ...Option) (tx *iotago.Transactio
 // addOutputsToOutputManager adds output to the OutputManager if.
 func (e *EvilWallet) addOutputsToOutputManager(tx *iotago.Transaction, outWallet, tmpWallet *Wallet, tempAddresses map[string]types.Empty) {
 	for idx, o := range tx.Essence.Outputs {
-		addr := o.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address)
+		addr := o.UnlockConditionSet().Address().Address
 		out := &Output{
 			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID(e.api)), uint16(idx)),
 			Address:      addr,
@@ -494,6 +496,7 @@ func (e *EvilWallet) updateInputWallet(buildOptions *Options) error {
 			buildOptions.inputWallet = nil
 			return nil
 		}
+
 		break
 	}
 	wallet, err := e.useFreshIfInputWalletNotProvided(buildOptions)
@@ -501,6 +504,7 @@ func (e *EvilWallet) updateInputWallet(buildOptions *Options) error {
 		return err
 	}
 	buildOptions.inputWallet = wallet
+
 	return nil
 }
 
@@ -547,6 +551,7 @@ func (e *EvilWallet) prepareOutputs(buildOptions *Options, tempWallet *Wallet) (
 		// if outputs were provided with aliases
 		outputs, addrAliasMap, tempAddresses, err = e.matchOutputsWithAliases(buildOptions, tempWallet)
 	}
+
 	return
 }
 
@@ -571,6 +576,7 @@ func (e *EvilWallet) matchInputsWithAliases(buildOptions *Options) (inputs []*Ou
 		}
 		inputs = append(inputs, in)
 	}
+
 	return inputs, nil
 }
 
@@ -584,12 +590,15 @@ func (e *EvilWallet) useFreshIfInputWalletNotProvided(buildOptions *Options) (*W
 				return wallet, nil
 			}
 		}
-		if wallet, err := e.wallets.freshWallet(); wallet != nil {
-			return wallet, nil
-		} else {
+
+		wallet, err := e.wallets.freshWallet()
+		if err != nil {
 			return nil, ierrors.Wrap(err, "no Fresh wallet is available")
 		}
+
+		return wallet, nil
 	}
+
 	return buildOptions.inputWallet, nil
 }
 
@@ -629,7 +638,7 @@ func (e *EvilWallet) matchOutputsWithAliases(buildOptions *Options, tempWallet *
 	return
 }
 
-func (e *EvilWallet) prepareRemainderOutput(buildOptions *Options, outputs []iotago.Output) (alias string, remainderOutput iotago.Output, remainderAddress *iotago.Ed25519Address, added bool) {
+func (e *EvilWallet) prepareRemainderOutput(buildOptions *Options, outputs []iotago.Output) (alias string, remainderOutput iotago.Output, remainderAddress iotago.Address, added bool) {
 	inputBalance := iotago.BaseToken(0)
 
 	for inputAlias := range buildOptions.aliasInputs {
@@ -654,10 +663,7 @@ func (e *EvilWallet) prepareRemainderOutput(buildOptions *Options, outputs []iot
 
 	outputBalance := iotago.BaseToken(0)
 	for _, o := range outputs {
-		if o.Type() == iotago.OutputBasic {
-			bo := o.(*iotago.BasicOutput)
-			outputBalance += bo.Deposit()
-		}
+		outputBalance += o.Deposit()
 	}
 
 	// remainder balances is sent to one of the address in inputs
@@ -707,6 +713,7 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 			i++
 		}
 	}
+
 	return
 }
 
@@ -742,18 +749,6 @@ func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[io
 	return txBuilder.Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 }
 
-func (e *EvilWallet) getAddressFromInput(input *Output) (addr *iotago.Ed25519Address, err error) {
-	out := e.outputManager.GetOutput(input.OutputID)
-	if out == nil {
-		err = ierrors.New("output not found in output manager")
-		return
-	}
-
-	addr = out.Address
-
-	return
-}
-
 func (e *EvilWallet) PrepareCustomConflictsSpam(scenario *EvilScenario) (txs [][]*iotago.Transaction, allAliases ScenarioAlias, err error) {
 	conflicts, allAliases := e.prepareConflictSliceForScenario(scenario)
 	txs, err = e.PrepareCustomConflicts(conflicts)
@@ -767,6 +762,7 @@ func (e *EvilWallet) prepareConflictSliceForScenario(scenario *EvilScenario) (co
 		for _, o := range aliases {
 			outputOptions = append(outputOptions, &OutputOption{aliasName: o})
 		}
+
 		return outputOptions
 	}
 
