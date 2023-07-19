@@ -654,7 +654,7 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 	if err := l.conflictDAG.CastVotes(vote.NewVote(seat, voteRank), block.ConflictIDs()); err != nil {
 		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
 		//  Do we track witness weight of invalid blocks?
-		// l.errorHandler(ierrors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
+		l.errorHandler(ierrors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
 }
 
