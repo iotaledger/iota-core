@@ -76,18 +76,10 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			// TODO: how do we want to handle changing API here?
-			iotagoAPI := l.apiProvider.LatestAPI()
+			iotagoAPI := l.apiProvider.CurrentAPI()
 			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), l.resolveAccountOutput)
 			l.accountsLedger.SetCommitmentEvictionAge(iotagoAPI.ProtocolParameters().EvictionAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
-
-			wp := e.Workers.CreateGroup("Ledger").CreatePool("BlockAccepted", 1)
-			e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-				l.accountsLedger.TrackBlock(block)
-				l.BlockAccepted(block)
-				l.sybilProtection.BlockAccepted(block)
-				l.events.BlockProcessed.Trigger(block)
-			}, event.WithWorkerPool(wp))
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
@@ -213,6 +205,8 @@ func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
+	l.accountsLedger.TrackBlock(block)
+
 	if _, hasTransaction := block.Transaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
 	}
@@ -237,7 +231,14 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 		if !exists {
 			var output *utxoledger.Output
 			stateRequest := l.resolveState(outputID.UTXOInput())
-			stateRequest.OnSuccess(func(loadedState mempool.State) { output = loadedState.(*utxoledger.Output) })
+			stateRequest.OnSuccess(func(loadedState mempool.State) {
+				concreteOutput, ok := loadedState.(*utxoledger.Output)
+				if !ok {
+					err = ErrUnexpectedUnderlyingType
+					return
+				}
+				output = concreteOutput
+			})
 			stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
 			stateRequest.WaitComplete()
 
@@ -626,20 +627,16 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 
 	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
 	if err != nil {
-		// fmt.Println(">>>get output spent state error")
 		return p.Reject(ierrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
 	}
 
 	if !isUnspent {
-		// fmt.Println(">>>get output spent already")
 		return p.Reject(ierrors.Errorf("unspent output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
 
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
 	output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(stateRef.Ref())
-
 	if err != nil {
-		// fmt.Println(">>>output not found")
 		return p.Reject(ierrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
 

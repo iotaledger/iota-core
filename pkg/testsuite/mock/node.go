@@ -37,9 +37,8 @@ import (
 type Node struct {
 	Testing *testing.T
 
-	Name          string
-	Validator     bool
-	ValidatorSeat account.SeatIndex
+	Name      string
+	Validator bool
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -242,11 +241,11 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
+		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.CurrentAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
 	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
+		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.CurrentAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
 	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
@@ -391,6 +390,16 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.AccountID = otherNode.AccountID
 	n.PubKey = otherNode.PubKey
 	n.privateKey = otherNode.privateKey
+	n.Validator = otherNode.Validator
+}
+
+func (n *Node) CreateValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+	modelBlock, err := n.blockIssuer.CreateValidationBlock(ctx, opts...)
+	require.NoError(n.Testing, err)
+
+	modelBlock.ID().RegisterAlias(alias)
+
+	return blocks.NewBlock(modelBlock)
 }
 
 func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
@@ -404,6 +413,16 @@ func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Op
 
 func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	block := n.CreateBlock(ctx, alias, opts...)
+
+	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "failed to issue block with alias %s", alias)
+
+	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
+
+	return block
+}
+
+func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+	block := n.CreateValidationBlock(ctx, alias, opts...)
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
 
