@@ -330,8 +330,6 @@ func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return p.MainEngineInstance().APIForEpoch(epoch)
 }
 
-var _ api.Provider = &Protocol{}
-
 func (p *Protocol) SupportedVersions() nodeclient.Versions {
 	return p.supportVersions
 }
@@ -341,3 +339,5 @@ func (p *Protocol) ErrorHandler() func(error) {
 		p.Events.Error.Trigger(err)
 	}
 }
+
+var _ api.Provider = &Protocol{}

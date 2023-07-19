@@ -15,7 +15,10 @@ export class UnlockConditionAddress extends React.Component<AddressProps, any> {
         return (
             <div className={"mb-2"} key={"unlockCondition"+this.props.unlock.address}>
                 <ListGroup>
-                    <ListGroup.Item>Address: {this.props.unlock.address}</ListGroup.Item>
+                    <ListGroup.Item>Address Type: {this.props.unlock.address.type}</ListGroup.Item>
+                </ListGroup>
+                <ListGroup>
+                    <ListGroup.Item>Address: {this.props.unlock.address.pubKeyHash}</ListGroup.Item>
                 </ListGroup>
             </div>
         );

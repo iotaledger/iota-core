@@ -97,6 +97,7 @@ func (t *TestFramework) CreateBlock(alias string, issuerAlias string, parents ..
 	block, err := builder.NewBasicBlockBuilder(tpkg.TestAPI).
 		StrongParents(t.BlockIDs(parents...)).
 		Sign(t.SeatManager.AccountID(issuerAlias), priv).
+		IssuingTime(time.Now()).
 		Build()
 	require.NoError(t, err)
 

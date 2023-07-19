@@ -3,7 +3,9 @@ package dashboard
 import (
 	"encoding/json"
 
+	"github.com/iotaledger/hive.go/ds/advancedset"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -30,9 +32,9 @@ import (
 
 // Output represents the JSON model of a ledgerstate.Output.
 type Output struct {
-	OutputID *OutputID       `json:"outputID,omitempty"`
-	Type     string          `json:"type"`
-	Output   json.RawMessage `json:"output"`
+	OutputID *OutputID         `json:"outputID,omitempty"`
+	Type     iotago.OutputType `json:"type"`
+	Output   json.RawMessage   `json:"output"`
 }
 
 // NewOutput returns an Output from the given ledgerstate.Output.
@@ -43,7 +45,7 @@ func NewOutput(output iotago.Output) (result *Output) {
 	}
 
 	return &Output{
-		Type:   output.Type().String(),
+		Type:   output.Type(),
 		Output: outputJSON,
 	}
 }
@@ -57,7 +59,7 @@ func NewOutputFromLedgerstateOutput(output *utxoledger.Output) (result *Output) 
 
 	return &Output{
 		OutputID: NewOutputID(output.OutputID()),
-		Type:     output.OutputType().String(),
+		Type:     output.OutputType(),
 		Output:   outputJSON,
 	}
 }
@@ -116,6 +118,7 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 
 // Transaction represents the JSON model of a ledgerstate.Transaction.
 type Transaction struct {
+	TransactionID    string                  `json:"txId"`
 	NetworkID        iotago.NetworkID        `json:"networkId"`
 	CreationTime     iotago.SlotIndex        `json:"creationTime"`
 	Inputs           []*Input                `json:"inputs"`
@@ -141,7 +144,9 @@ func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
 	for i, output := range iotaTx.Essence.Outputs {
 		outputs[i] = NewOutput(output)
 		outputs[i].OutputID = &OutputID{
-			Hex: iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(i)).ToHex(),
+			Hex:           iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(i)).ToHex(),
+			TransactionID: txID.ToHex(),
+			OutputIndex:   uint16(i),
 		}
 	}
 
@@ -196,10 +201,9 @@ func NewInput(input iotago.Input) *Input {
 
 // UnlockBlock represents the JSON model of a ledgerstate.UnlockBlock.
 type UnlockBlock struct {
-	Type            string               `json:"type"`
-	ReferencedIndex uint16               `json:"referencedIndex,omitempty"`
-	SignatureType   iotago.SignatureType `json:"signatureType,omitempty"`
-	Signature       json.RawMessage      `json:"signature,omitempty"`
+	Type          string               `json:"type"`
+	SignatureType iotago.SignatureType `json:"signatureType,omitempty"`
+	Signature     json.RawMessage      `json:"signature,omitempty"`
 }
 
 // NewUnlockBlock returns an UnlockBlock from the given ledgerstate.UnlockBlock.
@@ -217,6 +221,7 @@ func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
 				return nil
 			}
 			result.Signature = sigJSON
+			result.SignatureType = iotago.SignatureEd25519
 		}
 	}
 
@@ -228,26 +233,39 @@ func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
 // region TransactionMetadata ///////////////////////////////////////////////////////////////////////////////////////////
 
 // TransactionMetadata represents the JSON model of the mempool.TransactionMetadata.
-// type TransactionMetadata struct {
-// 	TransactionID         string             `json:"transactionID"`
-// 	ConflictIDs           []string           `json:"conflictIDs"`
-// 	Booked                bool               `json:"booked"`
-// 	BookedTime            int64              `json:"bookedTime"`
-// 	ConfirmationState     confirmation.State `json:"confirmationState"`
-// 	ConfirmationStateTime int64              `json:"confirmationStateTime"`
-// }
+type TransactionMetadata struct {
+	TransactionID         string   `json:"transactionID"`
+	ConflictIDs           []string `json:"conflictIDs"`
+	Booked                bool     `json:"booked"`
+	BookedTime            int64    `json:"bookedTime"`
+	ConfirmationState     string   `json:"confirmationState"`
+	ConfirmationStateTime int64    `json:"confirmationStateTime"`
+}
 
-// // NewTransactionMetadata returns the TransactionMetadata from the given mempool.TransactionMetadata.
-// func NewTransactionMetadata(transactionMetadata *mempool.TransactionMetadata) *TransactionMetadata {
-// 	return &TransactionMetadata{
-// 		TransactionID:         transactionMetadata.ID().Base58(),
-// 		ConflictIDs:           lo.Map(lo.Map(transactionMetadata.ConflictIDs().Slice(), func(t utxo.TransactionID) []byte { return lo.PanicOnErr(t.Bytes()) }), base58.Encode),
-// 		Booked:                transactionMetadata.IsBooked(),
-// 		BookedTime:            transactionMetadata.BookingTime().Unix(),
-// 		ConfirmationState:     transactionMetadata.ConfirmationState(),
-// 		ConfirmationStateTime: transactionMetadata.ConfirmationStateTime().Unix(),
-// 	}
-// }
+// NewTransactionMetadata returns the TransactionMetadata from the given mempool.TransactionMetadata.
+func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata, conflicts *advancedset.AdvancedSet[iotago.Identifier]) *TransactionMetadata {
+	var confirmationState string
+	if transactionMetadata.IsAccepted() {
+		confirmationState = "accepted"
+	} else if transactionMetadata.IsPending() {
+		confirmationState = "pending"
+	} else if transactionMetadata.IsRejected() {
+		confirmationState = "rejected"
+	}
+
+	return &TransactionMetadata{
+		TransactionID: transactionMetadata.ID().ToHex(),
+		ConflictIDs: func() []string {
+			var strIDs []string
+			for _, txID := range conflicts.Slice() {
+				strIDs = append(strIDs, txID.ToHex())
+			}
+			return strIDs
+		}(),
+		Booked:            transactionMetadata.IsBooked(),
+		ConfirmationState: confirmationState,
+	}
+}
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 

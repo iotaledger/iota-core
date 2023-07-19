@@ -5,9 +5,8 @@ import {
     getPayloadType,
     Output,
     PayloadType,
-    TransactionPayload,
     FaucetPayload,
-    Transaction,
+    TransactionPayload,
     TaggedDataPayload,
     BasicOutput
 } from "../misc/Payload";
@@ -51,6 +50,7 @@ export class Block {
     confirmationBySlotTime: number;
     payloadType: number;
     payload: any;
+    txId: string;
     rank: number;
     sequenceID: number;
     isPastMarker: boolean;
@@ -110,7 +110,7 @@ class TransactionMetadata {
     conflictIDs: string[];
     booked: boolean;
     bookedTime: number;
-    confirmationState: number;
+    confirmationState: string;
     confirmationStateTime: number;
 }
 
@@ -286,7 +286,7 @@ export class ExplorerStore {
 
     @action
     getTransaction = async (id: string) => {
-        const tx = await this.fetchJson<never, Transaction>("get", `/api/transaction/${id}`)
+        const tx = await this.fetchJson<never, TransactionPayload>("get", `/api/transaction/${id}`)
         
         for (let i = 0; i < tx.inputs.length; i++) {
             let inputID = tx.inputs[i] ? tx.inputs[i].referencedOutputID.hex : GenesisBlockID

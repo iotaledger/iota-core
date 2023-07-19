@@ -1,5 +1,5 @@
 import { UnlockConditionAddress, UnlockConditionExpiration, UnlockConditionStorageDepositReturn, UnlockConditionTimelock } from "app/components/Condition";
-import { AddressUnlockCondition, Condition, ExpirationUnlockCondition, StorageDepositReturnUnlockCondition, TimelockUnlockCondition } from "app/misc/Payload";
+import { AddressUnlockCondition, ExpirationUnlockCondition, StorageDepositReturnUnlockCondition, TimelockUnlockCondition } from "app/misc/Payload";
 import * as React from 'react';
 
 export enum ConditionType {
@@ -33,17 +33,21 @@ export function resolveConditionType(condType: number) {
     }
 }
 
-export function conditionToComponent(cond: Condition) {
+export function conditionToComponent(cond: 
+    AddressUnlockCondition |
+    StorageDepositReturnUnlockCondition |
+    TimelockUnlockCondition |
+    ExpirationUnlockCondition) {
     switch (cond.type) {
         case ConditionType.Address:
         case ConditionType.StateControllerAddress:
         case ConditionType.GovernorAddress:
-            return <UnlockConditionAddress unlock={cond.condition as AddressUnlockCondition} />;
+            return <UnlockConditionAddress unlock={cond as AddressUnlockCondition} />;
         case ConditionType.StorageDepositReturn:
-            return <UnlockConditionStorageDepositReturn unlock={cond.condition as StorageDepositReturnUnlockCondition} />;
+            return <UnlockConditionStorageDepositReturn unlock={cond as StorageDepositReturnUnlockCondition} />;
         case ConditionType.Expiration:
-            return <UnlockConditionExpiration unlock={cond.condition as ExpirationUnlockCondition} />;
+            return <UnlockConditionExpiration unlock={cond as ExpirationUnlockCondition} />;
         case ConditionType.Timelock:
-            return <UnlockConditionTimelock unlock={cond.condition as TimelockUnlockCondition} />;
+            return <UnlockConditionTimelock unlock={cond as TimelockUnlockCondition} />;
     }
 }

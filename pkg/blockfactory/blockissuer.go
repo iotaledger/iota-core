@@ -288,11 +288,6 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		resign = true
 	}
 
-	if iotaBlock.IssuingTime.IsZero() {
-		iotaBlock.IssuingTime = time.Now()
-		resign = true
-	}
-
 	if iotaBlock.SlotCommitmentID == iotago.EmptyCommitmentID {
 		iotaBlock.SlotCommitmentID = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID()
 		iotaBlock.LatestFinalizedSlot = i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
@@ -328,9 +323,14 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	references := make(model.ParentReferences)
-	references[iotago.StrongParentType] = iotaBlock.Block.StrongParentIDs()
-	references[iotago.WeakParentType] = iotaBlock.Block.WeakParentIDs()
-	references[iotago.ShallowLikeParentType] = iotaBlock.Block.ShallowLikeParentIDs()
+	references[iotago.StrongParentType] = iotaBlock.Block.StrongParentIDs().RemoveDupsAndSort()
+	references[iotago.WeakParentType] = iotaBlock.Block.WeakParentIDs().RemoveDupsAndSort()
+	references[iotago.ShallowLikeParentType] = iotaBlock.Block.ShallowLikeParentIDs().RemoveDupsAndSort()
+
+	if iotaBlock.IssuingTime.IsZero() {
+		iotaBlock.IssuingTime = time.Now()
+		resign = true
+	}
 
 	if err := i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Index(), references); err != nil {
 		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
