@@ -17,7 +17,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 
 		e.HookConstructed(func() {
 			e.Ledger.HookInitialized(func() {
-				e.Events.Ledger.BlockProcessed.Hook(func(block *blocks.Block) {
+				e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
 					livenessThresholdDuration := time.Duration(uint64(e.LatestAPI().ProtocolParameters().LivenessThreshold())*uint64(e.LatestAPI().ProtocolParameters().TimeProvider().SlotDurationSeconds())) * time.Second
 					t.SetLivenessThreshold(block.IssuingTime().Add(-livenessThresholdDuration))
 				})

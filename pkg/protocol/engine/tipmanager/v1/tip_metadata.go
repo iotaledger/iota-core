@@ -226,7 +226,7 @@ func (t *TipMetadata) String() string {
 	return fmt.Sprintf(
 		"TipMetadata: [\n"+
 			"Block: %s\n"+
-			"TipPool: %s\n"+
+			"TipPool: %d\n"+
 			"IsStrongTipPoolMember: %v\n"+
 			"IsWeakTipPoolMember: %v\n"+
 			"IsStronglyConnectedToTips: %v\n"+
