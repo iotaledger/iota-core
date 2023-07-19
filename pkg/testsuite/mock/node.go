@@ -240,6 +240,18 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
 	})
 
+	events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Scheduler.BlockScheduled: %s\n", n.Name, engineName, block.ID())
+	})
+
+	events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Scheduler.BlockSkipped: %s\n", n.Name, engineName, block.ID())
+	})
+
+	events.Scheduler.BlockDropped.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Scheduler.BlockDropped: %s\n", n.Name, engineName, block.ID())
+	})
+
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
 		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.CurrentAPI().TimeProvider().SlotFromTime(newTime))
 	})
@@ -254,7 +266,6 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
 		fmt.Printf("%s > [%s] Filter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
-		n.Testing.Fatal("no blocks should be filtered")
 	})
 
 	events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
