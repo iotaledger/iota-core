@@ -29,28 +29,33 @@ func blockByID(c echo.Context) (*model.Block, error) {
 	return block, nil
 }
 
+func blockMetadataByBlockID(blockID iotago.BlockID) (*models.BlockMetadataResponse, error) {
+	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &models.BlockMetadataResponse{
+		BlockID:          blockID.ToHex(),
+		BlockState:       metadata.BlockStatus.String(),
+		BlockStateReason: metadata.BlockReason,
+	}
+
+	if metadata.HasTx {
+		response.TxState = metadata.TransactionStatus.String()
+		response.TxStateReason = metadata.TransactionReason
+	}
+
+	return response, nil
+}
+
 func blockMetadataByID(c echo.Context) (*models.BlockMetadataResponse, error) {
 	block, err := blockByID(c)
 	if err != nil {
 		return nil, err
 	}
 
-	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(block.ID())
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: fill in blockReason, TxReason.
-	bmResponse := &models.BlockMetadataResponse{
-		BlockID:    block.ID().ToHex(),
-		BlockState: metadata.BlockStatus.String(),
-	}
-
-	if metadata.HasTx {
-		bmResponse.TxState = metadata.TransactionStatus.String()
-	}
-
-	return bmResponse, nil
+	return blockMetadataByBlockID(block.ID())
 }
 
 func blockIssuance(_ echo.Context) (*models.IssuanceBlockHeaderResponse, error) {
@@ -78,7 +83,7 @@ func sendBlock(c echo.Context) (*models.BlockCreatedResponse, error) {
 		return nil, err
 	}
 
-	var iotaBlock *iotago.ProtocolBlock
+	var iotaBlock = &iotago.ProtocolBlock{}
 
 	if c.Request().Body == nil {
 		// bad request

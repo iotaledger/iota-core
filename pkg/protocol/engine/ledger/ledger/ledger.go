@@ -31,7 +31,10 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-var ErrUnexpectedUnderlyingType = ierrors.New("unexpected underlying type provided by the interface")
+var (
+	ErrUnexpectedUnderlyingType    = ierrors.New("unexpected underlying type provided by the interface")
+	ErrTransactionMetadataNotFOund = ierrors.New("TransactionMetadata not found")
+)
 
 type Ledger struct {
 	events *ledger.Events
@@ -225,7 +228,24 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 	case *ExecutionOutput:
 		txWithMetadata, exists := l.memPool.TransactionMetadata(outputID.TransactionID())
 		if !exists {
-			return nil, err
+			var output *utxoledger.Output
+			stateRequest := l.resolveState(outputID.UTXOInput())
+			stateRequest.OnSuccess(func(loadedState mempool.State) {
+				concreteOutput, ok := loadedState.(*utxoledger.Output)
+				if !ok {
+					err = ErrUnexpectedUnderlyingType
+					return
+				}
+				output = concreteOutput
+			})
+			stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
+			stateRequest.WaitComplete()
+
+			if err != nil {
+				return nil, ierrors.Wrapf(ErrTransactionMetadataNotFOund, "error in getting output for %v", stateWithMetadata.ID())
+			}
+
+			return output, nil
 		}
 
 		earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
@@ -283,6 +303,10 @@ func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempoo
 
 func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank] {
 	return l.conflictDAG
+}
+
+func (l *Ledger) MemPool() mempool.MemPool[ledger.BlockVoteRank] {
+	return l.memPool
 }
 
 func (l *Ledger) Import(reader io.ReadSeeker) error {
@@ -602,23 +626,20 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 
 	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
 	if err != nil {
-		p.Reject(ierrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
+		return p.Reject(ierrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
 	}
 
 	if !isUnspent {
-		p.Reject(ierrors.Errorf("unspent output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+		return p.Reject(ierrors.Errorf("unspent output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
 
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
 	output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(stateRef.Ref())
-
 	if err != nil {
-		p.Reject(ierrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
-	} else {
-		p.Resolve(output)
+		return p.Reject(ierrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
 
-	return p
+	return p.Resolve(output)
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {

@@ -17,17 +17,17 @@ func info() (*models.InfoResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	protoParamsBytesRaw := json.RawMessage(protoParamsBytes)
+	protoParamsJSONRaw := json.RawMessage(protoParamsBytes)
 
 	return &models.InfoResponse{
 		Name:    deps.AppInfo.Name,
 		Version: deps.AppInfo.Version,
 		Status: &models.InfoResNodeStatus{
 			IsHealthy:                   syncStatus.NodeSynced,
-			AcceptedTangleTime:          uint64(clSnapshot.AcceptedTime.Unix()),
-			RelativeAcceptedTangleTime:  uint64(clSnapshot.RelativeAcceptedTime.Unix()),
-			ConfirmedTangleTime:         uint64(clSnapshot.ConfirmedTime.Unix()),
-			RelativeConfirmedTangleTime: uint64(clSnapshot.RelativeConfirmedTime.Unix()),
+			AcceptedTangleTime:          uint64(clSnapshot.AcceptedTime.UnixNano()),
+			RelativeAcceptedTangleTime:  uint64(clSnapshot.RelativeAcceptedTime.UnixNano()),
+			ConfirmedTangleTime:         uint64(clSnapshot.ConfirmedTime.UnixNano()),
+			RelativeConfirmedTangleTime: uint64(clSnapshot.RelativeConfirmedTime.UnixNano()),
 			// TODO: fill in pruningSlot
 			LatestCommittedSlot:    syncStatus.LatestCommittedSlot,
 			LatestFinalizedSlot:    syncStatus.FinalizedSlot,
@@ -41,7 +41,7 @@ func info() (*models.InfoResponse, error) {
 			ConfirmationRate:         metrics.ConfirmedRate,
 		},
 		SupportedProtocolVersions: deps.Protocol.SupportedVersions(),
-		ProtocolParameters:        &protoParamsBytesRaw,
+		ProtocolParameters:        &protoParamsJSONRaw,
 		Features:                  features,
 	}, nil
 }
