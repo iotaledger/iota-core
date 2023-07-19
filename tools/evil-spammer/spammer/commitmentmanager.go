@@ -1,4 +1,4 @@
-package evilspammerpkg
+package spammer
 
 // import (
 // 	"crypto/sha256"
@@ -6,7 +6,7 @@ package evilspammerpkg
 // 	"time"
 
 // 	"github.com/iotaledger/hive.go/core/slot"
-// 	"github.com/iotaledger/iota-core/tools/evilwallet"
+// 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 // 	iotago "github.com/iotaledger/iota.go/v4"
 
 // 	"github.com/pkg/errors"
@@ -34,7 +34,7 @@ package evilspammerpkg
 // 	latestCommitted slot.Index
 
 // 	clockSync   *ClockSync
-// 	validClient evilwallet.Client
+// 	validClient wallet.Client
 
 // 	log Logger
 // }
@@ -56,7 +56,7 @@ package evilspammerpkg
 // 	c.log = l
 
 // 	c.log.Infof("Commitment Manager will be based on the valid client: %s", c.Params.ValidClientURL)
-// 	c.validClient = evilwallet.NewWebClient(c.Params.ValidClientURL)
+// 	c.validClient = wallet.NewWebClient(c.Params.ValidClientURL)
 // 	c.setupTimeParams(c.validClient)
 
 // 	c.clockSync = NewClockSync(c.Params.SlotDuration, c.Params.ClockResyncTime, c.validClient)
@@ -78,7 +78,7 @@ package evilspammerpkg
 // }
 
 // // SetupTimeParams requests through API and sets the genesis time and slot duration for the commitment manager.
-// func (c *CommitmentManager) setupTimeParams(clt evilwallet.Client) {
+// func (c *CommitmentManager) setupTimeParams(clt wallet.Client) {
 // 	genesisTime, slotDuration, err := clt.GetTimeProvider()
 // 	if err != nil {
 // 		panic(errors.Wrapf(err, "failed to get time provider for the commitment manager setup"))
@@ -119,7 +119,7 @@ package evilspammerpkg
 // }
 
 // // GenerateCommitment generates a commitment based on the commitment type provided in spam details.
-// func (c *CommitmentManager) GenerateCommitment(clt evilwallet.Client) (*iotago.Commitment, slot.Index, error) {
+// func (c *CommitmentManager) GenerateCommitment(clt wallet.Client) (*iotago.Commitment, slot.Index, error) {
 // 	switch c.Params.CommitmentType {
 // 	// todo refactor this to work with chainsA
 // 	case "latest":

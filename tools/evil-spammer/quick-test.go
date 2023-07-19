@@ -3,8 +3,8 @@ package main
 import (
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evil-spammer/evilspammerpkg"
-	"github.com/iotaledger/iota-core/tools/evilwallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 )
 
 type QuickTestParams struct {
@@ -19,40 +19,40 @@ type QuickTestParams struct {
 
 // QuickTest runs short spamming periods with stable mps.
 func QuickTest(params *QuickTestParams) {
-	evilWallet := evilwallet.NewEvilWallet(evilwallet.WithClients(params.ClientURLs...))
-	counter := evilspammerpkg.NewErrorCount()
+	evilWallet := wallet.NewEvilWallet(wallet.WithClients(params.ClientURLs...))
+	counter := spammer.NewErrorCount()
 	log.Info("Starting quick test")
 
-	nWallets := 2 * evilspammerpkg.BigWalletsNeeded(params.Rate, params.TimeUnit, params.Duration)
+	nWallets := 2 * spammer.BigWalletsNeeded(params.Rate, params.TimeUnit, params.Duration)
 
 	log.Info("Start preparing funds")
 	evilWallet.RequestFreshBigFaucetWallets(nWallets)
 
 	// define spammers
-	baseOptions := []evilspammerpkg.Options{
-		evilspammerpkg.WithSpamRate(params.Rate, params.TimeUnit),
-		evilspammerpkg.WithSpamDuration(params.Duration),
-		evilspammerpkg.WithErrorCounter(counter),
-		evilspammerpkg.WithEvilWallet(evilWallet),
+	baseOptions := []spammer.Options{
+		spammer.WithSpamRate(params.Rate, params.TimeUnit),
+		spammer.WithSpamDuration(params.Duration),
+		spammer.WithErrorCounter(counter),
+		spammer.WithEvilWallet(evilWallet),
 	}
 
 	//nolint:gocritic // we want a copy here
 	blkOptions := append(baseOptions,
-		evilspammerpkg.WithSpammingFunc(evilspammerpkg.DataSpammingFunction),
+		spammer.WithSpammingFunc(spammer.DataSpammingFunction),
 	)
 
-	dsScenario := evilwallet.NewEvilScenario(
-		evilwallet.WithScenarioCustomConflicts(evilwallet.NSpendBatch(2)),
+	dsScenario := wallet.NewEvilScenario(
+		wallet.WithScenarioCustomConflicts(wallet.NSpendBatch(2)),
 	)
 
 	//nolint:gocritic // we want a copy here
 	dsOptions := append(baseOptions,
-		evilspammerpkg.WithEvilScenario(dsScenario),
+		spammer.WithEvilScenario(dsScenario),
 	)
 
-	blkSpammer := evilspammerpkg.NewSpammer(blkOptions...)
-	txSpammer := evilspammerpkg.NewSpammer(baseOptions...)
-	dsSpammer := evilspammerpkg.NewSpammer(dsOptions...)
+	blkSpammer := spammer.NewSpammer(blkOptions...)
+	txSpammer := spammer.NewSpammer(baseOptions...)
+	dsSpammer := spammer.NewSpammer(dsOptions...)
 
 	// start test
 	txSpammer.Spam()

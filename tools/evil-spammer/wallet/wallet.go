@@ -1,4 +1,4 @@
-package evilwallet
+package wallet
 
 import (
 	"crypto/ed25519"
@@ -56,6 +56,7 @@ func NewWallet(wType ...WalletType) *Wallet {
 	if walletType == Reuse {
 		wallet.reuseAddressPool = make(map[string]types.Empty)
 	}
+
 	return wallet
 }
 
@@ -74,6 +75,7 @@ func (w *Wallet) Address() *iotago.Ed25519Address {
 	addr := hdWallet.Address()
 	w.indexAddrMap[index] = addr.String()
 	w.addrIndexMap[addr.String()] = index
+
 	return addr
 }
 
@@ -84,6 +86,7 @@ func (w *Wallet) AddressOnIndex(index uint64) *iotago.Ed25519Address {
 
 	hdWallet := mock.NewHDWallet("", w.seed[:], index)
 	addr := hdWallet.Address()
+
 	return addr
 }
 
@@ -103,6 +106,7 @@ func (w *Wallet) UnspentOutputs() (outputs map[string]*Output) {
 	for addr, outs := range w.unspentOutputs {
 		outputs[addr] = outs
 	}
+
 	return outputs
 }
 
@@ -138,6 +142,7 @@ func (w *Wallet) UnspentOutputBalance(addr string) iotago.BaseToken {
 	if out, ok := w.unspentOutputs[addr]; ok {
 		total += out.Balance
 	}
+
 	return total
 }
 
@@ -149,6 +154,7 @@ func (w *Wallet) IsEmpty() (empty bool) {
 	default:
 		empty = w.UnspentOutputsLength() == 0
 	}
+
 	return
 }
 
@@ -160,6 +166,7 @@ func (w *Wallet) UnspentOutputsLeft() (left int) {
 	default:
 		left = int(w.lastAddrIdxUsed.Load() - w.lastAddrSpent.Load())
 	}
+
 	return
 }
 
@@ -186,6 +193,7 @@ func (w *Wallet) GetReuseAddress() string {
 			}
 		}
 	}
+
 	return ""
 }
 
@@ -200,9 +208,11 @@ func (w *Wallet) GetUnspentOutput() *Output {
 			idx := w.lastAddrSpent.Add(1)
 			addr := w.IndexAddrMap(uint64(idx))
 			outs := w.UnspentOutput(addr)
+
 			return outs
 		}
 	}
+
 	return nil
 }
 

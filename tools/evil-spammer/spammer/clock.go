@@ -1,10 +1,10 @@
-package evilspammerpkg
+package spammer
 
 // import (
 // 	"time"
 
 // 	iotago "github.com/iotaledger/iota.go/v4"
-// 	"github.com/iotaledger/iota-core/tools/evilwallet"
+// 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 // )
 
 // // region ClockSync //////////////evilspammerpkg/////////////////////////////////////////////////////////////////////////////////
@@ -14,10 +14,10 @@ package evilspammerpkg
 // 	LatestCommittedSlotClock *SlotClock
 
 // 	syncTicker *time.Ticker
-// 	clt        evilwallet.Client
+// 	clt        wallet.Client
 // }
 
-// func NewClockSync(slotDuration time.Duration, syncInterval time.Duration, clientList evilwallet.Client) *ClockSync {
+// func NewClockSync(slotDuration time.Duration, syncInterval time.Duration, clientList wallet.Client) *ClockSync {
 // 	updateTicker := time.NewTicker(syncInterval)
 // 	return &ClockSync{
 // 		LatestCommittedSlotClock: &SlotClock{slotDuration: slotDuration},

@@ -1,4 +1,4 @@
-package evilwallet
+package wallet
 
 import (
 	"sync"
@@ -11,20 +11,19 @@ import (
 )
 
 var (
-	awaitOutputsByAddress    = 150 * time.Second
 	awaitOutputToBeConfirmed = 150 * time.Second
 )
 
 // Input contains details of an input.
 type Input struct {
 	OutputID iotago.OutputID
-	Address  *iotago.Ed25519Address
+	Address  iotago.Address
 }
 
 // Output contains details of an output ID.
 type Output struct {
 	OutputID iotago.OutputID
-	Address  *iotago.Ed25519Address
+	Address  iotago.Address
 	Index    uint64
 	Balance  iotago.BaseToken
 
@@ -88,6 +87,7 @@ func (o *OutputManager) OutputIDAddrMap(outputID string) (addr string) {
 	defer o.RUnlock()
 
 	addr = o.outputIDAddrMap[outputID]
+
 	return
 }
 
@@ -112,6 +112,7 @@ func (o *OutputManager) IssuerSolidOutIDMap(issuer string, outputID iotago.Outpu
 			return
 		}
 	}
+
 	return
 }
 
@@ -152,6 +153,7 @@ func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519A
 	w.AddUnspentOutput(out)
 	o.setOutputIDWalletMap(outputID.ToHex(), w)
 	o.setOutputIDAddrMap(outputID.ToHex(), addr.String())
+
 	return out
 }
 
@@ -192,7 +194,7 @@ func (o *OutputManager) GetOutput(outputID iotago.OutputID) (output *Output) {
 
 		output = &Output{
 			OutputID:     outputID,
-			Address:      basicOutput.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address),
+			Address:      basicOutput.UnlockConditionSet().Address().Address,
 			Balance:      basicOutput.Deposit(),
 			OutputStruct: basicOutput,
 		}
@@ -209,6 +211,7 @@ func (o *OutputManager) getOutputFromWallet(outputID iotago.OutputID) (output *O
 		addr := o.outputIDAddrMap[outputID.ToHex()]
 		output = w.UnspentOutput(addr)
 	}
+
 	return
 }
 
@@ -236,8 +239,7 @@ func (o *OutputManager) RequestOutputsByTxID(txID iotago.TransactionID) (outputI
 	}
 
 	for index := range tx.Essence.Outputs {
-		Id := iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(index))
-		outputIDs = append(outputIDs, Id)
+		outputIDs = append(outputIDs, iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(index)))
 	}
 
 	return outputIDs
@@ -318,6 +320,7 @@ func (o *OutputManager) AwaitTransactionToBeAccepted(txID iotago.TransactionID, 
 	if !accepted {
 		return ierrors.Errorf("transaction %s not accepted in time", txID)
 	}
+
 	return nil
 }
 
@@ -334,12 +337,14 @@ func (o *OutputManager) AwaitOutputToBeSolid(outID iotago.OutputID, clt Client, 
 		if output := clt.GetOutput(outID); output != nil {
 			o.SetOutputIDSolidForIssuer(outID, clt.URL())
 			solid = true
+
 			break
 		}
 	}
 	if !solid {
 		return ierrors.Errorf("output %s not solidified in time", outID)
 	}
+
 	return nil
 }
 
@@ -365,5 +370,6 @@ func (o *OutputManager) AwaitOutputsToBeSolid(outputs iotago.OutputIDs, clt Clie
 		}(outID)
 	}
 	wg.Wait()
+
 	return
 }
