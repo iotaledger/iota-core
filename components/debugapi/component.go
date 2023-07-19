@@ -134,7 +134,7 @@ func configure() error {
 			return err
 		}
 
-		if block, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID); exists {
+		if block, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID); exists && block.ProtocolBlock() != nil {
 			response := &BlockMetadataResponse{
 				BlockID:            block.ID().String(),
 				StrongParents:      lo.Map(block.StrongParents(), func(blockID iotago.BlockID) string { return blockID.String() }),
