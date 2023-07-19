@@ -15,12 +15,13 @@ import (
 )
 
 var (
-	ErrCommitmentTooOld             = ierrors.New("a block cannot commit to a slot that is older than the block's slot minus maxCommittableAge")
-	ErrCommitmentTooRecent          = ierrors.New("a block cannot commit to a slot that is more recent than the block's slot minus minCommittableAge")
-	ErrCommitmentInputTooOld        = ierrors.New("a block cannot contain a commitment input with index older than the block's slot minus maxCommittableAge")
-	ErrCommitmentInputTooRecent     = ierrors.New("a block cannot contain a commitment input with index more recent than the block's slot minus minCommittableAge")
-	ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
-	ErrInvalidBlockVersion          = ierrors.New("block has invalid protocol version")
+	ErrCommitmentTooOld                   = ierrors.New("a block cannot commit to a slot that is older than the block's slot minus maxCommittableAge")
+	ErrCommitmentTooRecent                = ierrors.New("a block cannot commit to a slot that is more recent than the block's slot minus minCommittableAge")
+	ErrCommitmentInputTooOld              = ierrors.New("a block cannot contain a commitment input with index older than the block's slot minus maxCommittableAge")
+	ErrCommitmentInputTooRecent           = ierrors.New("a block cannot contain a commitment input with index more recent than the block's slot minus minCommittableAge")
+	ErrBlockTimeTooFarAheadInFuture       = ierrors.New("a block cannot be too far ahead in the future")
+	ErrInvalidBlockVersion                = ierrors.New("block has invalid protocol version")
+	ErrCommitmentInputNewerThanCommitment = ierrors.New("a block cannot contain a commitment input with index newer than the commitment index")
 )
 
 // Filter filters blocks.
@@ -124,7 +125,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 						block.ID().Index()-cInput.CommitmentID.Index() < minCommittableAge) {
 					f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 						Block:  block,
-						Reason: ierrors.Wrapf(ErrCommitmentTooRecent, "block at slot %d with commitment input to slot %d", block.ID().Index(), cInput.CommitmentID.Index()),
+						Reason: ierrors.Wrapf(ErrCommitmentInputTooRecent, "block at slot %d with commitment input to slot %d", block.ID().Index(), cInput.CommitmentID.Index()),
 						Source: source,
 					})
 
@@ -133,7 +134,17 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 				if block.ID().Index() >= cInput.CommitmentID.Index() && block.ID().Index()-cInput.CommitmentID.Index() > maxCommittableAge {
 					f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 						Block:  block,
-						Reason: ierrors.Wrapf(ErrCommitmentTooOld, "block at slot %d committing to slot %d, max committable age %d", block.ID().Index(), cInput.CommitmentID.Index(), maxCommittableAge),
+						Reason: ierrors.Wrapf(ErrCommitmentInputTooOld, "block at slot %d committing to slot %d, max committable age %d", block.ID().Index(), cInput.CommitmentID.Index(), maxCommittableAge),
+						Source: source,
+					})
+
+					return
+				}
+
+				if cInput.CommitmentID.Index() > block.ProtocolBlock().SlotCommitmentID.Index() {
+					f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+						Block:  block,
+						Reason: ierrors.Wrapf(ErrCommitmentInputNewerThanCommitment, "transaction in a block contains CommitmentInput to slot %d while max allowed is %d", cInput.CommitmentID.Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
 						Source: source,
 					})
 

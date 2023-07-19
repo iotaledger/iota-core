@@ -271,11 +271,21 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
-		require.True(t, strings.HasPrefix(block.ID().Alias(), "valid"))
+		require.NotContains(t, []string{"commitmentInputTooOld", "commitmentInputNewerThanBlockCommitment", "commitmentInputTooRecent"}, block.ID().Alias())
 	})
 
 	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
-		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
+		require.Contains(t, []string{"commitmentInputTooOld", "commitmentInputNewerThanBlockCommitment"}, event.Block.ID().Alias())
+
+		if strings.Contains(event.Block.ID().Alias(), "commitmentInputTooOld") {
+			require.True(t, ierrors.Is(event.Reason, ErrCommitmentInputTooOld))
+		}
+		if strings.Contains(event.Block.ID().Alias(), "commitmentInputNewerThanBlockCommitment") {
+			require.True(t, ierrors.Is(event.Reason, ErrCommitmentInputNewerThanCommitment))
+		}
+		if strings.Contains(event.Block.ID().Alias(), "commitmentInputTooRecent") {
+			require.True(t, ierrors.Is(event.Reason, ErrCommitmentInputTooRecent))
+		}
 	})
 
 	commitmentInputTooOld, err := builder.NewTransactionBuilder(v3API).
