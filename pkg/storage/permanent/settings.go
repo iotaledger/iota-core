@@ -462,7 +462,7 @@ func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
 }
 
 func (s *Settings) apiFromProtocolParameters(version iotago.Version) (iotago.API, error) {
-	protocolParams := s.ProtocolParameters(version)
+	protocolParams := s.protocolParameters(version)
 	if protocolParams == nil {
 		return nil, ierrors.Errorf("protocol parameters for version %d not found", version)
 	}
