@@ -215,45 +215,43 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 	tf.IssueUnsignedBlockAtTime("tooFarAheadFuture", time.Now().Add(allowedDrift).Add(1*time.Second))
 }
 
-func TestFilter_MinCommittableAge(t *testing.T) {
-	v3API := tpkg.TestAPI
+func TestFilter_Commitments(t *testing.T) {
+	// with the following parameters, a block issued in slot 100 can commit between slot 80 and 90
+	v3API := iotago.V3API(
+		iotago.NewV3ProtocolParameters(
+			iotago.WithTimeProviderOptions(time.Now().Add(-20*time.Minute).Unix(), 10, 13),
+			iotago.WithLivenessOptions(10, 20, 3, 4),
+		),
+	)
 
 	tf := NewTestFramework(t,
 		api.NewStaticProvider(v3API),
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
-		require.True(t, strings.HasPrefix(block.ID().Alias(), "valid"))
+		require.NotContains(t, []string{"commitmentInputTooOld", "commitmentInputNewerThanBlockCommitment", "commitmentInputTooRecent"}, block.ID().Alias())
 	})
 
 	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
-		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
-		require.True(t, ierrors.Is(event.Reason, ErrCommitmentTooRecent))
+		require.Contains(t, []string{"commitmentTooOld", "commitmentTooRecent"}, event.Block.ID().Alias())
+
+		if strings.Contains(event.Block.ID().Alias(), "commitmentInputTooOld") {
+			require.True(t, ierrors.Is(event.Reason, ErrCommitmentInputTooOld))
+		}
+		if strings.Contains(event.Block.ID().Alias(), "commitmentInputTooRecent") {
+			require.True(t, ierrors.Is(event.Reason, ErrCommitmentInputTooRecent))
+		}
 	})
 
-	tf.IssueUnsignedBlockAtSlot("valid-1-0", 1, 0)
-	tf.IssueUnsignedBlockAtSlot("valid-2-0", 2, 0)
-	tf.IssueUnsignedBlockAtSlot("valid-3-0", 3, 0)
-	tf.IssueUnsignedBlockAtSlot("valid-4-0", 4, 0)
+	tf.IssueUnsignedBlockAtSlot("commitmentTooOld", 100, 79)
 
-	tf.IssueUnsignedBlockAtSlot("invalid-1-1", 1, 1)
-	tf.IssueUnsignedBlockAtSlot("invalid-2-1", 2, 1)
-	tf.IssueUnsignedBlockAtSlot("invalid-3-1", 3, 1)
-	tf.IssueUnsignedBlockAtSlot("invalid-10-1", 10, 1)
-	tf.IssueUnsignedBlockAtSlot("valid-11-1", 11, 1)
+	tf.IssueUnsignedBlockAtSlot("commitmentTooRecent", 100, 91)
 
-	tf.IssueUnsignedBlockAtSlot("valid-5-0", 5, 0)
-	tf.IssueUnsignedBlockAtSlot("invalid-4-1", 4, 1)
-	tf.IssueUnsignedBlockAtSlot("invalid-5-2", 5, 2)
-	tf.IssueUnsignedBlockAtSlot("invalid-5-3", 5, 3)
-	tf.IssueUnsignedBlockAtSlot("invalid-5-4", 5, 4)
-	tf.IssueUnsignedBlockAtSlot("invalid-5-5", 5, 5)
-	tf.IssueUnsignedBlockAtSlot("invalid-5-6", 5, 6)
+	tf.IssueUnsignedBlockAtSlot("commitmentCorrectNewest", 100, 90)
 
-	tf.IssueUnsignedBlockAtSlot("invalid-19-10", 19, 10)
-	tf.IssueUnsignedBlockAtSlot("valid-19-9", 19, 9)
-	tf.IssueUnsignedBlockAtSlot("valid-19-8", 19, 8)
+	tf.IssueUnsignedBlockAtSlot("commitmentCorrectOldest", 100, 80)
 
+	tf.IssueUnsignedBlockAtSlot("commitmentCorrectMiddle", 100, 85)
 }
 
 func TestFilter_TransactionCommitmentInput(t *testing.T) {
@@ -271,7 +269,7 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
-		require.NotContains(t, []string{"commitmentInputTooOld", "commitmentInputNewerThanBlockCommitment", "commitmentInputTooRecent"}, block.ID().Alias())
+		require.NotContains(t, []string{"commitmentInputTooOld", "commitmentInputNewerThanBlockCommitment"}, block.ID().Alias())
 	})
 
 	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
@@ -282,9 +280,6 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 		}
 		if strings.Contains(event.Block.ID().Alias(), "commitmentInputNewerThanBlockCommitment") {
 			require.True(t, ierrors.Is(event.Reason, ErrCommitmentInputNewerThanCommitment))
-		}
-		if strings.Contains(event.Block.ID().Alias(), "commitmentInputTooRecent") {
-			require.True(t, ierrors.Is(event.Reason, ErrCommitmentInputTooRecent))
 		}
 	})
 
