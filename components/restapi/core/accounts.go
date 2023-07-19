@@ -33,7 +33,7 @@ func blockIssuanceCreditsForAccountID(c echo.Context) (*models.BlockIssuanceCred
 
 	return &models.BlockIssuanceCreditsResponse{
 		SlotIndex:            slotIndex,
-		BlockIssuanceCredits: uint64(account.Credits.Value),
+		BlockIssuanceCredits: account.Credits.Value,
 	}, nil
 }
 
@@ -59,7 +59,7 @@ func congestionForAccountID(c echo.Context) (*models.CongestionResponse, error) 
 		SlotIndex:            slotIndex,
 		Ready:                false, // TODO: update after scheduler is implemented
 		ReferenceManaCost:    0,     // TODO: update after RMC is implemented
-		BlockIssuanceCredits: uint64(account.Credits.Value),
+		BlockIssuanceCredits: account.Credits.Value,
 	}, nil
 }
 
@@ -78,9 +78,9 @@ func staking() (*models.AccountStakingListResponse, error) {
 	for _, accountData := range activeValidators {
 		resp.Stakers = append(resp.Stakers, models.ValidatorResponse{
 			AccountID:                      accountData.ID.ToHex(),
-			PoolStake:                      uint64(accountData.ValidatorStake + accountData.DelegationStake),
-			ValidatorStake:                 uint64(accountData.ValidatorStake),
-			FixedCost:                      uint64(accountData.FixedCost),
+			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
+			ValidatorStake:                 accountData.ValidatorStake,
+			FixedCost:                      accountData.FixedCost,
 			StakingEpochEnd:                accountData.StakeEndEpoch,
 			LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
 		})
@@ -105,10 +105,10 @@ func stakingByAccountID(c echo.Context) (*models.ValidatorResponse, error) {
 
 	return &models.ValidatorResponse{
 		AccountID:                      accountID.ToHex(),
-		PoolStake:                      uint64(accountData.ValidatorStake + accountData.DelegationStake),
-		ValidatorStake:                 uint64(accountData.ValidatorStake),
+		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
+		ValidatorStake:                 accountData.ValidatorStake,
 		StakingEpochEnd:                accountData.StakeEndEpoch,
-		FixedCost:                      uint64(accountData.FixedCost),
+		FixedCost:                      accountData.FixedCost,
 		LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
 	}, nil
 }
@@ -158,7 +158,7 @@ func rewardsByAccountID(c echo.Context) (*models.ManaRewardsResponse, error) {
 
 	return &models.ManaRewardsResponse{
 		EpochIndex: latestRewardsReadyEpoch,
-		Rewards:    uint64(reward),
+		Rewards:    reward,
 	}, nil
 }
 
@@ -178,9 +178,9 @@ func selectedCommittee(c echo.Context) (*models.CommitteeResponse, error) {
 	seatedAccounts.Accounts().ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
 		committee = append(committee, models.CommitteeMemberResponse{
 			AccountID:      accountID.ToHex(),
-			PoolStake:      uint64(seat.PoolStake),
-			ValidatorStake: uint64(seat.ValidatorStake),
-			FixedCost:      uint64(seat.FixedCost),
+			PoolStake:      seat.PoolStake,
+			ValidatorStake: seat.ValidatorStake,
+			FixedCost:      seat.FixedCost,
 		})
 		return true
 	})
@@ -188,7 +188,7 @@ func selectedCommittee(c echo.Context) (*models.CommitteeResponse, error) {
 	return &models.CommitteeResponse{
 		EpochIndex:          epochIndex,
 		Committee:           committee,
-		TotalStake:          uint64(seatedAccounts.Accounts().TotalStake()),
-		TotalValidatorStake: uint64(seatedAccounts.Accounts().TotalValidatorStake()),
+		TotalStake:          seatedAccounts.Accounts().TotalStake(),
+		TotalValidatorStake: seatedAccounts.Accounts().TotalValidatorStake(),
 	}, nil
 }
