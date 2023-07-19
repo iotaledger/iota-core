@@ -1,0 +1,100 @@
+---
+- name: Install WireGuard
+  apt:
+    name: wireguard
+    state: present
+
+- name: Ensure WireGuard configuration directory exists
+  file:
+    path: /etc/wireguard
+    state: directory
+    mode: '0700'
+
+- name: Deploy WireGuard server configuration
+  template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: '0600'
+
+- name: Enable and start WireGuard
+  systemd:
+    name: wg-quick@wg0
+    enabled: yes
+    state: restarted
+
+- name: Enable IPv4 forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes
+
+- name: Install UFW
+  apt:
+    name: ufw
+    state: present
+
+- name: Reset all UFW rules and disable UFW
+  ufw:
+    state: reset
+
+- name: Allow ssh (for management purposes, you can remove if unnecessary)
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+
+- name: Allow WireGuard traffic
+  ufw:
+    rule: allow
+    port: '51820'
+    proto: udp
+
+- name: Allow UDP port 53 from WireGuard, to resolve against systemd-resolved
+  ufw:
+    rule: allow
+    interface: wg0
+    direction: in
+    port: '53'
+    proto: udp
+
+- name: systemd-resolved to listen on wg0 for remote resolution of local network
+  lineinfile:
+    path: /etc/systemd/resolved.conf
+    line: 'DNSStubListenerExtra=10.0.0.1'
+    regexp: '^DNSStubListenerExtra='
+    state: present
+
+- name: restart resolved
+  service:
+    name: systemd-resolved
+    state: restarted
+
+- name: Allow all traffic from 192.168.20.0/24
+  ufw:
+    rule: allow
+    src: 192.168.20.0/24
+
+- name: Deny all other incoming traffic
+  ufw:
+    rule: deny
+    direction: in
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+
+- name: Add manual internal hosts with IPv4 mappings
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ item.value }} {{ item.key }}"
+    regexp: "^{{ item.value }}"
+    state: present
+  loop:
+    - { key: 'node-01.feature', value: '192.168.20.6' }
+    - { key: 'node-02.feature', value: '192.168.20.4' }
+    - { key: 'node-03.feature', value: '192.168.20.5' }
+    - { key: 'node-04.feature', value: '192.168.20.2' }
+    - { key: 'node-05.feature', value: '192.168.20.3' }
+  loop_control:
+    label: "{{ item.key }}"

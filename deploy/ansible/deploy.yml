@@ -1,0 +1,24 @@
+---
+## This playbook deploys new changes to the environment.
+- hosts: all
+  gather_facts: no
+  roles:
+    - exporter
+    - wireguard
+
+- hosts: cores:&internal_nodes
+  gather_facts: no
+  roles:
+    - iota-core-node
+
+# - hosts: node-01*
+#   gather_facts: no
+#   roles:
+#     - snapshotter
+
+# - hosts: metrics
+#   gather_facts: no
+#   vars:
+#     removeData: no
+#   roles:
+#     - metrics
