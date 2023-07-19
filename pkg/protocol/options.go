@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 )
@@ -113,6 +114,12 @@ func WithAttestationProvider(optsAttestationProvider module.Provider[*engine.Eng
 func WithLedgerProvider(optsLedgerProvider module.Provider[*engine.Engine, ledger.Ledger]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsLedgerProvider = optsLedgerProvider
+	}
+}
+
+func WithUpgradeOrchestratorProvider(optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsUpgradeOrchestratorProvider = optsUpgradeOrchestratorProvider
 	}
 }
 

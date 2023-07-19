@@ -38,6 +38,8 @@ import (
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
@@ -72,40 +74,42 @@ type Protocol struct {
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
 	optsStorageOptions      []options.Option[storage.Storage]
 
-	optsFilterProvider          module.Provider[*engine.Engine, filter.Filter]
-	optsBlockDAGProvider        module.Provider[*engine.Engine, blockdag.BlockDAG]
-	optsTipManagerProvider      module.Provider[*engine.Engine, tipmanager.TipManager]
-	optsTipSelectionProvider    module.Provider[*engine.Engine, tipselection.TipSelection]
-	optsBookerProvider          module.Provider[*engine.Engine, booker.Booker]
-	optsClockProvider           module.Provider[*engine.Engine, clock.Clock]
-	optsBlockGadgetProvider     module.Provider[*engine.Engine, blockgadget.Gadget]
-	optsSlotGadgetProvider      module.Provider[*engine.Engine, slotgadget.Gadget]
-	optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]
-	optsNotarizationProvider    module.Provider[*engine.Engine, notarization.Notarization]
-	optsAttestationProvider     module.Provider[*engine.Engine, attestation.Attestations]
-	optsSyncManagerProvider     module.Provider[*engine.Engine, syncmanager.SyncManager]
-	optsLedgerProvider          module.Provider[*engine.Engine, ledger.Ledger]
+	optsFilterProvider              module.Provider[*engine.Engine, filter.Filter]
+	optsBlockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
+	optsTipManagerProvider          module.Provider[*engine.Engine, tipmanager.TipManager]
+	optsTipSelectionProvider        module.Provider[*engine.Engine, tipselection.TipSelection]
+	optsBookerProvider              module.Provider[*engine.Engine, booker.Booker]
+	optsClockProvider               module.Provider[*engine.Engine, clock.Clock]
+	optsBlockGadgetProvider         module.Provider[*engine.Engine, blockgadget.Gadget]
+	optsSlotGadgetProvider          module.Provider[*engine.Engine, slotgadget.Gadget]
+	optsSybilProtectionProvider     module.Provider[*engine.Engine, sybilprotection.SybilProtection]
+	optsNotarizationProvider        module.Provider[*engine.Engine, notarization.Notarization]
+	optsAttestationProvider         module.Provider[*engine.Engine, attestation.Attestations]
+	optsSyncManagerProvider         module.Provider[*engine.Engine, syncmanager.SyncManager]
+	optsLedgerProvider              module.Provider[*engine.Engine, ledger.Ledger]
+	optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
-		Events:                      NewEvents(),
-		Workers:                     workers,
-		supportVersions:             nodeclient.Versions{3},
-		dispatcher:                  dispatcher,
-		optsFilterProvider:          blockfilter.NewProvider(),
-		optsBlockDAGProvider:        inmemoryblockdag.NewProvider(),
-		optsTipManagerProvider:      tipmanagerv1.NewProvider(),
-		optsTipSelectionProvider:    tipselectionv1.NewProvider(),
-		optsBookerProvider:          inmemorybooker.NewProvider(),
-		optsClockProvider:           blocktime.NewProvider(),
-		optsBlockGadgetProvider:     thresholdblockgadget.NewProvider(),
-		optsSlotGadgetProvider:      totalweightslotgadget.NewProvider(),
-		optsSybilProtectionProvider: sybilprotectionv1.NewProvider(),
-		optsNotarizationProvider:    slotnotarization.NewProvider(),
-		optsAttestationProvider:     slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
-		optsSyncManagerProvider:     trivialsyncmanager.NewProvider(),
-		optsLedgerProvider:          ledger1.NewProvider(),
+		Events:                          NewEvents(),
+		Workers:                         workers,
+		supportVersions:                 nodeclient.Versions{3},
+		dispatcher:                      dispatcher,
+		optsFilterProvider:              blockfilter.NewProvider(),
+		optsBlockDAGProvider:            inmemoryblockdag.NewProvider(),
+		optsTipManagerProvider:          tipmanagerv1.NewProvider(),
+		optsTipSelectionProvider:        tipselectionv1.NewProvider(),
+		optsBookerProvider:              inmemorybooker.NewProvider(),
+		optsClockProvider:               blocktime.NewProvider(),
+		optsBlockGadgetProvider:         thresholdblockgadget.NewProvider(),
+		optsSlotGadgetProvider:          totalweightslotgadget.NewProvider(),
+		optsSybilProtectionProvider:     sybilprotectionv1.NewProvider(),
+		optsNotarizationProvider:        slotnotarization.NewProvider(),
+		optsAttestationProvider:         slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
+		optsSyncManagerProvider:         trivialsyncmanager.NewProvider(),
+		optsLedgerProvider:              ledger1.NewProvider(),
+		optsUpgradeOrchestratorProvider: signalingupgradeorchestrator.NewProvider(),
 
 		optsBaseDirectory:           "",
 		optsChainSwitchingThreshold: 3,
@@ -204,6 +208,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsLedgerProvider,
 		p.optsTipManagerProvider,
 		p.optsTipSelectionProvider,
+		p.optsUpgradeOrchestratorProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine(p.optsSnapshotPath)
@@ -258,10 +263,6 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
-	if chainCommitment == nil {
-		return ierrors.Errorf("protocol ProcessBlock failed. Unknown commitment: %s", block.ProtocolBlock().SlotCommitmentID)
-	}
-
 	if !chainCommitment.IsSolid() {
 		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
@@ -313,7 +314,11 @@ func (p *Protocol) LatestAPI() iotago.API {
 	return p.MainEngineInstance().LatestAPI()
 }
 
-func (p *Protocol) APIForVersion(version iotago.Version) iotago.API {
+func (p *Protocol) CurrentAPI() iotago.API {
+	return p.MainEngineInstance().CurrentAPI()
+}
+
+func (p *Protocol) APIForVersion(version iotago.Version) (iotago.API, error) {
 	return p.MainEngineInstance().APIForVersion(version)
 }
 
@@ -325,8 +330,6 @@ func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return p.MainEngineInstance().APIForEpoch(epoch)
 }
 
-var _ api.Provider = &Protocol{}
-
 func (p *Protocol) SupportedVersions() nodeclient.Versions {
 	return p.supportVersions
 }
@@ -336,3 +339,5 @@ func (p *Protocol) ErrorHandler() func(error) {
 		p.Events.Error.Trigger(err)
 	}
 }
+
+var _ api.Provider = &Protocol{}

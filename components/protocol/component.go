@@ -23,6 +23,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -55,7 +56,6 @@ type dependencies struct {
 }
 
 func initConfigParams(c *dig.Container) error {
-
 	type cfgResult struct {
 		dig.Out
 		DatabaseEngine hivedb.Engine `name:"databaseEngine"`
@@ -78,7 +78,6 @@ func initConfigParams(c *dig.Container) error {
 }
 
 func provide(c *dig.Container) error {
-
 	type protocolDeps struct {
 		dig.In
 
@@ -115,6 +114,8 @@ func provide(c *dig.Container) error {
 					blockfilter.WithSignatureValidation(true),
 				),
 			),
+			// TODO: here we should pass the protocol parameters from the config.
+			protocol.WithUpgradeOrchestratorProvider(signalingupgradeorchestrator.NewProvider()),
 		)
 	})
 }
@@ -154,16 +155,16 @@ func configure() error {
 		Component.LogInfof("BlockAccepted: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockPreConfirmed: %s", block.ID())
-	})
-
 	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
 		Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
 		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time), time)
+	})
+
+	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
+		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time), time.String())
 	})
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {

@@ -78,7 +78,8 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...network.PeerID
 func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
 	var iotagoAPI iotago.API
 	if len(attestations) > 0 {
-		iotagoAPI = p.apiProvider.APIForVersion(attestations[0].ProtocolVersion)
+		// TODO: there are multiple attestations potentially spanning multiple epochs/versions, we need to use the correct API for each one
+		iotagoAPI = lo.PanicOnErr(p.apiProvider.APIForVersion(attestations[0].ProtocolVersion))
 	} else {
 		iotagoAPI = p.apiProvider.APIForSlot(cm.Index()) // we need an api to serialize empty slices as well
 	}
@@ -137,6 +138,7 @@ func (p *Protocol) onBlock(blockData []byte, id network.PeerID) {
 	blockIdentifier, err := iotago.BlockIdentifierFromBlockBytes(blockData)
 	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize block"), id)
+		return
 	}
 
 	isNew := p.duplicateBlockBytesFilter.AddIdentifier(types.Identifier(blockIdentifier))
@@ -152,6 +154,7 @@ func (p *Protocol) onBlock(blockData []byte, id network.PeerID) {
 	block, err := model.BlockFromBytes(blockData, p.apiProvider, serix.WithValidation())
 	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize block"), id)
+		return
 	}
 
 	p.Events.BlockReceived.Trigger(block, id)
@@ -197,7 +200,8 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 	}
 
 	var attestations []*iotago.Attestation
-	if _, err := p.apiProvider.APIForVersion(commitmentBytes[0]).Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
+	// TODO: there could be multiple versions of attestations in the same packet
+	if _, err := lo.PanicOnErr(p.apiProvider.APIForVersion(iotago.Version(commitmentBytes[0]))).Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
 
 		return

@@ -10,7 +10,8 @@ export class Vertex {
     weakParents: Array<string>;
     shallowLikedParents: Array<string>;
     is_tip: boolean;
-    is_finalized: boolean;
+    is_blk_confirmed: boolean;
+    is_tx_accepted: boolean;
     is_tx: boolean;
 }
 
@@ -65,6 +66,7 @@ export class VisualizerStore {
         this.routerStore = routerStore;
         registerHandler(WSMsgType.Vertex, this.addVertex);
         registerHandler(WSMsgType.TipInfo, this.addTipInfo);
+        registerHandler(WSMsgType.TXAccepted, this.updateTxStatus);
         // this.fetchHistory();
     }
 
@@ -119,19 +121,35 @@ export class VisualizerStore {
     }
 
     @action
+    updateTxStatus = (vert: Vertex) => {        
+        let existing = this.vertices.get(vert.id);
+        if (!existing) {
+            return
+        }
+
+        existing.is_tx_accepted = vert.is_tx_accepted;
+        this.vertices.set(vert.id, existing);
+
+        if (this.draw) {
+            this.drawVertex(existing);
+        }
+    }
+
+    @action
     addVertex = (vert: Vertex) => {
         let existing = this.vertices.get(vert.id);
         if (existing) {
-            if (!existing.is_finalized && vert.is_finalized) {
+            if (!existing.is_blk_confirmed && vert.is_blk_confirmed) {
                 this.finalized_count++;
             }
         } else {
-            if (vert.is_finalized) {
+            if (vert.is_blk_confirmed) {
                 this.finalized_count++;
             }
             this.verticesIncomingOrder.push(vert.id);
             this.checkLimit();
         }
+
         this.vertices.set(vert.id, vert);
 
         if (this.draw) {
@@ -153,7 +171,7 @@ export class VisualizerStore {
                 v.strongParents = blk.strongParents;
                 v.weakParents = blk.weakParents;
                 v.shallowLikedParents = blk.shallowLikedParents;
-                v.is_finalized = blk.acceptance;
+                v.is_blk_confirmed = blk.acceptance;
             }
             this.verticesIncomingOrder.push(v.id);
         }
@@ -182,7 +200,7 @@ export class VisualizerStore {
             if (!vert) {
                 continue;
             }
-            if (vert.is_finalized) {
+            if (vert.is_blk_confirmed) {
                 this.finalized_count--;
             }
             if (vert.is_tip) {
@@ -236,9 +254,13 @@ export class VisualizerStore {
         }
 
         // finalized
-        if (vert.is_finalized) {
+        if (vert.is_blk_confirmed) {
             if (vert.is_tx) {
-                return COLOR.TransactionConfirmed;
+                if (vert.is_tx_accepted) {
+                    return COLOR.TransactionConfirmed;
+                } else {
+                    return COLOR.TransactionPending;
+                }                
             }
             return COLOR.BlockConfirmed;
         }
