@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
 func getOutput(c echo.Context) (*utxoledger.Output, error) {
@@ -22,7 +23,7 @@ func getOutput(c echo.Context) (*utxoledger.Output, error) {
 	return output, nil
 }
 
-func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
+func getOutputMetadata(c echo.Context) (*nodeclient.OutputMetadataResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, err
@@ -40,10 +41,10 @@ func getOutputMetadata(c echo.Context) (*outputMetadataResponse, error) {
 	return newOutputMetadataResponse(output)
 }
 
-func newOutputMetadataResponse(output *utxoledger.Output) (*outputMetadataResponse, error) {
+func newOutputMetadataResponse(output *utxoledger.Output) (*nodeclient.OutputMetadataResponse, error) {
 	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
-	resp := &outputMetadataResponse{
+	resp := &nodeclient.OutputMetadataResponse{
 		BlockID:            output.BlockID().ToHex(),
 		TransactionID:      output.OutputID().TransactionID().ToHex(),
 		OutputIndex:        output.OutputID().Index(),
@@ -63,10 +64,10 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*outputMetadataRespon
 	return resp, nil
 }
 
-func newSpentMetadataResponse(spent *utxoledger.Spent) (*outputMetadataResponse, error) {
+func newSpentMetadataResponse(spent *utxoledger.Spent) (*nodeclient.OutputMetadataResponse, error) {
 	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
-	resp := &outputMetadataResponse{
+	resp := &nodeclient.OutputMetadataResponse{
 		BlockID:            spent.BlockID().ToHex(),
 		TransactionID:      spent.OutputID().TransactionID().ToHex(),
 		OutputIndex:        spent.OutputID().Index(),

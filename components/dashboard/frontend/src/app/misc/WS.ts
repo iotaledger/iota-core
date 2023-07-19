@@ -6,6 +6,7 @@ export enum WSMsgType {
     ComponentCounterMetrics,
     TipsMetrics,
     Vertex,
+    TXAccepted,
     TipInfo,
     Mana,
     ManaMapOverall,

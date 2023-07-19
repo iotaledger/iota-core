@@ -26,8 +26,8 @@ func (t *TestSuite) AssertProtocolParameters(parameters iotago.ProtocolParameter
 	for _, node := range nodes {
 		t.Eventually(func() error {
 			//nolint:forcetypeassert // just crash if you can't do it
-			if !parameters.(*iotago.V3ProtocolParameters).Equals(node.Protocol.MainEngineInstance().Storage.Settings().LatestAPI().ProtocolParameters().(*iotago.V3ProtocolParameters)) {
-				return ierrors.Errorf("AssertProtocolParameters: %s: expected %s, got %s", node.Name, parameters, node.Protocol.MainEngineInstance().Storage.Settings().LatestAPI().ProtocolParameters())
+			if !parameters.(*iotago.V3ProtocolParameters).Equals(node.Protocol.MainEngineInstance().Storage.Settings().CurrentAPI().ProtocolParameters().(*iotago.V3ProtocolParameters)) {
+				return ierrors.Errorf("AssertProtocolParameters: %s: expected %s, got %s", node.Name, parameters, node.Protocol.MainEngineInstance().Storage.Settings().CurrentAPI().ProtocolParameters())
 			}
 
 			return nil
@@ -42,6 +42,25 @@ func (t *TestSuite) AssertLatestCommitment(commitment *iotago.Commitment, nodes 
 		t.Eventually(func() error {
 			if !commitment.Equals(node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()) {
 				return ierrors.Errorf("AssertLatestCommitment: %s: expected %s, got %s", node.Name, commitment, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment())
+			}
+
+			return nil
+		})
+	}
+}
+
+func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			cm, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
+			if err != nil {
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: expected %v, got error %v", node.Name, slot, err)
+			}
+
+			if cm == nil {
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found", node.Name, slot)
 			}
 
 			return nil

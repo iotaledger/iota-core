@@ -1,6 +1,7 @@
 package coreapi
 
 import (
+	"encoding/json"
 	"io"
 
 	"github.com/labstack/echo/v4"
@@ -12,6 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
 func blockByID(c echo.Context) (*model.Block, error) {
@@ -28,25 +30,32 @@ func blockByID(c echo.Context) (*model.Block, error) {
 	return block, nil
 }
 
-func blockMetadataResponseByID(c echo.Context) (*blockMetadataResponse, error) {
+func blockMetadataResponseByID(c echo.Context) (*nodeclient.BlockMetadataResponse, error) {
 	block, err := blockByID(c)
 	if err != nil {
 		return nil, err
 	}
 
+	txState := txStatePending.String()
+	txMetadata, exist := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadataByAttachment(block.ID())
+	if exist {
+		txState = resolveTxState(txMetadata)
+	}
+
 	// TODO: fill in blockReason, TxState, TxReason.
-	bmResponse := &blockMetadataResponse{
+	bmResponse := &nodeclient.BlockMetadataResponse{
 		BlockID:            block.ID().ToHex(),
 		StrongParents:      block.ProtocolBlock().Block.StrongParentIDs().ToHex(),
 		WeakParents:        block.ProtocolBlock().Block.WeakParentIDs().ToHex(),
 		ShallowLikeParents: block.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
+		TxState:            txState,
 		BlockState:         blockStatePending.String(),
 	}
 
 	return bmResponse, nil
 }
 
-func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
+func blockIssuance(_ echo.Context) (*nodeclient.BlockIssuanceResponse, error) {
 	references := deps.Protocol.MainEngineInstance().TipSelection.SelectTips(iotago.BlockMaxParents)
 	slotCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
@@ -58,25 +67,26 @@ func blockIssuance(_ echo.Context) (*blockIssuanceResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	commitmentJSONRaw := json.RawMessage(cBytes)
 
-	resp := &blockIssuanceResponse{
+	resp := &nodeclient.BlockIssuanceResponse{
 		StrongParents:       references[iotago.StrongParentType].ToHex(),
 		WeakParents:         references[iotago.WeakParentType].ToHex(),
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType].ToHex(),
 		LatestFinalizedSlot: deps.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot(),
-		Commitment:          cBytes,
+		Commitment:          &commitmentJSONRaw,
 	}
 
 	return resp, nil
 }
 
-func sendBlock(c echo.Context) (*blockCreatedResponse, error) {
+func sendBlock(c echo.Context) (*submitBlockResponse, error) {
 	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
 	if err != nil {
 		return nil, err
 	}
 
-	var iotaBlock *iotago.ProtocolBlock
+	var iotaBlock = &iotago.ProtocolBlock{}
 
 	if c.Request().Body == nil {
 		// bad request
@@ -91,13 +101,23 @@ func sendBlock(c echo.Context) (*blockCreatedResponse, error) {
 	switch mimeType {
 	case echo.MIMEApplicationJSON:
 		// Do not validate here, the parents might need to be set
-		if err := deps.Protocol.LatestAPI().JSONDecode(bytes, iotaBlock); err != nil {
+		if err := deps.Protocol.CurrentAPI().JSONDecode(bytes, iotaBlock); err != nil {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 
 	case httpserver.MIMEApplicationVendorIOTASerializerV1:
+		version, _, err := iotago.VersionFromBytes(bytes)
+		if err != nil {
+			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
+		}
+
+		apiForVersion, err := deps.Protocol.APIForVersion(version)
+		if err != nil {
+			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
+		}
+
 		// Do not validate here, the parents might need to be set
-		if _, err := deps.Protocol.LatestAPI().Decode(bytes, iotaBlock); err != nil {
+		if _, err := apiForVersion.Decode(bytes, iotaBlock); err != nil {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 
@@ -122,7 +142,7 @@ func sendBlock(c echo.Context) (*blockCreatedResponse, error) {
 		}
 	}
 
-	return &blockCreatedResponse{
+	return &submitBlockResponse{
 		BlockID: blockID.ToHex(),
 	}, nil
 }

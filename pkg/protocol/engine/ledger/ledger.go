@@ -29,6 +29,7 @@ type Ledger interface {
 	AddUnspentOutput(unspentOutput *utxoledger.Output) error
 
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, BlockVoteRank]
+	MemPool() mempool.MemPool[BlockVoteRank]
 	StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 
 	ManaManager() *mana.Manager
@@ -37,6 +38,7 @@ type Ledger interface {
 
 	Import(reader io.ReadSeeker) error
 	Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error
+	BlockAccepted(block *blocks.Block)
 
 	module.Interface
 }
