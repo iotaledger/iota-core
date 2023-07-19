@@ -108,7 +108,7 @@ func (m *Manager) IsBootstrapped() bool {
 	// All slots smaller than 4 are committable, so in order to check if slot 3 is committed it's necessary to do m.minCommittableAge-1,
 	// otherwise we'd expect slot 4 to be committed in order to be fully committed, which is impossible.
 	latestIndex := m.storage.Settings().LatestCommitment().Index()
-	return latestIndex >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())-m.minCommittableAge-1
+	return latestIndex+m.minCommittableAge+1 >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
@@ -143,11 +143,7 @@ func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
 }
 
 func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool {
-	if acceptedBlockIndex < m.minCommittableAge {
-		return false
-	}
-
-	return index < acceptedBlockIndex-m.minCommittableAge
+	return index+m.minCommittableAge < acceptedBlockIndex
 }
 
 func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {

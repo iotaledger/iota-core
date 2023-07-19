@@ -28,6 +28,7 @@ type Ledger interface {
 	AddUnspentOutput(unspentOutput *utxoledger.Output) error
 
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, BlockVoteRank]
+	MemPool() mempool.MemPool[BlockVoteRank]
 	StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 
 	CommitSlot(index iotago.SlotIndex) (stateRoot, mutationRoot, accountRoot iotago.Identifier, err error)

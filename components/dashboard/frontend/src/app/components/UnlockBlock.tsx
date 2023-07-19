@@ -9,7 +9,6 @@ import { Ed25519Signature } from "./Ed25519Signature";
 
 interface UnlockProps {
     block: unlockBlockJSON;
-    index: number;
     key: number;
 }
 
@@ -26,12 +25,9 @@ export class UnlockBlock extends React.Component<UnlockProps, any> {
         return (
             <Row className={"mb-3"}>
                 <Col>
-                    Index: <Badge variant={"primary"}>{this.props.index}</Badge>
+                    Index: <Badge variant={"primary"}>{this.props.key}</Badge>
                     <ListGroup>
                         <ListGroup.Item>Type: {block.type}</ListGroup.Item>
-                        {
-                            block.referencedIndex && <ListGroup.Item>Referenced Index: {block.referencedIndex}</ListGroup.Item>
-                        }
                         {
                             block.signatureType && <ListGroup.Item>Signature Type: {resolveSignatureType(block.signatureType)}</ListGroup.Item>
                         } 

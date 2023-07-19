@@ -222,7 +222,7 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingWeightU
 	s.pendingWeightUpdatesMutex.Lock()
 	defer s.pendingWeightUpdatesMutex.Unlock()
 
-	if _, exists := s.pendingWeightUpdates.Get(member.ID); !exists {
+	if _, exists := s.pendingWeightUpdates.Get(member.ID); !exists && !s.isShutdown.Load() {
 		s.pendingUpdatesCounter.Increase()
 		s.pendingWeightUpdates.Set(member.ID, member)
 		s.pendingWeightUpdatesSignal.Signal()
@@ -297,7 +297,7 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) notifyPendingPreferr
 	s.pendingPreferredInsteadMutex.Lock()
 	defer s.pendingPreferredInsteadMutex.Unlock()
 
-	if _, exists := s.pendingPreferredInsteadUpdates.Get(member.ID); !exists {
+	if _, exists := s.pendingPreferredInsteadUpdates.Get(member.ID); !exists && !s.isShutdown.Load() {
 		s.pendingUpdatesCounter.Increase()
 		s.pendingPreferredInsteadUpdates.Set(member.ID, member)
 		s.pendingPreferredInsteadSignal.Signal()
