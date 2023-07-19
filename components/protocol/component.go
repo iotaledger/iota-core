@@ -110,8 +110,6 @@ func provide(c *dig.Container) error {
 			),
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(
-					blockfilter.WithMinCommittableAge(iotago.SlotIndex(ParamsProtocol.Filter.MinCommittableAge)),
-					blockfilter.WithMaxCommittableAge(iotago.SlotIndex(ParamsProtocol.Filter.MaxCommittableAge)),
 					blockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
 				),
 			),
