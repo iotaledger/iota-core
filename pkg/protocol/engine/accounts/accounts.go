@@ -14,6 +14,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+//nolint:revive
 type AccountsData []*AccountData
 
 type AccountData struct {

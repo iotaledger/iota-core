@@ -22,7 +22,7 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230717094216-46222fa0ec69
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230717094216-46222fa0ec69
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230714095119-326fc0683ede
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230719093526-b8506bc4b24a
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/libp2p/go-libp2p v0.28.1
 	github.com/multiformats/go-multiaddr v0.9.0

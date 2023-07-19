@@ -91,7 +91,7 @@ const (
 	// GET returns the block issuance credits balance.
 	RouteBlockIssuanceCredits = "/accounts/:" + restapipkg.ParameterAccountID
 
-	// RouteCongestion is the route for getting the current congestion state and all account related usefull details as block issuance credits.
+	// RouteCongestion is the route for getting the current congestion state and all account related useful details as block issuance credits.
 	// GET returns the congestion state raleted to the specified account.
 	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
 
@@ -296,6 +296,7 @@ func configure() error {
 		if err != nil {
 			return err
 		}
+
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
@@ -304,6 +305,7 @@ func configure() error {
 		if err != nil {
 			return err
 		}
+
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
 
@@ -335,10 +337,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteCommittee, func(c echo.Context) error {
-		resp, err := selectedCommittee(c)
-		if err != nil {
-			return err
-		}
+		resp := selectedCommittee(c)
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())

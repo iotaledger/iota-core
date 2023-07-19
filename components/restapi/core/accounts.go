@@ -20,7 +20,7 @@ func blockIssuanceCreditsForAccountID(c echo.Context) (*models.BlockIssuanceCred
 	}
 	slotIndex, err := httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
 	if err != nil {
-		// by deafult we return the balance for the latest slot
+		// by default we return the balance for the latest slot
 		slotIndex = deps.Protocol.SyncManager.LatestCommittedSlot()
 	}
 	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
@@ -85,6 +85,7 @@ func staking() (*models.AccountStakingListResponse, error) {
 			LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
 		})
 	}
+
 	return resp, nil
 }
 
@@ -128,11 +129,14 @@ func rewardsByAccountID(c echo.Context) (*models.ManaRewardsResponse, error) {
 	var reward iotago.Mana
 	switch utxoOutput.OutputType() {
 	case iotago.OutputAccount:
+		//nolint:forcetypeassert
 		accountOutput := utxoOutput.Output().(*iotago.AccountOutput)
 		feature, exists := accountOutput.FeatureSet()[iotago.FeatureStaking]
 		if !exists {
 			return nil, ierrors.Errorf("account %s is not a validator", outputID)
 		}
+
+		//nolint:forcetypeassert
 		stakingFeature := feature.(*iotago.StakingFeature)
 
 		// check if the account is a validator
@@ -144,6 +148,7 @@ func rewardsByAccountID(c echo.Context) (*models.ManaRewardsResponse, error) {
 		)
 
 	case iotago.OutputDelegation:
+		//nolint:forcetypeassert
 		delegationOutput := utxoOutput.Output().(*iotago.DelegationOutput)
 		reward, err = deps.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
 			delegationOutput.ValidatorID,
@@ -162,12 +167,15 @@ func rewardsByAccountID(c echo.Context) (*models.ManaRewardsResponse, error) {
 	}, nil
 }
 
-func selectedCommittee(c echo.Context) (*models.CommitteeResponse, error) {
+func selectedCommittee(c echo.Context) *models.CommitteeResponse {
 	timeProvider := deps.Protocol.APIForSlot(deps.Protocol.SyncManager.LatestCommittedSlot()).TimeProvider()
+
+	var slotIndex iotago.SlotIndex
+
 	epochIndex, err := httpserver.ParseEpochQueryParam(c, restapipkg.ParameterEpochIndex)
-	slotIndex := timeProvider.SlotFromTime(time.Now())
 	if err != nil {
-		// by deafult we return current epoch
+		// by default we return current epoch
+		slotIndex = timeProvider.SlotFromTime(time.Now())
 		epochIndex = timeProvider.EpochFromSlot(slotIndex)
 	} else {
 		slotIndex = timeProvider.EpochEnd(epochIndex)
@@ -182,6 +190,7 @@ func selectedCommittee(c echo.Context) (*models.CommitteeResponse, error) {
 			ValidatorStake: seat.ValidatorStake,
 			FixedCost:      seat.FixedCost,
 		})
+
 		return true
 	})
 
@@ -190,5 +199,5 @@ func selectedCommittee(c echo.Context) (*models.CommitteeResponse, error) {
 		Committee:           committee,
 		TotalStake:          seatedAccounts.Accounts().TotalStake(),
 		TotalValidatorStake: seatedAccounts.Accounts().TotalValidatorStake(),
-	}, nil
+	}
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
-func pruneDatabase(c echo.Context) (*models.PruneDatabaseResponse, error) {
+func pruneDatabase(_ echo.Context) (*models.PruneDatabaseResponse, error) {
 	/*
 		if deps.SnapshotManager.IsSnapshotting() || deps.PruningManager.IsPruning() {
 			return nil, errors.WithMessage(echo.ErrServiceUnavailable, "node is already creating a snapshot or pruning is running")
@@ -58,5 +58,6 @@ func pruneDatabase(c echo.Context) (*models.PruneDatabaseResponse, error) {
 		}, nil
 	*/
 
+	//nolint:revive,nilnil
 	return nil, nil
 }

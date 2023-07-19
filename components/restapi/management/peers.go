@@ -39,7 +39,7 @@ func WrapInfoSnapshot(info *p2p.PeerInfoSnapshot) *models.PeerResponse {
 }
 */
 
-func getPeer(c echo.Context) (*models.PeerResponse, error) {
+func getPeer(_ echo.Context) (*models.PeerResponse, error) {
 	/*
 		peerID, err := restapipkg.ParsePeerIDParam(c)
 		if err != nil {
@@ -53,10 +53,12 @@ func getPeer(c echo.Context) (*models.PeerResponse, error) {
 
 		return WrapInfoSnapshot(info), nil
 	*/
+
+	//nolint:revive,nilnil
 	return nil, nil
 }
 
-func removePeer(c echo.Context) error {
+func removePeer(_ echo.Context) error {
 	/*
 		peerID, err := restapipkg.ParsePeerIDParam(c)
 		if err != nil {
@@ -82,10 +84,12 @@ func listPeers(_ echo.Context) ([]*models.PeerResponse, error) {
 
 		return results, nil
 	*/
+
+	//nolint:revive,nilnil
 	return nil, nil
 }
 
-func addPeer(c echo.Context, logger *logger.Logger) (*models.PeerResponse, error) {
+func addPeer(_ echo.Context, _ *logger.Logger) (*models.PeerResponse, error) {
 	/*
 
 		request := &addPeerRequest{}
@@ -125,5 +129,6 @@ func addPeer(c echo.Context, logger *logger.Logger) (*models.PeerResponse, error
 		return WrapInfoSnapshot(info), nil
 	*/
 
+	//nolint:revive,nilnil
 	return nil, nil
 }

@@ -33,6 +33,7 @@ func NewErrorCount() *ErrorCounter {
 		errorsMap:       make(map[error]*atomic.Int64),
 		errInTotalCount: atomic.NewInt64(0),
 	}
+
 	return e
 }
 
@@ -60,5 +61,6 @@ func (e *ErrorCounter) GetErrorsSummary() string {
 	for key, value := range e.errorsMap {
 		blk += fmt.Sprintf("%s: %d\n", key.Error(), value.Load())
 	}
+
 	return blk
 }

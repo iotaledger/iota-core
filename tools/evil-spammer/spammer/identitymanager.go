@@ -46,7 +46,9 @@ func (i *IdentityManager) getIdentity(alias string) *identity.LocalIdentity {
 	if !exists {
 		i.log.Warnf("Identity %s does not exist, generating new one", alias)
 		key := ed25519.GenerateKeyPair().PrivateKey
+
 		return identity.NewLocalIdentity(key.Public(), key)
 	}
+
 	return id
 }

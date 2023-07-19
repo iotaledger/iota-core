@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
-func createSnapshots(c echo.Context) (*models.CreateSnapshotsResponse, error) {
+func createSnapshots(_ echo.Context) (*models.CreateSnapshotsResponse, error) {
 	/*
 		if deps.SnapshotManager.IsSnapshotting() || deps.PruningManager.IsPruning() {
 			return nil, errors.WithMessage(echo.ErrServiceUnavailable, "node is already creating a snapshot or pruning is running")
@@ -31,5 +31,7 @@ func createSnapshots(c echo.Context) (*models.CreateSnapshotsResponse, error) {
 			FilePath: filePath,
 		}, nil
 	*/
+
+	//nolint:revive,nilnil
 	return nil, nil
 }
