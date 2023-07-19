@@ -1,6 +1,7 @@
 package blockfilter
 
 import (
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -130,15 +131,14 @@ func (t *TestFramework) IssueBlockAtSlotWithVersion(alias string, index iotago.S
 
 func TestFilter_ProtocolVersion(t *testing.T) {
 	apiProvider := api.NewDynamicMockAPIProvider()
-	apiProvider.AddProtocolParameters(0, newMockProtocolParameters(3))
-	apiProvider.AddProtocolParameters(3, newMockProtocolParameters(4))
+	apiProvider.AddProtocolParameters(0, newMockProtocolParameters(3, 0, math.MaxUint64/2))
+	apiProvider.AddProtocolParameters(3, newMockProtocolParameters(4, 0, math.MaxUint64/2))
 
 	defaultAPI := apiProvider.LatestAPI()
 	timeProvider := apiProvider.LatestAPI().TimeProvider()
 
 	tf := NewTestFramework(t,
 		apiProvider,
-		WithSignatureValidation(false),
 		// Set this to some value far in the future so that we can arbitrarily manipulate block times.
 		WithMaxAllowedWallClockDrift(time.Duration(uint64(timeProvider.EpochEnd(50))*uint64(timeProvider.SlotDurationSeconds()))*time.Second),
 	)
@@ -146,12 +146,12 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 	valid := set.New[string](true)
 	invalid := set.New[string](true)
 
-	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
+	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
 		require.True(t, valid.Has(block.ID().Alias()))
 		require.False(t, invalid.Has(block.ID().Alias()))
 	})
 
-	tf.Filter.events.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		block := event.Block
 		require.False(t, valid.Has(block.ID().Alias()))
 		require.True(t, invalid.Has(block.ID().Alias()))
@@ -178,7 +178,7 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 	valid.Add("G")
 	tf.IssueBlockAtSlotWithVersion("G", timeProvider.EpochStart(5), 4, defaultAPI)
 
-	apiProvider.AddProtocolParameters(10, newMockProtocolParameters(5))
+	apiProvider.AddProtocolParameters(10, newMockProtocolParameters(5, 0, math.MaxUint64/2))
 
 	valid.Add("H")
 	tf.IssueBlockAtSlotWithVersion("H", timeProvider.EpochEnd(9), 4, defaultAPI)
@@ -216,11 +216,10 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 }
 
 func TestFilter_MinCommittableAge(t *testing.T) {
-	api := tpkg.TestAPI
+	v3API := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
-		api,
-		WithMinCommittableAge(3),
+		api.NewStaticProvider(v3API),
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
@@ -268,7 +267,7 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 	)
 
 	tf := NewTestFramework(t,
-		api,
+		api.NewStaticProvider(v3API),
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
@@ -277,7 +276,6 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 
 	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		require.True(t, strings.HasPrefix(event.Block.ID().Alias(), "invalid"))
-		require.True(t, ierrors.Is(event.Reason, ErrInvalidProofOfWork))
 	})
 
 	commitmentInputTooOld, err := builder.NewTransactionBuilder(v3API).
@@ -330,12 +328,14 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 
 }
 
-func newMockProtocolParameters(version iotago.Version) iotago.ProtocolParameters {
-	return &mockProtocolParameters{version: version}
+func newMockProtocolParameters(version iotago.Version, minCommittableAge iotago.SlotIndex, maxCommittableAge iotago.SlotIndex) iotago.ProtocolParameters {
+	return &mockProtocolParameters{version: version, minCommittableAge: minCommittableAge, maxCommittableAge: maxCommittableAge}
 }
 
 type mockProtocolParameters struct {
-	version iotago.Version
+	version           iotago.Version
+	minCommittableAge iotago.SlotIndex
+	maxCommittableAge iotago.SlotIndex
 }
 
 func (m mockProtocolParameters) Version() iotago.Version {
@@ -378,8 +378,12 @@ func (m mockProtocolParameters) LivenessThreshold() iotago.SlotIndex {
 	panic("implement me")
 }
 
-func (m mockProtocolParameters) EvictionAge() iotago.SlotIndex {
-	panic("implement me")
+func (m mockProtocolParameters) MinCommittableAge() iotago.SlotIndex {
+	return m.minCommittableAge
+}
+
+func (m mockProtocolParameters) MaxCommittableAge() iotago.SlotIndex {
+	return m.maxCommittableAge
 }
 
 func (m mockProtocolParameters) EpochNearingThreshold() iotago.SlotIndex {

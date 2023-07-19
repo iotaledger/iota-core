@@ -20,6 +20,7 @@ var (
 	ErrCommitmentInputTooOld        = ierrors.New("a block cannot contain a commitment input with index older than the block's slot minus maxCommittableAge")
 	ErrCommitmentInputTooRecent     = ierrors.New("a block cannot contain a commitment input with index more recent than the block's slot minus minCommittableAge")
 	ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
+	ErrInvalidBlockVersion          = ierrors.New("block has invalid protocol version")
 )
 
 // Filter filters blocks.
@@ -29,9 +30,6 @@ type Filter struct {
 	apiProvider api.Provider
 
 	optsMaxAllowedWallClockDrift time.Duration
-	optsMinCommittableAge        iotago.SlotIndex
-	optsMaxCommittableAge        iotago.SlotIndex
-	optsSignatureValidation      bool
 
 	module.Module
 }
@@ -57,9 +55,8 @@ var _ filter.Filter = new(Filter)
 // New creates a new Filter.
 func New(apiProvider api.Provider, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
-		events:                  filter.NewEvents(),
-		optsSignatureValidation: true,
-		apiProvider:             apiProvider,
+		events:      filter.NewEvents(),
+		apiProvider: apiProvider,
 	}, opts,
 		(*Filter).TriggerConstructed,
 		(*Filter).TriggerInitialized,
@@ -68,6 +65,17 @@ func New(apiProvider api.Provider, opts ...options.Option[Filter]) *Filter {
 
 // ProcessReceivedBlock processes block from the given source.
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID) {
+	blockSlotAPI := f.apiProvider.APIForSlot(block.ID().Index())
+
+	if blockSlotAPI.Version() != block.ProtocolBlock().ProtocolVersion {
+		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().ProtocolVersion, blockSlotAPI.Version(), blockSlotAPI.TimeProvider().EpochFromSlot(block.ID().Index())),
+			Source: source,
+		})
+
+		return
+	}
 	// Verify the timestamp is not too far in the future.
 	timeDelta := time.Since(block.ProtocolBlock().IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
@@ -80,11 +88,14 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 		return
 	}
 
+	minCommittableAge := blockSlotAPI.ProtocolParameters().MinCommittableAge()
+	maxCommittableAge := blockSlotAPI.ProtocolParameters().MaxCommittableAge()
+
 	// check that commitment is within allowed range.
-	if f.optsMinCommittableAge > 0 &&
+	if minCommittableAge > 0 &&
 		block.ProtocolBlock().SlotCommitmentID.Index() > 0 &&
 		(block.ProtocolBlock().SlotCommitmentID.Index() > block.ID().Index() ||
-			block.ID().Index()-block.ProtocolBlock().SlotCommitmentID.Index() < f.optsMinCommittableAge) {
+			block.ID().Index()-block.ProtocolBlock().SlotCommitmentID.Index() < minCommittableAge) {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
 			Reason: ierrors.Wrapf(ErrCommitmentTooRecent, "block at slot %d committing to slot %d", block.ID().Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
@@ -93,10 +104,10 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 		return
 	}
-	if block.ID().Index() >= block.ProtocolBlock().SlotCommitmentID.Index() && block.ID().Index()-block.ProtocolBlock().SlotCommitmentID.Index() > f.optsMaxCommittableAge {
+	if block.ID().Index() >= block.ProtocolBlock().SlotCommitmentID.Index() && block.ID().Index()-block.ProtocolBlock().SlotCommitmentID.Index() > maxCommittableAge {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
-			Reason: ierrors.Wrapf(ErrCommitmentTooOld, "block at slot %d committing to slot %d", block.ID().Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
+			Reason: ierrors.Wrapf(ErrCommitmentTooOld, "block at slot %d committing to slot %d, max committable age %d", block.ID().Index(), block.ProtocolBlock().SlotCommitmentID.Index(), maxCommittableAge),
 			Source: source,
 		})
 
@@ -107,10 +118,10 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 	if basicBlock, isBasic := block.BasicBlock(); isBasic {
 		if tx, isTX := basicBlock.Payload.(*iotago.Transaction); isTX {
 			if cInput := tx.CommitmentInput(); cInput != nil {
-				if f.optsMinCommittableAge > 0 &&
+				if minCommittableAge > 0 &&
 					cInput.CommitmentID.Index() > 0 &&
 					(cInput.CommitmentID.Index() > block.ID().Index() ||
-						block.ID().Index()-cInput.CommitmentID.Index() < f.optsMinCommittableAge) {
+						block.ID().Index()-cInput.CommitmentID.Index() < minCommittableAge) {
 					f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 						Block:  block,
 						Reason: ierrors.Wrapf(ErrCommitmentTooRecent, "block at slot %d with commitment input to slot %d", block.ID().Index(), cInput.CommitmentID.Index()),
@@ -119,10 +130,10 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 					return
 				}
-				if block.ID().Index() >= cInput.CommitmentID.Index() && block.ID().Index()-cInput.CommitmentID.Index() > f.optsMaxCommittableAge {
+				if block.ID().Index() >= cInput.CommitmentID.Index() && block.ID().Index()-cInput.CommitmentID.Index() > maxCommittableAge {
 					f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 						Block:  block,
-						Reason: ierrors.Wrapf(ErrCommitmentTooOld, "block at slot %d committing to slot %d", block.ID().Index(), cInput.CommitmentID.Index()),
+						Reason: ierrors.Wrapf(ErrCommitmentTooOld, "block at slot %d committing to slot %d, max committable age %d", block.ID().Index(), cInput.CommitmentID.Index(), maxCommittableAge),
 						Source: source,
 					})
 
@@ -138,20 +149,6 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 func (f *Filter) Shutdown() {
 	f.TriggerStopped()
-}
-
-// WithMinCommittableAge specifies how old a slot has to be for it to be committable.
-func WithMinCommittableAge(age iotago.SlotIndex) options.Option[Filter] {
-	return func(filter *Filter) {
-		filter.optsMinCommittableAge = age
-	}
-}
-
-// WithMaxCommittableAge specifies how old a slot has to be for it to be committable.
-func WithMaxCommittableAge(age iotago.SlotIndex) options.Option[Filter] {
-	return func(filter *Filter) {
-		filter.optsMaxCommittableAge = age
-	}
 }
 
 // WithMaxAllowedWallClockDrift specifies how far in the future are blocks allowed to be ahead of our own wall clock (defaults to 0 seconds).
