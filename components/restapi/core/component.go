@@ -384,7 +384,8 @@ func responseByHeader(c echo.Context, obj any) error {
 	switch mimeType {
 	// TODO: should this maybe already be V2 ?
 	case httpserver.MIMEApplicationVendorIOTASerializerV1:
-		b, err := deps.Protocol.LatestAPI().Encode(obj)
+		// TODO: that should take the API that belongs to the object
+		b, err := deps.Protocol.CurrentAPI().Encode(obj)
 		if err != nil {
 			return err
 		}
@@ -393,7 +394,8 @@ func responseByHeader(c echo.Context, obj any) error {
 
 	// default to echo.MIMEApplicationJSON
 	default:
-		j, err := deps.Protocol.LatestAPI().JSONEncode(obj)
+		// TODO: that should take the API that belongs to the object
+		j, err := deps.Protocol.CurrentAPI().JSONEncode(obj)
 		if err != nil {
 			return err
 		}

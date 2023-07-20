@@ -42,8 +42,8 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	if err != nil {
 		return nil, err
 	}
-	mca := deps.Protocol.LatestAPI().ProtocolParameters().EvictionAge()
-	slotIndex := deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	mca := deps.Protocol.CurrentAPI().ProtocolParameters().EvictionAge()
+	slotIndex := deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time.Now())
 	if slotIndex < mca {
 		mca = 0
 	}

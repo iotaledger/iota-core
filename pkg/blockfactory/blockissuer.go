@@ -95,7 +95,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 	}
 
 	if blockParams.ProtocolParametersHash == nil {
-		protocolParametersHash, err := i.protocol.LatestAPI().ProtocolParameters().Hash()
+		protocolParametersHash, err := i.protocol.CurrentAPI().ProtocolParameters().Hash()
 		if err != nil {
 			return nil, ierrors.Wrap(err, "error getting protocol parameters hash")
 		}
