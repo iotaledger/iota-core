@@ -98,7 +98,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 				transactionMetadata.OnAccepted(func() {
 					if slotIndex := attachmentID.Index(); slotIndex > 0 {
 						if err := r.onTransactionConfirmed(attachmentID); err != nil {
-							r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAccepted in retainer"))
+							r.errorHandler(ierrors.Wrap(err, "failed to store on Transaction Accepted in retainer"))
 						}
 					}
 				})
@@ -155,6 +155,16 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 		HasTx:             hasTx,
 		TransactionStatus: txStatus,
 	}, nil
+}
+
+func (r *Retainer) RetainBlockFailure(blockID iotago.BlockID, failureCode models.BlockFailureReason) {
+	retainerStore := r.retainerFunc(blockID.Index())
+	_ = retainerStore.StoreBlockFailure(blockID, failureCode)
+}
+
+func (r *Retainer) RetainTransactionFailure(transactionID iotago.TransactionID, slotIndex iotago.SlotIndex, failureCode models.TransactionFailureReason) {
+	retainerStore := r.retainerFunc(slotIndex)
+	_ = retainerStore.StoreTransactionFailure(transactionID, failureCode)
 }
 
 func (r *Retainer) blockStatus(blockID iotago.BlockID) (models.BlockState, *model.Block, error) {

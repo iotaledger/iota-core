@@ -1,11 +1,13 @@
 package prunable
 
 import (
+	"github.com/iotaledger/hive.go/core/storable"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/models"
 )
 
 const (
@@ -13,6 +15,8 @@ const (
 	blockConfirmedPrefix
 	transactionPendingPrefix
 	transactionConfirmedPrefix
+	blockFailurePrefix
+	transactionFailurePrefix
 )
 
 type Retainer struct {
@@ -21,6 +25,8 @@ type Retainer struct {
 	blockConfirmedStore       *kvstore.TypedStore[iotago.BlockID, types.Empty]
 	transactionPendingStore   *kvstore.TypedStore[iotago.BlockID, types.Empty]
 	transactionConfirmedStore *kvstore.TypedStore[iotago.BlockID, types.Empty]
+	blockFailureStore         *kvstore.TypedStore[iotago.BlockID, storable.SerializableInt64]
+	transactionFailureStore   *kvstore.TypedStore[iotago.TransactionID, storable.SerializableInt64]
 }
 
 func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Retainer) {
@@ -53,6 +59,24 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 			types.Empty.Bytes,
 			func(bytes []byte) (object types.Empty, consumed int, err error) {
 				return types.Void, 0, nil
+			}),
+		blockFailureStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockFailurePrefix})),
+			iotago.SlotIdentifier.Bytes,
+			iotago.SlotIdentifierFromBytes,
+			storable.SerializableInt64.Bytes,
+			func(bytes []byte) (storable.SerializableInt64, int, error) {
+				var i storable.SerializableInt64
+				c, err := i.FromBytes(bytes)
+				return i, c, err
+			}),
+		transactionFailureStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionFailurePrefix})),
+			iotago.TransactionID.Bytes,
+			iotago.IdentifierFromBytes,
+			storable.SerializableInt64.Bytes,
+			func(bytes []byte) (storable.SerializableInt64, int, error) {
+				var i storable.SerializableInt64
+				c, err := i.FromBytes(bytes)
+				return i, c, err
 			}),
 	}
 }
@@ -147,6 +171,24 @@ func (r *Retainer) StoreTransactionConfirmed(blockID iotago.BlockID) error {
 
 func (r *Retainer) DeleteTransactionConfirmed(prevID iotago.BlockID) error {
 	err := r.transactionConfirmedStore.Delete(prevID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType models.BlockFailureReason) error {
+	err := r.blockFailureStore.Set(blockID, storable.SerializableInt64(failureType))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Retainer) StoreTransactionFailure(transactionID iotago.TransactionID, failureType models.TransactionFailureReason) error {
+	err := r.transactionFailureStore.Set(transactionID, storable.SerializableInt64(failureType))
 	if err != nil {
 		return err
 	}
