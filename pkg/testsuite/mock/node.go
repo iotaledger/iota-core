@@ -26,6 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -254,6 +255,15 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		fmt.Printf("%s > [%s] Filter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+		n.Testing.Fatal("no blocks should be prefiltered")
+	})
+
+	events.CommitmentFilter.BlockAllowed.Hook(func(block *model.Block) {
+		fmt.Printf("%s > [%s] CommitmentFilter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
+	})
+
+	events.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+		fmt.Printf("%s > [%s] CommitmentFilter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
 		n.Testing.Fatal("no blocks should be filtered")
 	})
 

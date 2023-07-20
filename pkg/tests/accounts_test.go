@@ -30,6 +30,8 @@ func Test_TransitionAccount(t *testing.T) {
 		Amount: testsuite.MinIssuerAccountDeposit,
 		// AccountID is derived from this field, so this must be set uniquely for each account.
 		IssuerKey: oldGenesisOutputKey,
+		// Expiry Slot is the slot index at which the account expires.
+		ExpirySlot: math.MaxUint64,
 	}),
 		testsuite.WithGenesisTimestampOffset(100*10),
 	)
@@ -58,7 +60,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	newGenesisOutputKey := utils.RandPubKey()
 	{
-		accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount("Genesis:1", testsuite.AddBlockIssuerKey(newGenesisOutputKey[:]), testsuite.WithBlockIssuerExpirySlot(1))
+		accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount("Genesis:1", testsuite.AddBlockIssuerKey(newGenesisOutputKey[:]), testsuite.WithBlockIssuerExpirySlot(100))
 		consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(5, "Genesis:0")
 
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
@@ -84,6 +86,8 @@ func Test_TransitionAccount(t *testing.T) {
 		ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock1, &prunable.AccountDiff{
 			BICChange:           0,
 			PreviousUpdatedTime: 0,
+			PreviousExpirySlot:  math.MaxUint64,
+			NewExpirySlot:       100,
 			NewOutputID:         iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 			PreviousOutputID:    genesisAccount.OutputID(),
 			PubKeysRemoved:      []ed25519.PublicKey{},
@@ -109,6 +113,7 @@ func Test_TransitionAccount(t *testing.T) {
 			}),
 			testsuite.WithBlockIssuerFeature(&iotago.BlockIssuerFeature{
 				BlockIssuerKeys: iotago.BlockIssuerKeys{newAccountBlockIssuerKey[:]},
+				ExpirySlot:      10,
 			}),
 			testsuite.WithStakingFeature(&iotago.StakingFeature{
 				StakedAmount: 10000,

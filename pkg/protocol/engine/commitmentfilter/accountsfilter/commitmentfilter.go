@@ -37,7 +37,7 @@ type CommitmentFilter struct {
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
 	commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error)
 
-	accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error)
+	accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (*accounts.AccountData, bool, error)
 
 	futureBlocksMutex sync.RWMutex
 
@@ -49,8 +49,12 @@ type CommitmentFilter struct {
 func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter] {
 	return module.Provide(func(e *engine.Engine) commitmentfilter.CommitmentFilter {
 		// TODO: check the accounts manager directly rather than loading the commitment from storage.
-		c := New(e.Storage.Commitments().Load, e.Ledger.Account, e, opts...)
+		c := New(e, opts...)
 		e.HookConstructed(func() {
+			c.commitmentFunc = e.Storage.Commitments().Load
+
+			c.accountRetrieveFunc = e.Ledger.Account
+
 			e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				c.PromoteFutureBlocksUntil(details.Commitment.Index())
 			})
@@ -68,12 +72,11 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 	})
 }
 
-func New(commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error), apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
+func New(apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
 	return options.Apply(&CommitmentFilter{
-		apiProvider:         apiProvider,
-		futureBlocks:        memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*model.Block]](),
-		commitmentFunc:      commitmentFunc,
-		accountRetrieveFunc: accountRetrieveFunc,
+		apiProvider:  apiProvider,
+		events:       commitmentfilter.NewEvents(),
+		futureBlocks: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*model.Block]](),
 	}, opts,
 	)
 }

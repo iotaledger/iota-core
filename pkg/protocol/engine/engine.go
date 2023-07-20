@@ -84,6 +84,7 @@ func New(
 	errorHandler func(error),
 	storageInstance *storage.Storage,
 	filterProvider module.Provider[*Engine, filter.Filter],
+	commitmentFilterProvider module.Provider[*Engine, commitmentfilter.CommitmentFilter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
 	clockProvider module.Provider[*Engine, clock.Clock],
@@ -135,6 +136,7 @@ func New(
 			e.SybilProtection = sybilProtectionProvider(e)
 			e.BlockDAG = blockDAGProvider(e)
 			e.Filter = filterProvider(e)
+			e.CommitmentFilter = commitmentFilterProvider(e)
 			e.Booker = bookerProvider(e)
 			e.Clock = clockProvider(e)
 			e.BlockGadget = blockGadgetProvider(e)
@@ -209,6 +211,7 @@ func (e *Engine) Shutdown() {
 		e.UpgradeOrchestrator.Shutdown()
 		e.TipManager.Shutdown()
 		e.Filter.Shutdown()
+		e.CommitmentFilter.Shutdown()
 		e.Storage.Shutdown()
 		e.Workers.Shutdown()
 	}

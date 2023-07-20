@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -42,6 +43,12 @@ func WithChainSwitchingThreshold(threshold int) options.Option[Protocol] {
 func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, filter.Filter]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsFilterProvider = optsFilterProvider
+	}
+}
+
+func WithCommitmentFilterProvider(optsCommitmentFilterProvider module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsCommitmentFilterProvider = optsCommitmentFilterProvider
 	}
 }
 
