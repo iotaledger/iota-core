@@ -228,8 +228,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	}
 
 	// Make sure we only create syntactically valid blocks.
-	// TODO: add serix.WithValidation() after fixing issues in Test_TransitionAccount.
-	modelBlock, err := model.BlockFromBlock(block, api)
+	modelBlock, err := model.BlockFromBlock(block, api, serix.WithValidation())
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error serializing block to model block")
 	}
