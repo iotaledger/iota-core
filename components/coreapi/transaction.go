@@ -6,8 +6,10 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
 func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
@@ -42,20 +44,42 @@ func blockByTransactionID(c echo.Context) (*model.Block, error) {
 	return block, nil
 }
 
-func blockMetadataFromTransactionID(c echo.Context) (*blockMetadataResponse, error) {
+func blockMetadataFromTransactionID(c echo.Context) (*nodeclient.BlockMetadataResponse, error) {
 	block, err := blockByTransactionID(c)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: fill in blockReason, TxState, TxReason.
-	bmResponse := &blockMetadataResponse{
+	txState := txStatePending.String()
+	txMetadata, exist := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadataByAttachment(block.ID())
+	if exist {
+		txState = resolveTxState(txMetadata)
+	}
+
+	// TODO: fill in blockReason, TxReason.
+
+	bmResponse := &nodeclient.BlockMetadataResponse{
 		BlockID:            block.ID().ToHex(),
 		StrongParents:      block.ProtocolBlock().Block.StrongParentIDs().ToHex(),
 		WeakParents:        block.ProtocolBlock().Block.WeakParentIDs().ToHex(),
 		ShallowLikeParents: block.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
 		BlockState:         blockStatePending.String(),
+		TxState:            txState,
 	}
 
 	return bmResponse, nil
+}
+
+func resolveTxState(metadata mempool.TransactionMetadata) string {
+	var state txState
+
+	if metadata.IsAccepted() {
+		state = txStateConfirmed
+	} else if metadata.IsCommitted() {
+		state = txStateFinalized
+	} else {
+		state = txStatePending
+	}
+
+	return state.String()
 }

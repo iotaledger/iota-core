@@ -15,12 +15,6 @@ export class TaggedDataPayload {
     data: string;
 }
 
-// Transaction payload
-export class TransactionPayload {
-    txID: string;
-    transaction: Transaction;
-}
-
 export class FaucetPayload {
     address: string;
     accessManaPledgeID: string;
@@ -28,7 +22,7 @@ export class FaucetPayload {
     nonce: number;
 }
 
-export class Transaction {
+export class TransactionPayload {
     networkId: number;
     creationTime: number;
     inputs: Array<Input>;
@@ -76,7 +70,7 @@ export class SignatureEd25519 {
 export class BasicOutput {
     amount: number
     nativeTokens?: Array<NativeToken>;
-    unlockConditions?: Array<Condition>;
+    unlockConditions?: Array<any>;
     features?: Array<Feature>;
 }
 
@@ -87,7 +81,7 @@ export class AliasOutput {
     stateIndex: number;
     stateMetadata?: string;
     foundryCounter: number;
-    unlockConditions?: Array<Condition>;
+    unlockConditions?: Array<any>;
     features?: Array<Feature>;
     immutableFeatures?: Array<Feature>;
 }
@@ -97,7 +91,7 @@ export class FoundryOutput {
     nativeTokens?: Array<NativeToken>;
     serialNumber: number;
     tokenScheme: number;    
-    unlockConditions?: Array<Condition>;
+    unlockConditions?: Array<any>;
     features?: Array<Feature>;
     immutableFeatures?: Array<Feature>;
 }
@@ -106,7 +100,7 @@ export class NFTOutput {
     amount: number;
     nativeTokens?: Array<NativeToken>;
     nftId: string;  
-    unlockConditions?: Array<Condition>;
+    unlockConditions?: Array<any>;
     features?: Array<Feature>;
     immutableFeatures?: Array<Feature>;
 }
@@ -137,30 +131,29 @@ export class NativeToken {
     amount: number;
 }
 
-export class Condition {
-    type: number;
-    condition: 
-        AddressUnlockCondition |
-        StorageDepositReturnUnlockCondition |
-        TimelockUnlockCondition |
-        ExpirationUnlockCondition;
-}
-
 // address, stateController, Governor share the same struct
 export class AddressUnlockCondition {
-    address: string;
+    type: number;
+    address: Address;
 }
 
+export class Address {
+    type: number;
+    pubKeyHash: string;
+}
 export class StorageDepositReturnUnlockCondition {
+    type: number;
     returnAddress: string;
     amount: number;
 }
 
 export class TimelockUnlockCondition {
+    type: number;
     unixTime?: number;
 }
 
 export class ExpirationUnlockCondition {
+    type: number;
     returnAddress: string;
     unixTime: number;
 }

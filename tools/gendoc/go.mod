@@ -46,7 +46,7 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
-	github.com/holiman/uint256 v1.2.2 // indirect
+	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/huin/goupnp v1.2.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
@@ -64,7 +64,7 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230717094216-46222fa0ec69 // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230717094216-46222fa0ec69 // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230714095119-326fc0683ede // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230719093526-b8506bc4b24a // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect

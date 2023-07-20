@@ -27,8 +27,8 @@ github.com/gorilla/websocket v1.4.2/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/ad
 github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc=
 github.com/gorilla/websocket v1.5.0/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542 h1:2VTzZjLZBgl62/EtslCrtky5vbi9dd7HrQPQIx6wqiw=
-github.com/holiman/uint256 v1.2.2 h1:TXKcSGc2WaxPD2+bmzAsVthL4+pEN0YwXcL5qED83vk=
-github.com/holiman/uint256 v1.2.2/go.mod h1:SC8Ryt4n+UBbPbIBKaG9zbbDlp4jOru9xFZmPzLUTxw=
+github.com/holiman/uint256 v1.2.3 h1:K8UWO1HUJpRMXBxbmaY1Y8IAMZC/RsKB+ArEnnK4l5o=
+github.com/holiman/uint256 v1.2.3/go.mod h1:SC8Ryt4n+UBbPbIBKaG9zbbDlp4jOru9xFZmPzLUTxw=
 github.com/iancoleman/orderedmap v0.3.0 h1:5cbR2grmZR/DiVt+VJopEhtVs9YGInGIxAoMJn+Ichc=
 github.com/iancoleman/orderedmap v0.3.0/go.mod h1:XuLcCUkdL5owUCQeF2Ue9uuw1EptkJDkXXS7VoV7XGE=
 github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 h1:dTrD7X2PTNgli6EbS4tV9qu3QAm/kBU3XaYZV2xdzys=
@@ -55,8 +55,8 @@ github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230717094216-46222fa
 github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230717094216-46222fa0ec69/go.mod h1:2dzHxEpppULFjMRn0iyuQW81sLUuJ0Y/9zCHsRuLUvI=
 github.com/iotaledger/hive.go/stringify v0.0.0-20230717094216-46222fa0ec69 h1:K8G/pTxEy6PwbiCYiZO+wcKvCqeJ3uI6SljNRHaExks=
 github.com/iotaledger/hive.go/stringify v0.0.0-20230717094216-46222fa0ec69/go.mod h1:l/F3cA/+67QdNj+sohv2v4HhmsdOcWScoA+sVYoAE4c=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230714095119-326fc0683ede h1:Aifru0A0OW6qXy0zya7giJvAdkNPmL3FKwZAw1d62vQ=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230714095119-326fc0683ede/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230719093526-b8506bc4b24a h1:XnpEYagscvXbolW6c89ANEZWsrlrBnn5zzdhqPW2/kQ=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230719093526-b8506bc4b24a/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=

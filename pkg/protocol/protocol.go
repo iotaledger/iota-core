@@ -24,6 +24,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/passthrough"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -87,6 +89,7 @@ type Protocol struct {
 	optsAttestationProvider         module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider         module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsLedgerProvider              module.Provider[*engine.Engine, ledger.Ledger]
+	optsSchedulerProvider           module.Provider[*engine.Engine, scheduler.Scheduler]
 	optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
 }
 
@@ -109,6 +112,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsAttestationProvider:         slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:         trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:              ledger1.NewProvider(),
+		optsSchedulerProvider:           passthrough.NewProvider(),
 		optsUpgradeOrchestratorProvider: signalingupgradeorchestrator.NewProvider(),
 
 		optsBaseDirectory:           "",
@@ -206,6 +210,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsNotarizationProvider,
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,
+		p.optsSchedulerProvider,
 		p.optsTipManagerProvider,
 		p.optsTipSelectionProvider,
 		p.optsUpgradeOrchestratorProvider,
@@ -330,8 +335,6 @@ func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return p.MainEngineInstance().APIForEpoch(epoch)
 }
 
-var _ api.Provider = &Protocol{}
-
 func (p *Protocol) SupportedVersions() nodeclient.Versions {
 	return p.supportVersions
 }
@@ -341,3 +344,5 @@ func (p *Protocol) ErrorHandler() func(error) {
 		p.Events.Error.Trigger(err)
 	}
 }
+
+var _ api.Provider = &Protocol{}

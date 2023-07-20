@@ -101,6 +101,10 @@ func (t *TestSuite) AssertBlocksInCacheConfirmed(expectedBlocks []*blocks.Block,
 	t.assertBlocksInCacheWithFunc(expectedBlocks, "confirmed", expectedConfirmed, (*blocks.Block).IsConfirmed, nodes...)
 }
 
+func (t *TestSuite) AssertBlocksInCacheScheduled(expectedBlocks []*blocks.Block, expectedScheduled bool, nodes ...*mock.Node) {
+	t.assertBlocksInCacheWithFunc(expectedBlocks, "scheduled", expectedScheduled, (*blocks.Block).IsScheduled, nodes...)
+}
+
 func (t *TestSuite) AssertBlocksInCacheRootBlock(expectedBlocks []*blocks.Block, expectedRootBlock bool, nodes ...*mock.Node) {
 	t.assertBlocksInCacheWithFunc(expectedBlocks, "root-block", expectedRootBlock, (*blocks.Block).IsRootBlock, nodes...)
 }
