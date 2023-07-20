@@ -243,7 +243,7 @@ func getSlotDetailsByID(c echo.Context) error {
 		return err
 	}
 
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.StateDiffs(commitmentID.Index())
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(commitmentID.Index())
 	if err != nil {
 		return err
 	}

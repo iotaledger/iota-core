@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -65,8 +65,8 @@ func (f *Framework) UpdateConflictParents(conflictAlias string, addedParentIDs, 
 }
 
 // LikedInstead returns the set of conflicts that are liked instead of the given conflicts.
-func (f *Framework) LikedInstead(conflictAliases ...string) *advancedset.AdvancedSet[iotago.TransactionID] {
-	var result *advancedset.AdvancedSet[iotago.TransactionID]
+func (f *Framework) LikedInstead(conflictAliases ...string) ds.Set[iotago.TransactionID] {
+	var result ds.Set[iotago.TransactionID]
 	_ = f.Instance.ReadConsistent(func(conflictDAG conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]) error {
 		result = conflictDAG.LikedInstead(f.ConflictIDs(conflictAliases...))
 
@@ -92,8 +92,8 @@ func (f *Framework) EvictConflict(conflictAlias string) {
 }
 
 // ConflictIDs translates the given aliases into an AdvancedSet of iotago.TransactionIDs.
-func (f *Framework) ConflictIDs(aliases ...string) *advancedset.AdvancedSet[iotago.TransactionID] {
-	conflictIDs := advancedset.New[iotago.TransactionID]()
+func (f *Framework) ConflictIDs(aliases ...string) ds.Set[iotago.TransactionID] {
+	conflictIDs := ds.NewSet[iotago.TransactionID]()
 	for _, alias := range aliases {
 		conflictIDs.Add(f.ConflictID(alias))
 	}
@@ -102,8 +102,8 @@ func (f *Framework) ConflictIDs(aliases ...string) *advancedset.AdvancedSet[iota
 }
 
 // ConflictSetIDs translates the given aliases into an AdvancedSet of iotago.OutputIDs.
-func (f *Framework) ConflictSetIDs(aliases ...string) *advancedset.AdvancedSet[iotago.OutputID] {
-	conflictSetIDs := advancedset.New[iotago.OutputID]()
+func (f *Framework) ConflictSetIDs(aliases ...string) ds.Set[iotago.OutputID] {
+	conflictSetIDs := ds.NewSet[iotago.OutputID]()
 	for _, alias := range aliases {
 		conflictSetIDs.Add(f.ResourceID(alias))
 	}

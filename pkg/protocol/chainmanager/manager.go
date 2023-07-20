@@ -98,13 +98,13 @@ func (m *Manager) ProcessCommitment(commitment *model.Commitment) (isSolid bool,
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	isNew, isSolid, chainCommitment := m.processCommitment(commitment)
+	wasForked, isSolid, chainCommitment := m.processCommitment(commitment)
 
 	if chainCommitment == nil {
 		return false, nil
 	}
 
-	if !isNew {
+	if wasForked {
 		if err := m.switchMainChainToCommitment(chainCommitment); err != nil {
 			panic(err)
 		}
@@ -226,7 +226,7 @@ func (m *Manager) SwitchMainChain(head iotago.CommitmentID) error {
 	return m.switchMainChainToCommitment(commitment)
 }
 
-func (m *Manager) processCommitment(commitment *model.Commitment) (isNew bool, isSolid bool, chainCommitment *ChainCommitment) {
+func (m *Manager) processCommitment(commitment *model.Commitment) (wasForked bool, isSolid bool, chainCommitment *ChainCommitment) {
 	// Lock access to the parent commitment. We need to lock this first as we are trying to update children later within this function.
 	// Failure to do so, leads to a deadlock, where a child is locked and tries to lock its parent, which is locked by the parent which tries to lock the child.
 	m.commitmentEntityMutex.Lock(commitment.PrevID())
@@ -246,9 +246,9 @@ func (m *Manager) processCommitment(commitment *model.Commitment) (isNew bool, i
 		return false, isRootCommitment, chainCommitment
 	}
 
-	isNew, isSolid, _, chainCommitment = m.registerCommitment(commitment)
+	isNew, isSolid, wasForked, chainCommitment := m.registerCommitment(commitment)
 	if !isNew || chainCommitment.Chain() == nil {
-		return
+		return wasForked, isSolid, chainCommitment
 	}
 
 	if mainChild := chainCommitment.mainChild(); mainChild != nil {
@@ -265,7 +265,7 @@ func (m *Manager) processCommitment(commitment *model.Commitment) (isNew bool, i
 		}
 	}
 
-	return
+	return wasForked, isSolid, chainCommitment
 }
 
 func (m *Manager) evict(index iotago.SlotIndex) {
@@ -418,6 +418,10 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 
 		for childWalker := walker.New[*ChainCommitment]().Push(mainChild); childWalker.HasNext(); {
 			childWalker.PushAll(m.propagateReplaceChainToMainChild(childWalker.Next(), newChildChain)...)
+		}
+
+		for childWalker := walker.New[*ChainCommitment]().Push(fp); childWalker.HasNext(); {
+			childWalker.PushAll(m.propagateReplaceChainToMainChild(childWalker.Next(), parentCommitment.Chain())...)
 		}
 
 		if fp == forkingPoint {

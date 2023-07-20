@@ -3,13 +3,13 @@ package mempoolv1
 import (
 	"sync/atomic"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/promise"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	lpromise "github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -20,8 +20,8 @@ type TransactionMetadata struct {
 	inputs            []*StateMetadata
 	outputs           []*StateMetadata
 	transaction       mempool.Transaction
-	parentConflictIDs *lpromise.Set[iotago.TransactionID]
-	conflictIDs       *lpromise.Set[iotago.TransactionID]
+	parentConflictIDs reactive.DerivedSet[iotago.TransactionID]
+	conflictIDs       reactive.DerivedSet[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -33,13 +33,13 @@ type TransactionMetadata struct {
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
-	allInputsAccepted     *lpromise.Value[bool]
+	allInputsAccepted     reactive.Variable[bool]
 	conflicting           *promise.Event
 	conflictAccepted      *promise.Event
 
 	// attachments
 	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
-	earliestIncludedAttachment *lpromise.Value[iotago.BlockID]
+	earliestIncludedAttachment reactive.Variable[iotago.BlockID]
 	allAttachmentsEvicted      *promise.Event
 
 	// mutex needed?
@@ -66,8 +66,8 @@ func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction)
 		inputReferences:   inputReferences,
 		inputs:            make([]*StateMetadata, len(inputReferences)),
 		transaction:       transaction,
-		parentConflictIDs: lpromise.NewSet[iotago.TransactionID](),
-		conflictIDs:       lpromise.NewSet[iotago.TransactionID](),
+		parentConflictIDs: reactive.NewDerivedSet[iotago.TransactionID](),
+		conflictIDs:       reactive.NewDerivedSet[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(inputReferences)),
 		booked:             promise.NewEvent(),
@@ -77,12 +77,12 @@ func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction)
 		evicted:            promise.NewEvent(),
 
 		unacceptedInputsCount: uint64(len(inputReferences)),
-		allInputsAccepted:     lpromise.NewValue[bool](),
+		allInputsAccepted:     reactive.NewVariable[bool](),
 		conflicting:           promise.NewEvent(),
 		conflictAccepted:      promise.NewEvent(),
 
 		attachments:                shrinkingmap.New[iotago.BlockID, bool](),
-		earliestIncludedAttachment: lpromise.NewValue[iotago.BlockID](),
+		earliestIncludedAttachment: reactive.NewVariable[iotago.BlockID](),
 		allAttachmentsEvicted:      promise.NewEvent(),
 
 		inclusionFlags: newInclusionFlags(),
@@ -97,11 +97,11 @@ func (t *TransactionMetadata) Transaction() mempool.Transaction {
 	return t.transaction
 }
 
-func (t *TransactionMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateMetadata] {
+func (t *TransactionMetadata) Inputs() ds.Set[mempool.StateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	inputs := advancedset.New[mempool.StateMetadata]()
+	inputs := ds.NewSet[mempool.StateMetadata]()
 	for _, input := range t.inputs {
 		inputs.Add(input)
 	}
@@ -109,11 +109,11 @@ func (t *TransactionMetadata) Inputs() *advancedset.AdvancedSet[mempool.StateMet
 	return inputs
 }
 
-func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMetadata] {
+func (t *TransactionMetadata) Outputs() ds.Set[mempool.StateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	outputs := advancedset.New[mempool.StateMetadata]()
+	outputs := ds.NewSet[mempool.StateMetadata]()
 	for _, output := range t.outputs {
 		outputs.Add(output)
 	}
@@ -121,7 +121,7 @@ func (t *TransactionMetadata) Outputs() *advancedset.AdvancedSet[mempool.StateMe
 	return outputs
 }
 
-func (t *TransactionMetadata) ConflictIDs() *lpromise.Set[iotago.TransactionID] {
+func (t *TransactionMetadata) ConflictIDs() reactive.Set[iotago.TransactionID] {
 	return t.conflictIDs
 }
 
@@ -285,7 +285,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	t.OnConflicting(func() {
 		cancelConflictInheritance()
 
-		t.conflictIDs.Set(advancedset.New(t.id))
+		t.conflictIDs.Replace(ds.NewSet(t.id))
 	})
 
 	t.allAttachmentsEvicted.OnTrigger(func() {

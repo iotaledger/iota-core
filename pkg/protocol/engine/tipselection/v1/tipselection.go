@@ -1,12 +1,17 @@
 package tipselectionv1
 
 import (
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"time"
+
+	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -29,6 +34,12 @@ type TipSelection struct {
 	// memPool holds information about pending transactions.
 	memPool mempool.MemPool[ledger.BlockVoteRank]
 
+	// livenessThresholdQueue holds a queue of tips that are waiting to reach the liveness threshold.
+	livenessThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
+
+	// livenessThreshold holds the current liveness threshold.
+	livenessThreshold reactive.Variable[time.Time]
+
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int
 
@@ -44,36 +55,53 @@ type TipSelection struct {
 
 	// Module embeds the required methods of the module.Interface.
 	module.Module
+	engine *engine.Engine
 }
 
 // New is the constructor for the TipSelection.
-func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], memPool mempool.MemPool[ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
+func New(e *engine.Engine, tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], memPool mempool.MemPool[ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
 		tipManager:                   tipManager,
+		engine:                       e,
 		conflictDAG:                  conflictDAG,
 		memPool:                      memPool,
 		rootBlocks:                   rootBlocksRetriever,
+		livenessThresholdQueue:       timed.NewPriorityQueue[tipmanager.TipMetadata](true),
+		livenessThreshold:            reactive.NewVariable[time.Time](),
 		optMaxStrongParents:          8,
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,
 	}, opts, func(t *TipSelection) {
 		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
-	}, (*TipSelection).TriggerConstructed)
+
+		t.livenessThreshold.OnUpdate(func(_, threshold time.Time) {
+			for _, tip := range t.livenessThresholdQueue.PopUntil(threshold) {
+				tip.LivenessThresholdReached().Trigger()
+			}
+		})
+
+		t.TriggerConstructed()
+	})
 }
 
 // SelectTips selects the tips that should be used as references for a new block.
 func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
+	strongParents := ds.NewSet[iotago.BlockID]()
+	shallowLikesParents := ds.NewSet[iotago.BlockID]()
 	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]) error {
-		previousLikedInsteadConflicts := advancedset.New[iotago.TransactionID]()
+		previousLikedInsteadConflicts := ds.NewSet[iotago.TransactionID]()
 
 		if t.collectReferences(references, iotago.StrongParentType, t.tipManager.StrongTips, func(tip tipmanager.TipMetadata) {
 			addedLikedInsteadReferences, updatedLikedInsteadConflicts, err := t.likedInsteadReferences(previousLikedInsteadConflicts, tip)
 			if err != nil {
-				tip.SetTipPool(tipmanager.WeakTipPool)
+				tip.TipPool().Set(tipmanager.WeakTipPool)
 			} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[iotago.ShallowLikeParentType]) {
 				references[iotago.StrongParentType] = append(references[iotago.StrongParentType], tip.ID())
 				references[iotago.ShallowLikeParentType] = append(references[iotago.ShallowLikeParentType], addedLikedInsteadReferences...)
+
+				shallowLikesParents.AddAll(ds.NewSet(addedLikedInsteadReferences...))
+				strongParents.Add(tip.ID())
 
 				previousLikedInsteadConflicts = updatedLikedInsteadConflicts
 			}
@@ -85,8 +113,8 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 
 		t.collectReferences(references, iotago.WeakParentType, t.tipManager.WeakTips, func(tip tipmanager.TipMetadata) {
 			if !t.isValidWeakTip(tip.Block()) {
-				tip.SetTipPool(tipmanager.DroppedTipPool)
-			} else {
+				tip.TipPool().Set(tipmanager.DroppedTipPool)
+			} else if !shallowLikesParents.Has(tip.ID()) {
 				references[iotago.WeakParentType] = append(references[iotago.WeakParentType], tip.ID())
 			}
 		}, t.optMaxWeakReferences)
@@ -97,22 +125,31 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 	return references
 }
 
+// SetLivenessThreshold sets the liveness threshold used for tip selection (it can only increase monotonically).
+func (t *TipSelection) SetLivenessThreshold(threshold time.Time) {
+	t.livenessThreshold.Compute(func(currentThreshold time.Time) time.Time {
+		return lo.Cond(threshold.Before(currentThreshold), currentThreshold, threshold)
+	})
+}
+
 // Shutdown does nothing but is required by the module.Interface.
 func (t *TipSelection) Shutdown() {}
 
 // classifyTip determines the initial tip pool of the given tip.
 func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 	if t.isValidStrongTip(tipMetadata.Block()) {
-		tipMetadata.SetTipPool(tipmanager.StrongTipPool)
+		tipMetadata.TipPool().Set(tipmanager.StrongTipPool)
 	} else if t.isValidWeakTip(tipMetadata.Block()) {
-		tipMetadata.SetTipPool(tipmanager.WeakTipPool)
+		tipMetadata.TipPool().Set(tipmanager.WeakTipPool)
 	} else {
-		tipMetadata.SetTipPool(tipmanager.DroppedTipPool)
+		tipMetadata.TipPool().Set(tipmanager.DroppedTipPool)
 	}
+
+	t.livenessThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime())
 }
 
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
-func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.AdvancedSet[iotago.TransactionID], tipMetadata tipmanager.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts *advancedset.AdvancedSet[iotago.TransactionID], err error) {
+func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.TransactionID], tipMetadata tipmanager.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts ds.Set[iotago.TransactionID], err error) {
 	necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
 	if err = t.conflictDAG.LikedInstead(tipMetadata.Block().ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
 		transactionMetadata, exists := t.memPool.TransactionMetadata(likedConflictID)
@@ -144,7 +181,7 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts *advancedset.Advanc
 // collectReferences collects tips from a tip selector (and calls the callback for each tip) until the amount of
 // references of the given type is reached.
 func (t *TipSelection) collectReferences(references model.ParentReferences, parentsType iotago.ParentsType, tipSelector func(optAmount ...int) []tipmanager.TipMetadata, callback func(tipmanager.TipMetadata), amount int) {
-	seenTips := advancedset.New[iotago.BlockID]()
+	seenTips := ds.NewSet[iotago.BlockID]()
 	selectUniqueTips := func(amount int) (uniqueTips []tipmanager.TipMetadata) {
 		if amount > 0 {
 			for _, tip := range tipSelector(amount + seenTips.Size()) {
@@ -162,8 +199,8 @@ func (t *TipSelection) collectReferences(references model.ParentReferences, pare
 	}
 
 	for tipCandidates := selectUniqueTips(amount); len(tipCandidates) != 0; tipCandidates = selectUniqueTips(amount - len(references[parentsType])) {
-		for _, strongTip := range tipCandidates {
-			callback(strongTip)
+		for _, tip := range tipCandidates {
+			callback(tip)
 		}
 	}
 }

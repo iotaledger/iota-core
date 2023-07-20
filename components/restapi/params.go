@@ -41,7 +41,7 @@ var ParamsRestAPI = &ParametersRestAPI{
 		"/api/core/v3/transactions*",
 		"/api/core/v3/commitments*",
 		"/api/core/v3/outputs*",
-		"/api/debug/v1/*",
+		"/api/debug/*",
 		"/api/indexer/v1/*",
 	},
 	ProtectedRoutes: []string{

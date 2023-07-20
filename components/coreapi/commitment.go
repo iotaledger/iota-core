@@ -33,7 +33,7 @@ func getCommitment(index iotago.SlotIndex) (*nodeclient.CommitmentDetailsRespons
 }
 
 func getSlotUTXOChanges(index iotago.SlotIndex) (*nodeclient.UTXOChangesResponse, error) {
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.StateDiffs(index)
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(index)
 	if err != nil {
 		return nil, err
 	}
