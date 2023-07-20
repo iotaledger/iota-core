@@ -149,7 +149,6 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 }
 
 func (r *Retainer) Shutdown() {
-	r.retainerFunc = nil
 }
 
 func (r *Retainer) Block(blockID iotago.BlockID) (*model.Block, error) {
