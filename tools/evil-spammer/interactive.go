@@ -15,8 +15,8 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ds/types"
-	"github.com/iotaledger/iota-core/tools/evil-spammer/evilspammerpkg"
-	"github.com/iotaledger/iota-core/tools/evilwallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
@@ -184,7 +184,7 @@ func configure(mode *Mode) {
 // region Mode /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Mode struct {
-	evilWallet   *evilwallet.EvilWallet
+	evilWallet   *wallet.EvilWallet
 	shutdown     chan types.Empty
 	mainMenu     chan types.Empty
 	spamFinished chan int
@@ -199,7 +199,7 @@ type Mode struct {
 	txSent        *atomic.Uint64
 	scenariosSent *atomic.Uint64
 
-	activeSpammers map[int]*evilspammerpkg.Spammer
+	activeSpammers map[int]*spammer.Spammer
 	spammerLog     *SpammerLog
 	spamMutex      sync.Mutex
 
@@ -208,7 +208,7 @@ type Mode struct {
 
 func NewInteractiveMode() *Mode {
 	return &Mode{
-		evilWallet:   evilwallet.NewEvilWallet(),
+		evilWallet:   wallet.NewEvilWallet(),
 		action:       make(chan action),
 		shutdown:     make(chan types.Empty),
 		mainMenu:     make(chan types.Empty),
@@ -220,7 +220,7 @@ func NewInteractiveMode() *Mode {
 		scenariosSent: atomic.NewUint64(0),
 
 		spammerLog:     NewSpammerLog(),
-		activeSpammers: make(map[int]*evilspammerpkg.Spammer),
+		activeSpammers: make(map[int]*spammer.Spammer),
 	}
 }
 
@@ -291,7 +291,7 @@ func (m *Mode) onMenuAction() {
 }
 
 func (m *Mode) prepareFundsIfNeeded() {
-	if m.evilWallet.UnspentOutputsLeft(evilwallet.Fresh) < minSpamOutputs {
+	if m.evilWallet.UnspentOutputsLeft(wallet.Fresh) < minSpamOutputs {
 		if !m.preparingFunds && m.Config.AutoRequesting {
 			m.preparingFunds = true
 			go func() {
@@ -426,27 +426,27 @@ func (m *Mode) areEnoughFundsAvailable() bool {
 	if m.Config.timeUnit == time.Minute {
 		outputsNeeded = int(float64(m.Config.Rate) * m.Config.duration.Minutes())
 	}
-	return m.evilWallet.UnspentOutputsLeft(evilwallet.Fresh) < outputsNeeded && m.Config.Scenario != "blk"
+	return m.evilWallet.UnspentOutputsLeft(wallet.Fresh) < outputsNeeded && m.Config.Scenario != "blk"
 }
 
 func (m *Mode) startSpam() {
 	m.spamMutex.Lock()
 	defer m.spamMutex.Unlock()
 
-	var spammer *evilspammerpkg.Spammer
+	var s *spammer.Spammer
 	if m.Config.Scenario == "blk" {
-		spammer = SpamBlocks(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, 0, m.Config.UseRateSetter)
+		s = SpamBlocks(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, 0, m.Config.UseRateSetter)
 	} else {
-		s, _ := evilwallet.GetScenario(m.Config.Scenario)
-		spammer = SpamNestedConflicts(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, s, m.Config.Deep, m.Config.Reuse, m.Config.UseRateSetter)
-		if spammer == nil {
+		scenario, _ := wallet.GetScenario(m.Config.Scenario)
+		s = SpamNestedConflicts(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, scenario, m.Config.Deep, m.Config.Reuse, m.Config.UseRateSetter)
+		if s == nil {
 			return
 		}
 	}
 	spamID := m.spammerLog.AddSpam(m.Config)
-	m.activeSpammers[spamID] = spammer
+	m.activeSpammers[spamID] = s
 	go func(id int) {
-		spammer.Spam()
+		s.Spam()
 		m.spamFinished <- id
 	}(spamID)
 	printer.SpammerStartedBlock()
@@ -672,9 +672,9 @@ func (m *Mode) summarizeSpam(id int) {
 	}
 }
 
-func (m *Mode) updateSentStatistic(spammer *evilspammerpkg.Spammer, id int) {
-	blkSent := spammer.BlocksSent()
-	scenariosCreated := spammer.BatchesPrepared()
+func (m *Mode) updateSentStatistic(s *spammer.Spammer, id int) {
+	blkSent := s.BlocksSent()
+	scenariosCreated := s.BatchesPrepared()
 	if m.spammerLog.SpamDetails(id).Scenario == "blk" {
 		m.blkSent.Add(blkSent)
 	} else {

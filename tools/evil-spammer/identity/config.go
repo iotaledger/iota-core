@@ -36,10 +36,13 @@ func LoadIdentity(networkName, alias string) (privKey, url string) {
 			privateKey := keyURLPair[0]
 			urlAPI := keyURLPair[1]
 			fmt.Println("Loaded identity", alias, "API url:", url, "for network", networkName, "...DONE")
+
 			return privateKey, urlAPI
 		}
+
 		return "", ""
 	}
+
 	return "", ""
 }
 
@@ -64,5 +67,6 @@ func LoadConfig() Params {
 	if err = json.Unmarshal(fbytes, &Config); err != nil {
 		panic(err)
 	}
+
 	return Config
 }

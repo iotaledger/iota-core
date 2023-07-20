@@ -1,4 +1,4 @@
-package evilspammerpkg
+package spammer
 
 import (
 	"fmt"

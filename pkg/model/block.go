@@ -89,13 +89,22 @@ func (blk *Block) ProtocolBlock() *iotago.ProtocolBlock {
 	return blk.protocolBlock
 }
 
-func (blk *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
+func (blk *Block) Payload() iotago.Payload {
 	basicBlock, isBasicBlock := blk.BasicBlock()
 	if !isBasicBlock {
+		return nil
+	}
+
+	return basicBlock.Payload
+}
+
+func (blk *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
+	payload := blk.Payload()
+	if payload == nil {
 		return nil, false
 	}
 
-	tx, isTransaction = basicBlock.Payload.(*iotago.Transaction)
+	tx, isTransaction = payload.(*iotago.Transaction)
 
 	return tx, isTransaction
 }

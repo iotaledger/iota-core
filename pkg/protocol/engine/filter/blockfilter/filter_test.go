@@ -421,6 +421,10 @@ func (m mockProtocolParameters) LivenessThreshold() iotago.SlotIndex {
 	panic("implement me")
 }
 
+func (m mockProtocolParameters) LivenessThresholdDuration() time.Duration {
+	panic("implement me")
+}
+
 func (m mockProtocolParameters) EvictionAge() iotago.SlotIndex {
 	panic("implement me")
 }
