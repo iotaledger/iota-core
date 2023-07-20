@@ -23,6 +23,7 @@ import (
 var (
 	ErrInvalidSignature = ierrors.New("invalid signature")
 	ErrNegativeBIC      = ierrors.New("negative BIC")
+	ErrAccountExpired   = ierrors.New("account expired")
 )
 
 type CommitmentFilter struct {
@@ -189,6 +190,14 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 	}
 
 	// Check that the account is not expired
+	if accountData.ExpirySlot < block.ProtocolBlock().SlotCommitmentID.Index() {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().IssuerID, accountData.ExpirySlot, block.ProtocolBlock().SlotCommitmentID.Index()),
+		})
+
+		return
+	}
 
 	c.events.BlockAllowed.Trigger(block)
 }
