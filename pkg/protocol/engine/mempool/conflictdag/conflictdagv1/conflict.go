@@ -2,7 +2,6 @@ package conflictdagv1
 
 import (
 	"bytes"
-	"sync"
 
 	"go.uber.org/atomic"
 
@@ -78,10 +77,10 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	//  deadlock happens when the likedInstead conflict changes and parents are updated at the same time, which is impossible in the current setup
 	//  because we won't process votes on a conflict we're just creating.
 	// likedInsteadMutex is used to synchronize access to the liked instead value of the Conflict.
-	likedInsteadMutex sync.RWMutex
+	likedInsteadMutex syncutils.RWMutex
 
 	// structureMutex is used to synchronize access to the structure of the Conflict.
-	structureMutex sync.RWMutex
+	structureMutex syncutils.RWMutex
 
 	// acceptanceThreshold is the function that is used to retrieve the acceptance threshold of the committee.
 	acceptanceThreshold func() int64

@@ -2,11 +2,11 @@ package spammer
 
 import (
 	"fmt"
-	"sync"
 
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
 
 var (
@@ -25,7 +25,7 @@ var (
 type ErrorCounter struct {
 	errorsMap       map[error]*atomic.Int64
 	errInTotalCount *atomic.Int64
-	mutex           sync.RWMutex
+	mutex           syncutils.RWMutex
 }
 
 func NewErrorCount() *ErrorCounter {

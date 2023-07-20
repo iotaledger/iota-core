@@ -67,6 +67,7 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 			func(bytes []byte) (storable.SerializableInt64, int, error) {
 				var i storable.SerializableInt64
 				c, err := i.FromBytes(bytes)
+
 				return i, c, err
 			}),
 		transactionFailureStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionFailurePrefix})),
@@ -76,6 +77,7 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 			func(bytes []byte) (storable.SerializableInt64, int, error) {
 				var i storable.SerializableInt64
 				c, err := i.FromBytes(bytes)
+
 				return i, c, err
 			}),
 	}

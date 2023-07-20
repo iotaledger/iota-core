@@ -1,11 +1,10 @@
 package wallet
 
 import (
-	"sync"
-
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
 
 type walletID int
@@ -41,7 +40,7 @@ type Wallets struct {
 	// reuse wallets are stored without an order, so they are picked up randomly.
 	// Boolean flag indicates if wallet is ready - no new addresses will be generated, so empty wallets can be deleted.
 	reuseWallets map[walletID]bool
-	mu           sync.RWMutex
+	mu           syncutils.RWMutex
 
 	lastWalletID atomic.Int64
 }

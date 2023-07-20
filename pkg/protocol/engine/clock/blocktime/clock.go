@@ -1,12 +1,12 @@
 package blocktime
 
 import (
-	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -23,7 +23,7 @@ type Clock struct {
 	// confirmedTime contains a notion of time that is anchored to the latest confirmed block.
 	confirmedTime *RelativeTime
 
-	sync.RWMutex
+	syncutils.RWMutex
 
 	// Module embeds the required methods of the module.Interface.
 	module.Module

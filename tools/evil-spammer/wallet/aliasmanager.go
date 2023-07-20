@@ -1,11 +1,10 @@
 package wallet
 
 import (
-	"sync"
-
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
 
 // region AliasManager /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -16,7 +15,7 @@ type AliasManager struct {
 	inputMap  map[string]*Output
 
 	outputAliasCount *atomic.Uint64
-	mu               sync.RWMutex
+	mu               syncutils.RWMutex
 }
 
 // NewAliasManager creates and returns a new AliasManager.

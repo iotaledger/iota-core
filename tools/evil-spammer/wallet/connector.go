@@ -2,10 +2,10 @@ package wallet
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -45,7 +45,7 @@ type WebClients struct {
 	// helper variable indicating which clt was recently used, useful for double, triple,... spends
 	lastUsed int
 
-	mu sync.Mutex
+	mu syncutils.Mutex
 }
 
 // NewWebClients creates Connector from provided GoShimmerAPI urls.

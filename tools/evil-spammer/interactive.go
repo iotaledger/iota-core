@@ -7,7 +7,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
@@ -213,9 +213,9 @@ type Mode struct {
 
 	activeSpammers map[int]*spammer.Spammer
 	spammerLog     *SpammerLog
-	spamMutex      sync.Mutex
+	spamMutex      syncutils.Mutex
 
-	stdOutMutex sync.Mutex
+	stdOutMutex syncutils.Mutex
 }
 
 func NewInteractiveMode() *Mode {
@@ -828,7 +828,7 @@ type SpammerLog struct {
 	spamDetails   []InteractiveConfig
 	spamStartTime []time.Time
 	spamStopTime  []time.Time
-	mu            sync.Mutex
+	mu            syncutils.Mutex
 }
 
 func NewSpammerLog() *SpammerLog {
