@@ -16,6 +16,7 @@ const (
 	attestationsPrefix
 	ledgerPrefix
 	accountsPrefix
+	latestNonEmptySlotPrefix
 	rewardsPrefix
 	poolStatsPrefix
 	committeePrefix
@@ -31,14 +32,15 @@ type Permanent struct {
 	settings    *Settings
 	commitments *Commitments
 
-	sybilProtection kvstore.KVStore
-	attestations    kvstore.KVStore
-	ledger          kvstore.KVStore
-	accounts        kvstore.KVStore
-	rewards         kvstore.KVStore
-	poolStats       kvstore.KVStore
-	committee       kvstore.KVStore
-	upgradeSignals  kvstore.KVStore
+	sybilProtection    kvstore.KVStore
+	attestations       kvstore.KVStore
+	ledger             kvstore.KVStore
+	accounts           kvstore.KVStore
+	latestNonEmptySlot kvstore.KVStore
+	rewards            kvstore.KVStore
+	poolStats          kvstore.KVStore
+	committee          kvstore.KVStore
+	upgradeSignals     kvstore.KVStore
 }
 
 // New returns a new permanent storage instance.
@@ -46,7 +48,6 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 	return options.Apply(&Permanent{
 		errorHandler: errorHandler,
 	}, opts, func(p *Permanent) {
-
 		var err error
 		p.store, err = database.StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
 		if err != nil {
@@ -67,6 +68,7 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 		p.attestations = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{attestationsPrefix}))
 		p.ledger = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{ledgerPrefix}))
 		p.accounts = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{accountsPrefix}))
+		p.latestNonEmptySlot = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{latestNonEmptySlotPrefix}))
 		p.rewards = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{rewardsPrefix}))
 		p.poolStats = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{poolStatsPrefix}))
 		p.committee = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{committeePrefix}))
@@ -98,6 +100,14 @@ func (p *Permanent) Accounts(optRealm ...byte) kvstore.KVStore {
 	}
 
 	return lo.PanicOnErr(p.accounts.WithExtendedRealm(optRealm))
+}
+
+func (p *Permanent) LatestNonEmptySlot(optRealm ...byte) kvstore.KVStore {
+	if len(optRealm) == 0 {
+		return p.accounts
+	}
+
+	return lo.PanicOnErr(p.latestNonEmptySlot.WithExtendedRealm(optRealm))
 }
 
 // TODO: Rewards and PoolStats should be pruned after one year, so they are not really permanent.
