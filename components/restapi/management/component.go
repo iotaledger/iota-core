@@ -23,13 +23,13 @@ const (
 	// POST adds a new peer.
 	RoutePeers = "/peers"
 
-	// RouteControlDatabasePrune is the control route to manually prune the database.
+	// RouteDatabasePrune is the route to manually prune the database.
 	// POST prunes the database.
-	RouteControlDatabasePrune = "/control/database/prune"
+	RouteDatabasePrune = "/database/prune"
 
-	// RouteControlSnapshotsCreate is the control route to manually create a snapshot files.
+	// RouteSnapshotsCreate is the route to manually create a snapshot files.
 	// POST creates a full snapshot.
-	RouteControlSnapshotsCreate = "/control/snapshots/create"
+	RouteSnapshotsCreate = "/snapshots/create"
 )
 
 func init() {
@@ -97,7 +97,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.POST(RouteControlDatabasePrune, func(c echo.Context) error {
+	routeGroup.POST(RouteDatabasePrune, func(c echo.Context) error {
 		resp, err := pruneDatabase(c)
 		if err != nil {
 			return err
@@ -106,7 +106,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.POST(RouteControlSnapshotsCreate, func(c echo.Context) error {
+	routeGroup.POST(RouteSnapshotsCreate, func(c echo.Context) error {
 		resp, err := createSnapshots(c)
 		if err != nil {
 			return err

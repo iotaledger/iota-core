@@ -13,7 +13,7 @@ type Clock interface {
 
 	Confirmed() RelativeTime
 
-	// Snapshot returns a snapshot of all time values tracked in the clock read atomicaly.
+	// Snapshot returns a snapshot of all time values tracked in the clock read atomically.
 	Snapshot() *Snapshot
 
 	// Interface embeds the required methods of the module.Interface.
