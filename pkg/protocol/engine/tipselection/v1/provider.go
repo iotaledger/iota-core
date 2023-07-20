@@ -1,8 +1,6 @@
 package tipselectionv1
 
 import (
-	"time"
-
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
