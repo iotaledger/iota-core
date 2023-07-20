@@ -82,7 +82,7 @@ func configure() error {
 	}, prunable.WithGranularity(ParamsDebugAPI.DBGranularity), prunable.WithMaxOpenDBs(ParamsDebugAPI.MaxOpenDBs),
 	)
 
-	routeGroup := deps.RestRouteManager.AddRoute("debug/v3")
+	routeGroup := deps.RestRouteManager.AddRoute("debug/v1")
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		blocksPerSlot.Set(block.ID().Index(), append(lo.Return1(blocksPerSlot.GetOrCreate(block.ID().Index(), func() []*blocks.Block {

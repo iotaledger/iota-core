@@ -7,7 +7,7 @@ import (
 // ParametersDebugAPI contains the definition of configuration parameters used by the debug API.
 type ParametersDebugAPI struct {
 	// Enabled whether the DebugAPI component is enabled.
-	Enabled bool `default:"true" usage:"whether the BlockIssuer component is enabled"`
+	Enabled bool `default:"true" usage:"whether the DebugAPI component is enabled"`
 
 	Path             string `default:"debugapi" usage:"the path to the database folder"`
 	MaxOpenDBs       int    `default:"2" usage:"maximum number of open database instances"`
