@@ -103,7 +103,7 @@ const (
 	// GET returns the account details.
 	RouteStakingAccount = "/staking/:" + restapipkg.ParameterAccountID
 
-	// RouteRewards is the route for getting the rewards for staking of delegation based on sstaking account or delegaion output.
+	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
 	// GET returns the rewards.
 	RouteRewards = "/rewards/:" + restapipkg.ParameterAccountID
 
