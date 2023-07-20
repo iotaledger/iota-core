@@ -86,6 +86,7 @@ type AccountDetails struct {
 
 	Address   iotago.Address
 	Amount    iotago.BaseToken
+	Mana      iotago.Mana
 	IssuerKey ed25519.PublicKey
 
 	StakingEpochEnd iotago.EpochIndex

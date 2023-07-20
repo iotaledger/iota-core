@@ -1,4 +1,4 @@
-package evilwallet
+package wallet
 
 import (
 	"fmt"
@@ -13,18 +13,15 @@ import (
 
 // Options is a struct that represents a collection of options that can be set when creating a block.
 type Options struct {
-	aliasInputs            map[string]types.Empty
-	inputs                 []*Output
-	aliasOutputs           map[string]iotago.Output
-	outputs                []iotago.Output
-	inputWallet            *Wallet
-	outputWallet           *Wallet
-	outputBatchAliases     map[string]types.Empty
-	reuse                  bool
-	issuingTime            time.Time
-	reattachmentBlockAlias string
-	sequenceNumber         uint64
-	overrideSequenceNumber bool
+	aliasInputs        map[string]types.Empty
+	inputs             []*Output
+	aliasOutputs       map[string]iotago.Output
+	outputs            []iotago.Output
+	inputWallet        *Wallet
+	outputWallet       *Wallet
+	outputBatchAliases map[string]types.Empty
+	reuse              bool
+	issuingTime        time.Time
 }
 
 type OutputOption struct {
@@ -75,6 +72,7 @@ func (o *Options) isBalanceProvided() bool {
 			provided = true
 		}
 	}
+
 	return provided
 }
 
@@ -89,6 +87,7 @@ func (o *Options) isWalletProvidedForInputsOutputs() error {
 			return ierrors.New("no output wallet provided for outputs without aliases")
 		}
 	}
+
 	return nil
 }
 
@@ -114,6 +113,7 @@ func (o *Options) checkInputsAndOutputs() error {
 	if !inputsOk || !outputsOk {
 		return ierrors.New("mixing providing inputs/outputs with and without aliases is not allowed")
 	}
+
 	return nil
 }
 

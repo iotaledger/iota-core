@@ -26,7 +26,6 @@ require (
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230720094455-f4dc6d78287f
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/libp2p/go-libp2p v0.28.1
-	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.9.0
 	github.com/multiformats/go-varint v0.0.7
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
@@ -107,6 +106,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.3.1 // indirect

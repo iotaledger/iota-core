@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evil-spammer/evillogger"
-	"github.com/iotaledger/iota-core/tools/evilwallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/logger"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 )
 
 var (
-	log           = evillogger.New("main")
+	log           = logger.New("main")
 	optionFlagSet = flag.NewFlagSet("script flag set", flag.ExitOnError)
 )
 
@@ -113,7 +113,7 @@ func parseBasicSpamFlags() {
 		customSpamParams.BlkToBeSent = parsedBlkNums
 	}
 	if *scenario != "" {
-		conflictBatch, ok := evilwallet.GetScenario(*scenario)
+		conflictBatch, ok := wallet.GetScenario(*scenario)
 		if ok {
 			customSpamParams.Scenario = conflictBatch
 		}

@@ -1,4 +1,4 @@
-package evilwallet
+package wallet
 
 import (
 	"strconv"
@@ -46,6 +46,7 @@ func ConflictSetCircle(size int) EvilBatch {
 				Outputs: []string{strconv.Itoa(inputStartNum + i)},
 			})
 	}
+
 	return EvilBatch{scenarioAlias}
 }
 
@@ -63,6 +64,7 @@ func NSpendBatch(nSpent int) EvilBatch {
 		)
 	}
 	conflictSlice = append(conflictSlice, scenarioAlias)
+
 	return conflictSlice
 }
 
@@ -162,6 +164,7 @@ func Scenario5() EvilBatch {
 		Inputs:  []string{"5", "7"},
 		Outputs: []string{"9"},
 	}})
+
 	return circularConflict
 }
 
