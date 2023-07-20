@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -59,6 +60,7 @@ type EngineManager struct {
 	notarizationProvider        module.Provider[*engine.Engine, notarization.Notarization]
 	attestationProvider         module.Provider[*engine.Engine, attestation.Attestations]
 	ledgerProvider              module.Provider[*engine.Engine, ledger.Ledger]
+	schedulerProvider           module.Provider[*engine.Engine, scheduler.Scheduler]
 	tipManagerProvider          module.Provider[*engine.Engine, tipmanager.TipManager]
 	tipSelectionProvider        module.Provider[*engine.Engine, tipselection.TipSelection]
 	retainerProvider            module.Provider[*engine.Engine, retainer.Retainer]
@@ -84,6 +86,7 @@ func New(
 	notarizationProvider module.Provider[*engine.Engine, notarization.Notarization],
 	attestationProvider module.Provider[*engine.Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*engine.Engine, ledger.Ledger],
+	schedulerProvider module.Provider[*engine.Engine, scheduler.Scheduler],
 	tipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager],
 	tipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection],
 	retainerProvider module.Provider[*engine.Engine, retainer.Retainer],
@@ -106,6 +109,7 @@ func New(
 		notarizationProvider:        notarizationProvider,
 		attestationProvider:         attestationProvider,
 		ledgerProvider:              ledgerProvider,
+		schedulerProvider:           schedulerProvider,
 		tipManagerProvider:          tipManagerProvider,
 		tipSelectionProvider:        tipSelectionProvider,
 		retainerProvider:            retainerProvider,
@@ -195,6 +199,7 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.notarizationProvider,
 		e.attestationProvider,
 		e.ledgerProvider,
+		e.schedulerProvider,
 		e.tipManagerProvider,
 		e.tipSelectionProvider,
 		e.retainerProvider,

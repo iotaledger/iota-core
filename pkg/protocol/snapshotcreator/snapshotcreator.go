@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/passthrough"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
@@ -91,6 +92,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		slotnotarization.NewProvider(),
 		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		opt.LedgerProvider(),
+		passthrough.NewProvider(),
 		tipmanagerv1.NewProvider(),
 		tipselectionv1.NewProvider(),
 		retainer.NewProvider(),
@@ -139,7 +141,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine) (err error) {
 	// Account outputs start from Genesis TX index 1
 	for idx, account := range accounts {
-		output := createAccount(account.AccountID, account.Address, account.Amount, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
+		output := createAccount(account.AccountID, account.Address, account.Amount, account.Mana, account.IssuerKey, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
 
 		if _, err = engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversStateRent(output, account.Amount); err != nil {
 			return ierrors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
@@ -166,10 +168,11 @@ func createOutput(address iotago.Address, tokenAmount iotago.BaseToken) (output 
 	}
 }
 
-func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmount iotago.BaseToken, pubkey ed25519.PublicKey, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
+func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmount iotago.BaseToken, mana iotago.Mana, pubkey ed25519.PublicKey, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
 	accountOutput := &iotago.AccountOutput{
 		AccountID: accountID,
 		Amount:    tokenAmount,
+		Mana:      mana,
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: address},
 			&iotago.GovernorAddressUnlockCondition{Address: address},

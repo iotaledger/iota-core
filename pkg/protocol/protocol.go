@@ -24,6 +24,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/passthrough"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -90,6 +92,7 @@ type Protocol struct {
 	optsSyncManagerProvider         module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsLedgerProvider              module.Provider[*engine.Engine, ledger.Ledger]
 	optsRetainerProvider            module.Provider[*engine.Engine, retainer.Retainer]
+	optsSchedulerProvider           module.Provider[*engine.Engine, scheduler.Scheduler]
 	optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
 }
 
@@ -113,6 +116,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSyncManagerProvider:         trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:              ledger1.NewProvider(),
 		optsRetainerProvider:            retainer1.NewProvider(),
+		optsSchedulerProvider:           passthrough.NewProvider(),
 		optsUpgradeOrchestratorProvider: signalingupgradeorchestrator.NewProvider(),
 
 		optsBaseDirectory:           "",
@@ -210,6 +214,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsNotarizationProvider,
 		p.optsAttestationProvider,
 		p.optsLedgerProvider,
+		p.optsSchedulerProvider,
 		p.optsTipManagerProvider,
 		p.optsTipSelectionProvider,
 		p.optsRetainerProvider,

@@ -22,6 +22,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
@@ -54,6 +55,7 @@ type Engine struct {
 	Notarization        notarization.Notarization
 	Attestations        attestation.Attestations
 	Ledger              ledger.Ledger
+	Scheduler           scheduler.Scheduler
 	TipManager          tipmanager.TipManager
 	TipSelection        tipselection.TipSelection
 	Retainer            retainer.Retainer
@@ -93,6 +95,7 @@ func New(
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
+	schedulerProvider module.Provider[*Engine, scheduler.Scheduler],
 	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
 	retainerProvider module.Provider[*Engine, retainer.Retainer],
@@ -144,6 +147,7 @@ func New(
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
 			e.TipManager = tipManagerProvider(e)
+			e.Scheduler = schedulerProvider(e)
 			e.TipSelection = tipSelectionProvider(e)
 			e.Retainer = retainerProvider(e)
 			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
@@ -211,6 +215,7 @@ func (e *Engine) Shutdown() {
 		e.UpgradeOrchestrator.Shutdown()
 		e.TipManager.Shutdown()
 		e.Filter.Shutdown()
+		e.Scheduler.Shutdown()
 		e.Storage.Shutdown()
 		e.Workers.Shutdown()
 	}

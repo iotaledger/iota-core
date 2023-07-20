@@ -41,6 +41,12 @@ type Block struct {
 	confirmationRatifiers *advancedset.AdvancedSet[account.SeatIndex]
 	confirmed             bool
 
+	// Scheduler block
+	scheduled bool
+	skipped   bool
+	enqueued  bool
+	dropped   bool
+
 	mutex syncutils.RWMutex
 
 	modelBlock *model.Block
@@ -91,6 +97,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		booked:      true,
 		preAccepted: true,
 		accepted:    true, // This should be true since we commit and evict on acceptance.
+		scheduled:   true,
 	}
 }
 
@@ -134,6 +141,14 @@ func (b *Block) ForEachParent(consumer func(parent iotago.Parent)) {
 
 func (b *Block) IsRootBlock() bool {
 	return b.rootBlock != nil
+}
+
+func (b *Block) Payload() iotago.Payload {
+	if b.modelBlock == nil {
+		return nil
+	}
+
+	return b.modelBlock.Payload()
 }
 
 func (b *Block) Transaction() (tx *iotago.Transaction, hasTransaction bool) {
@@ -467,6 +482,89 @@ func (b *Block) SetAccepted() (wasUpdated bool) {
 	return wasUpdated
 }
 
+// IsScheduled returns true if the Block was scheduled.
+func (b *Block) IsScheduled() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.scheduled
+}
+
+// SetScheduled sets the Block as scheduled.
+func (b *Block) SetScheduled() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.scheduled; wasUpdated && b.enqueued {
+		b.scheduled = true
+		b.enqueued = false
+	}
+
+	return wasUpdated
+}
+
+// IsSkipped returns true if the Block was skipped.
+func (b *Block) IsSkipped() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.skipped
+}
+
+// SetSkipped sets the Block as skipped.
+func (b *Block) SetSkipped() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.skipped; wasUpdated && b.enqueued {
+		b.skipped = true
+		b.enqueued = false
+	}
+
+	return wasUpdated
+}
+
+// IsDropped returns true if the Block was dropped.
+func (b *Block) IsDropped() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.dropped
+}
+
+// SetDropped sets the Block as dropped.
+func (b *Block) SetDropped() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.dropped; wasUpdated && b.enqueued {
+		b.dropped = true
+		b.enqueued = false
+	}
+
+	return wasUpdated
+}
+
+// IsEnqueued returns true if the Block is currently enqueued in the scheduler.
+func (b *Block) IsEnqueued() bool {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.enqueued
+}
+
+// SetEnqueued sets the Block as enqueued.
+func (b *Block) SetEnqueued() (wasUpdated bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if wasUpdated = !b.enqueued; wasUpdated {
+		b.enqueued = true
+	}
+
+	return wasUpdated
+}
+
 func (b *Block) AddConfirmationRatifier(seat account.SeatIndex) (added bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -558,4 +656,17 @@ func (b *Block) ModelBlock() *model.Block {
 	defer b.mutex.RUnlock()
 
 	return b.modelBlock
+}
+
+func (b *Block) Work() int {
+	// TODO: define a work function which takes more than just payload size into account
+	// e.g. number of parents, payload type etc.
+	work := 1
+
+	payload := b.Payload()
+	if payload != nil {
+		work += payload.Size()
+	}
+
+	return work
 }
