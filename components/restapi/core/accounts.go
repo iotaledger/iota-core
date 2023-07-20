@@ -10,10 +10,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/models"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-func blockIssuanceCreditsForAccountID(c echo.Context) (*models.BlockIssuanceCreditsResponse, error) {
+func blockIssuanceCreditsForAccountID(c echo.Context) (*apimodels.BlockIssuanceCreditsResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
 		return nil, err
@@ -31,13 +31,13 @@ func blockIssuanceCreditsForAccountID(c echo.Context) (*models.BlockIssuanceCred
 		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
 	}
 
-	return &models.BlockIssuanceCreditsResponse{
+	return &apimodels.BlockIssuanceCreditsResponse{
 		SlotIndex:            slotIndex,
 		BlockIssuanceCredits: account.Credits.Value,
 	}, nil
 }
 
-func congestionForAccountID(c echo.Context) (*models.CongestionResponse, error) {
+func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func congestionForAccountID(c echo.Context) (*models.CongestionResponse, error) 
 		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
 	}
 
-	return &models.CongestionResponse{
+	return &apimodels.CongestionResponse{
 		SlotIndex:            slotIndex,
 		Ready:                false, // TODO: update after scheduler is implemented
 		ReferenceManaCost:    0,     // TODO: update after RMC is implemented
@@ -63,9 +63,9 @@ func congestionForAccountID(c echo.Context) (*models.CongestionResponse, error) 
 	}, nil
 }
 
-func staking() (*models.AccountStakingListResponse, error) {
-	resp := &models.AccountStakingListResponse{
-		Stakers: make([]models.ValidatorResponse, 0),
+func staking() (*apimodels.AccountStakingListResponse, error) {
+	resp := &apimodels.AccountStakingListResponse{
+		Stakers: make([]apimodels.ValidatorResponse, 0),
 	}
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommittedSlot()
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
@@ -76,7 +76,7 @@ func staking() (*models.AccountStakingListResponse, error) {
 	}
 
 	for _, accountData := range activeValidators {
-		resp.Stakers = append(resp.Stakers, models.ValidatorResponse{
+		resp.Stakers = append(resp.Stakers, apimodels.ValidatorResponse{
 			AccountID:                      accountData.ID.ToHex(),
 			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 			ValidatorStake:                 accountData.ValidatorStake,
@@ -89,7 +89,7 @@ func staking() (*models.AccountStakingListResponse, error) {
 	return resp, nil
 }
 
-func stakingByAccountID(c echo.Context) (*models.ValidatorResponse, error) {
+func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func stakingByAccountID(c echo.Context) (*models.ValidatorResponse, error) {
 		return nil, ierrors.Errorf("account not found: %s for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
 
-	return &models.ValidatorResponse{
+	return &apimodels.ValidatorResponse{
 		AccountID:                      accountID.ToHex(),
 		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 		ValidatorStake:                 accountData.ValidatorStake,
@@ -114,7 +114,7 @@ func stakingByAccountID(c echo.Context) (*models.ValidatorResponse, error) {
 	}, nil
 }
 
-func rewardsByAccountID(c echo.Context) (*models.ManaRewardsResponse, error) {
+func rewardsByAccountID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
 		return nil, err
@@ -161,13 +161,13 @@ func rewardsByAccountID(c echo.Context) (*models.ManaRewardsResponse, error) {
 		return nil, ierrors.Wrapf(err, "failed to calculate reward for output %s", outputID)
 	}
 
-	return &models.ManaRewardsResponse{
+	return &apimodels.ManaRewardsResponse{
 		EpochIndex: latestRewardsReadyEpoch,
 		Rewards:    reward,
 	}, nil
 }
 
-func selectedCommittee(c echo.Context) *models.CommitteeResponse {
+func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
 	timeProvider := deps.Protocol.APIForSlot(deps.Protocol.SyncManager.LatestCommittedSlot()).TimeProvider()
 
 	var slotIndex iotago.SlotIndex
@@ -182,9 +182,9 @@ func selectedCommittee(c echo.Context) *models.CommitteeResponse {
 	}
 
 	seatedAccounts := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(slotIndex)
-	committee := make([]models.CommitteeMemberResponse, 0, seatedAccounts.Accounts().Size())
+	committee := make([]apimodels.CommitteeMemberResponse, 0, seatedAccounts.Accounts().Size())
 	seatedAccounts.Accounts().ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
-		committee = append(committee, models.CommitteeMemberResponse{
+		committee = append(committee, apimodels.CommitteeMemberResponse{
 			AccountID:      accountID.ToHex(),
 			PoolStake:      seat.PoolStake,
 			ValidatorStake: seat.ValidatorStake,
@@ -194,7 +194,7 @@ func selectedCommittee(c echo.Context) *models.CommitteeResponse {
 		return true
 	})
 
-	return &models.CommitteeResponse{
+	return &apimodels.CommitteeResponse{
 		EpochIndex:          epochIndex,
 		Committee:           committee,
 		TotalStake:          seatedAccounts.Accounts().TotalStake(),

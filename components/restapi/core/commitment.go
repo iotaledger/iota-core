@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/models"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
@@ -27,7 +27,7 @@ func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {
 	return commitment.Commitment(), nil
 }
 
-func getUTXOChanges(index iotago.SlotIndex) (*models.UTXOChangesResponse, error) {
+func getUTXOChanges(index iotago.SlotIndex) (*apimodels.UTXOChangesResponse, error) {
 	diffs, err := deps.Protocol.MainEngineInstance().Ledger.StateDiffs(index)
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func getUTXOChanges(index iotago.SlotIndex) (*models.UTXOChangesResponse, error)
 		consumedOutputs[i] = output.OutputID().ToHex()
 	}
 
-	return &models.UTXOChangesResponse{
+	return &apimodels.UTXOChangesResponse{
 		Index:           index,
 		CreatedOutputs:  createdOutputs,
 		ConsumedOutputs: consumedOutputs,

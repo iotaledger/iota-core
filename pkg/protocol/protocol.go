@@ -51,7 +51,7 @@ import (
 	retainer1 "github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/models"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type Protocol struct {
@@ -64,7 +64,7 @@ type Protocol struct {
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
 	networkProtocol *core.Protocol
-	supportVersions models.Versions
+	supportVersions apimodels.Versions
 
 	activeEngineMutex syncutils.RWMutex
 	mainEngine        *engine.Engine
@@ -100,7 +100,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	return options.Apply(&Protocol{
 		Events:                          NewEvents(),
 		Workers:                         workers,
-		supportVersions:                 models.Versions{3},
+		supportVersions:                 apimodels.Versions{3},
 		dispatcher:                      dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
 		optsBlockDAGProvider:            inmemoryblockdag.NewProvider(),
@@ -340,7 +340,7 @@ func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return p.MainEngineInstance().APIForEpoch(epoch)
 }
 
-func (p *Protocol) SupportedVersions() models.Versions {
+func (p *Protocol) SupportedVersions() apimodels.Versions {
 	return p.supportVersions
 }
 

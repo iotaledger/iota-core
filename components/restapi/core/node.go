@@ -3,11 +3,11 @@ package core
 import (
 	"encoding/json"
 
-	"github.com/iotaledger/iota.go/v4/nodeclient/models"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 //nolint:unparam // we have no error case right now
-func info() (*models.InfoResponse, error) {
+func info() (*apimodels.InfoResponse, error) {
 	clSnapshot := deps.Protocol.MainEngineInstance().Clock.Snapshot()
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
@@ -19,10 +19,10 @@ func info() (*models.InfoResponse, error) {
 	}
 	protoParamsJSONRaw := json.RawMessage(protoParamsBytes)
 
-	return &models.InfoResponse{
+	return &apimodels.InfoResponse{
 		Name:    deps.AppInfo.Name,
 		Version: deps.AppInfo.Version,
-		Status: &models.InfoResNodeStatus{
+		Status: &apimodels.InfoResNodeStatus{
 			IsHealthy:                   syncStatus.NodeSynced,
 			AcceptedTangleTime:          uint64(clSnapshot.AcceptedTime.UnixNano()),
 			RelativeAcceptedTangleTime:  uint64(clSnapshot.RelativeAcceptedTime.UnixNano()),
@@ -35,7 +35,7 @@ func info() (*models.InfoResponse, error) {
 			LatestAcceptedBlockID:  syncStatus.LastAcceptedBlockID.ToHex(),
 			LatestConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
 		},
-		Metrics: &models.InfoResNodeMetrics{
+		Metrics: &apimodels.InfoResNodeMetrics{
 			BlocksPerSecond:          metrics.BlocksPerSecond,
 			ConfirmedBlocksPerSecond: metrics.ConfirmedBlocksPerSecond,
 			ConfirmationRate:         metrics.ConfirmedRate,

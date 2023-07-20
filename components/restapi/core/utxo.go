@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	"github.com/iotaledger/iota.go/v4/nodeclient/models"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 func getOutput(c echo.Context) (*utxoledger.Output, error) {
@@ -23,7 +23,7 @@ func getOutput(c echo.Context) (*utxoledger.Output, error) {
 	return output, nil
 }
 
-func getOutputMetadata(c echo.Context) (*models.OutputMetadataResponse, error) {
+func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadataResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, err
@@ -41,10 +41,10 @@ func getOutputMetadata(c echo.Context) (*models.OutputMetadataResponse, error) {
 	return newOutputMetadataResponse(output)
 }
 
-func newOutputMetadataResponse(output *utxoledger.Output) (*models.OutputMetadataResponse, error) {
+func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMetadataResponse, error) {
 	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
-	resp := &models.OutputMetadataResponse{
+	resp := &apimodels.OutputMetadataResponse{
 		BlockID:            output.BlockID().ToHex(),
 		TransactionID:      output.OutputID().TransactionID().ToHex(),
 		OutputIndex:        output.OutputID().Index(),
@@ -64,10 +64,10 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*models.OutputMetadat
 	return resp, nil
 }
 
-func newSpentMetadataResponse(spent *utxoledger.Spent) (*models.OutputMetadataResponse, error) {
+func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadataResponse, error) {
 	latestCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
-	resp := &models.OutputMetadataResponse{
+	resp := &apimodels.OutputMetadataResponse{
 		BlockID:            spent.BlockID().ToHex(),
 		TransactionID:      spent.OutputID().TransactionID().ToHex(),
 		OutputIndex:        spent.OutputID().Index(),

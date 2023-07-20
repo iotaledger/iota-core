@@ -12,7 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/models"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 func blockByID(c echo.Context) (*model.Block, error) {
@@ -29,13 +29,13 @@ func blockByID(c echo.Context) (*model.Block, error) {
 	return block, nil
 }
 
-func blockMetadataByBlockID(blockID iotago.BlockID) (*models.BlockMetadataResponse, error) {
+func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
 	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &models.BlockMetadataResponse{
+	response := &apimodels.BlockMetadataResponse{
 		BlockID:          blockID.ToHex(),
 		BlockState:       metadata.BlockStatus.String(),
 		BlockStateReason: metadata.BlockReason,
@@ -49,7 +49,7 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*models.BlockMetadataRespon
 	return response, nil
 }
 
-func blockMetadataByID(c echo.Context) (*models.BlockMetadataResponse, error) {
+func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
 	block, err := blockByID(c)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func blockMetadataByID(c echo.Context) (*models.BlockMetadataResponse, error) {
 	return blockMetadataByBlockID(block.ID())
 }
 
-func blockIssuance(_ echo.Context) (*models.IssuanceBlockHeaderResponse, error) {
+func blockIssuance(_ echo.Context) (*apimodels.IssuanceBlockHeaderResponse, error) {
 	references := deps.Protocol.MainEngineInstance().TipSelection.SelectTips(iotago.BlockMaxParents)
 	slotCommitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 
@@ -66,7 +66,7 @@ func blockIssuance(_ echo.Context) (*models.IssuanceBlockHeaderResponse, error) 
 		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "get references failed")
 	}
 
-	resp := &models.IssuanceBlockHeaderResponse{
+	resp := &apimodels.IssuanceBlockHeaderResponse{
 		StrongParents:       references[iotago.StrongParentType].ToHex(),
 		WeakParents:         references[iotago.WeakParentType].ToHex(),
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType].ToHex(),
@@ -77,7 +77,7 @@ func blockIssuance(_ echo.Context) (*models.IssuanceBlockHeaderResponse, error) 
 	return resp, nil
 }
 
-func sendBlock(c echo.Context) (*models.BlockCreatedResponse, error) {
+func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
 	if err != nil {
 		return nil, err
@@ -139,7 +139,7 @@ func sendBlock(c echo.Context) (*models.BlockCreatedResponse, error) {
 		}
 	}
 
-	return &models.BlockCreatedResponse{
+	return &apimodels.BlockCreatedResponse{
 		BlockID: blockID.ToHex(),
 	}, nil
 }

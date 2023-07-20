@@ -7,7 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/models"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 const (
@@ -178,7 +178,7 @@ func (r *Retainer) DeleteTransactionConfirmed(prevID iotago.BlockID) error {
 	return nil
 }
 
-func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType models.BlockFailureReason) error {
+func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType apimodels.BlockFailureReason) error {
 	err := r.blockFailureStore.Set(blockID, storable.SerializableInt64(failureType))
 	if err != nil {
 		return err
@@ -187,7 +187,7 @@ func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType models.
 	return nil
 }
 
-func (r *Retainer) StoreTransactionFailure(transactionID iotago.TransactionID, failureType models.TransactionFailureReason) error {
+func (r *Retainer) StoreTransactionFailure(transactionID iotago.TransactionID, failureType apimodels.TransactionFailureReason) error {
 	err := r.transactionFailureStore.Set(transactionID, storable.SerializableInt64(failureType))
 	if err != nil {
 		return err

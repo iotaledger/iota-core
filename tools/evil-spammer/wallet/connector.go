@@ -10,7 +10,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
-	"github.com/iotaledger/iota.go/v4/nodeclient/models"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type ServerInfo struct {
@@ -175,7 +175,7 @@ type Client interface {
 	// GetTransaction gets the transaction.
 	GetTransaction(txID iotago.TransactionID) (resp *iotago.Transaction, err error)
 	// GetBlockIssuance returns the latest commitment and data needed to create a new block.
-	GetBlockIssuance() (resp *models.IssuanceBlockHeaderResponse, err error)
+	GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error)
 }
 
 // WebClient contains a GoShimmer web API to interact with a node.
@@ -305,7 +305,7 @@ func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.Transa
 	return tx, nil
 }
 
-func (c *WebClient) GetBlockIssuance() (resp *models.IssuanceBlockHeaderResponse, err error) {
+func (c *WebClient) GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error) {
 	resp, err = c.api.BlockIssuance(context.Background())
 	if err != nil {
 		return
