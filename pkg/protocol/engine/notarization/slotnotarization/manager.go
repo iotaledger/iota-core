@@ -1,7 +1,6 @@
 package slotnotarization
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -227,8 +226,6 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		AcceptedBlocks:        acceptedBlocks,
 		ActiveValidatorsCount: 0,
 	})
-
-	fmt.Println(">> Committed slot", index, "ROOTS", iotago.Identifier(acceptedBlocks.Root()), mutationRoot, attestationsRoot, stateRoot, accountRoot, committeeRoot, rewardsRoot, protocolParametersAndVersionsHash)
 
 	if err = m.slotMutations.Evict(index); err != nil {
 		m.errorHandler(ierrors.Wrapf(err, "failed to evict slotMutations at index: %d", index))

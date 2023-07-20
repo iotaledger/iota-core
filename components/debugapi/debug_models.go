@@ -1,7 +1,11 @@
 package debugapi
 
 import (
+	"fmt"
+
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -25,7 +29,7 @@ type (
 		PreConfirmed bool `json:"preConfirmed"`
 		Confirmed    bool `json:"confirmed"`
 
-		Witnesses []account.SeatIndex `json:"witnesses"`
+		Witnesses []string `json:"witnesses"`
 		// conflictIDs are the all conflictIDs of the block inherited from the parents + payloadConflictIDs.
 		ConflictIDs []iotago.TransactionID `json:"conflictIDs"`
 		// payloadConflictIDs are the conflictIDs of the block's payload (in case it is a transaction, otherwise empty).
@@ -56,3 +60,24 @@ type (
 		MutationsRoot string `json:"mutationsRoot"`
 	}
 )
+
+func BlockMetadataResponseFromBlock(block *blocks.Block) *BlockMetadataResponse {
+	return &BlockMetadataResponse{
+		BlockID:            block.ID().String(),
+		StrongParents:      lo.Map(block.StrongParents(), func(blockID iotago.BlockID) string { return blockID.String() }),
+		WeakParents:        lo.Map(block.ProtocolBlock().Block.WeakParentIDs(), func(blockID iotago.BlockID) string { return blockID.String() }),
+		ShallowLikeParents: lo.Map(block.ProtocolBlock().Block.ShallowLikeParentIDs(), func(blockID iotago.BlockID) string { return blockID.String() }),
+		Solid:              block.IsSolid(),
+		Invalid:            block.IsInvalid(),
+		Booked:             block.IsBooked(),
+		Future:             block.IsFuture(),
+		PreAccepted:        block.IsPreAccepted(),
+		Accepted:           block.IsAccepted(),
+		PreConfirmed:       block.IsPreConfirmed(),
+		Confirmed:          block.IsConfirmed(),
+		Witnesses:          lo.Map(block.Witnesses(), func(seatIndex account.SeatIndex) string { return fmt.Sprintf("%d", seatIndex) }),
+		ConflictIDs:        block.ConflictIDs().ToSlice(),
+		PayloadConflictIDs: block.PayloadConflictIDs().ToSlice(),
+		String:             block.String(),
+	}
+}

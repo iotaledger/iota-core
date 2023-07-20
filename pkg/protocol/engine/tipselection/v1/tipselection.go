@@ -114,13 +114,8 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 		t.collectReferences(references, iotago.WeakParentType, t.tipManager.WeakTips, func(tip tipmanager.TipMetadata) {
 			if !t.isValidWeakTip(tip.Block()) {
 				tip.TipPool().Set(tipmanager.DroppedTipPool)
-			} else {
-				if strongParents.Has(tip.ID()) {
-					panic("race condition - tip both in StrongPool and WeakPool")
-				}
-				if !shallowLikesParents.Has(tip.ID()) {
-					references[iotago.WeakParentType] = append(references[iotago.WeakParentType], tip.ID())
-				}
+			} else if !shallowLikesParents.Has(tip.ID()) {
+				references[iotago.WeakParentType] = append(references[iotago.WeakParentType], tip.ID())
 			}
 		}, t.optMaxWeakReferences)
 
