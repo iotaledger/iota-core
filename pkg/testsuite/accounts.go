@@ -36,6 +36,10 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, node *m
 			return ierrors.Errorf("AssertAccountData: %s: accountID %s expected output %s, got %s", node.Name, accountData.ID, accountData.OutputID, actualAccountData.OutputID)
 		}
 
+		if accountData.ExpirySlot != actualAccountData.ExpirySlot {
+			return ierrors.Errorf("AssertAccountData: %s: accountID %s expected expiry slot %s, got %s", node.Name, accountData.ID, accountData.ExpirySlot, actualAccountData.ExpirySlot)
+		}
+
 		if !cmp.Equal(accountData.PubKeys.Slice(), actualAccountData.PubKeys.Slice()) {
 			return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.PubKeys, actualAccountData.PubKeys)
 		}

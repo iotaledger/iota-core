@@ -34,6 +34,8 @@ func Test_TransitionAccount(t *testing.T) {
 		ExpirySlot: math.MaxUint64,
 	}),
 		testsuite.WithGenesisTimestampOffset(100*10),
+		testsuite.WithMaxCommittableAge(100),
+		testsuite.WithSlotsPerEpochExponent(8),
 	)
 	defer ts.Shutdown()
 
@@ -60,7 +62,11 @@ func Test_TransitionAccount(t *testing.T) {
 
 	newGenesisOutputKey := utils.RandPubKey()
 	{
-		accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount("Genesis:1", testsuite.AddBlockIssuerKey(newGenesisOutputKey[:]), testsuite.WithBlockIssuerExpirySlot(100))
+		accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount(
+			"Genesis:1",
+			testsuite.AddBlockIssuerKey(newGenesisOutputKey[:]),
+			testsuite.WithBlockIssuerExpirySlot(1),
+		)
 		consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(5, "Genesis:0")
 
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
@@ -87,7 +93,7 @@ func Test_TransitionAccount(t *testing.T) {
 			BICChange:           0,
 			PreviousUpdatedTime: 0,
 			PreviousExpirySlot:  math.MaxUint64,
-			NewExpirySlot:       100,
+			NewExpirySlot:       1,
 			NewOutputID:         iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 			PreviousOutputID:    genesisAccount.OutputID(),
 			PubKeysRemoved:      []ed25519.PublicKey{},
@@ -97,9 +103,10 @@ func Test_TransitionAccount(t *testing.T) {
 		ts.AssertAccountData(&accounts.AccountData{
 			ID: genesisAccountOutput.AccountID,
 			// TODO: why do we use the deposit here as credits?
-			Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit), 0),
-			OutputID: iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
-			PubKeys:  advancedset.New(ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey),
+			Credits:    accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit), 0),
+			OutputID:   iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
+			PubKeys:    advancedset.New(ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey),
+			ExpirySlot: 1,
 		}, node1)
 	}
 

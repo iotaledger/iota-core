@@ -353,14 +353,14 @@ func (t *TestSuite) Shutdown() {
 		return true
 	})
 
-	fmt.Println("======= ATTACHED BLOCKS =======")
-	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
-		for _, block := range node.AttachedBlocks() {
-			fmt.Println(node.Name, ">", block)
-		}
-
-		return true
-	})
+	//fmt.Println("======= ATTACHED BLOCKS =======")
+	//t.nodes.ForEach(func(_ string, node *mock.Node) bool {
+	//	for _, block := range node.AttachedBlocks() {
+	//		fmt.Println(node.Name, ">", block)
+	//	}
+	//
+	//	return true
+	//})
 }
 
 func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, optDeposit ...iotago.BaseToken) *mock.Node {

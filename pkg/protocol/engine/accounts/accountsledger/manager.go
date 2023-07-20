@@ -168,10 +168,10 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 
 	// read initial account data at the latest committed slot
 	loadedAccount, exists := m.accountsTree.Get(accountID)
-
 	if !exists {
 		loadedAccount = accounts.NewAccountData(accountID, accounts.WithCredits(accounts.NewBlockIssuanceCredits(0, targetIndex)))
 	}
+
 	wasDestroyed, err := m.rollbackAccountTo(loadedAccount, targetIndex)
 	if err != nil {
 		return nil, false, err
@@ -214,6 +214,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 			accounts.WithCredits(accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(accountOutput.Amount), m.latestCommittedSlot)),
 			accounts.WithOutputID(output.OutputID()),
 			accounts.WithPubKeys(ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...),
+			accounts.WithExpirySlot(accountOutput.FeatureSet().BlockIssuer().ExpirySlot),
 		)...,
 	)
 

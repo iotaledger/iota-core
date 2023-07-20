@@ -145,6 +145,8 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 		return
 	}
 
+	fmt.Printf("%+v\n", accountData)
+
 	// Check that the issuer key is valid for this block issuer and that the signature is valid
 	edSig, isEdSig := block.ProtocolBlock().Signature.(*iotago.Ed25519Signature)
 	if !isEdSig {
