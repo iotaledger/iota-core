@@ -12,7 +12,7 @@ type Events struct {
 	// Skipping a block has the same effect as scheduling it, i.e., it is passed to tip manager and gossiped.
 	BlockSkipped *event.Event1[*blocks.Block]
 	// BlockDropped is triggered when a block in the buffer is dropped. Dropped blocks are not passed to tip manager and not gossiped.
-	BlockDropped *event.Event2[*blocks.Block, error]
+	BlockDropped *event.Event1[*blocks.Block]
 
 	event.Group[Events, *Events]
 }
@@ -22,6 +22,6 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 	return &Events{
 		BlockScheduled: event.New1[*blocks.Block](),
 		BlockSkipped:   event.New1[*blocks.Block](),
-		BlockDropped:   event.New2[*blocks.Block, error](),
+		BlockDropped:   event.New1[*blocks.Block](),
 	}
 })

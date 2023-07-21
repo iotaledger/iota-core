@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type Booker struct {
@@ -128,8 +127,7 @@ func (b *Booker) book(block *blocks.Block) error {
 
 func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	if block.SetInvalid() {
-		// TODO: attach to this in the retainer
-		b.events.BlockInvalid.Trigger(block, ierrors.Wrapf(err, "%s, block marked as invalid in Booker", apimodels.FailureMessage(apimodels.ErrBlockBookingFailure)))
+		b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "block marked as invalid in Booker"))
 	}
 }
 
