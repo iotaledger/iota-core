@@ -35,7 +35,6 @@ const (
 
 var (
 	defaultClientsURLs   = []string{"http://localhost:8080", "http://localhost:8090"}
-	faucetBalance        = iotago.BaseToken(100_0000_0000)
 	dockerProtocolParams = func() iotago.ProtocolParameters {
 		options := snapshotcreator.NewOptions(presets.Docker...)
 		return options.ProtocolParameters
@@ -94,7 +93,7 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		w.faucet.seed = [32]byte(w.optFaucetSeed)
 
 		// get faucet output and deposit
-		faucetDeposit := faucetBalance
+		var faucetDeposit iotago.BaseToken
 
 		faucetOutput := clt.GetOutput(w.optFaucetUnspentOutputID)
 		if faucetOutput != nil {
