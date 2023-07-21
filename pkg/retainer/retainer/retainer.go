@@ -109,6 +109,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			}
 		}, asyncOpt)
 
+		// TODO: if we hook and collect BlockFailure on blockDropped, then we should remove errors on acceptance, cause block can be dropped in one node but still accepted by the network
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
 			if err := r.onBlockAccepted(b.ID()); err != nil {
 				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAccepted in retainer"))
