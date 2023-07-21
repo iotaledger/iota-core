@@ -104,10 +104,12 @@ func runVisualizer(component *app.Component) {
 				sendVertex(block, block.IsConfirmed())
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
-				sendTipInfo(tipMetadata.Block(), true)
+				tipMetadata.IsStrongTip().OnUpdate(func(_, newValue bool) {
+					sendTipInfo(tipMetadata.Block(), newValue)
+				})
 
-				tipMetadata.Evicted().OnTrigger(func() {
-					sendTipInfo(tipMetadata.Block(), false)
+				tipMetadata.IsWeakTip().OnUpdate(func(_, newValue bool) {
+					sendTipInfo(tipMetadata.Block(), newValue)
 				})
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 		)

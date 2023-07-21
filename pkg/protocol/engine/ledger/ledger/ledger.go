@@ -227,6 +227,7 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 		return castState, nil
 	case *ExecutionOutput:
 		txWithMetadata, exists := l.memPool.TransactionMetadata(outputID.TransactionID())
+		// If the transaction is not in the mempool, we need to load the output from the ledger
 		if !exists {
 			var output *utxoledger.Output
 			stateRequest := l.resolveState(outputID.UTXOInput())
@@ -289,7 +290,7 @@ func (l *Ledger) ForEachUnspentOutput(consumer func(output *utxoledger.Output) b
 	return l.utxoLedger.ForEachUnspentOutput(consumer)
 }
 
-func (l *Ledger) StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error) {
+func (l *Ledger) SlotDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error) {
 	return l.utxoLedger.SlotDiffWithoutLocking(index)
 }
 

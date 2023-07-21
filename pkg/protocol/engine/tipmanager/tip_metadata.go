@@ -31,4 +31,6 @@ type TipMetadata interface {
 
 	// Evicted exposes an event that is triggered when the block is evicted.
 	Evicted() reactive.Event
+
+	String() string
 }

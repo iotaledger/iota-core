@@ -392,16 +392,15 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) swapNeighbors(heavie
 func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) Shutdown() []*Conflict[ConflictID, ResourceID, VoteRank] {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	s.pendingWeightUpdatesMutex.Lock()
+	defer s.pendingWeightUpdatesMutex.Unlock()
+	s.pendingPreferredInsteadMutex.Lock()
+	defer s.pendingPreferredInsteadMutex.Unlock()
 
 	s.isShutdown.Store(true)
 
-	s.pendingWeightUpdatesMutex.Lock()
-	s.pendingWeightUpdates.Clear()
-	s.pendingWeightUpdatesMutex.Unlock()
-
-	s.pendingPreferredInsteadMutex.Lock()
-	s.pendingPreferredInsteadUpdates.Clear()
-	s.pendingPreferredInsteadMutex.Unlock()
+	s.pendingUpdatesCounter.Update(-s.pendingWeightUpdates.Size())
+	s.pendingUpdatesCounter.Update(-s.pendingPreferredInsteadUpdates.Size())
 
 	s.pendingPreferredInsteadSignal.Broadcast()
 	s.pendingWeightUpdatesSignal.Broadcast()

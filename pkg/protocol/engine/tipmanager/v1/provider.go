@@ -19,6 +19,7 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 			e.Events.Scheduler.BlockScheduled.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(tipWorker))
 			e.Events.Scheduler.BlockSkipped.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(tipWorker))
 			e.BlockCache.Evict.Hook(t.Evict)
+
 			e.Events.TipManager.BlockAdded.LinkTo(t.blockAdded)
 
 			t.TriggerInitialized()

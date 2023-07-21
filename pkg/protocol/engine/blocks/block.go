@@ -630,10 +630,10 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("Booked", b.booked))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
 	builder.AddField(stringify.NewStructField("PreAccepted", b.preAccepted))
-	builder.AddField(stringify.NewStructField("AcceptanceRatifiers", b.acceptanceRatifiers))
-	builder.AddField(stringify.NewStructField("Accepted", b.accepted))
+	builder.AddField(stringify.NewStructField("AcceptanceRatifiers", b.acceptanceRatifiers.String()))
+	builder.AddField(stringify.NewStructField("Accepted", b.accepted.Get()))
 	builder.AddField(stringify.NewStructField("PreConfirmed", b.preConfirmed))
-	builder.AddField(stringify.NewStructField("ConfirmationRatifiers", b.confirmationRatifiers))
+	builder.AddField(stringify.NewStructField("ConfirmationRatifiers", b.confirmationRatifiers.String()))
 	builder.AddField(stringify.NewStructField("Confirmed", b.confirmed))
 
 	for index, child := range b.strongChildren {
@@ -648,8 +648,13 @@ func (b *Block) String() string {
 		builder.AddField(stringify.NewStructField(fmt.Sprintf("shallowLikeChildren%d", index), child.ID().String()))
 	}
 
-	builder.AddField(stringify.NewStructField("RootBlock", b.rootBlock))
-	builder.AddField(stringify.NewStructField("ModelsBlock", b.modelBlock))
+	if b.rootBlock != nil {
+		builder.AddField(stringify.NewStructField("RootBlock", b.rootBlock.String()))
+	}
+
+	if b.modelBlock != nil {
+		builder.AddField(stringify.NewStructField("ModelsBlock", b.modelBlock.String()))
+	}
 
 	return builder.String()
 }

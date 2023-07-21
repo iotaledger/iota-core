@@ -147,13 +147,14 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 		case iotago.WeakParentType:
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
 		case iotago.ShallowLikeParentType:
-			// TODO: check whether it contains a TX, otherwise shallow like reference is invalid?
-
+			// TODO: check whether it contains a (conflicting) TX, otherwise shallow like reference is invalid?
+			//  if a block contains a transaction that itself is not conflicting, then it's possible to vote on any transaction in the UTXO-future cone of the conflict
+			//  NOTE: the above only applies when we don't fork all transactions.
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
 			//  remove all conflicting conflicts from conflictIDsToInherit
 			for _, conflictID := range parentBlock.PayloadConflictIDs().ToSlice() {
 				if conflictingConflicts, exists := b.conflictDAG.ConflictingConflicts(conflictID); exists {
-					conflictIDsToInherit.DeleteAll(conflictingConflicts)
+					conflictIDsToInherit.DeleteAll(b.conflictDAG.FutureCone(conflictingConflicts))
 				}
 			}
 		}

@@ -53,13 +53,18 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
 func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
-	tipMetadata := NewBlockMetadata(block)
-
-	if storage := t.metadataStorage(block.ID().Index()); storage == nil || !storage.Set(block.ID(), tipMetadata) {
+	storage := t.metadataStorage(block.ID().Index())
+	if storage == nil {
 		return nil
 	}
 
-	t.setupBlockMetadata(tipMetadata)
+	tipMetadata, created := storage.GetOrCreate(block.ID(), func() *TipMetadata {
+		return NewBlockMetadata(block)
+	})
+
+	if created {
+		t.setupBlockMetadata(tipMetadata)
+	}
 
 	return tipMetadata
 }

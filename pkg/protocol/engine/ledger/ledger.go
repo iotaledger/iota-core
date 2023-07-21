@@ -30,7 +30,7 @@ type Ledger interface {
 
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, BlockVoteRank]
 	MemPool() mempool.MemPool[BlockVoteRank]
-	StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error)
+	SlotDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 
 	ManaManager() *mana.Manager
 

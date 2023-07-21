@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -54,12 +55,14 @@ type TipSelection struct {
 
 	// Module embeds the required methods of the module.Interface.
 	module.Module
+	engine *engine.Engine
 }
 
 // New is the constructor for the TipSelection.
-func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], memPool mempool.MemPool[ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
+func New(e *engine.Engine, tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], memPool mempool.MemPool[ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
 		tipManager:                   tipManager,
+		engine:                       e,
 		conflictDAG:                  conflictDAG,
 		memPool:                      memPool,
 		rootBlocks:                   rootBlocksRetriever,
@@ -84,6 +87,8 @@ func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[i
 // SelectTips selects the tips that should be used as references for a new block.
 func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences) {
 	references = make(model.ParentReferences)
+	strongParents := ds.NewSet[iotago.BlockID]()
+	shallowLikesParents := ds.NewSet[iotago.BlockID]()
 	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]) error {
 		previousLikedInsteadConflicts := ds.NewSet[iotago.TransactionID]()
 
@@ -94,6 +99,9 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 			} else if len(addedLikedInsteadReferences) <= t.optMaxLikedInsteadReferences-len(references[iotago.ShallowLikeParentType]) {
 				references[iotago.StrongParentType] = append(references[iotago.StrongParentType], tip.ID())
 				references[iotago.ShallowLikeParentType] = append(references[iotago.ShallowLikeParentType], addedLikedInsteadReferences...)
+
+				shallowLikesParents.AddAll(ds.NewSet(addedLikedInsteadReferences...))
+				strongParents.Add(tip.ID())
 
 				previousLikedInsteadConflicts = updatedLikedInsteadConflicts
 			}
@@ -106,7 +114,7 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 		t.collectReferences(references, iotago.WeakParentType, t.tipManager.WeakTips, func(tip tipmanager.TipMetadata) {
 			if !t.isValidWeakTip(tip.Block()) {
 				tip.TipPool().Set(tipmanager.DroppedTipPool)
-			} else {
+			} else if !shallowLikesParents.Has(tip.ID()) {
 				references[iotago.WeakParentType] = append(references[iotago.WeakParentType], tip.ID())
 			}
 		}, t.optMaxWeakReferences)
@@ -191,8 +199,8 @@ func (t *TipSelection) collectReferences(references model.ParentReferences, pare
 	}
 
 	for tipCandidates := selectUniqueTips(amount); len(tipCandidates) != 0; tipCandidates = selectUniqueTips(amount - len(references[parentsType])) {
-		for _, strongTip := range tipCandidates {
-			callback(strongTip)
+		for _, tip := range tipCandidates {
+			callback(tip)
 		}
 	}
 }

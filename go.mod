@@ -3,6 +3,7 @@ module github.com/iotaledger/iota-core
 go 1.20
 
 require (
+	github.com/goccy/go-graphviz v0.1.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
@@ -21,7 +22,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230718105411-48cf88979f49
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230718105411-48cf88979f49
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230718105411-48cf88979f49
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230630104742-e00321c8e813
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230720084922-26a37e052060
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230720090640-0cd215dd991b
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/libp2p/go-libp2p v0.28.1
@@ -59,11 +60,13 @@ require (
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
+	github.com/fogleman/gg v1.3.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-github v17.0.0+incompatible // indirect
@@ -143,6 +146,7 @@ require (
 	go.uber.org/fx v1.20.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
+	golang.org/x/image v0.6.0 // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect

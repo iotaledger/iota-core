@@ -21,7 +21,7 @@ type ConflictDAG[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 	// events contains the events of the ConflictDAG.
 	events *conflictdag.Events[ConflictID, ResourceID]
 
-	//seatCount is a function that returns the number of seats.
+	// seatCount is a function that returns the number of seats.
 	seatCount func() int
 
 	// conflictsByID is a mapping of ConflictIDs to Conflicts.
@@ -155,18 +155,10 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictParents(co
 		addedParents := ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]]()
 
 		if err := addedParentIDs.ForEach(func(addedParentID ConflictID) error {
-			addedParent, addedParentExists := c.conflictsByID.Get(addedParentID)
-			if !addedParentExists {
-				if !currentConflict.IsRejected() {
-					// UpdateConflictParents is only called when a Conflict is forked, which means that the added parent
-					// must exist (unless it was forked on top of a rejected branch, just before eviction).
-					return ierrors.Errorf("tried to add non-existent parent with %s: %w", addedParentID, conflictdag.ErrFatal)
-				}
-
-				return ierrors.Errorf("tried to add evicted parent with %s to rejected conflict with %s: %w", addedParentID, conflictID, conflictdag.ErrEntityEvicted)
+			// If we cannot load the parent it is because it has been already evicted
+			if addedParent, addedParentExists := c.conflictsByID.Get(addedParentID); addedParentExists {
+				addedParents.Add(addedParent)
 			}
-
-			addedParents.Add(addedParent)
 
 			return nil
 		}); err != nil {
