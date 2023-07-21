@@ -23,11 +23,9 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230718105411-48cf88979f49
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230718105411-48cf88979f49
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230720084922-26a37e052060
-	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-20230714130714-580a4c17e9bd
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230717092342-cf2f86ec0fed
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230720090640-0cd215dd991b
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/libp2p/go-libp2p v0.28.1
-	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.9.0
 	github.com/multiformats/go-varint v0.0.7
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
@@ -110,6 +108,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.3.1 // indirect

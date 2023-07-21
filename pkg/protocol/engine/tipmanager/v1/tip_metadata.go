@@ -60,7 +60,7 @@ type TipMetadata struct {
 	// isOrphaned is true if the block is either strongly or weakly orphaned.
 	isOrphaned reactive.Variable[bool]
 
-	// anyStrongParentStronglyOrphaned is true if the block has at least one orphaned parent.
+	// anyStrongParentStronglyOrphaned is true if the block has at least one strong parent that is strongly orphaned.
 	anyStrongParentStronglyOrphaned reactive.Variable[bool]
 
 	// anyWeakParentWeaklyOrphaned is true if the block has at least one weak parent that is weakly orphaned.

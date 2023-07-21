@@ -1,4 +1,4 @@
-package evillogger
+package logger
 
 import (
 	"fmt"
