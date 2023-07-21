@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
@@ -92,10 +91,10 @@ const (
 	RouteBlockIssuanceCredits = "/accounts/:" + restapipkg.ParameterAccountID
 
 	// RouteCongestion is the route for getting the current congestion state and all account related useful details as block issuance credits.
-	// GET returns the congestion state raleted to the specified account.
+	// GET returns the congestion state related to the specified account.
 	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
 
-	//RouteStaking is the route for getting informations about the current stakers.
+	// RouteStaking is the route for getting informations about the current stakers.
 	// GET returns the stakers.
 	RouteStaking = "/staking"
 
@@ -228,12 +227,12 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteCommitmentByIndex, func(c echo.Context) error {
-		indexUint64, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
+		index, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getCommitmentDetails(iotago.SlotIndex(indexUint64))
+		resp, err := getCommitmentDetails(index)
 		if err != nil {
 			return err
 		}
@@ -242,12 +241,12 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteCommitmentByIndexUTXOChanges, func(c echo.Context) error {
-		index, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
+		index, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChanges(iotago.SlotIndex(index))
+		resp, err := getUTXOChanges(index)
 		if err != nil {
 			return err
 		}
