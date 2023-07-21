@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -32,6 +33,8 @@ type Retainer struct {
 	finalizedSlotFunc       FinalizedSlotFunc
 	errorHandler            func(error)
 
+	workers *workerpool.Group
+
 	module.Module
 }
 
@@ -52,8 +55,9 @@ type Retainer struct {
 // get block status: go through stores to check status
 // get tx status: confirmed store -> check slot index finalized? finalized -> pending store (error codes)
 
-func New(retainerFunc RetainerFunc, blockFromCacheFunc BlockFromCacheFunc, blockFromStorageFunc BlockFromStorageFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
+func New(workers *workerpool.Group, retainerFunc RetainerFunc, blockFromCacheFunc BlockFromCacheFunc, blockFromStorageFunc BlockFromStorageFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
 	return &Retainer{
+		workers:                 workers,
 		retainerFunc:            retainerFunc,
 		blockFromCacheFunc:      blockFromCacheFunc,
 		blockFromStorageFunc:    blockFromStorageFunc,
@@ -66,7 +70,8 @@ func New(retainerFunc RetainerFunc, blockFromCacheFunc BlockFromCacheFunc, block
 // NewProvider creates a new Retainer provider.
 func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	return module.Provide(func(e *engine.Engine) retainer.Retainer {
-		r := New(e.Storage.Retainer,
+		r := New(e.Workers.CreateGroup("Retainer"),
+			e.Storage.Retainer,
 			func(blockID iotago.BlockID) *model.Block {
 				block, exists := e.BlockFromCache(blockID)
 				if !exists {
@@ -95,7 +100,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			e.Storage.Settings().LatestCommitment().Index,
 			e.ErrorHandler("retainer"))
 
-		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("Retainer", 1))
+		asyncOpt := event.WithWorkerPool(r.workers.CreatePool("Retainer", 1))
 
 		e.Events.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
 			_, isTx := b.Transaction()
@@ -149,6 +154,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 }
 
 func (r *Retainer) Shutdown() {
+	r.workers.Shutdown()
 }
 
 func (r *Retainer) Block(blockID iotago.BlockID) (*model.Block, error) {

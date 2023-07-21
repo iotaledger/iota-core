@@ -216,6 +216,7 @@ func (e *Engine) Shutdown() {
 		e.TipManager.Shutdown()
 		e.Filter.Shutdown()
 		e.Scheduler.Shutdown()
+		e.Retainer.Shutdown()
 		e.Storage.Shutdown()
 		e.Workers.Shutdown()
 	}
