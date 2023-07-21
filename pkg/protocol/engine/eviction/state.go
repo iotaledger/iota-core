@@ -55,7 +55,10 @@ func (s *State) AdvanceActiveWindowToIndex(index iotago.SlotIndex) {
 	s.lastEvictedSlot = index
 
 	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(index); shouldEvictRootBlocks {
-		s.rootBlocks.Evict(delayedIndex)
+		// Remember the last slot outside our cache window that has root blocks.
+		if evictedSlot := s.rootBlocks.Evict(delayedIndex); evictedSlot != nil && evictedSlot.Size() > 0 {
+			s.setLatestNonEmptySlot(delayedIndex)
+		}
 	}
 
 	s.evictionMutex.Unlock()
@@ -161,8 +164,6 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 		if err := s.rootBlockStorageFunc(id.Index()).Store(id, commitmentID); err != nil {
 			panic(ierrors.Wrapf(err, "failed to store root block %s", id))
 		}
-
-		s.setLatestNonEmptySlot(id.Index())
 	}
 
 	s.latestRootBlocks.Add(id)
@@ -264,6 +265,12 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget, targetSlot iotago.Slo
 		return ierrors.Wrap(err, "failed to write root blocks")
 	}
 
+	if latestNonEmptySlot > s.optsRootBlocksEvictionDelay {
+		latestNonEmptySlot -= s.optsRootBlocksEvictionDelay
+	} else {
+		latestNonEmptySlot = 0
+	}
+
 	stream.WriteSerializable(writer, latestNonEmptySlot, iotago.SlotIndexLength)
 
 	return nil
@@ -313,7 +320,7 @@ func (s *State) Import(reader io.ReadSeeker) error {
 		return ierrors.Wrap(err, "failed to parse latest non empty slot")
 	}
 
-	s.latestNonEmptyStore.Set([]byte{latestNonEmptySlotKey}, latestNonEmptySlot.MustBytes())
+	s.setLatestNonEmptySlot(latestNonEmptySlot)
 
 	return nil
 }
@@ -379,31 +386,25 @@ func (s *State) withinActiveIndexRange(index iotago.SlotIndex) bool {
 
 // delayedBlockEvictionThreshold returns the slot index that is the threshold for delayed rootblocks eviction.
 func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (threshold iotago.SlotIndex, shouldEvict bool) {
-	latestNonEmptySlot := s.latestNonEmptySlot()
-	if latestNonEmptySlot < slot {
-		slot = latestNonEmptySlot
+	if slot < s.optsRootBlocksEvictionDelay {
+		return 0, false
 	}
 
-	if slot >= s.optsRootBlocksEvictionDelay {
-		// Check if there are even root blocks at the delayed index (empty slots were committed).
-		// We keep shifting the eviction to the past until we find a slot that has root blocks, or we get to genesis.
-		for ; slot > 0; slot-- {
-			if rb := s.rootBlocks.Get(slot); rb != nil {
-				if rb.Size() > 0 {
+	// Check if we have root blocks up to the eviction point.
+	for ; slot >= s.lastEvictedSlot; slot-- {
+		if rb := s.rootBlocks.Get(slot); rb != nil {
+			if rb.Size() > 0 {
+				if slot >= s.optsRootBlocksEvictionDelay {
 					return slot - s.optsRootBlocksEvictionDelay, true
 				}
-			} else if storedRootBlocks := s.rootBlockStorageFunc(slot); storedRootBlocks != nil {
-				found := false
-				_ = storedRootBlocks.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
-					found = true
-					return ierrors.New("no error, just stop")
-				})
-
-				if found {
-					return slot - s.optsRootBlocksEvictionDelay, true
-				}
+				return 0, false
 			}
 		}
+	}
+
+	// If we didn't find any root blocks, we have to fallback to the latestNonEmptySlot before the eviction point.
+	if latestNonEmptySlot := s.latestNonEmptySlot(); latestNonEmptySlot >= s.optsRootBlocksEvictionDelay {
+		return latestNonEmptySlot - s.optsRootBlocksEvictionDelay, true
 	}
 
 	return 0, false
