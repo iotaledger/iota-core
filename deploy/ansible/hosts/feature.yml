@@ -1,6 +1,6 @@
-# metrics:
-#   hosts:
-#     metrics-01.feature.shimmer.iota.cafe:
+metrics:
+  hosts:
+    metrics-01.feature.shimmer.iota.cafe:
 
 cores:
   children:

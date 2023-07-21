@@ -10,6 +10,9 @@ ansible-playbook -u root -i deploy/ansible/hosts/"${1:-feature.yml}" \
 iota_core_docker_image_repo=$IOTA_CORE_DOCKER_IMAGE_REPO
 iota_core_docker_image_tag=$IOTA_CORE_DOCKER_IMAGE_TAG
 wireguard_server_private_key=$WIREGUARD_SERVER_PRIVKEY
+elkElasticUser=$ELASTIC_USER
+elkElasticPassword=$ELASTIC_PASSWORD
+grafanaAdminPassword=$GRAFANA_ADMIN_PASSWORD
 NODE_01_ACCOUNTID=$NODE_01_ACCOUNTID
 NODE_01_PRIVKEY=$NODE_01_PRIVKEY
 NODE_01_P2PSEED=$NODE_01_P2PSEED

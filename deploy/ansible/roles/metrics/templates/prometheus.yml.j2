@@ -5,20 +5,20 @@ scrape_configs:
     - job_name: analysis_server
       static_configs:
       - targets:
-      {% for host in groups['supports'] + groups['goshimmers']%}
+      {% for host in groups['cores']%}
         - {{ host }}:9311
       {% endfor %}
 
     - job_name: node
       static_configs:
       - targets:
-      {% for host in groups['supports'] + groups['goshimmers'] + groups['metrics']%}
+      {% for host in groups['cores'] + groups['metrics']%}
         - {{ host }}:9100
       {% endfor %}
 
     - job_name: cadvisor
       static_configs:
       - targets:
-      {% for host in groups['supports'] + groups['goshimmers'] + groups['metrics']%}
+      {% for host in groups['cores'] + groups['metrics']%}
         - {{ host }}:9111
       {% endfor %}

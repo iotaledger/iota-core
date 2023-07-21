@@ -30,7 +30,7 @@
     {
       "alert": {
         "alertRuleTags": {},
-        "block": "Some of the GoShimmer instances are out of sync. Please fix ASAP! Below is the list of the nodes currently out of sync.",
+        "block": "Some of the iota-core instances are out of sync. Please fix ASAP! Below is the list of the nodes currently out of sync.",
         "conditions": [
           {
             "evaluator": {
@@ -60,7 +60,7 @@
         "for": "5m",
         "frequency": "1m",
         "handler": 1,
-        "name": "GoShimmer Sync Monitoring",
+        "name": "iota-core Sync Monitoring",
         "noDataState": "alerting",
         "notifications": []
       },
@@ -160,13 +160,13 @@
           "visible": true
         }
       ],
-      "title": "GoShimmer Sync Monitoring",
+      "title": "iota-core Sync Monitoring",
       "type": "timeseries"
     },
     {
       "alert": {
         "alertRuleTags": {},
-        "block": "Some of the GoShimmer instances went down. Please fix ASAP! Below is the list of the nodes currently down.",
+        "block": "Some of the iota-core instances went down. Please fix ASAP! Below is the list of the nodes currently down.",
         "conditions": [
           {
             "evaluator": {
@@ -196,7 +196,7 @@
         "for": "5m",
         "frequency": "1m",
         "handler": 1,
-        "name": "GoShimmer Node Monitoring alert",
+        "name": "iota-core Node Monitoring alert",
         "noDataState": "alerting",
         "notifications": []
       },
@@ -300,7 +300,7 @@
           "visible": true
         }
       ],
-      "title": "GoShimmer Node Monitoring",
+      "title": "iota-core Node Monitoring",
       "type": "timeseries"
     }
   ],

@@ -39,7 +39,7 @@ services:
 
   elasticsearch:
     container_name: elasticsearch
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.13.2
+    image: elasticsearch:7.13.2
     restart: unless-stopped
     volumes:
       - "/etc/localtime:/etc/localtime:ro"
@@ -67,7 +67,7 @@ services:
 
   logstash:
     container_name: logstash
-    image: docker.elastic.co/logstash/logstash:7.13.2
+    image: logstash:7.13.2
     restart: unless-stopped
     volumes:
       - "/etc/localtime:/etc/localtime:ro"
@@ -91,7 +91,7 @@ services:
 
   kibana:
     container_name: kibana
-    image: docker.elastic.co/kibana/kibana:7.13.2
+    image: kibana:7.13.2
     restart: unless-stopped
     volumes:
       - "/etc/localtime:/etc/localtime:ro"

@@ -87,7 +87,7 @@
 - name: Add manual internal hosts with IPv4 mappings
   lineinfile:
     path: /etc/hosts
-    line: "{{ item.value }} {{ item.key }}"
+    line: "{{ item.value }} {{ item.key }} {{ item.key }}.shimmer.iota.cafe"
     regexp: "^{{ item.value }}"
     state: present
   loop:
@@ -96,5 +96,6 @@
     - { key: 'node-03.feature', value: '192.168.20.5' }
     - { key: 'node-04.feature', value: '192.168.20.2' }
     - { key: 'node-05.feature', value: '192.168.20.3' }
+    - { key: 'metrics-01.feature', value: '192.168.20.7' }
   loop_control:
     label: "{{ item.key }}"
