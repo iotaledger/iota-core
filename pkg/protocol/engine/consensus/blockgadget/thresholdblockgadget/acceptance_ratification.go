@@ -1,7 +1,7 @@
 package thresholdblockgadget
 
 import (
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/votes"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -17,7 +17,7 @@ func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
 	}
 
 	var toAccept []*blocks.Block
-	toAcceptByID := set.New[iotago.BlockID]()
+	toAcceptByID := ds.NewSet[iotago.BlockID]()
 
 	evaluateFunc := func(block *blocks.Block) bool {
 		// Skip propagation if the block is already accepted.

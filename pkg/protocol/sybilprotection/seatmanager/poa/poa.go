@@ -3,7 +3,7 @@ package poa
 import (
 	"time"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -27,7 +27,7 @@ type SeatManager struct {
 	workers           *workerpool.Group
 	accounts          *account.Accounts
 	committee         *account.SeatedAccounts
-	onlineCommittee   *advancedset.AdvancedSet[account.SeatIndex]
+	onlineCommittee   ds.Set[account.SeatIndex]
 	inactivityManager *timed.TaskExecutor[account.SeatIndex]
 	lastActivities    *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
 	activityMutex     syncutils.RWMutex
@@ -47,7 +47,7 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				events:            seatmanager.NewEvents(),
 				workers:           e.Workers.CreateGroup("SeatManager"),
 				accounts:          account.NewAccounts(),
-				onlineCommittee:   advancedset.New[account.SeatIndex](),
+				onlineCommittee:   ds.NewSet[account.SeatIndex](),
 				inactivityManager: timed.NewTaskExecutor[account.SeatIndex](1),
 				lastActivities:    shrinkingmap.New[account.SeatIndex, time.Time](),
 
@@ -101,7 +101,7 @@ func (s *SeatManager) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
 }
 
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
-func (s *SeatManager) OnlineCommittee() *advancedset.AdvancedSet[account.SeatIndex] {
+func (s *SeatManager) OnlineCommittee() ds.Set[account.SeatIndex] {
 	s.activityMutex.RLock()
 	defer s.activityMutex.RUnlock()
 

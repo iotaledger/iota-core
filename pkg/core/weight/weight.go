@@ -1,7 +1,7 @@
 package weight
 
 import (
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/stringify"
@@ -15,7 +15,7 @@ type Weight struct {
 	OnUpdate *event.Event1[Value]
 
 	// Voters is the set of voters contributing to the weight
-	Voters *advancedset.AdvancedSet[account.SeatIndex]
+	Voters ds.Set[account.SeatIndex]
 
 	// value is the current weight Value.
 	value Value
@@ -27,7 +27,7 @@ type Weight struct {
 // New creates a new Weight instance.
 func New() *Weight {
 	w := &Weight{
-		Voters:   advancedset.New[account.SeatIndex](),
+		Voters:   ds.NewSet[account.SeatIndex](),
 		OnUpdate: event.New1[Value](),
 	}
 

@@ -1,7 +1,7 @@
 package seatmanager
 
 import (
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -24,7 +24,7 @@ type SeatManager interface {
 	Committee(slotIndex iotago.SlotIndex) *account.SeatedAccounts
 
 	// OnlineCommittee returns the set of online validators that is used to track acceptance.
-	OnlineCommittee() *advancedset.AdvancedSet[account.SeatIndex]
+	OnlineCommittee() ds.Set[account.SeatIndex]
 
 	// SeatCount returns the number of seats in the SeatManager.
 	SeatCount() int

@@ -33,7 +33,7 @@ func (t *TestSuite) AssertSybilProtectionOnlineCommittee(expectedSeats []account
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			seats := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().OnlineCommittee().Slice()
+			seats := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().OnlineCommittee().ToSlice()
 			if !assert.ElementsMatch(t.fakeTesting, expectedSeats, seats) {
 				return ierrors.Errorf("AssertSybilProtectionOnlineCommittee: %s: expected %v, got %v", node.Name, expectedSeats, seats)
 			}

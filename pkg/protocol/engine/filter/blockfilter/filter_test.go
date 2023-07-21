@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/api"
@@ -143,8 +143,8 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 		WithMaxAllowedWallClockDrift(time.Duration(uint64(timeProvider.EpochEnd(50))*uint64(timeProvider.SlotDurationSeconds()))*time.Second),
 	)
 
-	valid := set.New[string](true)
-	invalid := set.New[string](true)
+	valid := ds.NewSet[string]()
+	invalid := ds.NewSet[string]()
 
 	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
 		require.True(t, valid.Has(block.ID().Alias()))
@@ -418,6 +418,10 @@ func (m mockProtocolParameters) StakingUnbondingPeriod() iotago.EpochIndex {
 }
 
 func (m mockProtocolParameters) LivenessThreshold() iotago.SlotIndex {
+	panic("implement me")
+}
+
+func (m mockProtocolParameters) LivenessThresholdDuration() time.Duration {
 	panic("implement me")
 }
 
