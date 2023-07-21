@@ -20,6 +20,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 // BlockDAG is a causally ordered DAG that forms the central data structure of the IOTA protocol.
@@ -263,7 +264,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	block, evicted, updated := b.blockCache.StoreOrUpdate(data)
 
 	if evicted {
-		return block, false, ierrors.New("block is too old")
+		return block, false, ierrors.Errorf("%s, cannot attach, block is too old, it was already evicted from the cache", apimodels.FailureMessage(apimodels.ErrBlockIsTooOld))
 	}
 
 	if updated {
@@ -280,7 +281,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 // canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
 func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
 	if b.evictionState.InRootBlockSlot(data.ID()) && !b.evictionState.IsRootBlock(data.ID()) {
-		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().IssuingTime)
+		return false, ierrors.Errorf("%s, block data with %s is too old (issued at: %s)", apimodels.FailureMessage(apimodels.ErrBlockIsTooOld), data.ID(), data.ProtocolBlock().IssuingTime)
 	}
 
 	storedBlock, storedBlockExists := b.blockCache.Block(data.ID())
@@ -303,7 +304,7 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid bool, err error) {
 	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
 		if b.evictionState.InRootBlockSlot(parentID) && !b.evictionState.IsRootBlock(parentID) {
-			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
+			return false, ierrors.Errorf("%s, parent %s of block %s is too old", apimodels.FailureMessage(apimodels.ErrBlockParentIsTooOld), parentID, modelBlock.ID())
 		}
 	}
 

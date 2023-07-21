@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type Scheduler struct {
@@ -159,7 +160,7 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	}
 	for _, b := range droppedBlocks {
 		b.SetDropped()
-		s.events.BlockDropped.Trigger(b)
+		s.events.BlockDropped.Trigger(b, ierrors.Errorf("%s, block dropped from buffer", apimodels.FailureMessage(apimodels.ErrBlockDroppedDueToCongestion)))
 	}
 	block.SetEnqueued()
 	s.tryReady(block)
@@ -269,7 +270,8 @@ func (s *Scheduler) selectBlockToSchedule() {
 	if err != nil {
 		// if something goes wrong with deficit update, drop the block instead of scheduling it.
 		block.SetDropped()
-		s.events.BlockDropped.Trigger(block)
+		// todo: attach to this event in the retainer
+		s.events.BlockDropped.Trigger(block, ierrors.Errorf("%s, error updating deficit", apimodels.FailureMessage(apimodels.ErrBlockDroppedDueToCongestion)))
 	}
 	s.blockChan <- block
 }

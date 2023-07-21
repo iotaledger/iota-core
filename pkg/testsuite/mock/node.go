@@ -248,8 +248,8 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Scheduler.BlockSkipped: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.Scheduler.BlockDropped.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Scheduler.BlockDropped: %s\n", n.Name, engineName, block.ID())
+	events.Scheduler.BlockDropped.Hook(func(block *blocks.Block, err error) {
+		fmt.Printf("%s > [%s] Scheduler.BlockDropped: %s - %s\n", n.Name, engineName, block.ID(), err.Error())
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
