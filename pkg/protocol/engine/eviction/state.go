@@ -271,7 +271,9 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 		latestNonEmptySlot = 0
 	}
 
-	stream.WriteSerializable(writer, latestNonEmptySlot, iotago.SlotIndexLength)
+	if err := stream.WriteSerializable(writer, latestNonEmptySlot, iotago.SlotIndexLength); err != nil {
+		return ierrors.Wrap(err, "failed to write latest non empty slot")
+	}
 
 	return nil
 }
@@ -397,6 +399,7 @@ func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (threshold 
 				if slot >= s.optsRootBlocksEvictionDelay {
 					return slot - s.optsRootBlocksEvictionDelay, true
 				}
+
 				return 0, false
 			}
 		}
