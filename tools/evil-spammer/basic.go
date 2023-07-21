@@ -36,7 +36,7 @@ func CustomSpam(params *CustomSpamParams) {
 
 	fundsNeeded := false
 	for _, st := range params.SpamTypes {
-		if st != "blk" {
+		if st != SpammerTypeBlock {
 			fundsNeeded = true
 		}
 	}
@@ -54,7 +54,7 @@ func CustomSpam(params *CustomSpamParams) {
 		log.Infof("Start spamming with rate: %d, time unit: %s, and spamming type: %s.", params.Rates[i], params.TimeUnit.String(), sType)
 
 		switch sType {
-		case "blk":
+		case SpammerTypeBlock:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -64,19 +64,19 @@ func CustomSpam(params *CustomSpamParams) {
 				}
 				s.Spam()
 			}(i)
-		case "tx":
+		case SpammerTypeTx:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
 				SpamTransaction(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.DeepSpam, params.EnableRateSetter)
 			}(i)
-		case "ds":
+		case SpammerTypeDs:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
 				SpamDoubleSpends(w, params.Rates[i], params.NSpend, params.TimeUnit, params.Durations[i], params.DelayBetweenConflicts, params.DeepSpam, params.EnableRateSetter)
 			}(i)
-		case "custom":
+		case SpammerTypeCustom:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -86,14 +86,14 @@ func CustomSpam(params *CustomSpamParams) {
 				}
 				s.Spam()
 			}(i)
-		case "commitments":
+		case SpammerTypeCommitments:
 			wg.Add(1)
-			go func(i int) {
+			go func() {
 				defer wg.Done()
-			}(i)
+			}()
 
 		default:
-			log.Warn("Spamming type not recognized. Try one of following: tx, ds, blk")
+			log.Warn("Spamming type not recognized. Try one of following: tx, ds, blk, custom, commitments")
 		}
 	}
 

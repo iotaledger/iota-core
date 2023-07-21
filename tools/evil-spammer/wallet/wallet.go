@@ -2,11 +2,11 @@ package wallet
 
 import (
 	"crypto/ed25519"
-	"sync"
 
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -28,7 +28,7 @@ type Wallet struct {
 	lastAddrIdxUsed atomic.Int64 // used during filling in wallet with new outputs
 	lastAddrSpent   atomic.Int64 // used during spamming with outputs one by one
 
-	*sync.RWMutex
+	*syncutils.RWMutex
 }
 
 // NewWallet creates a wallet of a given type.
@@ -50,7 +50,7 @@ func NewWallet(wType ...WalletType) *Wallet {
 		inputTransactions: make(map[string]types.Empty),
 		lastAddrSpent:     *idxSpent,
 		lastAddrIdxUsed:   *addrUsed,
-		RWMutex:           &sync.RWMutex{},
+		RWMutex:           &syncutils.RWMutex{},
 	}
 
 	if walletType == Reuse {

@@ -38,7 +38,7 @@ func main() {
 		CustomSpam(&customSpamParams)
 	case "quick":
 		QuickTest(&quickTestParams)
-	// case "commitments":
+	// case SpammerTypeCommitments:
 	// 	CommitmentsSpam(&commitmentsSpamParams)
 	default:
 		log.Warnf("Unknown parameter for script, possible values: basic, quick, commitments")
@@ -59,7 +59,7 @@ func parseFlags() (help bool) {
 		parseBasicSpamFlags()
 	case "quick":
 		parseQuickTestFlags()
-		// case "commitments":
+		// case SpammerTypeCommitments:
 		// 	parseCommitmentsSpamFlags()
 	}
 	if Script == "help" || Script == "-h" || Script == "--help" {

@@ -33,6 +33,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -57,6 +58,7 @@ type Engine struct {
 	Scheduler           scheduler.Scheduler
 	TipManager          tipmanager.TipManager
 	TipSelection        tipselection.TipSelection
+	Retainer            retainer.Retainer
 	UpgradeOrchestrator upgrade.Orchestrator
 
 	Workers      *workerpool.Group
@@ -96,6 +98,7 @@ func New(
 	schedulerProvider module.Provider[*Engine, scheduler.Scheduler],
 	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
+	retainerProvider module.Provider[*Engine, retainer.Retainer],
 	upgradeOrchestratorProvider module.Provider[*Engine, upgrade.Orchestrator],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
@@ -107,7 +110,7 @@ func New(
 		&Engine{
 			Events:        NewEvents(),
 			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance.RootBlocks),
+			EvictionState: eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
 			Workers:       workers,
 			errorHandler:  errorHandler,
 
@@ -146,6 +149,7 @@ func New(
 			e.TipManager = tipManagerProvider(e)
 			e.Scheduler = schedulerProvider(e)
 			e.TipSelection = tipSelectionProvider(e)
+			e.Retainer = retainerProvider(e)
 			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
 		},
 		(*Engine).setupBlockStorage,
@@ -212,6 +216,7 @@ func (e *Engine) Shutdown() {
 		e.TipManager.Shutdown()
 		e.Filter.Shutdown()
 		e.Scheduler.Shutdown()
+		e.Retainer.Shutdown()
 		e.Storage.Shutdown()
 		e.Workers.Shutdown()
 	}

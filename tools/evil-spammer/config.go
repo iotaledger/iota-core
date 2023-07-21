@@ -18,7 +18,7 @@ var (
 
 	customSpamParams = CustomSpamParams{
 		ClientURLs:            urls,
-		SpamTypes:             []string{"blk"},
+		SpamTypes:             []string{SpammerTypeBlock},
 		Rates:                 []int{1},
 		Durations:             []time.Duration{time.Second * 20},
 		BlkToBeSent:           []int{0},
@@ -38,6 +38,7 @@ var (
 		EnableRateSetter:      false,
 	}
 
+	//nolint:godot
 	// commitmentsSpamParams = CommitmentsSpamParams{
 	// 	Rate:           1,
 	// 	Duration:       time.Second * 20,
