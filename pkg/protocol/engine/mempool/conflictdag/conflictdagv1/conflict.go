@@ -2,11 +2,10 @@ package conflictdagv1
 
 import (
 	"bytes"
-	"sync"
 
 	"go.uber.org/atomic"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -26,13 +25,13 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	ID ConflictID
 
 	// Parents is the set of parents of the Conflict.
-	Parents *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
+	Parents ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]
 
 	// Children is the set of children of the Conflict.
-	Children *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
+	Children ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]
 
 	// ConflictSets is the set of ConflictSets that the Conflict is part of.
-	ConflictSets *advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VoteRank]]
+	ConflictSets ds.Set[*ConflictSet[ConflictID, ResourceID, VoteRank]]
 
 	// ConflictingConflicts is the set of conflicts that directly conflict with the Conflict.
 	ConflictingConflicts *SortedConflicts[ConflictID, ResourceID, VoteRank]
@@ -68,20 +67,20 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	preferredInsteadMutex syncutils.RWMutex
 
 	// likedInstead is the set of liked instead Conflicts.
-	likedInstead *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]
+	likedInstead ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]
 
 	// likedInsteadSources is a mapping of liked instead Conflicts to the set of parents that inherited them.
-	likedInsteadSources *shrinkingmap.ShrinkingMap[ConflictID, *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]]
+	likedInsteadSources *shrinkingmap.ShrinkingMap[ConflictID, ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]]
 
 	// TODO: likedInsteadMutex and structureMutex are sometimes locked in different order by different goroutines, which could result in a deadlock
 	//  however, it's impossible to deadlock if we fork all transactions upon booking
 	//  deadlock happens when the likedInstead conflict changes and parents are updated at the same time, which is impossible in the current setup
 	//  because we won't process votes on a conflict we're just creating.
 	// likedInsteadMutex is used to synchronize access to the liked instead value of the Conflict.
-	likedInsteadMutex sync.RWMutex
+	likedInsteadMutex syncutils.RWMutex
 
 	// structureMutex is used to synchronize access to the structure of the Conflict.
-	structureMutex sync.RWMutex
+	structureMutex syncutils.RWMutex
 
 	// acceptanceThreshold is the function that is used to retrieve the acceptance threshold of the committee.
 	acceptanceThreshold func() int64
@@ -94,9 +93,9 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 func NewConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.VoteRankType[VoteRank]](id ConflictID, initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[ConflictID, ResourceID, VoteRank] {
 	c := &Conflict[ConflictID, ResourceID, VoteRank]{
 		ID:                      id,
-		Parents:                 advancedset.New[*Conflict[ConflictID, ResourceID, VoteRank]](),
-		Children:                advancedset.New[*Conflict[ConflictID, ResourceID, VoteRank]](),
-		ConflictSets:            advancedset.New[*ConflictSet[ConflictID, ResourceID, VoteRank]](),
+		Parents:                 ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]](),
+		Children:                ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]](),
+		ConflictSets:            ds.NewSet[*ConflictSet[ConflictID, ResourceID, VoteRank]](),
 		Weight:                  initialWeight,
 		LatestVotes:             shrinkingmap.New[account.SeatIndex, *vote.Vote[VoteRank]](),
 		AcceptanceStateUpdated:  event.New2[acceptance.State, acceptance.State](),
@@ -106,8 +105,8 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 
 		childUnhookMethods:  shrinkingmap.New[ConflictID, func()](),
 		acceptanceThreshold: acceptanceThresholdProvider,
-		likedInstead:        advancedset.New[*Conflict[ConflictID, ResourceID, VoteRank]](),
-		likedInsteadSources: shrinkingmap.New[ConflictID, *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]](),
+		likedInstead:        ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]](),
+		likedInsteadSources: shrinkingmap.New[ConflictID, ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]](),
 	}
 
 	c.preferredInstead = c
@@ -129,7 +128,11 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 }
 
 // JoinConflictSets registers the Conflict with the given ConflictSets.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSets *advancedset.AdvancedSet[*ConflictSet[ConflictID, ResourceID, VoteRank]]) (joinedConflictSets *advancedset.AdvancedSet[ResourceID], err error) {
+func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSets ds.Set[*ConflictSet[ConflictID, ResourceID, VoteRank]]) (joinedConflictSets ds.Set[ResourceID], err error) {
+	if conflictSets == nil {
+		return ds.NewSet[ResourceID](), nil
+	}
+
 	if c.evicted.Load() {
 		return nil, ierrors.Errorf("tried to join conflict sets of evicted conflict: %w", conflictdag.ErrEntityEvicted)
 	}
@@ -145,7 +148,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSe
 		}
 	}
 
-	joinedConflictSets = advancedset.New[ResourceID]()
+	joinedConflictSets = ds.NewSet[ResourceID]()
 
 	return joinedConflictSets, conflictSets.ForEach(func(conflictSet *ConflictSet[ConflictID, ResourceID, VoteRank]) error {
 		otherConflicts, err := conflictSet.Add(c)
@@ -177,21 +180,25 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) removeParent(parent *Confli
 }
 
 // UpdateParents updates the parents of the Conflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) UpdateParents(addedParents, removedParents *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]]) (updated bool) {
+func (c *Conflict[ConflictID, ResourceID, VoteRank]) UpdateParents(addedParents, removedParents ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]) (updated bool) {
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
-	removedParents.Range(func(removedParent *Conflict[ConflictID, ResourceID, VoteRank]) {
-		updated = c.removeParent(removedParent) || updated
-	})
+	if removedParents != nil {
+		removedParents.Range(func(removedParent *Conflict[ConflictID, ResourceID, VoteRank]) {
+			updated = c.removeParent(removedParent) || updated
+		})
+	}
 
-	addedParents.Range(func(addedParent *Conflict[ConflictID, ResourceID, VoteRank]) {
-		if c.Parents.Add(addedParent) {
-			addedParent.registerChild(c)
+	if addedParents != nil {
+		addedParents.Range(func(addedParent *Conflict[ConflictID, ResourceID, VoteRank]) {
+			if c.Parents.Add(addedParent) {
+				addedParent.registerChild(c)
 
-			updated = true
-		}
-	})
+				updated = true
+			}
+		})
+	}
 
 	return updated
 }
@@ -263,7 +270,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) IsLiked() bool {
 }
 
 // LikedInstead returns the set of liked instead Conflicts.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) LikedInstead() *advancedset.AdvancedSet[*Conflict[ConflictID, ResourceID, VoteRank]] {
+func (c *Conflict[ConflictID, ResourceID, VoteRank]) LikedInstead() ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]] {
 	c.likedInsteadMutex.RLock()
 	defer c.likedInsteadMutex.RUnlock()
 
@@ -430,7 +437,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) addInheritedLikedInsteadRef
 	defer c.likedInsteadMutex.Unlock()
 
 	// abort if the source already added the reference or if the source already existed
-	if sources := lo.Return1(c.likedInsteadSources.GetOrCreate(reference.ID, lo.NoVariadic(advancedset.New[*Conflict[ConflictID, ResourceID, VoteRank]]))); !sources.Add(source) || !c.likedInstead.Add(reference) {
+	if sources := lo.Return1(c.likedInsteadSources.GetOrCreate(reference.ID, lo.NoVariadic(ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]]))); !sources.Add(source) || !c.likedInstead.Add(reference) {
 		return
 	}
 

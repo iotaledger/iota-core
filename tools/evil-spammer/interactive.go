@@ -7,7 +7,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
@@ -27,6 +27,17 @@ const (
 	timeFormat         = "2006/01/02 15:04:05"
 )
 
+const (
+	AnswerEnable  = "enable"
+	AnswerDisable = "disable"
+
+	SpammerTypeBlock       = "blk"
+	SpammerTypeTx          = "tx"
+	SpammerTypeDs          = "ds"
+	SpammerTypeCustom      = "custom"
+	SpammerTypeCommitments = "commitments"
+)
+
 var (
 	faucetTicker   *time.Ticker
 	printer        *Printer
@@ -34,6 +45,7 @@ var (
 )
 
 type InteractiveConfig struct {
+	//nolint:tagliatelle
 	WebAPI               []string `json:"webAPI"`
 	Rate                 int      `json:"rate"`
 	DurationStr          string   `json:"duration"`
@@ -50,19 +62,18 @@ type InteractiveConfig struct {
 	clientURLs map[string]types.Empty
 }
 
-var configJSON = `{
+var configJSON = fmt.Sprintf(`{
 	"webAPI": ["http://localhost:8080","http://localhost:8090"],
 	"rate": 2,
 	"duration": "20s",
 	"timeUnit": "1s",
 	"deepEnabled": false,
 	"reuseEnabled": true,
-	"scenario": "tx",
+	"scenario": "%s",
 	"autoRequestingEnabled": false,
 	"autoRequestingAmount": "100",
 	"useRateSetter": true
-
-}`
+}`, SpammerTypeTx)
 
 var defaultConfig = InteractiveConfig{
 	clientURLs: map[string]types.Empty{
@@ -74,7 +85,7 @@ var defaultConfig = InteractiveConfig{
 	timeUnit:             time.Second,
 	Deep:                 false,
 	Reuse:                true,
-	Scenario:             "tx",
+	Scenario:             SpammerTypeTx,
 	AutoRequesting:       false,
 	AutoRequestingAmount: "100",
 	UseRateSetter:        true,
@@ -132,8 +143,8 @@ const (
 )
 
 var (
-	scenarios     = []string{"blk", "tx", "ds", "conflict-circle", "guava", "orange", "mango", "pear", "lemon", "banana", "kiwi", "peace"}
-	confirms      = []string{"enable", "disable"}
+	scenarios     = []string{SpammerTypeBlock, SpammerTypeTx, SpammerTypeDs, "conflict-circle", "guava", "orange", "mango", "pear", "lemon", "banana", "kiwi", "peace"}
+	confirms      = []string{AnswerEnable, AnswerDisable}
 	outputNumbers = []string{"100", "1000", "5000", "cancel"}
 	timeUnits     = []string{mpm, mps}
 )
@@ -164,6 +175,7 @@ func Run() {
 			printer.FarewellBlock()
 			mode.saveConfigsToFile()
 			os.Exit(0)
+
 			return
 		}
 	}
@@ -201,9 +213,9 @@ type Mode struct {
 
 	activeSpammers map[int]*spammer.Spammer
 	spammerLog     *SpammerLog
-	spamMutex      sync.Mutex
+	spamMutex      syncutils.Mutex
 
-	stdOutMutex sync.Mutex
+	stdOutMutex syncutils.Mutex
 }
 
 func NewInteractiveMode() *Mode {
@@ -307,9 +319,6 @@ func (m *Mode) prepareFundsIfNeeded() {
 	}
 }
 
-func (m *Mode) onSettings() {
-}
-
 func (m *Mode) prepareFunds() {
 	m.stdOutMutex.Lock()
 	defer m.stdOutMutex.Unlock()
@@ -377,6 +386,7 @@ func (m *Mode) spamSubMenu(menuType string) {
 		if err != nil {
 			fmt.Println(err.Error())
 			m.mainMenu <- types.Void
+
 			return
 		}
 		m.parseSpamDetails(spamSurvey)
@@ -387,6 +397,7 @@ func (m *Mode) spamSubMenu(menuType string) {
 		if err != nil {
 			fmt.Println(err.Error())
 			m.mainMenu <- types.Void
+
 			return
 		}
 		m.parseSpamType(spamSurvey)
@@ -397,6 +408,7 @@ func (m *Mode) spamSubMenu(menuType string) {
 		if err != nil {
 			fmt.Println(err.Error())
 			m.mainMenu <- types.Void
+
 			return
 		}
 		m.parseScenario(scenario)
@@ -405,11 +417,13 @@ func (m *Mode) spamSubMenu(menuType string) {
 		if m.areEnoughFundsAvailable() {
 			printer.FundsWarning()
 			m.mainMenu <- types.Void
+
 			return
 		}
 		if len(m.activeSpammers) >= maxConcurrentSpams {
 			printer.MaxSpamWarning()
 			m.mainMenu <- types.Void
+
 			return
 		}
 		m.startSpam()
@@ -426,7 +440,8 @@ func (m *Mode) areEnoughFundsAvailable() bool {
 	if m.Config.timeUnit == time.Minute {
 		outputsNeeded = int(float64(m.Config.Rate) * m.Config.duration.Minutes())
 	}
-	return m.evilWallet.UnspentOutputsLeft(wallet.Fresh) < outputsNeeded && m.Config.Scenario != "blk"
+
+	return m.evilWallet.UnspentOutputsLeft(wallet.Fresh) < outputsNeeded && m.Config.Scenario != SpammerTypeBlock
 }
 
 func (m *Mode) startSpam() {
@@ -434,7 +449,7 @@ func (m *Mode) startSpam() {
 	defer m.spamMutex.Unlock()
 
 	var s *spammer.Spammer
-	if m.Config.Scenario == "blk" {
+	if m.Config.Scenario == SpammerTypeBlock {
 		s = SpamBlocks(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, 0, m.Config.UseRateSetter)
 	} else {
 		scenario, _ := wallet.GetScenario(m.Config.Scenario)
@@ -474,6 +489,7 @@ func (m *Mode) settingsSubMenu(menuType string) {
 		if err != nil {
 			fmt.Println(err.Error())
 			m.mainMenu <- types.Void
+
 			return
 		}
 		m.onFundsCreation(answer)
@@ -484,6 +500,7 @@ func (m *Mode) settingsSubMenu(menuType string) {
 		if err != nil {
 			fmt.Println(err.Error())
 			m.mainMenu <- types.Void
+
 			return
 		}
 		m.validateAndAddURL(url)
@@ -495,6 +512,7 @@ func (m *Mode) settingsSubMenu(menuType string) {
 		if err != nil {
 			fmt.Println(err.Error())
 			m.mainMenu <- types.Void
+
 			return
 		}
 		m.removeUrls(answer)
@@ -505,6 +523,7 @@ func (m *Mode) settingsSubMenu(menuType string) {
 		if err != nil {
 			fmt.Println(err.Error())
 			m.mainMenu <- types.Void
+
 			return
 		}
 		m.onEnableRateSetter(answer)
@@ -532,7 +551,7 @@ func (m *Mode) validateAndAddURL(url string) {
 }
 
 func (m *Mode) onFundsCreation(answer string) {
-	if answer == "enable" {
+	if answer == AnswerEnable {
 		m.Config.AutoRequesting = true
 		printer.AutoRequestingEnabled()
 		m.prepareFundsIfNeeded()
@@ -542,7 +561,7 @@ func (m *Mode) onFundsCreation(answer string) {
 }
 
 func (m *Mode) onEnableRateSetter(answer string) {
-	if answer == "enable" {
+	if answer == AnswerEnable {
 		m.Config.UseRateSetter = true
 		printer.RateSetterEnabled()
 	} else {
@@ -564,6 +583,7 @@ func (m *Mode) currentSpams() {
 		printer.Println(printer.colorString("There are no currently running spammers.", "red"), 1)
 		fmt.Println("")
 		m.mainMenu <- types.Void
+
 		return
 	}
 	printer.CurrentSpams()
@@ -572,6 +592,7 @@ func (m *Mode) currentSpams() {
 	if err != nil {
 		fmt.Println(err.Error())
 		m.mainMenu <- types.Void
+
 		return
 	}
 
@@ -589,6 +610,7 @@ func (m *Mode) currentSpamsSubMenu(menuType string) {
 			if err != nil {
 				fmt.Println(err.Error())
 				m.mainMenu <- types.Void
+
 				return
 			}
 			m.parseIDToRemove(answer)
@@ -648,6 +670,7 @@ func (m *Mode) urlMapToList() (list []string) {
 	for url := range m.Config.clientURLs {
 		list = append(list, url)
 	}
+
 	return
 }
 
@@ -675,7 +698,7 @@ func (m *Mode) summarizeSpam(id int) {
 func (m *Mode) updateSentStatistic(s *spammer.Spammer, id int) {
 	blkSent := s.BlocksSent()
 	scenariosCreated := s.BatchesPrepared()
-	if m.spammerLog.SpamDetails(id).Scenario == "blk" {
+	if m.spammerLog.SpamDetails(id).Scenario == SpammerTypeBlock {
 		m.blkSent.Add(blkSent)
 	} else {
 		m.txSent.Add(blkSent)
@@ -751,8 +774,10 @@ func (m *Mode) saveConfigsToFile() {
 	// update time unit
 	m.Config.TimeUnitStr = m.Config.timeUnit.String()
 
-	jsonConfigs, _ := json.MarshalIndent(m.Config, "", "    ")
-
+	jsonConfigs, err := json.MarshalIndent(m.Config, "", "    ")
+	if err != nil {
+		panic(err)
+	}
 	//nolint:gosec // users should be able to read the file
 	if err = os.WriteFile("config.json", jsonConfigs, 0o644); err != nil {
 		panic(err)
@@ -760,14 +785,15 @@ func (m *Mode) saveConfigsToFile() {
 }
 
 func enableToBool(e string) bool {
-	return e == "enable"
+	return e == AnswerEnable
 }
 
 func boolToEnable(b bool) string {
 	if b {
-		return "enable"
+		return AnswerEnable
 	}
-	return "disable"
+
+	return AnswerDisable
 }
 
 func validateURL(url string) (ok bool) {
@@ -775,6 +801,7 @@ func validateURL(url string) (ok bool) {
 	if err != nil {
 		return
 	}
+
 	return true
 }
 
@@ -783,9 +810,9 @@ func timeUnitToString(d time.Duration) string {
 
 	if strings.Contains(durStr, "s") {
 		return mps
-	} else {
-		return mpm
 	}
+
+	return mpm
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -801,8 +828,7 @@ type SpammerLog struct {
 	spamDetails   []InteractiveConfig
 	spamStartTime []time.Time
 	spamStopTime  []time.Time
-	tabWriter     io.Writer
-	mu            sync.Mutex
+	mu            syncutils.Mutex
 }
 
 func NewSpammerLog() *SpammerLog {
@@ -828,6 +854,7 @@ func (s *SpammerLog) AddSpam(config InteractiveConfig) (spamID int) {
 	s.spamDetails = append(s.spamDetails, config)
 	s.spamStartTime = append(s.spamStartTime, time.Now())
 	s.spamStopTime = append(s.spamStopTime, time.Time{})
+
 	return len(s.spamDetails) - 1
 }
 

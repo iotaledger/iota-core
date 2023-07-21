@@ -13,6 +13,7 @@ import (
 func DataSpammingFunction(s *Spammer) {
 	clt := s.Clients.GetClient()
 	// sleep randomly to avoid issuing blocks in different goroutines at once
+	//nolint:gosec
 	time.Sleep(time.Duration(rand.Float64()*20) * time.Millisecond)
 	// if err := wallet.RateSetterSleep(clt, s.UseRateSetter); err != nil {
 	// 	s.ErrCounter.CountError(err)
@@ -53,6 +54,7 @@ func CustomConflictSpammingFunc(s *Spammer) {
 				defer wg.Done()
 
 				// sleep randomly to avoid issuing blocks in different goroutines at once
+				//nolint:gosec
 				time.Sleep(time.Duration(rand.Float64()*100) * time.Millisecond)
 				// if err = wallet.RateSetterSleep(clt, s.UseRateSetter); err != nil {
 				// 	s.ErrCounter.CountError(err)

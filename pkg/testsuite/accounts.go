@@ -37,10 +37,9 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected output %s, got %s", node.Name, accountData.ID, accountData.OutputID, actualAccountData.OutputID)
 			}
 
-			if !cmp.Equal(accountData.PubKeys.Slice(), actualAccountData.PubKeys.Slice()) {
+			if !cmp.Equal(accountData.PubKeys.ToSlice(), actualAccountData.PubKeys.ToSlice()) {
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.PubKeys, actualAccountData.PubKeys)
 			}
-
 		}
 
 		return nil

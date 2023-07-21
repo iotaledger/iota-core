@@ -229,7 +229,7 @@ func (s *Settings) VersionsAndProtocolParametersHash(slot iotago.SlotIndex) (iot
 		// Only write the protocol parameters if the version is already active.
 		// TODO: this is not optimal: we are not committing to the protocol parameters that are going to be active.
 		if currentEpoch >= version.StartEpoch {
-			paramsBytes, err := s.ProtocolParameters(version.Version).Bytes()
+			paramsBytes, err := s.protocolParameters(version.Version).Bytes()
 			if err != nil {
 				return iotago.Identifier{}, ierrors.Wrap(err, "failed to get protocol parameters bytes")
 			}
@@ -462,7 +462,7 @@ func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
 }
 
 func (s *Settings) apiFromProtocolParameters(version iotago.Version) (iotago.API, error) {
-	protocolParams := s.ProtocolParameters(version)
+	protocolParams := s.protocolParameters(version)
 	if protocolParams == nil {
 		return nil, ierrors.Errorf("protocol parameters for version %d not found", version)
 	}
@@ -479,6 +479,10 @@ func (s *Settings) ProtocolParameters(version iotago.Version) iotago.ProtocolPar
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
+	return s.protocolParameters(version)
+}
+
+func (s *Settings) protocolParameters(version iotago.Version) iotago.ProtocolParameters {
 	bytes, err := s.store.Get([]byte{protocolParametersKey, byte(version)})
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {

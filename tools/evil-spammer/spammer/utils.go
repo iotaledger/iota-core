@@ -11,5 +11,6 @@ func BigWalletsNeeded(rate int, timeUnit, duration time.Duration) int {
 	bigWalletSize := wallet.FaucetRequestSplitNumber * wallet.FaucetRequestSplitNumber
 	outputsNeeded := rate * int(duration/timeUnit)
 	walletsNeeded := outputsNeeded/bigWalletSize + 1
+
 	return walletsNeeded
 }

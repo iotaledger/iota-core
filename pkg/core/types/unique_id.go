@@ -1,4 +1,4 @@
-package promise
+package types
 
 // UniqueID is a unique identifier.
 type UniqueID uint64

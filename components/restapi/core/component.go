@@ -1,4 +1,4 @@
-package coreapi
+package core
 
 import (
 	"net/http"
@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
@@ -25,6 +24,8 @@ const (
 
 	// RouteBlockIssuance is the route for getting all needed information for block creation.
 	// GET returns the data needed toa attach block.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
 	RouteBlockIssuance = "/blocks/issuance"
 
 	// RouteBlock is the route for getting a block by its blockID.
@@ -85,31 +86,29 @@ const (
 	// GET returns the output IDs of all UTXO changes.
 	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
-	// RouteAccountsByAcciuntID is the route for getting an account by its accountID.
+	// RouteBlockIssuanceCredits is the route for getting block issuance credits balance for an account.
+	// GET returns the block issuance credits balance.
+	RouteBlockIssuanceCredits = "/accounts/:" + restapipkg.ParameterAccountID
+
+	// RouteCongestion is the route for getting the current congestion state and all account related useful details as block issuance credits.
+	// GET returns the congestion state related to the specified account.
+	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
+
+	// RouteStaking is the route for getting informations about the current stakers.
+	// GET returns the stakers.
+	RouteStaking = "/staking"
+
+	// RouteStakingAccount is the route for getting an account by its accountID.
 	// GET returns the account details.
-	RouteAccountsByAcciuntID = "/accounts/:" + restapipkg.ParameterAccountID
+	RouteStakingAccount = "/staking/:" + restapipkg.ParameterAccountID
 
-	// RouteAccountMana is the route for getting an account mana by its accountID.
-	// GET returns the account mana details.
-	RouteAccountMana = "/accounts/:" + restapipkg.ParameterAccountID + "/mana"
+	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
+	// GET returns the rewards.
+	RouteRewards = "/rewards/:" + restapipkg.ParameterOutputID
 
-	// RoutePeer is the route for getting peers by their peerID.
-	// GET returns the peer
-	// DELETE deletes the peer.
-	RoutePeer = "/peers/:" + restapipkg.ParameterPeerID
-
-	// RoutePeers is the route for getting all peers of the node.
-	// GET returns a list of all peers.
-	// POST adds a new peer.
-	RoutePeers = "/peers"
-
-	// RouteControlDatabasePrune is the control route to manually prune the database.
-	// POST prunes the database.
-	RouteControlDatabasePrune = "/control/database/prune"
-
-	// RouteControlSnapshotsCreate is the control route to manually create a snapshot files.
-	// POST creates a full snapshot.
-	RouteControlSnapshotsCreate = "/control/snapshots/create"
+	// RouteCommittee is the route for getting the current committee.
+	// GET returns the committee.
+	RouteCommittee = "/committee"
 )
 
 func init() {
@@ -133,9 +132,9 @@ var (
 type dependencies struct {
 	dig.In
 
-	Protocol         *protocol.Protocol
 	AppInfo          *app.Info
-	RestRouteManager *restapi.RestRouteManager
+	RestRouteManager *restapipkg.RestRouteManager
+	Protocol         *protocol.Protocol
 	BlockIssuer      *blockfactory.BlockIssuer `optional:"true"`
 	MetricsTracker   *metricstracker.MetricsTracker
 }
@@ -143,7 +142,7 @@ type dependencies struct {
 func configure() error {
 	// check if RestAPI plugin is disabled
 	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanic("RestAPI plugin needs to be enabled to use the CoreAPIV3 plugin")
+		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
 	}
 
 	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
@@ -172,7 +171,7 @@ func configure() error {
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
 		// TODO: fill in blockReason, TxState, TxReason.
-		resp, err := blockMetadataResponseByID(c)
+		resp, err := blockMetadataByID(c)
 		if err != nil {
 			return err
 		}
@@ -196,8 +195,8 @@ func configure() error {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	})
+		return responseByHeader(c, resp)
+	}, checkNodeSynced())
 
 	routeGroup.GET(RouteCommitmentByID, func(c echo.Context) error {
 		index, err := indexByCommitmentID(c)
@@ -205,13 +204,13 @@ func configure() error {
 			return err
 		}
 
-		resp, err := getCommitment(index)
+		commitment, err := getCommitmentDetails(index)
 		if err != nil {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
+		return responseByHeader(c, commitment)
+	})
 
 	routeGroup.GET(RouteCommitmentByIDUTXOChanges, func(c echo.Context) error {
 		index, err := indexByCommitmentID(c)
@@ -219,41 +218,41 @@ func configure() error {
 			return err
 		}
 
-		resp, err := getSlotUTXOChanges(index)
+		resp, err := getUTXOChanges(index)
 		if err != nil {
 			return err
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteCommitmentByIndex, func(c echo.Context) error {
-		indexUint64, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
+		index, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getCommitment(iotago.SlotIndex(indexUint64))
+		resp, err := getCommitmentDetails(index)
 		if err != nil {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
+		return responseByHeader(c, resp)
+	})
 
 	routeGroup.GET(RouteCommitmentByIndexUTXOChanges, func(c echo.Context) error {
-		index, err := httpserver.ParseUint64Param(c, restapipkg.ParameterSlotIndex)
+		index, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getSlotUTXOChanges(iotago.SlotIndex(index))
+		resp, err := getUTXOChanges(index)
 		if err != nil {
 			return err
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteOutput, func(c echo.Context) error {
 		output, err := getOutput(c)
@@ -262,7 +261,7 @@ func configure() error {
 		}
 
 		return responseByHeader(c, output.Output())
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteOutputMetadata, func(c echo.Context) error {
 		resp, err := getOutputMetadata(c)
@@ -271,7 +270,7 @@ func configure() error {
 		}
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteTransactionsIncludedBlock, func(c echo.Context) error {
 		block, err := blockByTransactionID(c)
@@ -280,13 +279,64 @@ func configure() error {
 		}
 
 		return responseByHeader(c, block.ProtocolBlock())
-	}, checkNodeSynced())
+	})
 
 	routeGroup.GET(RouteTransactionsIncludedBlockMetadata, func(c echo.Context) error {
 		resp, err := blockMetadataFromTransactionID(c)
 		if err != nil {
 			return err
 		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteBlockIssuanceCredits, func(c echo.Context) error {
+		resp, err := blockIssuanceCreditsForAccountID(c)
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteCongestion, func(c echo.Context) error {
+		resp, err := congestionForAccountID(c)
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteStaking, func(c echo.Context) error {
+		resp, err := staking()
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteStakingAccount, func(c echo.Context) error {
+		resp, err := stakingByAccountID(c)
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteRewards, func(c echo.Context) error {
+		resp, err := rewardsByOutputID(c)
+		if err != nil {
+			return err
+		}
+
+		return httpserver.JSONResponse(c, http.StatusOK, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteCommittee, func(c echo.Context) error {
+		resp := selectedCommittee(c)
 
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	}, checkNodeSynced())
@@ -330,18 +380,21 @@ func responseByHeader(c echo.Context, obj any) error {
 		return err
 	}
 
-	// default to echo.MIMEApplicationJSON
 	switch mimeType {
+	// TODO: should this maybe already be V2 ?
 	case httpserver.MIMEApplicationVendorIOTASerializerV1:
-		b, err := deps.Protocol.LatestAPI().Encode(obj)
+		// TODO: that should take the API that belongs to the object
+		b, err := deps.Protocol.CurrentAPI().Encode(obj)
 		if err != nil {
 			return err
 		}
 
 		return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, b)
 
+	// default to echo.MIMEApplicationJSON
 	default:
-		j, err := deps.Protocol.LatestAPI().JSONEncode(obj)
+		// TODO: that should take the API that belongs to the object
+		j, err := deps.Protocol.CurrentAPI().JSONEncode(obj)
 		if err != nil {
 			return err
 		}

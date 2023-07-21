@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
@@ -51,7 +51,7 @@ func Test_TransitionAccount(t *testing.T) {
 		// TODO: why do we use the deposit here as credits?
 		Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit*3), 0),
 		OutputID: genesisAccount.OutputID(),
-		PubKeys:  advancedset.New(ed25519.PublicKey(oldGenesisOutputKey)),
+		PubKeys:  ds.NewSet(ed25519.PublicKey(oldGenesisOutputKey)),
 	}, ts.Nodes()...)
 
 	// MODIFY EXISTING GENESIS ACCOUNT AND PREPARE SOME BASIC OUTPUTS
@@ -95,7 +95,7 @@ func Test_TransitionAccount(t *testing.T) {
 			// TODO: why do we use the deposit here as credits?
 			Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit*3), 0),
 			OutputID: iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
-			PubKeys:  advancedset.New(ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey),
+			PubKeys:  ds.NewSet(ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey),
 		}, ts.Nodes()...)
 	}
 
@@ -179,7 +179,7 @@ func Test_TransitionAccount(t *testing.T) {
 			ID:              newAccountOutput.AccountID,
 			Credits:         accounts.NewBlockIssuanceCredits(0, 10),
 			OutputID:        newAccount.OutputID(),
-			PubKeys:         advancedset.New(newAccountBlockIssuerKey),
+			PubKeys:         ds.NewSet(newAccountBlockIssuerKey),
 			StakeEndEpoch:   10,
 			FixedCost:       421,
 			DelegationStake: 0,
@@ -230,7 +230,7 @@ func Test_TransitionAccount(t *testing.T) {
 			ID:              newAccountOutput.AccountID,
 			Credits:         accounts.NewBlockIssuanceCredits(0, 10),
 			OutputID:        newAccount.OutputID(),
-			PubKeys:         advancedset.New(newAccountBlockIssuerKey),
+			PubKeys:         ds.NewSet(newAccountBlockIssuerKey),
 			StakeEndEpoch:   10,
 			FixedCost:       421,
 			DelegationStake: 1966240,

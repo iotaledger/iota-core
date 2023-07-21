@@ -2,7 +2,6 @@ package drr
 
 import (
 	"math"
-	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -10,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
@@ -29,7 +29,7 @@ type Scheduler struct {
 	manaRetrieveFunc func(iotago.AccountID) (iotago.Mana, error)
 
 	buffer      *BufferQueue
-	bufferMutex sync.RWMutex
+	bufferMutex syncutils.RWMutex
 
 	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, uint64]
 
@@ -159,7 +159,7 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	}
 	for _, b := range droppedBlocks {
 		b.SetDropped()
-		s.events.BlockDropped.Trigger(block)
+		s.events.BlockDropped.Trigger(b)
 	}
 	block.SetEnqueued()
 	s.tryReady(block)
