@@ -25,7 +25,7 @@ type CustomSpamParams struct {
 	config *BasicConfig
 }
 
-func CustomSpam(params *CustomSpamParams) *BasicConfig {
+func CustomSpam(params *CustomSpamParams) {
 	outputID := iotago.EmptyOutputID
 	if params.config.LastFaucetUnspentOutputID != "" {
 		outputID, _ = iotago.OutputIDFromHex(params.config.LastFaucetUnspentOutputID)
@@ -45,6 +45,9 @@ func CustomSpam(params *CustomSpamParams) *BasicConfig {
 		if err != nil {
 			panic(err)
 		}
+		saveConfigsToFile(&BasicConfig{
+			LastFaucetUnspentOutputID: w.LastFaucetUnspentOutput().ToHex(),
+		})
 	}
 
 	for i, sType := range params.SpamTypes {
@@ -96,10 +99,6 @@ func CustomSpam(params *CustomSpamParams) *BasicConfig {
 
 	wg.Wait()
 	log.Info("Basic spamming finished!")
-
-	return &BasicConfig{
-		LastFaucetUnspentOutputID: w.LastFaucetUnspentOutput().ToHex(),
-	}
 }
 
 func SpamTransaction(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, deepSpam, enableRateSetter bool) {
@@ -181,7 +180,6 @@ func SpamNestedConflicts(w *wallet.EvilWallet, rate int, timeUnit, duration time
 	scenario := wallet.NewEvilScenario(scenarioOptions...)
 	if scenario.NumOfClientsNeeded > w.NumOfClient() {
 		printer.NotEnoughClientsWarning(scenario.NumOfClientsNeeded)
-		return nil
 	}
 
 	options := []spammer.Options{

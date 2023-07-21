@@ -22,7 +22,7 @@ import (
 const (
 	// FaucetRequestSplitNumber defines the number of outputs to split from a faucet request.
 	FaucetRequestSplitNumber                  = 100
-	faucetTokensPerRequest   iotago.BaseToken = 10_0000
+	faucetTokensPerRequest   iotago.BaseToken = 1_000_000
 
 	waitForConfirmation   = 150 * time.Second
 	waitForSolidification = 150 * time.Second
@@ -314,8 +314,10 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 		return nil, err
 	}
 
+	// requested output to split and use in spammer
 	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID(e.api)), 0), tx.Essence.Outputs[0])
 
+	// set remainder output to be reused by the faucet wallet
 	e.faucet.AddUnspentOutput(&Output{
 		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID(e.api)), 1),
 		Address:      faucetAddr,
