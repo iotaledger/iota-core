@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
 const (
@@ -55,7 +56,7 @@ type dependencies struct {
 	dig.In
 
 	Protocol         *protocol.Protocol
-	RestRouteManager *restapi.RestRouteManager
+	RestRouteManager *restapipkg.RestRouteManager
 	AppInfo          *app.Info
 	LocalPeer        *peer.Local
 }
@@ -63,7 +64,7 @@ type dependencies struct {
 func configure() error {
 	// check if RestAPI plugin is disabled
 	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanic("RestAPI plugin needs to be enabled to use the DashboardMetrics plugin")
+		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
 	}
 	configureComponentCountersEvents()
 

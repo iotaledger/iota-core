@@ -1,19 +1,18 @@
 package api
 
 import (
-	"sync"
-
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type DynamicMockAPIProvider struct {
-	mutex                       sync.RWMutex
+	mutex                       syncutils.RWMutex
 	protocolParametersByVersion map[iotago.Version]iotago.ProtocolParameters
 	protocolVersions            *ProtocolEpochVersions
 
-	latestVersionMutex sync.RWMutex
+	latestVersionMutex syncutils.RWMutex
 	latestVersion      iotago.Version
 }
 

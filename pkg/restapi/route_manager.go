@@ -4,19 +4,18 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
 type RestRouteManager struct {
 	syncutils.RWMutex
 	routes []string
-	proxy  *restapipkg.DynamicProxy
+	proxy  *DynamicProxy
 }
 
-func newRestRouteManager(e *echo.Echo) *RestRouteManager {
+func NewRestRouteManager(e *echo.Echo) *RestRouteManager {
 	return &RestRouteManager{
 		routes: []string{},
-		proxy:  restapipkg.NewDynamicProxy(e, "/api"),
+		proxy:  NewDynamicProxy(e, "/api"),
 	}
 }
 func (p *RestRouteManager) Routes() []string {

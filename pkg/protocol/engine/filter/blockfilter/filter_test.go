@@ -106,7 +106,7 @@ func (t *TestFramework) IssueSigned(alias string) {
 	keyPair := ed25519.GenerateKeyPair()
 	// We derive a dummy account from addr.
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
-	block, err := builder.NewBasicBlockBuilder(t.apiProvider.LatestAPI()).
+	block, err := builder.NewBasicBlockBuilder(t.apiProvider.CurrentAPI()).
 		StrongParents(iotago.BlockIDs{}).
 		IssuingTime(time.Now()).
 		Sign(iotago.AccountID(addr[:]), keyPair.PrivateKey[:]).
@@ -133,8 +133,8 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 	apiProvider.AddProtocolParameters(0, newMockProtocolParameters(3))
 	apiProvider.AddProtocolParameters(3, newMockProtocolParameters(4))
 
-	defaultAPI := apiProvider.LatestAPI()
-	timeProvider := apiProvider.LatestAPI().TimeProvider()
+	defaultAPI := apiProvider.CurrentAPI()
+	timeProvider := apiProvider.CurrentAPI().TimeProvider()
 
 	tf := NewTestFramework(t,
 		apiProvider,

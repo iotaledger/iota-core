@@ -16,6 +16,7 @@ const (
 	performanceFactorsPrefix
 	upgradeSignalsPrefix
 	rootsPrefix
+	retainerPrefix
 )
 
 const (
@@ -98,6 +99,15 @@ func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *UpgradeSignals {
 
 func (p *Prunable) Roots(slot iotago.SlotIndex) kvstore.KVStore {
 	return p.manager.Get(slot, kvstore.Realm{rootsPrefix})
+}
+
+func (p *Prunable) Retainer(slot iotago.SlotIndex) *Retainer {
+	store := p.manager.Get(slot, kvstore.Realm{retainerPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewRetainer(slot, store)
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.

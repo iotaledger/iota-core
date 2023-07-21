@@ -18,7 +18,8 @@ import (
 )
 
 // region Spammer //////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//
+//nolint:revive
 type SpammerFunc func(*Spammer)
 
 type State struct {
@@ -259,7 +260,7 @@ func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt wallet.Client) {
 	s.log.Debugf("%s: Last transaction sent, ID: %s, txCount: %d", blockID.ToHex(), txID.ToHex(), count)
 }
 
-func (s *Spammer) handleSolidityForReuseOutputs(clt wallet.Client, tx *iotago.Transaction) (ok bool) {
+func (s *Spammer) handleSolidityForReuseOutputs(_ wallet.Client, _ *iotago.Transaction) (ok bool) {
 	// ok = s.EvilWallet.AwaitInputsSolidity(tx.Essence().Inputs(), clt)
 	// if s.EvilScenario.OutputWallet.Type() == wallet.Reuse {
 	// 	s.EvilWallet.AddReuseOutputsToThePool(tx.Essence().Outputs())

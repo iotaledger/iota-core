@@ -157,15 +157,11 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogDebugf("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time), time)
+		Component.LogDebugf("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogDebugf("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time), time)
-	})
-
-	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogDebugf("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.LatestAPI().TimeProvider().SlotFromTime(time), time.String())
+		Component.LogDebugf("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
@@ -173,7 +169,7 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		Component.LogInfof("SlotConfirmed: %d", index)
+		Component.LogInfof("SlotFinalized: %d", index)
 	})
 
 	deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {
