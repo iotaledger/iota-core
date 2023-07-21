@@ -1,9 +1,0 @@
-[Unit]
-Description=Dump Goshimmer DB
-
-[Service]
-Type=oneshot
-ExecStart=/opt/goshimmer_db_dump.sh
-
-[Install]
-WantedBy=timers.target
