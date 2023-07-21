@@ -104,7 +104,7 @@ func (p *Permanent) Accounts(optRealm ...byte) kvstore.KVStore {
 
 func (p *Permanent) LatestNonEmptySlot(optRealm ...byte) kvstore.KVStore {
 	if len(optRealm) == 0 {
-		return p.accounts
+		return p.latestNonEmptySlot
 	}
 
 	return lo.PanicOnErr(p.latestNonEmptySlot.WithExtendedRealm(optRealm))
