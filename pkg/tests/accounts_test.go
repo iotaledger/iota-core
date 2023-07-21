@@ -24,8 +24,9 @@ func Test_TransitionAccount(t *testing.T) {
 		// Nil address will be replaced with the address generated from genesis seed.
 		// A single key may unlock multiple accounts; that's why it can't be used as a source for AccountID derivation.
 		Address: nil,
-		// Min amount to cover the rent. If it's too little, then the snapshot creation will fail
-		Amount: testsuite.MinIssuerAccountDeposit,
+		// Set 3 time min amount to cover the rent. If it's too little, then the snapshot creation will fail.
+		// We need more to cover an additional key that is added in the test.
+		Amount: testsuite.MinIssuerAccountDeposit * 3,
 		Mana:   0,
 		// AccountID is derived from this field, so this must be set uniquely for each account.
 		IssuerKey: oldGenesisOutputKey,
@@ -37,6 +38,7 @@ func Test_TransitionAccount(t *testing.T) {
 	minSlotCommittableAge := ts.API.ProtocolParameters().EvictionAge()
 
 	node1 := ts.AddValidatorNode("node1")
+	_ = ts.AddNode("node2")
 
 	ts.Run(map[string][]options.Option[protocol.Protocol]{})
 	ts.HookLogging()
@@ -47,10 +49,10 @@ func Test_TransitionAccount(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID: genesisAccountOutput.AccountID,
 		// TODO: why do we use the deposit here as credits?
-		Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit), 0),
+		Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit*3), 0),
 		OutputID: genesisAccount.OutputID(),
 		PubKeys:  ds.NewSet(ed25519.PublicKey(oldGenesisOutputKey)),
-	}, node1)
+	}, ts.Nodes()...)
 
 	// MODIFY EXISTING GENESIS ACCOUNT AND PREPARE SOME BASIC OUTPUTS
 
@@ -86,15 +88,15 @@ func Test_TransitionAccount(t *testing.T) {
 			PreviousOutputID:    genesisAccount.OutputID(),
 			PubKeysRemoved:      []ed25519.PublicKey{},
 			PubKeysAdded:        []ed25519.PublicKey{newGenesisOutputKey},
-		}, false, node1)
+		}, false, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
 			ID: genesisAccountOutput.AccountID,
 			// TODO: why do we use the deposit here as credits?
-			Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit), 0),
+			Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit*3), 0),
 			OutputID: iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 			PubKeys:  ds.NewSet(ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey),
-		}, node1)
+		}, ts.Nodes()...)
 	}
 
 	// DESTROY GENESIS ACCOUNT, CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
@@ -145,7 +147,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 		// assert diff of a destroyed account, to make sure we can correctly restore it
 		ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock4, &prunable.AccountDiff{
-			BICChange:             -iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit),
+			BICChange:             -iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit * 3),
 			PreviousUpdatedTime:   0,
 			NewOutputID:           iotago.EmptyOutputID,
 			PreviousOutputID:      iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
@@ -155,7 +157,7 @@ func Test_TransitionAccount(t *testing.T) {
 			StakeEndEpochChange:   0,
 			FixedCostChange:       0,
 			DelegationStakeChange: 0,
-		}, true, node1)
+		}, true, ts.Nodes()...)
 
 		newAccount := ts.AccountOutput("TX2:0")
 		newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
@@ -171,7 +173,7 @@ func Test_TransitionAccount(t *testing.T) {
 			StakeEndEpochChange:   10,
 			FixedCostChange:       421,
 			DelegationStakeChange: 0,
-		}, false, node1)
+		}, false, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
 			ID:              newAccountOutput.AccountID,
@@ -182,7 +184,7 @@ func Test_TransitionAccount(t *testing.T) {
 			FixedCost:       421,
 			DelegationStake: 0,
 			ValidatorStake:  10000,
-		}, node1)
+		}, ts.Nodes()...)
 	}
 
 	// create a delegation output delegating to the newly created account
@@ -221,8 +223,8 @@ func Test_TransitionAccount(t *testing.T) {
 			ValidatorStakeChange:  0,
 			StakeEndEpochChange:   0,
 			FixedCostChange:       0,
-			DelegationStakeChange: 1965580,
-		}, false, node1)
+			DelegationStakeChange: 1914280,
+		}, false, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
 			ID:              newAccountOutput.AccountID,
@@ -233,9 +235,9 @@ func Test_TransitionAccount(t *testing.T) {
 			FixedCost:       421,
 			DelegationStake: 1966240,
 			ValidatorStake:  10000,
-		}, node1)
+		}, ts.Nodes()...)
 	}
-	ts.Wait(node1)
+	ts.Wait(ts.Nodes()...)
 }
 
 /*
