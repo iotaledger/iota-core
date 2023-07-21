@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -310,11 +310,14 @@ func CastVotesAcceptance(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict5", []string{"resource1"}))
 	tf.Assert.Rejected("conflict5")
 
-	// Evict conflict and try to add non-existing parent to a rejected conflict.
+	// Evict conflict and try to add non-existing parent to a rejected conflict - update is ignored because the parent is evicted.
 	tf.EvictConflict("conflict2")
-	require.ErrorIs(t, tf.UpdateConflictParents("conflict4", []string{"conflict2"}, []string{}), conflictdag.ErrEntityEvicted)
+	require.NoError(t, tf.UpdateConflictParents("conflict4", []string{"conflict2"}, []string{}))
+	parents, exists := tf.Instance.ConflictParents(tf.ConflictID("conflict4"))
+	require.True(t, exists)
+	require.False(t, parents.Has(tf.ConflictID("conflict2")))
 
-	// Try to update parents of evicted conflict
+	// Try to update parents of evicted conflict.
 	require.ErrorIs(t, tf.UpdateConflictParents("conflict2", []string{"conflict1"}, []string{}), conflictdag.ErrEntityEvicted)
 }
 
@@ -324,7 +327,7 @@ func JoinConflictSetTwice(t *testing.T, tf *Framework) {
 		conflictCreatedEventCount++
 	})
 
-	tf.Instance.Events().ConflictingResourcesAdded.Hook(func(id iotago.TransactionID, resourceID *advancedset.AdvancedSet[iotago.OutputID]) {
+	tf.Instance.Events().ConflictingResourcesAdded.Hook(func(id iotago.TransactionID, resourceID ds.Set[iotago.OutputID]) {
 		fmt.Println("conflict joins conflictset", id, resourceID)
 		resourceAddedEventCount++
 	})
@@ -494,6 +497,10 @@ func EvictRejectedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("conflict5", "conflict2")
 	tf.Assert.Children("conflict2", "conflict5")
 
-	// Try to add non-existing parent to a pending conflict.
-	require.ErrorIs(t, tf.UpdateConflictParents("conflict5", []string{"conflict1"}, []string{}), conflictdag.ErrFatal)
+	// Try to add non-existing parent to a pending conflict - nothing happens.
+	require.NoError(t, tf.UpdateConflictParents("conflict5", []string{"conflict1"}, []string{}))
+
+	parents, exists := tf.Instance.ConflictParents(tf.ConflictID("conflict5"))
+	require.True(t, exists)
+	require.False(t, parents.Has(tf.ConflictID("conflict1")))
 }

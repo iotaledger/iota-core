@@ -8,16 +8,16 @@ replace github.com/iotaledger/iota-core/tools/genesis-snapshot => ../genesis-sna
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
-	github.com/iotaledger/hive.go/app v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/ds v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/lo v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/logger v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230717094216-46222fa0ec69
+	github.com/iotaledger/hive.go/app v0.0.0-20230720140101-3f0a9a305cd6
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230720140101-3f0a9a305cd6
+	github.com/iotaledger/hive.go/ds v0.0.0-20230720140101-3f0a9a305cd6
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20230720140101-3f0a9a305cd6
+	github.com/iotaledger/hive.go/lo v0.0.0-20230720140101-3f0a9a305cd6
+	github.com/iotaledger/hive.go/logger v0.0.0-20230720140101-3f0a9a305cd6
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230720140101-3f0a9a305cd6
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230720082722-b4589df61bea
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230721073056-81397c2f9e97
 	github.com/mr-tron/base58 v1.2.0
 	go.uber.org/atomic v1.11.0
 )
@@ -38,12 +38,12 @@ require (
 	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/hive.go/ads v0.0.0-20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/constraints v0.0.0-20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230717094216-46222fa0ec69 // indirect
+	github.com/iotaledger/hive.go/ads v0.0.0-20230720140101-3f0a9a305cd6 // indirect
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230720140101-3f0a9a305cd6 // indirect
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230720140101-3f0a9a305cd6 // indirect
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230720140101-3f0a9a305cd6 // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230720140101-3f0a9a305cd6 // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230720140101-3f0a9a305cd6 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
 	github.com/kr/text v0.2.0 // indirect

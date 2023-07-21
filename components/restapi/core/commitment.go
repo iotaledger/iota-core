@@ -28,7 +28,7 @@ func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {
 }
 
 func getUTXOChanges(index iotago.SlotIndex) (*apimodels.UTXOChangesResponse, error) {
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.StateDiffs(index)
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(index)
 	if err != nil {
 		return nil, err
 	}

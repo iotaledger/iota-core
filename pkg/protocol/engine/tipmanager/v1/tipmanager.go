@@ -53,13 +53,18 @@ func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Bl
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
 func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
-	tipMetadata := NewBlockMetadata(block)
-
-	if storage := t.metadataStorage(block.ID().Index()); storage == nil || !storage.Set(block.ID(), tipMetadata) {
+	storage := t.metadataStorage(block.ID().Index())
+	if storage == nil {
 		return nil
 	}
 
-	t.setupBlockMetadata(tipMetadata)
+	tipMetadata, created := storage.GetOrCreate(block.ID(), func() *TipMetadata {
+		return NewBlockMetadata(block)
+	})
+
+	if created {
+		t.setupBlockMetadata(tipMetadata)
+	}
 
 	return tipMetadata
 }
@@ -87,7 +92,7 @@ func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
 
 	if evictedObjects, deleted := t.tipMetadataStorage.DeleteAndReturn(slotIndex); deleted {
 		evictedObjects.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
-			tipMetadata.isEvicted.Trigger()
+			tipMetadata.evicted.Trigger()
 
 			return true
 		})
@@ -99,7 +104,7 @@ func (t *TipManager) Shutdown() {}
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
-	tipMetadata.OnIsStrongTipUpdated(func(isStrongTip bool) {
+	tipMetadata.isStrongTip.OnUpdate(func(_, isStrongTip bool) {
 		if isStrongTip {
 			t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
 		} else {
@@ -107,7 +112,7 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 		}
 	})
 
-	tipMetadata.OnIsWeakTipUpdated(func(isWeakTip bool) {
+	tipMetadata.isWeakTip.OnUpdate(func(_, isWeakTip bool) {
 		if isWeakTip {
 			t.weakTipSet.Set(tipMetadata.Block().ID(), tipMetadata)
 		} else {
@@ -117,9 +122,9 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 
 	t.forEachParentByType(tipMetadata.Block(), func(parentType iotago.ParentsType, parentMetadata *TipMetadata) {
 		if parentType == iotago.StrongParentType {
-			tipMetadata.setupStrongParent(parentMetadata)
+			tipMetadata.connectStrongParent(parentMetadata)
 		} else {
-			tipMetadata.setupWeakParent(parentMetadata)
+			tipMetadata.connectWeakParent(parentMetadata)
 		}
 	})
 

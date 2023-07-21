@@ -21,6 +21,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
@@ -132,39 +133,35 @@ func configure() error {
 	// TODO: check whether we hooked to all events
 
 	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
-		Component.LogInfof("BlockReceived: %s", block.ID())
+		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
-		Component.LogInfof("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
+		Component.LogDebugf("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
 	})
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockSolid: %s", block.ID())
+		Component.LogDebugf("BlockSolid: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockBooked: %s", block.ID())
+		Component.LogDebugf("BlockBooked: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockPreAccepted: %s", block.ID())
+		Component.LogDebugf("BlockPreAccepted: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		Component.LogInfof("BlockAccepted: %s", block.ID())
+		Component.LogDebugf("BlockAccepted: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time)
+		Component.LogDebugf("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time)
-	})
-
-	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogInfof("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time.String())
+		Component.LogDebugf("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
@@ -176,19 +173,30 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {
-		Component.LogInfof("RequestCommitment: %s", id)
+		Component.LogDebugf("RequestCommitment: %s", id)
 	})
 
 	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id network.PeerID) {
-		Component.LogInfof("SlotCommitmentRequestReceived: %s", commitmentID)
+		Component.LogDebugf("SlotCommitmentRequestReceived: %s", commitmentID)
 	})
 
 	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id network.PeerID) {
-		Component.LogInfof("SlotCommitmentReceived: %s", commitment.ID())
+		Component.LogDebugf("SlotCommitmentReceived: %s", commitment.ID())
 	})
 
 	deps.Protocol.Events.Engine.SybilProtection.CommitteeSelected.Hook(func(committee *account.Accounts, epoch iotago.EpochIndex) {
 		Component.LogInfof("CommitteeSelected: Epoch %d - %s (reused: %t)", epoch, committee.IDs(), committee.IsReused())
+	})
+
+	deps.Protocol.Events.Engine.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+		Component.LogWarnf("Booker BlockInvalid: Block %s - %s", block.ID(), err.Error())
+	})
+
+	// TODO: create a transaction invalid event in the booker instead of hooking to a specific engine instance
+	deps.Protocol.MainEngineInstance().Ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
+		transaction.OnInvalid(func(err error) {
+			Component.LogWarnf("TransactionInvalid: transaction %s - %s", transaction.ID(), err.Error())
+		})
 	})
 
 	return nil

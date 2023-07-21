@@ -8,7 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
@@ -88,7 +88,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 
 	// Commit an empty diff if no actions specified.
 	if len(actions) == 0 {
-		err := t.Instance.ApplyDiff(slotIndex, make(map[iotago.AccountID]*prunable.AccountDiff), advancedset.New[iotago.AccountID]())
+		err := t.Instance.ApplyDiff(slotIndex, make(map[iotago.AccountID]*prunable.AccountDiff), ds.NewSet[iotago.AccountID]())
 		require.NoError(t.T, err)
 		return
 	}
@@ -114,7 +114,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 			prevAccountFields = &latestAccountFields{
 				OutputID:       iotago.EmptyOutputID,
 				BICUpdatedAt:   0,
-				UpdatedInSlots: advancedset.New[iotago.SlotIndex](),
+				UpdatedInSlots: ds.NewSet[iotago.SlotIndex](),
 			}
 			t.latestFieldsPerAccount.Set(accountID, prevAccountFields)
 		}
@@ -212,7 +212,7 @@ func (t *TestSuite) AssertAccountLedgerUntil(slotIndex iotago.SlotIndex, account
 }
 
 func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
-	expectedPubKeys := advancedset.New(t.PublicKeys(expectedState.PubKeys, false)...)
+	expectedPubKeys := ds.NewSet(t.PublicKeys(expectedState.PubKeys, false)...)
 	expectedCredits := accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(expectedState.BICAmount), expectedState.BICUpdatedTime)
 
 	actualState, exists, err := t.Instance.Account(accountID, slotIndex)
@@ -228,7 +228,7 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 
 	require.Equal(t.T, accountID, actualState.ID)
 	require.Equal(t.T, expectedCredits, actualState.Credits, "slotIndex: %d, accountID %s: expected: %v, actual: %v", slotIndex, accountID, expectedCredits, actualState.Credits)
-	require.Truef(t.T, expectedPubKeys.Equal(actualState.PubKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedPubKeys, actualState.PubKeys)
+	require.Truef(t.T, expectedPubKeys.Equals(actualState.PubKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedPubKeys, actualState.PubKeys)
 
 	require.Equal(t.T, t.OutputID(expectedState.OutputID, false), actualState.OutputID)
 
@@ -354,18 +354,18 @@ type AccountState struct {
 type latestAccountFields struct {
 	OutputID       iotago.OutputID
 	BICUpdatedAt   iotago.SlotIndex
-	UpdatedInSlots *advancedset.AdvancedSet[iotago.SlotIndex]
+	UpdatedInSlots ds.Set[iotago.SlotIndex]
 }
 
 type slotData struct {
 	Burns             map[iotago.AccountID]iotago.Mana
 	SlotDiff          map[iotago.AccountID]*prunable.AccountDiff
-	DestroyedAccounts *advancedset.AdvancedSet[iotago.AccountID]
+	DestroyedAccounts ds.Set[iotago.AccountID]
 }
 
 func newSlotData() *slotData {
 	return &slotData{
-		DestroyedAccounts: advancedset.New[iotago.AccountID](),
+		DestroyedAccounts: ds.NewSet[iotago.AccountID](),
 		Burns:             make(map[iotago.AccountID]iotago.Mana),
 		SlotDiff:          make(map[iotago.AccountID]*prunable.AccountDiff),
 	}
