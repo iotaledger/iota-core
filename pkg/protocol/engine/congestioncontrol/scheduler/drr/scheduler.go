@@ -159,7 +159,7 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	}
 	for _, b := range droppedBlocks {
 		b.SetDropped()
-		s.events.BlockDropped.Trigger(block)
+		s.events.BlockDropped.Trigger(b)
 	}
 	block.SetEnqueued()
 	s.tryReady(block)
