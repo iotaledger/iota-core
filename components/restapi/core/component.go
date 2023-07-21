@@ -105,7 +105,7 @@ const (
 
 	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
 	// GET returns the rewards.
-	RouteRewards = "/rewards/:" + restapipkg.ParameterAccountID
+	RouteRewards = "/rewards/:" + restapipkg.ParameterOutputID
 
 	// RouteCommittee is the route for getting the current committee.
 	// GET returns the committee.
@@ -328,7 +328,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteRewards, func(c echo.Context) error {
-		resp, err := rewardsByAccountID(c)
+		resp, err := rewardsByOutputID(c)
 		if err != nil {
 			return err
 		}

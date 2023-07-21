@@ -114,8 +114,8 @@ func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	}, nil
 }
 
-func rewardsByAccountID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
-	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterAccountID)
+func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
+	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, err
 	}
