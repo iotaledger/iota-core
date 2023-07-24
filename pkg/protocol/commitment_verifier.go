@@ -12,16 +12,20 @@ import (
 )
 
 type CommitmentVerifier struct {
-	engine *engine.Engine
+	engine           *engine.Engine
+	forkingPoint     *model.Commitment
+	cumulativeWeight uint64
 }
 
-func NewCommitmentVerifier(mainEngine *engine.Engine) *CommitmentVerifier {
+func NewCommitmentVerifier(mainEngine *engine.Engine, forkingPoint *model.Commitment) *CommitmentVerifier {
 	return &CommitmentVerifier{
-		engine: mainEngine,
+		engine:           mainEngine,
+		forkingPoint:     forkingPoint,
+		cumulativeWeight: forkingPoint.CumulativeWeight(),
 	}
 }
 
-func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (iotago.BlockIDs, error) {
+func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (iotago.BlockIDs, uint64, error) {
 	// 1. Verify that the provided attestations are indeed the ones that were included in the commitment.
 	tree := ads.NewMap[iotago.AccountID, *iotago.Attestation](mapdb.NewMapDB(),
 		iotago.Identifier.Bytes,
@@ -55,21 +59,39 @@ func (c *CommitmentVerifier) verifyCommitment(prevCommitment, commitment *model.
 		tree.Set(att.IssuerID, att)
 	}
 	if !iotago.VerifyProof(merkleProof, iotago.Identifier(tree.Root()), commitment.RootsID()) {
-		return nil, ierrors.Errorf("invalid merkle proof for attestations for commitment %s", commitment.ID())
+		return nil, 0, ierrors.Errorf("invalid merkle proof for attestations for commitment %s", commitment.ID())
 	}
 
 	// 2. Verify attestations.
 	blockIDs, seatCount, err := c.verifyAttestations(attestations)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "error validating attestations for commitment %s", commitment.ID())
+		return nil, 0, ierrors.Wrapf(err, "error validating attestations for commitment %s", commitment.ID())
 	}
 
-	// 3. Verify cumulative weight of commitment matches with calculated weight from attestations.
-	if prevCommitment.CumulativeWeight()+seatCount != commitment.CumulativeWeight() {
-		return nil, ierrors.Errorf("invalid cumulative weight for commitment %s", commitment.ID())
+	// 3. Verify that cumulative weight of commitment matches (as an upper bound) with calculated weight from attestations.
+	// This is necessary due to the following edge case that can happen in the window of forking point and the current state of the other chain:
+	//	1. A public key is added to an account.
+	//     We do not count a seat for the issuer for this slot and the computed CW will be lower than the CW in
+	//	   the commitment. This is fine, since this is a rare occasion and a heavier chain will become heavier anyway, eventually.
+	//	   It will simply take a bit longer to accumulate enough CW so that the chain-switch rule kicks in.
+	//	TODO: what happens in an extreme case where all change their keys?
+	//
+	// 2. A public key is removed from an account.
+	//    We count the seat for the issuer for this slot even though we shouldn't have. According to the protocol, a valid
+	//    chain with such a block can never exist because the block itself (here provided as an attestation) would be invalid.
+	//    However, we do not know about this yet since we do not have the latest ledger state.
+	//    In a rare and elaborate scenario, an attacker might have acquired such removed (private) keys and could
+	//    fabricate attestations and thus a theoretically heavier chain (solely when looking on the chain backed by attestations)
+	//    than it actually is. Nodes might consider to switch to this chain, even though it is invalid which will be discovered
+	//    before the candidate chain/engine is activated.
+	c.cumulativeWeight += seatCount
+	if c.cumulativeWeight <= commitment.CumulativeWeight() {
+		return nil, 0, ierrors.Errorf("invalid cumulative weight for commitment %s", commitment.ID())
 	}
 
-	return blockIDs, nil
+	// TODO: when activating the candidate engine we need to make sure that the its indeed the same chain as the one we verified here.
+
+	return blockIDs, c.cumulativeWeight, nil
 }
 
 func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestation) (iotago.BlockIDs, uint64, error) {
@@ -78,9 +100,32 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 	var seatCount uint64
 
 	for _, att := range attestations {
-		// TODO: 1. Make sure the public key used to sign is valid for the given issuerID.
-		//  First, this can be based on the latest commonly known ledger state.
-		//  Later, this needs to include a proof of added/removed public keys.
+		// 1. Make sure the public key used to sign is valid for the given issuerID.
+		//    We ignore attestations that don't have a valid public key for the given issuerID.
+		//    1. The attestation might be fake.
+		//    2. The issuer might have added a new public key in the meantime, but we don't know about it yet
+		//       since we only have the ledger state at the forking point.
+
+		// TODO: here we need to use a different function to get an old ledgerstate (at the forking point) instead
+		//  of the current one based on the progress of the current chain.
+		account, exists, err := c.engine.Ledger.Account(att.IssuerID, c.forkingPoint.Index())
+		// We always need to have the account for a validator.
+		if err != nil {
+			return nil, 0, ierrors.Wrapf(err, "error getting account for issuerID %s", att.IssuerID)
+		}
+		if !exists {
+			return nil, 0, ierrors.Errorf("account for issuerID %s does not exist", att.IssuerID)
+		}
+
+		edSig, isEdSig := att.Signature.(*iotago.Ed25519Signature)
+		if !isEdSig {
+			return nil, 0, ierrors.Errorf("only ed2519 signatures supported, got %s", att.Signature.Type())
+		}
+
+		// We found the account but we don't know the public key used to sign this block/attestation. Ignore.
+		if !account.PubKeys.Has(edSig.PublicKey) {
+			continue
+		}
 
 		api, err := c.engine.APIForVersion(att.ProtocolVersion)
 		if err != nil {

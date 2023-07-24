@@ -56,13 +56,13 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil && candidateEngine.ChainID() == fork.ForkingPoint.ID() {
-		//TODO: log instead of error
+		// TODO: log instead of error
 		p.ErrorHandler()(ierrors.Errorf("we are already processing the fork at forkingPoint %s", fork.ForkingPoint.ID()))
 		return
 	}
 
 	if p.MainEngineInstance().ChainID() == fork.ForkingPoint.ID() {
-		//TODO: log instead of error
+		// TODO: log instead of error
 		p.ErrorHandler()(ierrors.Errorf("we already switched our main engine to the fork at forkingPoint %s", fork.ForkingPoint.ID()))
 		return
 	}
@@ -130,9 +130,10 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 }
 
 type commitmentVerificationResult struct {
-	commitment *model.Commitment
-	blockIDs   iotago.BlockIDs
-	err        error
+	commitment             *model.Commitment
+	actualCumulativeWeight uint64
+	blockIDs               iotago.BlockIDs
+	err                    error
 }
 
 func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.BlockIDs, shouldSwitch, banSource bool, err error) {
@@ -144,14 +145,15 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	ch := make(chan *commitmentVerificationResult)
 	defer close(ch)
 
-	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance())
+	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.ForkingPoint)
 	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
-		blockIDs, err := commitmentVerifier.verifyCommitment(fork.ForkedChain.Commitment(commitment.PrevID().Index()).Commitment(), commitment, attestations, merkleProof)
+		blockIDs, actualCumulativeWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 
 		result := &commitmentVerificationResult{
-			commitment: commitment,
-			blockIDs:   blockIDs,
-			err:        err,
+			commitment:             commitment,
+			actualCumulativeWeight: actualCumulativeWeight,
+			blockIDs:               blockIDs,
+			err:                    err,
 		}
 		ch <- result
 	}
@@ -211,9 +213,9 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 
 			// Count how many consecutive slots are heavier/lighter than the main chain.
 			switch {
-			case result.commitment.CumulativeWeight() > mainChainCommitment.CumulativeWeight():
+			case result.actualCumulativeWeight > mainChainCommitment.CumulativeWeight():
 				heavierCount++
-			case result.commitment.CumulativeWeight() < mainChainCommitment.CumulativeWeight():
+			case result.actualCumulativeWeight < mainChainCommitment.CumulativeWeight():
 				heavierCount--
 			default:
 				heavierCount = 0
