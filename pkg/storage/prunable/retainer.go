@@ -1,7 +1,6 @@
 package prunable
 
 import (
-	"github.com/iotaledger/hive.go/core/storable"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -144,36 +143,24 @@ func (r *Retainer) GetTransaction(blockID iotago.BlockID) (*TransactionRetainerD
 }
 
 func (r *Retainer) StoreBlockAccepted(blockID iotago.BlockID) error {
-	err := r.blockStore.Set(blockID, &BlockRetainerData{
+	return r.blockStore.Set(blockID, &BlockRetainerData{
 		State:         apimodels.BlockStateAccepted,
 		FailureReason: apimodels.NoBlockFailureReason,
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (r *Retainer) StoreBlockConfirmed(blockID iotago.BlockID) error {
-	err := r.blockStore.Set(blockID, &BlockRetainerData{
+	return r.blockStore.Set(blockID, &BlockRetainerData{
 		State:         apimodels.BlockStateConfirmed,
 		FailureReason: apimodels.NoBlockFailureReason,
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (r *Retainer) StoreTransactionPending(blockID iotago.BlockID) error {
-	if err := r.transactionStore.Set(blockID, &TransactionRetainerData{
+	return r.transactionStore.Set(blockID, &TransactionRetainerData{
 		State:         apimodels.TransactionStatePending,
 		FailureReason: apimodels.NoTransactionFailureReason,
-	}); err != nil {
-		return nil
-	}
+	})
 }
 
 func (r *Retainer) StoreTransactionNoFailureStatus(blockID iotago.BlockID, status apimodels.TransactionState) error {
@@ -181,40 +168,26 @@ func (r *Retainer) StoreTransactionNoFailureStatus(blockID iotago.BlockID, statu
 		return ierrors.Errorf("failed to retain transaction status, status cannot be failed, blockID: %s", blockID.String())
 	}
 
-	err := r.transactionStore.Set(blockID, &TransactionRetainerData{
+	return r.transactionStore.Set(blockID, &TransactionRetainerData{
 		State:         status,
 		FailureReason: apimodels.NoTransactionFailureReason,
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (r *Retainer) DeleteTransactionData(prevID iotago.BlockID) error {
-	err := r.transactionStore.Delete(prevID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return r.transactionStore.Delete(prevID)
 }
 
 func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType apimodels.BlockFailureReason) error {
-	err := r.blockStore.Set(blockID, storable.SerializableInt64(failureType))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return r.blockStore.Set(blockID, &BlockRetainerData{
+		State:         apimodels.BlockStateFailed,
+		FailureReason: failureType,
+	})
 }
 
-func (r *Retainer) StoreTransactionFailure(transactionID iotago.TransactionID, failureType apimodels.TransactionFailureReason) error {
-	err := r.transactionStore.Set(transactionID, storable.SerializableInt64(failureType))
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (r *Retainer) StoreTransactionFailure(blockID iotago.BlockID, failureType apimodels.TransactionFailureReason) error {
+	return r.transactionStore.Set(blockID, &TransactionRetainerData{
+		State:         apimodels.TransactionStateFailed,
+		FailureReason: failureType,
+	})
 }
