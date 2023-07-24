@@ -34,7 +34,6 @@ services:
       --p2p.seed=0xf739eea09eb0f4820f26504a3135131a075089b4c901c19c2099513ee016f516
       --blockIssuer.issuerAccount=0x375358f92cc94750669598b0aaa55a6ff73310b90710e1fad524c0f911be0fea
       --blockIssuer.privateKey=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064
-      --activity.ignoreBootstrapped=true
       --restAPI.allowIncompleteBlock=true
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
@@ -55,7 +54,6 @@ services:
       --p2p.seed=0x2ab2792bba8ab6deb7978165e4072d3f00def97a0138b98ba2d21eba54159705
       --blockIssuer.issuerAccount=0x6aee704f25558e8aa7630fed0121da53074188abc423b3c5810f80be4936eb6e
       --blockIssuer.privateKey=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
-      --activity.ignoreBootstrapped=true
       --restAPI.allowIncompleteBlock=true
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin

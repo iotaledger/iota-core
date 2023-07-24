@@ -84,13 +84,43 @@ var Docker = []options.Option[snapshotcreator.Options]{
 	),
 }
 
+// Feature is a preset for the feature network, genesis time ~20th of July 2023.
 var Feature = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithFilePath("docker-network.snapshot"),
+	snapshotcreator.WithAccounts(
+		snapshotcreator.AccountDetails{
+			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe"))),
+			Address:         iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe"))),
+			Amount:          testsuite.MinValidatorAccountDeposit,
+			IssuerKey:       lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe")),
+			StakingEpochEnd: math.MaxUint64,
+			FixedCost:       1,
+			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+		},
+		snapshotcreator.AccountDetails{
+			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6"))),
+			Address:         iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6"))),
+			Amount:          testsuite.MinValidatorAccountDeposit,
+			IssuerKey:       lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6")),
+			StakingEpochEnd: math.MaxUint64,
+			FixedCost:       1,
+			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+		},
+		snapshotcreator.AccountDetails{
+			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805"))),
+			Address:         iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805"))),
+			Amount:          testsuite.MinValidatorAccountDeposit,
+			IssuerKey:       lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805")),
+			StakingEpochEnd: math.MaxUint64,
+			FixedCost:       1,
+			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+		},
+	),
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("feature", "rms"),
 			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10),
-			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
+			iotago.WithTimeProviderOptions(1689848996, 10, 13),
 			iotago.WithLivenessOptions(6, 5, 30),
 		),
 	),
