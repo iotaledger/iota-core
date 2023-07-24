@@ -21,9 +21,9 @@ func blockByID(c echo.Context) (*model.Block, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
 	}
 
-	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
-	if err != nil {
-		return nil, err
+	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	if !exists {
+		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
 	}
 
 	return block, nil

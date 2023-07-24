@@ -180,9 +180,9 @@ func getTransaction(c echo.Context) error {
 		return err
 	}
 
-	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(output.BlockID())
-	if err != nil {
-		return err
+	block, exists := deps.Protocol.MainEngineInstance().Block(output.BlockID())
+	if !exists {
+		return ierrors.Errorf("block not found: %s", output.BlockID().ToHex())
 	}
 
 	iotaTX, isTX := block.Transaction()
