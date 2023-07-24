@@ -33,6 +33,7 @@ type Retainer struct {
 	finalizedSlotFunc       FinalizedSlotFunc
 	errorHandler            func(error)
 
+	api     func(index iotago.SlotIndex) iotago.API
 	workers *workerpool.Group
 
 	module.Module
@@ -55,7 +56,7 @@ type Retainer struct {
 // get block status: go through stores to check status
 // get tx status: confirmed store -> check slot index finalized? finalized -> pending store (error codes)
 
-func New(workers *workerpool.Group, retainerFunc RetainerFunc, blockFromCacheFunc BlockFromCacheFunc, blockFromStorageFunc BlockFromStorageFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
+func New(workers *workerpool.Group, currentAPI func(index iotago.SlotIndex) iotago.API, retainerFunc RetainerFunc, blockFromCacheFunc BlockFromCacheFunc, blockFromStorageFunc BlockFromStorageFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
 	return &Retainer{
 		workers:                 workers,
 		retainerFunc:            retainerFunc,
@@ -64,6 +65,7 @@ func New(workers *workerpool.Group, retainerFunc RetainerFunc, blockFromCacheFun
 		latestCommittedSlotFunc: latestCommittedSlotFunc,
 		finalizedSlotFunc:       finalizedSlotFunc,
 		errorHandler:            errorHandler,
+		api:                     currentAPI,
 	}
 }
 
@@ -71,6 +73,7 @@ func New(workers *workerpool.Group, retainerFunc RetainerFunc, blockFromCacheFun
 func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	return module.Provide(func(e *engine.Engine) retainer.Retainer {
 		r := New(e.Workers.CreateGroup("Retainer"),
+			e.Storage.Settings().APIForSlot,
 			e.Storage.Retainer,
 			func(blockID iotago.BlockID) *model.Block {
 				block, exists := e.BlockFromCache(blockID)
@@ -103,8 +106,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 		asyncOpt := event.WithWorkerPool(r.workers.CreatePool("Retainer", 1))
 
 		e.Events.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
-			_, isTx := b.Transaction()
-			if err := r.onBlockAttached(b.ID(), isTx); err != nil {
+			if err := r.onBlockAttached(b.ID()); err != nil {
 				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAttached in retainer"))
 			}
 		}, asyncOpt)
@@ -139,12 +141,12 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 				})
 
 				transactionMetadata.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
-					if newBlock.Index() != prevBlock.Index() {
-						if err := r.onAttachmentUpdated(prevBlock, newBlock); err != nil {
-							r.errorHandler(ierrors.Wrap(err, "failed to delete/store on AttachmentUpdated in retainer"))
-						}
+					if err := r.onAttachmentUpdated(prevBlock, newBlock); err != nil {
+						r.errorHandler(ierrors.Wrap(err, "failed to delete/store on AttachmentUpdated in retainer"))
 					}
 				})
+
+				// TODO attach on invalid transactions, add error codes and store to retainer
 			})
 		})
 
@@ -159,12 +161,16 @@ func (r *Retainer) Shutdown() {
 }
 
 func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
-	blockStatus, block, err := r.blockStatus(blockID)
+	blockStatus, err := r.blockStatus(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get block status for %s", blockID.ToHex())
 	}
+	// we do not expose accepted flag
+	if blockStatus == apimodels.BlockStateAccepted {
+		blockStatus = apimodels.BlockStatePending
+	}
 
-	hasTx, txStatus, err := r.transactionStatus(blockID, block)
+	hasTx, txStatus, err := r.transactionStatus(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get transaction status for %s", blockID.ToHex())
 	}
@@ -187,77 +193,55 @@ func (r *Retainer) RetainTransactionFailure(transactionID iotago.TransactionID, 
 	_ = retainerStore.StoreTransactionFailure(transactionID, failureCode)
 }
 
-func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, *model.Block, error) {
-	// we store the block on acceptance, so if block is nil and slot was already committed we know its orphaned or never existed
-	block, err := r.blockFromStorageFunc(blockID)
-	if err != nil {
-		return 0, nil, err
+func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, error) {
+	blockData, exists := r.retainerFunc(blockID.Index()).GetBlock(blockID)
+	if !exists {
+		return apimodels.BlockStateUnknown, nil
 	}
-
 	// block was for sure accepted in this chain
-	if block != nil {
+	if blockData.State == apimodels.BlockStateAccepted || blockData.State == apimodels.BlockStateConfirmed {
 		// check if finalized in this chain
 		if blockID.Index() <= r.finalizedSlotFunc() {
-			return apimodels.BlockStateFinalized, block, nil
+			return apimodels.BlockStateFinalized, nil
 		}
-
-		// check if confirmed
-		if confirmed, err := r.retainerFunc(blockID.Index()).WasBlockConfirmed(blockID); err != nil {
-			return apimodels.BlockStateUnknown, nil, ierrors.Wrap(err, "failed to get block confirmed state in retainer.")
-		} else if confirmed {
-			return apimodels.BlockStateConfirmed, block, nil
-		}
-
-		return apimodels.BlockStatePending, block, nil
+		return blockData.State, nil
+	}
+	if blockData.State == apimodels.BlockStatePending && blockID.Index() <= r.latestCommittedSlotFunc() {
+		return apimodels.BlockStateOrphaned, nil
 	}
 
-	if blockID.Index() > r.latestCommittedSlotFunc() {
-		// orphaned (attached, but never accepted)
-		if orphaned, err := r.retainerFunc(blockID.Index()).WasBlockOrphaned(blockID); err != nil {
-			return apimodels.BlockStateUnknown, nil, ierrors.Wrap(err, "failed to get block orphaned state in retainer.")
-		} else if orphaned {
-			return apimodels.BlockStateOrphaned, nil, nil
-		}
-	}
-
-	if block := r.blockFromCacheFunc(blockID); block != nil {
-		return apimodels.BlockStatePending, block, nil
-	}
-
-	return apimodels.BlockStateUnknown, nil, nil
+	return apimodels.BlockStatePending, nil
 }
 
-func (r *Retainer) transactionStatus(blockID iotago.BlockID, block *model.Block) (bool, apimodels.TransactionState, error) {
-	// block was for sure accepted
-	if block != nil {
-		// return if block does not have a transaction
-		if _, hasTx := block.Transaction(); !hasTx {
-			return false, apimodels.TransactionStatePending, nil
-		}
-
-		if blockID.Index() <= r.finalizedSlotFunc() {
-			return true, apimodels.TransactionStateFinalized, nil
-		}
-		// check if confirmed
-		if confirmed, err := r.retainerFunc(blockID.Index()).WasTransactionConfirmed(blockID); err != nil {
-			return true, apimodels.TransactionStateFailed, ierrors.Wrap(err, "failed to get transaction confirmed state in retainer.")
-		} else if confirmed {
-			return true, apimodels.TransactionStateConfirmed, nil
-		}
+func (r *Retainer) transactionStatus(blockID iotago.BlockID) (bool, apimodels.TransactionState, error) {
+	txData, exists := r.retainerFunc(blockID.Index()).GetTransaction(blockID)
+	if !exists {
+		return false, apimodels.TransactionStateUnknown, nil
+	}
+	// we update tx status up to accepted, for conf anf finalization we need to check for the block status
+	if txData.State != apimodels.TransactionStateAccepted {
+		return false, apimodels.TransactionStatePending, nil
 	}
 
-	if pending, err := r.retainerFunc(blockID.Index()).WasTransactionPending(blockID); err != nil {
-		return true, apimodels.TransactionStateFailed, ierrors.Wrap(err, "failed to get transaction pending state in retainer.")
-	} else if pending {
-		return true, apimodels.TransactionStatePending, nil
+	blockData, exists := r.retainerFunc(blockID.Index()).GetBlock(blockID)
+	if !exists {
+		return false, apimodels.TransactionStateUnknown, nil
 	}
 
-	return true, apimodels.TransactionStateFailed, ierrors.Errorf("failed to get transaction state in retainer.")
+	switch blockData.State {
+	case apimodels.BlockStateConfirmed:
+		return true, apimodels.TransactionStateConfirmed, nil
+	case apimodels.BlockStateFinalized:
+		return true, apimodels.TransactionStateFinalized, nil
+	}
+
+	return true, apimodels.TransactionStatePending, ierrors.Errorf("failed to get transaction state in retainer.")
 }
 
+// todo: check if we are on the same engine
 // TODO: trigger this if we have orphaned event.
-func (r *Retainer) onBlockAttached(blockID iotago.BlockID, isTx bool) error {
-	return r.retainerFunc(blockID.Index()).Store(blockID, isTx)
+func (r *Retainer) onBlockAttached(blockID iotago.BlockID) error {
+	return r.retainerFunc(blockID.Index()).StoreBlockAttached(blockID)
 }
 
 func (r *Retainer) onBlockAccepted(blockID iotago.BlockID) error {
@@ -269,19 +253,20 @@ func (r *Retainer) onBlockConfirmed(blockID iotago.BlockID) error {
 }
 
 func (r *Retainer) onTransactionAttached(blockID iotago.BlockID) error {
-	return r.retainerFunc(blockID.Index()).StoreTransactionPending(blockID)
+	return r.retainerFunc(blockID.Index()).StoreTransactionNoFailureStatus(blockID, apimodels.TransactionStatePending)
 }
 
 func (r *Retainer) onTransactionAccepted(blockID iotago.BlockID) error {
-	return r.retainerFunc(blockID.Index()).StoreTransactionConfirmed(blockID)
+	return r.retainerFunc(blockID.Index()).StoreTransactionNoFailureStatus(blockID, apimodels.TransactionStateAccepted)
 }
 
 func (r *Retainer) onAttachmentUpdated(prevID, newID iotago.BlockID) error {
+
 	// delete the old transactionID
-	if err := r.retainerFunc(prevID.Index()).DeleteTransactionConfirmed(prevID); err != nil {
+	if err := r.retainerFunc(prevID.Index()).DeleteTransactionData(prevID); err != nil {
 		return err
 	}
-
+	// TODO: why it was always confirmed? Does the attachement update event is triggered ony on confirmed blocK?
 	// store the new transactionID
-	return r.retainerFunc(newID.Index()).StoreTransactionConfirmed(newID)
+	return r.retainerFunc(newID.Index()).StoreTransactionNoFailureStatus(newID, apimodels.TransactionStateConfirmed)
 }
