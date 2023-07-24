@@ -11,7 +11,7 @@ type Retainer interface {
 	BlockMetadata(blockID iotago.BlockID) (*BlockMetadata, error)
 
 	RetainBlockFailure(iotago.BlockID, apimodels.BlockFailureReason)
-	RetainTransactionFailure(iotago.TransactionID, iotago.SlotIndex, apimodels.TransactionFailureReason)
+	RetainTransactionFailure(iotago.BlockID, apimodels.TransactionFailureReason)
 
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface

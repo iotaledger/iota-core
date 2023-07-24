@@ -157,9 +157,9 @@ func (r *Retainer) RetainBlockFailure(blockID iotago.BlockID, failureCode apimod
 	_ = retainerStore.StoreBlockFailure(blockID, failureCode)
 }
 
-func (r *Retainer) RetainTransactionFailure(transactionID iotago.TransactionID, slotIndex iotago.SlotIndex, failureCode apimodels.TransactionFailureReason) {
-	retainerStore := r.retainerFunc(slotIndex)
-	_ = retainerStore.StoreTransactionFailure(transactionID, failureCode)
+func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, failureCode apimodels.TransactionFailureReason) {
+	retainerStore := r.retainerFunc(blockID.Index())
+	_ = retainerStore.StoreTransactionFailure(blockID, failureCode)
 }
 
 func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, error) {
