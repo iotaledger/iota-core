@@ -14,4 +14,5 @@ const (
 	PriorityRestAPI  // depends on PriorityPoWHandler
 	PriorityDashboardMetrics
 	PriorityDashboard
+	PriorityMetrics
 )
