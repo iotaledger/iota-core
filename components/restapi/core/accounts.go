@@ -13,41 +13,20 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-func blockIssuanceCreditsForAccountID(c echo.Context) (*apimodels.BlockIssuanceCreditsResponse, error) {
-	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
-	if err != nil {
-		return nil, err
-	}
-	slotIndex, err := httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
-	if err != nil {
-		// by default we return the balance for the latest slot
-		slotIndex = deps.Protocol.SyncManager.LatestCommittedSlot()
-	}
-	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
-	}
-
-	return &apimodels.BlockIssuanceCreditsResponse{
-		SlotIndex:            slotIndex,
-		BlockIssuanceCredits: account.Credits.Value,
-	}, nil
-}
-
 func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
 		return nil, err
 	}
-	mca := deps.Protocol.CurrentAPI().ProtocolParameters().EvictionAge()
+
+	evictionAge := deps.Protocol.CurrentAPI().ProtocolParameters().EvictionAge()
+
 	slotIndex := deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time.Now())
-	if slotIndex < mca {
-		mca = 0
+	if slotIndex >= evictionAge {
+		slotIndex -= evictionAge
 	}
-	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex-mca)
+
+	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
 	if err != nil {
 		return nil, err
 	}
