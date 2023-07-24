@@ -5,7 +5,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -18,8 +17,6 @@ import (
 type (
 	//nolint:revive
 	RetainerFunc            func(iotago.SlotIndex) *prunable.Retainer
-	BlockFromCacheFunc      func(iotago.BlockID) *model.Block
-	BlockFromStorageFunc    func(iotago.BlockID) (*model.Block, error)
 	LatestCommittedSlotFunc func() iotago.SlotIndex
 	FinalizedSlotFunc       func() iotago.SlotIndex
 )
@@ -27,8 +24,6 @@ type (
 // Retainer keeps and resolves all the information needed in the API and INX.
 type Retainer struct {
 	retainerFunc            RetainerFunc
-	blockFromCacheFunc      BlockFromCacheFunc
-	blockFromStorageFunc    BlockFromStorageFunc
 	latestCommittedSlotFunc LatestCommittedSlotFunc
 	finalizedSlotFunc       FinalizedSlotFunc
 	errorHandler            func(error)
@@ -56,12 +51,10 @@ type Retainer struct {
 // get block status: go through stores to check status
 // get tx status: confirmed store -> check slot index finalized? finalized -> pending store (error codes)
 
-func New(workers *workerpool.Group, currentAPI func(index iotago.SlotIndex) iotago.API, retainerFunc RetainerFunc, blockFromCacheFunc BlockFromCacheFunc, blockFromStorageFunc BlockFromStorageFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
+func New(workers *workerpool.Group, currentAPI func(index iotago.SlotIndex) iotago.API, retainerFunc RetainerFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
 	return &Retainer{
 		workers:                 workers,
 		retainerFunc:            retainerFunc,
-		blockFromCacheFunc:      blockFromCacheFunc,
-		blockFromStorageFunc:    blockFromStorageFunc,
 		latestCommittedSlotFunc: latestCommittedSlotFunc,
 		finalizedSlotFunc:       finalizedSlotFunc,
 		errorHandler:            errorHandler,
@@ -75,31 +68,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 		r := New(e.Workers.CreateGroup("Retainer"),
 			e.Storage.Settings().APIForSlot,
 			e.Storage.Retainer,
-			func(blockID iotago.BlockID) *model.Block {
-				block, exists := e.BlockFromCache(blockID)
-				if !exists {
-					return nil
-				}
-
-				return block.ModelBlock()
-			},
-			func(blockID iotago.BlockID) (*model.Block, error) {
-				storage := e.Storage.Blocks(blockID.Index())
-				if storage == nil {
-					return nil, ierrors.Errorf("failed to get storage for block %s in retainer", blockID)
-				}
-
-				block, err := e.Storage.Blocks(blockID.Index()).Load(blockID)
-				if err != nil {
-					return nil, ierrors.Wrap(err, "failed to get block from storage in retainer")
-				}
-
-				if block == nil {
-					return nil, ierrors.Errorf("failed to get block from storage in retainer, block not found: %s", blockID)
-				}
-
-				return block, nil
-			}, e.Storage.Settings().LatestFinalizedSlot,
+			e.Storage.Settings().LatestFinalizedSlot,
 			e.Storage.Settings().LatestCommitment().Index,
 			e.ErrorHandler("retainer"))
 
