@@ -158,19 +158,6 @@ func (r *Retainer) Shutdown() {
 	r.workers.Shutdown()
 }
 
-func (r *Retainer) Block(blockID iotago.BlockID) (*model.Block, error) {
-	if block := r.blockFromCacheFunc(blockID); block != nil {
-		return block, nil
-	}
-
-	block, err := r.blockFromStorageFunc(blockID)
-	if err != nil {
-		return nil, err
-	}
-
-	return block, nil
-}
-
 func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
 	blockStatus, block, err := r.blockStatus(blockID)
 	if err != nil {

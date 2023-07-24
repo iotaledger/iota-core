@@ -78,24 +78,18 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 }
 
 func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
-	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
-	if err != nil {
-		return nil, err
+	block, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID)
+	if !exists {
+		return nil, ierrors.Errorf("block not found: %s", blockID)
 	}
 
 	// TODO: metadata instead, or retainer
-	cachedBlock, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID)
-	if !exists {
-		cachedBlock = nil
-	}
 	// blockMetadata, exists := deps.Retainer.BlockMetadata(blockID)
 	// if !exists {
 	// 	return nil, ierrors.Wrapf(ErrNotFound, "block metadata %s", blockID.Base58())
 	// }
 
-	explorerBlk = createExplorerBlock(block, cachedBlock)
-
-	return
+	return createExplorerBlock(block.ModelBlock(), block), nil
 }
 
 func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *ExplorerBlock {
