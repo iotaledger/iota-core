@@ -17,7 +17,7 @@ services:
       - back-tier
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:8.5.25
     container_name: grafana
     restart: unless-stopped
     environment:
@@ -39,7 +39,7 @@ services:
 
   elasticsearch:
     container_name: elasticsearch
-    image: elasticsearch:7.13.2
+    image: elastic/elasticsearch:7.13.2
     restart: unless-stopped
     volumes:
       - "/etc/localtime:/etc/localtime:ro"
@@ -67,7 +67,7 @@ services:
 
   logstash:
     container_name: logstash
-    image: logstash:7.13.2
+    image: elastic/logstash:7.13.2
     restart: unless-stopped
     volumes:
       - "/etc/localtime:/etc/localtime:ro"
@@ -91,7 +91,7 @@ services:
 
   kibana:
     container_name: kibana
-    image: kibana:7.13.2
+    image: elastic/kibana:7.13.2
     restart: unless-stopped
     volumes:
       - "/etc/localtime:/etc/localtime:ro"
