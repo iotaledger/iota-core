@@ -256,8 +256,8 @@ Example:
 | engine           | The used database engine (rocksdb/mapdb)                   | string | "rocksdb"          |
 | path             | The path to the database folder                            | string | "testnet/database" |
 | maxOpenDBs       | Maximum number of open database instances                  | int    | 10                 |
-| pruningThreshold | How many confirmed slots should be retained                | uint   | 360                |
-| dbGranularity    | How many slots should be contained in a single DB instance | int    | 1                  |
+| pruningThreshold | How many confirmed slots should be retained                | uint   | 16384              |
+| dbGranularity    | How many slots should be contained in a single DB instance | int    | 8192               |
 
 Example:
 
@@ -267,8 +267,8 @@ Example:
       "engine": "rocksdb",
       "path": "testnet/database",
       "maxOpenDBs": 10,
-      "pruningThreshold": 360,
-      "dbGranularity": 1
+      "pruningThreshold": 16384,
+      "dbGranularity": 8192
     }
   }
 ```
