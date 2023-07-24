@@ -3,11 +3,12 @@
   gather_facts: no
   roles:
     - exporter
-    - wireguard
+    - firewall
 
 - hosts: cores:&internal_nodes
   gather_facts: no
   roles:
+    - wireguard
     - iota-core-node
 
 - hosts: metrics

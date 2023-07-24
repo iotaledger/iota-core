@@ -1,0 +1,58 @@
+- name: Install UFW
+  apt:
+    name: ufw
+    state: present
+
+- name: Reset all UFW rules and disable UFW
+  ufw:
+    state: reset
+
+- name: Allow ssh
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+
+- name: Allow all traffic from 192.168.20.0/24
+  ufw:
+    rule: allow
+    src: 192.168.20.0/24
+
+- name: Allow WireGuard traffic
+  ufw:
+    rule: allow
+    port: '51820'
+    proto: udp
+
+- name: Allow UDP port 53 from WireGuard, to resolve against systemd-resolved
+  ufw:
+    rule: allow
+    interface: wg0
+    direction: in
+    port: '53'
+    proto: udp
+
+- name: Deny all other incoming traffic
+  ufw:
+    rule: deny
+    direction: in
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+
+- name: Add manual internal hosts with IPv4 mappings
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ item.value }} {{ item.key }} {{ item.key }}.shimmer.iota.cafe"
+    regexp: "^{{ item.value }}"
+    state: present
+  loop:
+    - { key: 'node-01.feature', value: '192.168.20.6' }
+    - { key: 'node-02.feature', value: '192.168.20.4' }
+    - { key: 'node-03.feature', value: '192.168.20.5' }
+    - { key: 'node-04.feature', value: '192.168.20.2' }
+    - { key: 'node-05.feature', value: '192.168.20.3' }
+    - { key: 'metrics-01.feature', value: '192.168.20.7' }
+  loop_control:
+    label: "{{ item.key }}"
