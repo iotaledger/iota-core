@@ -98,13 +98,12 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommittedSlot()
-	latestRewardsReadyEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 
 	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get output %s from ledger", outputID)
 	}
+
 	var reward iotago.Mana
 	switch utxoOutput.OutputType() {
 	case iotago.OutputAccount:
@@ -139,6 +138,10 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to calculate reward for output %s", outputID)
 	}
+
+	// TODO: the epoch should be returned by the reward calculations
+	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommittedSlot()
+	latestRewardsReadyEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 
 	return &apimodels.ManaRewardsResponse{
 		EpochIndex: latestRewardsReadyEpoch,
