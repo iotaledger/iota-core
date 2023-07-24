@@ -2,20 +2,20 @@ package wallet
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type ServerInfo struct {
-	Healthy  bool
-	Version  string
-	IssuerID string
+	Healthy bool
+	Version string
 }
 
 type ServerInfos []*ServerInfo
@@ -45,7 +45,7 @@ type WebClients struct {
 	// helper variable indicating which clt was recently used, useful for double, triple,... spends
 	lastUsed int
 
-	mu sync.Mutex
+	mu syncutils.Mutex
 }
 
 // NewWebClients creates Connector from provided GoShimmerAPI urls.
@@ -81,9 +81,8 @@ func (c *WebClients) ServerStatus(cltIdx int) (status *ServerInfo, err error) {
 	}
 
 	return &ServerInfo{
-		IssuerID: response.IssuerID,
-		Healthy:  response.Status.IsHealthy,
-		Version:  response.Version,
+		Healthy: response.Status.IsHealthy,
+		Version: response.Version,
 	}, nil
 }
 
@@ -176,7 +175,7 @@ type Client interface {
 	// GetTransaction gets the transaction.
 	GetTransaction(txID iotago.TransactionID) (resp *iotago.Transaction, err error)
 	// GetBlockIssuance returns the latest commitment and data needed to create a new block.
-	GetBlockIssuance() (resp *nodeclient.BlockIssuanceResponse, err error)
+	GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error)
 }
 
 // WebClient contains a GoShimmer web API to interact with a node.
@@ -206,7 +205,7 @@ func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
 
 		info, err := tmpClient.Info(context.Background())
 		if err == nil {
-			tmpAPI.JSONDecode(*info.ProtocolParameters, &w.optsProtocolParams)
+			_ = tmpAPI.JSONDecode(*info.ProtocolParameters, &w.optsProtocolParams)
 		}
 
 		w.serixAPI = iotago.V3API(w.optsProtocolParams)
@@ -306,7 +305,7 @@ func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.Transa
 	return tx, nil
 }
 
-func (c *WebClient) GetBlockIssuance() (resp *nodeclient.BlockIssuanceResponse, err error) {
+func (c *WebClient) GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error) {
 	resp, err = c.api.BlockIssuance(context.Background())
 	if err != nil {
 		return

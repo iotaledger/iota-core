@@ -6,7 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/app/components/shutdown"
 	"github.com/iotaledger/iota-core/components/activity"
 	"github.com/iotaledger/iota-core/components/blockissuer"
-	"github.com/iotaledger/iota-core/components/coreapi"
 	"github.com/iotaledger/iota-core/components/dashboard"
 	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
 	"github.com/iotaledger/iota-core/components/debugapi"
@@ -14,6 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/components/p2p"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
+	coreapi "github.com/iotaledger/iota-core/components/restapi/core"
 )
 
 var (

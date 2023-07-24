@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -20,7 +21,7 @@ func TestState_RootBlocks(t *testing.T) {
 		Directory: t.TempDir(),
 	}, 0, errorHandler)
 
-	ts := NewTestFramework(t, prunableStorage, eviction.NewState(prunableStorage.RootBlocks, eviction.WithRootBlocksEvictionDelay(3)))
+	ts := NewTestFramework(t, prunableStorage, eviction.NewState(mapdb.NewMapDB(), prunableStorage.RootBlocks, eviction.WithRootBlocksEvictionDelay(3)))
 	ts.CreateAndAddRootBlock("Genesis", 0, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID())
 	ts.RequireActiveRootBlocks("Genesis")
 	ts.RequireLastEvictedSlot(0)

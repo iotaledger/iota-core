@@ -61,7 +61,7 @@ type dependencies struct {
 
 	Protocol         *protocol.Protocol
 	AppInfo          *app.Info
-	RestRouteManager *restapi.RestRouteManager
+	RestRouteManager *restapipkg.RestRouteManager
 }
 
 func configure() error {

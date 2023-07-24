@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -43,7 +44,7 @@ type OutputManager struct {
 	// stores solid outputs per node
 	issuerSolidOutIDMap map[string]map[iotago.OutputID]types.Empty
 
-	sync.RWMutex
+	syncutils.RWMutex
 }
 
 // NewOutputManager creates an OutputManager instance.

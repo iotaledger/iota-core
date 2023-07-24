@@ -78,9 +78,9 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 }
 
 func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
-	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
-	if !exists {
-		return nil, ierrors.Errorf("model block not found: %s", blockID.ToHex())
+	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
+	if err != nil {
+		return nil, err
 	}
 
 	// TODO: metadata instead, or retainer
@@ -186,9 +186,9 @@ func getTransaction(c echo.Context) error {
 		return err
 	}
 
-	block, exists := deps.Protocol.MainEngineInstance().Block(output.BlockID())
-	if !exists {
-		return ierrors.Errorf("block not found: %s", output.BlockID().ToHex())
+	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(output.BlockID())
+	if err != nil {
+		return err
 	}
 
 	iotaTX, isTX := block.Transaction()

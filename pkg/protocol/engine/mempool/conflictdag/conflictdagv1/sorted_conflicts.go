@@ -261,7 +261,7 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) applyWeightUpdate(me
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if member.weightUpdateApplied() {
+	if !s.isShutdown.Load() && member.weightUpdateApplied() {
 		s.fixMemberPosition(member)
 	}
 }
@@ -336,7 +336,7 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) applyPreferredInstea
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if member.preferredInsteadUpdateApplied() {
+	if !s.isShutdown.Load() && member.preferredInsteadUpdateApplied() {
 		s.fixHeaviestPreferredMember(member)
 	}
 }

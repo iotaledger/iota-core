@@ -22,7 +22,7 @@ import (
 const (
 	// FaucetRequestSplitNumber defines the number of outputs to split from a faucet request.
 	FaucetRequestSplitNumber                  = 100
-	faucetTokensPerRequest   iotago.BaseToken = 10_0000
+	faucetTokensPerRequest   iotago.BaseToken = 1_000_000
 
 	waitForConfirmation   = 150 * time.Second
 	waitForSolidification = 150 * time.Second
@@ -35,7 +35,6 @@ const (
 
 var (
 	defaultClientsURLs   = []string{"http://localhost:8080", "http://localhost:8090"}
-	faucetBalance        = iotago.BaseToken(100_0000_0000)
 	dockerProtocolParams = func() iotago.ProtocolParameters {
 		options := snapshotcreator.NewOptions(presets.Docker...)
 		return options.ProtocolParameters
@@ -94,7 +93,7 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		w.faucet.seed = [32]byte(w.optFaucetSeed)
 
 		// get faucet output and deposit
-		faucetDeposit := faucetBalance
+		var faucetDeposit iotago.BaseToken
 
 		faucetOutput := clt.GetOutput(w.optFaucetUnspentOutputID)
 		if faucetOutput != nil {
@@ -314,8 +313,10 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 		return nil, err
 	}
 
+	// requested output to split and use in spammer
 	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID(e.api)), 0), tx.Essence.Outputs[0])
 
+	// set remainder output to be reused by the faucet wallet
 	e.faucet.AddUnspentOutput(&Output{
 		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID(e.api)), 1),
 		Address:      faucetAddr,

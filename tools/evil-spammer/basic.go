@@ -25,7 +25,7 @@ type CustomSpamParams struct {
 	config *BasicConfig
 }
 
-func CustomSpam(params *CustomSpamParams) *BasicConfig {
+func CustomSpam(params *CustomSpamParams) {
 	outputID := iotago.EmptyOutputID
 	if params.config.LastFaucetUnspentOutputID != "" {
 		outputID, _ = iotago.OutputIDFromHex(params.config.LastFaucetUnspentOutputID)
@@ -36,7 +36,7 @@ func CustomSpam(params *CustomSpamParams) *BasicConfig {
 
 	fundsNeeded := false
 	for _, st := range params.SpamTypes {
-		if st != "blk" {
+		if st != SpammerTypeBlock {
 			fundsNeeded = true
 		}
 	}
@@ -45,13 +45,16 @@ func CustomSpam(params *CustomSpamParams) *BasicConfig {
 		if err != nil {
 			panic(err)
 		}
+		saveConfigsToFile(&BasicConfig{
+			LastFaucetUnspentOutputID: w.LastFaucetUnspentOutput().ToHex(),
+		})
 	}
 
 	for i, sType := range params.SpamTypes {
 		log.Infof("Start spamming with rate: %d, time unit: %s, and spamming type: %s.", params.Rates[i], params.TimeUnit.String(), sType)
 
 		switch sType {
-		case "blk":
+		case SpammerTypeBlock:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -61,19 +64,19 @@ func CustomSpam(params *CustomSpamParams) *BasicConfig {
 				}
 				s.Spam()
 			}(i)
-		case "tx":
+		case SpammerTypeTx:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
 				SpamTransaction(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.DeepSpam, params.EnableRateSetter)
 			}(i)
-		case "ds":
+		case SpammerTypeDs:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
 				SpamDoubleSpends(w, params.Rates[i], params.NSpend, params.TimeUnit, params.Durations[i], params.DelayBetweenConflicts, params.DeepSpam, params.EnableRateSetter)
 			}(i)
-		case "custom":
+		case SpammerTypeCustom:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -83,23 +86,19 @@ func CustomSpam(params *CustomSpamParams) *BasicConfig {
 				}
 				s.Spam()
 			}(i)
-		case "commitments":
+		case SpammerTypeCommitments:
 			wg.Add(1)
-			go func(i int) {
+			go func() {
 				defer wg.Done()
-			}(i)
+			}()
 
 		default:
-			log.Warn("Spamming type not recognized. Try one of following: tx, ds, blk")
+			log.Warn("Spamming type not recognized. Try one of following: tx, ds, blk, custom, commitments")
 		}
 	}
 
 	wg.Wait()
 	log.Info("Basic spamming finished!")
-
-	return &BasicConfig{
-		LastFaucetUnspentOutputID: w.LastFaucetUnspentOutput().ToHex(),
-	}
 }
 
 func SpamTransaction(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, deepSpam, enableRateSetter bool) {
@@ -181,7 +180,6 @@ func SpamNestedConflicts(w *wallet.EvilWallet, rate int, timeUnit, duration time
 	scenario := wallet.NewEvilScenario(scenarioOptions...)
 	if scenario.NumOfClientsNeeded > w.NumOfClient() {
 		printer.NotEnoughClientsWarning(scenario.NumOfClientsNeeded)
-		return nil
 	}
 
 	options := []spammer.Options{

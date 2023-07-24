@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/jwt"
+	"github.com/iotaledger/iota-core/pkg/restapi"
 )
 
 func init() {
@@ -45,7 +46,7 @@ type dependencies struct {
 	Host               host.Host
 	RestAPIBindAddress string         `name:"restAPIBindAddress"`
 	NodePrivateKey     crypto.PrivKey `name:"nodePrivateKey"`
-	RestRouteManager   *RestRouteManager
+	RestRouteManager   *restapi.RestRouteManager
 }
 
 func initConfigParams(c *dig.Container) error {
@@ -88,8 +89,8 @@ func provide(c *dig.Container) error {
 		Echo *echo.Echo
 	}
 
-	if err := c.Provide(func(deps proxyDeps) *RestRouteManager {
-		return newRestRouteManager(deps.Echo)
+	if err := c.Provide(func(deps proxyDeps) *restapi.RestRouteManager {
+		return restapi.NewRestRouteManager(deps.Echo)
 	}); err != nil {
 		Component.LogPanic(err)
 	}
