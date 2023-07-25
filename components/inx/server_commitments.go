@@ -33,6 +33,7 @@ func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, status.Errorf(codes.NotFound, "commitment index %d not found", req.GetCommitmentIndex())
 		}
+
 		return nil, err
 	}
 

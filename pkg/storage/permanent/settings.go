@@ -126,11 +126,7 @@ func (s *Settings) StoreProtocolParametersForStartEpoch(params iotago.ProtocolPa
 		return err
 	}
 
-	if err := s.StoreProtocolParameters(params); err != nil {
-		return err
-	}
-
-	return nil
+	return s.StoreProtocolParameters(params)
 }
 
 func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) error {
