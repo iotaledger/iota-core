@@ -59,3 +59,34 @@ func (t *TestSuite) AssertVersionAndProtocolParameters(versionsAndProtocolParame
 		})
 	}
 }
+
+func (t *TestSuite) AssertVersionAndProtocolParametersHashes(versionsAndProtocolParametersHashes map[iotago.Version]iotago.Identifier, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+
+			for version, expectedProtocolParametersHash := range versionsAndProtocolParametersHashes {
+				protocolParametersHash := node.Protocol.MainEngineInstance().Storage.Settings().APIProvider().ProtocolParametersHash(version)
+
+				if expectedProtocolParametersHash == iotago.EmptyIdentifier {
+					if protocolParametersHash != iotago.EmptyIdentifier {
+						return ierrors.Errorf("AssertVersionAndProtocolParametersHashes: %s: for version %d protocol parameters hashes not equal. expected empty, got %s", node.Name, version, protocolParametersHash)
+					}
+
+					continue
+				}
+
+				if protocolParametersHash == iotago.EmptyIdentifier {
+					return ierrors.Errorf("AssertVersionAndProtocolParametersHashes: %s: for version %d protocol parameters hashes not equal. expected %s, got nil", node.Name, version, expectedProtocolParametersHash)
+				}
+
+				if expectedProtocolParametersHash != protocolParametersHash {
+					return ierrors.Errorf("AssertVersionAndProtocolParametersHashes: %s: for version %d protocol parameters hashes not equal. expected %s, got %s", node.Name, version, expectedProtocolParametersHash, protocolParametersHash)
+				}
+			}
+
+			return nil
+		})
+	}
+}
