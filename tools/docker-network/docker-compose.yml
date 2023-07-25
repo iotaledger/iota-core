@@ -123,24 +123,29 @@ services:
       - peer_master
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:9.5.6
     profiles:
       - grafana
     environment:
-      # path to provisioning definitions can only be defined as
-      # environment variables for grafana within docker
-      - GF_PATHS_PROVISIONING=/var/lib/grafana/provisioning
       - GF_ALERTING_ENABLED=true
       - GF_UNIFIED_ALERTING_ENABLED=false
     networks:
       - iota-core
     ports:
       - "3000:3000"
-    user: "104"
+    user: root
+    # Resolves "database locked" error
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        apk update && 
+        apk add sqlite && 
+        sqlite3 /var/lib/grafana/grafana.db 'pragma journal_mode=wal;' ;
+        /run.sh
     volumes:
-      - grafana-data-volume:/var/lib/grafana
-      - ./grafana/provisioning:/var/lib/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/:ro
 
 # Create our own network
 networks:
@@ -148,7 +153,7 @@ networks:
     driver: bridge
 # Named Docker volumes for data persistence
 volumes:
-  grafana-data-volume:
+  grafana_data:
 # read only files to load in the containers that may be shared across containers
 secrets:
   prometheus.yml:
