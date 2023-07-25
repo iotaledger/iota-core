@@ -26,8 +26,8 @@ func (t *TestSuite) AssertProtocolParameters(parameters iotago.ProtocolParameter
 	for _, node := range nodes {
 		t.Eventually(func() error {
 			//nolint:forcetypeassert // just crash if you can't do it
-			if !parameters.(*iotago.V3ProtocolParameters).Equals(node.Protocol.MainEngineInstance().Storage.Settings().CurrentAPI().ProtocolParameters().(*iotago.V3ProtocolParameters)) {
-				return ierrors.Errorf("AssertProtocolParameters: %s: expected %s, got %s", node.Name, parameters, node.Protocol.MainEngineInstance().Storage.Settings().CurrentAPI().ProtocolParameters())
+			if !parameters.(*iotago.V3ProtocolParameters).Equals(node.Protocol.CurrentAPI().ProtocolParameters().(*iotago.V3ProtocolParameters)) {
+				return ierrors.Errorf("AssertProtocolParameters: %s: expected %s, got %s", node.Name, parameters, node.Protocol.CurrentAPI().ProtocolParameters())
 			}
 
 			return nil

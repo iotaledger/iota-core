@@ -84,13 +84,14 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 
 func (s *Server) ReadNodeConfiguration(context.Context, *inx.NoParams) (*inx.NodeConfiguration, error) {
 	var protoParams []*inx.RawProtocolParameters
-	for _, version := range deps.Protocol.MainEngineInstance().Storage.Settings().ProtocolVersions() {
-		apiForVersion, err := deps.Protocol.APIForVersion(version.Version)
-		if err != nil {
-			return nil, err
+	provider := deps.Protocol.MainEngineInstance().Storage.Settings().APIProvider()
+	for _, version := range provider.ProtocolEpochVersions() {
+		protocolParams := provider.ProtocolParameters(version.Version)
+		if protocolParams == nil {
+			continue
 		}
 
-		rawParams, err := inx.WrapProtocolParameters(version.StartEpoch, apiForVersion.ProtocolParameters())
+		rawParams, err := inx.WrapProtocolParameters(version.StartEpoch, protocolParams)
 		if err != nil {
 			return nil, err
 		}

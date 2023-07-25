@@ -16,7 +16,7 @@ import (
 )
 
 func TestUTXOComputeBalance(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	initialOutput := tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, utils.RandAddress(iotago.AddressEd25519), 2_134_656_365)
 	require.NoError(t, manager.AddUnspentOutput(initialOutput))
@@ -52,7 +52,7 @@ func TestUTXOComputeBalance(t *testing.T) {
 }
 
 func TestUTXOIteration(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	outputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputBasic, utils.RandAddress(iotago.AddressEd25519)),

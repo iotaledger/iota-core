@@ -114,7 +114,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 			return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.ProtocolVersion)
 		}
 	} else {
-		api = i.protocol.MainEngineInstance().Storage.Settings().CurrentAPI()
+		api = i.protocol.CurrentAPI()
 	}
 
 	blockBuilder := builder.NewValidationBlockBuilder(api)
@@ -198,7 +198,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 			return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.ProtocolVersion)
 		}
 	} else {
-		api = i.protocol.MainEngineInstance().Storage.Settings().CurrentAPI()
+		api = i.protocol.CurrentAPI()
 	}
 
 	blockBuilder := builder.NewBasicBlockBuilder(api)

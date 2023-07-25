@@ -73,7 +73,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		2,
 		bucketedStorage,
 		committeeFunc,
-		api.NewStaticProvider(tpkg.TestAPI),
+		api.SingleVersionProvider(tpkg.TestAPI),
 	)
 
 	return t
