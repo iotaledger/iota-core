@@ -102,7 +102,7 @@
           "refId": "A"
         }
       ],
-      "title": "GoShimmer",
+      "title": "iota-core",
       "transformations": [
         {
           "id": "labelsToFields",
@@ -5369,7 +5369,7 @@
     ]
   },
   "timezone": "",
-  "title": "GoShimmer Local Metrics",
+  "title": "iota-core Local Metrics",
   "uid": "R-T27yW7k",
   "version": 3,
   "weekStart": ""

@@ -3,10 +3,7 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": {
-          "type": "datasource",
-          "uid": "grafana"
-        },
+        "datasource": "-- Grafana --",
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -30,7 +27,6 @@
     {
       "alert": {
         "alertRuleTags": {},
-        "block": "Some of the GoShimmer instances are out of sync. Please fix ASAP! Below is the list of the nodes currently out of sync.",
         "conditions": [
           {
             "evaluator": {
@@ -60,7 +56,8 @@
         "for": "5m",
         "frequency": "1m",
         "handler": 1,
-        "name": "GoShimmer Sync Monitoring",
+        "block": "Some of the iota-core instances are out of sync. Please fix ASAP! Below is the list of the nodes currently out of sync.",
+        "name": "iota-core Sync Monitoring",
         "noDataState": "alerting",
         "notifications": []
       },
@@ -74,8 +71,6 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -131,12 +126,10 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "placement": "bottom"
         },
         "tooltip": {
-          "mode": "single",
-          "sort": "none"
+          "mode": "single"
         }
       },
       "targets": [
@@ -160,13 +153,12 @@
           "visible": true
         }
       ],
-      "title": "GoShimmer Sync Monitoring",
+      "title": "iota-core Sync Monitoring",
       "type": "timeseries"
     },
     {
       "alert": {
         "alertRuleTags": {},
-        "block": "Some of the GoShimmer instances went down. Please fix ASAP! Below is the list of the nodes currently down.",
         "conditions": [
           {
             "evaluator": {
@@ -196,7 +188,8 @@
         "for": "5m",
         "frequency": "1m",
         "handler": 1,
-        "name": "GoShimmer Node Monitoring alert",
+        "block": "Some of the iota-core instances went down. Please fix ASAP! Below is the list of the nodes currently down.",
+        "name": "iota-core Node Monitoring alert",
         "noDataState": "alerting",
         "notifications": []
       },
@@ -211,8 +204,6 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -268,12 +259,10 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "placement": "bottom"
         },
         "tooltip": {
-          "mode": "single",
-          "sort": "none"
+          "mode": "single"
         }
       },
       "pluginVersion": "8.3.3",
@@ -283,12 +272,10 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "editorMode": "code",
           "exemplar": true,
-          "expr": "up{job=\"analysis_server\"}",
+          "expr": "up",
           "interval": "",
           "legendFormat": "{{instance}}",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -300,25 +287,25 @@
           "visible": true
         }
       ],
-      "title": "GoShimmer Node Monitoring",
+      "title": "iota-core Node Monitoring",
       "type": "timeseries"
     }
   ],
   "refresh": "10s",
-  "schemaVersion": 37,
+  "schemaVersion": 34,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Node Monitoring",
   "uid": "ok_NLw17k",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
