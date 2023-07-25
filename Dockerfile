@@ -61,9 +61,6 @@ RUN mkdir -p /app/data/peerdb
 # using distroless cc "nonroot" image, which includes everything in the base image (glibc, libssl and openssl)
 FROM gcr.io/distroless/cc-debian11:nonroot
 
-EXPOSE 15600/tcp
-EXPOSE 14265/tcp
-
 # Copy the app dir into distroless image
 COPY --chown=nonroot:nonroot --from=build /app /app
 

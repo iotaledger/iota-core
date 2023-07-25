@@ -35,8 +35,7 @@ func main() {
 	case "interactive":
 		Run()
 	case "basic":
-		config := CustomSpam(&customSpamParams)
-		saveConfigsToFile(config)
+		CustomSpam(&customSpamParams)
 	case "quick":
 		QuickTest(&quickTestParams)
 	// case SpammerTypeCommitments:
@@ -182,6 +181,7 @@ func parseQuickTestFlags() {
 
 func parseCommaSepString(urls string) []string {
 	split := strings.Split(urls, ",")
+
 	return split
 }
 
@@ -206,12 +206,11 @@ func parseDurations(durations string) []time.Duration {
 }
 
 type BasicConfig struct {
-	//nolint:tagliatelle
-	LastFaucetUnspentOutputID string `json:"lastFaucetUnspentOutputID"`
+	LastFaucetUnspentOutputID string `json:"lastFaucetUnspentOutputId"`
 }
 
 var basicConfigJSON = `{
-	"lastFaucetUnspentOutputID": ""
+	"lastFaucetUnspentOutputId": ""
 }`
 
 var basicConfigFile = "basic_config.json"
@@ -253,8 +252,9 @@ func saveConfigsToFile(config *BasicConfig) {
 	defer file.Close()
 
 	jsonConfigs, err := json.MarshalIndent(config, "", "    ")
+
 	if err != nil {
-		panic(err)
+		log.Errorf("failed to write configs to file %s", err)
 	}
 
 	//nolint:gosec // users should be able to read the file

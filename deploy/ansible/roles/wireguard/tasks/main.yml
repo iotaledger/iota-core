@@ -1,0 +1,42 @@
+---
+- name: Install WireGuard
+  apt:
+    name: wireguard
+    state: present
+
+- name: Ensure WireGuard configuration directory exists
+  file:
+    path: /etc/wireguard
+    state: directory
+    mode: '0700'
+
+- name: Deploy WireGuard server configuration
+  template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: '0600'
+
+- name: Enable and start WireGuard
+  systemd:
+    name: wg-quick@wg0
+    enabled: yes
+    state: restarted
+
+- name: Enable IPv4 forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes
+
+- name: systemd-resolved to listen on wg0 for remote resolution of local network
+  lineinfile:
+    path: /etc/systemd/resolved.conf
+    line: 'DNSStubListenerExtra=10.0.0.1'
+    regexp: '^DNSStubListenerExtra='
+    state: present
+
+- name: restart resolved
+  service:
+    name: systemd-resolved
+    state: restarted

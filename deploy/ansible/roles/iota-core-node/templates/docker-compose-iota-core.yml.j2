@@ -1,0 +1,44 @@
+#jinja2: trim_blocks:True, lstrip_blocks:True
+version: '3.3'
+
+services:
+  iota_core:
+    image: {{iota_core_docker_image_repo}}:{{iota_core_docker_image_tag}}
+    container_name: iota-core
+    volumes:
+      - ./snapshot.bin:/app/data/snapshot.bin:ro
+      - ./config.json:/app/config.json:ro
+      - ./data:/app/data/
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "0.0.0.0:14666:14666/tcp"
+      - "0.0.0.0:8080:8080/tcp"
+      - "0.0.0.0:8081:8081/tcp"
+      - "0.0.0.0:6061:6061/tcp"
+      # prometheus
+      - "0.0.0.0:9311:9311/tcp"
+    environment:
+      - P2P_BINDADDRESS=0.0.0.0:14666
+      - WEBAPI_BINDADDRESS=0.0.0.0:8080
+      - DASHBOARD_BINDADDRESS=0.0.0.0:8081
+      - PROFILING_BINDADDRESS=0.0.0.0:6061
+    command: >
+      -c config.json
+      --logger.level=debug
+      --logger.disableCaller=false
+      --logger.disableStacktrace=false
+      --logger.encoding=console
+      --logger.outputPaths=stdout
+      --database.path=/app/data/database
+      --p2p.peerDBDirectory=/app/data/peerdb
+      --profiling.bindAddress=0.0.0.0:6061
+      --profiling.enabled=true
+      --protocol.snapshot.path=/app/data/snapshot.bin
+      --restAPI.allowIncompleteBlock=true
+      {% if 'node-01' in inventory_hostname %}
+      --activity.ignoreBootstrapped=true
+      {% endif %}
+      --p2p.knownPeers='[{"address":"node-01.feature:14666", "publicKey":"EkWxG4rYNScTSbbYTg4LZfkdnt7yMGSQrKer4NFpPpir"}, {"address":"node-02.feature:14666", "publicKey":"FKyTy3ymS6K4Wh9ZWiVNcnWLEgnCVPfsNTJbKe41o53w"}, {"address":"node-03.feature:14666", "publicKey":"Hrngzn39Eedm2YDZME8XQNXc5F5umxCwAj6GCdScGAxR"}, {"address":"node-04.feature:14666", "publicKey":"2Nke9T3vtLDHu5pn8nX3iCmkcA5ti3etir37LSuPkUwe"}, {"address":"node-05.feature:14666", "publicKey":"Dzydp9QHYSFBpRtp21eimY2vfFdSPmP4ZMToJrHoFjrF"}]'
+      --p2p.seed={{p2pSeed}}
+      --blockIssuer.issuerAccount={{issuerAccount}}
+      --blockIssuer.privateKey={{privKey}}
