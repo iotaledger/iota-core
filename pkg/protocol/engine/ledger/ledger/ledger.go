@@ -378,7 +378,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		oldPubKeysSet := accountData.PubKeys
 		newPubKeysSet := ds.NewSet[ed25519.PublicKey]()
 		for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
-			newPubKeysSet.Add(ed25519.PublicKey(pubKey))
+			newPubKeysSet.Add(pubKey)
 		}
 
 		// Add public keys that are not in the old set
