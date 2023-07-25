@@ -40,6 +40,8 @@ type BlockDAG struct {
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
 	commitmentFunc func(index iotago.SlotIndex) (*model.Commitment, error)
 
+	retainerFailureFunc func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)
+
 	// futureBlocks contains blocks with a commitment in the future, that should not be passed to the booker yet.
 	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*blocks.Block]]
 
@@ -66,7 +68,7 @@ type BlockDAG struct {
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.IsBootstrapped, e.Storage.Commitments().Load, e.ErrorHandler("blockdag"), opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.IsBootstrapped, e.Storage.Commitments().Load, e.Retainer.RetainBlockFailure, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
 			wp := b.workers.CreatePool("BlockDAG.Attach", 2)
@@ -91,12 +93,13 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, shouldParkBlocksFunc func() bool, latestCommitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, shouldParkBlocksFunc func() bool, latestCommitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), retainerFunc func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason), errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
 		events:                     blockdag.NewEvents(),
 		evictionState:              evictionState,
 		shouldParkFutureBlocksFunc: shouldParkBlocksFunc,
 		commitmentFunc:             latestCommitmentFunc,
+		retainerFailureFunc:        retainerFunc,
 		blockCache:                 blockCache,
 		futureBlocks:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*blocks.Block]](),
 		workers:                    workers,
@@ -264,7 +267,8 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	block, evicted, updated := b.blockCache.StoreOrUpdate(data)
 
 	if evicted {
-		return block, false, ierrors.Errorf("%s, cannot attach, block is too old, it was already evicted from the cache", apimodels.FailureMessage(apimodels.ErrBlockIsTooOld))
+		b.retainerFailureFunc(data.ID(), apimodels.ErrBlockIsTooOld)
+		return block, false, ierrors.New("cannot attach, block is too old, it was already evicted from the cache")
 	}
 
 	if updated {
@@ -281,7 +285,8 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 // canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
 func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
 	if b.evictionState.InRootBlockSlot(data.ID()) && !b.evictionState.IsRootBlock(data.ID()) {
-		return false, ierrors.Errorf("%s, block data with %s is too old (issued at: %s)", apimodels.FailureMessage(apimodels.ErrBlockIsTooOld), data.ID(), data.ProtocolBlock().IssuingTime)
+		b.retainerFailureFunc(data.ID(), apimodels.ErrBlockIsTooOld)
+		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().IssuingTime)
 	}
 
 	storedBlock, storedBlockExists := b.blockCache.Block(data.ID())
@@ -304,7 +309,8 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid bool, err error) {
 	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
 		if b.evictionState.InRootBlockSlot(parentID) && !b.evictionState.IsRootBlock(parentID) {
-			return false, ierrors.Errorf("%s, parent %s of block %s is too old", apimodels.FailureMessage(apimodels.ErrBlockParentIsTooOld), parentID, modelBlock.ID())
+			b.retainerFailureFunc(modelBlock.ID(), apimodels.ErrBlockParentIsTooOld)
+			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
 		}
 	}
 

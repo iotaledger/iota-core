@@ -29,6 +29,8 @@ type Booker struct {
 
 	ledger ledger.Ledger
 
+	retianBlockFailureFunc func(id iotago.BlockID, reason apimodels.BlockFailureReason)
+
 	errorHandler func(error)
 
 	module.Module
@@ -36,8 +38,7 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.BlockCache, e.ErrorHandler("booker"), opts...)
-
+		b := New(e.Workers.CreateGroup("Booker"), e.BlockCache, e.Retainer.RetainBlockFailure, e.ErrorHandler("booker"), opts...)
 		e.HookConstructed(func() {
 			b.ledger = e.Ledger
 			b.ledger.HookConstructed(func() {
@@ -59,12 +60,13 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, blockCache *blocks.Blocks, retainBlockFunc func(id iotago.BlockID, reason apimodels.BlockFailureReason), errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
-		events:       booker.NewEvents(),
-		blockCache:   blockCache,
-		workers:      workers,
-		errorHandler: errorHandler,
+		events:                 booker.NewEvents(),
+		blockCache:             blockCache,
+		workers:                workers,
+		retianBlockFailureFunc: retainBlockFunc,
+		errorHandler:           errorHandler,
 	}, opts, func(b *Booker) {
 		b.bookingOrder = causalorder.New(
 			workers.CreatePool("BookingOrder", 2),
@@ -128,8 +130,8 @@ func (b *Booker) book(block *blocks.Block) error {
 
 func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	if block.SetInvalid() {
-		// TODO: attach to this in the retainer
-		b.events.BlockInvalid.Trigger(block, ierrors.Wrapf(err, "%s, block marked as invalid in Booker", apimodels.FailureMessage(apimodels.ErrBlockBookingFailure)))
+		b.retianBlockFailureFunc(block.ID(), apimodels.ErrBlockBookingFailure)
+		b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "block marked as invalid in Booker"))
 	}
 }
 
