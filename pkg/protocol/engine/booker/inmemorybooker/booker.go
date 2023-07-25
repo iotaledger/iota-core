@@ -38,7 +38,7 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.BlockCache, e.Retainer.RetainBlockFailure, e.ErrorHandler("booker"), opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e.BlockCache, e.ErrorHandler("booker"), opts...)
 		e.HookConstructed(func() {
 			b.ledger = e.Ledger
 			b.ledger.HookConstructed(func() {
@@ -51,6 +51,8 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 				}
 			})
 
+			b.setReatainerFunc(e.Retainer.RetainBlockFailure)
+
 			e.Events.Booker.LinkTo(b.events)
 
 			b.TriggerInitialized()
@@ -60,13 +62,12 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, blockCache *blocks.Blocks, retainBlockFunc func(id iotago.BlockID, reason apimodels.BlockFailureReason), errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
-		events:                 booker.NewEvents(),
-		blockCache:             blockCache,
-		workers:                workers,
-		retianBlockFailureFunc: retainBlockFunc,
-		errorHandler:           errorHandler,
+		events:       booker.NewEvents(),
+		blockCache:   blockCache,
+		workers:      workers,
+		errorHandler: errorHandler,
 	}, opts, func(b *Booker) {
 		b.bookingOrder = causalorder.New(
 			workers.CreatePool("BookingOrder", 2),
@@ -109,6 +110,10 @@ func (b *Booker) Queue(block *blocks.Block) error {
 func (b *Booker) Shutdown() {
 	b.TriggerStopped()
 	b.workers.Shutdown()
+}
+
+func (b *Booker) setReatainerFunc(retainerFunc func(id iotago.BlockID, reason apimodels.BlockFailureReason)) {
+	b.retianBlockFailureFunc = retainerFunc
 }
 
 func (b *Booker) evict(slotIndex iotago.SlotIndex) {

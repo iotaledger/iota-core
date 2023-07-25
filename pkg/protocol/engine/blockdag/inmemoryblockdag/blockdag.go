@@ -68,7 +68,7 @@ type BlockDAG struct {
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.IsBootstrapped, e.Storage.Commitments().Load, e.Retainer.RetainBlockFailure, e.ErrorHandler("blockdag"), opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.IsBootstrapped, e.Storage.Commitments().Load, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
 			wp := b.workers.CreatePool("BlockDAG.Attach", 2)
@@ -80,8 +80,10 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 			}, event.WithWorkerPool(wp))
 
 			e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				b.PromoteFutureBlocksUntil(details.Commitment.Index())
+				b.promoteFutureBlocksUntil(details.Commitment.Index())
 			}, event.WithWorkerPool(wp))
+
+			b.setRetainerFunc(e.Retainer.RetainBlockFailure)
 
 			e.Events.BlockDAG.LinkTo(b.events)
 
@@ -93,13 +95,12 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, shouldParkBlocksFunc func() bool, latestCommitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), retainerFunc func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason), errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, shouldParkBlocksFunc func() bool, latestCommitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
 		events:                     blockdag.NewEvents(),
 		evictionState:              evictionState,
 		shouldParkFutureBlocksFunc: shouldParkBlocksFunc,
 		commitmentFunc:             latestCommitmentFunc,
-		retainerFailureFunc:        retainerFunc,
 		blockCache:                 blockCache,
 		futureBlocks:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*blocks.Block]](),
 		workers:                    workers,
@@ -149,7 +150,7 @@ func (b *BlockDAG) SetInvalid(block *blocks.Block, reason error) (wasUpdated boo
 	return
 }
 
-func (b *BlockDAG) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
+func (b *BlockDAG) promoteFutureBlocksUntil(index iotago.SlotIndex) {
 	b.solidifierMutex.RLock()
 	defer b.solidifierMutex.RUnlock()
 	b.futureBlocksMutex.Lock()
@@ -177,6 +178,10 @@ func (b *BlockDAG) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
 func (b *BlockDAG) Shutdown() {
 	b.TriggerStopped()
 	b.workers.Shutdown()
+}
+
+func (b *BlockDAG) setRetainerFunc(retainerFunc func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)) {
+	b.retainerFailureFunc = retainerFunc
 }
 
 // evictSlot is used to evict Blocks from committed slots from the BlockDAG.
