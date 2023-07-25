@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -24,14 +24,14 @@ type TestConflict = *Conflict[iotago.TransactionID, iotago.OutputID, vote.Mocked
 
 //var NewTestConflict = NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-func NewTestConflict(id iotago.TransactionID, parentConflicts *advancedset.AdvancedSet[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], conflictSets *advancedset.AdvancedSet[*ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank] {
+func NewTestConflict(id iotago.TransactionID, parentConflicts ds.Set[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], conflictSets ds.Set[*ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank] {
 	conflict := NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank](id, initialWeight, pendingTasksCounter, acceptanceThresholdProvider)
 	_, err := conflict.JoinConflictSets(conflictSets)
 	if err != nil {
 		// TODO: change this
 		panic(err)
 	}
-	conflict.UpdateParents(parentConflicts, advancedset.New[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]]())
+	conflict.UpdateParents(parentConflicts, ds.NewSet[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]]())
 
 	return conflict
 }
@@ -45,15 +45,15 @@ func TestConflict_SetRejected(t *testing.T) {
 	})
 
 	conflict1 := NewTestConflict(transactionID("Conflict1"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
-	conflict2 := NewTestConflict(transactionID("Conflict2"), advancedset.New(conflict1), nil, weight.New(), pendingTasks, thresholdProvider)
-	conflict3 := NewTestConflict(transactionID("Conflict3"), advancedset.New(conflict2), nil, weight.New(), pendingTasks, thresholdProvider)
+	conflict2 := NewTestConflict(transactionID("Conflict2"), ds.NewSet(conflict1), nil, weight.New(), pendingTasks, thresholdProvider)
+	conflict3 := NewTestConflict(transactionID("Conflict3"), ds.NewSet(conflict2), nil, weight.New(), pendingTasks, thresholdProvider)
 
 	conflict1.setAcceptanceState(acceptance.Rejected)
 	require.True(t, conflict1.IsRejected())
 	require.True(t, conflict2.IsRejected())
 	require.True(t, conflict3.IsRejected())
 
-	conflict4 := NewTestConflict(transactionID("Conflict4"), advancedset.New(conflict1), nil, weight.New(), pendingTasks, thresholdProvider)
+	conflict4 := NewTestConflict(transactionID("Conflict4"), ds.NewSet(conflict1), nil, weight.New(), pendingTasks, thresholdProvider)
 	require.True(t, conflict4.IsRejected())
 }
 
@@ -67,7 +67,7 @@ func TestConflict_UpdateParents(t *testing.T) {
 
 	conflict1 := NewTestConflict(transactionID("Conflict1"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
 	conflict2 := NewTestConflict(transactionID("Conflict2"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
-	conflict3 := NewTestConflict(transactionID("Conflict3"), advancedset.New(conflict1, conflict2), nil, weight.New(), pendingTasks, thresholdProvider)
+	conflict3 := NewTestConflict(transactionID("Conflict3"), ds.NewSet(conflict1, conflict2), nil, weight.New(), pendingTasks, thresholdProvider)
 
 	require.True(t, conflict3.Parents.Has(conflict1))
 	require.True(t, conflict3.Parents.Has(conflict2))
@@ -85,9 +85,9 @@ func TestConflict_SetAccepted(t *testing.T) {
 		conflictSet1 := NewTestConflictSet(id("ConflictSet1"))
 		conflictSet2 := NewTestConflictSet(id("ConflictSet2"))
 
-		conflict1 := NewTestConflict(transactionID("Conflict1"), nil, advancedset.New(conflictSet1), weight.New(), pendingTasks, thresholdProvider)
-		conflict2 := NewTestConflict(transactionID("Conflict2"), nil, advancedset.New(conflictSet1, conflictSet2), weight.New(), pendingTasks, thresholdProvider)
-		conflict3 := NewTestConflict(transactionID("Conflict3"), nil, advancedset.New(conflictSet2), weight.New(), pendingTasks, thresholdProvider)
+		conflict1 := NewTestConflict(transactionID("Conflict1"), nil, ds.NewSet(conflictSet1), weight.New(), pendingTasks, thresholdProvider)
+		conflict2 := NewTestConflict(transactionID("Conflict2"), nil, ds.NewSet(conflictSet1, conflictSet2), weight.New(), pendingTasks, thresholdProvider)
+		conflict3 := NewTestConflict(transactionID("Conflict3"), nil, ds.NewSet(conflictSet2), weight.New(), pendingTasks, thresholdProvider)
 
 		require.Equal(t, acceptance.Pending, conflict1.setAcceptanceState(acceptance.Accepted))
 		require.True(t, conflict1.IsAccepted())
@@ -106,9 +106,9 @@ func TestConflict_SetAccepted(t *testing.T) {
 		conflictSet1 := NewTestConflictSet(id("ConflictSet1"))
 		conflictSet2 := NewTestConflictSet(id("ConflictSet2"))
 
-		conflict1 := NewTestConflict(transactionID("Conflict1"), nil, advancedset.New(conflictSet1), weight.New(), pendingTasks, thresholdProvider)
-		conflict2 := NewTestConflict(transactionID("Conflict2"), nil, advancedset.New(conflictSet1, conflictSet2), weight.New(), pendingTasks, thresholdProvider)
-		conflict3 := NewTestConflict(transactionID("Conflict3"), nil, advancedset.New(conflictSet2), weight.New(), pendingTasks, thresholdProvider)
+		conflict1 := NewTestConflict(transactionID("Conflict1"), nil, ds.NewSet(conflictSet1), weight.New(), pendingTasks, thresholdProvider)
+		conflict2 := NewTestConflict(transactionID("Conflict2"), nil, ds.NewSet(conflictSet1, conflictSet2), weight.New(), pendingTasks, thresholdProvider)
+		conflict3 := NewTestConflict(transactionID("Conflict3"), nil, ds.NewSet(conflictSet2), weight.New(), pendingTasks, thresholdProvider)
 
 		conflict2.setAcceptanceState(acceptance.Accepted)
 		require.True(t, conflict1.IsRejected())
@@ -130,11 +130,11 @@ func TestConflict_ConflictSets(t *testing.T) {
 	green := NewTestConflictSet(id("green"))
 	yellow := NewTestConflictSet(id("yellow"))
 
-	conflictA := NewTestConflict(transactionID("A"), nil, advancedset.New(red), weight.New().AddCumulativeWeight(7), pendingTasks, thresholdProvider)
-	conflictB := NewTestConflict(transactionID("B"), nil, advancedset.New(red, blue), weight.New().AddCumulativeWeight(3), pendingTasks, thresholdProvider)
-	conflictC := NewTestConflict(transactionID("C"), nil, advancedset.New(blue, green), weight.New().AddCumulativeWeight(5), pendingTasks, thresholdProvider)
-	conflictD := NewTestConflict(transactionID("D"), nil, advancedset.New(green, yellow), weight.New().AddCumulativeWeight(7), pendingTasks, thresholdProvider)
-	conflictE := NewTestConflict(transactionID("E"), nil, advancedset.New(yellow), weight.New().AddCumulativeWeight(9), pendingTasks, thresholdProvider)
+	conflictA := NewTestConflict(transactionID("A"), nil, ds.NewSet(red), weight.New().AddCumulativeWeight(7), pendingTasks, thresholdProvider)
+	conflictB := NewTestConflict(transactionID("B"), nil, ds.NewSet(red, blue), weight.New().AddCumulativeWeight(3), pendingTasks, thresholdProvider)
+	conflictC := NewTestConflict(transactionID("C"), nil, ds.NewSet(blue, green), weight.New().AddCumulativeWeight(5), pendingTasks, thresholdProvider)
+	conflictD := NewTestConflict(transactionID("D"), nil, ds.NewSet(green, yellow), weight.New().AddCumulativeWeight(7), pendingTasks, thresholdProvider)
+	conflictE := NewTestConflict(transactionID("E"), nil, ds.NewSet(yellow), weight.New().AddCumulativeWeight(9), pendingTasks, thresholdProvider)
 
 	preferredInsteadMap := map[TestConflict]TestConflict{
 		conflictA: conflictA,
@@ -198,7 +198,7 @@ func TestConflict_ConflictSets(t *testing.T) {
 		conflictD: conflictE,
 	}))
 
-	conflictF := NewTestConflict(transactionID("F"), nil, advancedset.New(yellow), weight.New().AddCumulativeWeight(19), pendingTasks, thresholdProvider)
+	conflictF := NewTestConflict(transactionID("F"), nil, ds.NewSet(yellow), weight.New().AddCumulativeWeight(19), pendingTasks, thresholdProvider)
 
 	pendingTasks.WaitIsZero()
 
@@ -270,8 +270,8 @@ func TestLikedInstead1(t *testing.T) {
 
 	conflictSet1 := NewTestConflictSet(id("O1"))
 
-	conflict1 := NewTestConflict(transactionID("TxA"), advancedset.New(masterBranch), advancedset.New(conflictSet1), weight.New().SetCumulativeWeight(6), pendingTasks, thresholdProvider)
-	conflict2 := NewTestConflict(transactionID("TxB"), advancedset.New(masterBranch), advancedset.New(conflictSet1), weight.New().SetCumulativeWeight(3), pendingTasks, thresholdProvider)
+	conflict1 := NewTestConflict(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(conflictSet1), weight.New().SetCumulativeWeight(6), pendingTasks, thresholdProvider)
+	conflict2 := NewTestConflict(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(conflictSet1), weight.New().SetCumulativeWeight(3), pendingTasks, thresholdProvider)
 
 	require.True(t, conflict1.IsPreferred())
 	require.True(t, conflict1.IsLiked())
@@ -296,8 +296,8 @@ func TestLikedInsteadFromPreferredInstead(t *testing.T) {
 	require.True(t, masterBranch.LikedInstead().IsEmpty())
 
 	conflictSet1 := NewTestConflictSet(id("O1"))
-	conflictA := NewTestConflict(transactionID("TxA"), advancedset.New(masterBranch), advancedset.New(conflictSet1), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
-	conflictB := NewTestConflict(transactionID("TxB"), advancedset.New(masterBranch), advancedset.New(conflictSet1), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
+	conflictA := NewTestConflict(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(conflictSet1), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
+	conflictB := NewTestConflict(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(conflictSet1), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
 
 	require.True(t, conflictA.IsPreferred())
 	require.True(t, conflictA.IsLiked())
@@ -309,8 +309,8 @@ func TestLikedInsteadFromPreferredInstead(t *testing.T) {
 	require.True(t, conflictB.LikedInstead().Has(conflictA))
 
 	conflictSet2 := NewTestConflictSet(id("O2"))
-	conflictC := NewTestConflict(transactionID("TxC"), advancedset.New(conflictA), advancedset.New(conflictSet2), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
-	conflictD := NewTestConflict(transactionID("TxD"), advancedset.New(conflictA), advancedset.New(conflictSet2), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
+	conflictC := NewTestConflict(transactionID("TxC"), ds.NewSet(conflictA), ds.NewSet(conflictSet2), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
+	conflictD := NewTestConflict(transactionID("TxD"), ds.NewSet(conflictA), ds.NewSet(conflictSet2), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
 
 	require.True(t, conflictC.IsPreferred())
 	require.True(t, conflictC.IsLiked())
@@ -373,8 +373,8 @@ func TestLikedInstead21(t *testing.T) {
 	require.True(t, masterBranch.LikedInstead().IsEmpty())
 
 	conflictSet1 := NewTestConflictSet(id("O1"))
-	conflictA := NewTestConflict(transactionID("TxA"), advancedset.New(masterBranch), advancedset.New(conflictSet1), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
-	conflictB := NewTestConflict(transactionID("TxB"), advancedset.New(masterBranch), advancedset.New(conflictSet1), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
+	conflictA := NewTestConflict(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(conflictSet1), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
+	conflictB := NewTestConflict(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(conflictSet1), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
 
 	require.True(t, conflictA.IsPreferred())
 	require.True(t, conflictA.IsLiked())
@@ -386,8 +386,8 @@ func TestLikedInstead21(t *testing.T) {
 	require.True(t, conflictB.LikedInstead().Has(conflictA))
 
 	conflictSet4 := NewTestConflictSet(id("O4"))
-	conflictF := NewTestConflict(transactionID("TxF"), advancedset.New(conflictA), advancedset.New(conflictSet4), weight.New().SetCumulativeWeight(20), pendingTasks, thresholdProvider)
-	conflictG := NewTestConflict(transactionID("TxG"), advancedset.New(conflictA), advancedset.New(conflictSet4), weight.New().SetCumulativeWeight(10), pendingTasks, thresholdProvider)
+	conflictF := NewTestConflict(transactionID("TxF"), ds.NewSet(conflictA), ds.NewSet(conflictSet4), weight.New().SetCumulativeWeight(20), pendingTasks, thresholdProvider)
+	conflictG := NewTestConflict(transactionID("TxG"), ds.NewSet(conflictA), ds.NewSet(conflictSet4), weight.New().SetCumulativeWeight(10), pendingTasks, thresholdProvider)
 
 	require.True(t, conflictF.IsPreferred())
 	require.True(t, conflictF.IsLiked())
@@ -399,8 +399,8 @@ func TestLikedInstead21(t *testing.T) {
 	require.True(t, conflictG.LikedInstead().Has(conflictF))
 
 	conflictSet2 := NewTestConflictSet(id("O2"))
-	conflictC := NewTestConflict(transactionID("TxC"), advancedset.New(masterBranch), advancedset.New(conflictSet2), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
-	conflictH := NewTestConflict(transactionID("TxH"), advancedset.New(masterBranch, conflictA), advancedset.New(conflictSet2, conflictSet4), weight.New().SetCumulativeWeight(150), pendingTasks, thresholdProvider)
+	conflictC := NewTestConflict(transactionID("TxC"), ds.NewSet(masterBranch), ds.NewSet(conflictSet2), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
+	conflictH := NewTestConflict(transactionID("TxH"), ds.NewSet(masterBranch, conflictA), ds.NewSet(conflictSet2, conflictSet4), weight.New().SetCumulativeWeight(150), pendingTasks, thresholdProvider)
 
 	require.True(t, conflictC.IsPreferred())
 	require.True(t, conflictC.IsLiked())
@@ -412,8 +412,8 @@ func TestLikedInstead21(t *testing.T) {
 	require.True(t, conflictH.LikedInstead().Has(conflictC))
 
 	conflictSet3 := NewTestConflictSet(id("O12"))
-	conflictI := NewTestConflict(transactionID("TxI"), advancedset.New(conflictF), advancedset.New(conflictSet3), weight.New().SetCumulativeWeight(5), pendingTasks, thresholdProvider)
-	conflictJ := NewTestConflict(transactionID("TxJ"), advancedset.New(conflictF), advancedset.New(conflictSet3), weight.New().SetCumulativeWeight(15), pendingTasks, thresholdProvider)
+	conflictI := NewTestConflict(transactionID("TxI"), ds.NewSet(conflictF), ds.NewSet(conflictSet3), weight.New().SetCumulativeWeight(5), pendingTasks, thresholdProvider)
+	conflictJ := NewTestConflict(transactionID("TxJ"), ds.NewSet(conflictF), ds.NewSet(conflictSet3), weight.New().SetCumulativeWeight(15), pendingTasks, thresholdProvider)
 
 	require.True(t, conflictJ.IsPreferred())
 	require.True(t, conflictJ.IsLiked())
@@ -459,7 +459,7 @@ func TestConflictSet_AllMembersEvicted(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	conflict1 := NewTestConflict(transactionID("conflict1"), nil, advancedset.New(yellow), weight.New(), pendingTasks, thresholdProvider)
+	conflict1 := NewTestConflict(transactionID("conflict1"), nil, ds.NewSet(yellow), weight.New(), pendingTasks, thresholdProvider)
 	evictedConflicts := conflict1.Evict()
 	require.Len(t, evictedConflicts, 1)
 	require.Contains(t, evictedConflicts, conflict1.ID)
@@ -470,11 +470,11 @@ func TestConflictSet_AllMembersEvicted(t *testing.T) {
 
 	// conflict tries to join conflictset who's all members were evicted
 	conflict2 := NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank](transactionID("conflict1"), weight.New(), pendingTasks, thresholdProvider)
-	_, err := conflict2.JoinConflictSets(advancedset.New(yellow))
+	_, err := conflict2.JoinConflictSets(ds.NewSet(yellow))
 	require.Error(t, err)
 
 	// evicted conflict tries to join conflictset
-	_, err = conflict1.JoinConflictSets(advancedset.New(green))
+	_, err = conflict1.JoinConflictSets(ds.NewSet(green))
 	require.Error(t, err)
 }
 
@@ -506,10 +506,10 @@ func TestConflict_Inheritance(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	conflict1 := NewTestConflict(transactionID("conflict1"), nil, advancedset.New(yellow), weight.New().SetCumulativeWeight(1), pendingTasks, thresholdProvider)
-	conflict2 := NewTestConflict(transactionID("conflict2"), nil, advancedset.New(green), weight.New().SetCumulativeWeight(1), pendingTasks, thresholdProvider)
-	conflict3 := NewTestConflict(transactionID("conflict3"), advancedset.New(conflict1, conflict2), nil, weight.New(), pendingTasks, thresholdProvider)
-	conflict4 := NewTestConflict(transactionID("conflict4"), nil, advancedset.New(yellow, green), weight.New(), pendingTasks, thresholdProvider)
+	conflict1 := NewTestConflict(transactionID("conflict1"), nil, ds.NewSet(yellow), weight.New().SetCumulativeWeight(1), pendingTasks, thresholdProvider)
+	conflict2 := NewTestConflict(transactionID("conflict2"), nil, ds.NewSet(green), weight.New().SetCumulativeWeight(1), pendingTasks, thresholdProvider)
+	conflict3 := NewTestConflict(transactionID("conflict3"), ds.NewSet(conflict1, conflict2), nil, weight.New(), pendingTasks, thresholdProvider)
+	conflict4 := NewTestConflict(transactionID("conflict4"), nil, ds.NewSet(yellow, green), weight.New(), pendingTasks, thresholdProvider)
 
 	pendingTasks.WaitIsZero()
 	require.True(t, conflict3.LikedInstead().IsEmpty())
@@ -524,7 +524,7 @@ func TestConflict_Inheritance(t *testing.T) {
 	require.True(t, conflict3.LikedInstead().Has(conflict4))
 
 	// make sure that inheritance of LikedInstead works correctly for newly created conflicts
-	conflict5 := NewTestConflict(transactionID("conflict5"), advancedset.New(conflict3), nil, weight.New(), pendingTasks, thresholdProvider)
+	conflict5 := NewTestConflict(transactionID("conflict5"), ds.NewSet(conflict3), nil, weight.New(), pendingTasks, thresholdProvider)
 	pendingTasks.WaitIsZero()
 	require.True(t, conflict5.LikedInstead().Has(conflict4))
 
@@ -538,8 +538,8 @@ func assertCorrectOrder(t *testing.T, conflicts ...TestConflict) {
 		return conflicts[i].Compare(conflicts[j]) == weight.Heavier
 	})
 
-	preferredConflicts := advancedset.New[TestConflict]()
-	unPreferredConflicts := advancedset.New[TestConflict]()
+	preferredConflicts := ds.NewSet[TestConflict]()
+	unPreferredConflicts := ds.NewSet[TestConflict]()
 
 	for _, conflict := range conflicts {
 		if !unPreferredConflicts.Has(conflict) {
@@ -600,11 +600,11 @@ func createConflicts(pendingTasks *syncutils.Counter) map[string]TestConflict {
 	green := NewTestConflictSet(id("green"))
 	yellow := NewTestConflictSet(id("yellow"))
 
-	conflictA := NewTestConflict(transactionID("A"), nil, advancedset.New(red), weight.New(), pendingTasks, thresholdProvider)
-	conflictB := NewTestConflict(transactionID("B"), nil, advancedset.New(red, blue), weight.New(), pendingTasks, thresholdProvider)
-	conflictC := NewTestConflict(transactionID("C"), nil, advancedset.New(green, blue), weight.New(), pendingTasks, thresholdProvider)
-	conflictD := NewTestConflict(transactionID("D"), nil, advancedset.New(green, yellow), weight.New(), pendingTasks, thresholdProvider)
-	conflictE := NewTestConflict(transactionID("E"), nil, advancedset.New(yellow), weight.New(), pendingTasks, thresholdProvider)
+	conflictA := NewTestConflict(transactionID("A"), nil, ds.NewSet(red), weight.New(), pendingTasks, thresholdProvider)
+	conflictB := NewTestConflict(transactionID("B"), nil, ds.NewSet(red, blue), weight.New(), pendingTasks, thresholdProvider)
+	conflictC := NewTestConflict(transactionID("C"), nil, ds.NewSet(green, blue), weight.New(), pendingTasks, thresholdProvider)
+	conflictD := NewTestConflict(transactionID("D"), nil, ds.NewSet(green, yellow), weight.New(), pendingTasks, thresholdProvider)
+	conflictE := NewTestConflict(transactionID("E"), nil, ds.NewSet(yellow), weight.New(), pendingTasks, thresholdProvider)
 
 	return map[string]TestConflict{
 		"conflictA": conflictA,

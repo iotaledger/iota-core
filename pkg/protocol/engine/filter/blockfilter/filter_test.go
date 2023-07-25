@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/inx-app/pkg/api"
@@ -106,7 +106,7 @@ func (t *TestFramework) IssueSigned(alias string) {
 	keyPair := ed25519.GenerateKeyPair()
 	// We derive a dummy account from addr.
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
-	block, err := builder.NewBasicBlockBuilder(t.apiProvider.LatestAPI()).
+	block, err := builder.NewBasicBlockBuilder(t.apiProvider.CurrentAPI()).
 		StrongParents(iotago.BlockIDs{}).
 		IssuingTime(time.Now()).
 		Sign(iotago.AccountID(addr[:]), keyPair.PrivateKey[:]).
@@ -133,8 +133,8 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 	apiProvider.AddProtocolParameters(0, newMockProtocolParameters(3))
 	apiProvider.AddProtocolParameters(3, newMockProtocolParameters(4))
 
-	defaultAPI := apiProvider.LatestAPI()
-	timeProvider := apiProvider.LatestAPI().TimeProvider()
+	defaultAPI := apiProvider.CurrentAPI()
+	timeProvider := apiProvider.CurrentAPI().TimeProvider()
 
 	tf := NewTestFramework(t,
 		apiProvider,
@@ -143,8 +143,8 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 		WithMaxAllowedWallClockDrift(time.Duration(uint64(timeProvider.EpochEnd(50))*uint64(timeProvider.SlotDurationSeconds()))*time.Second),
 	)
 
-	valid := set.New[string](true)
-	invalid := set.New[string](true)
+	valid := ds.NewSet[string]()
+	invalid := ds.NewSet[string]()
 
 	tf.Filter.events.BlockAllowed.Hook(func(block *model.Block) {
 		require.True(t, valid.Has(block.ID().Alias()))
@@ -418,6 +418,10 @@ func (m mockProtocolParameters) StakingUnbondingPeriod() iotago.EpochIndex {
 }
 
 func (m mockProtocolParameters) LivenessThreshold() iotago.SlotIndex {
+	panic("implement me")
+}
+
+func (m mockProtocolParameters) LivenessThresholdDuration() time.Duration {
 	panic("implement me")
 }
 

@@ -2,7 +2,7 @@ package inmemorybooker
 
 import (
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -96,7 +96,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 
 	// Based on the assumption that we always fork and the UTXO and Tangle paste cones are always fully known.
 	transactionMetadata.OnBooked(func() {
-		block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs().Get())
+		block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs())
 		b.bookingOrder.Queue(block)
 	})
 
@@ -131,8 +131,8 @@ func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	}
 }
 
-func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset.AdvancedSet[iotago.TransactionID], err error) {
-	conflictIDsToInherit := advancedset.New[iotago.TransactionID]()
+func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotago.TransactionID], err error) {
+	conflictIDsToInherit := ds.NewSet[iotago.TransactionID]()
 
 	// Inherit conflictIDs from parents based on the parent type.
 	for _, parent := range block.ParentsWithType() {
@@ -147,13 +147,14 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs *advancedset
 		case iotago.WeakParentType:
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
 		case iotago.ShallowLikeParentType:
-			// TODO: check whether it contains a TX, otherwise shallow like reference is invalid?
-
+			// TODO: check whether it contains a (conflicting) TX, otherwise shallow like reference is invalid?
+			//  if a block contains a transaction that itself is not conflicting, then it's possible to vote on any transaction in the UTXO-future cone of the conflict
+			//  NOTE: the above only applies when we don't fork all transactions.
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
 			//  remove all conflicting conflicts from conflictIDsToInherit
-			for _, conflictID := range parentBlock.PayloadConflictIDs().Slice() {
+			for _, conflictID := range parentBlock.PayloadConflictIDs().ToSlice() {
 				if conflictingConflicts, exists := b.conflictDAG.ConflictingConflicts(conflictID); exists {
-					conflictIDsToInherit.DeleteAll(conflictingConflicts)
+					conflictIDsToInherit.DeleteAll(b.conflictDAG.FutureCone(conflictingConflicts))
 				}
 			}
 		}

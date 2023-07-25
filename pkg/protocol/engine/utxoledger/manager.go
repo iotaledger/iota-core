@@ -170,13 +170,13 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 		}
 	}
 
-	msDiff := &SlotDiff{
+	slotDiff := &SlotDiff{
 		Index:   index,
 		Outputs: newOutputs,
 		Spents:  newSpents,
 	}
 
-	if err = storeDiff(msDiff, mutations); err != nil {
+	if err = storeDiff(slotDiff, mutations); err != nil {
 		mutations.Cancel()
 
 		return err

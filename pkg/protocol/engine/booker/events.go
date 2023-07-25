@@ -8,7 +8,7 @@ import (
 type Events struct {
 	BlockBooked  *event.Event1[*blocks.Block]
 	BlockInvalid *event.Event2[*blocks.Block, error]
-	// TODO: hook this up in engine
+	// TODO: add transaction invalid event
 
 	event.Group[Events, *Events]
 }

@@ -1,4 +1,4 @@
-package coreapi
+package core
 
 import (
 	"github.com/labstack/echo/v4"
@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
@@ -18,22 +18,17 @@ func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
 	return commitmentID.Index(), nil
 }
 
-func getCommitment(index iotago.SlotIndex) (*nodeclient.CommitmentDetailsResponse, error) {
+func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {
 	commitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(index)
 	if err != nil {
 		return nil, err
 	}
 
-	return &nodeclient.CommitmentDetailsResponse{
-		Index:            commitment.Index(),
-		PrevID:           commitment.PrevID().ToHex(),
-		RootsID:          commitment.RootsID().ToHex(),
-		CumulativeWeight: commitment.CumulativeWeight(),
-	}, nil
+	return commitment.Commitment(), nil
 }
 
-func getSlotUTXOChanges(index iotago.SlotIndex) (*nodeclient.UTXOChangesResponse, error) {
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.StateDiffs(index)
+func getUTXOChanges(index iotago.SlotIndex) (*apimodels.UTXOChangesResponse, error) {
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(index)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +44,7 @@ func getSlotUTXOChanges(index iotago.SlotIndex) (*nodeclient.UTXOChangesResponse
 		consumedOutputs[i] = output.OutputID().ToHex()
 	}
 
-	return &nodeclient.UTXOChangesResponse{
+	return &apimodels.UTXOChangesResponse{
 		Index:           index,
 		CreatedOutputs:  createdOutputs,
 		ConsumedOutputs: consumedOutputs,

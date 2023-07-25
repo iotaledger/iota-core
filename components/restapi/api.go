@@ -1,45 +1,25 @@
 package restapi
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/iota-core/pkg/jwt"
+	"github.com/iotaledger/iota-core/pkg/restapi"
 )
-
-func compileRouteAsRegex(route string) *regexp.Regexp {
-
-	r := regexp.QuoteMeta(route)
-	r = strings.Replace(r, `\*`, "(.*?)", -1)
-	r = r + "$"
-
-	reg, err := regexp.Compile(r)
-	if err != nil {
-		return nil
-	}
-
-	return reg
-}
-
-func compileRoutesAsRegexes(routes []string) []*regexp.Regexp {
-	regexes := make([]*regexp.Regexp, len(routes))
-	for i, route := range routes {
-		reg := compileRouteAsRegex(route)
-		if reg == nil {
-			Component.LogErrorfAndExit("Invalid route in config: %s", route)
-		}
-		regexes[i] = reg
-	}
-
-	return regexes
-}
 
 func apiMiddleware() echo.MiddlewareFunc {
 
-	publicRoutesRegEx := compileRoutesAsRegexes(ParamsRestAPI.PublicRoutes)
-	protectedRoutesRegEx := compileRoutesAsRegexes(ParamsRestAPI.ProtectedRoutes)
+	publicRoutesRegEx, err := restapi.CompileRoutesAsRegexes(ParamsRestAPI.PublicRoutes)
+	if err != nil {
+		Component.LogErrorfAndExit(err.Error())
+	}
+
+	protectedRoutesRegEx, err := restapi.CompileRoutesAsRegexes(ParamsRestAPI.ProtectedRoutes)
+	if err != nil {
+		Component.LogErrorfAndExit(err.Error())
+	}
 
 	matchPublic := func(c echo.Context) bool {
 		loweredPath := strings.ToLower(c.Request().RequestURI)
@@ -72,7 +52,6 @@ func apiMiddleware() echo.MiddlewareFunc {
 	}
 
 	// API tokens do not expire.
-	var err error
 	jwtAuth, err = jwt.NewAuth(salt,
 		0,
 		deps.Host.ID().String(),

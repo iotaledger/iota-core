@@ -43,7 +43,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		SeatManager: mock.NewManualPOA(),
 	}
 
-	evictionState := eviction.NewState(func(index iotago.SlotIndex) *prunable.RootBlocks {
+	evictionState := eviction.NewState(mapdb.NewMapDB(), func(index iotago.SlotIndex) *prunable.RootBlocks {
 		return prunable.NewRootBlocks(index, mapdb.NewMapDB())
 	})
 

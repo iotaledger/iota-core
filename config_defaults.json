@@ -45,7 +45,7 @@
       "/api/core/v3/transactions*",
       "/api/core/v3/commitments*",
       "/api/core/v3/outputs*",
-      "/api/debug/v1/*",
+      "/api/debug/v2/*",
       "/api/indexer/v1/*"
     ],
     "protectedRoutes": [
@@ -60,6 +60,13 @@
       "maxBodyLength": "1M",
       "maxResults": 1000
     }
+  },
+  "debugAPI": {
+    "enabled": true,
+    "path": "testnet/debug",
+    "maxOpenDBs": 2,
+    "pruningThreshold": 8640,
+    "dbGranularity": 100
   },
   "metricstracker": {
     "enabled": true
@@ -98,8 +105,8 @@
     "bindAddress": "0.0.0.0:8081",
     "basicAuth": {
       "enabled": false,
-      "username": "goshimmer",
-      "password": "goshimmer"
+      "username": "core",
+      "password": "core"
     },
     "conflicts": {
       "maxCount": 100

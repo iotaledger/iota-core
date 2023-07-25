@@ -1,7 +1,6 @@
-package coreapi
+package core
 
 import (
-	"encoding/json"
 	"io"
 
 	"github.com/labstack/echo/v4"
@@ -13,7 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 func blockByID(c echo.Context) (*model.Block, error) {
@@ -22,40 +21,44 @@ func blockByID(c echo.Context) (*model.Block, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
 	}
 
-	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
-	if !exists {
-		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
+	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
+	if err != nil {
+		return nil, err
 	}
 
 	return block, nil
 }
 
-func blockMetadataResponseByID(c echo.Context) (*nodeclient.BlockMetadataResponse, error) {
+func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
+	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &apimodels.BlockMetadataResponse{
+		BlockID:          blockID.ToHex(),
+		BlockState:       metadata.BlockStatus.String(),
+		BlockStateReason: metadata.BlockReason,
+	}
+
+	if metadata.HasTx {
+		response.TxState = metadata.TransactionStatus.String()
+		response.TxStateReason = metadata.TransactionReason
+	}
+
+	return response, nil
+}
+
+func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
 	block, err := blockByID(c)
 	if err != nil {
 		return nil, err
 	}
 
-	txState := txStatePending.String()
-	txMetadata, exist := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadataByAttachment(block.ID())
-	if exist {
-		txState = resolveTxState(txMetadata)
-	}
-
-	// TODO: fill in blockReason, TxState, TxReason.
-	bmResponse := &nodeclient.BlockMetadataResponse{
-		BlockID:            block.ID().ToHex(),
-		StrongParents:      block.ProtocolBlock().Block.StrongParentIDs().ToHex(),
-		WeakParents:        block.ProtocolBlock().Block.WeakParentIDs().ToHex(),
-		ShallowLikeParents: block.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
-		TxState:            txState,
-		BlockState:         blockStatePending.String(),
-	}
-
-	return bmResponse, nil
+	return blockMetadataByBlockID(block.ID())
 }
 
-func blockIssuance(_ echo.Context) (*nodeclient.BlockIssuanceResponse, error) {
+func blockIssuance(_ echo.Context) (*apimodels.IssuanceBlockHeaderResponse, error) {
 	references := deps.Protocol.MainEngineInstance().TipSelection.SelectTips(iotago.BlockMaxParents)
 	slotCommitment := deps.Protocol.SyncManager.LatestCommitment()
 
@@ -63,24 +66,18 @@ func blockIssuance(_ echo.Context) (*nodeclient.BlockIssuanceResponse, error) {
 		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "get references failed")
 	}
 
-	cBytes, err := deps.Protocol.APIForSlot(slotCommitment.Index()).JSONEncode(slotCommitment.Commitment())
-	if err != nil {
-		return nil, err
-	}
-	commitmentJSONRaw := json.RawMessage(cBytes)
-
-	resp := &nodeclient.BlockIssuanceResponse{
+	resp := &apimodels.IssuanceBlockHeaderResponse{
 		StrongParents:       references[iotago.StrongParentType].ToHex(),
 		WeakParents:         references[iotago.WeakParentType].ToHex(),
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType].ToHex(),
 		LatestFinalizedSlot: deps.Protocol.SyncManager.LatestFinalizedSlot(),
-		Commitment:          &commitmentJSONRaw,
+		Commitment:          *slotCommitment,
 	}
 
 	return resp, nil
 }
 
-func sendBlock(c echo.Context) (*submitBlockResponse, error) {
+func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
 	if err != nil {
 		return nil, err
@@ -142,7 +139,7 @@ func sendBlock(c echo.Context) (*submitBlockResponse, error) {
 		}
 	}
 
-	return &submitBlockResponse{
+	return &apimodels.BlockCreatedResponse{
 		BlockID: blockID.ToHex(),
 	}, nil
 }

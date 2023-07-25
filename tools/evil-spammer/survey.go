@@ -115,8 +115,10 @@ var spamDetailsQuestions = func(defaultDuration, defaultRate, defaultTimeUnit st
 					if err == nil {
 						return nil
 					}
+
 					return ierrors.New("Incorrect spam rate")
 				}
+
 				return nil
 			},
 		},

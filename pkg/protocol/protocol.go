@@ -47,9 +47,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
+	"github.com/iotaledger/iota-core/pkg/retainer"
+	retainer1 "github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type Protocol struct {
@@ -62,7 +64,7 @@ type Protocol struct {
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
 	networkProtocol *core.Protocol
-	supportVersions nodeclient.Versions
+	supportVersions apimodels.Versions
 
 	activeEngineMutex syncutils.RWMutex
 	mainEngine        *engine.Engine
@@ -89,6 +91,7 @@ type Protocol struct {
 	optsAttestationProvider         module.Provider[*engine.Engine, attestation.Attestations]
 	optsSyncManagerProvider         module.Provider[*engine.Engine, syncmanager.SyncManager]
 	optsLedgerProvider              module.Provider[*engine.Engine, ledger.Ledger]
+	optsRetainerProvider            module.Provider[*engine.Engine, retainer.Retainer]
 	optsSchedulerProvider           module.Provider[*engine.Engine, scheduler.Scheduler]
 	optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
 }
@@ -97,7 +100,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	return options.Apply(&Protocol{
 		Events:                          NewEvents(),
 		Workers:                         workers,
-		supportVersions:                 nodeclient.Versions{3},
+		supportVersions:                 apimodels.Versions{3},
 		dispatcher:                      dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
 		optsBlockDAGProvider:            inmemoryblockdag.NewProvider(),
@@ -112,6 +115,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsAttestationProvider:         slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
 		optsSyncManagerProvider:         trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:              ledger1.NewProvider(),
+		optsRetainerProvider:            retainer1.NewProvider(),
 		optsSchedulerProvider:           passthrough.NewProvider(),
 		optsUpgradeOrchestratorProvider: signalingupgradeorchestrator.NewProvider(),
 
@@ -213,6 +217,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsSchedulerProvider,
 		p.optsTipManagerProvider,
 		p.optsTipSelectionProvider,
+		p.optsRetainerProvider,
 		p.optsUpgradeOrchestratorProvider,
 	)
 
@@ -335,7 +340,7 @@ func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return p.MainEngineInstance().APIForEpoch(epoch)
 }
 
-func (p *Protocol) SupportedVersions() nodeclient.Versions {
+func (p *Protocol) SupportedVersions() apimodels.Versions {
 	return p.supportVersions
 }
 

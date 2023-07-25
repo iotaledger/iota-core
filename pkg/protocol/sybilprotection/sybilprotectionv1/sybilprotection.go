@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
@@ -275,6 +276,34 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 	}
 
 	return weightedCommittee
+}
+
+// EligibleValidators returns the currently known list of recently active validator candidates for the given epoch.
+func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error) {
+	candidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+	validators := make(accounts.AccountsData, 0)
+
+	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
+		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
+		}
+		// TODO: not needed if EligibleValidatorsCandidates will take care of it
+		if accountData.StakeEndEpoch < epoch {
+			return nil
+		}
+		validators = append(validators, accountData.Clone())
+
+		return nil
+	}); err != nil {
+
+		return nil, err
+	}
+
+	return validators, nil
 }
 
 // WithInitialCommittee registers the passed committee on a given slot.
