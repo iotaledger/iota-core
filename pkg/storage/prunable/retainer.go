@@ -23,6 +23,7 @@ func (b *BlockRetainerData) Bytes() ([]byte, error) {
 	marshalUtil := marshalutil.New()
 	marshalUtil.WriteUint8(uint8(b.State))
 	marshalUtil.WriteUint8(uint8(b.FailureReason))
+
 	return marshalUtil.Bytes(), nil
 }
 
@@ -38,6 +39,7 @@ func (b *BlockRetainerData) FromBytes(bytes []byte) (int, error) {
 		return 0, err
 	}
 	b.FailureReason = apimodels.BlockFailureReason(reason)
+
 	return marshalUtil.ReadOffset(), nil
 }
 
@@ -50,6 +52,7 @@ func (t *TransactionRetainerData) Bytes() ([]byte, error) {
 	marshalUtil := marshalutil.New()
 	marshalUtil.WriteUint8(uint8(t.State))
 	marshalUtil.WriteUint8(uint8(t.FailureReason))
+
 	return marshalUtil.Bytes(), nil
 }
 
@@ -65,6 +68,7 @@ func (t *TransactionRetainerData) FromBytes(bytes []byte) (int, error) {
 		return 0, err
 	}
 	t.FailureReason = apimodels.TransactionFailureReason(reason)
+
 	return marshalUtil.ReadOffset(), nil
 }
 
@@ -111,15 +115,6 @@ func (r *Retainer) StoreBlockAttached(blockID iotago.BlockID) error {
 	}); err != nil {
 		return err
 	}
-	//
-	//if !transactionID.Empty() {
-	//	if err := r.transactionStore.Set(transactionID, TransactionRetainerData{
-	//		State:         apimodels.TransactionStatePending,
-	//		FailureReason: apimodels.NoTransactionFailureReason,
-	//	}); err != nil {
-	//		return ierrors.Errorf("failed to retain transaction in pending store: %w", err)
-	//	}
-	//}
 
 	return nil
 }

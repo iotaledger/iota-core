@@ -35,18 +35,7 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataRes
 		return nil, err
 	}
 
-	response := &apimodels.BlockMetadataResponse{
-		BlockID:          blockID.ToHex(),
-		BlockState:       metadata.BlockStatus.String(),
-		BlockStateReason: metadata.BlockReason,
-	}
-
-	if metadata.HasTx {
-		response.TxState = metadata.TransactionStatus.String()
-		response.TxStateReason = metadata.TransactionReason
-	}
-
-	return response, nil
+	return metadata, nil
 }
 
 func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {

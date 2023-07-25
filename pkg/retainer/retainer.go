@@ -8,7 +8,7 @@ import (
 
 // Retainer keeps and resolves all the information needed in the API and INX.
 type Retainer interface {
-	BlockMetadata(blockID iotago.BlockID) (*BlockMetadata, error)
+	BlockMetadata(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error)
 
 	RetainBlockFailure(iotago.BlockID, apimodels.BlockFailureReason)
 	RetainTransactionFailure(iotago.BlockID, apimodels.TransactionFailureReason)
