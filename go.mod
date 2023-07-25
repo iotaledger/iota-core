@@ -23,7 +23,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230721122326-34450325011f
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230721122326-34450325011f
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230725124635-2aac55bb9a84
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230725134904-6414fcdc8699
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230725125524-fc620754230d
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230725120148-f6b95a8ad40a
 	github.com/labstack/echo/v4 v4.11.1
@@ -38,7 +38,7 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.0
 	golang.org/x/crypto v0.11.0
-	golang.org/x/exp v0.0.0-20230725093048-515e97ebf090
+	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	google.golang.org/grpc v1.56.2
 	google.golang.org/protobuf v1.31.0
 )
@@ -134,8 +134,8 @@ require (
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
-	github.com/quic-go/qtls-go1-20 v0.3.0 // indirect
-	github.com/quic-go/quic-go v0.37.0 // indirect
+	github.com/quic-go/qtls-go1-20 v0.2.2 // indirect
+	github.com/quic-go/quic-go v0.36.2 // indirect
 	github.com/quic-go/webtransport-go v0.5.3 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
