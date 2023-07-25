@@ -30,30 +30,15 @@ func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlo
 }
 
 func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*inx.BlockMetadata, error) {
-	blkID := blockID.Unwrap()
-
-	finalizedSlot := deps.Protocol.SyncManager.LatestFinalizedSlot()
-
-	// Check if the block is still in the cache and we have the proper flags
-	if cachedBlock, exists := deps.Protocol.MainEngineInstance().BlockFromCache(blkID); exists {
-		return &inx.BlockMetadata{
-			BlockId:   blockID,
-			Accepted:  cachedBlock.IsAccepted(),
-			Confirmed: cachedBlock.IsConfirmed(),
-			Finalized: cachedBlock.ID().Index() <= finalizedSlot,
-		}, nil
+	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID.Unwrap())
+	if err != nil {
+		return nil, err
 	}
 
-	block, exists := deps.Protocol.MainEngineInstance().Block(blkID) // block +1
-	if !exists {
-		return nil, status.Errorf(codes.NotFound, "block %s not found", blkID.ToHex())
-	}
-
+	//TODO: use enums
 	return &inx.BlockMetadata{
-		BlockId:   blockID,
-		Accepted:  true,  // we only store accepted blocks
-		Confirmed: false, // TODO: ask the retainer for this information
-		Finalized: block.ID().Index() <= finalizedSlot,
+		BlockId:     blockID,
+		BlockStatus: uint32(metadata.BlockStatus),
 	}, nil
 }
 
