@@ -24,7 +24,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 6,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -54,7 +53,9 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false,
             "minWidth": 50
           },
@@ -80,7 +81,9 @@
       },
       "id": 115,
       "options": {
+        "cellHeight": "sm",
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -89,7 +92,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "9.2.6",
+      "pluginVersion": "9.5.6",
       "repeat": "instance",
       "repeatDirection": "v",
       "targets": [
@@ -99,7 +102,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_total_blocks{instance=\"$instance\"}\n",
+          "expr": "slots_total_blocks\n",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -112,7 +115,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_accepted_blocks{instance=\"$instance\"}\n",
+          "expr": "slots_accepted_blocks",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -125,7 +128,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_orphaned_blocks{instance=\"$instance\"}\n",
+          "expr": "slots_orphaned_blocks\n",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -138,7 +141,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_invalid_blocks{instance=\"$instance\"}\n",
+          "expr": "slots_invalid_blocks\n",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -151,7 +154,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_subjectively_invalid_blocks{instance=\"$instance\"}\n",
+          "expr": "slots_subjectively_invalid_blocks",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -241,12 +244,12 @@
                 ],
                 "operation": "aggregate"
               },
+              "instance": {
+                "aggregations": []
+              },
               "slot": {
                 "aggregations": [],
                 "operation": "groupby"
-              },
-              "instance": {
-                "aggregations": []
               },
               "transactions": {
                 "aggregations": [
@@ -301,7 +304,7 @@
               "accepted_blocks (lastNotNull)": "Accepted Blocka",
               "active_validators": "Active validators",
               "active_validators (lastNotNull)": "Active Validators",
-              "slot": "EI",
+              "slot": "Slot",
               "transactions": "Accepted Transactions",
               "transactions (lastNotNull)": "Accepted Txs"
             }
@@ -323,7 +326,9 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false,
             "minWidth": 50
           },
@@ -349,7 +354,9 @@
       },
       "id": 211,
       "options": {
+        "cellHeight": "sm",
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -359,7 +366,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "9.2.6",
+      "pluginVersion": "9.5.6",
       "repeat": "instance",
       "repeatDirection": "v",
       "targets": [
@@ -369,7 +376,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_orphaned_attachments{instance=\"$instance\"}\n",
+          "expr": "slots_orphaned_attachments",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -382,7 +389,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_total_attachments{instance=\"$instance\"}\n",
+          "expr": "slots_total_attachments\n",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -395,7 +402,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_rejected_attachments{instance=\"$instance\"}\n",
+          "expr": "slots_rejected_attachments",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -408,7 +415,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_accepted_attachments{instance=\"$instance\"}\n",
+          "expr": "slots_accepted_attachments\n",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -522,12 +529,12 @@
                 ],
                 "operation": "aggregate"
               },
+              "instance": {
+                "aggregations": []
+              },
               "slot": {
                 "aggregations": [],
                 "operation": "groupby"
-              },
-              "instance": {
-                "aggregations": []
               },
               "transactions": {
                 "aggregations": [
@@ -589,7 +596,7 @@
               "accepted_blocks (lastNotNull)": "Accepted Blocka",
               "active_validators": "Active validators",
               "active_validators (lastNotNull)": "Active Validators",
-              "slot": "EI",
+              "slot": "Slot",
               "transactions": "Accepted Transactions",
               "transactions (lastNotNull)": "Accepted Txs"
             }
@@ -611,7 +618,9 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false,
             "minWidth": 50
           },
@@ -649,7 +658,9 @@
       },
       "id": 207,
       "options": {
+        "cellHeight": "sm",
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -658,7 +669,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "9.2.6",
+      "pluginVersion": "9.5.6",
       "repeat": "instance",
       "repeatDirection": "v",
       "targets": [
@@ -668,7 +679,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_created_conflicts{instance=\"$instance\"}\n",
+          "expr": "slots_created_conflicts",
           "format": "table",
           "legendFormat": "__auto",
           "range": true,
@@ -680,7 +691,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_accepted_conflicts{instance=\"$instance\"}\n",
+          "expr": "slots_accepted_conflicts\n",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -693,7 +704,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_rejected_conflicts{instance=\"$instance\"}\n",
+          "expr": "slots_rejected_conflicts\n",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -706,7 +717,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_not_conflicting_conflicts{instance=\"$instance\"}\n",
+          "expr": "slots_not_conflicting_conflicts\n",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -840,7 +851,7 @@
               "accepted_blocks (lastNotNull)": "Accepted Blocka",
               "active_validators": "Active validators",
               "active_validators (lastNotNull)": "Active Validators",
-              "slot": "EI",
+              "slot": "Slot",
               "transactions": "Accepted Transactions",
               "transactions (lastNotNull)": "Accepted Txs"
             }
@@ -851,14 +862,14 @@
     }
   ],
   "refresh": "10s",
-  "schemaVersion": 37,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
+          "selected": true,
           "text": [
             "All"
           ],
@@ -870,7 +881,7 @@
           "type": "prometheus",
           "uid": "PBFA97CFB590B2093"
         },
-        "definition": "label_values(info_app, instance)",
+        "definition": "label_values(instance)",
         "hide": 0,
         "includeAll": true,
         "label": "Instance",
@@ -878,8 +889,8 @@
         "name": "instance",
         "options": [],
         "query": {
-          "query": "label_values(info_app, instance)",
-          "refId": "StandardVariableQuery"
+          "query": "label_values(instance)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
@@ -921,6 +932,6 @@
   "timezone": "",
   "title": "Global Slots View",
   "uid": "9eivfEo4z",
-  "version": 4,
+  "version": 1,
   "weekStart": ""
 }

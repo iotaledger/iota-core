@@ -24,7 +24,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 7,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -99,7 +98,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.5.6",
       "repeat": "instance",
       "repeatDirection": "h",
       "targets": [
@@ -141,15 +140,15 @@
                   "max"
                 ]
               },
+              "instance": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
               "slot": {
                 "aggregations": [
                   "max"
                 ],
                 "operation": "aggregate"
-              },
-              "instance": {
-                "aggregations": [],
-                "operation": "groupby"
               }
             }
           }
@@ -209,7 +208,7 @@
         "h": 3,
         "w": 6,
         "x": 0,
-        "y": 7
+        "y": 4
       },
       "id": 96,
       "options": {
@@ -226,7 +225,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.5.6",
       "repeat": "instance",
       "repeatDirection": "h",
       "targets": [
@@ -268,15 +267,15 @@
                   "max"
                 ]
               },
+              "instance": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
               "slot": {
                 "aggregations": [
                   "max"
                 ],
                 "operation": "aggregate"
-              },
-              "instance": {
-                "aggregations": [],
-                "operation": "groupby"
               }
             }
           }
@@ -300,7 +299,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 7
       },
       "id": 63,
       "panels": [],
@@ -383,12 +382,13 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 14
+        "y": 8
       },
       "id": 115,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
@@ -615,12 +615,13 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 14
+        "y": 8
       },
       "id": 172,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
@@ -862,12 +863,13 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 14
+        "y": 8
       },
       "id": 185,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
@@ -1039,7 +1041,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 70
+        "y": 16
       },
       "id": 33,
       "panels": [],
@@ -1058,7 +1060,9 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
             "filterable": false,
             "inspect": false
           },
@@ -1082,8 +1086,10 @@
             },
             "properties": [
               {
-                "id": "custom.displayMode",
-                "value": "color-text"
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
               },
               {
                 "id": "color",
@@ -1113,8 +1119,11 @@
             },
             "properties": [
               {
-                "id": "custom.displayMode",
-                "value": "color-background-solid"
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
               },
               {
                 "id": "color",
@@ -1131,12 +1140,14 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 71
+        "y": 17
       },
       "id": 39,
       "maxPerRow": 4,
       "options": {
+        "cellHeight": "sm",
         "footer": {
+          "countRows": false,
           "enablePagination": false,
           "fields": "",
           "reducer": [
@@ -1152,7 +1163,7 @@
           }
         ]
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.5.6",
       "repeat": "instance",
       "repeatDirection": "h",
       "targets": [
@@ -1249,8 +1260,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1265,7 +1275,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 87
+        "y": 25
       },
       "id": 47,
       "options": {
@@ -1326,7 +1336,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 93
+        "y": 31
       },
       "id": 59,
       "panels": [],
@@ -1368,8 +1378,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1384,7 +1393,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 94
+        "y": 32
       },
       "id": 49,
       "options": {
@@ -1474,8 +1483,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1490,7 +1498,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 94
+        "y": 32
       },
       "id": 48,
       "options": {
@@ -1550,7 +1558,7 @@
     }
   ],
   "refresh": "5s",
-  "schemaVersion": 37,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": [],
   "templating": {
@@ -1569,7 +1577,7 @@
           "type": "prometheus",
           "uid": "PBFA97CFB590B2093"
         },
-        "definition": "label_values(info_app, instance)",
+        "definition": "label_values(instance)",
         "hide": 0,
         "includeAll": true,
         "label": "Instance",
@@ -1577,8 +1585,8 @@
         "name": "instance",
         "options": [],
         "query": {
-          "query": "label_values(info_app, instance)",
-          "refId": "StandardVariableQuery"
+          "query": "label_values(instance)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
@@ -1620,6 +1628,6 @@
   "timezone": "",
   "title": "Global Nodes View",
   "uid": "JKcc02v4d",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }
