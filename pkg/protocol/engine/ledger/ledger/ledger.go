@@ -216,6 +216,10 @@ func (l *Ledger) Account(accountID iotago.AccountID, targetIndex iotago.SlotInde
 	return l.accountsLedger.Account(accountID, targetIndex)
 }
 
+func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) map[iotago.AccountID]*accounts.AccountData {
+	return l.accountsLedger.PastAccounts(accountIDs, targetIndex)
+}
+
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
 	if err != nil {

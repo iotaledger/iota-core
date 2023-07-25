@@ -289,6 +289,9 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 			candidateEngine.ProcessBlockFromPeer(block, src)
 			if candidateEngine.IsBootstrapped() &&
 				candidateEngine.Storage.Settings().LatestCommitment().CumulativeWeight() > mainEngine.Storage.Settings().LatestCommitment().CumulativeWeight() {
+				// TODO: when activating the candidate engine should we make sure that the candidate engine produces the same commitments as the chain we decided to switch to?
+				//   -> if they are different we could shut down this engine.
+
 				p.switchEngines()
 			}
 			processed = true

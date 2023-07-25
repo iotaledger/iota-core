@@ -7,21 +7,27 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
 type CommitmentVerifier struct {
-	engine           *engine.Engine
-	forkingPoint     *model.Commitment
-	cumulativeWeight uint64
+	engine                  *engine.Engine
+	forkingPoint            *model.Commitment
+	cumulativeWeight        uint64
+	validatorAccountsAtFork map[iotago.AccountID]*accounts.AccountData
 }
 
 func NewCommitmentVerifier(mainEngine *engine.Engine, forkingPoint *model.Commitment) *CommitmentVerifier {
+	committeeAtForkingPoint := mainEngine.SybilProtection.SeatManager().Committee(forkingPoint.Index()).Accounts().IDs()
+
 	return &CommitmentVerifier{
-		engine:           mainEngine,
-		forkingPoint:     forkingPoint,
-		cumulativeWeight: forkingPoint.CumulativeWeight(),
+		engine:                  mainEngine,
+		forkingPoint:            forkingPoint,
+		cumulativeWeight:        forkingPoint.CumulativeWeight(),
+		validatorAccountsAtFork: mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, forkingPoint.Index()),
+		// TODO: what happens if the committee rotated after the fork?
 	}
 }
 
@@ -83,13 +89,11 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 	//    In a rare and elaborate scenario, an attacker might have acquired such removed (private) keys and could
 	//    fabricate attestations and thus a theoretically heavier chain (solely when looking on the chain backed by attestations)
 	//    than it actually is. Nodes might consider to switch to this chain, even though it is invalid which will be discovered
-	//    before the candidate chain/engine is activated.
+	//    before the candidate chain/engine is activated (it will never get heavier than the current chain).
 	c.cumulativeWeight += seatCount
 	if c.cumulativeWeight <= commitment.CumulativeWeight() {
 		return nil, 0, ierrors.Errorf("invalid cumulative weight for commitment %s", commitment.ID())
 	}
-
-	// TODO: when activating the candidate engine we need to make sure that the its indeed the same chain as the one we verified here.
 
 	return blockIDs, c.cumulativeWeight, nil
 }
@@ -105,16 +109,11 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		//    1. The attestation might be fake.
 		//    2. The issuer might have added a new public key in the meantime, but we don't know about it yet
 		//       since we only have the ledger state at the forking point.
+		accountData, exists := c.validatorAccountsAtFork[att.IssuerID]
 
-		// TODO: here we need to use a different function to get an old ledgerstate (at the forking point) instead
-		//  of the current one based on the progress of the current chain.
-		account, exists, err := c.engine.Ledger.Account(att.IssuerID, c.forkingPoint.Index())
-		// We always need to have the account for a validator.
-		if err != nil {
-			return nil, 0, ierrors.Wrapf(err, "error getting account for issuerID %s", att.IssuerID)
-		}
+		// We always need to have the accountData for a validator.
 		if !exists {
-			return nil, 0, ierrors.Errorf("account for issuerID %s does not exist", att.IssuerID)
+			return nil, 0, ierrors.Errorf("accountData for issuerID %s does not exist", att.IssuerID)
 		}
 
 		edSig, isEdSig := att.Signature.(*iotago.Ed25519Signature)
@@ -122,8 +121,8 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 			return nil, 0, ierrors.Errorf("only ed2519 signatures supported, got %s", att.Signature.Type())
 		}
 
-		// We found the account but we don't know the public key used to sign this block/attestation. Ignore.
-		if !account.PubKeys.Has(edSig.PublicKey) {
+		// We found the accountData, but we don't know the public key used to sign this block/attestation. Ignore.
+		if !accountData.PubKeys.Has(edSig.PublicKey) {
 			continue
 		}
 
