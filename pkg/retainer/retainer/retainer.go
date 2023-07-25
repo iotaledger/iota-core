@@ -110,7 +110,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 				})
 
 				transactionMetadata.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
-					if err := r.onAttachmentUpdated(prevBlock, newBlock); err != nil {
+					if err := r.onAttachmentUpdated(prevBlock, newBlock, transactionMetadata.IsAccepted()); err != nil {
 						r.errorHandler(ierrors.Wrap(err, "failed to delete/store on AttachmentUpdated in retainer"))
 					}
 				})
@@ -167,19 +167,19 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, er
 	if !exists {
 		return apimodels.BlockStateUnknown, nil
 	}
-	// block was for sure accepted in this chain
-	if blockData.State == apimodels.BlockStateAccepted || blockData.State == apimodels.BlockStateConfirmed {
-		// check if finalized in this chain
+
+	switch blockData.State {
+	case apimodels.BlockStatePending:
+		if blockID.Index() <= r.latestCommittedSlotFunc() {
+			return apimodels.BlockStateOrphaned, nil
+		}
+	case apimodels.BlockStateAccepted, apimodels.BlockStateConfirmed:
 		if blockID.Index() <= r.finalizedSlotFunc() {
 			return apimodels.BlockStateFinalized, nil
 		}
-		return blockData.State, nil
-	}
-	if blockData.State == apimodels.BlockStatePending && blockID.Index() <= r.latestCommittedSlotFunc() {
-		return apimodels.BlockStateOrphaned, nil
 	}
 
-	return apimodels.BlockStatePending, nil
+	return blockData.State, nil
 }
 
 func (r *Retainer) transactionStatus(blockID iotago.BlockID) (bool, apimodels.TransactionState, error) {
@@ -187,24 +187,23 @@ func (r *Retainer) transactionStatus(blockID iotago.BlockID) (bool, apimodels.Tr
 	if !exists {
 		return false, apimodels.TransactionStateUnknown, nil
 	}
-	// we update tx status up to accepted, for conf anf finalization we need to check for the block status
-	if txData.State != apimodels.TransactionStateAccepted {
-		return false, apimodels.TransactionStatePending, nil
+
+	// for confirmed and finalized we need to check for the block status
+	if txData.State == apimodels.TransactionStateAccepted {
+		blockState, err := r.blockStatus(blockID)
+		if err != nil {
+			return false, apimodels.TransactionStateUnknown, err
+		}
+
+		switch blockState {
+		case apimodels.BlockStateConfirmed:
+			return true, apimodels.TransactionStateConfirmed, nil
+		case apimodels.BlockStateFinalized:
+			return true, apimodels.TransactionStateFinalized, nil
+		}
 	}
 
-	blockData, exists := r.retainerFunc(blockID.Index()).GetBlock(blockID)
-	if !exists {
-		return false, apimodels.TransactionStateUnknown, nil
-	}
-
-	switch blockData.State {
-	case apimodels.BlockStateConfirmed:
-		return true, apimodels.TransactionStateConfirmed, nil
-	case apimodels.BlockStateFinalized:
-		return true, apimodels.TransactionStateFinalized, nil
-	}
-
-	return true, apimodels.TransactionStatePending, ierrors.Errorf("failed to get transaction state in retainer.")
+	return true, txData.State, nil
 }
 
 // todo: check if we are on the same engine
@@ -229,13 +228,19 @@ func (r *Retainer) onTransactionAccepted(blockID iotago.BlockID) error {
 	return r.retainerFunc(blockID.Index()).StoreTransactionNoFailureStatus(blockID, apimodels.TransactionStateAccepted)
 }
 
-func (r *Retainer) onAttachmentUpdated(prevID, newID iotago.BlockID) error {
-
+func (r *Retainer) onAttachmentUpdated(prevID, newID iotago.BlockID, accepted bool) error {
+	txData, exists := r.retainerFunc(prevID.Index()).GetTransaction(prevID)
 	// delete the old transactionID
-	if err := r.retainerFunc(prevID.Index()).DeleteTransactionData(prevID); err != nil {
-		return err
+	if exists {
+		if err := r.retainerFunc(prevID.Index()).DeleteTransactionData(prevID); err != nil {
+			return err
+		}
+		return r.retainerFunc(newID.Index()).StoreTransactionNoFailureStatus(newID, txData.State)
 	}
-	// TODO: why it was always confirmed? Does the attachement update event is triggered ony on confirmed blocK?
-	// store the new transactionID
-	return r.retainerFunc(newID.Index()).StoreTransactionNoFailureStatus(newID, apimodels.TransactionStateConfirmed)
+
+	if accepted {
+		return r.retainerFunc(newID.Index()).StoreTransactionNoFailureStatus(newID, apimodels.TransactionStateAccepted)
+	}
+
+	return r.retainerFunc(newID.Index()).StoreTransactionNoFailureStatus(newID, apimodels.TransactionStatePending)
 }
