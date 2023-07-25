@@ -35,7 +35,7 @@ require (
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230721122326-34450325011f // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230721122326-34450325011f // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230721122326-34450325011f // indirect
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230725124635-2aac55bb9a84 // indirect
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230725134904-6414fcdc8699 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
