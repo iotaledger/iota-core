@@ -205,7 +205,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	sendStateDiffsRange := func(startIndex iotago.SlotIndex, endIndex iotago.SlotIndex) error {
 		for currentIndex := startIndex; currentIndex <= endIndex; currentIndex++ {
-			stateDiff, err := deps.Protocol.MainEngineInstance().Ledger.StateDiffs(currentIndex)
+			stateDiff, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(currentIndex)
 			if err != nil {
 				return status.Errorf(codes.NotFound, "ledger update for milestoneIndex %d not found", currentIndex)
 			}

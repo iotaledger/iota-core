@@ -2,16 +2,15 @@ package inx
 
 import (
 	"context"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
 func init() {
@@ -31,8 +30,6 @@ func init() {
 var (
 	Component *app.Component
 	deps      dependencies
-
-	blockProcessedTimeout = 1 * time.Second
 )
 
 type dependencies struct {
@@ -40,7 +37,7 @@ type dependencies struct {
 	Protocol         *protocol.Protocol
 	BlockIssuer      *blockfactory.BlockIssuer
 	Echo             *echo.Echo `optional:"true"`
-	RestRouteManager *restapi.RestRouteManager
+	RestRouteManager restapipkg.RestRouteManager
 	INXServer        *Server
 }
 

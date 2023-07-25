@@ -28,12 +28,12 @@ func info() (*apimodels.InfoResponse, error) {
 			RelativeAcceptedTangleTime:  uint64(clSnapshot.RelativeAcceptedTime.UnixNano()),
 			ConfirmedTangleTime:         uint64(clSnapshot.ConfirmedTime.UnixNano()),
 			RelativeConfirmedTangleTime: uint64(clSnapshot.RelativeConfirmedTime.UnixNano()),
+			LatestCommitmentId:          syncStatus.LatestCommitment.ID(),
+			LatestFinalizedSlot:         syncStatus.LatestFinalizedSlot,
+			LatestAcceptedBlockSlot:     syncStatus.LastAcceptedBlockSlot,
+			LatestConfirmedBlockSlot:    syncStatus.LastConfirmedBlockSlot,
 			// TODO: fill in pruningSlot
-			LatestCommittedSlot:    syncStatus.LatestCommittedSlot,
-			LatestFinalizedSlot:    syncStatus.FinalizedSlot,
-			PruningSlot:            0,
-			LatestAcceptedBlockID:  syncStatus.LastAcceptedBlockID.ToHex(),
-			LatestConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
+			PruningSlot: 0,
 		},
 		Metrics: &apimodels.InfoResNodeMetrics{
 			BlocksPerSecond:          metrics.BlocksPerSecond,
