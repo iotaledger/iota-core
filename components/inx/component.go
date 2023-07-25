@@ -37,7 +37,7 @@ type dependencies struct {
 	Protocol         *protocol.Protocol
 	BlockIssuer      *blockfactory.BlockIssuer
 	Echo             *echo.Echo `optional:"true"`
-	RestRouteManager restapipkg.RestRouteManager
+	RestRouteManager *restapipkg.RestRouteManager
 	INXServer        *Server
 }
 
