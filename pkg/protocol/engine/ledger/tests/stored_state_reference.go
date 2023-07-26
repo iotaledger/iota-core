@@ -12,9 +12,14 @@ func (l StoredStateReference) Type() iotago.InputType {
 	return 0
 }
 
-// Size returns the sizeof the StateReference.
+// Size returns the size of the StateReference.
 func (l StoredStateReference) Size() int {
 	return 0
+}
+
+// WorkScore returns the workscore of the StateReference.
+func (l StoredStateReference) WorkScore(workScoreStructure *iotago.WorkScoreStructure) (iotago.WorkScore, error) {
+	return 0, nil
 }
 
 // Ref returns the ID of the referenced State in the ledger state.
