@@ -42,7 +42,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	if err != nil {
 		return nil, err
 	}
-	mca := deps.Protocol.CurrentAPI().ProtocolParameters().EvictionAge()
+	mca := deps.Protocol.CurrentAPI().ProtocolParameters().MaxCommittableAge()
 	slotIndex := deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time.Now())
 	if slotIndex < mca {
 		mca = 0

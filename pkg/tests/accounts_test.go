@@ -194,7 +194,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              newAccountOutput.AccountID,
-		Credits:         accounts.NewBlockIssuanceCredits(0, 10),
+		Credits:         accounts.NewBlockIssuanceCredits(0, 13),
 		ExpirySlot:      newAccountExpirySlot,
 		OutputID:        newAccount.OutputID(),
 		PubKeys:         ds.NewSet(newAccountBlockIssuerKey),

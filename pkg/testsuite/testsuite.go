@@ -32,7 +32,7 @@ import (
 )
 
 const MinIssuerAccountDeposit = iotago.BaseToken(84400)
-const MinValidatorAccountDeposit = iotago.BaseToken(87700)
+const MinValidatorAccountDeposit = iotago.BaseToken(88200)
 
 type TestSuite struct {
 	Testing     *testing.T
