@@ -172,6 +172,18 @@ func configure() error {
 		Component.LogInfof("SlotFinalized: %d", index)
 	})
 
+	deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+		Component.LogDebugf("BlockScheduled: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block) {
+		Component.LogDebugf("BlockDropped: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+		Component.LogDebugf("BlockSkipped: %s", block.ID())
+	})
+
 	deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {
 		Component.LogDebugf("RequestCommitment: %s", id)
 	})

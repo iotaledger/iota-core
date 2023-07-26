@@ -56,11 +56,15 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 				s.manaRetrieveFunc = func(accountID iotago.AccountID) (iotago.Mana, error) {
 					manaSlot := e.Storage.Settings().LatestCommitment().Index()
 					mana, err := e.Ledger.ManaManager().GetManaOnAccount(accountID, manaSlot)
+					if err != nil {
+						return 0, err
+					}
+
 					if mana < s.optsMinMana {
 						return mana, ierrors.Errorf("account %s has insufficient Mana for block to be scheduled: account Mana %d, min Mana %d", accountID, mana, s.optsMinMana)
 					}
 
-					return mana, err
+					return mana, nil
 				}
 			})
 			s.TriggerConstructed()
@@ -241,7 +245,7 @@ func (s *Scheduler) selectBlockToSchedule() {
 		// increment every issuer's deficit for the required number of rounds
 		for q := start; ; {
 			if err := s.incrementDeficit(q.IssuerID(), rounds); err != nil {
-				s.buffer.RemoveIssuer(q.IssuerID())
+				s.removeIssuer(q)
 				q = s.buffer.Current()
 			} else {
 				q = s.buffer.Next()
@@ -257,7 +261,8 @@ func (s *Scheduler) selectBlockToSchedule() {
 	// increment the deficit for all issuers before schedulingIssuer one more time
 	for q := start; q != schedulingIssuer; q = s.buffer.Next() {
 		if err := s.incrementDeficit(q.IssuerID(), 1); err != nil {
-			s.buffer.RemoveIssuer(q.IssuerID())
+			s.removeIssuer(q)
+
 			return
 		}
 	}
@@ -298,17 +303,18 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 			deficit, err := s.getDeficit(issuerID)
 			if err != nil {
 				// no deficit exists for this issuer queue, so remove it
-				s.buffer.RemoveIssuer(issuerID)
+				s.removeIssuer(q)
 				issuerRemoved = true
 
 				break
 			}
+
 			remainingDeficit := int64(block.Work()) - int64(deficit)
 			// calculate how many rounds we need to skip to accumulate enough deficit.
 			quantum, err := s.quantum(issuerID)
 			if err != nil {
 				// if quantum, can't be retrieved, we need to remove this issuer.
-				s.buffer.RemoveIssuer(issuerID)
+				s.removeIssuer(q)
 				issuerRemoved = true
 
 				break
@@ -335,6 +341,23 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 	}
 
 	return rounds, schedulingIssuer
+}
+
+func (s *Scheduler) removeIssuer(q *IssuerQueue) {
+	q.submitted.ForEach(func(id iotago.BlockID, block *blocks.Block) bool {
+		block.SetDropped()
+		s.events.BlockDropped.Trigger(block)
+
+		return true
+	})
+
+	for q.inbox.Len() > 0 {
+		block := q.PopFront()
+		block.SetDropped()
+		s.events.BlockDropped.Trigger(block)
+	}
+
+	s.buffer.RemoveIssuer(q.IssuerID())
 }
 
 func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error {
