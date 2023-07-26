@@ -12,7 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/utils"
@@ -22,7 +22,7 @@ import (
 
 func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Output, spent *utxoledger.Spent) {
 	outputID := output.OutputID()
-	manager := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	require.NoError(t, manager.AddUnspentOutput(output))
 
@@ -79,7 +79,7 @@ func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Out
 
 func CreateOutputAndAssertSerialization(t *testing.T, blockID iotago.BlockID, indexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, outputID iotago.OutputID, iotaOutput iotago.Output) *utxoledger.Output {
 	iotagoAPI := iotago_tpkg.TestAPI
-	output := utxoledger.CreateOutput(api.NewStaticProvider(iotagoAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotagoAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput)
 	outputBytes, err := iotagoAPI.Encode(output.Output())
 	require.NoError(t, err)
 
