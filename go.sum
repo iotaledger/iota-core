@@ -282,8 +282,8 @@ github.com/iotaledger/hive.go/stringify v0.0.0-20230721122326-34450325011f h1:Rt
 github.com/iotaledger/hive.go/stringify v0.0.0-20230721122326-34450325011f/go.mod h1:l/F3cA/+67QdNj+sohv2v4HhmsdOcWScoA+sVYoAE4c=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230720084922-26a37e052060 h1:eUAuhreGT8d8ULX5HdtJIdJXofduL3HU2xNVogk0Sao=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230720084922-26a37e052060/go.mod h1:pLdizcFlAqzkUaTLTkXJ/VkdSzfopd6Dx3+VjBnlMVI=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230721073056-81397c2f9e97 h1:snUYhg5Ne620e4UqKpDuv4wQ+SaRiSk/gbVOFbCcwdQ=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230721073056-81397c2f9e97/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230726070841-4391e7d80d02 h1:tgL57GflT2uFNHxPSPz8NULGUf31BhsaRDBZkB6DQJ8=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230726070841-4391e7d80d02/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
 github.com/ipfs/go-cid v0.4.1/go.mod h1:uQHwDeX4c6CtyrFwdqyhpNcxVewur1M7l7fNU7LKwZk=
 github.com/ipfs/go-detect-race v0.0.1 h1:qX/xay2W3E4Q1U7d9lNs1sU9nvguX0a7319XbyQ6cOk=

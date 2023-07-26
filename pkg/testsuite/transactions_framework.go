@@ -222,7 +222,6 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 		Conditions: iotago.DelegationOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 		},
-		ImmutableFeatures: nil,
 	}, opts)
 
 	if delegationOutput.ValidatorID == iotago.EmptyAccountID() ||
@@ -350,12 +349,6 @@ func WithDelegationConditions(delegationConditions iotago.DelegationOutputUnlock
 func WithDelegationDeposit(deposit iotago.BaseToken) options.Option[iotago.DelegationOutput] {
 	return func(delegationOutput *iotago.DelegationOutput) {
 		delegationOutput.Amount = deposit
-	}
-}
-
-func WithDelegationImmutableFeatures(features iotago.DelegationOutputImmFeatures) options.Option[iotago.DelegationOutput] {
-	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.ImmutableFeatures = features
 	}
 }
 
