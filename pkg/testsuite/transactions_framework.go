@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
@@ -219,7 +219,6 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 		Conditions: iotago.DelegationOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 		},
-		ImmutableFeatures: nil,
 	}, opts)
 
 	if delegationOutput.ValidatorID == iotago.EmptyAccountID() ||
@@ -347,12 +346,6 @@ func WithDelegationConditions(delegationConditions iotago.DelegationOutputUnlock
 func WithDelegationDeposit(deposit iotago.BaseToken) options.Option[iotago.DelegationOutput] {
 	return func(delegationOutput *iotago.DelegationOutput) {
 		delegationOutput.Amount = deposit
-	}
-}
-
-func WithDelegationImmutableFeatures(features iotago.DelegationOutputImmFeatures) options.Option[iotago.DelegationOutput] {
-	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.ImmutableFeatures = features
 	}
 }
 

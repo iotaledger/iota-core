@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -190,6 +190,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		tx.Commit()
 		return true
 	})
+
+	l.events.StateDiffApplied.Trigger(index, outputs, spends)
 
 	return l.utxoLedger.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), l.accountsLedger.AccountsTreeRoot(), nil
 }

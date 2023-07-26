@@ -54,15 +54,11 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, errorHandler)
 	defer s.Shutdown()
 
-	if err := s.Settings().StoreProtocolParameters(opt.ProtocolParameters); err != nil {
-		return ierrors.Wrap(err, "failed to store the protocol parameters")
+	if err := s.Settings().StoreProtocolParametersForStartEpoch(opt.ProtocolParameters, 0); err != nil {
+		return ierrors.Wrap(err, "failed to store the protocol parameters for epoch 0")
 	}
 
-	if err := s.Settings().StoreProtocolParametersEpochMapping(opt.ProtocolParameters.Version(), 0); err != nil {
-		return ierrors.Wrap(err, "failed to set the protocol parameters epoch mapping")
-	}
-
-	api := s.Settings().LatestAPI()
+	api := s.Settings().APIProvider().CurrentAPI()
 	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
 		return ierrors.Wrap(err, "failed to store empty commitment")
 	}
