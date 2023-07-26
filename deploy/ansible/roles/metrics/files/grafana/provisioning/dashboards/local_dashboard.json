@@ -808,9 +808,41 @@
         "type": "prometheus",
         "uid": "PBFA97CFB590B2093"
       },
-      "description": "Number of currently connected neighbors.",
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -829,610 +861,39 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 11,
-        "y": 15
-      },
-      "id": 6,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.5.6",
-      "targets": [
-        {
-          "expr": "autopeering_neighbor_connections_total{instance=\"$instance\"} - autopeering_neighbor_drop_total{instance=\"$instance\"}",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Current Neighbors",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "description": "Calculated for each dropped neighbor.",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 14,
-        "y": 15
-      },
-      "id": 2,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.5.6",
-      "targets": [
-        {
-          "expr": "autopeering_neighbor_connection_lifetime_seconds_total{instance=\"$instance\"}",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "AvgNeighbor Connection Lifetime",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "description": "Amount of newly registered neighbor connections.",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 18,
-        "y": 15
-      },
-      "id": 8,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.5.6",
-      "targets": [
-        {
-          "expr": "autopeering_neighbor_connections_total{instance=\"$instance\"}",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "New Neighbor Connections",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "description": "Amount of neighbor connections dropped.",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 21,
-        "y": 15
-      },
-      "id": 10,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.5.6",
-      "targets": [
-        {
-          "expr": "autopeering_neighbor_drop_total{instance=\"$instance\"}",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Dropped Neighbor Connections",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 2,
-        "w": 2,
-        "x": 11,
-        "y": 18
-      },
-      "id": 59,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.5.6",
-      "targets": [
-        {
-          "expr": "traffic_analysis_outbound_bytes{instance=\"$instance\"}",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Analysis",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 2,
-        "w": 2,
-        "x": 13,
-        "y": 18
-      },
-      "id": 67,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.5.6",
-      "targets": [
-        {
-          "expr": "traffic_gossip_outbound_packets{instance=\"$instance\"}",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Gossip TX",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 2,
-        "w": 3,
-        "x": 15,
-        "y": 18
-      },
-      "id": 66,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.5.6",
-      "targets": [
-        {
-          "expr": "traffic_gossip_inbound_packets{instance=\"$instance\"}",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Gossip RX",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 2,
-        "w": 3,
-        "x": 18,
-        "y": 18
-      },
-      "id": 63,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.5.6",
-      "targets": [
-        {
-          "expr": "autopeering_traffic_outbound_total_bytes{instance=\"$instance\"}",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Autopeering TX",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 2,
-        "w": 3,
-        "x": 21,
-        "y": 18
-      },
-      "id": 62,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.5.6",
-      "targets": [
-        {
-          "expr": "autopeering_traffic_inbound_total_bytes{instance=\"$instance\"}",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Autopeering RX",
-      "type": "stat"
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 7,
+        "h": 10,
         "w": 13,
         "x": 11,
-        "y": 20
+        "y": 15
       },
-      "hiddenSeries": false,
-      "id": 26,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
+      "id": 166,
       "options": {
-        "alertThreshold": true
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
-      "percentage": false,
-      "pluginVersion": "9.5.6",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(traffic_analysis_outbound_bytes{instance=\"$instance\"}[1m])",
-          "interval": "",
-          "legendFormat": "Analysis TX",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "account_active_seats{instance=\"$instance\"}\n",
+          "legendFormat": "__auto",
+          "range": true,
           "refId": "A"
-        },
-        {
-          "expr": "irate(autopeering_traffic_inbound_total_bytes{instance=\"$instance\"}[1m])",
-          "interval": "",
-          "legendFormat": "Autopeering RX",
-          "refId": "B"
-        },
-        {
-          "expr": "irate(autopeering_traffic_outbound_total_bytes{instance=\"$instance\"}[1m])",
-          "interval": "",
-          "legendFormat": "Autopeering TX",
-          "refId": "C"
-        },
-        {
-          "expr": "irate(traffic_fpc_inbound_bytes{instance=\"$instance\"}[1m])",
-          "interval": "",
-          "legendFormat": "FPC RX",
-          "refId": "D"
-        },
-        {
-          "expr": "irate(traffic_fpc_outbound_bytes{instance=\"$instance\"}[1m])",
-          "interval": "",
-          "legendFormat": "FPC TX",
-          "refId": "E"
-        },
-        {
-          "expr": "irate(traffic_gossip_inbound_packets{instance=\"$instance\"}[1m])",
-          "interval": "",
-          "legendFormat": "Gossip RX",
-          "refId": "F"
-        },
-        {
-          "expr": "irate(traffic_gossip_outbound_packets{instance=\"$instance\"}[1m])",
-          "interval": "",
-          "legendFormat": "Gossip Tx",
-          "refId": "G"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Network Traffic",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "Bps",
-          "logBase": 1,
-          "show": true
-        },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "title": "Online Commitee Seats",
+      "type": "timeseries"
     },
     {
       "aliasColors": {},
@@ -1613,6 +1074,514 @@
       }
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Number of currently connected neighbors.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 11,
+        "y": 25
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.6",
+      "targets": [
+        {
+          "expr": "autopeering_neighbor_connections_total{instance=\"$instance\"} - autopeering_neighbor_drop_total{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Current Neighbors",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Calculated for each dropped neighbor.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 14,
+        "y": 25
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.6",
+      "targets": [
+        {
+          "expr": "autopeering_neighbor_connection_lifetime_seconds_total{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "AvgNeighbor Connection Lifetime",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Amount of newly registered neighbor connections.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 18,
+        "y": 25
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.6",
+      "targets": [
+        {
+          "expr": "autopeering_neighbor_connections_total{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "New Neighbor Connections",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Amount of neighbor connections dropped.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 21,
+        "y": 25
+      },
+      "id": 10,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.6",
+      "targets": [
+        {
+          "expr": "autopeering_neighbor_drop_total{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Dropped Neighbor Connections",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 2,
+        "x": 11,
+        "y": 28
+      },
+      "id": 59,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.6",
+      "targets": [
+        {
+          "expr": "traffic_analysis_outbound_bytes{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Analysis",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 2,
+        "x": 13,
+        "y": 28
+      },
+      "id": 67,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.6",
+      "targets": [
+        {
+          "expr": "traffic_gossip_outbound_packets{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Gossip TX",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 3,
+        "x": 15,
+        "y": 28
+      },
+      "id": 66,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.6",
+      "targets": [
+        {
+          "expr": "traffic_gossip_inbound_packets{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Gossip RX",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 3,
+        "x": 18,
+        "y": 28
+      },
+      "id": 63,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.6",
+      "targets": [
+        {
+          "expr": "autopeering_traffic_outbound_total_bytes{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Autopeering TX",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 3,
+        "x": 21,
+        "y": 28
+      },
+      "id": 62,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.6",
+      "targets": [
+        {
+          "expr": "autopeering_traffic_inbound_total_bytes{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Autopeering RX",
+      "type": "stat"
+    },
+    {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
@@ -1621,7 +1590,6 @@
         "type": "prometheus",
         "uid": "PBFA97CFB590B2093"
       },
-      "description": "Describes the amount of total, solid and not solid blocks in the node's database.",
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -1634,20 +1602,18 @@
         "h": 7,
         "w": 13,
         "x": 11,
-        "y": 27
+        "y": 30
       },
       "hiddenSeries": false,
-      "id": 73,
+      "id": 26,
       "legend": {
-        "alignAsTable": true,
         "avg": false,
-        "current": true,
+        "current": false,
         "max": false,
         "min": false,
-        "rightSide": true,
         "show": true,
         "total": false,
-        "values": true
+        "values": false
       },
       "lines": true,
       "linewidth": 1,
@@ -1666,30 +1632,51 @@
       "steppedLine": false,
       "targets": [
         {
-          "exemplar": true,
-          "expr": "tangle_blocks_per_component_total{component=\"Solidified\",instance=\"$instance\"}",
+          "expr": "irate(traffic_analysis_outbound_bytes{instance=\"$instance\"}[1m])",
           "interval": "",
-          "legendFormat": "Solid Blocks in DB",
+          "legendFormat": "Analysis TX",
           "refId": "A"
         },
         {
-          "exemplar": true,
-          "expr": "tangle_blocks_per_component_total{component=\"Store\",instance=\"$instance\"} - tangle_blocks_per_component_total{component=\"Solidified\",instance=\"$instance\"}",
+          "expr": "irate(autopeering_traffic_inbound_total_bytes{instance=\"$instance\"}[1m])",
           "interval": "",
-          "legendFormat": "Not Solid Blocks in DB",
+          "legendFormat": "Autopeering RX",
           "refId": "B"
         },
         {
-          "exemplar": true,
-          "expr": "tangle_blocks_per_component_total{component=\"Store\",instance=\"$instance\"}",
+          "expr": "irate(autopeering_traffic_outbound_total_bytes{instance=\"$instance\"}[1m])",
           "interval": "",
-          "legendFormat": "Total Blocks in DB",
+          "legendFormat": "Autopeering TX",
           "refId": "C"
+        },
+        {
+          "expr": "irate(traffic_fpc_inbound_bytes{instance=\"$instance\"}[1m])",
+          "interval": "",
+          "legendFormat": "FPC RX",
+          "refId": "D"
+        },
+        {
+          "expr": "irate(traffic_fpc_outbound_bytes{instance=\"$instance\"}[1m])",
+          "interval": "",
+          "legendFormat": "FPC TX",
+          "refId": "E"
+        },
+        {
+          "expr": "irate(traffic_gossip_inbound_packets{instance=\"$instance\"}[1m])",
+          "interval": "",
+          "legendFormat": "Gossip RX",
+          "refId": "F"
+        },
+        {
+          "expr": "irate(traffic_gossip_outbound_packets{instance=\"$instance\"}[1m])",
+          "interval": "",
+          "legendFormat": "Gossip Tx",
+          "refId": "G"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Blocks in Database",
+      "title": "Network Traffic",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1703,9 +1690,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "format": "Bps",
           "logBase": 1,
-          "min": "0",
           "show": true
         },
         {
@@ -1815,32 +1801,33 @@
         "type": "prometheus",
         "uid": "PBFA97CFB590B2093"
       },
-      "description": "Average time it takes to solidify blocks.",
+      "description": "Describes the amount of total, solid and not solid blocks in the node's database.",
       "fieldConfig": {
         "defaults": {
-          "links": [],
-          "unit": "ms"
+          "links": []
         },
         "overrides": []
       },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
-        "h": 8,
+        "h": 7,
         "w": 13,
         "x": 11,
-        "y": 34
+        "y": 37
       },
       "hiddenSeries": false,
-      "id": 75,
+      "id": 73,
       "legend": {
+        "alignAsTable": true,
         "avg": false,
-        "current": false,
+        "current": true,
         "max": false,
         "min": false,
+        "rightSide": true,
         "show": true,
         "total": false,
-        "values": false
+        "values": true
       },
       "lines": true,
       "linewidth": 1,
@@ -1860,23 +1847,29 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(tangle_block_total_time_since_received{component=\"Solidified\",instance=\"$instance\"}[5m])/rate(tangle_blocks_per_component_total{component=\"Solidified\",instance=\"$instance\"}[5m])",
+          "expr": "tangle_blocks_per_component_total{component=\"Solidified\",instance=\"$instance\"}",
           "interval": "",
-          "legendFormat": "Avg Solidification Time",
+          "legendFormat": "Solid Blocks in DB",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "",
-          "hide": false,
+          "expr": "tangle_blocks_per_component_total{component=\"Store\",instance=\"$instance\"} - tangle_blocks_per_component_total{component=\"Solidified\",instance=\"$instance\"}",
           "interval": "",
-          "legendFormat": "",
+          "legendFormat": "Not Solid Blocks in DB",
           "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "tangle_blocks_per_component_total{component=\"Store\",instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "Total Blocks in DB",
+          "refId": "C"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Average Solidification Time",
+      "title": "Blocks in Database",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1890,8 +1883,9 @@
       },
       "yaxes": [
         {
-          "format": "ms",
+          "format": "short",
           "logBase": 1,
+          "min": "0",
           "show": true
         },
         {
@@ -1996,6 +1990,104 @@
       }
     },
     {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Average time it takes to solidify blocks.",
+      "fieldConfig": {
+        "defaults": {
+          "links": [],
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 13,
+        "x": 11,
+        "y": 44
+      },
+      "hiddenSeries": false,
+      "id": 75,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "9.5.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(tangle_block_total_time_since_received{component=\"Solidified\",instance=\"$instance\"}[5m])/rate(tangle_blocks_per_component_total{component=\"Solidified\",instance=\"$instance\"}[5m])",
+          "interval": "",
+          "legendFormat": "Avg Solidification Time",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Average Solidification Time",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "ms",
+          "logBase": 1,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
       "collapsed": false,
       "datasource": {
         "type": "datasource",
@@ -2005,7 +2097,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 52
       },
       "id": 105,
       "panels": [],
@@ -2025,8 +2117,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2038,7 +2129,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 51
+        "y": 53
       },
       "id": 85,
       "options": {
@@ -2091,8 +2182,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2108,7 +2198,7 @@
         "h": 3,
         "w": 3,
         "x": 4,
-        "y": 51
+        "y": 53
       },
       "id": 101,
       "options": {
@@ -2158,8 +2248,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2171,7 +2260,7 @@
         "h": 3,
         "w": 4,
         "x": 7,
-        "y": 51
+        "y": 53
       },
       "id": 95,
       "options": {
@@ -2220,8 +2309,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2233,7 +2321,7 @@
         "h": 3,
         "w": 3,
         "x": 11,
-        "y": 51
+        "y": 53
       },
       "id": 96,
       "options": {
@@ -2284,8 +2372,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2297,7 +2384,7 @@
         "h": 3,
         "w": 4,
         "x": 14,
-        "y": 51
+        "y": 53
       },
       "id": 109,
       "options": {
@@ -2357,7 +2444,7 @@
         "h": 15,
         "w": 6,
         "x": 18,
-        "y": 51
+        "y": 53
       },
       "hiddenSeries": false,
       "id": 89,
@@ -2452,7 +2539,7 @@
         "h": 12,
         "w": 9,
         "x": 0,
-        "y": 54
+        "y": 56
       },
       "hiddenSeries": false,
       "id": 98,
@@ -2548,7 +2635,7 @@
         "h": 12,
         "w": 9,
         "x": 9,
-        "y": 54
+        "y": 56
       },
       "hiddenSeries": false,
       "id": 99,
@@ -2645,7 +2732,7 @@
         "h": 9,
         "w": 8,
         "x": 0,
-        "y": 66
+        "y": 68
       },
       "hiddenSeries": false,
       "id": 83,
@@ -2736,7 +2823,7 @@
         "h": 9,
         "w": 8,
         "x": 8,
-        "y": 66
+        "y": 68
       },
       "hiddenSeries": false,
       "id": 90,
@@ -2832,7 +2919,7 @@
         "h": 9,
         "w": 8,
         "x": 16,
-        "y": 66
+        "y": 68
       },
       "id": 92,
       "links": [],
@@ -2894,7 +2981,7 @@
         "h": 9,
         "w": 8,
         "x": 0,
-        "y": 75
+        "y": 77
       },
       "hiddenSeries": false,
       "id": 84,
@@ -2985,7 +3072,7 @@
         "h": 9,
         "w": 8,
         "x": 8,
-        "y": 75
+        "y": 77
       },
       "hiddenSeries": false,
       "id": 91,
@@ -3082,7 +3169,7 @@
         "h": 9,
         "w": 8,
         "x": 16,
-        "y": 75
+        "y": 77
       },
       "id": 93,
       "links": [],
@@ -3142,7 +3229,7 @@
         "h": 11,
         "w": 8,
         "x": 0,
-        "y": 84
+        "y": 86
       },
       "hiddenSeries": false,
       "id": 103,
@@ -3226,7 +3313,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 95
+        "y": 97
       },
       "id": 116,
       "panels": [],
@@ -3255,7 +3342,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 96
+        "y": 98
       },
       "hiddenSeries": false,
       "id": 118,
@@ -3347,7 +3434,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 96
+        "y": 98
       },
       "hiddenSeries": false,
       "id": 119,
@@ -3432,7 +3519,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 104
+        "y": 106
       },
       "hiddenSeries": false,
       "id": 121,
@@ -3530,7 +3617,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 104
+        "y": 106
       },
       "id": 123,
       "options": {
@@ -3592,7 +3679,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 104
+        "y": 106
       },
       "id": 125,
       "options": {
@@ -3654,7 +3741,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 108
+        "y": 110
       },
       "id": 124,
       "options": {
@@ -3716,7 +3803,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 108
+        "y": 110
       },
       "id": 126,
       "options": {
@@ -3758,7 +3845,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 112
+        "y": 114
       },
       "id": 128,
       "panels": [],
@@ -3793,7 +3880,7 @@
         "h": 6,
         "w": 15,
         "x": 0,
-        "y": 113
+        "y": 115
       },
       "id": 146,
       "options": {
@@ -3855,7 +3942,7 @@
         "h": 3,
         "w": 3,
         "x": 15,
-        "y": 113
+        "y": 115
       },
       "id": 132,
       "options": {
@@ -3913,7 +4000,7 @@
         "h": 3,
         "w": 3,
         "x": 18,
-        "y": 113
+        "y": 115
       },
       "id": 142,
       "options": {
@@ -3973,7 +4060,7 @@
         "h": 3,
         "w": 3,
         "x": 21,
-        "y": 113
+        "y": 115
       },
       "id": 149,
       "options": {
@@ -4033,7 +4120,7 @@
         "h": 3,
         "w": 3,
         "x": 15,
-        "y": 116
+        "y": 118
       },
       "id": 143,
       "options": {
@@ -4092,7 +4179,7 @@
         "h": 3,
         "w": 3,
         "x": 18,
-        "y": 116
+        "y": 118
       },
       "id": 140,
       "options": {
@@ -4150,7 +4237,7 @@
         "h": 3,
         "w": 3,
         "x": 21,
-        "y": 116
+        "y": 118
       },
       "id": 154,
       "options": {
@@ -4213,7 +4300,7 @@
         "h": 6,
         "w": 15,
         "x": 0,
-        "y": 119
+        "y": 121
       },
       "id": 145,
       "options": {
@@ -4281,7 +4368,7 @@
         "h": 3,
         "w": 3,
         "x": 15,
-        "y": 119
+        "y": 121
       },
       "id": 130,
       "options": {
@@ -4339,7 +4426,7 @@
         "h": 3,
         "w": 3,
         "x": 18,
-        "y": 119
+        "y": 121
       },
       "id": 134,
       "options": {
@@ -4398,7 +4485,7 @@
         "h": 3,
         "w": 3,
         "x": 21,
-        "y": 119
+        "y": 121
       },
       "id": 153,
       "options": {
@@ -4460,7 +4547,7 @@
         "h": 3,
         "w": 3,
         "x": 15,
-        "y": 122
+        "y": 124
       },
       "id": 138,
       "options": {
@@ -4538,7 +4625,7 @@
         "h": 3,
         "w": 3,
         "x": 18,
-        "y": 122
+        "y": 124
       },
       "id": 151,
       "options": {
@@ -4600,7 +4687,7 @@
         "h": 3,
         "w": 3,
         "x": 21,
-        "y": 122
+        "y": 124
       },
       "id": 136,
       "options": {
@@ -4659,7 +4746,7 @@
         "h": 3,
         "w": 3,
         "x": 15,
-        "y": 125
+        "y": 127
       },
       "id": 152,
       "options": {
@@ -4722,7 +4809,7 @@
         "h": 3,
         "w": 3,
         "x": 18,
-        "y": 125
+        "y": 127
       },
       "id": 155,
       "options": {
