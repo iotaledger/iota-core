@@ -58,7 +58,7 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPruningDelay, errorHandler, s.optsPrunableManagerOptions...)
 
 			// TODO: fix initialization order
-			s.Prunable.Initialize(s.Settings())
+			s.Prunable.Initialize(s.Settings().APIProvider())
 		})
 }
 

@@ -14,8 +14,8 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/core/account"
-	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -73,7 +73,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		2,
 		bucketedStorage,
 		committeeFunc,
-		api.NewStaticProvider(tpkg.TestAPI),
+		api.SingleVersionProvider(tpkg.TestAPI),
 	)
 
 	return t
