@@ -209,16 +209,7 @@ func (s *Settings) LatestCommitment() *model.Commitment {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	bytes, err := s.store.Get([]byte{latestCommitmentKey})
-
-	if err != nil {
-		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return model.NewEmptyCommitment(s.apiProvider.LatestAPI())
-		}
-		panic(err)
-	}
-
-	return lo.PanicOnErr(model.CommitmentFromBytes(bytes, s.apiProvider))
+	return s.latestCommitment()
 }
 
 func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err error) {
@@ -235,7 +226,7 @@ func (s *Settings) latestCommitment() *model.Commitment {
 
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return model.NewEmptyCommitment(s.apiProvider.LatestAPI())
+			return model.NewEmptyCommitment(s.apiProvider.CurrentAPI())
 		}
 		panic(err)
 	}

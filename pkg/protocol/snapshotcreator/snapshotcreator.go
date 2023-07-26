@@ -58,7 +58,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		return ierrors.Wrap(err, "failed to store the protocol parameters for epoch 0")
 	}
 
-	api := s.Settings().APIProvider().LatestAPI()
+	api := s.Settings().APIProvider().CurrentAPI()
 	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
 		return ierrors.Wrap(err, "failed to store empty commitment")
 	}
