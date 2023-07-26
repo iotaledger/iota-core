@@ -118,7 +118,10 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 					}
 				})
 
-				// TODO attach on invalid transactions, add error codes and store to retainer
+				transactionMetadata.OnInvalid(func(err error) {
+					// TODO: determine the error code
+					// r.RetainTransactionFailure(attachmentID, apimodels.ErrTxStateChainStateTransitionInvalid)
+				})
 			})
 		})
 

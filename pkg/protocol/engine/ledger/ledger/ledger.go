@@ -29,6 +29,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 var (
@@ -41,14 +42,15 @@ type Ledger struct {
 
 	apiProvider api.Provider
 
-	utxoLedger       *utxoledger.Manager
-	accountsLedger   *accountsledger.Manager
-	manaManager      *mana.Manager
-	sybilProtection  sybilprotection.SybilProtection
-	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
-	memPool          mempool.MemPool[ledger.BlockVoteRank]
-	conflictDAG      conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
-	errorHandler     func(error)
+	utxoLedger            *utxoledger.Manager
+	accountsLedger        *accountsledger.Manager
+	manaManager           *mana.Manager
+	sybilProtection       sybilprotection.SybilProtection
+	commitmentLoader      func(iotago.SlotIndex) (*model.Commitment, error)
+	memPool               mempool.MemPool[ledger.BlockVoteRank]
+	conflictDAG           conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
+	retainTxFailureReason func(iotago.SlotIdentifier, apimodels.TransactionFailureReason)
+	errorHandler          func(error)
 
 	module.Module
 }
@@ -72,7 +74,9 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
-			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.setReatainerFunc(e.Retainer.RetainTransactionFailure)
+
+			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, e.Retainer.RetainTransactionFailure, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			// TODO: how do we want to handle changing API here?
@@ -121,6 +125,10 @@ func New(
 		errorHandler:     errorHandler,
 		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](sybilProtection.SeatManager().OnlineCommittee().Size),
 	}
+}
+
+func (l *Ledger) setReatainerFunc(retainTxFailureReasonFunc func(iotago.SlotIdentifier, apimodels.TransactionFailureReason)) {
+	l.retainTxFailureReason = retainTxFailureReasonFunc
 }
 
 func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
