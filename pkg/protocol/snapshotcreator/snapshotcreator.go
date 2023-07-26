@@ -1,11 +1,11 @@
 package snapshotcreator
 
 import (
-	"crypto/ed25519"
 	"os"
 
 	"golang.org/x/crypto/blake2b"
 
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -68,7 +68,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	for _, accountData := range opt.Accounts {
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
-			accounts.Set(blake2b.Sum256(accountData.IssuerKey), &account.Pool{
+			accounts.Set(blake2b.Sum256(accountData.IssuerKey[:]), &account.Pool{
 				PoolStake:      accountData.StakedAmount,
 				ValidatorStake: accountData.StakedAmount,
 				FixedCost:      accountData.FixedCost,

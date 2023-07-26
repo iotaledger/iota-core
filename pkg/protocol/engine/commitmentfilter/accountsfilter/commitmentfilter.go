@@ -6,12 +6,12 @@ import (
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -30,7 +30,7 @@ type CommitmentFilter struct {
 	// Events contains the Events of the CommitmentFilter
 	events *commitmentfilter.Events
 	// futureBlocks contains blocks with a commitment in the future, that should not be passed to the blockdag yet.
-	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*model.Block]]
+	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*model.Block]]
 
 	apiProvider api.Provider
 
@@ -76,7 +76,7 @@ func New(apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *Co
 	return options.Apply(&CommitmentFilter{
 		apiProvider:  apiProvider,
 		events:       commitmentfilter.NewEvents(),
-		futureBlocks: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *advancedset.AdvancedSet[*model.Block]](),
+		futureBlocks: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*model.Block]](),
 	}, opts,
 	)
 }
@@ -110,8 +110,8 @@ func (c *CommitmentFilter) isFutureBlock(block *model.Block) (isFutureBlock bool
 
 	// If we are not able to load the commitment for the block, it means we haven't committed this slot yet.
 	if _, err := c.commitmentFunc(block.ProtocolBlock().SlotCommitmentID.Index()); err != nil {
-		lo.Return1(c.futureBlocks.Get(block.ProtocolBlock().SlotCommitmentID.Index(), true).GetOrCreate(block.ProtocolBlock().SlotCommitmentID, func() *advancedset.AdvancedSet[*model.Block] {
-			return advancedset.New[*model.Block]()
+		lo.Return1(c.futureBlocks.Get(block.ProtocolBlock().SlotCommitmentID.Index(), true).GetOrCreate(block.ProtocolBlock().SlotCommitmentID, func() ds.Set[*model.Block] {
+			return ds.NewSet[*model.Block]()
 		})).Add(block)
 
 		return true

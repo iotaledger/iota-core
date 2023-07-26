@@ -1,8 +1,7 @@
 package snapshotcreator
 
 import (
-	"crypto/ed25519"
-
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
