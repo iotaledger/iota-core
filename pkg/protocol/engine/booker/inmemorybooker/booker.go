@@ -29,7 +29,7 @@ type Booker struct {
 
 	ledger ledger.Ledger
 
-	retianBlockFailureFunc func(id iotago.BlockID, reason apimodels.BlockFailureReason)
+	retainBlockFailureFunc func(id iotago.BlockID, reason apimodels.BlockFailureReason)
 
 	errorHandler func(error)
 
@@ -112,8 +112,8 @@ func (b *Booker) Shutdown() {
 	b.workers.Shutdown()
 }
 
-func (b *Booker) setReatainerFunc(retainerFunc func(id iotago.BlockID, reason apimodels.BlockFailureReason)) {
-	b.retianBlockFailureFunc = retainerFunc
+func (b *Booker) setReatainerFunc(retainBlockFailureFunc func(iotago.BlockID, apimodels.BlockFailureReason)) {
+	b.retainBlockFailureFunc = retainBlockFailureFunc
 }
 
 func (b *Booker) evict(slotIndex iotago.SlotIndex) {
@@ -135,7 +135,7 @@ func (b *Booker) book(block *blocks.Block) error {
 
 func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	if block.SetInvalid() {
-		b.retianBlockFailureFunc(block.ID(), apimodels.ErrBlockBookingFailure)
+		b.retainBlockFailureFunc(block.ID(), apimodels.ErrBlockBookingFailure)
 		b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "block marked as invalid in Booker"))
 	}
 }
