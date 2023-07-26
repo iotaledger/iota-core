@@ -15,6 +15,8 @@ services:
       --blockIssuer.privateKey=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
       --activity.ignoreBootstrapped=true
       --restAPI.allowIncompleteBlock=true
+      --inx.enabled=true
+      --inx.bindAddress=0.0.0.0:9029
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -22,6 +24,7 @@ services:
       - "8080:8080/tcp" # web API
       - "8081:8081/tcp" # dashboard
       - "6081:6061/tcp" # pprof
+      - "9029:9029/tcp" # inx
     networks:
       - iota-core
 

@@ -134,7 +134,7 @@ func New(
 		},
 		func(e *Engine) {
 			// Setup all components
-			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings())
+			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings().APIProvider())
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 			e.SybilProtection = sybilProtectionProvider(e)
 			e.BlockDAG = blockDAGProvider(e)
@@ -275,23 +275,23 @@ func (e *Engine) IsSynced() (isBootstrapped bool) {
 }
 
 func (e *Engine) APIForSlot(slot iotago.SlotIndex) iotago.API {
-	return e.Storage.Settings().APIForSlot(slot)
+	return e.Storage.Settings().APIProvider().APIForSlot(slot)
 }
 
 func (e *Engine) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
-	return e.Storage.Settings().APIForEpoch(epoch)
+	return e.Storage.Settings().APIProvider().APIForEpoch(epoch)
 }
 
 func (e *Engine) APIForVersion(version iotago.Version) (iotago.API, error) {
-	return e.Storage.Settings().APIForVersion(version)
+	return e.Storage.Settings().APIProvider().APIForVersion(version)
 }
 
 func (e *Engine) LatestAPI() iotago.API {
-	return e.Storage.Settings().LatestAPI()
+	return e.Storage.Settings().APIProvider().LatestAPI()
 }
 
 func (e *Engine) CurrentAPI() iotago.API {
-	return e.Storage.Settings().CurrentAPI()
+	return e.Storage.Settings().APIProvider().CurrentAPI()
 }
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {

@@ -1,17 +1,15 @@
 package ledger
 
 import (
-	cryptoed25519 "crypto/ed25519"
 	"io"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -192,6 +190,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		tx.Commit()
 		return true
 	})
+
+	l.events.StateDiffApplied.Trigger(index, outputs, spends)
 
 	return l.utxoLedger.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), l.accountsLedger.AccountsTreeRoot(), nil
 }
@@ -380,7 +380,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		oldPubKeysSet := accountData.PubKeys
 		newPubKeysSet := ds.NewSet[ed25519.PublicKey]()
 		for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
-			newPubKeysSet.Add(ed25519.PublicKey(pubKey))
+			newPubKeysSet.Add(pubKey)
 		}
 
 		// Add public keys that are not in the old set
@@ -420,7 +420,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		// have some values from the allotment, so no need to set them explicitly.
 		accountDiff.NewOutputID = createdOutput.OutputID()
 		accountDiff.PreviousOutputID = iotago.EmptyOutputID
-		accountDiff.PubKeysAdded = lo.Map(createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys, func(pk cryptoed25519.PublicKey) ed25519.PublicKey { return ed25519.PublicKey(pk) })
+		accountDiff.PubKeysAdded = createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
 
 		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
 			accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
