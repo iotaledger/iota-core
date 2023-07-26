@@ -42,6 +42,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			StakingEpochEnd: math.MaxUint64,
 			FixedCost:       1,
 			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+			Mana:            iotago.Mana(testsuite.MinValidatorAccountDeposit),
 		},
 		snapshotcreator.AccountDetails{ // master2
 			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064"))),
@@ -51,6 +52,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			StakingEpochEnd: math.MaxUint64,
 			FixedCost:       1,
 			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+			Mana:            iotago.Mana(testsuite.MinValidatorAccountDeposit),
 		},
 		snapshotcreator.AccountDetails{ // faucet
 			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648"))),
@@ -60,18 +62,21 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			StakingEpochEnd: math.MaxUint64,
 			FixedCost:       1,
 			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+			Mana:            iotago.Mana(testsuite.MinValidatorAccountDeposit),
 		},
 		snapshotcreator.AccountDetails{ // nomana
 			AccountID: blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xa54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39"))),
 			Address:   iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xa54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39"))),
 			Amount:    testsuite.MinIssuerAccountDeposit,
 			IssuerKey: lo.PanicOnErr(hexutil.DecodeHex("0xa54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39")),
+			Mana:      iotago.Mana(testsuite.MinIssuerAccountDeposit),
 		},
 		snapshotcreator.AccountDetails{ // nomana2
 			AccountID: blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xcb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b"))),
 			Address:   iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xcb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b"))),
 			Amount:    testsuite.MinIssuerAccountDeposit,
 			IssuerKey: lo.PanicOnErr(hexutil.DecodeHex("0xcb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b")),
+			Mana:      iotago.Mana(testsuite.MinIssuerAccountDeposit),
 		},
 	),
 	snapshotcreator.WithProtocolParameters(
@@ -96,6 +101,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			StakingEpochEnd: math.MaxUint64,
 			FixedCost:       1,
 			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+			Mana:            iotago.Mana(testsuite.MinValidatorAccountDeposit),
 		},
 		snapshotcreator.AccountDetails{
 			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6"))),
@@ -105,6 +111,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			StakingEpochEnd: math.MaxUint64,
 			FixedCost:       1,
 			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+			Mana:            iotago.Mana(testsuite.MinValidatorAccountDeposit),
 		},
 		snapshotcreator.AccountDetails{
 			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805"))),
@@ -114,6 +121,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			StakingEpochEnd: math.MaxUint64,
 			FixedCost:       1,
 			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+			Mana:            iotago.Mana(testsuite.MinValidatorAccountDeposit),
 		},
 	),
 	snapshotcreator.WithProtocolParameters(
