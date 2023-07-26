@@ -99,9 +99,12 @@ func (m *Metric) Collect() {
 // Update updates the metric value, for Gauge/GaugeVec values are set, for Counter/CounterVec values are added.
 // For CounterVec/GaugeVec metrics updates will be done only if each provided metric label was previously defined with WithLabels option.
 // To set metrics labels string values, enable use WithLabelValuesCollection option.
-func (m *Metric) Update(values map[string]float64) {
+func (m *Metric) Update(values map[string]float64, metricValue ...float64) {
 	if m.labelValuesCollectionEnabled {
 		value := float64(0)
+		if len(metricValue) != 0 {
+			value = metricValue[0] 
+		}
 		if len(values) != len(m.labels) {
 			fmt.Println("Warning! Nothing updated, label values and labels length mismatch when updating metric", m.Name)
 			return

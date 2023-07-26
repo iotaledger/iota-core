@@ -130,4 +130,5 @@ func registerMetrics() {
 	deps.Collector.RegisterCollection(DBMetrics)
 	deps.Collector.RegisterCollection(CommitmentsMetrics)
 	deps.Collector.RegisterCollection(SlotMetrics)
+	deps.Collector.RegisterCollection(AccountMetrics)
 }
