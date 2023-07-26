@@ -23,9 +23,9 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230721122326-34450325011f
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230721122326-34450325011f
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726094056-e4fe59ff68a6
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230726065442-90d758432bb7
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230726132127-65d5932bb64f
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726135831-dd0c6ef61d5b
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230726135421-ca90b96ff054
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230726134822-e4317abe9128
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/libp2p/go-libp2p v0.29.0
 	github.com/multiformats/go-multiaddr v0.10.1
@@ -157,7 +157,7 @@ require (
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.11.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230724170836-66ad5b6ff146 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230725213213-b022f6e96895 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
