@@ -133,10 +133,13 @@ func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (iotago.Mana
 				break
 			}
 		}
-		longestQueue := b.IssuerQueue(maxIssuerID)
-		tail := longestQueue.RemoveTail()
-		b.size--
-		droppedBlocks = append(droppedBlocks, tail)
+
+		if longestQueue := b.IssuerQueue(maxIssuerID); longestQueue != nil {
+			if tail := longestQueue.RemoveTail(); tail != nil {
+				b.size--
+				droppedBlocks = append(droppedBlocks, tail)
+			}
+		}
 	}
 
 	return droppedBlocks

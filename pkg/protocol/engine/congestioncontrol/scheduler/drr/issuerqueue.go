@@ -135,8 +135,27 @@ func (q *IssuerQueue) PopFront() *blocks.Block {
 }
 
 func (q *IssuerQueue) RemoveTail() *blocks.Block {
-	tail := q.tail()
+	var oldestSubmittedBlock *blocks.Block
+	q.submitted.ForEach(func(_ iotago.BlockID, block *blocks.Block) bool {
+		if oldestSubmittedBlock == nil || oldestSubmittedBlock.IssuingTime().After(block.IssuingTime()) {
+			oldestSubmittedBlock = block
+		}
 
+		return true
+	})
+
+	tail := q.tail()
+	// if heap tail does not exist or tail is newer than oldest submitted block, unsubmit oldest block
+	if oldestSubmittedBlock != nil && (tail < 0 || q.inbox[tail].Key.CompareTo(timed.HeapKey(oldestSubmittedBlock.IssuingTime())) > 0) {
+		q.Unsubmit(oldestSubmittedBlock)
+
+		return oldestSubmittedBlock
+	} else if tail < 0 {
+		// should never happen that the oldest submitted block does not exist and the tail does not exist.
+		return nil
+	}
+
+	// if the tail exists and is older than the oldest submitted block, drop it
 	heapElement, isHeapElement := heap.Remove(&q.inbox, tail).(*generalheap.HeapElement[timed.HeapKey, *blocks.Block])
 	if !isHeapElement {
 		return nil
@@ -148,7 +167,7 @@ func (q *IssuerQueue) RemoveTail() *blocks.Block {
 	return blk
 }
 
-func (q IssuerQueue) tail() int {
+func (q *IssuerQueue) tail() int {
 	h := q.inbox
 	if h.Len() <= 0 {
 		return -1
