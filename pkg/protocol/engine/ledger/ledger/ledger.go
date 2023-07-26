@@ -29,12 +29,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
-)
-
-var (
-	ErrUnexpectedUnderlyingType    = ierrors.New("unexpected underlying type provided by the interface")
-	ErrTransactionMetadataNotFOund = ierrors.New("TransactionMetadata not found")
 )
 
 type Ledger struct {
@@ -49,7 +43,7 @@ type Ledger struct {
 	commitmentLoader      func(iotago.SlotIndex) (*model.Commitment, error)
 	memPool               mempool.MemPool[ledger.BlockVoteRank]
 	conflictDAG           conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
-	retainTxFailureReason func(iotago.SlotIdentifier, apimodels.TransactionFailureReason)
+	retainTxFailureReason func(iotago.SlotIdentifier, error)
 	errorHandler          func(error)
 
 	module.Module
@@ -76,7 +70,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			l.setReatainerFunc(e.Retainer.RetainTransactionFailure)
 
-			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, e.Retainer.RetainTransactionFailure, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			// TODO: how do we want to handle changing API here?
@@ -127,7 +121,7 @@ func New(
 	}
 }
 
-func (l *Ledger) setReatainerFunc(retainTxFailureReasonFunc func(iotago.SlotIdentifier, apimodels.TransactionFailureReason)) {
+func (l *Ledger) setReatainerFunc(retainTxFailureReasonFunc func(iotago.SlotIdentifier, error)) {
 	l.retainTxFailureReason = retainTxFailureReasonFunc
 }
 
@@ -139,6 +133,7 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 	if transaction, hasTransaction := block.Transaction(); hasTransaction {
 		transactionMetadata, err := l.memPool.AttachTransaction(transaction, block.ID())
 		if err != nil {
+			l.retainTxFailureReason(block.ID(), err)
 			l.errorHandler(err)
 
 			return nil, true
@@ -242,17 +237,13 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 			stateRequest.OnSuccess(func(loadedState mempool.State) {
 				concreteOutput, ok := loadedState.(*utxoledger.Output)
 				if !ok {
-					err = ErrUnexpectedUnderlyingType
+					err = iotago.ErrUnknownOutputType
 					return
 				}
 				output = concreteOutput
 			})
 			stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
 			stateRequest.WaitComplete()
-
-			if err != nil {
-				return nil, ierrors.Wrapf(ErrTransactionMetadataNotFOund, "error in getting output for %v", stateWithMetadata.ID())
-			}
 
 			return output, nil
 		}
@@ -261,7 +252,7 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 
 		tx, ok := txWithMetadata.Transaction().(*iotago.Transaction)
 		if !ok {
-			return nil, ErrUnexpectedUnderlyingType
+			return nil, iotago.ErrUnknownTransactinType
 		}
 
 		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
@@ -542,7 +533,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
 		if !ok {
-			err = ErrUnexpectedUnderlyingType
+			err = iotago.ErrUnknownTransactinType
 			return false
 		}
 		txCreationTime := tx.Essence.CreationTime

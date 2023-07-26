@@ -58,7 +58,7 @@ func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction)
 
 	inputReferences, inputsErr := transaction.Inputs()
 	if inputsErr != nil {
-		return nil, ierrors.Errorf("failed to retrieve inputReferences of transaction %s: %w", transactionID, inputsErr)
+		return nil, ierrors.Join(iotago.ErrFailedToRetrieveInput, ierrors.Wrapf(inputsErr, "failed to retrieve inputReferences of transaction %s: %w", transactionID, inputsErr))
 	}
 
 	return (&TransactionMetadata{

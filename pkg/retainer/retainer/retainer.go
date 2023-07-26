@@ -119,8 +119,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 				})
 
 				transactionMetadata.OnInvalid(func(err error) {
-					// TODO: determine the error code
-					// r.RetainTransactionFailure(attachmentID, apimodels.ErrTxStateChainStateTransitionInvalid)
+					r.RetainTransactionFailure(attachmentID, err)
 				})
 			})
 		})
@@ -136,10 +135,7 @@ func (r *Retainer) Shutdown() {
 }
 
 func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
-	blockStatus, blockFailureReason, err := r.blockStatus(blockID)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get block status for %s", blockID.ToHex())
-	}
+	blockStatus, blockFailureReason := r.blockStatus(blockID)
 	// we do not expose accepted flag
 	if blockStatus == apimodels.BlockStateAccepted {
 		blockStatus = apimodels.BlockStatePending
@@ -167,28 +163,29 @@ func (r *Retainer) RetainBlockFailure(blockID iotago.BlockID, failureCode apimod
 	_ = retainerStore.StoreBlockFailure(blockID, failureCode)
 }
 
-func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, failureCode apimodels.TransactionFailureReason) {
+func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, err error) {
 	retainerStore := r.retainerFunc(blockID.Index())
+	failureCode := determineTxFailureReason(err)
 	_ = retainerStore.StoreTransactionFailure(blockID, failureCode)
 }
 
-func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, apimodels.BlockFailureReason, error) {
+func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, apimodels.BlockFailureReason) {
 	blockData, exists := r.retainerFunc(blockID.Index()).GetBlock(blockID)
 	if !exists {
-		return apimodels.BlockStateUnknown, apimodels.NoBlockFailureReason, nil
+		return apimodels.BlockStateUnknown, apimodels.NoBlockFailureReason
 	}
 	switch blockData.State {
 	case apimodels.BlockStatePending:
 		if blockID.Index() <= r.latestCommittedSlotFunc() {
-			return apimodels.BlockStateOrphaned, blockData.FailureReason, nil
+			return apimodels.BlockStateOrphaned, blockData.FailureReason
 		}
 	case apimodels.BlockStateAccepted, apimodels.BlockStateConfirmed:
 		if blockID.Index() <= r.finalizedSlotFunc() {
-			return apimodels.BlockStateFinalized, apimodels.NoBlockFailureReason, nil
+			return apimodels.BlockStateFinalized, apimodels.NoBlockFailureReason
 		}
 	}
 
-	return blockData.State, blockData.FailureReason, nil
+	return blockData.State, blockData.FailureReason
 }
 
 func (r *Retainer) transactionStatus(blockID iotago.BlockID) (apimodels.TransactionState, apimodels.TransactionFailureReason, error) {
@@ -199,10 +196,7 @@ func (r *Retainer) transactionStatus(blockID iotago.BlockID) (apimodels.Transact
 
 	// for confirmed and finalized we need to check for the block status
 	if txData.State == apimodels.TransactionStateAccepted {
-		blockState, _, err := r.blockStatus(blockID)
-		if err != nil {
-			return apimodels.TransactionStateUnknown, apimodels.NoTransactionFailureReason, err
-		}
+		blockState, _ := r.blockStatus(blockID)
 
 		switch blockState {
 		case apimodels.BlockStateConfirmed:
