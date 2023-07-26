@@ -34,23 +34,6 @@ type Retainer struct {
 	module.Module
 }
 
-// the retainer should store the "confirmed" flag of blocks between they got committed and finalized.
-// this storage should have buckets and the confirmed info should be stored by simply setting the blockid.
-
-// several intervals to prune => triggered by the pruning manager
-//
-//	=> the confirmed flag until it got finalized (is this always the same interval?)
-//	=> the info about conflicting blocks (maybe 1 - 2 epochs)
-//
-// maybe also store the orphaned block there as well?
-
-// always get metadata through blockID
-// txconfirmed store (blockID)
-// txPending store (error codes)
-
-// get block status: go through stores to check status
-// get tx status: confirmed store -> check slot index finalized? finalized -> pending store (error codes)
-
 func New(workers *workerpool.Group, currentAPI func(index iotago.SlotIndex) iotago.API, retainerFunc RetainerFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
 	return &Retainer{
 		workers:                 workers,
