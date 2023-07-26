@@ -15,6 +15,7 @@ const (
 	strongTipsCount               = "strong_tips_count"
 	weakTipsCount                 = "weak_tips_count"
 	blockPerTypeCount             = "block_per_type_total"
+	blocksTotal                   = "blocks_total"
 	missingBlocksCount            = "missing_block_total"
 	parentPerTypeCount            = "parent_per_type_total"
 	blocksPerComponentCount       = "blocks_per_component_total"
@@ -55,6 +56,15 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.BlockDAG.BlockMissing.Hook(func(_ *blocks.Block) {
 				deps.Collector.Increment(tangleNamespace, missingBlocksCount)
+			}, event.WithWorkerPool(Component.WorkerPool))
+		}),
+	)),
+	collector.WithMetric(collector.NewMetric(blocksTotal,
+		collector.WithType(collector.Counter),
+		collector.WithHelp("Total number of blocks attached."),
+		collector.WithInitFunc(func() {
+			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
+				deps.Collector.Increment(tangleNamespace, blocksTotal)
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),

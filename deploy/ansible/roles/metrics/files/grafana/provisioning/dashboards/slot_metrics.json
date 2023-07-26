@@ -37,7 +37,7 @@
       },
       "id": 63,
       "panels": [],
-      "title": "Slot metrics",
+      "title": "Live slot metrics",
       "type": "row"
     },
     {
@@ -49,48 +49,92 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false,
-            "minWidth": 50
+            "mode": "continuous-GrYlRd"
           },
           "mappings": [],
           "thresholds": {
-            "mode": "absolute",
+            "mode": "percentage",
             "steps": [
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Invalid "
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
+                }
               }
             ]
           },
-          "unit": "none"
-        },
-        "overrides": []
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Attached "
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Accepted "
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
+        "h": 4,
+        "w": 12,
         "x": 0,
         "y": 1
       },
       "id": 115,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
+        "displayMode": "basic",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "show": false
+          "fields": "",
+          "values": false
         },
-        "showHeader": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
       "pluginVersion": "9.5.6",
       "repeat": "instance",
@@ -162,7 +206,7 @@
           "refId": "E"
         }
       ],
-      "title": "Blocks per slot $instance",
+      "title": "Blocks $instance",
       "transformations": [
         {
           "id": "groupBy",
@@ -311,7 +355,7 @@
           }
         }
       ],
-      "type": "table"
+      "type": "bargauge"
     },
     {
       "datasource": {
@@ -322,15 +366,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false,
-            "minWidth": 50
+            "mode": "continuous-GrYlRd"
           },
           "mappings": [],
           "thresholds": {
@@ -339,298 +375,10 @@
               {
                 "color": "green",
                 "value": null
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 1
-      },
-      "id": 211,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": []
-      },
-      "pluginVersion": "9.5.6",
-      "repeat": "instance",
-      "repeatDirection": "v",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "slots_orphaned_attachments",
-          "format": "table",
-          "hide": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "E"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "slots_total_attachments\n",
-          "format": "table",
-          "hide": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "D"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "slots_rejected_attachments",
-          "format": "table",
-          "hide": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "F"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "slots_accepted_attachments\n",
-          "format": "table",
-          "hide": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "G"
-        }
-      ],
-      "title": "Transactions per slot $instance",
-      "transformations": [
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "Accepted Blocks": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
               },
-              "Accepted Transactions": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Active validators": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Slot Index": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "Time": {
-                "aggregations": []
-              },
-              "Value": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #A": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #B": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #C": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #D": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #E": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #F": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #G": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #H": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #I": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "__name__": {
-                "aggregations": []
-              },
-              "accepted_blocks": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "active_validators": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "instance": {
-                "aggregations": []
-              },
-              "slot": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "transactions": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
               {
-                "field": "slot"
-              }
-            ]
-          }
-        },
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "slot",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {},
-            "indexByName": {
-              "Value #A (lastNotNull)": 1,
-              "Value #B (lastNotNull)": 4,
-              "Value #C (lastNotNull)": 2,
-              "Value #D (lastNotNull)": 5,
-              "Value #E (lastNotNull)": 9,
-              "Value #F (lastNotNull)": 7,
-              "Value #G (lastNotNull)": 6,
-              "Value #H (lastNotNull)": 3,
-              "Value #I (lastNotNull)": 8,
-              "slot": 0
-            },
-            "renameByName": {
-              "Value": "Slot Index",
-              "Value #A (lastNotNull)": "Tot. tr.",
-              "Value #B (lastNotNull)": "Inv. tr. ",
-              "Value #C (lastNotNull)": "Acc. tr.",
-              "Value #D (lastNotNull)": "Total att.",
-              "Value #E (firstNotNull)": "Orphaned attachments",
-              "Value #E (lastNotNull)": "Orph. att.",
-              "Value #F (lastNotNull)": "Rej. att.",
-              "Value #G (lastNotNull)": "Acc. att.",
-              "Value #H (lastNotNull)": "Rej. tr.",
-              "Value #I (lastNotNull)": "NC. att.",
-              "Value (lastNotNull)": "Attached blocks",
-              "accepted_blocks": "Accepted Blocks",
-              "accepted_blocks (lastNotNull)": "Accepted Blocka",
-              "active_validators": "Active validators",
-              "active_validators (lastNotNull)": "Active Validators",
-              "slot": "Slot",
-              "transactions": "Accepted Transactions",
-              "transactions (lastNotNull)": "Accepted Txs"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false,
-            "minWidth": 50
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
+                "color": "red",
+                "value": 80
               }
             ]
           }
@@ -639,35 +387,56 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Slot Index"
+              "options": "Created"
             },
             "properties": [
               {
-                "id": "unit",
-                "value": "SI"
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Accepted"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
+        "h": 4,
+        "w": 12,
+        "x": 12,
         "y": 1
       },
       "id": 207,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
+        "displayMode": "basic",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "show": false
+          "fields": "",
+          "values": false
         },
-        "showHeader": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
       "pluginVersion": "9.5.6",
       "repeat": "instance",
@@ -858,7 +627,7 @@
           }
         }
       ],
-      "type": "table"
+      "type": "bargauge"
     }
   ],
   "refresh": "10s",
@@ -932,6 +701,6 @@
   "timezone": "",
   "title": "Global Slots View",
   "uid": "9eivfEo4z",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

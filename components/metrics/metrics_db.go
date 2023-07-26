@@ -22,10 +22,9 @@ var DBMetrics = collector.NewCollection(dbNamespace,
 		collector.WithCollectFunc(func() map[string]float64 {
 			mainEngine := deps.Protocol.MainEngineInstance()
 			return collector.MultiLabelsValues(
-				[]string{storagePermanentSizeLabel, storagePrunableSizeLabel, retainerSizeLabel},
+				[]string{storagePermanentSizeLabel, storagePrunableSizeLabel},
 				mainEngine.Storage.PermanentDatabaseSize(),
 				mainEngine.Storage.PrunableDatabaseSize(),
-				// deps.Retainer.DatabaseSize(),
 			)
 		}),
 	)),

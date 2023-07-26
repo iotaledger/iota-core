@@ -134,7 +134,7 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 	collector.WithMetric(collector.NewMetric(acceptedAttachments,
 		collector.WithType(collector.CounterVec),
 		collector.WithLabels(labelName),
-		collector.WithHelp("Number of rejected attachments by the node per slot."),
+		collector.WithHelp("Number of accepted attachments by the node per slot."),
 		collector.WithInitFunc(func() {
 			deps.Protocol.MainEngineInstance().Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
 				transactionMetadata.OnAccepted(func() {

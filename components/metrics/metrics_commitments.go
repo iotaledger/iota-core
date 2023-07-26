@@ -13,13 +13,14 @@ import (
 const (
 	commitmentsNamespace = "commitments"
 
-	lastCommitment   = "latest"
-	seenTotal        = "seen_total"
-	missingRequested = "missing_requested_total"
-	missingReceived  = "missing_received_total"
-	acceptedBlocks   = "accepted_blocks"
-	transactions     = "accepted_transactions"
-	validators       = "active_validators"
+	lastCommitment      = "latest"
+	finalizedCommitment = "finalized"
+	forksCount          = "forks_total"
+	missingRequested    = "missing_requested_total"
+	missingReceived     = "missing_received_total"
+	acceptedBlocks      = "accepted_blocks"
+	transactions        = "accepted_transactions"
+	validators          = "active_validators"
 )
 
 var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
@@ -35,12 +36,24 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
-	collector.WithMetric(collector.NewMetric(seenTotal,
+	collector.WithMetric(collector.NewMetric(finalizedCommitment,
+		collector.WithType(collector.GaugeVec),
+		collector.WithHelp("Last commitment finalized by the node."),
+		collector.WithLabels("slot"),
+		collector.WithLabelValuesCollection(),
+		collector.WithInitFunc(func() {
+			deps.Collector.ResetMetric(commitmentsNamespace, finalizedCommitment)
+			deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+				deps.Collector.Update(commitmentsNamespace, finalizedCommitment, collector.MultiLabels(strconv.Itoa(int(slot))))
+			}, event.WithWorkerPool(Component.WorkerPool))
+		}),
+	)),
+	collector.WithMetric(collector.NewMetric(forksCount,
 		collector.WithType(collector.Counter),
-		collector.WithHelp("Number of commitments seen by the node."),
+		collector.WithHelp("Number of forks seen by the node."),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.ChainManager.ForkDetected.Hook(func(_ *chainmanager.Fork) {
-				deps.Collector.Increment(commitmentsNamespace, seenTotal)
+				deps.Collector.Increment(commitmentsNamespace, forksCount)
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
