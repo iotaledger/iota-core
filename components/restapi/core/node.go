@@ -28,7 +28,7 @@ func info() (*apimodels.InfoResponse, error) {
 			RelativeAcceptedTangleTime:  uint64(clSnapshot.RelativeAcceptedTime.UnixNano()),
 			ConfirmedTangleTime:         uint64(clSnapshot.ConfirmedTime.UnixNano()),
 			RelativeConfirmedTangleTime: uint64(clSnapshot.RelativeConfirmedTime.UnixNano()),
-			LatestCommitmentId:          syncStatus.LatestCommitment.ID(),
+			LatestCommitmentID:          syncStatus.LatestCommitment.ID(),
 			LatestFinalizedSlot:         syncStatus.LatestFinalizedSlot,
 			LatestAcceptedBlockSlot:     syncStatus.LastAcceptedBlockSlot,
 			LatestConfirmedBlockSlot:    syncStatus.LastConfirmedBlockSlot,
