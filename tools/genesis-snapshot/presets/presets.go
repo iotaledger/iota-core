@@ -21,7 +21,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("default", "rms"),
-			iotago.WithSupplyOptions(1_000_0000, 100, 1, 10),
+			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10),
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
 			iotago.WithLivenessOptions(10, 20, 5, 30),
 		),
@@ -34,7 +34,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 var Docker = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithFilePath("docker-network.snapshot"),
 	snapshotcreator.WithAccounts(
-		snapshotcreator.AccountDetails{
+		snapshotcreator.AccountDetails{ // master
 			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b"))),
 			Address:         iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b"))),
 			Amount:          testsuite.MinValidatorAccountDeposit,
@@ -43,7 +43,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			FixedCost:       1,
 			StakedAmount:    testsuite.MinValidatorAccountDeposit,
 		},
-		snapshotcreator.AccountDetails{
+		snapshotcreator.AccountDetails{ // master2
 			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064"))),
 			Address:         iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064"))),
 			Amount:          testsuite.MinValidatorAccountDeposit,
@@ -52,7 +52,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			FixedCost:       1,
 			StakedAmount:    testsuite.MinValidatorAccountDeposit,
 		},
-		snapshotcreator.AccountDetails{
+		snapshotcreator.AccountDetails{ // faucet
 			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648"))),
 			Address:         iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648"))),
 			Amount:          testsuite.MinValidatorAccountDeposit,
@@ -61,24 +61,66 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			FixedCost:       1,
 			StakedAmount:    testsuite.MinValidatorAccountDeposit,
 		},
+		snapshotcreator.AccountDetails{ // nomana
+			AccountID: blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xa54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39"))),
+			Address:   iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xa54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39"))),
+			Amount:    testsuite.MinIssuerAccountDeposit,
+			IssuerKey: lo.PanicOnErr(hexutil.DecodeHex("0xa54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39")),
+		},
+		snapshotcreator.AccountDetails{ // nomana2
+			AccountID: blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xcb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b"))),
+			Address:   iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xcb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b"))),
+			Amount:    testsuite.MinIssuerAccountDeposit,
+			IssuerKey: lo.PanicOnErr(hexutil.DecodeHex("0xcb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b")),
+		},
 	),
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("docker", "rms"),
-			iotago.WithSupplyOptions(100_000_0000, 1, 1, 10),
+			iotago.WithSupplyOptions(10_000_000_000, 1, 1, 10),
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
 			iotago.WithLivenessOptions(10, 20, 5, 30),
 		),
 	),
 }
 
+// Feature is a preset for the feature network, genesis time ~20th of July 2023.
 var Feature = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithFilePath("docker-network.snapshot"),
+	snapshotcreator.WithAccounts(
+		snapshotcreator.AccountDetails{
+			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe"))),
+			Address:         iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe"))),
+			Amount:          testsuite.MinValidatorAccountDeposit,
+			IssuerKey:       lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe")),
+			StakingEpochEnd: math.MaxUint64,
+			FixedCost:       1,
+			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+		},
+		snapshotcreator.AccountDetails{
+			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6"))),
+			Address:         iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6"))),
+			Amount:          testsuite.MinValidatorAccountDeposit,
+			IssuerKey:       lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6")),
+			StakingEpochEnd: math.MaxUint64,
+			FixedCost:       1,
+			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+		},
+		snapshotcreator.AccountDetails{
+			AccountID:       blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805"))),
+			Address:         iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805"))),
+			Amount:          testsuite.MinValidatorAccountDeposit,
+			IssuerKey:       lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805")),
+			StakingEpochEnd: math.MaxUint64,
+			FixedCost:       1,
+			StakedAmount:    testsuite.MinValidatorAccountDeposit,
+		},
+	),
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("feature", "rms"),
-			iotago.WithSupplyOptions(1_000_0000, 100, 1, 10),
-			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
+			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10),
+			iotago.WithTimeProviderOptions(1689848996, 10, 13),
 			iotago.WithLivenessOptions(10, 20, 5, 30),
 		),
 	),

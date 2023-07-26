@@ -23,6 +23,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
@@ -33,6 +34,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -55,8 +57,10 @@ type Engine struct {
 	Notarization        notarization.Notarization
 	Attestations        attestation.Attestations
 	Ledger              ledger.Ledger
+	Scheduler           scheduler.Scheduler
 	TipManager          tipmanager.TipManager
 	TipSelection        tipselection.TipSelection
+	Retainer            retainer.Retainer
 	UpgradeOrchestrator upgrade.Orchestrator
 
 	Workers      *workerpool.Group
@@ -94,8 +98,10 @@ func New(
 	notarizationProvider module.Provider[*Engine, notarization.Notarization],
 	attestationProvider module.Provider[*Engine, attestation.Attestations],
 	ledgerProvider module.Provider[*Engine, ledger.Ledger],
+	schedulerProvider module.Provider[*Engine, scheduler.Scheduler],
 	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
+	retainerProvider module.Provider[*Engine, retainer.Retainer],
 	upgradeOrchestratorProvider module.Provider[*Engine, upgrade.Orchestrator],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
@@ -107,7 +113,7 @@ func New(
 		&Engine{
 			Events:        NewEvents(),
 			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance.RootBlocks),
+			EvictionState: eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
 			Workers:       workers,
 			errorHandler:  errorHandler,
 
@@ -131,7 +137,7 @@ func New(
 		},
 		func(e *Engine) {
 			// Setup all components
-			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings())
+			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings().APIProvider())
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 			e.SybilProtection = sybilProtectionProvider(e)
 			e.BlockDAG = blockDAGProvider(e)
@@ -145,7 +151,9 @@ func New(
 			e.Attestations = attestationProvider(e)
 			e.Ledger = ledgerProvider(e)
 			e.TipManager = tipManagerProvider(e)
+			e.Scheduler = schedulerProvider(e)
 			e.TipSelection = tipSelectionProvider(e)
+			e.Retainer = retainerProvider(e)
 			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
 		},
 		(*Engine).setupBlockStorage,
@@ -212,6 +220,8 @@ func (e *Engine) Shutdown() {
 		e.TipManager.Shutdown()
 		e.Filter.Shutdown()
 		e.CommitmentFilter.Shutdown()
+		e.Scheduler.Shutdown()
+		e.Retainer.Shutdown()
 		e.Storage.Shutdown()
 		e.Workers.Shutdown()
 	}
@@ -270,23 +280,23 @@ func (e *Engine) IsSynced() (isBootstrapped bool) {
 }
 
 func (e *Engine) APIForSlot(slot iotago.SlotIndex) iotago.API {
-	return e.Storage.Settings().APIForSlot(slot)
+	return e.Storage.Settings().APIProvider().APIForSlot(slot)
 }
 
 func (e *Engine) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
-	return e.Storage.Settings().APIForEpoch(epoch)
+	return e.Storage.Settings().APIProvider().APIForEpoch(epoch)
 }
 
 func (e *Engine) APIForVersion(version iotago.Version) (iotago.API, error) {
-	return e.Storage.Settings().APIForVersion(version)
+	return e.Storage.Settings().APIProvider().APIForVersion(version)
 }
 
 func (e *Engine) LatestAPI() iotago.API {
-	return e.Storage.Settings().LatestAPI()
+	return e.Storage.Settings().APIProvider().LatestAPI()
 }
 
 func (e *Engine) CurrentAPI() iotago.API {
-	return e.Storage.Settings().CurrentAPI()
+	return e.Storage.Settings().APIProvider().CurrentAPI()
 }
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
@@ -386,14 +396,12 @@ func (e *Engine) acceptanceHandler() {
 	wp := e.Workers.CreatePool("BlockAccepted", 1)
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-			e.Ledger.BlockAccepted(block)
-			e.SybilProtection.BlockAccepted(block)
-			e.UpgradeOrchestrator.TrackBlock(block)
+		e.Ledger.BlockAccepted(block)
+		e.SybilProtection.BlockAccepted(block)
+		e.UpgradeOrchestrator.TrackBlock(block)
 
-			e.Events.AcceptedBlockProcessed.Trigger(block)
-		}, event.WithWorkerPool(wp))
-	})
+		e.Events.AcceptedBlockProcessed.Trigger(block)
+	}, event.WithWorkerPool(wp))
 }
 
 func (e *Engine) setupBlockStorage() {

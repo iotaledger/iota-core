@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evil-spammer/evillogger"
-	"github.com/iotaledger/iota-core/tools/evilwallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/logger"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 )
 
 var (
-	log           = evillogger.New("main")
+	log           = logger.New("main")
 	optionFlagSet = flag.NewFlagSet("script flag set", flag.ExitOnError)
 )
 
@@ -27,6 +27,7 @@ func main() {
 			"'basic' - can be parametrized with additional flags to run one time spammer. Run 'evil-wallet basic -h' for the list of possible flags.\n" +
 			"'quick' - runs simple stress test: tx spam -> blk spam -> ds spam. Run 'evil-wallet quick -h' for the list of possible flags.\n" +
 			"'commitments' - runs spammer for commitments. Run 'evil-wallet commitments -h' for the list of possible flags.")
+
 		return
 	}
 	// run selected test scenario
@@ -34,11 +35,10 @@ func main() {
 	case "interactive":
 		Run()
 	case "basic":
-		config := CustomSpam(&customSpamParams)
-		saveConfigsToFile(config)
+		CustomSpam(&customSpamParams)
 	case "quick":
 		QuickTest(&quickTestParams)
-	// case "commitments":
+	// case SpammerTypeCommitments:
 	// 	CommitmentsSpam(&commitmentsSpamParams)
 	default:
 		log.Warnf("Unknown parameter for script, possible values: basic, quick, commitments")
@@ -59,12 +59,13 @@ func parseFlags() (help bool) {
 		parseBasicSpamFlags()
 	case "quick":
 		parseQuickTestFlags()
-		// case "commitments":
+		// case SpammerTypeCommitments:
 		// 	parseCommitmentsSpamFlags()
 	}
 	if Script == "help" || Script == "-h" || Script == "--help" {
 		return true
 	}
+
 	return
 }
 
@@ -113,7 +114,7 @@ func parseBasicSpamFlags() {
 		customSpamParams.BlkToBeSent = parsedBlkNums
 	}
 	if *scenario != "" {
-		conflictBatch, ok := evilwallet.GetScenario(*scenario)
+		conflictBatch, ok := wallet.GetScenario(*scenario)
 		if ok {
 			customSpamParams.Scenario = conflictBatch
 		}
@@ -180,6 +181,7 @@ func parseQuickTestFlags() {
 
 func parseCommaSepString(urls string) []string {
 	split := strings.Split(urls, ",")
+
 	return split
 }
 
@@ -189,6 +191,7 @@ func parseCommaSepInt(nums string) []int {
 	for i, num := range split {
 		parsed[i], _ = strconv.Atoi(num)
 	}
+
 	return parsed
 }
 
@@ -198,15 +201,16 @@ func parseDurations(durations string) []time.Duration {
 	for i, dur := range split {
 		parsed[i], _ = time.ParseDuration(dur)
 	}
+
 	return parsed
 }
 
 type BasicConfig struct {
-	LastFaucetUnspentOutputID string `json:"lastFaucetUnspentOutputID"`
+	LastFaucetUnspentOutputID string `json:"lastFaucetUnspentOutputId"`
 }
 
 var basicConfigJSON = `{
-	"lastFaucetUnspentOutputID": ""
+	"lastFaucetUnspentOutputId": ""
 }`
 
 var basicConfigFile = "basic_config.json"
@@ -247,7 +251,11 @@ func saveConfigsToFile(config *BasicConfig) {
 	}
 	defer file.Close()
 
-	jsonConfigs, _ := json.MarshalIndent(config, "", "    ")
+	jsonConfigs, err := json.MarshalIndent(config, "", "    ")
+
+	if err != nil {
+		log.Errorf("failed to write configs to file %s", err)
+	}
 
 	//nolint:gosec // users should be able to read the file
 	if err = os.WriteFile(basicConfigFile, jsonConfigs, 0o644); err != nil {

@@ -2,6 +2,7 @@ package syncmanager
 
 import (
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -12,17 +13,17 @@ type SyncManager interface {
 	// IsNodeSynced returns bool indicating if a node is synced.
 	IsNodeSynced() bool
 
-	// LastAcceptedBlock returns the latest accepted block ID.
-	LastAcceptedBlock() iotago.BlockID
+	// LastAcceptedBlockSlot returns the slot of the latest accepted block.
+	LastAcceptedBlockSlot() iotago.SlotIndex
 
-	// LastConfirmedBlock returns the latest confirmed block ID.
-	LastConfirmedBlock() iotago.BlockID
+	// LastConfirmedBlockSlot returns slot of the latest confirmed block.
+	LastConfirmedBlockSlot() iotago.SlotIndex
 
-	// FinalizedSlot returns the latest finalized slot index.
-	FinalizedSlot() iotago.SlotIndex
+	// LatestCommitment returns the latest commitment.
+	LatestCommitment() *model.Commitment
 
-	// LatestCommittedSlot returns the latest committed slot index.
-	LatestCommittedSlot() iotago.SlotIndex
+	// LatestFinalizedSlot returns the latest finalized slot index.
+	LatestFinalizedSlot() iotago.SlotIndex
 
 	// Shutdown shuts down the SyncManager.
 	Shutdown()
@@ -31,9 +32,9 @@ type SyncManager interface {
 }
 
 type SyncStatus struct {
-	NodeSynced           bool
-	LastAcceptedBlockID  iotago.BlockID
-	LastConfirmedBlockID iotago.BlockID
-	FinalizedSlot        iotago.SlotIndex
-	LatestCommittedSlot  iotago.SlotIndex
+	NodeSynced             bool
+	LastAcceptedBlockSlot  iotago.SlotIndex
+	LastConfirmedBlockSlot iotago.SlotIndex
+	LatestCommitment       *model.Commitment
+	LatestFinalizedSlot    iotago.SlotIndex
 }

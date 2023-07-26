@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -15,7 +15,7 @@ import (
 )
 
 func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	outputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),
@@ -88,7 +88,7 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 }
 
 func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	previousOutputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),

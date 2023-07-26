@@ -183,7 +183,7 @@ func (n *Node) HookLogging() {
 	})
 
 	events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
-		fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool())
+		fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
 	})
 
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
@@ -239,6 +239,18 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
+	})
+
+	events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Scheduler.BlockScheduled: %s\n", n.Name, engineName, block.ID())
+	})
+
+	events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Scheduler.BlockSkipped: %s\n", n.Name, engineName, block.ID())
+	})
+
+	events.Scheduler.BlockDropped.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Scheduler.BlockDropped: %s\n", n.Name, engineName, block.ID())
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {

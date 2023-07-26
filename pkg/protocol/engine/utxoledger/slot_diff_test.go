@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/utils"
@@ -35,7 +35,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 			},
 		},
 	}
-	output := utxoledger.CreateOutput(api.NewStaticProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput)
 
 	transactionIDSpent := utils.RandTransactionID()
 
@@ -60,7 +60,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 }
 
 func TestSlotDiffSerialization(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	outputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),

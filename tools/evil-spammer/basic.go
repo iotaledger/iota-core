@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evil-spammer/evilspammerpkg"
-	"github.com/iotaledger/iota-core/tools/evilwallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -18,194 +18,194 @@ type CustomSpamParams struct {
 	TimeUnit              time.Duration
 	DelayBetweenConflicts time.Duration
 	NSpend                int
-	Scenario              evilwallet.EvilBatch
+	Scenario              wallet.EvilBatch
 	DeepSpam              bool
 	EnableRateSetter      bool
 
 	config *BasicConfig
 }
 
-func CustomSpam(params *CustomSpamParams) *BasicConfig {
+func CustomSpam(params *CustomSpamParams) {
 	outputID := iotago.EmptyOutputID
 	if params.config.LastFaucetUnspentOutputID != "" {
 		outputID, _ = iotago.OutputIDFromHex(params.config.LastFaucetUnspentOutputID)
 	}
 
-	wallet := evilwallet.NewEvilWallet(evilwallet.WithClients(params.ClientURLs...), evilwallet.WithFaucetOutputID(outputID))
+	w := wallet.NewEvilWallet(wallet.WithClients(params.ClientURLs...), wallet.WithFaucetOutputID(outputID))
 	wg := sync.WaitGroup{}
 
 	fundsNeeded := false
 	for _, st := range params.SpamTypes {
-		if st != "blk" {
+		if st != SpammerTypeBlock {
 			fundsNeeded = true
 		}
 	}
 	if fundsNeeded {
-		err := wallet.RequestFreshBigFaucetWallet()
+		err := w.RequestFreshBigFaucetWallet()
 		if err != nil {
 			panic(err)
 		}
+		saveConfigsToFile(&BasicConfig{
+			LastFaucetUnspentOutputID: w.LastFaucetUnspentOutput().ToHex(),
+		})
 	}
 
 	for i, sType := range params.SpamTypes {
 		log.Infof("Start spamming with rate: %d, time unit: %s, and spamming type: %s.", params.Rates[i], params.TimeUnit.String(), sType)
 
 		switch sType {
-		case "blk":
+		case SpammerTypeBlock:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				s := SpamBlocks(wallet, params.Rates[i], params.TimeUnit, params.Durations[i], params.BlkToBeSent[i], params.EnableRateSetter)
+				s := SpamBlocks(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.BlkToBeSent[i], params.EnableRateSetter)
 				if s == nil {
 					return
 				}
 				s.Spam()
 			}(i)
-		case "tx":
+		case SpammerTypeTx:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				SpamTransaction(wallet, params.Rates[i], params.TimeUnit, params.Durations[i], params.DeepSpam, params.EnableRateSetter)
+				SpamTransaction(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.DeepSpam, params.EnableRateSetter)
 			}(i)
-		case "ds":
+		case SpammerTypeDs:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				SpamDoubleSpends(wallet, params.Rates[i], params.NSpend, params.TimeUnit, params.Durations[i], params.DelayBetweenConflicts, params.DeepSpam, params.EnableRateSetter)
+				SpamDoubleSpends(w, params.Rates[i], params.NSpend, params.TimeUnit, params.Durations[i], params.DelayBetweenConflicts, params.DeepSpam, params.EnableRateSetter)
 			}(i)
-		case "custom":
+		case SpammerTypeCustom:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				s := SpamNestedConflicts(wallet, params.Rates[i], params.TimeUnit, params.Durations[i], params.Scenario, params.DeepSpam, false, params.EnableRateSetter)
+				s := SpamNestedConflicts(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.Scenario, params.DeepSpam, false, params.EnableRateSetter)
 				if s == nil {
 					return
 				}
 				s.Spam()
 			}(i)
-		case "commitments":
+		case SpammerTypeCommitments:
 			wg.Add(1)
-			go func(i int) {
+			go func() {
 				defer wg.Done()
-			}(i)
+			}()
 
 		default:
-			log.Warn("Spamming type not recognized. Try one of following: tx, ds, blk")
+			log.Warn("Spamming type not recognized. Try one of following: tx, ds, blk, custom, commitments")
 		}
 	}
 
 	wg.Wait()
 	log.Info("Basic spamming finished!")
-
-	return &BasicConfig{
-		LastFaucetUnspentOutputID: wallet.LastFaucetUnspentOutput().ToHex(),
-	}
 }
 
-func SpamTransaction(wallet *evilwallet.EvilWallet, rate int, timeUnit, duration time.Duration, deepSpam, enableRateSetter bool) {
-	if wallet.NumOfClient() < 1 {
+func SpamTransaction(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, deepSpam, enableRateSetter bool) {
+	if w.NumOfClient() < 1 {
 		printer.NotEnoughClientsWarning(1)
 	}
 
-	scenarioOptions := []evilwallet.ScenarioOption{
-		evilwallet.WithScenarioCustomConflicts(evilwallet.SingleTransactionBatch()),
+	scenarioOptions := []wallet.ScenarioOption{
+		wallet.WithScenarioCustomConflicts(wallet.SingleTransactionBatch()),
 	}
 	if deepSpam {
-		outWallet := wallet.NewWallet(evilwallet.Reuse)
+		outWallet := wallet.NewWallet(wallet.Reuse)
 		scenarioOptions = append(scenarioOptions,
-			evilwallet.WithScenarioDeepSpamEnabled(),
-			evilwallet.WithScenarioReuseOutputWallet(outWallet),
-			evilwallet.WithScenarioInputWalletForDeepSpam(outWallet),
+			wallet.WithScenarioDeepSpamEnabled(),
+			wallet.WithScenarioReuseOutputWallet(outWallet),
+			wallet.WithScenarioInputWalletForDeepSpam(outWallet),
 		)
 	}
-	scenarioTx := evilwallet.NewEvilScenario(scenarioOptions...)
+	scenarioTx := wallet.NewEvilScenario(scenarioOptions...)
 
-	options := []evilspammerpkg.Options{
-		evilspammerpkg.WithSpamRate(rate, timeUnit),
-		evilspammerpkg.WithSpamDuration(duration),
-		evilspammerpkg.WithRateSetter(enableRateSetter),
-		evilspammerpkg.WithEvilWallet(wallet),
-		evilspammerpkg.WithEvilScenario(scenarioTx),
+	options := []spammer.Options{
+		spammer.WithSpamRate(rate, timeUnit),
+		spammer.WithSpamDuration(duration),
+		spammer.WithRateSetter(enableRateSetter),
+		spammer.WithEvilWallet(w),
+		spammer.WithEvilScenario(scenarioTx),
 	}
-	spammer := evilspammerpkg.NewSpammer(options...)
-	spammer.Spam()
+
+	s := spammer.NewSpammer(options...)
+	s.Spam()
 }
 
-func SpamDoubleSpends(wallet *evilwallet.EvilWallet, rate, nSpent int, timeUnit, duration, delayBetweenConflicts time.Duration, deepSpam, enableRateSetter bool) {
+func SpamDoubleSpends(w *wallet.EvilWallet, rate, nSpent int, timeUnit, duration, delayBetweenConflicts time.Duration, deepSpam, enableRateSetter bool) {
 	log.Debugf("Setting up double spend spammer with rate: %d, time unit: %s, and duration: %s.", rate, timeUnit.String(), duration.String())
-	if wallet.NumOfClient() < 2 {
+	if w.NumOfClient() < 2 {
 		printer.NotEnoughClientsWarning(2)
 	}
 
-	scenarioOptions := []evilwallet.ScenarioOption{
-		evilwallet.WithScenarioCustomConflicts(evilwallet.NSpendBatch(nSpent)),
+	scenarioOptions := []wallet.ScenarioOption{
+		wallet.WithScenarioCustomConflicts(wallet.NSpendBatch(nSpent)),
 	}
 	if deepSpam {
-		outWallet := wallet.NewWallet(evilwallet.Reuse)
+		outWallet := wallet.NewWallet(wallet.Reuse)
 		scenarioOptions = append(scenarioOptions,
-			evilwallet.WithScenarioDeepSpamEnabled(),
-			evilwallet.WithScenarioReuseOutputWallet(outWallet),
-			evilwallet.WithScenarioInputWalletForDeepSpam(outWallet),
+			wallet.WithScenarioDeepSpamEnabled(),
+			wallet.WithScenarioReuseOutputWallet(outWallet),
+			wallet.WithScenarioInputWalletForDeepSpam(outWallet),
 		)
 	}
-	scenarioDs := evilwallet.NewEvilScenario(scenarioOptions...)
-	options := []evilspammerpkg.Options{
-		evilspammerpkg.WithSpamRate(rate, timeUnit),
-		evilspammerpkg.WithSpamDuration(duration),
-		evilspammerpkg.WithEvilWallet(wallet),
-		evilspammerpkg.WithRateSetter(enableRateSetter),
-		evilspammerpkg.WithTimeDelayForDoubleSpend(delayBetweenConflicts),
-		evilspammerpkg.WithEvilScenario(scenarioDs),
+	scenarioDs := wallet.NewEvilScenario(scenarioOptions...)
+	options := []spammer.Options{
+		spammer.WithSpamRate(rate, timeUnit),
+		spammer.WithSpamDuration(duration),
+		spammer.WithEvilWallet(w),
+		spammer.WithRateSetter(enableRateSetter),
+		spammer.WithTimeDelayForDoubleSpend(delayBetweenConflicts),
+		spammer.WithEvilScenario(scenarioDs),
 	}
-	spammer := evilspammerpkg.NewSpammer(options...)
-	spammer.Spam()
+
+	s := spammer.NewSpammer(options...)
+	s.Spam()
 }
 
-func SpamNestedConflicts(wallet *evilwallet.EvilWallet, rate int, timeUnit, duration time.Duration, conflictBatch evilwallet.EvilBatch, deepSpam, reuseOutputs, enableRateSetter bool) *evilspammerpkg.Spammer {
-	scenarioOptions := []evilwallet.ScenarioOption{
-		evilwallet.WithScenarioCustomConflicts(conflictBatch),
+func SpamNestedConflicts(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, conflictBatch wallet.EvilBatch, deepSpam, reuseOutputs, enableRateSetter bool) *spammer.Spammer {
+	scenarioOptions := []wallet.ScenarioOption{
+		wallet.WithScenarioCustomConflicts(conflictBatch),
 	}
 	if deepSpam {
-		outWallet := wallet.NewWallet(evilwallet.Reuse)
+		outWallet := wallet.NewWallet(wallet.Reuse)
 		scenarioOptions = append(scenarioOptions,
-			evilwallet.WithScenarioDeepSpamEnabled(),
-			evilwallet.WithScenarioReuseOutputWallet(outWallet),
-			evilwallet.WithScenarioInputWalletForDeepSpam(outWallet),
+			wallet.WithScenarioDeepSpamEnabled(),
+			wallet.WithScenarioReuseOutputWallet(outWallet),
+			wallet.WithScenarioInputWalletForDeepSpam(outWallet),
 		)
 	} else if reuseOutputs {
-		outWallet := wallet.NewWallet(evilwallet.Reuse)
-		scenarioOptions = append(scenarioOptions, evilwallet.WithScenarioReuseOutputWallet(outWallet))
+		outWallet := wallet.NewWallet(wallet.Reuse)
+		scenarioOptions = append(scenarioOptions, wallet.WithScenarioReuseOutputWallet(outWallet))
 	}
-	scenario := evilwallet.NewEvilScenario(scenarioOptions...)
-	if scenario.NumOfClientsNeeded > wallet.NumOfClient() {
+	scenario := wallet.NewEvilScenario(scenarioOptions...)
+	if scenario.NumOfClientsNeeded > w.NumOfClient() {
 		printer.NotEnoughClientsWarning(scenario.NumOfClientsNeeded)
-		return nil
 	}
 
-	options := []evilspammerpkg.Options{
-		evilspammerpkg.WithSpamRate(rate, timeUnit),
-		evilspammerpkg.WithSpamDuration(duration),
-		evilspammerpkg.WithEvilWallet(wallet),
-		evilspammerpkg.WithRateSetter(enableRateSetter),
-		evilspammerpkg.WithEvilScenario(scenario),
+	options := []spammer.Options{
+		spammer.WithSpamRate(rate, timeUnit),
+		spammer.WithSpamDuration(duration),
+		spammer.WithEvilWallet(w),
+		spammer.WithRateSetter(enableRateSetter),
+		spammer.WithEvilScenario(scenario),
 	}
 
-	return evilspammerpkg.NewSpammer(options...)
+	return spammer.NewSpammer(options...)
 }
 
-func SpamBlocks(wallet *evilwallet.EvilWallet, rate int, timeUnit, duration time.Duration, numBlkToSend int, enableRateSetter bool) *evilspammerpkg.Spammer {
-	if wallet.NumOfClient() < 1 {
+func SpamBlocks(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, numBlkToSend int, enableRateSetter bool) *spammer.Spammer {
+	if w.NumOfClient() < 1 {
 		printer.NotEnoughClientsWarning(1)
 	}
 
-	options := []evilspammerpkg.Options{
-		evilspammerpkg.WithSpamRate(rate, timeUnit),
-		evilspammerpkg.WithSpamDuration(duration),
-		evilspammerpkg.WithBatchesSent(numBlkToSend),
-		evilspammerpkg.WithRateSetter(enableRateSetter),
-		evilspammerpkg.WithEvilWallet(wallet),
-		evilspammerpkg.WithSpammingFunc(evilspammerpkg.DataSpammingFunction),
+	options := []spammer.Options{
+		spammer.WithSpamRate(rate, timeUnit),
+		spammer.WithSpamDuration(duration),
+		spammer.WithBatchesSent(numBlkToSend),
+		spammer.WithRateSetter(enableRateSetter),
+		spammer.WithEvilWallet(w),
+		spammer.WithSpammingFunc(spammer.DataSpammingFunction),
 	}
-	spammer := evilspammerpkg.NewSpammer(options...)
-	return spammer
+
+	return spammer.NewSpammer(options...)
 }

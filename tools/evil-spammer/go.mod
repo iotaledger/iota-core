@@ -4,17 +4,20 @@ go 1.20
 
 replace github.com/iotaledger/iota-core => ../../
 
+replace github.com/iotaledger/iota-core/tools/genesis-snapshot => ../genesis-snapshot/
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
-	github.com/iotaledger/hive.go/app v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/ds v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/lo v0.0.0-20230717094216-46222fa0ec69
-	github.com/iotaledger/hive.go/logger v0.0.0-20230717094216-46222fa0ec69
+	github.com/iotaledger/hive.go/app v0.0.0-20230721122326-34450325011f
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230721122326-34450325011f
+	github.com/iotaledger/hive.go/ds v0.0.0-20230721122326-34450325011f
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20230721122326-34450325011f
+	github.com/iotaledger/hive.go/lo v0.0.0-20230721122326-34450325011f
+	github.com/iotaledger/hive.go/logger v0.0.0-20230721122326-34450325011f
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230721122326-34450325011f
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-20230718111805-9d3cc4d584ef
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230714095119-326fc0683ede
+	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-00010101000000-000000000000
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230726093907-2e7cfcdc28b6
 	github.com/mr-tron/base58 v1.2.0
 	go.uber.org/atomic v1.11.0
 )
@@ -25,7 +28,7 @@ require (
 	github.com/celestiaorg/smt v0.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
-	github.com/eclipse/paho.mqtt.golang v1.4.2 // indirect
+	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
 	github.com/ethereum/go-ethereum v1.12.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -35,13 +38,13 @@ require (
 	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/hive.go/ads v0.0.0-20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/constraints v0.0.0-20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230717094216-46222fa0ec69 // indirect
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230717094216-46222fa0ec69 // indirect
+	github.com/iotaledger/hive.go/ads v0.0.0-20230721122326-34450325011f // indirect
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230721122326-34450325011f // indirect
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230721122326-34450325011f // indirect
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230721122326-34450325011f // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230721122326-34450325011f // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230721122326-34450325011f // indirect
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726094056-e4fe59ff68a6 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
@@ -65,7 +68,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.11.0 // indirect
-	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df // indirect
+	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect

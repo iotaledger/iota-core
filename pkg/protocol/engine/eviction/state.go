@@ -1,12 +1,14 @@
 package eviction
 
 import (
+	"errors"
 	"io"
 	"math"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -14,6 +16,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
+
+const latestNonEmptySlotKey = 1
 
 // State represents the state of the eviction and keeps track of the root blocks.
 type State struct {
@@ -23,18 +27,20 @@ type State struct {
 	latestRootBlocks     *ringbuffer.RingBuffer[iotago.BlockID]
 	rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks
 	lastEvictedSlot      iotago.SlotIndex
+	latestNonEmptyStore  kvstore.KVStore
 	evictionMutex        syncutils.RWMutex
 
 	optsRootBlocksEvictionDelay iotago.SlotIndex
 }
 
 // NewState creates a new eviction State.
-func NewState(rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks, opts ...options.Option[State]) (state *State) {
+func NewState(latestNonEmptyStore kvstore.KVStore, rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks, opts ...options.Option[State]) (state *State) {
 	return options.Apply(&State{
 		Events:                      NewEvents(),
 		rootBlocks:                  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID](),
 		latestRootBlocks:            ringbuffer.NewRingBuffer[iotago.BlockID](8),
 		rootBlockStorageFunc:        rootBlockStorageFunc,
+		latestNonEmptyStore:         latestNonEmptyStore,
 		optsRootBlocksEvictionDelay: 3,
 	}, opts)
 }
@@ -49,7 +55,10 @@ func (s *State) AdvanceActiveWindowToIndex(index iotago.SlotIndex) {
 	s.lastEvictedSlot = index
 
 	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(index); shouldEvictRootBlocks {
-		s.rootBlocks.Evict(delayedIndex)
+		// Remember the last slot outside our cache window that has root blocks.
+		if evictedSlot := s.rootBlocks.Evict(delayedIndex); evictedSlot != nil && evictedSlot.Size() > 0 {
+			s.setLatestNonEmptySlot(delayedIndex)
+		}
 	}
 
 	s.evictionMutex.Unlock()
@@ -223,7 +232,9 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 
 	start, _ := s.delayedBlockEvictionThreshold(lowerTarget)
 
-	return stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
+	latestNonEmptySlot := iotago.SlotIndex(0)
+
+	if err := stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		for currentSlot := start; currentSlot <= targetSlot; currentSlot++ {
 			storage := s.rootBlockStorageFunc(currentSlot)
 			if storage == nil {
@@ -245,15 +256,31 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 			}); err != nil {
 				return 0, ierrors.Wrap(err, "failed to stream root blocks")
 			}
+
+			latestNonEmptySlot = currentSlot
 		}
 
 		return elementsCount, nil
-	})
+	}); err != nil {
+		return ierrors.Wrap(err, "failed to write root blocks")
+	}
+
+	if latestNonEmptySlot > s.optsRootBlocksEvictionDelay {
+		latestNonEmptySlot -= s.optsRootBlocksEvictionDelay
+	} else {
+		latestNonEmptySlot = 0
+	}
+
+	if err := stream.WriteSerializable(writer, latestNonEmptySlot, iotago.SlotIndexLength); err != nil {
+		return ierrors.Wrap(err, "failed to write latest non empty slot")
+	}
+
+	return nil
 }
 
 // Import imports the root blocks from the given reader.
-func (s *State) Import(reader io.ReadSeeker) (err error) {
-	return stream.ReadCollection(reader, func(i int) error {
+func (s *State) Import(reader io.ReadSeeker) error {
+	if err := stream.ReadCollection(reader, func(i int) error {
 		blockIDBytes, err := stream.ReadBytes(reader, iotago.BlockIDLength)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to read root block id %d", i)
@@ -281,7 +308,23 @@ func (s *State) Import(reader io.ReadSeeker) (err error) {
 		}
 
 		return nil
-	})
+	}); err != nil {
+		return ierrors.Wrap(err, "failed to read root blocks")
+	}
+
+	latestNonEmptySlotBytes, err := stream.ReadBytes(reader, iotago.SlotIndexLength)
+	if err != nil {
+		return ierrors.Wrap(err, "failed to read latest non empty slot")
+	}
+
+	latestNonEmptySlot, _, err := iotago.SlotIndexFromBytes(latestNonEmptySlotBytes)
+	if err != nil {
+		return ierrors.Wrap(err, "failed to parse latest non empty slot")
+	}
+
+	s.setLatestNonEmptySlot(latestNonEmptySlot)
+
+	return nil
 }
 
 // PopulateFromStorage populates the root blocks from the storage.
@@ -297,19 +340,44 @@ func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 	}
 }
 
+// latestNonEmptySlot returns the latest slot that contains a rootblock.
+func (s *State) latestNonEmptySlot() iotago.SlotIndex {
+	latestNonEmptySlotBytes, err := s.latestNonEmptyStore.Get([]byte{latestNonEmptySlotKey})
+	if err != nil {
+		if errors.Is(err, kvstore.ErrKeyNotFound) {
+			return 0
+		}
+		panic(ierrors.Wrap(err, "failed to get latest non empty slot"))
+	}
+
+	latestNonEmptySlot, _, err := iotago.SlotIndexFromBytes(latestNonEmptySlotBytes)
+	if err != nil {
+		panic(ierrors.Wrap(err, "failed to parse latest non empty slot"))
+	}
+
+	return latestNonEmptySlot
+}
+
+// setLatestNonEmptySlot sets the latest slot that contains a rootblock.
+func (s *State) setLatestNonEmptySlot(slot iotago.SlotIndex) {
+	if err := s.latestNonEmptyStore.Set([]byte{latestNonEmptySlotKey}, slot.MustBytes()); err != nil {
+		panic(ierrors.Wrap(err, "failed to store latest non empty slot"))
+	}
+}
+
 func (s *State) activeIndexRange() (start, end iotago.SlotIndex) {
 	lastCommitted := s.lastEvictedSlot
-	delayed, valid := s.delayedBlockEvictionThreshold(lastCommitted)
+	delayedIndex, valid := s.delayedBlockEvictionThreshold(lastCommitted)
 
 	if !valid {
 		return 0, lastCommitted
 	}
 
-	if delayed+1 > lastCommitted {
-		return delayed, lastCommitted
+	if delayedIndex+1 > lastCommitted {
+		return delayedIndex, lastCommitted
 	}
 
-	return delayed + 1, lastCommitted
+	return delayedIndex + 1, lastCommitted
 }
 
 func (s *State) withinActiveIndexRange(index iotago.SlotIndex) bool {
@@ -319,27 +387,27 @@ func (s *State) withinActiveIndexRange(index iotago.SlotIndex) bool {
 }
 
 // delayedBlockEvictionThreshold returns the slot index that is the threshold for delayed rootblocks eviction.
-func (s *State) delayedBlockEvictionThreshold(slotIndex iotago.SlotIndex) (threshold iotago.SlotIndex, shouldEvict bool) {
-	if slotIndex >= s.optsRootBlocksEvictionDelay {
-		// Check if there are even root blocks at the delayed index (empty slots were committed).
-		// We keep shifting the eviction to the past until we find a slot that has root blocks, or we get to genesis.
-		for ; slotIndex > 0; slotIndex-- {
-			if rb := s.rootBlocks.Get(slotIndex); rb != nil {
-				if rb.Size() > 0 {
-					return slotIndex - s.optsRootBlocksEvictionDelay, true
-				}
-			} else if storedRootBlocks := s.rootBlockStorageFunc(slotIndex); storedRootBlocks != nil {
-				found := false
-				_ = storedRootBlocks.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
-					found = true
-					return ierrors.New("no error, just stop")
-				})
+func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (threshold iotago.SlotIndex, shouldEvict bool) {
+	if slot < s.optsRootBlocksEvictionDelay {
+		return 0, false
+	}
 
-				if found {
-					return slotIndex - s.optsRootBlocksEvictionDelay, true
+	// Check if we have root blocks up to the eviction point.
+	for ; slot >= s.lastEvictedSlot; slot-- {
+		if rb := s.rootBlocks.Get(slot); rb != nil {
+			if rb.Size() > 0 {
+				if slot >= s.optsRootBlocksEvictionDelay {
+					return slot - s.optsRootBlocksEvictionDelay, true
 				}
+
+				return 0, false
 			}
 		}
+	}
+
+	// If we didn't find any root blocks, we have to fallback to the latestNonEmptySlot before the eviction point.
+	if latestNonEmptySlot := s.latestNonEmptySlot(); latestNonEmptySlot >= s.optsRootBlocksEvictionDelay {
+		return latestNonEmptySlot - s.optsRootBlocksEvictionDelay, true
 	}
 
 	return 0, false

@@ -1,0 +1,132 @@
+#jinja2: trim_blocks:True, lstrip_blocks:True
+input {
+	udp {
+        port => 5213
+    }
+}
+
+filter {
+    mutate {
+        split => ["host", "."]
+        add_field => { "shortHostname" => "%{[host][0]}.%{[host][1]}.%{[host][2]}.x" }
+    }
+    mutate {
+        rename => ["shortHostname", "host" ]
+    }
+
+    json {
+        source => "message"
+        target => "log"
+        remove_field => ["message"]
+    }
+}
+
+output {
+#     stdout {codec => rubydebug}
+    if [log][type] == "networkdelay" {
+        elasticsearch {
+            hosts => "elasticsearch:9200"
+            user => "{{ elkElasticUser }}"
+            password => "{{ elkElasticPassword }}"
+            ilm_rollover_alias => "networkdelay"
+            ilm_pattern => "000001"
+            ilm_policy => "logstash-policy"
+        }
+    } else if [log][type] == "sync" {
+        elasticsearch {
+            hosts => "elasticsearch:9200"
+            user => "{{ elkElasticUser }}"
+            password => "{{ elkElasticPassword }}"
+            ilm_rollover_alias => "sync"
+            ilm_pattern => "000001"
+            ilm_policy => "logstash-policy"
+        }
+    } else if [log][type] == "blockFinalized" {
+         elasticsearch {
+            hosts => "elasticsearch:9200"
+            user => "{{ elkElasticUser }}"
+            password => "{{ elkElasticPassword }}"
+            ilm_rollover_alias => "blockfinalized"
+            ilm_pattern => "000001"
+            ilm_policy => "logstash-policy"
+         }
+    } else if [log][type] == "conflictConfirmation" {
+        elasticsearch {
+            hosts => "elasticsearch:9200"
+            user => "{{ elkElasticUser }}"
+            password => "{{ elkElasticPassword }}"
+            ilm_rollover_alias => "conflictconfirmation"
+            ilm_pattern => "000001"
+            ilm_policy => "logstash-policy"
+        }
+    } else if [log][type] == "conflictCounts" {
+        elasticsearch {
+            hosts => "elasticsearch:9200"
+            user => "{{ elkElasticUser }}"
+            password => "{{ elkElasticPassword }}"
+            ilm_rollover_alias => "conflictcounts"
+            ilm_pattern => "000001"
+            ilm_policy => "logstash-policy"
+        }
+    } else if [log][type] == "blockScheduled" {
+        elasticsearch {
+            hosts => "elasticsearch:9200"
+            user => "{{ elkElasticUser }}"
+            password => "{{ elkElasticPassword }}"
+            ilm_rollover_alias => "blockscheduled"
+            ilm_pattern => "000001"
+            ilm_policy => "logstash-policy"
+        }
+    } else if [log][type] == "blockDiscarded" {
+        elasticsearch {
+            hosts => "elasticsearch:9200"
+            user => "{{ elkElasticUser }}"
+            password => "{{ elkElasticPassword }}"
+            ilm_rollover_alias => "blockdiscarded"
+            ilm_pattern => "000001"
+            ilm_policy => "logstash-policy"
+        }
+    } else if [log][type] == "missingBlock" {
+        elasticsearch {
+            hosts => "elasticsearch:9200"
+            user => "{{ elkElasticUser }}"
+            password => "{{ elkElasticPassword }}"
+            ilm_rollover_alias => "missingblock"
+            ilm_pattern => "000001"
+            ilm_policy => "logstash-policy"
+        }
+    } else if [log][type] == "missingBlockStored" {
+        elasticsearch {
+            hosts => "elasticsearch:9200"
+            user => "{{ elkElasticUser }}"
+            password => "{{ elkElasticPassword }}"
+            ilm_rollover_alias => "missingblockstored"
+            ilm_pattern => "000001"
+            ilm_policy => "logstash-policy"
+        }
+    } else if [log][type] == "schedulerSample" {
+         elasticsearch {
+             hosts => "elasticsearch:9200"
+             user => "{{ elkElasticUser }}"
+             password => "{{ elkElasticPassword }}"
+             ilm_rollover_alias => "schedulersample"
+             ilm_pattern => "000001"
+             ilm_policy => "logstash-policy"
+         }
+    } else if [log][type] == "log" {
+         elasticsearch {
+             hosts => "elasticsearch:9200"
+             user => "{{ elkElasticUser }}"
+             password => "{{ elkElasticPassword }}"
+             ilm_rollover_alias => "logs"
+             ilm_pattern => "000001"
+             ilm_policy => "logstash-policy"
+         }
+    } else{
+        elasticsearch {
+            hosts => "elasticsearch:9200"
+            user => "{{ elkElasticUser }}"
+            password => "{{ elkElasticPassword }}"
+        }
+    }
+}

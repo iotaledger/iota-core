@@ -155,7 +155,7 @@ Example:
 | --------------------------- | ---------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | enabled                     | Whether the REST API plugin is enabled                                                         | boolean | true                                                                                                                                                                                                    |
 | bindAddress                 | The bind address on which the REST API listens on                                              | string  | "0.0.0.0:8080"                                                                                                                                                                                          |
-| publicRoutes                | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes<br/>/api/core/v3/info<br/>/api/core/v3/blocks\*<br/>/api/core/v3/transactions\*<br/>/api/core/v3/commitments\*<br/>/api/core/v3/outputs\*<br/>/api/debug/v1/\*<br/>/api/indexer/v1/\* |
+| publicRoutes                | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes<br/>/api/core/v3/info<br/>/api/core/v3/blocks\*<br/>/api/core/v3/transactions\*<br/>/api/core/v3/commitments\*<br/>/api/core/v3/outputs\*<br/>/api/debug/v2/\*<br/>/api/indexer/v1/\* |
 | protectedRoutes             | The HTTP REST routes which need to be called with authorization. Wildcards using \* are allowed | array   | /api/\*                                                                                                                                                                                                  |
 | debugRequestLoggerEnabled   | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                   |
 | allowIncompleteBlock        | Whether the node allows to fill in incomplete block and issue it for user                      | boolean | false                                                                                                                                                                                                   |
@@ -190,7 +190,7 @@ Example:
         "/api/core/v3/transactions*",
         "/api/core/v3/commitments*",
         "/api/core/v3/outputs*",
-        "/api/debug/v1/*",
+        "/api/debug/v2/*",
         "/api/indexer/v1/*"
       ],
       "protectedRoutes": [
@@ -209,7 +209,31 @@ Example:
   }
 ```
 
-## <a id="metricstracker"></a> 6. Metricstracker
+## <a id="debugapi"></a> 6. DebugAPI
+
+| Name             | Description                                                | Type    | Default value   |
+| ---------------- | ---------------------------------------------------------- | ------- | --------------- |
+| enabled          | Whether the DebugAPI component is enabled                  | boolean | true            |
+| path             | The path to the database folder                            | string  | "testnet/debug" |
+| maxOpenDBs       | Maximum number of open database instances                  | int     | 2               |
+| pruningThreshold | How many confirmed slots should be retained                | uint    | 8640            |
+| dbGranularity    | How many slots should be contained in a single DB instance | int     | 100             |
+
+Example:
+
+```json
+  {
+    "debugAPI": {
+      "enabled": true,
+      "path": "testnet/debug",
+      "maxOpenDBs": 2,
+      "pruningThreshold": 8640,
+      "dbGranularity": 100
+    }
+  }
+```
+
+## <a id="metricstracker"></a> 7. Metricstracker
 
 | Name    | Description                                   | Type    | Default value |
 | ------- | --------------------------------------------- | ------- | ------------- |
@@ -225,15 +249,15 @@ Example:
   }
 ```
 
-## <a id="database"></a> 7. Database
+## <a id="database"></a> 8. Database
 
 | Name             | Description                                                | Type   | Default value      |
 | ---------------- | ---------------------------------------------------------- | ------ | ------------------ |
 | engine           | The used database engine (rocksdb/mapdb)                   | string | "rocksdb"          |
 | path             | The path to the database folder                            | string | "testnet/database" |
 | maxOpenDBs       | Maximum number of open database instances                  | int    | 10                 |
-| pruningThreshold | How many confirmed slots should be retained                | uint   | 360                |
-| dbGranularity    | How many slots should be contained in a single DB instance | int    | 1                  |
+| pruningThreshold | How many confirmed slots should be retained                | uint   | 16384              |
+| dbGranularity    | How many slots should be contained in a single DB instance | int    | 8192               |
 
 Example:
 
@@ -243,13 +267,13 @@ Example:
       "engine": "rocksdb",
       "path": "testnet/database",
       "maxOpenDBs": 10,
-      "pruningThreshold": 360,
-      "dbGranularity": 1
+      "pruningThreshold": 16384,
+      "dbGranularity": 8192
     }
   }
 ```
 
-## <a id="protocol"></a> 8. Protocol
+## <a id="protocol"></a> 9. Protocol
 
 | Name                           | Description                | Type   | Default value |
 | ------------------------------ | -------------------------- | ------ | ------------- |
@@ -285,7 +309,7 @@ Example:
   }
 ```
 
-## <a id="blockissuer"></a> 9. BlockIssuer
+## <a id="blockissuer"></a> 10. BlockIssuer
 
 | Name                      | Description                                               | Type    | Default value |
 | ------------------------- | --------------------------------------------------------- | ------- | ------------- |
@@ -309,7 +333,7 @@ Example:
   }
 ```
 
-## <a id="activity"></a> 10. Activity
+## <a id="activity"></a> 11. Activity
 
 | Name               | Description                                                                                                | Type    | Default value |
 | ------------------ | ---------------------------------------------------------------------------------------------------------- | ------- | ------------- |
@@ -331,7 +355,7 @@ Example:
   }
 ```
 
-## <a id="dashboard"></a> 11. Dashboard
+## <a id="dashboard"></a> 12. Dashboard
 
 | Name                              | Description                             | Type    | Default value  |
 | --------------------------------- | --------------------------------------- | ------- | -------------- |
@@ -345,8 +369,8 @@ Example:
 | Name     | Description                       | Type    | Default value |
 | -------- | --------------------------------- | ------- | ------------- |
 | enabled  | Whether to enable HTTP basic auth | boolean | false         |
-| username | HTTP basic auth username          | string  | "goshimmer"   |
-| password | HTTP basic auth password          | string  | "goshimmer"   |
+| username | HTTP basic auth username          | string  | "core"        |
+| password | HTTP basic auth password          | string  | "core"        |
 
 ### <a id="dashboard_conflicts"></a> Conflicts
 
@@ -363,8 +387,8 @@ Example:
       "bindAddress": "0.0.0.0:8081",
       "basicAuth": {
         "enabled": false,
-        "username": "goshimmer",
-        "password": "goshimmer"
+        "username": "core",
+        "password": "core"
       },
       "conflicts": {
         "maxCount": 100

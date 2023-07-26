@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
@@ -43,11 +43,11 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		SeatManager: mock.NewManualPOA(),
 	}
 
-	evictionState := eviction.NewState(func(index iotago.SlotIndex) *prunable.RootBlocks {
+	evictionState := eviction.NewState(mapdb.NewMapDB(), func(index iotago.SlotIndex) *prunable.RootBlocks {
 		return prunable.NewRootBlocks(index, mapdb.NewMapDB())
 	})
 
-	t.blockCache = blocks.New(evictionState, api.NewStaticProvider(tpkg.TestAPI))
+	t.blockCache = blocks.New(evictionState, api.SingleVersionProvider(tpkg.TestAPI))
 	instance := thresholdblockgadget.New(t.blockCache, t.SeatManager)
 	t.Events = instance.Events()
 	t.Instance = instance

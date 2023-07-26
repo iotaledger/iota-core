@@ -12,9 +12,9 @@ type ParametersDashboard struct {
 		// Enabled defines the config flag of the dashboard basic auth enabler.
 		Enabled bool `default:"false" usage:"whether to enable HTTP basic auth"`
 		// Username defines the config flag of the dashboard basic auth username.
-		Username string `default:"goshimmer" usage:"HTTP basic auth username"`
+		Username string `default:"core" usage:"HTTP basic auth username"`
 		// Password defines the config flag of the dashboard basic auth password.
-		Password string `default:"goshimmer" usage:"HTTP basic auth password"`
+		Password string `default:"core" usage:"HTTP basic auth password"`
 	}
 	// Conflicts defines the config flag for the configs tab of the dashboard.
 	Conflicts struct {

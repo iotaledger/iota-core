@@ -45,7 +45,7 @@
       "/api/core/v3/transactions*",
       "/api/core/v3/commitments*",
       "/api/core/v3/outputs*",
-      "/api/debug/v1/*",
+      "/api/debug/v2/*",
       "/api/indexer/v1/*"
     ],
     "protectedRoutes": [
@@ -61,6 +61,13 @@
       "maxResults": 1000
     }
   },
+  "debugAPI": {
+    "enabled": true,
+    "path": "testnet/debug",
+    "maxOpenDBs": 2,
+    "pruningThreshold": 8640,
+    "dbGranularity": 100
+  },
   "metricstracker": {
     "enabled": true
   },
@@ -68,8 +75,8 @@
     "engine": "rocksdb",
     "path": "testnet/database",
     "maxOpenDBs": 10,
-    "pruningThreshold": 360,
-    "dbGranularity": 1
+    "pruningThreshold": 16384,
+    "dbGranularity": 8192
   },
   "protocol": {
     "snapshot": {
@@ -98,8 +105,8 @@
     "bindAddress": "0.0.0.0:8081",
     "basicAuth": {
       "enabled": false,
-      "username": "goshimmer",
-      "password": "goshimmer"
+      "username": "core",
+      "password": "core"
     },
     "conflicts": {
       "maxCount": 100

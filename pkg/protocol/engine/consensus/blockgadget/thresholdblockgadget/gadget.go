@@ -3,7 +3,7 @@ package thresholdblockgadget
 import (
 	"fmt"
 
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -72,11 +72,10 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 	for walk.HasNext() {
 		blockID := walk.Next()
 		block, exists := g.blockCache.Block(blockID)
-		if !exists {
-			panic(fmt.Sprintf("parent %s does not exist", blockID))
-		}
 
-		if block.IsRootBlock() {
+		// If the block doesn't exist it is either in the process of being evicted (accepted or orphaned), or we should
+		// find it as a root block.
+		if !exists || block.IsRootBlock() {
 			continue
 		}
 
@@ -92,7 +91,7 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 	}
 }
 
-func anyChildInSet(block *blocks.Block, set set.Set[iotago.BlockID]) bool {
+func anyChildInSet(block *blocks.Block, set ds.Set[iotago.BlockID]) bool {
 	for _, child := range block.Children() {
 		if set.Has(child.ID()) {
 			return true

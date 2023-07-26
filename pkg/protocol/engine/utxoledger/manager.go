@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -170,13 +170,13 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 		}
 	}
 
-	msDiff := &SlotDiff{
+	slotDiff := &SlotDiff{
 		Index:   index,
 		Outputs: newOutputs,
 		Spents:  newSpents,
 	}
 
-	if err = storeDiff(msDiff, mutations); err != nil {
+	if err = storeDiff(slotDiff, mutations); err != nil {
 		mutations.Cancel()
 
 		return err

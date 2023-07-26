@@ -5,13 +5,13 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/advancedset"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -193,6 +193,8 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return true
 	})
 
+	l.events.StateDiffApplied.Trigger(index, outputs, spends)
+
 	return l.utxoLedger.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), l.accountsLedger.AccountsTreeRoot(), nil
 }
 
@@ -227,6 +229,7 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 		return castState, nil
 	case *ExecutionOutput:
 		txWithMetadata, exists := l.memPool.TransactionMetadata(outputID.TransactionID())
+		// If the transaction is not in the mempool, we need to load the output from the ledger
 		if !exists {
 			var output *utxoledger.Output
 			stateRequest := l.resolveState(outputID.UTXOInput())
@@ -289,7 +292,7 @@ func (l *Ledger) ForEachUnspentOutput(consumer func(output *utxoledger.Output) b
 	return l.utxoLedger.ForEachUnspentOutput(consumer)
 }
 
-func (l *Ledger) StateDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error) {
+func (l *Ledger) SlotDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error) {
 	return l.utxoLedger.SlotDiffWithoutLocking(index)
 }
 
@@ -331,6 +334,10 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 	}
 
 	return nil
+}
+
+func (l *Ledger) ManaManager() *mana.Manager {
+	return l.manaManager
 }
 
 func (l *Ledger) Shutdown() {
@@ -376,7 +383,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.PreviousExpirySlot = consumedOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 
 		oldPubKeysSet := accountData.PubKeys
-		newPubKeysSet := advancedset.New[ed25519.PublicKey]()
+		newPubKeysSet := ds.NewSet[ed25519.PublicKey]()
 		for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
 			newPubKeysSet.Add(ed25519.PublicKey(pubKey))
 		}
@@ -384,12 +391,12 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		// Add public keys that are not in the old set
 		accountDiff.PubKeysAdded = newPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
 			return !oldPubKeysSet.Has(key)
-		}).Slice()
+		}).ToSlice()
 
 		// Remove the keys that are not in the new set
 		accountDiff.PubKeysRemoved = oldPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
 			return !newPubKeysSet.Has(key)
-		}).Slice()
+		}).ToSlice()
 
 		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
 			// staking feature is created or updated - create the diff between the account data and new account
@@ -430,10 +437,10 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 	}
 }
 
-func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts *advancedset.AdvancedSet[iotago.AccountID], err error) {
+func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts ds.Set[iotago.AccountID], err error) {
 	createdAccounts = make(map[iotago.AccountID]*utxoledger.Output)
 	consumedAccounts = make(map[iotago.AccountID]*utxoledger.Output)
-	destroyedAccounts = advancedset.New[iotago.AccountID]()
+	destroyedAccounts = ds.NewSet[iotago.AccountID]()
 
 	createdAccountDelegation := make(map[iotago.ChainID]*iotago.DelegationOutput)
 

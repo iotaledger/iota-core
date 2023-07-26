@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evilwallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 )
 
 // Nodes used during the test, use at least two nodes to be able to doublespend.
@@ -18,14 +18,14 @@ var (
 
 	customSpamParams = CustomSpamParams{
 		ClientURLs:            urls,
-		SpamTypes:             []string{"blk"},
+		SpamTypes:             []string{SpammerTypeBlock},
 		Rates:                 []int{1},
 		Durations:             []time.Duration{time.Second * 20},
 		BlkToBeSent:           []int{0},
 		TimeUnit:              time.Second,
 		DelayBetweenConflicts: 0,
 		NSpend:                2,
-		Scenario:              evilwallet.Scenario1(),
+		Scenario:              wallet.Scenario1(),
 		DeepSpam:              false,
 		EnableRateSetter:      false,
 	}
@@ -38,6 +38,7 @@ var (
 		EnableRateSetter:      false,
 	}
 
+	//nolint:godot
 	// commitmentsSpamParams = CommitmentsSpamParams{
 	// 	Rate:           1,
 	// 	Duration:       time.Second * 20,

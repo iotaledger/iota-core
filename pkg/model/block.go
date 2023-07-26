@@ -6,7 +6,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -89,13 +89,22 @@ func (blk *Block) ProtocolBlock() *iotago.ProtocolBlock {
 	return blk.protocolBlock
 }
 
-func (blk *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
+func (blk *Block) Payload() iotago.Payload {
 	basicBlock, isBasicBlock := blk.BasicBlock()
 	if !isBasicBlock {
+		return nil
+	}
+
+	return basicBlock.Payload
+}
+
+func (blk *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
+	payload := blk.Payload()
+	if payload == nil {
 		return nil, false
 	}
 
-	tx, isTransaction = basicBlock.Payload.(*iotago.Transaction)
+	tx, isTransaction = payload.(*iotago.Transaction)
 
 	return tx, isTransaction
 }

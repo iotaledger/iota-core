@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
@@ -89,12 +90,13 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 	}
 
 	if blockParams.HighestSupportedVersion == nil {
-		version := i.protocol.CurrentAPI().Version()
+		// We use the latest supported version and not the current one.
+		version := i.protocol.LatestAPI().Version()
 		blockParams.HighestSupportedVersion = &version
 	}
 
 	if blockParams.ProtocolParametersHash == nil {
-		protocolParametersHash, err := i.protocol.LatestAPI().ProtocolParameters().Hash()
+		protocolParametersHash, err := i.protocol.CurrentAPI().ProtocolParameters().Hash()
 		if err != nil {
 			return nil, ierrors.Wrap(err, "error getting protocol parameters hash")
 		}
@@ -113,7 +115,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 			return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.ProtocolVersion)
 		}
 	} else {
-		api = i.protocol.MainEngineInstance().Storage.Settings().CurrentAPI()
+		api = i.protocol.CurrentAPI()
 	}
 
 	blockBuilder := builder.NewValidationBlockBuilder(api)
@@ -197,7 +199,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 			return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.ProtocolVersion)
 		}
 	} else {
-		api = i.protocol.MainEngineInstance().Storage.Settings().CurrentAPI()
+		api = i.protocol.CurrentAPI()
 	}
 
 	blockBuilder := builder.NewBasicBlockBuilder(api)
@@ -228,8 +230,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	}
 
 	// Make sure we only create syntactically valid blocks.
-	// TODO: add serix.WithValidation() after fixing issues in Test_TransitionAccount.
-	modelBlock, err := model.BlockFromBlock(block, api)
+	modelBlock, err := model.BlockFromBlock(block, api, serix.WithValidation())
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error serializing block to model block")
 	}
@@ -246,7 +247,7 @@ func (i *BlockIssuer) IssueBlock(block *model.Block) error {
 
 // IssueBlockAndAwaitEvent submits a block to be processed and waits for the event to be triggered.
 func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.Block, evt *event.Event1[*blocks.Block]) error {
-	triggered := make(chan *blocks.Block, 1)
+	triggered := make(chan error, 1)
 	exit := make(chan struct{})
 	defer close(exit)
 
@@ -255,7 +256,17 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 			return
 		}
 		select {
-		case triggered <- eventBlock:
+		case triggered <- nil:
+		case <-exit:
+		}
+	}, event.WithWorkerPool(i.workerPool)).Unhook()
+
+	defer i.protocol.Events.Engine.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+		if block.ID() != event.Block.ID() {
+			return
+		}
+		select {
+		case triggered <- event.Reason:
 		case <-exit:
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
@@ -267,7 +278,11 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	select {
 	case <-ctx.Done():
 		return ierrors.Errorf("context canceled whilst waiting for event on block %s", block.ID())
-	case <-triggered:
+	case err := <-triggered:
+		if err != nil {
+			return ierrors.Wrapf(err, "block filtered out %s", block.ID())
+		}
+
 		return nil
 	}
 }
@@ -364,7 +379,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 
 	i.events.BlockConstructed.Trigger(modelBlock)
 
-	if err := i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
+	if err = i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
 		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error issuing model block")
 	}
 

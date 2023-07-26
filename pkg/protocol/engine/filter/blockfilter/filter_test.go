@@ -1,7 +1,6 @@
 package blockfilter
 
 import (
-	"math"
 	"strings"
 	"testing"
 	"time"
@@ -9,10 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/set"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -107,7 +106,7 @@ func (t *TestFramework) IssueSigned(alias string) {
 	keyPair := ed25519.GenerateKeyPair()
 	// We derive a dummy account from addr.
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
-	block, err := builder.NewBasicBlockBuilder(t.apiProvider.LatestAPI()).
+	block, err := builder.NewBasicBlockBuilder(t.apiProvider.CurrentAPI()).
 		StrongParents(iotago.BlockIDs{}).
 		IssuingTime(time.Now()).
 		Sign(iotago.AccountID(addr[:]), keyPair.PrivateKey[:]).
@@ -130,12 +129,18 @@ func (t *TestFramework) IssueBlockAtSlotWithVersion(alias string, index iotago.S
 }
 
 func TestFilter_ProtocolVersion(t *testing.T) {
-	apiProvider := api.NewDynamicMockAPIProvider()
-	apiProvider.AddProtocolParameters(0, newMockProtocolParameters(3, 0, math.MaxUint64/2))
-	apiProvider.AddProtocolParameters(3, newMockProtocolParameters(4, 0, math.MaxUint64/2))
+	apiProvider := api.NewEpochBasedProvider(
+		api.WithAPIForMissingVersionCallback(
+			func(version iotago.Version) (iotago.API, error) {
+				return iotago.V3API(iotago.NewV3ProtocolParameters(iotago.WithVersion(version))), nil
+			},
+		),
+	)
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 0)
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithVersion(4)), 3)
 
-	defaultAPI := apiProvider.LatestAPI()
-	timeProvider := apiProvider.LatestAPI().TimeProvider()
+	defaultAPI := apiProvider.CurrentAPI()
+	timeProvider := apiProvider.CurrentAPI().TimeProvider()
 
 	tf := NewTestFramework(t,
 		apiProvider,
@@ -143,8 +148,8 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 		WithMaxAllowedWallClockDrift(time.Duration(uint64(timeProvider.EpochEnd(50))*uint64(timeProvider.SlotDurationSeconds()))*time.Second),
 	)
 
-	valid := set.New[string](true)
-	invalid := set.New[string](true)
+	valid := ds.NewSet[string]()
+	invalid := ds.NewSet[string]()
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
 		require.True(t, valid.Has(block.ID().Alias()))
@@ -178,7 +183,7 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 	valid.Add("G")
 	tf.IssueBlockAtSlotWithVersion("G", timeProvider.EpochStart(5), 4, defaultAPI)
 
-	apiProvider.AddProtocolParameters(10, newMockProtocolParameters(5, 0, math.MaxUint64/2))
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithVersion(5)), 10)
 
 	valid.Add("H")
 	tf.IssueBlockAtSlotWithVersion("H", timeProvider.EpochEnd(9), 4, defaultAPI)
@@ -196,7 +201,7 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
-		api.NewStaticProvider(testAPI),
+		api.SingleVersionProvider(testAPI),
 		WithMaxAllowedWallClockDrift(allowedDrift),
 	)
 
@@ -225,7 +230,7 @@ func TestFilter_Commitments(t *testing.T) {
 	)
 
 	tf := NewTestFramework(t,
-		api.NewStaticProvider(v3API),
+		api.SingleVersionProvider(v3API),
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
@@ -265,7 +270,7 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 	)
 
 	tf := NewTestFramework(t,
-		api.NewStaticProvider(v3API),
+		api.SingleVersionProvider(v3API),
 	)
 
 	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
@@ -331,78 +336,4 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 
 	tf.IssueUnsignedBlockAtSlotWithPayload("commitmentCorrectMiddle", 100, 90, commitmentCorrectMiddle)
 
-}
-
-func newMockProtocolParameters(version iotago.Version, minCommittableAge iotago.SlotIndex, maxCommittableAge iotago.SlotIndex) iotago.ProtocolParameters {
-	return &mockProtocolParameters{version: version, minCommittableAge: minCommittableAge, maxCommittableAge: maxCommittableAge}
-}
-
-type mockProtocolParameters struct {
-	version           iotago.Version
-	minCommittableAge iotago.SlotIndex
-	maxCommittableAge iotago.SlotIndex
-}
-
-func (m mockProtocolParameters) Version() iotago.Version {
-	return m.version
-}
-
-func (m mockProtocolParameters) NetworkName() string {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) NetworkID() iotago.NetworkID {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) Bech32HRP() iotago.NetworkPrefix {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) RentStructure() *iotago.RentStructure {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) TokenSupply() iotago.BaseToken {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) TimeProvider() *iotago.TimeProvider {
-	return iotago.NewTimeProvider(0, 10, 13)
-}
-
-func (m mockProtocolParameters) ManaDecayProvider() *iotago.ManaDecayProvider {
-	return iotago.NewManaDecayProvider(m.TimeProvider(), 0, 0, 0, nil, 0, 0, 0)
-}
-
-func (m mockProtocolParameters) StakingUnbondingPeriod() iotago.EpochIndex {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) LivenessThreshold() iotago.SlotIndex {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) MinCommittableAge() iotago.SlotIndex {
-	return m.minCommittableAge
-}
-
-func (m mockProtocolParameters) MaxCommittableAge() iotago.SlotIndex {
-	return m.maxCommittableAge
-}
-
-func (m mockProtocolParameters) EpochNearingThreshold() iotago.SlotIndex {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) VersionSignaling() *iotago.VersionSignaling {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) Bytes() ([]byte, error) {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) Hash() (iotago.Identifier, error) {
-	panic("implement me")
 }

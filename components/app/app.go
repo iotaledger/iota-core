@@ -6,13 +6,15 @@ import (
 	"github.com/iotaledger/hive.go/app/components/shutdown"
 	"github.com/iotaledger/iota-core/components/activity"
 	"github.com/iotaledger/iota-core/components/blockissuer"
-	"github.com/iotaledger/iota-core/components/coreapi"
 	"github.com/iotaledger/iota-core/components/dashboard"
 	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
+	"github.com/iotaledger/iota-core/components/debugapi"
+	"github.com/iotaledger/iota-core/components/inx"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/p2p"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
+	coreapi "github.com/iotaledger/iota-core/components/restapi/core"
 )
 
 var (
@@ -33,12 +35,14 @@ func App() *app.App {
 			profiling.Component,
 			restapi.Component,
 			coreapi.Component,
+			debugapi.Component,
 			metricstracker.Component,
 			protocol.Component,
 			blockissuer.Component,
 			activity.Component,
 			dashboardmetrics.Component,
 			dashboard.Component,
+			inx.Component,
 		),
 	)
 }

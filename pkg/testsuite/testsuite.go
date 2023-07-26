@@ -420,6 +420,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 		accountDetails := snapshotcreator.AccountDetails{
 			Address:    iotago.Ed25519AddressFromPubKey(node.PubKey),
 			Amount:     deposit,
+			Mana:       iotago.Mana(deposit),
 			IssuerKey:  node.PubKey,
 			ExpirySlot: math.MaxUint64,
 		}

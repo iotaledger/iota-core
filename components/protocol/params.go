@@ -29,8 +29,8 @@ type ParametersDatabase struct {
 	Engine           string `default:"rocksdb" usage:"the used database engine (rocksdb/mapdb)"`
 	Path             string `default:"testnet/database" usage:"the path to the database folder"`
 	MaxOpenDBs       int    `default:"10" usage:"maximum number of open database instances"`
-	PruningThreshold uint64 `default:"360" usage:"how many confirmed slots should be retained"`
-	DBGranularity    int64  `default:"1" usage:"how many slots should be contained in a single DB instance"`
+	PruningThreshold uint64 `default:"16384" usage:"how many confirmed slots should be retained"`
+	DBGranularity    int64  `default:"8192" usage:"how many slots should be contained in a single DB instance"`
 }
 
 // ParamsProtocol contains the configuration parameters used by the Protocol.

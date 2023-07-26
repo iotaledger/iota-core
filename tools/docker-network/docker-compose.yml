@@ -15,6 +15,8 @@ services:
       --blockIssuer.privateKey=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
       --activity.ignoreBootstrapped=true
       --restAPI.allowIncompleteBlock=true
+      --inx.enabled=true
+      --inx.bindAddress=0.0.0.0:9029
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -22,6 +24,7 @@ services:
       - "8080:8080/tcp" # web API
       - "8081:8081/tcp" # dashboard
       - "6081:6061/tcp" # pprof
+      - "9029:9029/tcp" # inx
     networks:
       - iota-core
 
@@ -34,7 +37,6 @@ services:
       --p2p.seed=0xf739eea09eb0f4820f26504a3135131a075089b4c901c19c2099513ee016f516
       --blockIssuer.issuerAccount=0x375358f92cc94750669598b0aaa55a6ff73310b90710e1fad524c0f911be0fea
       --blockIssuer.privateKey=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064
-      --activity.ignoreBootstrapped=true
       --restAPI.allowIncompleteBlock=true
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
@@ -55,7 +57,6 @@ services:
       --p2p.seed=0x2ab2792bba8ab6deb7978165e4072d3f00def97a0138b98ba2d21eba54159705
       --blockIssuer.issuerAccount=0x6aee704f25558e8aa7630fed0121da53074188abc423b3c5810f80be4936eb6e
       --blockIssuer.privateKey=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
-      --activity.ignoreBootstrapped=true
       --restAPI.allowIncompleteBlock=true
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
@@ -73,9 +74,11 @@ services:
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
-      --blockIssuer.issuerAccount=0xa54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39
-      --blockIssuer.privateKey=dcf7adb000f03826f1964a3e5378874b1972c38229fb740a8e47f2c421cddcf9a54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39
       --p2p.seed=0x6bd12a0398f9264788bc6481e2665eb90bd58a33b82347fb70f612cc8a91fcce
+      --blockIssuer.issuerAccount=0xd057230f48fdf59ae093e2179857c590e960b05389399399ce69ad169a9c7f37
+      --blockIssuer.privateKey=dcf7adb000f03826f1964a3e5378874b1972c38229fb740a8e47f2c421cddcf9a54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39
+      --restAPI.allowIncompleteBlock=true
+
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -92,9 +95,11 @@ services:
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
-      --blockIssuer.issuerAccount=0xcb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b
-      --blockIssuer.privateKey=0d8ecad4cefe927d2b6c64ee56576c52450f9a7a0113f96683cf8e8cc5c64264cb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b
       --p2p.seed=0x4da1119dc9cc3750ebb313c3c7dcb50120465544d256ee3c0d4586ce1772c96b
+      --blockIssuer.issuerAccount=0x7a9ec5d9c0c145bae03b20cbe481cfea306e688c00525b410eb8cb18a169ed7f
+      --blockIssuer.privateKey=0d8ecad4cefe927d2b6c64ee56576c52450f9a7a0113f96683cf8e8cc5c64264cb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b
+      --restAPI.allowIncompleteBlock=true
+
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro

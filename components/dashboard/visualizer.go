@@ -42,7 +42,7 @@ type tipinfo struct {
 // }
 
 func sendVertex(blk *blocks.Block, confirmed bool) {
-	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock(), deps.Protocol.LatestAPI())
+	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock(), deps.Protocol.APIForSlot(blk.ID().Index()))
 	tx, isTx := modelBlk.Transaction()
 
 	broadcastWsBlock(&wsblk{MsgTypeVertex, &vertex{
@@ -104,10 +104,12 @@ func runVisualizer(component *app.Component) {
 				sendVertex(block, block.IsConfirmed())
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
-				sendTipInfo(tipMetadata.Block(), true)
+				tipMetadata.IsStrongTip().OnUpdate(func(_, newValue bool) {
+					sendTipInfo(tipMetadata.Block(), newValue)
+				})
 
-				tipMetadata.OnEvicted(func() {
-					sendTipInfo(tipMetadata.Block(), false)
+				tipMetadata.IsWeakTip().OnUpdate(func(_, newValue bool) {
+					sendTipInfo(tipMetadata.Block(), newValue)
 				})
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 		)

@@ -153,16 +153,16 @@ func currentNodeStatus() *nodestatus {
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 
 	status.TangleTime = tangleTime{
-		Synced:           syncStatus.NodeSynced,
-		Bootstrapped:     deps.Protocol.MainEngineInstance().IsBootstrapped(),
-		AcceptedBlockID:  syncStatus.LastAcceptedBlockID.ToHex(),
-		ConfirmedBlockID: syncStatus.LastConfirmedBlockID.ToHex(),
-		CommittedSlot:    int64(syncStatus.LatestCommittedSlot),
-		ConfirmedSlot:    int64(syncStatus.FinalizedSlot),
-		ATT:              cl.Accepted().Time().UnixNano(),
-		RATT:             cl.Accepted().RelativeTime().UnixNano(),
-		CTT:              cl.Confirmed().Time().UnixNano(),
-		RCTT:             cl.Confirmed().RelativeTime().UnixNano(),
+		Synced:             syncStatus.NodeSynced,
+		Bootstrapped:       deps.Protocol.MainEngineInstance().IsBootstrapped(),
+		AcceptedBlockSlot:  int64(syncStatus.LastAcceptedBlockSlot),
+		ConfirmedBlockSlot: int64(syncStatus.LastConfirmedBlockSlot),
+		CommittedSlot:      int64(syncStatus.LatestCommitment.Index()),
+		ConfirmedSlot:      int64(syncStatus.LatestFinalizedSlot),
+		ATT:                cl.Accepted().Time().UnixNano(),
+		RATT:               cl.Accepted().RelativeTime().UnixNano(),
+		CTT:                cl.Confirmed().Time().UnixNano(),
+		RCTT:               cl.Confirmed().RelativeTime().UnixNano(),
 	}
 
 	return status

@@ -1,0 +1,19 @@
+---
+- hosts: all
+  gather_facts: no
+  roles:
+    - exporter
+    - firewall
+
+- hosts: cores:&internal_nodes
+  gather_facts: no
+  roles:
+    - wireguard
+    - iota-core-node
+
+- hosts: metrics
+  gather_facts: no
+  vars:
+    removeData: no
+  roles:
+    - metrics
