@@ -91,8 +91,8 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 	//    than it actually is. Nodes might consider to switch to this chain, even though it is invalid which will be discovered
 	//    before the candidate chain/engine is activated (it will never get heavier than the current chain).
 	c.cumulativeWeight += seatCount
-	if c.cumulativeWeight <= commitment.CumulativeWeight() {
-		return nil, 0, ierrors.Errorf("invalid cumulative weight for commitment %s", commitment.ID())
+	if c.cumulativeWeight > commitment.CumulativeWeight() {
+		return nil, 0, ierrors.Errorf("invalid cumulative weight for commitment %s: expected %d, got %d", commitment.ID(), commitment.CumulativeWeight(), c.cumulativeWeight)
 	}
 
 	return blockIDs, c.cumulativeWeight, nil
