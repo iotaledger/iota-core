@@ -267,6 +267,44 @@ func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...optio
 	return block
 }
 
+func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, activeNodes []*mock.Node, parent *blocks.Block) *blocks.Block {
+
+	// we need to get accepted tangle time up to slot + minCA + 1
+	// first issue a chain of blocks with step size minCA up until slot + minCA + 1
+	// then issue one more block to accept the last in the chain which will trigger commitment of the second last in the chain
+
+	latestCommittedSlot := activeNodes[0].Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index()
+	if latestCommittedSlot >= slot {
+		return parent
+	}
+	nextBlockSlot := lo.Min(slot+t.optsMinCommittableAge+1, latestCommittedSlot+t.optsMinCommittableAge+1)
+	tip := parent
+	chainIndex := 0
+	for {
+		// preacceptance of nextBlockSlot
+		for _, node := range activeNodes {
+			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex, node.Name)
+			tip = t.IssueBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+		}
+		// acceptance of nextBlockSlot
+		for _, node := range activeNodes {
+			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
+			tip = t.IssueBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+		}
+		if nextBlockSlot == slot+t.optsMinCommittableAge+1 {
+			break
+		}
+		nextBlockSlot = lo.Min(slot+t.optsMinCommittableAge+1, nextBlockSlot+t.optsMinCommittableAge+1)
+		chainIndex += 2
+	}
+
+	for _, node := range activeNodes {
+		t.AssertLatestCommitmentSlotIndex(slot, node)
+	}
+
+	return tip
+}
+
 func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Option[blockfactory.BlockParams], node *mock.Node) {
 	params := options.Apply(&blockfactory.BlockParams{}, blockOpts)
 	parents := params.References[iotago.StrongParentType]
