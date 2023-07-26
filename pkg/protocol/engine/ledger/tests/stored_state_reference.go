@@ -18,7 +18,7 @@ func (l StoredStateReference) Size() int {
 }
 
 // WorkScore returns the workscore of the StateReference.
-func (l StoredStateReference) WorkScore(workScoreStructure *iotago.WorkScoreStructure) (iotago.WorkScore, error) {
+func (l StoredStateReference) WorkScore(_ *iotago.WorkScoreStructure) (iotago.WorkScore, error) {
 	return 0, nil
 }
 
