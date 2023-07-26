@@ -2,7 +2,6 @@ package accountsledger
 
 import (
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -213,7 +212,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 			//  but we shouldn't simply cast the iota value to credits here.
 			accounts.WithCredits(accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(accountOutput.Amount), m.latestCommittedSlot)),
 			accounts.WithOutputID(output.OutputID()),
-			accounts.WithPubKeys(ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...),
+			accounts.WithPubKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys...),
 			accounts.WithExpirySlot(accountOutput.FeatureSet().BlockIssuer().ExpirySlot),
 		)...,
 	)

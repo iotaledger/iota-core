@@ -1,14 +1,11 @@
 package testsuite
 
 import (
-	"bytes"
-	"crypto/ed25519"
 	"encoding/binary"
 	"fmt"
 	"time"
 
-	"golang.org/x/exp/slices"
-
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -222,7 +219,6 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 		Conditions: iotago.DelegationOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 		},
-		ImmutableFeatures: nil,
 	}, opts)
 
 	if delegationOutput.ValidatorID == iotago.EmptyAccountID() ||
@@ -353,12 +349,6 @@ func WithDelegationDeposit(deposit iotago.BaseToken) options.Option[iotago.Deleg
 	}
 }
 
-func WithDelegationImmutableFeatures(features iotago.DelegationOutputImmFeatures) options.Option[iotago.DelegationOutput] {
-	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.ImmutableFeatures = features
-	}
-}
-
 // BlockIssuer options
 
 func WithBlockIssuerFeature(blockIssuerFeature *iotago.BlockIssuerFeature) options.Option[iotago.AccountOutput] {
@@ -382,9 +372,7 @@ func AddBlockIssuerKey(key ed25519.PublicKey) options.Option[iotago.AccountOutpu
 		}
 		blockIssuer.BlockIssuerKeys = append(blockIssuer.BlockIssuerKeys, key)
 
-		slices.SortFunc(blockIssuer.BlockIssuerKeys, func(a, b ed25519.PublicKey) bool {
-			return bytes.Compare(a, b) < 0
-		})
+		blockIssuer.BlockIssuerKeys.Sort()
 	}
 }
 

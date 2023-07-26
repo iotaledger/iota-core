@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -421,7 +422,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			Address:    iotago.Ed25519AddressFromPubKey(node.PubKey),
 			Amount:     deposit,
 			Mana:       iotago.Mana(deposit),
-			IssuerKey:  node.PubKey,
+			IssuerKey:  ed25519.PublicKey(node.PubKey),
 			ExpirySlot: math.MaxUint64,
 		}
 		if validator {
@@ -470,7 +471,7 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 			}
 
 			if accountDetails.AccountID.Empty() {
-				accountDetails.AccountID = blake2b.Sum256(accountDetails.IssuerKey)
+				accountDetails.AccountID = blake2b.Sum256(accountDetails.IssuerKey[:])
 			}
 
 			return accountDetails

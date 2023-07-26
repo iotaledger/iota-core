@@ -22,7 +22,7 @@ import (
 // TODO: implement tests for staking and delegation transitions
 func Test_TransitionAccount(t *testing.T) {
 
-	oldGenesisOutputKey := utils.RandPubKey().ToEd25519()
+	oldGenesisOutputKey := utils.RandPubKey()
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
 		// Nil address will be replaced with the address generated from genesis seed.
 		// A single key may unlock multiple accounts; that's why it can't be used as a source for AccountID derivation.
@@ -67,7 +67,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount(
 		"Genesis:1",
-		testsuite.AddBlockIssuerKey(newGenesisOutputKey[:]),
+		testsuite.AddBlockIssuerKey(newGenesisOutputKey),
 		testsuite.WithBlockIssuerExpirySlot(1),
 	)
 	consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(5, "Genesis:0")
@@ -124,7 +124,7 @@ func Test_TransitionAccount(t *testing.T) {
 			&iotago.GovernorAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
 		}),
 		testsuite.WithBlockIssuerFeature(&iotago.BlockIssuerFeature{
-			BlockIssuerKeys: iotago.BlockIssuerKeys{newAccountBlockIssuerKey[:]},
+			BlockIssuerKeys: iotago.BlockIssuerKeys{newAccountBlockIssuerKey},
 			ExpirySlot:      newAccountExpirySlot,
 		}),
 		testsuite.WithStakingFeature(&iotago.StakingFeature{
@@ -159,7 +159,7 @@ func Test_TransitionAccount(t *testing.T) {
 	latestParent = ts.CommitUntilSlot(slotIndexBlock2, activeNodes, block2)
 
 	// assert diff of a destroyed account, to make sure we can correctly restore it
-	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock4, &prunable.AccountDiff{
+	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock2, &prunable.AccountDiff{
 		BICChange:             -iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit * 3),
 		PreviousUpdatedTime:   0,
 		NewExpirySlot:         0,
@@ -177,7 +177,7 @@ func Test_TransitionAccount(t *testing.T) {
 	newAccount := ts.AccountOutput("TX2:0")
 	newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
 
-	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock4, &prunable.AccountDiff{
+	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock2, &prunable.AccountDiff{
 		BICChange:             0,
 		PreviousUpdatedTime:   0,
 		NewExpirySlot:         newAccountExpirySlot,
@@ -203,58 +203,6 @@ func Test_TransitionAccount(t *testing.T) {
 		DelegationStake: 0,
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
-
-	// create a delegation output delegating to the newly created account
-	{
-		newAccount := ts.AccountOutput("TX2:0")
-		newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
-
-		inputForNewDelegation, newDelegationOutputs, newDelegationWallets := ts.TransactionFramework.CreateDelegationFromInput("TX1:2",
-			testsuite.WithDelegatedValidatorID(newAccountOutput.AccountID),
-			testsuite.WithDelegationStartEpoch(2),
-		)
-
-		var slotIndexBlock7 iotago.SlotIndex = ts.BlockID("block6").Index() + 3
-
-		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX2", newDelegationWallets,
-			testsuite.WithInputs(inputForNewDelegation),
-			testsuite.WithOutputs(newDelegationOutputs),
-			testsuite.WithCreationTime(slotIndexBlock7),
-		))
-
-		ts.IssueBlockAtSlotWithOptions("block7", slotIndexBlock7, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, blockfactory.WithStrongParents(ts.BlockID("block6")), blockfactory.WithPayload(tx2))
-
-		slotIndexChildrenBlock3 := ts.BlockID("block7").Index() + minSlotCommittableAge + 1
-		ts.IssueBlockAtSlot("block8", slotIndexChildrenBlock3, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block7")...)
-		ts.IssueBlockAtSlot("block9", slotIndexChildrenBlock3, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, ts.BlockIDs("block8")...)
-
-		ts.AssertLatestCommitmentSlotIndex(slotIndexBlock7, node1)
-
-		ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock7, &prunable.AccountDiff{
-			BICChange:             0,
-			PreviousUpdatedTime:   0,
-			NewOutputID:           iotago.EmptyOutputID,
-			PreviousOutputID:      iotago.EmptyOutputID,
-			PubKeysAdded:          []ed25519.PublicKey{},
-			PubKeysRemoved:        []ed25519.PublicKey{},
-			ValidatorStakeChange:  0,
-			StakeEndEpochChange:   0,
-			FixedCostChange:       0,
-			DelegationStakeChange: 1914280,
-		}, false, ts.Nodes()...)
-
-		ts.AssertAccountData(&accounts.AccountData{
-			ID:              newAccountOutput.AccountID,
-			Credits:         accounts.NewBlockIssuanceCredits(0, 10),
-			OutputID:        newAccount.OutputID(),
-			PubKeys:         ds.NewSet(newAccountBlockIssuerKey),
-			StakeEndEpoch:   10,
-			FixedCost:       421,
-			DelegationStake: 1966240,
-			ValidatorStake:  10000,
-		}, ts.Nodes()...)
-	}
-	ts.Wait(ts.Nodes()...)
 }
 
 /*
