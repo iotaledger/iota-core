@@ -290,8 +290,8 @@ github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726094056-e4fe59ff68a6 h1:+5tDX
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726094056-e4fe59ff68a6/go.mod h1:pDdKl2b5wx+VEwcIntbQvThu5Tpq0mUcg5KuQKjimP4=
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230726065442-90d758432bb7 h1:zPisRu9k7E7yZlx3lPqZESZk9D5E7qNAUIsqIVCISKs=
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230726065442-90d758432bb7/go.mod h1:z8tFR7vLD11nSmwBgxNQpM2t12OxUagQ+Dtz/4Q6Sm8=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230726110608-b668253c96e1 h1:NtoXdqKK4hyipHY0EAwRoj58eS9SoYusp/cp+4lhLzQ=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230726110608-b668253c96e1/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230726132127-65d5932bb64f h1:Z7y3hDdPIAGhMo0BhrGCecTDRVRvjHsO7dsDqF12cJ8=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230726132127-65d5932bb64f/go.mod h1:bfxxRff6dp0PR1fkJpcAMw441iVfRV9XEdYbFGhVCog=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
 github.com/ipfs/go-cid v0.4.1/go.mod h1:uQHwDeX4c6CtyrFwdqyhpNcxVewur1M7l7fNU7LKwZk=
 github.com/ipfs/go-detect-race v0.0.1 h1:qX/xay2W3E4Q1U7d9lNs1sU9nvguX0a7319XbyQ6cOk=
@@ -636,8 +636,8 @@ golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5y
 golang.org/x/crypto v0.11.0 h1:6Ewdq3tDic1mg5xRO4milcWCfMVQhI4NkqWWvqejpuA=
 golang.org/x/crypto v0.11.0/go.mod h1:xgJhtzW8F9jGdVFWZESrid1U1bjeNy4zgy5cRr/CIio=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
-golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 h1:MGwJjxBy0HJshjDNfLsYO8xppfqWlA5ZT9OhtUUhTNw=
-golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1/go.mod h1:FXUEEKJgO7OQYeo8N01OfiKP8RXMtf6e8aTskBGqWdc=
+golang.org/x/exp v0.0.0-20230725093048-515e97ebf090 h1:Di6/M8l0O2lCLc6VVRWhgCiApHV8MnQurBnFSHsQtNY=
+golang.org/x/exp v0.0.0-20230725093048-515e97ebf090/go.mod h1:FXUEEKJgO7OQYeo8N01OfiKP8RXMtf6e8aTskBGqWdc=
 golang.org/x/image v0.9.0 h1:QrzfX26snvCM20hIhBwuHI/ThTg18b/+kcKdXHvnR+g=
 golang.org/x/image v0.9.0/go.mod h1:jtrku+n79PfroUbvDdeUWMAI+heR786BofxrbiSF+J0=
 golang.org/x/lint v0.0.0-20180702182130-06c8688daad7/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=
