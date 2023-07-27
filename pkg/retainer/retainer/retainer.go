@@ -51,8 +51,8 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 		r := New(e.Workers.CreateGroup("Retainer"),
 			e.Storage.Settings().APIProvider().APIForSlot,
 			e.Storage.Retainer,
-			e.Storage.Settings().LatestFinalizedSlot,
 			e.Storage.Settings().LatestCommitment().Index,
+			e.Storage.Settings().LatestFinalizedSlot,
 			e.ErrorHandler("retainer"))
 
 		asyncOpt := event.WithWorkerPool(r.workers.CreatePool("Retainer", 1))
