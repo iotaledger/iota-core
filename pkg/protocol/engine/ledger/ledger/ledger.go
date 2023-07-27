@@ -630,7 +630,7 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 
 	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
 	if err != nil {
-		return p.Reject(ierrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
+		return p.Reject(ierrors.Wrapf(iotago.ErrFailedToRetrieveInput, "error while retrieving output %s: %w", stateRef.Ref(), err))
 	}
 
 	if !isUnspent {
@@ -640,7 +640,7 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
 	output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(stateRef.Ref())
 	if err != nil {
-		return p.Reject(ierrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+		return p.Reject(ierrors.Wrapf(iotago.ErrFailedToRetrieveInput, "output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
 
 	return p.Resolve(output)
