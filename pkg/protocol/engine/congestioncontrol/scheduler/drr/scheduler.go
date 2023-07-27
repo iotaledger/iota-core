@@ -200,16 +200,18 @@ func (s *Scheduler) scheduleBlock(block *blocks.Block) {
 		// deduct tokens from the token bucket according to the scheduled block's work.
 		s.tokenBucket -= float64(block.Work())
 		// check for another block ready to schedule
-		s.selectBlockToScheduleWithLocking()
 		s.updateChildren(block)
+
+		s.selectBlockToScheduleWithLocking()
 		s.events.BlockScheduled.Trigger(block)
 	}
 }
 
 func (s *Scheduler) skipBlock(block *blocks.Block) {
 	if block.SetSkipped() && block.SetScheduled() {
-		s.selectBlockToScheduleWithoutLocking()
 		s.updateChildren(block)
+
+		s.selectBlockToScheduleWithoutLocking()
 		s.events.BlockSkipped.Trigger(block)
 	}
 }
