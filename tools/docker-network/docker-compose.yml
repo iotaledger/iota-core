@@ -133,19 +133,9 @@ services:
       - iota-core
     ports:
       - "3000:3000"
-    user: root
-    # Resolves "database locked" error
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        apk update && 
-        apk add sqlite && 
-        sqlite3 /var/lib/grafana/grafana.db 'pragma journal_mode=wal;' ;
-        /run.sh
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning/:/etc/grafana/provisioning/:ro
+      - ./grafana/:/etc/grafana/:ro
 
 # Create our own network
 networks:

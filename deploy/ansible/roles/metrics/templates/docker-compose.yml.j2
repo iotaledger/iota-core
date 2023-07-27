@@ -28,17 +28,9 @@ services:
     ports:
       - "3000:3000"
     # Resolves "database locked" error
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        apk update && 
-        apk add sqlite && 
-        sqlite3 /var/lib/grafana/grafana.db 'pragma journal_mode=wal;' ;
-        /run.sh
     volumes:
     - grafana_data:/var/lib/grafana
-    - ./grafana/provisioning/:/etc/grafana/provisioning/
+    - ./grafana/:/etc/grafana/
     - ./grafana/admin-password:/run/secrets/admin_password
     depends_on:
       - prometheus
