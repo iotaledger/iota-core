@@ -19,9 +19,9 @@ var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	iotago.ErrUnlockBlockSignatureInvalid: apimodels.TxFailureUnlockBlockSignatureInvalid,
 
 	// context inputs errors
-	iotago.ErrNoStakingFeature:             apimodels.TxFailureNoStakingFeature,
-	iotago.ErrFailedToClaimValidatorReward: apimodels.TxFailureFailedToClaimValidatorReward,
-	iotago.ErrFailedToClaimDelegatorReward: apimodels.TxFailureFailedToClaimDelegatorReward,
+	iotago.ErrNoStakingFeature:              apimodels.TxFailureNoStakingFeature,
+	iotago.ErrFailedToClaimStakingReward:    apimodels.TxFailureFailedToClaimStakingReward,
+	iotago.ErrFailedToClaimDelegationReward: apimodels.TxFailureFailedToClaimDelegationReward,
 
 	// UTXO errors
 	iotago.ErrTxConflicting:     apimodels.TxFailureConflicting,
