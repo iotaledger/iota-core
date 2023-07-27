@@ -27,24 +27,21 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 	collector.WithMetric(collector.NewMetric(lastCommitment,
 		collector.WithType(collector.GaugeVec),
 		collector.WithHelp("Last commitment of the node."),
-		collector.WithLabels("slot", "commitment"),
+		collector.WithLabels("commitment"),
 		collector.WithLabelValuesCollection(),
 		collector.WithInitFunc(func() {
-			deps.Collector.ResetMetric(commitmentsNamespace, lastCommitment)
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				deps.Collector.Update(commitmentsNamespace, lastCommitment, collector.MultiLabels(strconv.Itoa(int(details.Commitment.Index())), details.Commitment.ID().String()))
+				deps.Collector.Update(commitmentsNamespace, lastCommitment, collector.MultiLabels(details.Commitment.ID().String()), float64(details.Commitment.ID().Index()))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(finalizedCommitment,
-		collector.WithType(collector.GaugeVec),
+		collector.WithType(collector.Gauge),
 		collector.WithHelp("Last commitment finalized by the node."),
-		collector.WithLabels("slot"),
-		collector.WithLabelValuesCollection(),
 		collector.WithInitFunc(func() {
 			deps.Collector.ResetMetric(commitmentsNamespace, finalizedCommitment)
 			deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
-				deps.Collector.Update(commitmentsNamespace, finalizedCommitment, collector.MultiLabels(strconv.Itoa(int(slot))))
+				deps.Collector.Update(commitmentsNamespace, finalizedCommitment, collector.SingleValue(slot))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),

@@ -78,7 +78,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("docker", "rms"),
 			iotago.WithSupplyOptions(10_000_000_000, 1, 1, 10),
-			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
+			iotago.WithTimeProviderOptions(time.Now().Unix()-50000, 10, 13),
 			iotago.WithLivenessOptions(6, 5, 30),
 		),
 	),
@@ -120,7 +120,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("feature", "rms"),
 			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10),
-			iotago.WithTimeProviderOptions(1689848996, 10, 13),
+			iotago.WithTimeProviderOptions(time.Now().Unix()-10000, 10, 13),
 			iotago.WithLivenessOptions(6, 5, 30),
 		),
 	),

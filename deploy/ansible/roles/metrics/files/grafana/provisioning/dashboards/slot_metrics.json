@@ -24,6 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -49,7 +50,37 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -115,26 +146,23 @@
         ]
       },
       "gridPos": {
-        "h": 4,
+        "h": 6,
         "w": 12,
         "x": 0,
         "y": 1
       },
       "id": 115,
       "options": {
-        "displayMode": "basic",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showUnfilled": true,
-        "valueMode": "color"
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "9.5.6",
       "repeat": "instance",
@@ -151,7 +179,7 @@
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
-          "refId": "A"
+          "refId": "Attached"
         },
         {
           "datasource": {
@@ -162,22 +190,9 @@
           "expr": "slots_accepted_blocks",
           "format": "table",
           "hide": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{label_name}}",
           "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "slots_orphaned_blocks\n",
-          "format": "table",
-          "hide": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "C"
+          "refId": "Accepted"
         },
         {
           "datasource": {
@@ -190,172 +205,12 @@
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
-          "refId": "D"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "slots_subjectively_invalid_blocks",
-          "format": "table",
-          "hide": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "E"
+          "refId": "Invalid"
         }
       ],
       "title": "Blocks $instance",
-      "transformations": [
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "Accepted Blocks": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Accepted Transactions": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Active validators": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Slot Index": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "Time": {
-                "aggregations": []
-              },
-              "Value": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #A": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #B": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #C": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #D": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #E": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "__name__": {
-                "aggregations": []
-              },
-              "accepted_blocks": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "active_validators": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "instance": {
-                "aggregations": []
-              },
-              "slot": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "transactions": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "slot"
-              }
-            ]
-          }
-        },
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "slot",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {},
-            "indexByName": {
-              "Time": 0,
-              "Value": 7,
-              "__name__": 1,
-              "accepted_blocks": 2,
-              "active_validators": 4,
-              "instance": 5,
-              "job": 6,
-              "transactions": 3
-            },
-            "renameByName": {
-              "Value": "Slot Index",
-              "Value #A (lastNotNull)": "Attached ",
-              "Value #B (lastNotNull)": "Accepted ",
-              "Value #C (lastNotNull)": "Orphaned ",
-              "Value #D (lastNotNull)": "Invalid ",
-              "Value #E (lastNotNull)": "Subj. inv.",
-              "Value (lastNotNull)": "Attached blocks",
-              "accepted_blocks": "Accepted Blocks",
-              "accepted_blocks (lastNotNull)": "Accepted Blocka",
-              "active_validators": "Active validators",
-              "active_validators (lastNotNull)": "Active Validators",
-              "slot": "Slot",
-              "transactions": "Accepted Transactions",
-              "transactions (lastNotNull)": "Accepted Txs"
-            }
-          }
-        }
-      ],
-      "type": "bargauge"
+      "transformations": [],
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -366,7 +221,37 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -417,26 +302,23 @@
         ]
       },
       "gridPos": {
-        "h": 4,
+        "h": 6,
         "w": 12,
         "x": 12,
         "y": 1
       },
       "id": 207,
       "options": {
-        "displayMode": "basic",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showUnfilled": true,
-        "valueMode": "color"
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "9.5.6",
       "repeat": "instance",
@@ -452,7 +334,7 @@
           "format": "table",
           "legendFormat": "__auto",
           "range": true,
-          "refId": "A"
+          "refId": "Created"
         },
         {
           "datasource": {
@@ -465,169 +347,12 @@
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "slots_rejected_conflicts\n",
-          "format": "table",
-          "hide": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "slots_not_conflicting_conflicts\n",
-          "format": "table",
-          "hide": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "D"
+          "refId": "Accepted"
         }
       ],
       "title": "Conflicts per slot $instance",
-      "transformations": [
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "Accepted Blocks": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Accepted Transactions": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Active validators": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Slot Index": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "Value": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #A": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #B": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #C": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Value #D": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "accepted_blocks": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "active_validators": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "slot": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "transactions": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "slot"
-              }
-            ]
-          }
-        },
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "slot",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {},
-            "indexByName": {
-              "Time": 0,
-              "Value": 7,
-              "__name__": 1,
-              "accepted_blocks": 2,
-              "active_validators": 4,
-              "instance": 5,
-              "job": 6,
-              "transactions": 3
-            },
-            "renameByName": {
-              "Value": "Slot Index",
-              "Value #A (lastNotNull)": "Created",
-              "Value #B (lastNotNull)": "Accepted",
-              "Value #C (lastNotNull)": "Rejeced",
-              "Value #D (lastNotNull)": "Not Confl.",
-              "Value (lastNotNull)": "Attached blocks",
-              "accepted_blocks": "Accepted Blocks",
-              "accepted_blocks (lastNotNull)": "Accepted Blocka",
-              "active_validators": "Active validators",
-              "active_validators (lastNotNull)": "Active Validators",
-              "slot": "Slot",
-              "transactions": "Accepted Transactions",
-              "transactions (lastNotNull)": "Accepted Txs"
-            }
-          }
-        }
-      ],
-      "type": "bargauge"
+      "transformations": [],
+      "type": "timeseries"
     }
   ],
   "refresh": "10s",
@@ -662,7 +387,7 @@
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
-        "regex": "",
+        "regex": ".+:9311",
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
@@ -672,7 +397,14 @@
           "type": "prometheus",
           "uid": "PBFA97CFB590B2093"
         },
-        "filters": [],
+        "filters": [
+          {
+            "condition": "",
+            "key": "job",
+            "operator": "=",
+            "value": "metrics"
+          }
+        ],
         "hide": 0,
         "name": "Filters",
         "skipUrlSync": false,

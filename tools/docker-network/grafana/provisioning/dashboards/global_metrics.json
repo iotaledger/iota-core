@@ -24,6 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -49,7 +50,6 @@
             "fixedColor": "semi-dark-blue",
             "mode": "fixed"
           },
-          "displayName": ".",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -108,13 +108,13 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "exemplar": false,
-          "expr": "max(commitments_latest{}) by (slot, instance)",
+          "exemplar": true,
+          "expr": "max(commitments_latest{instance=\"$instance\"})",
           "format": "table",
-          "instant": true,
+          "instant": false,
           "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
+          "range": true,
+          "refId": "Committed"
         },
         {
           "datasource": {
@@ -122,53 +122,18 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "exemplar": false,
-          "expr": "max(commitments_finalized{}) by (slot, instance)",
+          "exemplar": true,
+          "expr": "max(commitments_finalized{instance=\"$instance\"})",
           "format": "table",
           "hide": false,
-          "instant": true,
+          "instant": false,
           "legendFormat": "__auto",
-          "range": false,
-          "refId": "B"
+          "range": true,
+          "refId": "Finalized"
         }
       ],
       "title": "Last commitmed slot $instance",
-      "transformations": [
-        {
-          "id": "convertFieldType",
-          "options": {
-            "conversions": [
-              {
-                "destinationType": "number",
-                "targetField": "slot"
-              }
-            ],
-            "fields": {}
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "Value": {
-                "aggregations": [
-                  "max"
-                ]
-              },
-              "instance": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "slot": {
-                "aggregations": [
-                  "max"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        }
-      ],
+      "transformations": [],
       "type": "stat"
     },
     {
@@ -332,18 +297,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Value"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "commitment"
             },
             "properties": [
@@ -403,7 +356,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(commitments_latest{instance=\"$instance\", slot!=\"0\"}) by (commitment, slot)",
+          "expr": "commitments_latest{instance=\"$instance\"}",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -415,19 +368,15 @@
       "title": "Commitments $instance",
       "transformations": [
         {
-          "id": "seriesToRows",
-          "options": {}
-        },
-        {
-          "id": "convertFieldType",
+          "id": "sortBy",
           "options": {
-            "conversions": [
+            "fields": {},
+            "sort": [
               {
-                "destinationType": "number",
-                "targetField": "slot"
+                "desc": true,
+                "field": "Value"
               }
-            ],
-            "fields": {}
+            ]
           }
         },
         {
@@ -441,7 +390,10 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "Value": true
+              "Value": false,
+              "__name__": true,
+              "instance": true,
+              "job": true
             },
             "indexByName": {},
             "renameByName": {
@@ -503,8 +455,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -613,8 +564,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -727,7 +677,14 @@
           "type": "prometheus",
           "uid": "PBFA97CFB590B2093"
         },
-        "filters": [],
+        "filters": [
+          {
+            "condition": "",
+            "key": "job",
+            "operator": "=",
+            "value": "metrics"
+          }
+        ],
         "hide": 0,
         "name": "Filters",
         "skipUrlSync": false,
@@ -756,6 +713,6 @@
   "timezone": "",
   "title": "Global Nodes View",
   "uid": "JKcc02v4d",
-  "version": 1,
+  "version": 4,
   "weekStart": ""
 }
