@@ -49,7 +49,7 @@ func New(workers *workerpool.Group, currentAPI func(index iotago.SlotIndex) iota
 func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	return module.Provide(func(e *engine.Engine) retainer.Retainer {
 		r := New(e.Workers.CreateGroup("Retainer"),
-			e.Storage.Settings().APIForSlot,
+			e.Storage.Settings().APIProvider().APIForSlot,
 			e.Storage.Retainer,
 			e.Storage.Settings().LatestFinalizedSlot,
 			e.Storage.Settings().LatestCommitment().Index,
@@ -117,8 +117,9 @@ func (r *Retainer) Shutdown() {
 	r.workers.Shutdown()
 }
 
-func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
+func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
 	blockStatus, blockFailureReason := r.blockStatus(blockID)
+
 	// we do not expose accepted flag
 	if blockStatus == apimodels.BlockStateAccepted {
 		blockStatus = apimodels.BlockStatePending
@@ -128,17 +129,14 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*apimodels.BlockMetada
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get transaction status for %s", blockID.ToHex())
 	}
-	resp := &apimodels.BlockMetadataResponse{
-		BlockID:            blockID.ToHex(),
-		BlockState:         blockStatus.String(),
-		BlockFailureReason: blockFailureReason,
-	}
-	if txStatus != apimodels.TransactionStateUnknown {
-		resp.TxState = txStatus.String()
-		resp.TxFailureReason = txFailureReason
-	}
 
-	return resp, nil
+	return &retainer.BlockMetadata{
+		BlockID:            blockID,
+		BlockState:         blockStatus,
+		BlockFailureReason: blockFailureReason,
+		TxState:            txStatus,
+		TxFailureReason:    txFailureReason,
+	}, nil
 }
 
 func (r *Retainer) RetainBlockFailure(blockID iotago.BlockID, failureCode apimodels.BlockFailureReason) {

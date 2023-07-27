@@ -30,12 +30,12 @@ func blockByID(c echo.Context) (*model.Block, error) {
 }
 
 func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
-	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, err
 	}
 
-	return metadata, nil
+	return blockMetadata.BlockMetadataResponse(), nil
 }
 
 func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
