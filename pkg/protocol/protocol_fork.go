@@ -110,6 +110,10 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 		detachProcessCommitment()
 		detachMainEngineSwitched()
 
+		p.activeEngineMutex.Lock()
+		p.candidateEngine = nil
+		p.activeEngineMutex.Unlock()
+
 		candidateEngineInstance.Shutdown()
 		if err := candidateEngineInstance.RemoveFromFilesystem(); err != nil {
 			p.ErrorHandler()(ierrors.Wrapf(err, "error cleaning up candidate engine %s from file system", candidateEngineInstance.Name()))
@@ -122,12 +126,19 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 		if fork.ForkedChain.LatestCommitment().ID().Index() >= details.Commitment.Index() {
 			forkedChainCommitmentID := fork.ForkedChain.Commitment(details.Commitment.Index()).ID()
 			if forkedChainCommitmentID != details.Commitment.ID() {
+				p.ErrorHandler()(ierrors.Errorf("candidate engine %s produced a commitment %s that is not part of the forked chain %s", candidateEngineInstance.Name(), details.Commitment.ID(), forkedChainCommitmentID))
 				cleanupFunc()
+
 				return
 			}
 		}
 
 		p.ChainManager.ProcessCandidateCommitment(details.Commitment)
+
+		if candidateEngineInstance.IsBootstrapped() &&
+			details.Commitment.CumulativeWeight() > p.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
+			p.switchEngines()
+		}
 	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("ProcessCandidateCommitment", 2))).Unhook
 
 	// Clean up events when we switch to the candidate engine.

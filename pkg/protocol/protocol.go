@@ -287,10 +287,6 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil {
 		if candidateChain := candidateEngineInstance.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngineInstance.BlockRequester.HasTicker(block.ID()) {
 			candidateEngineInstance.ProcessBlockFromPeer(block, src)
-			if candidateEngineInstance.IsBootstrapped() &&
-				candidateEngineInstance.Storage.Settings().LatestCommitment().CumulativeWeight() > mainEngine.Storage.Settings().LatestCommitment().CumulativeWeight() {
-				p.switchEngines()
-			}
 			processed = true
 		}
 	}
