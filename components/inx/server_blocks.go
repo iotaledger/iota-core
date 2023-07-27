@@ -3,10 +3,10 @@ package inx
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/contextutils"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -160,10 +160,10 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (
 	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, block)
 	if err != nil {
 		switch {
-		case errors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
+		case ierrors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
 			return nil, status.Errorf(codes.InvalidArgument, "failed to attach block: %s", err.Error())
 
-		case errors.Is(err, blockfactory.ErrBlockAttacherAttachingNotPossible):
+		case ierrors.Is(err, blockfactory.ErrBlockAttacherAttachingNotPossible):
 			return nil, status.Errorf(codes.Internal, "failed to attach block: %s", err.Error())
 
 		default:
