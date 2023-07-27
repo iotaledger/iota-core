@@ -123,6 +123,10 @@ func (q *IssuerQueue) Front() *blocks.Block {
 
 // PopFront removes the first ready block from the queue.
 func (q *IssuerQueue) PopFront() *blocks.Block {
+	if q.inbox.Len() == 0 {
+		return nil
+	}
+
 	heapElement, isHeapElement := heap.Pop(&q.inbox).(*generalheap.HeapElement[timed.HeapKey, *blocks.Block])
 	if !isHeapElement {
 		return nil

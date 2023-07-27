@@ -154,6 +154,7 @@ func (b *BufferQueue) Unsubmit(block *blocks.Block) bool {
 	if issuerQueue == nil {
 		return false
 	}
+
 	if !issuerQueue.Unsubmit(block) {
 		return false
 	}
@@ -179,6 +180,7 @@ func (b *BufferQueue) ReadyBlocksCount() (readyBlocksCount int) {
 	if start == nil {
 		return
 	}
+
 	for q := start; ; {
 		readyBlocksCount += q.inbox.Len()
 		q = b.Next()
@@ -261,9 +263,18 @@ func (b *BufferQueue) Current() *IssuerQueue {
 }
 
 // PopFront removes the first ready block from the queue of the current issuer.
-func (b *BufferQueue) PopFront() (block *blocks.Block) {
+func (b *BufferQueue) PopFront() *blocks.Block {
 	q := b.Current()
-	block = q.PopFront()
+	if q == nil {
+		return nil
+	}
+
+	block := q.PopFront()
+	if block == nil {
+		return nil
+
+	}
+
 	b.size--
 
 	return block
