@@ -103,6 +103,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("CandidateBlockRequester", 2))).Unhook
 
 	var detachProcessCommitment, detachMainEngineSwitched func()
+	candidateEngineTimeoutTimer := time.NewTimer(10 * time.Minute)
 
 	cleanupFunc := func() {
 		detachRequestBlocks()
@@ -131,22 +132,22 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 
 	// Clean up events when we switch to the candidate engine.
 	detachMainEngineSwitched = p.Events.MainEngineSwitched.Hook(func(_ *engine.Engine) {
+		candidateEngineTimeoutTimer.Stop()
 		detachRequestBlocks()
 		detachProcessCommitment()
 	}, event.WithMaxTriggerCount(1)).Unhook
 
 	// Clean up candidate engine if we never switch to it.
 	go func() {
-		timer := time.NewTimer(10 * time.Minute)
-		defer timeutil.CleanupTimer(timer)
+		defer timeutil.CleanupTimer(candidateEngineTimeoutTimer)
 
 		select {
-		case <-timer.C:
+		case <-candidateEngineTimeoutTimer.C:
 			p.ErrorHandler()(ierrors.Errorf("timeout waiting for candidate engine %s to sync", candidateEngineInstance.Name()))
+			cleanupFunc()
 		case <-p.context.Done():
-			// TODO: what exactly do we do with a candidate engine when shutting down a node?
+			// Nothing to do here. The candidate engine will be shutdown on protocol shutdown and cleaned up when starting the node again.
 		}
-		cleanupFunc()
 	}()
 
 	// Add all the blocks from the forking point attestations to the requester since those will not be passed to the engine by the protocol
