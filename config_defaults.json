@@ -75,8 +75,8 @@
     "engine": "rocksdb",
     "path": "testnet/database",
     "maxOpenDBs": 10,
-    "pruningThreshold": 360,
-    "dbGranularity": 1
+    "pruningThreshold": 16384,
+    "dbGranularity": 8192
   },
   "protocol": {
     "snapshot": {
@@ -111,5 +111,9 @@
     "conflicts": {
       "maxCount": 100
     }
+  },
+  "inx": {
+    "enabled": false,
+    "bindAddress": "localhost:9029"
   }
 }

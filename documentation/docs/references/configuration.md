@@ -256,8 +256,8 @@ Example:
 | engine           | The used database engine (rocksdb/mapdb)                   | string | "rocksdb"          |
 | path             | The path to the database folder                            | string | "testnet/database" |
 | maxOpenDBs       | Maximum number of open database instances                  | int    | 10                 |
-| pruningThreshold | How many confirmed slots should be retained                | uint   | 360                |
-| dbGranularity    | How many slots should be contained in a single DB instance | int    | 1                  |
+| pruningThreshold | How many confirmed slots should be retained                | uint   | 16384              |
+| dbGranularity    | How many slots should be contained in a single DB instance | int    | 8192               |
 
 Example:
 
@@ -267,8 +267,8 @@ Example:
       "engine": "rocksdb",
       "path": "testnet/database",
       "maxOpenDBs": 10,
-      "pruningThreshold": 360,
-      "dbGranularity": 1
+      "pruningThreshold": 16384,
+      "dbGranularity": 8192
     }
   }
 ```
@@ -393,6 +393,24 @@ Example:
       "conflicts": {
         "maxCount": 100
       }
+    }
+  }
+```
+
+## <a id="inx"></a> 13. Inx
+
+| Name        | Description                                            | Type    | Default value    |
+| ----------- | ------------------------------------------------------ | ------- | ---------------- |
+| enabled     | Whether the INX plugin is enabled                      | boolean | false            |
+| bindAddress | The bind address on which the INX can be accessed from | string  | "localhost:9029" |
+
+Example:
+
+```json
+  {
+    "inx": {
+      "enabled": false,
+      "bindAddress": "localhost:9029"
     }
   }
 ```

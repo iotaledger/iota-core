@@ -1,0 +1,5 @@
+---
+- hosts: cores:&internal_nodes
+  gather_facts: no
+  roles:
+    - iota-core-node

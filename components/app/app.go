@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/iota-core/components/dashboard"
 	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
 	"github.com/iotaledger/iota-core/components/debugapi"
+	"github.com/iotaledger/iota-core/components/inx"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/p2p"
 	"github.com/iotaledger/iota-core/components/protocol"
@@ -41,6 +42,7 @@ func App() *app.App {
 			activity.Component,
 			dashboardmetrics.Component,
 			dashboard.Component,
+			inx.Component,
 		),
 	)
 }

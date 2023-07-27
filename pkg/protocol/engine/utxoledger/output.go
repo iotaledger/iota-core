@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 

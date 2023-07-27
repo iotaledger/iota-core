@@ -46,7 +46,7 @@ func staking() (*apimodels.AccountStakingListResponse, error) {
 	resp := &apimodels.AccountStakingListResponse{
 		Stakers: make([]apimodels.ValidatorResponse, 0),
 	}
-	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommittedSlot()
+	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
 	activeValidators, err := deps.Protocol.MainEngineInstance().SybilProtection.EligibleValidators(nextEpoch)
@@ -73,7 +73,7 @@ func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommittedSlot()
+	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 
 	accountData, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
@@ -140,7 +140,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	}
 
 	// TODO: the epoch should be returned by the reward calculations
-	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommittedSlot()
+	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 	latestRewardsReadyEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 
 	return &apimodels.ManaRewardsResponse{
@@ -150,7 +150,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 }
 
 func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
-	timeProvider := deps.Protocol.APIForSlot(deps.Protocol.SyncManager.LatestCommittedSlot()).TimeProvider()
+	timeProvider := deps.Protocol.CurrentAPI().TimeProvider()
 
 	var slotIndex iotago.SlotIndex
 
