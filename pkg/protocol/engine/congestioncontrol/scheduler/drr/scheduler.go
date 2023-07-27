@@ -140,21 +140,6 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 	return deficit >= uint64(work+s.buffer.IssuerQueue(accountID).Work())
 }
 
-func (s *Scheduler) getDeficit(accountID iotago.AccountID) (uint64, error) {
-	d, exists := s.deficits.Get(accountID)
-	if !exists {
-		_, err := s.manaRetrieveFunc(accountID)
-		// manaRetrieveFunc return error if mana is less than MinMana or the Mana can not be retrieved for the account.
-		if err != nil {
-			return 0, ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
-		}
-		// load with max deficit if the issuer has Mana but has been removed from the deficits map
-		return s.optsMaxDeficit, nil
-	}
-
-	return d, nil
-}
-
 func (s *Scheduler) AddBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
@@ -367,15 +352,49 @@ func (s *Scheduler) removeIssuer(q *IssuerQueue) {
 	s.buffer.RemoveIssuer(q.IssuerID())
 }
 
+func (s *Scheduler) getDeficit(accountID iotago.AccountID) (uint64, error) {
+	d, exists := s.deficits.Get(accountID)
+	if !exists {
+		_, err := s.manaRetrieveFunc(accountID)
+		// manaRetrieveFunc return error if mana is less than MinMana or the Mana can not be retrieved for the account.
+		if err != nil {
+			return 0, ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
+		}
+		// load with max deficit if the issuer has Mana but has been removed from the deficits map
+		return s.optsMaxDeficit, nil
+	}
+
+	return d, nil
+}
+
 func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error {
-	deficit, err := s.getDeficit(accountID)
+	var err error
+	s.deficits.Compute(accountID, func(currentValue uint64, exists bool) uint64 {
+		if !exists {
+			_, err = s.manaRetrieveFunc(accountID)
+			// manaRetrieveFunc return error if mana is less than MinMana or the Mana can not be retrieved for the account.
+			if err != nil {
+				err = ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
+				return 0
+			}
+
+			// load with max deficit if the issuer has Mana but has been removed from the deficits map
+			return s.optsMaxDeficit
+		}
+
+		if int64(currentValue)+delta < 0 {
+			err = ierrors.Errorf("tried to decrease deficit to a negative value %d for issuer %s", int64(currentValue)+delta, accountID)
+			return 0
+		}
+
+		return lo.Min(uint64(int64(currentValue)+delta), s.optsMaxDeficit)
+	})
+
 	if err != nil {
-		return ierrors.Errorf("could not get deficit for issuer %s", accountID)
+		s.deficits.Delete(accountID)
+
+		return err
 	}
-	if int64(deficit)+delta < 0 {
-		return ierrors.Errorf("tried to decrease deficit to a negative value %d for issuer %s", int64(deficit)+delta, accountID)
-	}
-	s.deficits.Set(accountID, lo.Max(uint64(int64(deficit)+delta), s.optsMaxDeficit))
 
 	return nil
 }
