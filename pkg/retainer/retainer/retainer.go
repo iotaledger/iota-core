@@ -142,14 +142,16 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*apimodels.BlockMetada
 }
 
 func (r *Retainer) RetainBlockFailure(blockID iotago.BlockID, failureCode apimodels.BlockFailureReason) {
-	retainerStore := r.store(blockID.Index())
-	_ = retainerStore.StoreBlockFailure(blockID, failureCode)
+	if err := r.store(blockID.Index()).StoreBlockFailure(blockID, failureCode); err != nil {
+		r.errorHandler(ierrors.Wrap(err, "failed to store block failure in retainer"))
+	}
 }
 
 func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, err error) {
-	retainerStore := r.store(blockID.Index())
 	failureCode := determineTxFailureReason(err)
-	_ = retainerStore.StoreTransactionFailure(blockID, failureCode)
+	if err := r.store(blockID.Index()).StoreTransactionFailure(blockID, failureCode); err != nil {
+		r.errorHandler(ierrors.Wrap(err, "failed to store transaction failure in retainer"))
+	}
 }
 
 func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, apimodels.BlockFailureReason) {
