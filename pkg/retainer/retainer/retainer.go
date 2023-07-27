@@ -125,10 +125,7 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 		blockStatus = apimodels.BlockStatePending
 	}
 
-	txStatus, txFailureReason, err := r.transactionStatus(blockID)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get transaction status for %s", blockID.ToHex())
-	}
+	txStatus, txFailureReason := r.transactionStatus(blockID)
 
 	return &retainer.BlockMetadata{
 		BlockID:            blockID,
@@ -171,10 +168,10 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, ap
 	return blockData.State, blockData.FailureReason
 }
 
-func (r *Retainer) transactionStatus(blockID iotago.BlockID) (apimodels.TransactionState, apimodels.TransactionFailureReason, error) {
+func (r *Retainer) transactionStatus(blockID iotago.BlockID) (apimodels.TransactionState, apimodels.TransactionFailureReason) {
 	txData, exists := r.store(blockID.Index()).GetTransaction(blockID)
 	if !exists {
-		return apimodels.TransactionStateUnknown, apimodels.TxFailureNone, nil
+		return apimodels.TransactionStateUnknown, apimodels.TxFailureNone
 	}
 
 	// for confirmed and finalized we need to check for the block status
@@ -183,13 +180,13 @@ func (r *Retainer) transactionStatus(blockID iotago.BlockID) (apimodels.Transact
 
 		switch blockState {
 		case apimodels.BlockStateConfirmed:
-			return apimodels.TransactionStateConfirmed, apimodels.TxFailureNone, nil
+			return apimodels.TransactionStateConfirmed, apimodels.TxFailureNone
 		case apimodels.BlockStateFinalized:
-			return apimodels.TransactionStateFinalized, apimodels.TxFailureNone, nil
+			return apimodels.TransactionStateFinalized, apimodels.TxFailureNone
 		}
 	}
 
-	return txData.State, txData.FailureReason, nil
+	return txData.State, txData.FailureReason
 }
 
 func (r *Retainer) onBlockAttached(blockID iotago.BlockID) error {
