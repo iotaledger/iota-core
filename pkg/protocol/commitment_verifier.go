@@ -80,7 +80,9 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 	//     We do not count a seat for the issuer for this slot and the computed CW will be lower than the CW in
 	//	   the commitment. This is fine, since this is a rare occasion and a heavier chain will become heavier anyway, eventually.
 	//	   It will simply take a bit longer to accumulate enough CW so that the chain-switch rule kicks in.
-	//	TODO: what happens in an extreme case where all change their keys?
+	//     Note: In an extreme scenario where all validators add and use a new public key, the chain will never become heavier.
+	//           This can only be prevented by adding such key changes provably to the commitments so that these changes
+	//           can be reconstructed and verified by nodes that do not have the latest ledger state.
 	//
 	// 2. A public key is removed from an account.
 	//    We count the seat for the issuer for this slot even though we shouldn't have. According to the protocol, a valid

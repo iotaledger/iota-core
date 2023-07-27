@@ -68,7 +68,7 @@ type Protocol struct {
 
 	activeEngineMutex syncutils.RWMutex
 	mainEngine        *engine.Engine
-	candidateEngine   *engine.Engine
+	candidateEngine   *candidateEngine
 
 	optsBaseDirectory           string
 	optsSnapshotPath            string
@@ -189,7 +189,8 @@ func (p *Protocol) shutdown() {
 	p.activeEngineMutex.RLock()
 	p.mainEngine.Shutdown()
 	if p.candidateEngine != nil {
-		p.candidateEngine.Shutdown()
+		// TODO: do we want to delete the candidate engine's data as well?
+		p.candidateEngine.engine.Shutdown()
 	}
 	p.activeEngineMutex.RUnlock()
 
@@ -284,14 +285,11 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 		processed = true
 	}
 
-	if candidateEngine := p.CandidateEngineInstance(); candidateEngine != nil {
-		if candidateChain := candidateEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngine.BlockRequester.HasTicker(block.ID()) {
-			candidateEngine.ProcessBlockFromPeer(block, src)
-			if candidateEngine.IsBootstrapped() &&
-				candidateEngine.Storage.Settings().LatestCommitment().CumulativeWeight() > mainEngine.Storage.Settings().LatestCommitment().CumulativeWeight() {
-				// TODO: when activating the candidate engine should we make sure that the candidate engine produces the same commitments as the chain we decided to switch to?
-				//   -> if they are different we could shut down this engine.
-
+	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil {
+		if candidateChain := candidateEngineInstance.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngineInstance.BlockRequester.HasTicker(block.ID()) {
+			candidateEngineInstance.ProcessBlockFromPeer(block, src)
+			if candidateEngineInstance.IsBootstrapped() &&
+				candidateEngineInstance.Storage.Settings().LatestCommitment().CumulativeWeight() > mainEngine.Storage.Settings().LatestCommitment().CumulativeWeight() {
 				p.switchEngines()
 			}
 			processed = true
@@ -316,7 +314,11 @@ func (p *Protocol) CandidateEngineInstance() *engine.Engine {
 	p.activeEngineMutex.RLock()
 	defer p.activeEngineMutex.RUnlock()
 
-	return p.candidateEngine
+	if p.candidateEngine == nil {
+		return nil
+	}
+
+	return p.candidateEngine.engine
 }
 
 func (p *Protocol) Network() *core.Protocol {
