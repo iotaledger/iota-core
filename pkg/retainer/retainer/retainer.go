@@ -214,14 +214,8 @@ func (r *Retainer) onTransactionAccepted(blockID iotago.BlockID) error {
 }
 
 func (r *Retainer) onAttachmentUpdated(prevID, newID iotago.BlockID, accepted bool) error {
-	txData, exists := r.store(prevID.Index()).GetTransaction(prevID)
-	// delete the old transactionID
-	if exists {
-		if err := r.store(prevID.Index()).DeleteTransactionData(prevID); err != nil {
-			return err
-		}
-
-		return r.store(newID.Index()).StoreTransactionNoFailureStatus(newID, txData.State)
+	if err := r.store(prevID.Index()).DeleteTransactionData(prevID); err != nil {
+		return err
 	}
 
 	if accepted {
