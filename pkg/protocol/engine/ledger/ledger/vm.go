@@ -13,7 +13,7 @@ import (
 func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.State) ([]mempool.State, error) {
 	tx, ok := stateTransition.(*iotago.Transaction)
 	if !ok {
-		return nil, iotago.ErrUnknownTransactinType
+		return nil, iotago.ErrTxTypeInvalid
 	}
 
 	inputSet := iotagovm.InputSet{}
@@ -30,12 +30,12 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	// TODO: refactor resolution of ContextInputs to be handled by Mempool
 	bicInputs, err := tx.BICInputs()
 	if err != nil {
-		return nil, ierrors.Join(err, iotago.ErrCouldNotResolveBICInput)
+		return nil, ierrors.Join(err, iotago.ErrBICInputInvalid)
 	}
 
 	rewardInputs, err := tx.RewardInputs()
 	if err != nil {
-		return nil, ierrors.Join(err, iotago.ErrCouldNotResolveRewardInput)
+		return nil, ierrors.Join(err, iotago.ErrRewardInputInvalid)
 	}
 
 	// resolve the commitment inputs from storage
@@ -49,7 +49,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	if commitment != nil {
 		loadedCommitment, err = l.loadCommitment(commitment.CommitmentID)
 		if err != nil {
-			return nil, ierrors.Join(iotago.ErrCouldNorRetrieveCommitment, ierrors.Wrapf(err, "could not load commitment %s", commitment.CommitmentID))
+			return nil, ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.Wrapf(err, "could not load commitment %s", commitment.CommitmentID))
 		}
 
 		resolvedInputs.CommitmentInput = loadedCommitment
@@ -59,10 +59,10 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	for _, inp := range bicInputs {
 		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, loadedCommitment.Index)
 		if accountErr != nil {
-			return nil, ierrors.Join(iotago.ErrCouldNotResolveBICInput, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, loadedCommitment.Index))
+			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, loadedCommitment.Index))
 		}
 		if !exists {
-			return nil, ierrors.Join(iotago.ErrCouldNotResolveBICInput, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, loadedCommitment.Index))
+			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, loadedCommitment.Index))
 		}
 
 		bicInputSet[inp.AccountID] = accountData.Credits.Value

@@ -8,14 +8,15 @@ import (
 
 var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	// unknown type / type casting errors
-	iotago.ErrUnknownTransactinType:      apimodels.TxFailureUnderlyingTxTypeInvalid,
-	iotago.ErrUnknownInputType:           apimodels.TxFailureUnderlyingUTXOInputInvalid,
-	iotago.ErrFailedToRetrieveInput:      apimodels.TxFailureUnderlyingUTXOInputInvalid,
-	iotago.ErrUnknownOutputType:          apimodels.TxFailureUnderlyingUTXOInputInvalid,
-	iotago.ErrCouldNotResolveBICInput:    apimodels.TxFailureUnderlyingBICInputInvalid,
-	iotago.ErrCouldNotResolveRewardInput: apimodels.TxFailureUnderlyingRewardInputInvalid,
-	iotago.ErrCommitmentInputMissing:     apimodels.TxFailureUnderlyingCommitmentInputInvalid,
-	iotago.ErrCouldNorRetrieveCommitment: apimodels.TxFailureUnderlyingCommitmentInputInvalid,
+	iotago.ErrTxTypeInvalid:               apimodels.TxFailureTxTypeInvalid,
+	iotago.ErrUnknownInputType:            apimodels.TxFailureUTXOInputInvalid,
+	iotago.ErrUTXOInputInvalid:            apimodels.TxFailureUTXOInputInvalid,
+	iotago.ErrUnknownOutputType:           apimodels.TxFailureUTXOInputInvalid,
+	iotago.ErrBICInputInvalid:             apimodels.TxFailureBICInputInvalid,
+	iotago.ErrRewardInputInvalid:          apimodels.TxFailureRewardInputInvalid,
+	iotago.ErrCommitmentInputMissing:      apimodels.TxFailureCommitmentInputInvalid,
+	iotago.ErrCommitmentInputInvalid:      apimodels.TxFailureCommitmentInputInvalid,
+	iotago.ErrUnlockBlockSignatureInvalid: apimodels.TxFailureUnlockBlockSignatureInvalid,
 
 	// context inputs errors
 	iotago.ErrNoStakingFeature:             apimodels.TxFailureNoStakingFeature,
@@ -23,7 +24,7 @@ var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	iotago.ErrFailedToClaimDelegatorReward: apimodels.TxFailureFailedToClaimDelegatorReward,
 
 	// native token errors
-	iotago.ErrInvalidNativeTokenSet:        apimodels.TxFailureGivenNativeTokensInvalid,
+	iotago.ErrNativeTokenSetInvalid:        apimodels.TxFailureGivenNativeTokensInvalid,
 	iotago.ErrMaxNativeTokensCountExceeded: apimodels.TxFailureGivenNativeTokensInvalid,
 	iotago.ErrNativeTokenSumUnbalanced:     apimodels.TxFailureGivenNativeTokensInvalid,
 
@@ -36,7 +37,7 @@ var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	iotago.ErrSenderFeatureNotUnlocked:     apimodels.TxFailureSenderNotUnlocked,
 	iotago.ErrChainTransitionInvalid:       apimodels.TxFailureChainStateTransitionInvalid,
 	iotago.ErrInputOutputManaMismatch:      apimodels.TxFailureManaAmountInvalid,
-	iotago.ErrInvalidManaAmount:            apimodels.TxFailureManaAmountInvalid,
+	iotago.ErrManaAmountInvalid:            apimodels.TxFailureManaAmountInvalid,
 	iotago.ErrInputCreationAfterTxCreation: apimodels.TxFailureInputCreationAfterTxCreation,
 }
 

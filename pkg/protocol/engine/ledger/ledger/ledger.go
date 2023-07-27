@@ -252,7 +252,7 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 
 		tx, ok := txWithMetadata.Transaction().(*iotago.Transaction)
 		if !ok {
-			return nil, iotago.ErrUnknownTransactinType
+			return nil, iotago.ErrTxTypeInvalid
 		}
 
 		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
@@ -533,7 +533,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
 		if !ok {
-			err = iotago.ErrUnknownTransactinType
+			err = iotago.ErrTxTypeInvalid
 			return false
 		}
 		txCreationTime := tx.Essence.CreationTime
@@ -630,7 +630,7 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 
 	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
 	if err != nil {
-		return p.Reject(ierrors.Wrapf(iotago.ErrFailedToRetrieveInput, "error while retrieving output %s: %w", stateRef.Ref(), err))
+		return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "error while retrieving output %s: %w", stateRef.Ref(), err))
 	}
 
 	if !isUnspent {
@@ -640,7 +640,7 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
 	output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(stateRef.Ref())
 	if err != nil {
-		return p.Reject(ierrors.Wrapf(iotago.ErrFailedToRetrieveInput, "output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+		return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
 
 	return p.Resolve(output)
