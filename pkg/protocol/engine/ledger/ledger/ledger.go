@@ -634,7 +634,7 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 	}
 
 	if !isUnspent {
-		return p.Reject(ierrors.Join(iotago.ErrInputAlreadySpent, ierrors.Wrapf(mempool.ErrStateNotFound, "unspent output %s not found: %w", stateRef.Ref())))
+		return p.Reject(ierrors.Join(iotago.ErrInputAlreadySpent, ierrors.Wrapf(mempool.ErrStateNotFound, "unspent output %s not found", stateRef.Ref())))
 	}
 
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
