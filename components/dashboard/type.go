@@ -71,10 +71,10 @@ type tangleTime struct {
 	CTT          int64 `json:"CTT"`
 	RCTT         int64 `json:"RCTT"`
 
-	AcceptedBlockID  string `json:"acceptedBlockID"`
-	ConfirmedBlockID string `json:"confirmedBlockID"`
-	CommittedSlot    int64  `json:"committedSlot"`
-	ConfirmedSlot    int64  `json:"confirmedSlot"`
+	AcceptedBlockSlot  int64 `json:"acceptedBlockSlot"`
+	ConfirmedBlockSlot int64 `json:"confirmedBlockSlot"`
+	CommittedSlot      int64 `json:"committedSlot"`
+	ConfirmedSlot      int64 `json:"confirmedSlot"`
 }
 
 type memmetrics struct {

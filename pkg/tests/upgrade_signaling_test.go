@@ -151,11 +151,10 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		5: nil,
 	}, ts.Nodes()...)
 
-	// TODO: add this after handling future protocol parameters hashes in settings
-	// ts.AssertVersionsAndProtocolParameterHashes(map[iotago.Version]iotago.Identifier{
-	// 	3: ts.API.ProtocolParameters().Hash(),
-	// 	5: hash1,
-	// }, ts.Nodes()...)
+	ts.AssertVersionAndProtocolParametersHashes(map[iotago.Version]iotago.Identifier{
+		3: lo.PanicOnErr(ts.API.ProtocolParameters().Hash()),
+		5: hash1,
+	}, ts.Nodes()...)
 }
 
 func issueBlocksAtSlotsInEpoch(ts *testsuite.TestSuite, epoch iotago.EpochIndex, slotsWithinEpoch []iotago.SlotIndex, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) {

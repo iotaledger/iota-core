@@ -8,6 +8,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
+	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/iotaledger/hive.go/ads v0.0.0-20230721122326-34450325011f
 	github.com/iotaledger/hive.go/app v0.0.0-20230721122326-34450325011f
 	github.com/iotaledger/hive.go/autopeering v0.0.0-20230721122326-34450325011f
@@ -22,8 +23,9 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230721122326-34450325011f
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230721122326-34450325011f
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230720084922-26a37e052060
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230721073056-81397c2f9e97
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726135831-dd0c6ef61d5b
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230726135421-ca90b96ff054
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230726134822-e4317abe9128
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/libp2p/go-libp2p v0.29.0
 	github.com/multiformats/go-multiaddr v0.10.1
@@ -35,7 +37,7 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.0
 	golang.org/x/crypto v0.11.0
-	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
+	google.golang.org/grpc v1.56.2
 	google.golang.org/protobuf v1.31.0
 )
 
@@ -53,6 +55,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/ethereum/go-ethereum v1.12.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
@@ -118,7 +121,7 @@ require (
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/onsi/ginkgo/v2 v2.11.0 // indirect
-	github.com/opencontainers/runtime-spec v1.0.2 // indirect
+	github.com/opencontainers/runtime-spec v1.1.0 // indirect
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.9 // indirect
@@ -145,7 +148,8 @@ require (
 	go.uber.org/fx v1.20.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/image v0.6.0 // indirect
+	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // indirect
+	golang.org/x/image v0.9.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
@@ -153,6 +157,7 @@ require (
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.11.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230725213213-b022f6e96895 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect

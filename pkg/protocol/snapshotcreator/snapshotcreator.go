@@ -1,11 +1,11 @@
 package snapshotcreator
 
 import (
-	"crypto/ed25519"
 	"os"
 
 	"golang.org/x/crypto/blake2b"
 
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -54,15 +54,11 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, errorHandler)
 	defer s.Shutdown()
 
-	if err := s.Settings().StoreProtocolParameters(opt.ProtocolParameters); err != nil {
-		return ierrors.Wrap(err, "failed to store the protocol parameters")
+	if err := s.Settings().StoreProtocolParametersForStartEpoch(opt.ProtocolParameters, 0); err != nil {
+		return ierrors.Wrap(err, "failed to store the protocol parameters for epoch 0")
 	}
 
-	if err := s.Settings().StoreProtocolParametersEpochMapping(opt.ProtocolParameters.Version(), 0); err != nil {
-		return ierrors.Wrap(err, "failed to set the protocol parameters epoch mapping")
-	}
-
-	api := s.Settings().LatestAPI()
+	api := s.Settings().APIProvider().CurrentAPI()
 	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
 		return ierrors.Wrap(err, "failed to store empty commitment")
 	}
@@ -71,7 +67,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	for _, accountData := range opt.Accounts {
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
-			accounts.Set(blake2b.Sum256(accountData.IssuerKey), &account.Pool{
+			accounts.Set(blake2b.Sum256(accountData.IssuerKey[:]), &account.Pool{
 				PoolStake:      accountData.StakedAmount,
 				ValidatorStake: accountData.StakedAmount,
 				FixedCost:      accountData.FixedCost,

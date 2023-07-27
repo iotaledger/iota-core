@@ -10,8 +10,8 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/core/account"
-	"github.com/iotaledger/iota-core/pkg/core/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
@@ -61,8 +61,8 @@ type Orchestrator struct {
 	upgradeSignalsFunc      func(slot iotago.SlotIndex) *prunable.UpgradeSignals
 	permanentUpgradeSignals *kvstore.TypedStore[iotago.EpochIndex, VersionAndHash]
 
-	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.EpochIndex) error
-	protocolParametersAndVersionsHashFunc func(iotago.SlotIndex) (iotago.Identifier, error)
+	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error
+	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error)
 	epochForVersionFunc                   func(iotago.Version) (iotago.EpochIndex, bool)
 
 	apiProvider api.Provider
@@ -79,16 +79,16 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 			e.ErrorHandler("upgradegadget"),
 			e.Storage.Permanent.UpgradeSignals(),
 			e.Storage.Prunable.UpgradeSignals,
-			e.Storage.Settings(),
-			e.Storage.Settings().StoreProtocolParametersEpochMapping,
-			e.Storage.Settings().VersionsAndProtocolParametersHash,
-			e.Storage.Settings().EpochForVersion,
+			e.Storage.Settings().APIProvider(),
+			e.Storage.Settings().StoreFutureProtocolParametersHash,
+			e.Storage.Settings().APIProvider().VersionsAndProtocolParametersHash,
+			e.Storage.Settings().APIProvider().EpochForVersion,
 			e.SybilProtection.SeatManager(),
 			opts...,
 		)
 
 		for _, protocolParams := range o.optsProtocolParameters {
-			storedProtocolParams := e.Storage.Settings().ProtocolParameters(protocolParams.Version())
+			storedProtocolParams := e.Storage.Settings().APIProvider().ProtocolParameters(protocolParams.Version())
 			if storedProtocolParams != nil {
 				if lo.PanicOnErr(storedProtocolParams.Hash()) == lo.PanicOnErr(protocolParams.Hash()) {
 					continue
@@ -112,8 +112,8 @@ func NewOrchestrator(errorHandler func(error),
 	permanentUpgradeSignal kvstore.KVStore,
 	upgradeSignalsFunc func(slot iotago.SlotIndex) *prunable.UpgradeSignals,
 	apiProvider api.Provider,
-	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.EpochIndex) error,
-	protocolParametersAndVersionsHashFunc func(iotago.SlotIndex) (iotago.Identifier, error),
+	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error,
+	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error),
 	epochForVersionFunc func(iotago.Version) (iotago.EpochIndex, bool),
 	seatManager seatmanager.SeatManager, opts ...options.Option[Orchestrator]) *Orchestrator {
 	return options.Apply(&Orchestrator{
@@ -219,7 +219,7 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 
 	o.tryUpgrade(currentEpoch, lastSlotInEpoch, signaledBlockPerSeat)
 
-	return o.protocolParametersAndVersionsHashFunc(slot)
+	return o.protocolParametersAndVersionsHashFunc()
 }
 
 func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoch bool, signaledBlockPerSeat map[account.SeatIndex]*prunable.SignaledBlock) {
@@ -266,7 +266,7 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 
 	// The version should be upgraded. We're adding the version to the settings.
 	// Effectively, this is a soft fork as it is contained in the hash of protocol parameters and versions.
-	if err := o.setProtocolParametersEpochMappingFunc(versionAndHashTobeUpgraded.Version, currentEpoch+iotago.EpochIndex(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().ActivationOffset)); err != nil {
+	if err := o.setProtocolParametersEpochMappingFunc(versionAndHashTobeUpgraded.Version, versionAndHashTobeUpgraded.Hash, currentEpoch+iotago.EpochIndex(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().ActivationOffset)); err != nil {
 		o.errorHandler(ierrors.Wrap(err, "failed to set protocol parameters epoch mapping"))
 		return
 	}

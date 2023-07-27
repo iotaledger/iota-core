@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
@@ -129,9 +129,15 @@ func (t *TestFramework) IssueBlockAtSlotWithVersion(alias string, index iotago.S
 }
 
 func TestFilter_ProtocolVersion(t *testing.T) {
-	apiProvider := api.NewDynamicMockAPIProvider()
-	apiProvider.AddProtocolParameters(0, newMockProtocolParameters(3))
-	apiProvider.AddProtocolParameters(3, newMockProtocolParameters(4))
+	apiProvider := api.NewEpochBasedProvider(
+		api.WithAPIForMissingVersionCallback(
+			func(version iotago.Version) (iotago.API, error) {
+				return iotago.V3API(iotago.NewV3ProtocolParameters(iotago.WithVersion(version))), nil
+			},
+		),
+	)
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 0)
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithVersion(4)), 3)
 
 	defaultAPI := apiProvider.CurrentAPI()
 	timeProvider := apiProvider.CurrentAPI().TimeProvider()
@@ -178,7 +184,7 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 	valid.Add("G")
 	tf.IssueBlockAtSlotWithVersion("G", timeProvider.EpochStart(5), 4, defaultAPI)
 
-	apiProvider.AddProtocolParameters(10, newMockProtocolParameters(5))
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithVersion(5)), 10)
 
 	valid.Add("H")
 	tf.IssueBlockAtSlotWithVersion("H", timeProvider.EpochEnd(9), 4, defaultAPI)
@@ -196,7 +202,7 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
-		api.NewStaticProvider(testAPI),
+		api.SingleVersionProvider(testAPI),
 		WithMaxAllowedWallClockDrift(allowedDrift),
 		WithSignatureValidation(false),
 	)
@@ -220,7 +226,7 @@ func TestFilter_WithSignatureValidation(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
-		api.NewStaticProvider(testAPI),
+		api.SingleVersionProvider(testAPI),
 		WithSignatureValidation(true),
 	)
 
@@ -255,7 +261,7 @@ func TestFilter_ExpiryThreshold(t *testing.T) {
 	)
 
 	tf := NewTestFramework(t,
-		api.NewStaticProvider(v3API),
+		api.SingleVersionProvider(v3API),
 		WithSignatureValidation(false),
 	)
 
@@ -304,7 +310,7 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 	)
 
 	tf := NewTestFramework(t,
-		api.NewStaticProvider(v3API),
+		api.SingleVersionProvider(v3API),
 		WithSignatureValidation(false),
 	)
 
@@ -371,76 +377,4 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 
 	tf.IssueUnsignedBlockAtSlotWithPayload("commitmentCorrectMiddle", 100, 90, commitmentCorrectMiddle)
 
-}
-
-func newMockProtocolParameters(version iotago.Version) iotago.ProtocolParameters {
-	return &mockProtocolParameters{version: version}
-}
-
-type mockProtocolParameters struct {
-	version iotago.Version
-}
-
-func (m mockProtocolParameters) Version() iotago.Version {
-	return m.version
-}
-
-func (m mockProtocolParameters) NetworkName() string {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) NetworkID() iotago.NetworkID {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) Bech32HRP() iotago.NetworkPrefix {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) RentStructure() *iotago.RentStructure {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) TokenSupply() iotago.BaseToken {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) TimeProvider() *iotago.TimeProvider {
-	return iotago.NewTimeProvider(0, 10, 13)
-}
-
-func (m mockProtocolParameters) ManaDecayProvider() *iotago.ManaDecayProvider {
-	return iotago.NewManaDecayProvider(m.TimeProvider(), 0, 0, 0, nil, 0, 0, 0)
-}
-
-func (m mockProtocolParameters) StakingUnbondingPeriod() iotago.EpochIndex {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) LivenessThreshold() iotago.SlotIndex {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) LivenessThresholdDuration() time.Duration {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) EvictionAge() iotago.SlotIndex {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) EpochNearingThreshold() iotago.SlotIndex {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) VersionSignaling() *iotago.VersionSignaling {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) Bytes() ([]byte, error) {
-	panic("implement me")
-}
-
-func (m mockProtocolParameters) Hash() (iotago.Identifier, error) {
-	panic("implement me")
 }

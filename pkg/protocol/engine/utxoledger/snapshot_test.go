@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/utils"
@@ -29,7 +29,7 @@ func TestOutput_SnapshotBytes(t *testing.T) {
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.NewStaticProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
 
 	snapshotBytes := output.SnapshotBytes()
 
@@ -50,11 +50,11 @@ func TestOutputFromSnapshotReader(t *testing.T) {
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.NewStaticProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
 	snapshotBytes := output.SnapshotBytes()
 
 	buf := bytes.NewReader(snapshotBytes)
-	readOutput, err := utxoledger.OutputFromSnapshotReader(buf, api.NewStaticProvider(iotago_tpkg.TestAPI))
+	readOutput, err := utxoledger.OutputFromSnapshotReader(buf, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 	require.NoError(t, err)
 
 	require.Equal(t, output, readOutput)
@@ -69,7 +69,7 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.NewStaticProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
 	outputSnapshotBytes := output.SnapshotBytes()
 
 	transactionID := utils.RandTransactionID()
@@ -92,7 +92,7 @@ func TestSpentFromSnapshotReader(t *testing.T) {
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.NewStaticProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
 
 	transactionID := utils.RandTransactionID()
 	indexSpent := utils.RandSlotIndex()
@@ -101,7 +101,7 @@ func TestSpentFromSnapshotReader(t *testing.T) {
 	snapshotBytes := spent.SnapshotBytes()
 
 	buf := bytes.NewReader(snapshotBytes)
-	readSpent, err := utxoledger.SpentFromSnapshotReader(buf, api.NewStaticProvider(iotago_tpkg.TestAPI), indexSpent)
+	readSpent, err := utxoledger.SpentFromSnapshotReader(buf, api.SingleVersionProvider(iotago_tpkg.TestAPI), indexSpent)
 	require.NoError(t, err)
 
 	require.Equal(t, spent, readSpent)
@@ -129,7 +129,7 @@ func TestReadSlotDiffToSnapshotReader(t *testing.T) {
 	require.Equal(t, int64(writer.BytesReader().Len()), written)
 
 	reader := writer.BytesReader()
-	readSlotDiff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.NewStaticProvider(iotago_tpkg.TestAPI))
+	readSlotDiff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 	require.NoError(t, err)
 
 	require.Equal(t, slotDiff.Index, readSlotDiff.Index)
@@ -170,7 +170,7 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 
 	var snapshotOutputs utxoledger.Outputs
 	for i := 0; i < len(slotDiff.Outputs); i++ {
-		readOutput, err := utxoledger.OutputFromSnapshotReader(reader, api.NewStaticProvider(iotago_tpkg.TestAPI))
+		readOutput, err := utxoledger.OutputFromSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 		require.NoError(t, err)
 		snapshotOutputs = append(snapshotOutputs, readOutput)
 	}
@@ -183,7 +183,7 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 
 	var snapshotSpents utxoledger.Spents
 	for i := 0; i < len(slotDiff.Spents); i++ {
-		readSpent, err := utxoledger.SpentFromSnapshotReader(reader, api.NewStaticProvider(iotago_tpkg.TestAPI), iotago.SlotIndex(readSlotIndex))
+		readSpent, err := utxoledger.SpentFromSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI), iotago.SlotIndex(readSlotIndex))
 		require.NoError(t, err)
 		snapshotSpents = append(snapshotSpents, readSpent)
 	}
@@ -193,7 +193,7 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 
 func TestManager_Import(t *testing.T) {
 	mapDB := mapdb.NewMapDB()
-	manager := utxoledger.New(mapDB, api.NewStaticProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapDB, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	output1 := tpkg.RandLedgerStateOutput()
 
@@ -246,7 +246,7 @@ func TestManager_Import(t *testing.T) {
 
 		reader := writer.BytesReader()
 
-		importedIndex2 := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
+		importedIndex2 := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 		require.NoError(t, importedIndex2.Import(reader))
 
 		require.Equal(t, iotago.SlotIndex(2), lo.PanicOnErr(importedIndex2.ReadLedgerIndex()))
@@ -260,10 +260,10 @@ func TestManager_Import(t *testing.T) {
 
 		reader := writer.BytesReader()
 
-		importedIndex1 := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
+		importedIndex1 := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 		require.NoError(t, importedIndex1.Import(reader))
 
-		managerAtIndex1 := utxoledger.New(mapDBAtIndex1, api.NewStaticProvider(iotago_tpkg.TestAPI))
+		managerAtIndex1 := utxoledger.New(mapDBAtIndex1, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 		require.Equal(t, iotago.SlotIndex(1), lo.PanicOnErr(importedIndex1.ReadLedgerIndex()))
 		require.Equal(t, iotago.SlotIndex(1), lo.PanicOnErr(managerAtIndex1.ReadLedgerIndex()))
@@ -277,10 +277,10 @@ func TestManager_Import(t *testing.T) {
 
 		reader := writer.BytesReader()
 
-		importedIndex0 := utxoledger.New(mapdb.NewMapDB(), api.NewStaticProvider(iotago_tpkg.TestAPI))
+		importedIndex0 := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 		require.NoError(t, importedIndex0.Import(reader))
 
-		managerAtIndex0 := utxoledger.New(mapDBAtIndex0, api.NewStaticProvider(iotago_tpkg.TestAPI))
+		managerAtIndex0 := utxoledger.New(mapDBAtIndex0, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 		require.Equal(t, iotago.SlotIndex(0), lo.PanicOnErr(importedIndex0.ReadLedgerIndex()))
 		require.Equal(t, iotago.SlotIndex(0), lo.PanicOnErr(managerAtIndex0.ReadLedgerIndex()))
@@ -290,7 +290,7 @@ func TestManager_Import(t *testing.T) {
 
 func TestManager_Export(t *testing.T) {
 	mapDB := mapdb.NewMapDB()
-	manager := utxoledger.New(mapDB, api.NewStaticProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapDB, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	output1 := tpkg.RandLedgerStateOutput()
 
@@ -347,7 +347,7 @@ func TestManager_Export(t *testing.T) {
 
 		var snapshotOutputs utxoledger.Outputs
 		for i := uint64(0); i < outputCount; i++ {
-			output, err := utxoledger.OutputFromSnapshotReader(reader, api.NewStaticProvider(iotago_tpkg.TestAPI))
+			output, err := utxoledger.OutputFromSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
 			snapshotOutputs = append(snapshotOutputs, output)
 		}
@@ -380,7 +380,7 @@ func TestManager_Export(t *testing.T) {
 
 		var snapshotOutputs utxoledger.Outputs
 		for i := uint64(0); i < outputCount; i++ {
-			output, err := utxoledger.OutputFromSnapshotReader(reader, api.NewStaticProvider(iotago_tpkg.TestAPI))
+			output, err := utxoledger.OutputFromSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
 			snapshotOutputs = append(snapshotOutputs, output)
 		}
@@ -391,7 +391,7 @@ func TestManager_Export(t *testing.T) {
 		tpkg.EqualOutputs(t, unspentOutputs, snapshotOutputs)
 
 		for i := uint64(0); i < slotDiffCount; i++ {
-			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.NewStaticProvider(iotago_tpkg.TestAPI))
+			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
 			require.Equal(t, snapshotLedgerIndex-i, uint64(diff.Index))
 		}
@@ -418,7 +418,7 @@ func TestManager_Export(t *testing.T) {
 
 		var snapshotOutputs utxoledger.Outputs
 		for i := uint64(0); i < outputCount; i++ {
-			output, err := utxoledger.OutputFromSnapshotReader(reader, api.NewStaticProvider(iotago_tpkg.TestAPI))
+			output, err := utxoledger.OutputFromSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
 			snapshotOutputs = append(snapshotOutputs, output)
 		}
@@ -429,7 +429,7 @@ func TestManager_Export(t *testing.T) {
 		tpkg.EqualOutputs(t, unspentOutputs, snapshotOutputs)
 
 		for i := uint64(0); i < slotDiffCount; i++ {
-			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.NewStaticProvider(iotago_tpkg.TestAPI))
+			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
 			require.Equal(t, snapshotLedgerIndex-i, uint64(diff.Index))
 		}

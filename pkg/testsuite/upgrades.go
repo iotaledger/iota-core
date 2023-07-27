@@ -14,7 +14,7 @@ func (t *TestSuite) AssertEpochVersions(epochVersions map[iotago.Version]iotago.
 		t.Eventually(func() error {
 
 			for version, expectedEpoch := range epochVersions {
-				epochForVersion, exists := node.Protocol.MainEngineInstance().Storage.Settings().EpochForVersion(version)
+				epochForVersion, exists := node.Protocol.MainEngineInstance().Storage.Settings().APIProvider().EpochForVersion(version)
 				if !exists {
 					return ierrors.Errorf("AssertEpochVersions: %s: version %d not found", node.Name, version)
 				}
@@ -36,7 +36,7 @@ func (t *TestSuite) AssertVersionAndProtocolParameters(versionsAndProtocolParame
 		t.Eventually(func() error {
 
 			for version, expectedProtocolParameters := range versionsAndProtocolParameters {
-				protocolParameters := node.Protocol.MainEngineInstance().Storage.Settings().ProtocolParameters(version)
+				protocolParameters := node.Protocol.MainEngineInstance().Storage.Settings().APIProvider().ProtocolParameters(version)
 
 				if expectedProtocolParameters == nil {
 					if protocolParameters != nil {
@@ -52,6 +52,37 @@ func (t *TestSuite) AssertVersionAndProtocolParameters(versionsAndProtocolParame
 
 				if lo.PanicOnErr(expectedProtocolParameters.Hash()) != lo.PanicOnErr(protocolParameters.Hash()) {
 					return ierrors.Errorf("AssertVersionAndProtocolParameters: %s: for version %d protocol parameters not equal. expected %s, got %s", node.Name, version, lo.PanicOnErr(expectedProtocolParameters.Hash()), lo.PanicOnErr(protocolParameters.Hash()))
+				}
+			}
+
+			return nil
+		})
+	}
+}
+
+func (t *TestSuite) AssertVersionAndProtocolParametersHashes(versionsAndProtocolParametersHashes map[iotago.Version]iotago.Identifier, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+
+			for version, expectedProtocolParametersHash := range versionsAndProtocolParametersHashes {
+				protocolParametersHash := node.Protocol.MainEngineInstance().Storage.Settings().APIProvider().ProtocolParametersHash(version)
+
+				if expectedProtocolParametersHash == iotago.EmptyIdentifier {
+					if protocolParametersHash != iotago.EmptyIdentifier {
+						return ierrors.Errorf("AssertVersionAndProtocolParametersHashes: %s: for version %d protocol parameters hashes not equal. expected empty, got %s", node.Name, version, protocolParametersHash)
+					}
+
+					continue
+				}
+
+				if protocolParametersHash == iotago.EmptyIdentifier {
+					return ierrors.Errorf("AssertVersionAndProtocolParametersHashes: %s: for version %d protocol parameters hashes not equal. expected %s, got nil", node.Name, version, expectedProtocolParametersHash)
+				}
+
+				if expectedProtocolParametersHash != protocolParametersHash {
+					return ierrors.Errorf("AssertVersionAndProtocolParametersHashes: %s: for version %d protocol parameters hashes not equal. expected %s, got %s", node.Name, version, expectedProtocolParametersHash, protocolParametersHash)
 				}
 			}
 
