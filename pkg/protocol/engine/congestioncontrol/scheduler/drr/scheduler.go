@@ -116,6 +116,9 @@ func (s *Scheduler) Rate() int {
 }
 
 func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*blocks.Block) bool {
+	s.bufferMutex.RLock()
+	defer s.bufferMutex.RUnlock()
+
 	// if the buffer is completely empty, any issuer can issue a block.
 	if s.buffer.Size() == 0 {
 		return true
@@ -419,8 +422,11 @@ func (s *Scheduler) ready(block *blocks.Block) {
 // updateChildren iterates over the direct children of the given blockID and
 // tries to mark them as ready.
 func (s *Scheduler) updateChildren(block *blocks.Block) {
+	s.bufferMutex.Lock()
+	defer s.bufferMutex.Unlock()
+
 	for _, childBlock := range block.Children() {
-		if childBlock, childBlockExists := s.blockCache.Block(childBlock.ID()); childBlockExists && childBlock.IsEnqueued() {
+		if _, childBlockExists := s.blockCache.Block(childBlock.ID()); childBlockExists && childBlock.IsEnqueued() {
 			s.tryReady(childBlock)
 		}
 	}
