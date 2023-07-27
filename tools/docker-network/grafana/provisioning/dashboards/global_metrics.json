@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -61,20 +61,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Slot Index"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "SI"
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 6,
@@ -109,7 +96,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max(commitments_latest{instance=\"$instance\"})",
+          "expr": "max(commitments_latest{instance=~\"$instance\"})",
           "format": "table",
           "instant": false,
           "legendFormat": "__auto",
@@ -123,7 +110,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max(commitments_finalized{instance=\"$instance\"})",
+          "expr": "max(commitments_finalized{instance=~\"$instance\"})",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -356,7 +343,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "commitments_latest{instance=\"$instance\"}",
+          "expr": "commitments_latest{instance=~\"$instance\"}",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -667,7 +654,7 @@
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
-        "regex": "",
+        "regex": ".+:9311",
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
@@ -713,6 +700,6 @@
   "timezone": "",
   "title": "Global Nodes View",
   "uid": "JKcc02v4d",
-  "version": 4,
+  "version": 2,
   "weekStart": ""
 }

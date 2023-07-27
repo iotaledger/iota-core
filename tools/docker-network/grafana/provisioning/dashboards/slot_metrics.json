@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -387,7 +387,7 @@
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
-        "regex": "",
+        "regex": ".+:9311",
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
@@ -433,6 +433,6 @@
   "timezone": "",
   "title": "Global Slots View",
   "uid": "9eivfEo4z",
-  "version": 5,
+  "version": 2,
   "weekStart": ""
 }

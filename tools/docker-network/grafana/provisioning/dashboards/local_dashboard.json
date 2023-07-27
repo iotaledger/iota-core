@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3,
+  "id": 5,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -105,7 +105,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "info_sync_status{instance=\"$instance\"}",
+          "expr": "info_sync_status{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -172,7 +172,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "irate(tangle_blocks_total{instance=\"$instance\"}[5m])",
+          "expr": "irate(tangle_blocks_total{instance=~\"$instance\"}[5m])",
           "interval": "",
           "legendFormat": "Total BPS",
           "range": true,
@@ -229,7 +229,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "mana_access_per_node{instance=\"$instance\",nodeID=\"$NodeID\"}",
+          "expr": "mana_access_per_node{instance=~\"$instance\",nodeID=\"$NodeID\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -294,7 +294,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "sum(db_size_bytes{instance=\"$instance\"}) /1024/1024",
+          "expr": "sum(db_size_bytes{instance=~\"$instance\"}) /1024/1024",
           "interval": "",
           "legendFormat": "",
           "range": true,
@@ -360,7 +360,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "sum(db_size_bytes{type=\"storage_permanent\", instance=\"$instance\"}) /1024/1024",
+          "expr": "sum(db_size_bytes{type=\"storage_permanent\", instance=~\"$instance\"}) /1024/1024",
           "interval": "",
           "legendFormat": "",
           "range": true,
@@ -426,7 +426,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "sum(db_size_bytes{type=\"storage_prunable\", instance=\"$instance\"}) /1024/1024",
+          "expr": "sum(db_size_bytes{type=\"storage_prunable\", instance=~\"$instance\"}) /1024/1024",
           "interval": "",
           "legendFormat": "",
           "range": true,
@@ -492,7 +492,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "sum(db_size_bytes{instance=\"$instance\", type=\"retainer\"}) /1024/1024",
+          "expr": "sum(db_size_bytes{instance=~\"$instance\", type=\"retainer\"}) /1024/1024",
           "interval": "",
           "legendFormat": "",
           "range": true,
@@ -566,7 +566,7 @@
       "renderer": "flot",
       "seriesOverrides": [],
       "spaceLength": 10,
-      "stack": true,
+      "stack": false,
       "steppedLine": false,
       "targets": [
         {
@@ -576,7 +576,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "irate(tangle_blocks_total{instance=\"$instance\"}[5m])",
+          "expr": "irate(tangle_blocks_total{instance=~\"$instance\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "Block Per Second {{block_type}}",
@@ -586,7 +586,7 @@
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Block Per Second Per Type",
+      "title": "Block Per Second",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -705,7 +705,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "account_credits{instance=\"$instance\"}",
+          "expr": "account_credits{instance=~\"$instance\"}",
           "format": "time_series",
           "instant": false,
           "legendFormat": "__auto",
@@ -768,7 +768,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "tangle_tips_count{instance=\"$instance\"}",
+          "expr": "tangle_tips_count{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Block Layer Tips",
           "refId": "A"
@@ -887,7 +887,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "account_active_seats{instance=\"$instance\"}\n",
+          "expr": "account_active_seats{instance=~\"$instance\"}\n",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -949,7 +949,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "irate(tangle_missing_block_total{instance=\"$instance\"}[5m])",
+          "expr": "irate(tangle_missing_block_total{instance=~\"$instance\"}[5m])",
           "interval": "",
           "legendFormat": "Solidifier-requested blocks",
           "refId": "A"
@@ -1038,7 +1038,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "tangle_missing_block_total{instance=\"$instance\"}",
+          "expr": "tangle_missing_block_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Solidifier-requested blocks",
           "refId": "A"
@@ -1087,7 +1087,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1123,7 +1124,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "autopeering_neighbor_connections_total{instance=\"$instance\"} - autopeering_neighbor_drop_total{instance=\"$instance\"}",
+          "expr": "autopeering_neighbor_connections_total{instance=~\"$instance\"} - autopeering_neighbor_drop_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -1145,7 +1146,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1178,7 +1180,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "autopeering_neighbor_connection_lifetime_seconds_total{instance=\"$instance\"}",
+          "expr": "autopeering_neighbor_connection_lifetime_seconds_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -1200,7 +1202,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1236,7 +1239,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "autopeering_neighbor_connections_total{instance=\"$instance\"}",
+          "expr": "autopeering_neighbor_connections_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -1258,7 +1261,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1294,7 +1298,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "autopeering_neighbor_drop_total{instance=\"$instance\"}",
+          "expr": "autopeering_neighbor_drop_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -1315,7 +1319,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1348,7 +1353,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "traffic_analysis_outbound_bytes{instance=\"$instance\"}",
+          "expr": "traffic_analysis_outbound_bytes{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -1369,7 +1374,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1402,7 +1408,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "traffic_gossip_outbound_packets{instance=\"$instance\"}",
+          "expr": "traffic_gossip_outbound_packets{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -1423,7 +1429,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1456,7 +1463,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "traffic_gossip_inbound_packets{instance=\"$instance\"}",
+          "expr": "traffic_gossip_inbound_packets{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -1477,7 +1484,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1510,7 +1518,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "autopeering_traffic_outbound_total_bytes{instance=\"$instance\"}",
+          "expr": "autopeering_traffic_outbound_total_bytes{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -1531,7 +1539,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1564,7 +1573,7 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "autopeering_traffic_inbound_total_bytes{instance=\"$instance\"}",
+          "expr": "autopeering_traffic_inbound_total_bytes{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -1624,43 +1633,43 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(traffic_analysis_outbound_bytes{instance=\"$instance\"}[1m])",
+          "expr": "irate(traffic_analysis_outbound_bytes{instance=~\"$instance\"}[1m])",
           "interval": "",
           "legendFormat": "Analysis TX",
           "refId": "A"
         },
         {
-          "expr": "irate(autopeering_traffic_inbound_total_bytes{instance=\"$instance\"}[1m])",
+          "expr": "irate(autopeering_traffic_inbound_total_bytes{instance=~\"$instance\"}[1m])",
           "interval": "",
           "legendFormat": "Autopeering RX",
           "refId": "B"
         },
         {
-          "expr": "irate(autopeering_traffic_outbound_total_bytes{instance=\"$instance\"}[1m])",
+          "expr": "irate(autopeering_traffic_outbound_total_bytes{instance=~\"$instance\"}[1m])",
           "interval": "",
           "legendFormat": "Autopeering TX",
           "refId": "C"
         },
         {
-          "expr": "irate(traffic_fpc_inbound_bytes{instance=\"$instance\"}[1m])",
+          "expr": "irate(traffic_fpc_inbound_bytes{instance=~\"$instance\"}[1m])",
           "interval": "",
           "legendFormat": "FPC RX",
           "refId": "D"
         },
         {
-          "expr": "irate(traffic_fpc_outbound_bytes{instance=\"$instance\"}[1m])",
+          "expr": "irate(traffic_fpc_outbound_bytes{instance=~\"$instance\"}[1m])",
           "interval": "",
           "legendFormat": "FPC TX",
           "refId": "E"
         },
         {
-          "expr": "irate(traffic_gossip_inbound_packets{instance=\"$instance\"}[1m])",
+          "expr": "irate(traffic_gossip_inbound_packets{instance=~\"$instance\"}[1m])",
           "interval": "",
           "legendFormat": "Gossip RX",
           "refId": "F"
         },
         {
-          "expr": "irate(traffic_gossip_outbound_packets{instance=\"$instance\"}[1m])",
+          "expr": "irate(traffic_gossip_outbound_packets{instance=~\"$instance\"}[1m])",
           "interval": "",
           "legendFormat": "Gossip Tx",
           "refId": "G"
@@ -1748,7 +1757,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "tangle_missing_block_total{instance=\"$instance\"}",
+          "expr": "tangle_missing_block_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Missing Blocks",
           "refId": "A"
@@ -1839,21 +1848,21 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "tangle_blocks_per_component_total{component=\"Solidified\",instance=\"$instance\"}",
+          "expr": "tangle_blocks_per_component_total{component=\"Solidified\",instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Solid Blocks in DB",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "tangle_blocks_per_component_total{component=\"Store\",instance=\"$instance\"} - tangle_blocks_per_component_total{component=\"Solidified\",instance=\"$instance\"}",
+          "expr": "tangle_blocks_per_component_total{component=\"Store\",instance=~\"$instance\"} - tangle_blocks_per_component_total{component=\"Solidified\",instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Not Solid Blocks in DB",
           "refId": "B"
         },
         {
           "exemplar": true,
-          "expr": "tangle_blocks_per_component_total{component=\"Store\",instance=\"$instance\"}",
+          "expr": "tangle_blocks_per_component_total{component=\"Store\",instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Total Blocks in DB",
           "refId": "C"
@@ -1943,7 +1952,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "tangle_request_queue_size{instance=\"$instance\"}",
+          "expr": "tangle_request_queue_size{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Block Request Queue Size",
           "refId": "A"
@@ -2035,7 +2044,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(tangle_block_total_time_since_received{component=\"Solidified\",instance=\"$instance\"}[5m])/rate(tangle_blocks_per_component_total{component=\"Solidified\",instance=\"$instance\"}[5m])",
+          "expr": "rate(tangle_block_total_time_since_received{component=\"Solidified\",instance=~\"$instance\"}[5m])/rate(tangle_blocks_per_component_total{component=\"Solidified\",instance=~\"$instance\"}[5m])",
           "interval": "",
           "legendFormat": "Avg Solidification Time",
           "refId": "A"
@@ -2143,14 +2152,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "mana_access_per_node{instance=\"$instance\",nodeID=\"$NodeID\"}",
+          "expr": "mana_access_per_node{instance=~\"$instance\",nodeID=\"$NodeID\"}",
           "interval": "",
           "legendFormat": "{{nodeID}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "mana_consensus_per_node{instance=\"$instance\",nodeID=\"$NodeID\"}",
+          "expr": "mana_consensus_per_node{instance=~\"$instance\",nodeID=\"$NodeID\"}",
           "hide": true,
           "interval": "",
           "legendFormat": "Consensus {{nodeID}}",
@@ -2212,13 +2221,13 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "mana_node_percentile{instance=\"$instance\",type=\"access\"}",
+          "expr": "mana_node_percentile{instance=~\"$instance\",type=\"access\"}",
           "interval": "",
           "legendFormat": "Access",
           "refId": "A"
         },
         {
-          "expr": "mana_node_percentile{instance=\"$instance\",type=\"consensus\"}",
+          "expr": "mana_node_percentile{instance=~\"$instance\",type=\"consensus\"}",
           "interval": "",
           "legendFormat": "Consensus",
           "refId": "B"
@@ -2273,13 +2282,13 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "avg(mana_access_per_node{instance=\"$instance\"})",
+          "expr": "avg(mana_access_per_node{instance=~\"$instance\"})",
           "interval": "",
           "legendFormat": "Access",
           "refId": "A"
         },
         {
-          "expr": "avg(mana_consensus_per_node{instance=\"$instance\"})",
+          "expr": "avg(mana_consensus_per_node{instance=~\"$instance\"})",
           "interval": "",
           "legendFormat": "Consensus",
           "refId": "B"
@@ -2335,14 +2344,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "stddev(mana_access_per_node{instance=\"$instance\"})",
+          "expr": "stddev(mana_access_per_node{instance=~\"$instance\"})",
           "interval": "",
           "legendFormat": "Access",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "stddev(mana_consensus_per_node{instance=\"$instance\"})",
+          "expr": "stddev(mana_consensus_per_node{instance=~\"$instance\"})",
           "interval": "",
           "legendFormat": "Consensus",
           "refId": "B"
@@ -2397,14 +2406,14 @@
       "pluginVersion": "9.5.6",
       "targets": [
         {
-          "expr": "mana_neighbors{instance=\"$instance\"}",
+          "expr": "mana_neighbors{instance=~\"$instance\"}",
           "instant": false,
           "interval": "",
           "legendFormat": "Access",
           "refId": "A"
         },
         {
-          "expr": "mana_neighbors{instance=\"$instance\"}",
+          "expr": "mana_neighbors{instance=~\"$instance\"}",
           "instant": false,
           "interval": "",
           "legendFormat": "Consensus",
@@ -2467,13 +2476,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(mana_access_per_node{instance=\"$instance\"})",
+          "expr": "sum(mana_access_per_node{instance=~\"$instance\"})",
           "interval": "",
           "legendFormat": "Total Access Mana In Network",
           "refId": "A"
         },
         {
-          "expr": "sum(mana_consensus_per_node{instance=\"$instance\"})",
+          "expr": "sum(mana_consensus_per_node{instance=~\"$instance\"})",
           "interval": "",
           "legendFormat": "Total Consensus Mana In Network",
           "refId": "B"
@@ -2756,7 +2765,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "mana_access_per_node{instance=\"$instance\"}",
+          "expr": "mana_access_per_node{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "{{nodeID}}",
           "refId": "A"
@@ -2849,7 +2858,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "mana_access_per_node{instance=\"$instance\"}",
+          "expr": "mana_access_per_node{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "{{nodeID}}",
           "refId": "A"
@@ -2941,7 +2950,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "mana_access_per_node{instance=\"$instance\"}",
+          "expr": "mana_access_per_node{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "{{nodeID}}",
           "refId": "A"
@@ -3005,7 +3014,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "mana_consensus_per_node{instance=\"$instance\"}",
+          "expr": "mana_consensus_per_node{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "{{nodeID}}",
           "refId": "A"
@@ -3099,7 +3108,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "mana_consensus_per_node{instance=\"$instance\"}",
+          "expr": "mana_consensus_per_node{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "{{nodeID}}",
           "refId": "A"
@@ -3191,7 +3200,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "mana_consensus_per_node{instance=\"$instance\"}",
+          "expr": "mana_consensus_per_node{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "{{nodeID}}",
           "refId": "A"
@@ -3253,13 +3262,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "mana_node_percentile{instance=\"$instance\",type=\"access\"}",
+          "expr": "mana_node_percentile{instance=~\"$instance\",type=\"access\"}",
           "interval": "",
           "legendFormat": "Access Percentile",
           "refId": "A"
         },
         {
-          "expr": "mana_node_percentile{instance=\"$instance\",type=\"consensus\"}",
+          "expr": "mana_node_percentile{instance=~\"$instance\",type=\"consensus\"}",
           "interval": "",
           "legendFormat": "Consensus Percentile",
           "refId": "B"
@@ -3365,7 +3374,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "irate(conflict_resolution_time_seconds_total{instance=\"$instance\"}[1m]) / irate(conflict_resolved_total{instance=\"$instance\"}[1m])",
+          "expr": "irate(conflict_resolution_time_seconds_total{instance=~\"$instance\"}[1m]) / irate(conflict_resolved_total{instance=~\"$instance\"}[1m])",
           "interval": "",
           "legendFormat": "{{blockType}} avg. finalization time",
           "queryType": "randomWalk",
@@ -3457,7 +3466,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "irate(conflict_resolution_time_seconds_total{instance=\"$instance\"}[30s]) / rate(conflict_resolved_total{instance=\"$instance\"}[30s])",
+          "expr": "irate(conflict_resolution_time_seconds_total{instance=~\"$instance\"}[30s]) / rate(conflict_resolved_total{instance=~\"$instance\"}[30s])",
           "interval": "",
           "legendFormat": "Average conflict confirmation time",
           "queryType": "randomWalk",
@@ -3542,7 +3551,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(irate(tangle_parent_per_type_total{instance=\"$instance\"}[1m])) by (type,instance) / on(instance) group_left() sum(irate(tangle_accepted_blocks_count{instance=\"$instance\"}[1m])) by (instance)",
+          "expr": "sum(irate(tangle_parent_per_type_total{instance=~\"$instance\"}[1m])) by (type,instance) / on(instance) group_left() sum(irate(tangle_accepted_blocks_count{instance=~\"$instance\"}[1m])) by (instance)",
           "hide": false,
           "interval": "",
           "legendFormat": "{{type}}",
@@ -3631,7 +3640,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "conflict_created_total{instance=\"$instance\"}",
+          "expr": "conflict_created_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -3693,7 +3702,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "conflict_created_total{instance=\"$instance\"} - conflict_resolved_total{instance=\"$instance\"}",
+          "expr": "conflict_created_total{instance=~\"$instance\"} - conflict_resolved_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -3755,7 +3764,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "conflict_resolved_total{instance=\"$instance\"}",
+          "expr": "conflict_resolved_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -3817,7 +3826,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "conflict_resolved_total{instance=\"$instance\"}",
+          "expr": "conflict_resolved_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -3895,7 +3904,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "topk(15, sum by (node_id) (scheduler_queue_size_per_node_bytes{instance=\"$instance\"}/scheduler_mana_per_node{instance=\"$instance\"}))",
+          "expr": "topk(15, sum by (node_id) (scheduler_queue_size_per_node_bytes{instance=~\"$instance\"}/scheduler_mana_per_node{instance=~\"$instance\"}))",
           "instant": true,
           "interval": "",
           "legendFormat": "Node: {{node_id}}",
@@ -3956,7 +3965,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "scheduler_rate{instance=\"$instance\"}",
+          "expr": "scheduler_rate{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4014,7 +4023,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "tangle_blocks_per_component_total{component=\"Scheduled\",instance=\"$instance\"}",
+          "expr": "tangle_blocks_per_component_total{component=\"Scheduled\",instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4074,7 +4083,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "tangle_blocks_per_component_total{component=\"SchedulerSkipped\",instance=\"$instance\"}",
+          "expr": "tangle_blocks_per_component_total{component=\"SchedulerSkipped\",instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4134,7 +4143,7 @@
       "targets": [
         {
           "exemplar": false,
-          "expr": "scheduler_buffer_max_size{instance=\"$instance\"}",
+          "expr": "scheduler_buffer_max_size{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4193,7 +4202,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "tangle_blocks_per_component_total{component=\"SchedulerDropped\",instance=\"$instance\"}",
+          "expr": "tangle_blocks_per_component_total{component=\"SchedulerDropped\",instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4255,7 +4264,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": true,
-          "expr": "scheduler_deficit{instance=\"$instance\"}",
+          "expr": "scheduler_deficit{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4320,7 +4329,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(15, sum by (node_id) (scheduler_queue_size_per_node_bytes{instance=\"$instance\"}))",
+          "expr": "topk(15, sum by (node_id) (scheduler_queue_size_per_node_bytes{instance=~\"$instance\"}))",
           "instant": true,
           "interval": "",
           "legendFormat": "Node: {{node_id}}",
@@ -4382,7 +4391,7 @@
       "targets": [
         {
           "exemplar": false,
-          "expr": "scheduler_buffer_size_bytes_total{instance=\"$instance\"}",
+          "expr": "scheduler_buffer_size_bytes_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4440,7 +4449,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "scheduler_buffer_size_bytes_total{instance=\"$instance\"}",
+          "expr": "scheduler_buffer_size_bytes_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4503,7 +4512,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": true,
-          "expr": "ratesetter_estimate{instance=\"$instance\"}",
+          "expr": "ratesetter_estimate{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4565,7 +4574,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": true,
-          "expr": "ratesetter_buffer_size{instance=\"$instance\"}",
+          "expr": "ratesetter_buffer_size{instance=~\"$instance\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "Own ratesetter queue size",
@@ -4578,7 +4587,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": true,
-          "expr": "scheduler_queue_size_per_node_bytes{node_id=\"$NodeID\",instance=\"$instance\"}",
+          "expr": "scheduler_queue_size_per_node_bytes{node_id=\"$NodeID\",instance=~\"$instance\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "Own scheduler queue size",
@@ -4643,7 +4652,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": false,
-          "expr": "scheduler_buffer_size_bytes_total{instance=\"$instance\"} - scheduler_buffer_ready_block_total{instance=\"$instance\"}",
+          "expr": "scheduler_buffer_size_bytes_total{instance=~\"$instance\"} - scheduler_buffer_ready_block_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4701,7 +4710,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "scheduler_buffer_ready_block_total{instance=\"$instance\"}",
+          "expr": "scheduler_buffer_ready_block_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4764,7 +4773,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": true,
-          "expr": "ratesetter_own_rate{instance=\"$instance\"}",
+          "expr": "ratesetter_own_rate{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4827,7 +4836,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": true,
-          "expr": "tangle_blocks_orphaned_total{instance=\"$instance\"}",
+          "expr": "tangle_blocks_orphaned_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "",
           "queryType": "randomWalk",
@@ -4847,8 +4856,8 @@
       {
         "current": {
           "selected": false,
-          "text": "faucet:9311",
-          "value": "faucet:9311"
+          "text": "node-01.feature.shimmer.iota.cafe:9311",
+          "value": "node-01.feature.shimmer.iota.cafe:9311"
         },
         "datasource": {
           "type": "prometheus",
@@ -4856,7 +4865,7 @@
         },
         "definition": "label_values(instance)",
         "hide": 0,
-        "includeAll": true,
+        "includeAll": false,
         "label": "Instance",
         "multi": false,
         "name": "instance",
@@ -4866,7 +4875,7 @@
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
-        "regex": "",
+        "regex": ".+:9311",
         "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
@@ -4877,8 +4886,8 @@
       {
         "current": {
           "selected": false,
-          "text": "7oR7s6hY",
-          "value": "7oR7s6hY"
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
@@ -4926,6 +4935,6 @@
   "timezone": "",
   "title": "iota-core Local Metrics",
   "uid": "R-T27yW7k",
-  "version": 1,
+  "version": 3,
   "weekStart": ""
 }
