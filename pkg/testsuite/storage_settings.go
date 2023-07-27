@@ -63,6 +63,11 @@ func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, nodes
 				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found", node.Name, slot)
 			}
 
+			// Make sure the commitment is also available in the ChainManager.
+			if node.Protocol.ChainManager.RootCommitment().Chain().LatestCommitment().ID().Index() < slot {
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found in ChainManager", node.Name, slot)
+			}
+
 			return nil
 		})
 	}
