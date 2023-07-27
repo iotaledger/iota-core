@@ -42,7 +42,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	commitment := tx.CommitmentInput()
 
 	if (len(rewardInputs) > 0 || len(bicInputs) > 0) && commitment == nil {
-		return nil, iotago.ErrCommittmentInputMissing
+		return nil, iotago.ErrCommitmentInputMissing
 	}
 
 	var loadedCommitment *iotago.Commitment

@@ -27,7 +27,7 @@ func (b *BlockMetadata) BlockMetadataResponse() *apimodels.BlockMetadataResponse
 		response.TxState = b.TxState.String()
 	}
 
-	if b.TxFailureReason != apimodels.NoTransactionFailureReason {
+	if b.TxFailureReason != apimodels.TxFailureNone {
 		response.TxFailureReason = b.TxFailureReason
 	}
 

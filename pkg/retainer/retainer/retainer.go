@@ -76,7 +76,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 		}, asyncOpt)
 
 		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, err error) {
-			r.RetainBlockFailure(b.ID(), apimodels.ErrBlockDroppedDueToCongestion)
+			r.RetainBlockFailure(b.ID(), apimodels.BlockFailureDroppedDueToCongestion)
 		})
 
 		e.HookInitialized(func() {
@@ -155,16 +155,16 @@ func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, err error) {
 func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, apimodels.BlockFailureReason) {
 	blockData, exists := r.store(blockID.Index()).GetBlock(blockID)
 	if !exists {
-		return apimodels.BlockStateUnknown, apimodels.NoBlockFailureReason
+		return apimodels.BlockStateUnknown, apimodels.BlockFailureNone
 	}
 	switch blockData.State {
 	case apimodels.BlockStatePending:
 		if blockID.Index() <= r.latestCommittedSlotFunc() {
-			return apimodels.BlockStateOrphaned, blockData.FailureReason
+			return apimodels.BlockStateRejected, blockData.FailureReason
 		}
 	case apimodels.BlockStateAccepted, apimodels.BlockStateConfirmed:
 		if blockID.Index() <= r.finalizedSlotFunc() {
-			return apimodels.BlockStateFinalized, apimodels.NoBlockFailureReason
+			return apimodels.BlockStateFinalized, apimodels.BlockFailureNone
 		}
 	}
 
@@ -174,7 +174,7 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, ap
 func (r *Retainer) transactionStatus(blockID iotago.BlockID) (apimodels.TransactionState, apimodels.TransactionFailureReason, error) {
 	txData, exists := r.store(blockID.Index()).GetTransaction(blockID)
 	if !exists {
-		return apimodels.TransactionStateUnknown, apimodels.NoTransactionFailureReason, nil
+		return apimodels.TransactionStateUnknown, apimodels.TxFailureNone, nil
 	}
 
 	// for confirmed and finalized we need to check for the block status
@@ -183,9 +183,9 @@ func (r *Retainer) transactionStatus(blockID iotago.BlockID) (apimodels.Transact
 
 		switch blockState {
 		case apimodels.BlockStateConfirmed:
-			return apimodels.TransactionStateConfirmed, apimodels.NoTransactionFailureReason, nil
+			return apimodels.TransactionStateConfirmed, apimodels.TxFailureNone, nil
 		case apimodels.BlockStateFinalized:
-			return apimodels.TransactionStateFinalized, apimodels.NoTransactionFailureReason, nil
+			return apimodels.TransactionStateFinalized, apimodels.TxFailureNone, nil
 		}
 	}
 

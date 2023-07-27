@@ -111,7 +111,7 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 func (r *Retainer) StoreBlockAttached(blockID iotago.BlockID) error {
 	if err := r.blockStore.Set(blockID, &BlockRetainerData{
 		State:         apimodels.BlockStatePending,
-		FailureReason: apimodels.NoBlockFailureReason,
+		FailureReason: apimodels.BlockFailureNone,
 	}); err != nil {
 		return err
 	}
@@ -140,21 +140,21 @@ func (r *Retainer) GetTransaction(blockID iotago.BlockID) (*TransactionRetainerD
 func (r *Retainer) StoreBlockAccepted(blockID iotago.BlockID) error {
 	return r.blockStore.Set(blockID, &BlockRetainerData{
 		State:         apimodels.BlockStateAccepted,
-		FailureReason: apimodels.NoBlockFailureReason,
+		FailureReason: apimodels.BlockFailureNone,
 	})
 }
 
 func (r *Retainer) StoreBlockConfirmed(blockID iotago.BlockID) error {
 	return r.blockStore.Set(blockID, &BlockRetainerData{
 		State:         apimodels.BlockStateConfirmed,
-		FailureReason: apimodels.NoBlockFailureReason,
+		FailureReason: apimodels.BlockFailureNone,
 	})
 }
 
 func (r *Retainer) StoreTransactionPending(blockID iotago.BlockID) error {
 	return r.transactionStore.Set(blockID, &TransactionRetainerData{
 		State:         apimodels.TransactionStatePending,
-		FailureReason: apimodels.NoTransactionFailureReason,
+		FailureReason: apimodels.TxFailureNone,
 	})
 }
 
@@ -165,7 +165,7 @@ func (r *Retainer) StoreTransactionNoFailureStatus(blockID iotago.BlockID, statu
 
 	return r.transactionStore.Set(blockID, &TransactionRetainerData{
 		State:         status,
-		FailureReason: apimodels.NoTransactionFailureReason,
+		FailureReason: apimodels.TxFailureNone,
 	})
 }
 
