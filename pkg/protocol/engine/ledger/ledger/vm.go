@@ -49,7 +49,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	if commitment != nil {
 		loadedCommitment, err = l.loadCommitment(commitment.CommitmentID)
 		if err != nil {
-			return nil, ierrors.Join(iotago.ErrCouldNorRetrieveCommittment, ierrors.Wrapf(err, "could not load commitment %s", commitment.CommitmentID))
+			return nil, ierrors.Join(iotago.ErrCouldNorRetrieveCommitment, ierrors.Wrapf(err, "could not load commitment %s", commitment.CommitmentID))
 		}
 
 		resolvedInputs.CommitmentInput = loadedCommitment

@@ -14,6 +14,7 @@ var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	iotago.ErrCouldNotResolveBICInput:    apimodels.ErrTxStateUnderlyingBICInputInvalid,
 	iotago.ErrCouldNotResolveRewardInput: apimodels.ErrTxStateUnderlyingRewardInputInvalid,
 	iotago.ErrCommittmentInputMissing:    apimodels.ErrTxStateUnderlyingCommitmentInputInvalid,
+	iotago.ErrCouldNorRetrieveCommitment: apimodels.ErrTxStateUnderlyingCommitmentInputInvalid,
 
 	// context inputs errors
 	iotago.ErrNoStakingFeature:             apimodels.ErrTxStateNoStakingFeature,
