@@ -80,7 +80,6 @@ type Retainer struct {
 }
 
 func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Retainer) {
-	// core.BlockIDFromTransactionID()
 	return &Retainer{
 		slot: slot,
 		blockStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockStorePrefix})),
