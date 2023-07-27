@@ -74,9 +74,13 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 		return nil, 0, ierrors.Wrapf(err, "error validating attestations for commitment %s", commitment.ID())
 	}
 
-	// 3. Verify that cumulative weight of commitment matches (as an upper bound) with calculated weight from attestations.
-	// This is necessary due to the following edge case that can happen in the window of forking point and the current state of the other chain:
-	//	1. A public key is added to an account.
+	// 3. Verify that calculated cumulative weight from attestations is lower or equal to cumulative weight of commitment.
+	//    This is necessary due to public key changes of validators in the window of forking point and the current state of
+	//    the other chain (as validators could have added/removed public keys that we don't know about yet).
+	//
+	//	1. The weight should be equal if all public keys are known and unchanged.
+	//
+	//	2. A public key is added to an account.
 	//     We do not count a seat for the issuer for this slot and the computed CW will be lower than the CW in
 	//	   the commitment. This is fine, since this is a rare occasion and a heavier chain will become heavier anyway, eventually.
 	//	   It will simply take a bit longer to accumulate enough CW so that the chain-switch rule kicks in.
@@ -84,7 +88,7 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 	//           This can only be prevented by adding such key changes provably to the commitments so that these changes
 	//           can be reconstructed and verified by nodes that do not have the latest ledger state.
 	//
-	// 2. A public key is removed from an account.
+	// 3. A public key is removed from an account.
 	//    We count the seat for the issuer for this slot even though we shouldn't have. According to the protocol, a valid
 	//    chain with such a block can never exist because the block itself (here provided as an attestation) would be invalid.
 	//    However, we do not know about this yet since we do not have the latest ledger state.
