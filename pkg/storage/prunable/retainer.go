@@ -109,14 +109,10 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 }
 
 func (r *Retainer) StoreBlockAttached(blockID iotago.BlockID) error {
-	if err := r.blockStore.Set(blockID, &BlockRetainerData{
+	return r.blockStore.Set(blockID, &BlockRetainerData{
 		State:         apimodels.BlockStatePending,
 		FailureReason: apimodels.BlockFailureNone,
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }
 
 func (r *Retainer) GetBlock(blockID iotago.BlockID) (*BlockRetainerData, bool) {
