@@ -288,8 +288,8 @@ github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726135831-dd0c6ef61d5b h1:UTEDK
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726135831-dd0c6ef61d5b/go.mod h1:bCVbiVUZpvMs35hQy/KHM05iYBQ62HF9DKfGZmPtzSk=
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230726135421-ca90b96ff054 h1:nu/aPBAOpAo3ApvBlu6f3P5GZaluoPIG9E0RPxaWDHA=
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230726135421-ca90b96ff054/go.mod h1:/bc7NOT7XLe60/OuiDGO8Odag/fWueCXxn4DIKRe7d4=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230726134822-e4317abe9128 h1:WGHm4c2aeCpa+/P8KreFYSsXrE7P0bcpd+p1i55h6SY=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230726134822-e4317abe9128/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230727074907-3cdbe635364a h1:DeJ71eopmBQc3ITirtGwdCLtSWVBfVQF8hcAzyRg0ww=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230727074907-3cdbe635364a/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
 github.com/ipfs/go-cid v0.4.1/go.mod h1:uQHwDeX4c6CtyrFwdqyhpNcxVewur1M7l7fNU7LKwZk=
 github.com/ipfs/go-detect-race v0.0.1 h1:qX/xay2W3E4Q1U7d9lNs1sU9nvguX0a7319XbyQ6cOk=
