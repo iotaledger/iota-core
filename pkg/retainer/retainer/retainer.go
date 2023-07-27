@@ -81,13 +81,13 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 
 		e.HookInitialized(func() {
 			e.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
-				attachmentID := transactionMetadata.EarliestIncludedAttachment()
 
-				if err := r.onTransactionAttached(attachmentID); err != nil {
+				if err := r.onTransactionAttached(transactionMetadata.EarliestIncludedAttachment()); err != nil {
 					r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAttached in retainer"))
 				}
 
 				transactionMetadata.OnAccepted(func() {
+					attachmentID := transactionMetadata.EarliestIncludedAttachment()
 					if slotIndex := attachmentID.Index(); slotIndex > 0 {
 						if err := r.onTransactionAccepted(attachmentID); err != nil {
 							r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAccepted in retainer"))
@@ -106,7 +106,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 				})
 
 				transactionMetadata.OnInvalid(func(err error) {
-					r.RetainTransactionFailure(attachmentID, err)
+					r.RetainTransactionFailure(transactionMetadata.EarliestIncludedAttachment(), err)
 				})
 			})
 		})
