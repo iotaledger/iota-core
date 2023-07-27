@@ -101,6 +101,10 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 					}
 				})
 
+				transactionMetadata.OnConflicting(func() {
+					r.RetainTransactionFailure(transactionMetadata.EarliestIncludedAttachment(), iotago.ErrTxConflicting)
+				})
+
 				transactionMetadata.OnInvalid(func(err error) {
 					r.RetainTransactionFailure(attachmentID, err)
 				})

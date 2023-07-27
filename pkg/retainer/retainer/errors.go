@@ -23,6 +23,10 @@ var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	iotago.ErrFailedToClaimValidatorReward: apimodels.TxFailureFailedToClaimValidatorReward,
 	iotago.ErrFailedToClaimDelegatorReward: apimodels.TxFailureFailedToClaimDelegatorReward,
 
+	// UTXO errors
+	iotago.ErrTxConflicting:     apimodels.TxFailureConflicting,
+	iotago.ErrInputAlreadySpent: apimodels.TxFailureUTXOInputAlreadySpent,
+
 	// native token errors
 	iotago.ErrNativeTokenSetInvalid:        apimodels.TxFailureGivenNativeTokensInvalid,
 	iotago.ErrMaxNativeTokensCountExceeded: apimodels.TxFailureGivenNativeTokensInvalid,
