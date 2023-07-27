@@ -189,7 +189,6 @@ func (p *Protocol) shutdown() {
 	p.activeEngineMutex.RLock()
 	p.mainEngine.Shutdown()
 	if p.candidateEngine != nil {
-		// TODO: do we want to delete the candidate engine's data as well?
 		p.candidateEngine.engine.Shutdown()
 	}
 	p.activeEngineMutex.RUnlock()
