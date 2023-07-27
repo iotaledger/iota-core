@@ -397,3 +397,21 @@ Example:
   }
 ```
 
+## <a id="inx"></a> 13. Inx
+
+| Name        | Description                                            | Type    | Default value    |
+| ----------- | ------------------------------------------------------ | ------- | ---------------- |
+| enabled     | Whether the INX plugin is enabled                      | boolean | false            |
+| bindAddress | The bind address on which the INX can be accessed from | string  | "localhost:9029" |
+
+Example:
+
+```json
+  {
+    "inx": {
+      "enabled": false,
+      "bindAddress": "localhost:9029"
+    }
+  }
+```
+
