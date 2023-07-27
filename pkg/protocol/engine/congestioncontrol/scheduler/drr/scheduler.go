@@ -70,7 +70,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			s.TriggerConstructed()
 			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 				s.AddBlock(block)
-				s.selectBlockToSchedule()
+				s.selectBlockToScheduleWithLocking()
 			})
 
 			e.HookInitialized(s.Start)
@@ -200,7 +200,7 @@ func (s *Scheduler) scheduleBlock(block *blocks.Block) {
 		// deduct tokens from the token bucket according to the scheduled block's work.
 		s.tokenBucket -= float64(block.Work())
 		// check for another block ready to schedule
-		s.selectBlockToSchedule()
+		s.selectBlockToScheduleWithLocking()
 		s.updateChildren(block)
 		s.events.BlockScheduled.Trigger(block)
 	}
@@ -208,7 +208,7 @@ func (s *Scheduler) scheduleBlock(block *blocks.Block) {
 
 func (s *Scheduler) skipBlock(block *blocks.Block) {
 	if block.SetSkipped() && block.SetScheduled() {
-		s.selectBlockToSchedule()
+		s.selectBlockToScheduleWithoutLocking()
 		s.updateChildren(block)
 		s.events.BlockSkipped.Trigger(block)
 	}
@@ -219,11 +219,13 @@ func (s *Scheduler) quantum(accountID iotago.AccountID) (iotago.Mana, error) {
 
 	return mana / s.optsMinMana, err
 }
-
-func (s *Scheduler) selectBlockToSchedule() {
+func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
+	s.selectBlockToScheduleWithoutLocking()
+}
+func (s *Scheduler) selectBlockToScheduleWithoutLocking() {
 	// already a block selected to be scheduled.
 	if len(s.blockChan) > 0 {
 		return
