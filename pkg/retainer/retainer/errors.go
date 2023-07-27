@@ -9,6 +9,7 @@ import (
 var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	// unknown type / type casting errors
 	iotago.ErrUnknownTransactinType:      apimodels.ErrTxStateUnderlyingTxTypeInvalid,
+	iotago.ErrUnknownInputType:           apimodels.ErrTxStateUnderlyingUTXOInputInvalid,
 	iotago.ErrFailedToRetrieveInput:      apimodels.ErrTxStateUnderlyingUTXOInputInvalid,
 	iotago.ErrUnknownOutputType:          apimodels.ErrTxStateUnderlyingUTXOInputInvalid,
 	iotago.ErrCouldNotResolveBICInput:    apimodels.ErrTxStateUnderlyingBICInputInvalid,
