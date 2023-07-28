@@ -26,6 +26,7 @@ var InfoMetrics = collector.NewCollection(infoNamespace,
 			if deps.Local != nil {
 				nodeID = deps.Local.ID().String()
 			}
+
 			return 0, []string{nodeID, runtime.GOOS, runtime.GOARCH, strconv.Itoa(runtime.GOMAXPROCS(0))}
 		}),
 	)),
@@ -36,6 +37,7 @@ var InfoMetrics = collector.NewCollection(infoNamespace,
 			if deps.Protocol.MainEngineInstance().IsSynced() {
 				return 1, nil
 			}
+
 			return 0, nil
 		}),
 	)),
@@ -45,6 +47,7 @@ var InfoMetrics = collector.NewCollection(infoNamespace,
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
+
 			return float64(m.Alloc), nil
 		}),
 	)),

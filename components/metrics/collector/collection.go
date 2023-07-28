@@ -25,6 +25,7 @@ func (c *Collection) GetMetric(metricName string) *Metric {
 	if metric, exists := c.metrics[metricName]; exists {
 		return metric
 	}
+
 	return nil
 }
 

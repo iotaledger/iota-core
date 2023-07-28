@@ -98,51 +98,53 @@ func (m *Metric) collect() {
 func (m *Metric) update(metricValue float64, labelValues ...string) {
 	if len(labelValues) != len(m.labels) {
 		fmt.Println("Warning! Nothing updated, label values and labels length mismatch when updating metric", m.Name)
+
 		return
 	}
 	m.metricUpdate(metricValue, labelValues...)
 }
 
 func (m *Metric) metricUpdate(value float64, labelValues ...string) {
-	switch m.promMetric.(type) {
+	switch metric := m.promMetric.(type) {
 	case prometheus.Gauge:
-		m.promMetric.(prometheus.Gauge).Set(value)
+		metric.Set(value)
 	case *prometheus.GaugeVec:
-		m.promMetric.(*prometheus.GaugeVec).WithLabelValues(labelValues...).Set(value)
+		metric.WithLabelValues(labelValues...).Set(value)
 	case prometheus.Counter:
-		m.promMetric.(prometheus.Counter).Add(value)
+		metric.Add(value)
 	case *prometheus.CounterVec:
-		m.promMetric.(*prometheus.CounterVec).WithLabelValues(labelValues...).Add(value)
+		metric.WithLabelValues(labelValues...).Add(value)
 	}
 }
 
 func (m *Metric) increment(labelValues ...string) {
 	if len(labelValues) != len(m.labels) {
 		fmt.Println("Warning! Nothing updated, label values and labels length mismatch when updating metric", m.Name)
+
 		return
 	}
 	m.metricIncrement(labelValues...)
 }
 
 func (m *Metric) metricIncrement(labelValues ...string) {
-	switch m.promMetric.(type) {
+	switch metric := m.promMetric.(type) {
 	case prometheus.Gauge:
-		m.promMetric.(prometheus.Gauge).Inc()
+		metric.Inc()
 	case prometheus.GaugeVec:
-		m.promMetric.(*prometheus.GaugeVec).WithLabelValues(labelValues...).Inc()
+		metric.WithLabelValues(labelValues...).Inc()
 	case prometheus.Counter:
-		m.promMetric.(prometheus.Counter).Inc()
+		metric.Inc()
 	case prometheus.CounterVec:
-		m.promMetric.(*prometheus.CounterVec).WithLabelValues(labelValues...).Inc()
+		metric.WithLabelValues(labelValues...).Inc()
 	}
 }
 
 func (m *Metric) Reset() {
-	switch m.promMetric.(type) {
+	switch metric := m.promMetric.(type) {
 	case prometheus.Gauge:
-		m.promMetric.(prometheus.Gauge).Set(0)
+		metric.Set(0)
 	case prometheus.GaugeVec:
-		m.promMetric.(*prometheus.GaugeVec).Reset()
+		metric.Reset()
 	case prometheus.Counter:
 		m.promMetric = prometheus.NewCounter(prometheus.CounterOpts{
 			Name:      m.Name,
@@ -150,7 +152,7 @@ func (m *Metric) Reset() {
 			Help:      m.help,
 		})
 	case prometheus.CounterVec:
-		m.promMetric.(*prometheus.CounterVec).Reset()
+		metric.Reset()
 	}
 }
 
@@ -160,8 +162,10 @@ func (m *Metric) DeleteLabels(labels map[string]string) {
 	if len(m.labels) == len(labels) {
 		switch m.Type {
 		case Gauge:
+			//nolint:forcetypeassert // we can safely assume that this is a GaugeVec
 			m.promMetric.(*prometheus.GaugeVec).Delete(labels)
 		case Counter:
+			//nolint:forcetypeassert // we can safely assume that this is a CounterVec
 			m.promMetric.(*prometheus.CounterVec).Delete(labels)
 		}
 	}
