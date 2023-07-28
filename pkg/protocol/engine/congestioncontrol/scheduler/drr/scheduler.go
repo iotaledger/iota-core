@@ -151,7 +151,7 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	}
 	for _, b := range droppedBlocks {
 		b.SetDropped()
-		s.events.BlockDropped.Trigger(b)
+		s.events.BlockDropped.Trigger(b, ierrors.New("block dropped from buffer"))
 	}
 	block.SetEnqueued()
 	s.tryReady(block)
@@ -256,7 +256,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	if err != nil {
 		// if something goes wrong with deficit update, drop the block instead of scheduling it.
 		block.SetDropped()
-		s.events.BlockDropped.Trigger(block)
+		s.events.BlockDropped.Trigger(block, ierrors.New("error updating deficit"))
 	}
 	s.blockChan <- block
 }

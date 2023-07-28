@@ -21,6 +21,7 @@ type Ledger interface {
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transactionMetadata mempool.TransactionMetadata, exists bool)
 
 	Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error)
+	PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) map[iotago.AccountID]*accounts.AccountData
 	AddAccount(account *utxoledger.Output) error
 
 	Output(id iotago.OutputID) (*utxoledger.Output, error)

@@ -3,10 +3,10 @@ package inx
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/contextutils"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -30,7 +30,7 @@ func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlo
 }
 
 func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*inx.BlockMetadata, error) {
-	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID.Unwrap())
+	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID.Unwrap())
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*in
 	//TODO: use enums
 	return &inx.BlockMetadata{
 		BlockId:     blockID,
-		BlockStatus: uint32(metadata.BlockStatus),
+		BlockStatus: uint32(blockMetadata.BlockState),
 	}, nil
 }
 
@@ -160,10 +160,10 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (
 	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, block)
 	if err != nil {
 		switch {
-		case errors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
+		case ierrors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
 			return nil, status.Errorf(codes.InvalidArgument, "failed to attach block: %s", err.Error())
 
-		case errors.Is(err, blockfactory.ErrBlockAttacherAttachingNotPossible):
+		case ierrors.Is(err, blockfactory.ErrBlockAttacherAttachingNotPossible):
 			return nil, status.Errorf(codes.Internal, "failed to attach block: %s", err.Error())
 
 		default:

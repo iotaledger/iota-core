@@ -6,7 +6,6 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/runtime/contextutils"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -21,32 +20,21 @@ func blockByID(c echo.Context) (*model.Block, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
 	}
 
-	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
-	if err != nil {
-		return nil, err
+	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	if !exists {
+		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
 	}
 
 	return block, nil
 }
 
 func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
-	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &apimodels.BlockMetadataResponse{
-		BlockID:          blockID.ToHex(),
-		BlockState:       metadata.BlockStatus.String(),
-		BlockStateReason: metadata.BlockReason,
-	}
-
-	if metadata.HasTx {
-		response.TxState = metadata.TransactionStatus.String()
-		response.TxStateReason = metadata.TransactionReason
-	}
-
-	return response, nil
+	return blockMetadata.BlockMetadataResponse(), nil
 }
 
 func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
@@ -122,10 +110,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 		return nil, echo.ErrUnsupportedMediaType
 	}
 
-	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(c.Request().Context(), Component.Daemon().ContextStopped())
-	defer mergedCtxCancel()
-
-	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, iotaBlock)
+	blockID, err := deps.BlockIssuer.AttachBlock(c.Request().Context(), iotaBlock)
 	if err != nil {
 		switch {
 		case ierrors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
