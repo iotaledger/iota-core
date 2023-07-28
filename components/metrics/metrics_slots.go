@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -35,7 +34,6 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 				eventSlot := int(block.ID().Index())
-				fmt.Println(">> increment blocks")
 				deps.Collector.Increment(slotNamespace, totalBlocks, strconv.Itoa(eventSlot))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
