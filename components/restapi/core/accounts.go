@@ -13,41 +13,20 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-func blockIssuanceCreditsForAccountID(c echo.Context) (*apimodels.BlockIssuanceCreditsResponse, error) {
-	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
-	if err != nil {
-		return nil, err
-	}
-	slotIndex, err := httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
-	if err != nil {
-		// by default we return the balance for the latest slot
-		slotIndex = deps.Protocol.SyncManager.LatestCommitment().Index()
-	}
-	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
-	}
-
-	return &apimodels.BlockIssuanceCreditsResponse{
-		SlotIndex:            slotIndex,
-		BlockIssuanceCredits: account.Credits.Value,
-	}, nil
-}
-
 func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
 		return nil, err
 	}
-	mca := deps.Protocol.CurrentAPI().ProtocolParameters().EvictionAge()
+
+	evictionAge := deps.Protocol.CurrentAPI().ProtocolParameters().EvictionAge()
+
 	slotIndex := deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time.Now())
-	if slotIndex < mca {
-		mca = 0
+	if slotIndex >= evictionAge {
+		slotIndex -= evictionAge
 	}
-	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex-mca)
+
+	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -119,13 +98,12 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
-	latestRewardsReadyEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 
 	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get output %s from ledger", outputID)
 	}
+
 	var reward iotago.Mana
 	switch utxoOutput.OutputType() {
 	case iotago.OutputAccount:
@@ -160,6 +138,10 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to calculate reward for output %s", outputID)
 	}
+
+	// TODO: the epoch should be returned by the reward calculations
+	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
+	latestRewardsReadyEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 
 	return &apimodels.ManaRewardsResponse{
 		EpochIndex: latestRewardsReadyEpoch,
