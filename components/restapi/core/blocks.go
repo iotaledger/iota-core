@@ -21,32 +21,21 @@ func blockByID(c echo.Context) (*model.Block, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
 	}
 
-	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
-	if err != nil {
-		return nil, err
+	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	if !exists {
+		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
 	}
 
 	return block, nil
 }
 
 func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
-	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &apimodels.BlockMetadataResponse{
-		BlockID:          blockID.ToHex(),
-		BlockState:       metadata.BlockStatus.String(),
-		BlockStateReason: metadata.BlockReason,
-	}
-
-	if metadata.HasTx {
-		response.TxState = metadata.TransactionStatus.String()
-		response.TxStateReason = metadata.TransactionReason
-	}
-
-	return response, nil
+	return blockMetadata.BlockMetadataResponse(), nil
 }
 
 func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {

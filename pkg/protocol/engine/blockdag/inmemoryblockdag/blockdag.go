@@ -20,6 +20,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 // BlockDAG is a causally ordered DAG that forms the central data structure of the IOTA protocol.
@@ -38,6 +39,8 @@ type BlockDAG struct {
 
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
 	commitmentFunc func(index iotago.SlotIndex) (*model.Commitment, error)
+
+	retainBlockFailure func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)
 
 	// futureBlocks contains blocks with a commitment in the future, that should not be passed to the booker yet.
 	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*blocks.Block]]
@@ -77,8 +80,10 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 			}, event.WithWorkerPool(wp))
 
 			e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				b.PromoteFutureBlocksUntil(details.Commitment.Index())
+				b.promoteFutureBlocksUntil(details.Commitment.Index())
 			}, event.WithWorkerPool(wp))
+
+			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
 
 			e.Events.BlockDAG.LinkTo(b.events)
 
@@ -145,7 +150,7 @@ func (b *BlockDAG) SetInvalid(block *blocks.Block, reason error) (wasUpdated boo
 	return
 }
 
-func (b *BlockDAG) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
+func (b *BlockDAG) promoteFutureBlocksUntil(index iotago.SlotIndex) {
 	b.solidifierMutex.RLock()
 	defer b.solidifierMutex.RUnlock()
 	b.futureBlocksMutex.Lock()
@@ -173,6 +178,10 @@ func (b *BlockDAG) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
 func (b *BlockDAG) Shutdown() {
 	b.TriggerStopped()
 	b.workers.Shutdown()
+}
+
+func (b *BlockDAG) setRetainBlockFailureFunc(retainBlockFailure func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)) {
+	b.retainBlockFailure = retainBlockFailure
 }
 
 // evictSlot is used to evict Blocks from committed slots from the BlockDAG.
@@ -263,7 +272,8 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	block, evicted, updated := b.blockCache.StoreOrUpdate(data)
 
 	if evicted {
-		return block, false, ierrors.New("block is too old")
+		b.retainBlockFailure(data.ID(), apimodels.BlockFailureIsTooOld)
+		return block, false, ierrors.New("cannot attach, block is too old, it was already evicted from the cache")
 	}
 
 	if updated {
@@ -280,6 +290,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 // canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
 func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
 	if b.evictionState.InRootBlockSlot(data.ID()) && !b.evictionState.IsRootBlock(data.ID()) {
+		b.retainBlockFailure(data.ID(), apimodels.BlockFailureIsTooOld)
 		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().IssuingTime)
 	}
 
@@ -303,6 +314,7 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid bool, err error) {
 	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
 		if b.evictionState.InRootBlockSlot(parentID) && !b.evictionState.IsRootBlock(parentID) {
+			b.retainBlockFailure(modelBlock.ID(), apimodels.BlockFailureParentIsTooOld)
 			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
 		}
 	}

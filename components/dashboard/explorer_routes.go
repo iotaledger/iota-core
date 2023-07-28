@@ -78,24 +78,23 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 }
 
 func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
-	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
-	if err != nil {
-		return nil, err
+	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	if !exists {
+		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
+	}
+
+	cachedBlock, _ := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID)
+	if !exists {
+		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
 	}
 
 	// TODO: metadata instead, or retainer
-	cachedBlock, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID)
-	if !exists {
-		cachedBlock = nil
-	}
 	// blockMetadata, exists := deps.Retainer.BlockMetadata(blockID)
 	// if !exists {
 	// 	return nil, ierrors.Wrapf(ErrNotFound, "block metadata %s", blockID.Base58())
 	// }
 
-	explorerBlk = createExplorerBlock(block, cachedBlock)
-
-	return
+	return createExplorerBlock(block, cachedBlock), nil
 }
 
 func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *ExplorerBlock {
@@ -186,9 +185,9 @@ func getTransaction(c echo.Context) error {
 		return err
 	}
 
-	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(output.BlockID())
-	if err != nil {
-		return err
+	block, exists := deps.Protocol.MainEngineInstance().Block(output.BlockID())
+	if !exists {
+		return ierrors.Errorf("block not found: %s", output.BlockID().ToHex())
 	}
 
 	iotaTX, isTX := block.Transaction()

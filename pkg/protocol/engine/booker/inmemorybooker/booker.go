@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type Booker struct {
@@ -28,6 +29,8 @@ type Booker struct {
 
 	ledger ledger.Ledger
 
+	retainBlockFailure func(id iotago.BlockID, reason apimodels.BlockFailureReason)
+
 	errorHandler func(error)
 
 	module.Module
@@ -36,7 +39,6 @@ type Booker struct {
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
 		b := New(e.Workers.CreateGroup("Booker"), e.BlockCache, e.ErrorHandler("booker"), opts...)
-
 		e.HookConstructed(func() {
 			b.ledger = e.Ledger
 			b.ledger.HookConstructed(func() {
@@ -48,6 +50,8 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 					b.errorHandler(err)
 				}
 			})
+
+			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
 
 			e.Events.Booker.LinkTo(b.events)
 
@@ -91,6 +95,9 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	}
 
 	if transactionMetadata == nil {
+		// TODO: if the block fails here it never goes further in the flow, so is it orphaned? should we store err to the retainer?
+		b.retainBlockFailure(block.ID(), apimodels.BlockFailurePayloadInvalid)
+
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
@@ -106,6 +113,10 @@ func (b *Booker) Queue(block *blocks.Block) error {
 func (b *Booker) Shutdown() {
 	b.TriggerStopped()
 	b.workers.Shutdown()
+}
+
+func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockID, apimodels.BlockFailureReason)) {
+	b.retainBlockFailure = retainBlockFailure
 }
 
 func (b *Booker) evict(slotIndex iotago.SlotIndex) {
@@ -127,6 +138,7 @@ func (b *Booker) book(block *blocks.Block) error {
 
 func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	if block.SetInvalid() {
+		b.retainBlockFailure(block.ID(), apimodels.BlockFailureBookingFailure)
 		b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "block marked as invalid in Booker"))
 	}
 }

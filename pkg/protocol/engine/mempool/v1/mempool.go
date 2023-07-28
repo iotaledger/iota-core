@@ -80,7 +80,7 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolv
 func (m *MemPool[VoteRank]) AttachTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (metadata mempool.TransactionMetadata, err error) {
 	storedTransaction, isNew, err := m.storeTransaction(transaction, blockID)
 	if err != nil {
-		return nil, ierrors.Errorf("failed to store transaction: %w", err)
+		return nil, ierrors.Wrap(err, "failed to store transaction")
 	}
 
 	if isNew {
@@ -168,6 +168,7 @@ func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, bl
 	defer m.evictionMutex.RUnlock()
 
 	if m.lastEvictedSlot >= blockID.Index() {
+		// block will be retained as invalid, we do not store tx failure as it was block's fault
 		return nil, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
 	}
 
