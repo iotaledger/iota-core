@@ -187,19 +187,20 @@ func (s *Scheduler) scheduleBlock(block *blocks.Block) {
 	if block.SetScheduled() {
 		// deduct tokens from the token bucket according to the scheduled block's work.
 		s.tokenBucket -= float64(block.Work())
-		// check for another block ready to schedule
-		s.updateChildren(block)
 
+		// check for another block ready to schedule
+		s.updateChildrenWithLocking(block)
 		s.selectBlockToScheduleWithLocking()
+
 		s.events.BlockScheduled.Trigger(block)
 	}
 }
 
 func (s *Scheduler) skipBlock(block *blocks.Block) {
 	if block.SetSkipped() && block.SetScheduled() {
-		s.updateChildren(block)
-
+		s.updateChildrenWithoutLocking(block)
 		s.selectBlockToScheduleWithoutLocking()
+
 		s.events.BlockSkipped.Trigger(block)
 	}
 }
@@ -438,12 +439,18 @@ func (s *Scheduler) ready(block *blocks.Block) {
 	s.buffer.Ready(block)
 }
 
-// updateChildren iterates over the direct children of the given blockID and
+// updateChildrenWithLocking locks the buffer mutex and iterates over the direct children of the given blockID and
 // tries to mark them as ready.
-func (s *Scheduler) updateChildren(block *blocks.Block) {
+func (s *Scheduler) updateChildrenWithLocking(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
+	s.updateChildrenWithoutLocking(block)
+}
+
+// updateChildrenWithoutLocking iterates over the direct children of the given blockID and
+// tries to mark them as ready.
+func (s *Scheduler) updateChildrenWithoutLocking(block *blocks.Block) {
 	for _, childBlock := range block.Children() {
 		if _, childBlockExists := s.blockCache.Block(childBlock.ID()); childBlockExists && childBlock.IsEnqueued() {
 			s.tryReady(childBlock)
