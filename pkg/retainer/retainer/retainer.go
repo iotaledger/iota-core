@@ -28,20 +28,18 @@ type Retainer struct {
 	finalizedSlotFunc       FinalizedSlotFunc
 	errorHandler            func(error)
 
-	api     func(index iotago.SlotIndex) iotago.API
 	workers *workerpool.Group
 
 	module.Module
 }
 
-func New(workers *workerpool.Group, currentAPI func(index iotago.SlotIndex) iotago.API, retainerFunc RetainerFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
+func New(workers *workerpool.Group, retainerFunc RetainerFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
 	return &Retainer{
 		workers:                 workers,
 		store:                   retainerFunc,
 		latestCommittedSlotFunc: latestCommittedSlotFunc,
 		finalizedSlotFunc:       finalizedSlotFunc,
 		errorHandler:            errorHandler,
-		api:                     currentAPI,
 	}
 }
 
@@ -49,7 +47,6 @@ func New(workers *workerpool.Group, currentAPI func(index iotago.SlotIndex) iota
 func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	return module.Provide(func(e *engine.Engine) retainer.Retainer {
 		r := New(e.Workers.CreateGroup("Retainer"),
-			e.Storage.Settings().APIProvider().APIForSlot,
 			e.Storage.Retainer,
 			e.Storage.Settings().LatestCommitment().Index,
 			e.Storage.Settings().LatestFinalizedSlot,
@@ -156,8 +153,7 @@ func (r *Retainer) RetainBlockFailure(blockID iotago.BlockID, failureCode apimod
 }
 
 func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, err error) {
-	failureCode := determineTxFailureReason(err)
-	if err := r.store(blockID.Index()).StoreTransactionFailure(blockID, failureCode); err != nil {
+	if err := r.store(blockID.Index()).StoreTransactionFailure(blockID, determineTxFailureReason(err)); err != nil {
 		r.errorHandler(ierrors.Wrap(err, "failed to store transaction failure in retainer"))
 	}
 }

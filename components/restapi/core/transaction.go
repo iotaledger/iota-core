@@ -17,10 +17,10 @@ func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
 		return iotago.EmptyBlockID(), err
 	}
 
-	return BlockIDFromTransactionID(txID)
+	return blockIDFromTransactionID(txID)
 }
 
-func BlockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockID, error) {
+func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockID, error) {
 	// Get the first output of that transaction (using index 0)
 	outputID := iotago.OutputID{}
 	copy(outputID[:], transactionID[:])

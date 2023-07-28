@@ -20,7 +20,7 @@ type BlockRetainerData struct {
 }
 
 func (b *BlockRetainerData) Bytes() ([]byte, error) {
-	marshalUtil := marshalutil.New()
+	marshalUtil := marshalutil.New(2)
 	marshalUtil.WriteUint8(uint8(b.State))
 	marshalUtil.WriteUint8(uint8(b.FailureReason))
 
@@ -34,6 +34,7 @@ func (b *BlockRetainerData) FromBytes(bytes []byte) (int, error) {
 		return 0, err
 	}
 	b.State = apimodels.BlockState(state)
+
 	reason, err := marshalUtil.ReadUint8()
 	if err != nil {
 		return 0, err
@@ -49,7 +50,7 @@ type TransactionRetainerData struct {
 }
 
 func (t *TransactionRetainerData) Bytes() ([]byte, error) {
-	marshalUtil := marshalutil.New()
+	marshalUtil := marshalutil.New(2)
 	marshalUtil.WriteUint8(uint8(t.State))
 	marshalUtil.WriteUint8(uint8(t.FailureReason))
 
@@ -63,6 +64,7 @@ func (t *TransactionRetainerData) FromBytes(bytes []byte) (int, error) {
 		return 0, err
 	}
 	t.State = apimodels.TransactionState(state)
+
 	reason, err := marshalUtil.ReadUint8()
 	if err != nil {
 		return 0, err

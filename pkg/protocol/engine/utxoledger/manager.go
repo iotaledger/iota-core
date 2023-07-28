@@ -85,20 +85,20 @@ func (m *Manager) PruneSlotIndexWithoutLocking(index iotago.SlotIndex) error {
 	}
 
 	for _, spent := range diff.Spents {
-		if err = deleteOutput(spent.output, mutations); err != nil {
+		if err := deleteOutput(spent.output, mutations); err != nil {
 			mutations.Cancel()
 
 			return err
 		}
 
-		if err = deleteSpent(spent, mutations); err != nil {
+		if err := deleteSpent(spent, mutations); err != nil {
 			mutations.Cancel()
 
 			return err
 		}
 	}
 
-	if err = deleteDiff(index, mutations); err != nil {
+	if err := deleteDiff(index, mutations); err != nil {
 		mutations.Cancel()
 
 		return err
@@ -155,7 +155,7 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 
 			return err
 		}
-		if err = markAsUnspent(output, mutations); err != nil {
+		if err := markAsUnspent(output, mutations); err != nil {
 			mutations.Cancel()
 
 			return err
@@ -163,7 +163,7 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 	}
 
 	for _, spent := range newSpents {
-		if err = storeSpentAndMarkOutputAsSpent(spent, mutations); err != nil {
+		if err := storeSpentAndMarkOutputAsSpent(spent, mutations); err != nil {
 			mutations.Cancel()
 
 			return err
@@ -176,19 +176,19 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 		Spents:  newSpents,
 	}
 
-	if err = storeDiff(slotDiff, mutations); err != nil {
+	if err := storeDiff(slotDiff, mutations); err != nil {
 		mutations.Cancel()
 
 		return err
 	}
 
-	if err = storeLedgerIndex(index, mutations); err != nil {
+	if err := storeLedgerIndex(index, mutations); err != nil {
 		mutations.Cancel()
 
 		return err
 	}
 
-	if err = mutations.Commit(); err != nil {
+	if err := mutations.Commit(); err != nil {
 		return err
 	}
 
@@ -217,13 +217,13 @@ func (m *Manager) RollbackDiffWithoutLocking(index iotago.SlotIndex, newOutputs 
 
 	// we have to store the spents as output and mark them as unspent
 	for _, spent := range newSpents {
-		if err = storeOutput(spent.output, mutations); err != nil {
+		if err := storeOutput(spent.output, mutations); err != nil {
 			mutations.Cancel()
 
 			return err
 		}
 
-		if err = deleteSpentAndMarkOutputAsUnspent(spent, mutations); err != nil {
+		if err := deleteSpentAndMarkOutputAsUnspent(spent, mutations); err != nil {
 			mutations.Cancel()
 
 			return err
@@ -232,31 +232,31 @@ func (m *Manager) RollbackDiffWithoutLocking(index iotago.SlotIndex, newOutputs 
 
 	// we have to delete the newOutputs of this milestone
 	for _, output := range newOutputs {
-		if err = deleteOutput(output, mutations); err != nil {
+		if err := deleteOutput(output, mutations); err != nil {
 			mutations.Cancel()
 
 			return err
 		}
-		if err = deleteOutputLookups(output, mutations); err != nil {
+		if err := deleteOutputLookups(output, mutations); err != nil {
 			mutations.Cancel()
 
 			return err
 		}
 	}
 
-	if err = deleteDiff(index, mutations); err != nil {
+	if err := deleteDiff(index, mutations); err != nil {
 		mutations.Cancel()
 
 		return err
 	}
 
-	if err = storeLedgerIndex(index-1, mutations); err != nil {
+	if err := storeLedgerIndex(index-1, mutations); err != nil {
 		mutations.Cancel()
 
 		return err
 	}
 
-	if err = mutations.Commit(); err != nil {
+	if err := mutations.Commit(); err != nil {
 		return err
 	}
 
@@ -296,13 +296,13 @@ func (m *Manager) AddUnspentOutputWithoutLocking(unspentOutput *Output) error {
 		return err
 	}
 
-	if err = storeOutput(unspentOutput, mutations); err != nil {
+	if err := storeOutput(unspentOutput, mutations); err != nil {
 		mutations.Cancel()
 
 		return err
 	}
 
-	if err = markAsUnspent(unspentOutput, mutations); err != nil {
+	if err := markAsUnspent(unspentOutput, mutations); err != nil {
 		mutations.Cancel()
 
 		return err
@@ -334,7 +334,7 @@ func (m *Manager) LedgerStateSHA256Sum() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = binary.Write(ledgerStateHash, binary.LittleEndian, ledgerIndex); err != nil {
+	if err := binary.Write(ledgerStateHash, binary.LittleEndian, ledgerIndex); err != nil {
 		return nil, err
 	}
 
@@ -350,11 +350,11 @@ func (m *Manager) LedgerStateSHA256Sum() ([]byte, error) {
 			return nil, err
 		}
 
-		if _, err = ledgerStateHash.Write(output.outputID[:]); err != nil {
+		if _, err := ledgerStateHash.Write(output.outputID[:]); err != nil {
 			return nil, err
 		}
 
-		if _, err = ledgerStateHash.Write(output.KVStorableValue()); err != nil {
+		if _, err := ledgerStateHash.Write(output.KVStorableValue()); err != nil {
 			return nil, err
 		}
 	}
@@ -365,7 +365,7 @@ func (m *Manager) LedgerStateSHA256Sum() ([]byte, error) {
 		return nil, err
 	}
 
-	if _, err = ledgerStateHash.Write(stateTreeBytes); err != nil {
+	if _, err := ledgerStateHash.Write(stateTreeBytes); err != nil {
 		return nil, err
 	}
 

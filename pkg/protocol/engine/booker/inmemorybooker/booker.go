@@ -29,7 +29,7 @@ type Booker struct {
 
 	ledger ledger.Ledger
 
-	retainBlockFailureFunc func(id iotago.BlockID, reason apimodels.BlockFailureReason)
+	retainBlockFailure func(id iotago.BlockID, reason apimodels.BlockFailureReason)
 
 	errorHandler func(error)
 
@@ -51,7 +51,7 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 				}
 			})
 
-			b.setReatainerFunc(e.Retainer.RetainBlockFailure)
+			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
 
 			e.Events.Booker.LinkTo(b.events)
 
@@ -95,8 +95,8 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	}
 
 	if transactionMetadata == nil {
-		// TODO: if the block fails here it never goes furthere in the flow, so is it orphaned? should we store err to the retainer?
-		b.retainBlockFailureFunc(block.ID(), apimodels.BlockFailurePayloadInvalid)
+		// TODO: if the block fails here it never goes further in the flow, so is it orphaned? should we store err to the retainer?
+		b.retainBlockFailure(block.ID(), apimodels.BlockFailurePayloadInvalid)
 
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
@@ -115,8 +115,8 @@ func (b *Booker) Shutdown() {
 	b.workers.Shutdown()
 }
 
-func (b *Booker) setReatainerFunc(retainBlockFailureFunc func(iotago.BlockID, apimodels.BlockFailureReason)) {
-	b.retainBlockFailureFunc = retainBlockFailureFunc
+func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockID, apimodels.BlockFailureReason)) {
+	b.retainBlockFailure = retainBlockFailure
 }
 
 func (b *Booker) evict(slotIndex iotago.SlotIndex) {
@@ -138,7 +138,7 @@ func (b *Booker) book(block *blocks.Block) error {
 
 func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	if block.SetInvalid() {
-		b.retainBlockFailureFunc(block.ID(), apimodels.BlockFailureBookingFailure)
+		b.retainBlockFailure(block.ID(), apimodels.BlockFailureBookingFailure)
 		b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "block marked as invalid in Booker"))
 	}
 }
