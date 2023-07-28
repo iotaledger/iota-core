@@ -196,6 +196,12 @@ func (m *Metric) schedulePruning(labelValues []string) {
 	}
 }
 
+func (m *Metric) shutdown() {
+	if m.pruningExecutor != nil {
+		m.pruningExecutor.Shutdown()
+	}
+}
+
 // WithType sets the metric type: Gauge, GaugeVec, Counter, CounterVec.
 func WithType(t MetricType) options.Option[Metric] {
 	return func(m *Metric) {

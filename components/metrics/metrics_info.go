@@ -3,6 +3,7 @@ package metrics
 import (
 	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/iotaledger/iota-core/components/metrics/collector"
 )
@@ -21,6 +22,7 @@ var InfoMetrics = collector.NewCollection(infoNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Node OS data."),
 		collector.WithLabels("nodeID", "OS", "ARCH", "NUM_CPU"),
+		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitValueFunc(func() (metricValue float64, labelValues []string) {
 			var nodeID string
 			if deps.Local != nil {

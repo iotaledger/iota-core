@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/components/metrics/collector"
@@ -28,6 +29,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Last commitment of the node."),
 		collector.WithLabels("commitment"),
+		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				deps.Collector.Update(commitmentsNamespace, latestCommitment, float64(details.Commitment.ID().Index()), details.Commitment.ID().String())
@@ -74,6 +76,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of accepted blocks by the node per slot."),
 		collector.WithLabels("slot"),
+		collector.WithPruningDelay(10*time.Minute),
 		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
@@ -85,6 +88,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of active validators per slot."),
 		collector.WithLabels("slot"),
+		collector.WithPruningDelay(10*time.Minute),
 		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {

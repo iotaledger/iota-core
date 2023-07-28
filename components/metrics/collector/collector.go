@@ -77,6 +77,14 @@ func (c *Collector) ResetMetric(namespace string, metricName string) {
 	}
 }
 
+func (c *Collector) Shutdown() {
+	for _, collection := range c.collections {
+		for _, metric := range collection.metrics {
+			metric.shutdown()
+		}
+	}
+}
+
 func (c *Collector) getMetric(subsystem, metricName string) *Metric {
 	col := c.getCollection(subsystem)
 	if col != nil {

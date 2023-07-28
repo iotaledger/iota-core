@@ -110,6 +110,9 @@ func run() error {
 		shutdownCtx, shutdownCtxCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCtxCancel()
 
+		// shutdown collector to stop all pruning executors
+		deps.Collector.Shutdown()
+
 		//nolint:contextcheck // false positive
 		err := server.Shutdown(shutdownCtx)
 		if err != nil {
