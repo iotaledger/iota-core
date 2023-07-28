@@ -22,6 +22,9 @@ type ParametersBlockIssuer struct {
 
 	// PrivateKey the private key of the account that will issue the blocks.
 	PrivateKey string `default:"" usage:"the private key of the account that will issue the blocks"`
+
+	// RateSetterEnabled whether the RateSetter should be taken into account when issuing blocks.
+	RateSetterEnabled bool `default:"false" usage:"whether the RateSetter should be taken into account when issuing blocks"`
 }
 
 // ParamsBlockIssuer is the default configuration parameters for the BlockIssuer component.

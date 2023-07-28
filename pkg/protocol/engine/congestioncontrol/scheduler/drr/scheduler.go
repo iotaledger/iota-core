@@ -56,17 +56,21 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 				s.manaRetrieveFunc = func(accountID iotago.AccountID) (iotago.Mana, error) {
 					manaSlot := e.Storage.Settings().LatestCommitment().Index()
 					mana, err := e.Ledger.ManaManager().GetManaOnAccount(accountID, manaSlot)
+					if err != nil {
+						return 0, err
+					}
+
 					if mana < s.optsMinMana {
 						return mana, ierrors.Errorf("account %s has insufficient Mana for block to be scheduled: account Mana %d, min Mana %d", accountID, mana, s.optsMinMana)
 					}
 
-					return mana, err
+					return mana, nil
 				}
 			})
 			s.TriggerConstructed()
 			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 				s.AddBlock(block)
-				s.selectBlockToSchedule()
+				s.selectBlockToScheduleWithLocking()
 			})
 
 			e.HookInitialized(s.Start)
@@ -82,12 +86,12 @@ func New(opts ...options.Option[Scheduler]) *Scheduler {
 			events:                             scheduler.NewEvents(),
 			lastScheduleTime:                   time.Now(),
 			deficits:                           shrinkingmap.New[iotago.AccountID, uint64](),
-			optsRate:                           100,
-			optsMaxBufferSize:                  100,
-			optsAcceptedBlockScheduleThreshold: 10 * time.Second,
-			optsMaxDeficit:                     100,
+			optsRate:                           200,
+			optsMaxBufferSize:                  300,
+			optsAcceptedBlockScheduleThreshold: 2 * time.Minute,
+			optsMaxDeficit:                     1,
 			optsMinMana:                        1,
-			optsTokenBucketSize:                1000,
+			optsTokenBucketSize:                1,
 		}, opts,
 	)
 }
@@ -112,6 +116,9 @@ func (s *Scheduler) Rate() int {
 }
 
 func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*blocks.Block) bool {
+	s.bufferMutex.RLock()
+	defer s.bufferMutex.RUnlock()
+
 	// if the buffer is completely empty, any issuer can issue a block.
 	if s.buffer.Size() == 0 {
 		return true
@@ -131,21 +138,6 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 	}
 
 	return deficit >= uint64(work+s.buffer.IssuerQueue(accountID).Work())
-}
-
-func (s *Scheduler) getDeficit(accountID iotago.AccountID) (uint64, error) {
-	d, exists := s.deficits.Get(accountID)
-	if !exists {
-		_, err := s.manaRetrieveFunc(accountID)
-		// manaRetrieveFunc return error if mana is less than MinMana or the Mana can not be retrieved for the account.
-		if err != nil {
-			return 0, ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
-		}
-		// load with max deficit if the issuer has Mana but has been removed from the deficits map
-		return s.optsMaxDeficit, nil
-	}
-
-	return d, nil
 }
 
 func (s *Scheduler) AddBlock(block *blocks.Block) {
@@ -195,18 +187,12 @@ func (s *Scheduler) scheduleBlock(block *blocks.Block) {
 	if block.SetScheduled() {
 		// deduct tokens from the token bucket according to the scheduled block's work.
 		s.tokenBucket -= float64(block.Work())
-		// check for another block ready to schedule
-		s.selectBlockToSchedule()
-		s.updateChildren(block)
-		s.events.BlockScheduled.Trigger(block)
-	}
-}
 
-func (s *Scheduler) skipBlock(block *blocks.Block) {
-	if block.SetSkipped() && block.SetScheduled() {
-		s.selectBlockToSchedule()
-		s.updateChildren(block)
-		s.events.BlockSkipped.Trigger(block)
+		// check for another block ready to schedule
+		s.updateChildrenWithLocking(block)
+		s.selectBlockToScheduleWithLocking()
+
+		s.events.BlockScheduled.Trigger(block)
 	}
 }
 
@@ -216,7 +202,7 @@ func (s *Scheduler) quantum(accountID iotago.AccountID) (iotago.Mana, error) {
 	return mana / s.optsMinMana, err
 }
 
-func (s *Scheduler) selectBlockToSchedule() {
+func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
@@ -241,7 +227,7 @@ func (s *Scheduler) selectBlockToSchedule() {
 		// increment every issuer's deficit for the required number of rounds
 		for q := start; ; {
 			if err := s.incrementDeficit(q.IssuerID(), rounds); err != nil {
-				s.buffer.RemoveIssuer(q.IssuerID())
+				s.removeIssuer(q, err)
 				q = s.buffer.Current()
 			} else {
 				q = s.buffer.Next()
@@ -257,7 +243,8 @@ func (s *Scheduler) selectBlockToSchedule() {
 	// increment the deficit for all issuers before schedulingIssuer one more time
 	for q := start; q != schedulingIssuer; q = s.buffer.Next() {
 		if err := s.incrementDeficit(q.IssuerID(), 1); err != nil {
-			s.buffer.RemoveIssuer(q.IssuerID())
+			s.removeIssuer(q, err)
+
 			return
 		}
 	}
@@ -284,7 +271,11 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 
 		for block != nil && time.Now().After(block.IssuingTime()) {
 			if block.IsAccepted() && time.Since(block.IssuingTime()) > s.optsAcceptedBlockScheduleThreshold {
-				s.skipBlock(block)
+				if block.SetSkipped() {
+					s.updateChildrenWithoutLocking(block)
+					s.events.BlockSkipped.Trigger(block)
+				}
+
 				s.buffer.PopFront()
 
 				block = q.Front()
@@ -298,17 +289,18 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 			deficit, err := s.getDeficit(issuerID)
 			if err != nil {
 				// no deficit exists for this issuer queue, so remove it
-				s.buffer.RemoveIssuer(issuerID)
+				s.removeIssuer(q, err)
 				issuerRemoved = true
 
 				break
 			}
+
 			remainingDeficit := int64(block.Work()) - int64(deficit)
 			// calculate how many rounds we need to skip to accumulate enough deficit.
 			quantum, err := s.quantum(issuerID)
 			if err != nil {
 				// if quantum, can't be retrieved, we need to remove this issuer.
-				s.buffer.RemoveIssuer(issuerID)
+				s.removeIssuer(q, err)
 				issuerRemoved = true
 
 				break
@@ -337,15 +329,67 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 	return rounds, schedulingIssuer
 }
 
+func (s *Scheduler) removeIssuer(q *IssuerQueue, err error) {
+	q.submitted.ForEach(func(id iotago.BlockID, block *blocks.Block) bool {
+		block.SetDropped()
+		s.events.BlockDropped.Trigger(block, err)
+
+		return true
+	})
+
+	for q.inbox.Len() > 0 {
+		block := q.PopFront()
+		block.SetDropped()
+		s.events.BlockDropped.Trigger(block, err)
+	}
+
+	s.buffer.RemoveIssuer(q.IssuerID())
+}
+
+func (s *Scheduler) getDeficit(accountID iotago.AccountID) (uint64, error) {
+	d, exists := s.deficits.Get(accountID)
+	if !exists {
+		_, err := s.manaRetrieveFunc(accountID)
+		// manaRetrieveFunc return error if mana is less than MinMana or the Mana can not be retrieved for the account.
+		if err != nil {
+			return 0, ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
+		}
+		// load with max deficit if the issuer has Mana but has been removed from the deficits map
+		return s.optsMaxDeficit, nil
+	}
+
+	return d, nil
+}
+
 func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error {
-	deficit, err := s.getDeficit(accountID)
+	var err error
+	s.deficits.Compute(accountID, func(currentValue uint64, exists bool) uint64 {
+		if !exists {
+			_, err = s.manaRetrieveFunc(accountID)
+			// manaRetrieveFunc return error if mana is less than MinMana or the Mana can not be retrieved for the account.
+			if err != nil {
+				err = ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
+				return 0
+			}
+
+			// load with max deficit if the issuer has Mana but has been removed from the deficits map
+			return s.optsMaxDeficit
+		}
+
+		// TODO: use safemath package to prevent underflow
+		if int64(currentValue)+delta < 0 {
+			err = ierrors.Errorf("tried to decrease deficit to a negative value %d for issuer %s", int64(currentValue)+delta, accountID)
+			return 0
+		}
+
+		return lo.Min(uint64(int64(currentValue)+delta), s.optsMaxDeficit)
+	})
+
 	if err != nil {
-		return ierrors.Errorf("could not get deficit for issuer %s", accountID)
+		s.deficits.Delete(accountID)
+
+		return err
 	}
-	if int64(deficit)+delta < 0 {
-		return ierrors.Errorf("tried to decrease deficit to a negative value %d for issuer %s", int64(deficit)+delta, accountID)
-	}
-	s.deficits.Set(accountID, lo.Max(uint64(int64(deficit)+delta), s.optsMaxDeficit))
 
 	return nil
 }
@@ -360,7 +404,7 @@ func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds int64) er
 }
 
 func (s *Scheduler) isEligible(block *blocks.Block) (eligible bool) {
-	return block.IsScheduled() || block.IsAccepted()
+	return block.IsSkipped() || block.IsScheduled() || block.IsAccepted()
 }
 
 // isReady returns true if the given blockID's parents are eligible.
@@ -389,11 +433,20 @@ func (s *Scheduler) ready(block *blocks.Block) {
 	s.buffer.Ready(block)
 }
 
-// updateChildren iterates over the direct children of the given blockID and
+// updateChildrenWithLocking locks the buffer mutex and iterates over the direct children of the given blockID and
 // tries to mark them as ready.
-func (s *Scheduler) updateChildren(block *blocks.Block) {
+func (s *Scheduler) updateChildrenWithLocking(block *blocks.Block) {
+	s.bufferMutex.Lock()
+	defer s.bufferMutex.Unlock()
+
+	s.updateChildrenWithoutLocking(block)
+}
+
+// updateChildrenWithoutLocking iterates over the direct children of the given blockID and
+// tries to mark them as ready.
+func (s *Scheduler) updateChildrenWithoutLocking(block *blocks.Block) {
 	for _, childBlock := range block.Children() {
-		if childBlock, childBlockExists := s.blockCache.Block(childBlock.ID()); childBlockExists && childBlock.IsEnqueued() {
+		if _, childBlockExists := s.blockCache.Block(childBlock.ID()); childBlockExists && childBlock.IsEnqueued() {
 			s.tryReady(childBlock)
 		}
 	}
