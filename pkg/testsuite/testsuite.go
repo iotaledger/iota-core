@@ -217,18 +217,17 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	return block
 }
 
-func (t *TestSuite) IssueValidationBlockAtSlotWithinEpochWithOptions(alias string, epoch iotago.EpochIndex, slotWithinEpoch iotago.SlotIndex, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+func (t *TestSuite) IssueValidationBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	t.assertParentsExistFromBlockOptions(blockOpts, node)
 
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
 	timeProvider := t.API.TimeProvider()
-	actualSlot := timeProvider.EpochStart(epoch) + slotWithinEpoch
 
-	issuingTime := timeProvider.SlotStartTime(actualSlot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
 
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, actualSlot, time.Now(), timeProvider.SlotFromTime(time.Now()))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
 	block := node.IssueValidationBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime))...)
 
@@ -266,6 +265,64 @@ func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...optio
 	t.registerBlock(alias, block)
 
 	return block
+}
+
+func (t *TestSuite) IssueBlockRowInSlot(slot iotago.SlotIndex, row int, parentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) []*blocks.Block {
+	blocksIssued := make([]*blocks.Block, 0, len(nodes))
+
+	strongParents := t.BlockIDsWithPrefix(parentsPrefixAlias)
+	issuingOptionsCopy := lo.MergeMaps(make(map[string][]options.Option[blockfactory.BlockParams]), issuingOptions)
+
+	for _, node := range nodes {
+		blockAlias := fmt.Sprintf("%d.%d-%s", slot, row, node.Name)
+		issuingOptionsCopy[node.Name] = append(issuingOptions[node.Name], blockfactory.WithStrongParents(strongParents...))
+
+		b := t.IssueValidationBlockAtSlotWithOptions(blockAlias, slot, node, issuingOptions[node.Name]...)
+		blocksIssued = append(blocksIssued, b)
+	}
+
+	return blocksIssued
+}
+
+func (t *TestSuite) IssueBlockRowsInSlot(slot iotago.SlotIndex, rows int, initialParentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+	var blocksIssued, lastBlockRowIssued []*blocks.Block
+	parentsPrefixAlias := initialParentsPrefixAlias
+
+	for row := 0; row < rows; row++ {
+		if row > 0 {
+			parentsPrefixAlias = fmt.Sprintf("%d.%d", slot, row-1)
+		}
+
+		lastBlockRowIssued = t.IssueBlockRowInSlot(slot, row, parentsPrefixAlias, nodes, issuingOptions)
+		blocksIssued = append(blocksIssued, lastBlockRowIssued...)
+	}
+
+	return blocksIssued, lastBlockRowIssued
+}
+
+func (t *TestSuite) IssueBlocksAtSlots(slots []iotago.SlotIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+	var blocksIssued, lastBlockRowIssued []*blocks.Block
+	parentsPrefixAlias := initialParentsPrefixAlias
+
+	for i, slot := range slots {
+		if i > 0 {
+			parentsPrefixAlias = fmt.Sprintf("%d.%d", slots[i-1], rowsPerSlot)
+		}
+
+		blocksInSlot, lastRowInSlot := t.IssueBlockRowsInSlot(slot, rowsPerSlot, parentsPrefixAlias, nodes, issuingOptions)
+		blocksIssued = append(blocksIssued, blocksInSlot...)
+		lastBlockRowIssued = lastRowInSlot
+
+		if waitForSlotsCommitted {
+			if slot > t.API.ProtocolParameters().MinCommittableAge()+1 {
+				t.AssertCommitmentSlotIndexExists(slot-(t.API.ProtocolParameters().MinCommittableAge()+1), nodes...)
+			} else {
+				t.AssertBlocksExist(blocksInSlot, true, nodes...)
+			}
+		}
+	}
+
+	return blocksIssued, lastBlockRowIssued
 }
 
 func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, activeNodes []*mock.Node, parent *blocks.Block) *blocks.Block {
@@ -392,14 +449,14 @@ func (t *TestSuite) Shutdown() {
 		return true
 	})
 
-	//fmt.Println("======= ATTACHED BLOCKS =======")
-	//t.nodes.ForEach(func(_ string, node *mock.Node) bool {
+	// fmt.Println("======= ATTACHED BLOCKS =======")
+	// t.nodes.ForEach(func(_ string, node *mock.Node) bool {
 	//	for _, block := range node.AttachedBlocks() {
 	//		fmt.Println(node.Name, ">", block)
 	//	}
 	//
 	//	return true
-	//})
+	// })
 }
 
 func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, optDeposit ...iotago.BaseToken) *mock.Node {
@@ -419,10 +476,10 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	}
 	if deposit > 0 {
 		accountDetails := snapshotcreator.AccountDetails{
-			Address:   iotago.Ed25519AddressFromPubKey(node.PubKey),
-			Amount:    deposit,
-			Mana:      iotago.Mana(deposit),
-			IssuerKey: ed25519.PublicKey(node.PubKey),
+			Address:    iotago.Ed25519AddressFromPubKey(node.PubKey),
+			Amount:     deposit,
+			Mana:       iotago.Mana(deposit),
+			IssuerKey:  ed25519.PublicKey(node.PubKey),
 			ExpirySlot: math.MaxUint64,
 		}
 		if validator {
