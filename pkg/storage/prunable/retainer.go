@@ -1,162 +1,185 @@
 package prunable
 
 import (
-	"github.com/iotaledger/hive.go/core/storable"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 const (
-	blockOrphanedPrefix byte = iota
-	blockConfirmedPrefix
-	blockFailurePrefix
-	transactionPendingPrefix
-	transactionConfirmedPrefix
-	transactionFailurePrefix
+	blockStorePrefix byte = iota
+	transactionStorePrefix
 )
 
+type BlockRetainerData struct {
+	State         apimodels.BlockState
+	FailureReason apimodels.BlockFailureReason
+}
+
+func (b *BlockRetainerData) Bytes() ([]byte, error) {
+	marshalUtil := marshalutil.New(2)
+	marshalUtil.WriteUint8(uint8(b.State))
+	marshalUtil.WriteUint8(uint8(b.FailureReason))
+
+	return marshalUtil.Bytes(), nil
+}
+
+func (b *BlockRetainerData) FromBytes(bytes []byte) (int, error) {
+	marshalUtil := marshalutil.New(bytes)
+	state, err := marshalUtil.ReadUint8()
+	if err != nil {
+		return 0, err
+	}
+	b.State = apimodels.BlockState(state)
+
+	reason, err := marshalUtil.ReadUint8()
+	if err != nil {
+		return 0, err
+	}
+	b.FailureReason = apimodels.BlockFailureReason(reason)
+
+	return marshalUtil.ReadOffset(), nil
+}
+
+type TransactionRetainerData struct {
+	State         apimodels.TransactionState
+	FailureReason apimodels.TransactionFailureReason
+}
+
+func (t *TransactionRetainerData) Bytes() ([]byte, error) {
+	marshalUtil := marshalutil.New(2)
+	marshalUtil.WriteUint8(uint8(t.State))
+	marshalUtil.WriteUint8(uint8(t.FailureReason))
+
+	return marshalUtil.Bytes(), nil
+}
+
+func (t *TransactionRetainerData) FromBytes(bytes []byte) (int, error) {
+	marshalUtil := marshalutil.New(bytes)
+	state, err := marshalUtil.ReadUint8()
+	if err != nil {
+		return 0, err
+	}
+	t.State = apimodels.TransactionState(state)
+
+	reason, err := marshalUtil.ReadUint8()
+	if err != nil {
+		return 0, err
+	}
+	t.FailureReason = apimodels.TransactionFailureReason(reason)
+
+	return marshalUtil.ReadOffset(), nil
+}
+
 type Retainer struct {
-	slot                      iotago.SlotIndex
-	blockOrphanedStore        *kvstore.TypedStore[iotago.BlockID, types.Empty]
-	blockConfirmedStore       *kvstore.TypedStore[iotago.BlockID, types.Empty]
-	blockFailureStore         *kvstore.TypedStore[iotago.BlockID, storable.SerializableInt64]
-	transactionPendingStore   *kvstore.TypedStore[iotago.BlockID, types.Empty]
-	transactionConfirmedStore *kvstore.TypedStore[iotago.BlockID, types.Empty]
-	transactionFailureStore   *kvstore.TypedStore[iotago.TransactionID, storable.SerializableInt64]
+	slot       iotago.SlotIndex
+	blockStore *kvstore.TypedStore[iotago.BlockID, *BlockRetainerData]
+	// we store transaction metadata per blockID as in API requests we always request by blockID
+	transactionStore *kvstore.TypedStore[iotago.BlockID, *TransactionRetainerData]
 }
 
 func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Retainer) {
 	return &Retainer{
 		slot: slot,
-		blockOrphanedStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockOrphanedPrefix})),
+		blockStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockStorePrefix})),
 			iotago.SlotIdentifier.Bytes,
 			iotago.SlotIdentifierFromBytes,
-			types.Empty.Bytes,
-			func(bytes []byte) (object types.Empty, consumed int, err error) {
-				return types.Void, 0, nil
-			}),
-		blockConfirmedStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockConfirmedPrefix})),
-			iotago.SlotIdentifier.Bytes,
-			iotago.SlotIdentifierFromBytes,
-			types.Empty.Bytes,
-			func(bytes []byte) (object types.Empty, consumed int, err error) {
-				return types.Void, 0, nil
-			}),
-		blockFailureStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockFailurePrefix})),
-			iotago.SlotIdentifier.Bytes,
-			iotago.SlotIdentifierFromBytes,
-			storable.SerializableInt64.Bytes,
-			func(bytes []byte) (storable.SerializableInt64, int, error) {
-				var i storable.SerializableInt64
-				c, err := i.FromBytes(bytes)
+			(*BlockRetainerData).Bytes,
+			func(bytes []byte) (*BlockRetainerData, int, error) {
+				b := new(BlockRetainerData)
+				c, err := b.FromBytes(bytes)
 
-				return i, c, err
-			}),
-		transactionPendingStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionPendingPrefix})),
+				return b, c, err
+			},
+		),
+		transactionStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionStorePrefix})),
 			iotago.SlotIdentifier.Bytes,
 			iotago.SlotIdentifierFromBytes,
-			types.Empty.Bytes,
-			func(bytes []byte) (object types.Empty, consumed int, err error) {
-				return types.Void, 0, nil
-			}),
-		transactionConfirmedStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionConfirmedPrefix})),
-			iotago.SlotIdentifier.Bytes,
-			iotago.SlotIdentifierFromBytes,
-			types.Empty.Bytes,
-			func(bytes []byte) (object types.Empty, consumed int, err error) {
-				return types.Void, 0, nil
-			}),
-		transactionFailureStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionFailurePrefix})),
-			iotago.TransactionID.Bytes,
-			iotago.IdentifierFromBytes,
-			storable.SerializableInt64.Bytes,
-			func(bytes []byte) (storable.SerializableInt64, int, error) {
-				var i storable.SerializableInt64
-				c, err := i.FromBytes(bytes)
+			(*TransactionRetainerData).Bytes,
+			func(bytes []byte) (*TransactionRetainerData, int, error) {
+				t := new(TransactionRetainerData)
+				c, err := t.FromBytes(bytes)
 
-				return i, c, err
-			}),
+				return t, c, err
+			},
+		),
 	}
 }
 
-func (r *Retainer) Store(blockID iotago.BlockID, hasTx bool) error {
-	if err := r.blockOrphanedStore.Set(blockID, types.Void); err != nil {
-		return err
-	}
-
-	if hasTx {
-		if err := r.transactionPendingStore.Set(blockID, types.Void); err != nil {
-			return ierrors.Errorf("failed to retain transaction in pending store: %w", err)
-		}
-	}
-
-	return nil
+func (r *Retainer) StoreBlockAttached(blockID iotago.BlockID) error {
+	return r.blockStore.Set(blockID, &BlockRetainerData{
+		State:         apimodels.BlockStatePending,
+		FailureReason: apimodels.BlockFailureNone,
+	})
 }
 
-func (r *Retainer) WasBlockConfirmed(blockID iotago.BlockID) (bool, error) {
-	exists, err := r.blockConfirmedStore.Has(blockID)
+func (r *Retainer) GetBlock(blockID iotago.BlockID) (*BlockRetainerData, bool) {
+	blockData, err := r.blockStore.Get(blockID)
 	if err != nil {
-		return false, err
+		return nil, false
 	}
 
-	return exists, nil
+	return blockData, true
 }
 
-func (r *Retainer) WasBlockOrphaned(blockID iotago.BlockID) (bool, error) {
-	exists, err := r.blockOrphanedStore.Has(blockID)
+func (r *Retainer) GetTransaction(blockID iotago.BlockID) (*TransactionRetainerData, bool) {
+	txData, err := r.transactionStore.Get(blockID)
 	if err != nil {
-		return false, err
+		return nil, false
 	}
 
-	return exists, nil
+	return txData, true
 }
 
 func (r *Retainer) StoreBlockAccepted(blockID iotago.BlockID) error {
-	return r.blockOrphanedStore.Delete(blockID)
+	return r.blockStore.Set(blockID, &BlockRetainerData{
+		State:         apimodels.BlockStateAccepted,
+		FailureReason: apimodels.BlockFailureNone,
+	})
 }
 
 func (r *Retainer) StoreBlockConfirmed(blockID iotago.BlockID) error {
-	return r.blockConfirmedStore.Set(blockID, types.Void)
-}
-
-func (r *Retainer) WasTransactionConfirmed(blockID iotago.BlockID) (bool, error) {
-	exists, err := r.transactionConfirmedStore.Has(blockID)
-	if err != nil {
-		return false, err
-	}
-
-	return exists, nil
-}
-
-func (r *Retainer) WasTransactionPending(blockID iotago.BlockID) (bool, error) {
-	exists, err := r.transactionPendingStore.Has(blockID)
-	if err != nil {
-		return false, err
-	}
-
-	return exists, nil
+	return r.blockStore.Set(blockID, &BlockRetainerData{
+		State:         apimodels.BlockStateConfirmed,
+		FailureReason: apimodels.BlockFailureNone,
+	})
 }
 
 func (r *Retainer) StoreTransactionPending(blockID iotago.BlockID) error {
-	return r.transactionPendingStore.Set(blockID, types.Void)
+	return r.transactionStore.Set(blockID, &TransactionRetainerData{
+		State:         apimodels.TransactionStatePending,
+		FailureReason: apimodels.TxFailureNone,
+	})
 }
 
-func (r *Retainer) StoreTransactionConfirmed(blockID iotago.BlockID) error {
-	return r.transactionConfirmedStore.Set(blockID, types.Void)
+func (r *Retainer) StoreTransactionNoFailureStatus(blockID iotago.BlockID, status apimodels.TransactionState) error {
+	if status == apimodels.TransactionStateFailed {
+		return ierrors.Errorf("failed to retain transaction status, status cannot be failed, blockID: %s", blockID.String())
+	}
+
+	return r.transactionStore.Set(blockID, &TransactionRetainerData{
+		State:         status,
+		FailureReason: apimodels.TxFailureNone,
+	})
 }
 
-func (r *Retainer) DeleteTransactionConfirmed(prevID iotago.BlockID) error {
-	return r.transactionConfirmedStore.Delete(prevID)
+func (r *Retainer) DeleteTransactionData(prevID iotago.BlockID) error {
+	return r.transactionStore.Delete(prevID)
 }
 
-func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason) error {
-	return r.blockFailureStore.Set(blockID, storable.SerializableInt64(failureReason))
+func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType apimodels.BlockFailureReason) error {
+	return r.blockStore.Set(blockID, &BlockRetainerData{
+		State:         apimodels.BlockStateFailed,
+		FailureReason: failureType,
+	})
 }
 
-func (r *Retainer) StoreTransactionFailure(transactionID iotago.TransactionID, failureReason apimodels.TransactionFailureReason) error {
-	return r.transactionFailureStore.Set(transactionID, storable.SerializableInt64(failureReason))
+func (r *Retainer) StoreTransactionFailure(blockID iotago.BlockID, failureType apimodels.TransactionFailureReason) error {
+	return r.transactionStore.Set(blockID, &TransactionRetainerData{
+		State:         apimodels.TransactionStateFailed,
+		FailureReason: failureType,
+	})
 }

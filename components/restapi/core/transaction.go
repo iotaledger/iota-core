@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/labstack/echo/v4"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
@@ -16,9 +17,13 @@ func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
 		return iotago.EmptyBlockID(), err
 	}
 
+	return blockIDFromTransactionID(txID)
+}
+
+func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockID, error) {
 	// Get the first output of that transaction (using index 0)
 	outputID := iotago.OutputID{}
-	copy(outputID[:], txID[:])
+	copy(outputID[:], transactionID[:])
 
 	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
@@ -34,9 +39,9 @@ func blockByTransactionID(c echo.Context) (*model.Block, error) {
 		return nil, err
 	}
 
-	block, err := deps.Protocol.MainEngineInstance().Retainer.Block(blockID)
-	if err != nil {
-		return nil, err
+	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	if !exists {
+		return nil, ierrors.Errorf("block not found: %s", blockID.String())
 	}
 
 	return block, nil
