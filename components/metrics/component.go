@@ -15,7 +15,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/dig"
@@ -38,6 +37,7 @@ func init() {
 			if err := container.Provide(createCollector); err != nil {
 				panic(ierrors.Wrap(err, "failed to provide collector"))
 			}
+
 			return ParamsMetrics.Enabled
 		},
 	}
@@ -99,7 +99,7 @@ func run() error {
 
 		go func() {
 			Component.LogInfof("You can now access the Prometheus exporter using: http://%s/metrics", bindAddr)
-			if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			if err := server.ListenAndServe(); err != nil && !ierrors.Is(err, http.ErrServerClosed) {
 				Component.LogError("Stopping Prometheus exporter due to an error ... done")
 			}
 		}()
@@ -107,14 +107,15 @@ func run() error {
 		<-ctx.Done()
 		Component.LogInfo("Stopping Prometheus exporter ...")
 
-		if server != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			err := server.Shutdown(ctx)
-			if err != nil {
-				Component.LogError(err.Error())
-			}
-			cancel()
+		shutdownCtx, shutdownCtxCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCtxCancel()
+
+		//nolint:contextcheck // false positive
+		err := server.Shutdown(shutdownCtx)
+		if err != nil {
+			Component.LogWarn(err)
 		}
+
 		Component.LogInfo("Stopping Prometheus exporter ... done")
 	}, daemon.PriorityMetrics)
 }

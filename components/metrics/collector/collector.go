@@ -82,6 +82,7 @@ func (c *Collector) getMetric(subsystem, metricName string) *Metric {
 	if col != nil {
 		return col.GetMetric(metricName)
 	}
+
 	return nil
 }
 
@@ -89,5 +90,6 @@ func (c *Collector) getCollection(subsystem string) *Collection {
 	if collection, exists := c.collections[subsystem]; exists {
 		return collection
 	}
+
 	return nil
 }

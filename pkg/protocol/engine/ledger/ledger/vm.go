@@ -13,7 +13,7 @@ import (
 func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.State) ([]mempool.State, error) {
 	tx, ok := stateTransition.(*iotago.Transaction)
 	if !ok {
-		return nil, ErrUnexpectedUnderlyingType
+		return nil, iotago.ErrTxTypeInvalid
 	}
 
 	inputSet := iotagovm.InputSet{}
@@ -30,26 +30,26 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	// TODO: refactor resolution of ContextInputs to be handled by Mempool
 	bicInputs, err := tx.BICInputs()
 	if err != nil {
-		return nil, ierrors.Errorf("could not get BIC inputs: %w", err)
+		return nil, ierrors.Join(err, iotago.ErrBICInputInvalid)
 	}
 
 	rewardInputs, err := tx.RewardInputs()
 	if err != nil {
-		return nil, ierrors.Errorf("could not get reward inputs: %w", err)
+		return nil, ierrors.Join(err, iotago.ErrRewardInputInvalid)
 	}
 
 	// resolve the commitment inputs from storage
 	commitment := tx.CommitmentInput()
 
 	if (len(rewardInputs) > 0 || len(bicInputs) > 0) && commitment == nil {
-		return nil, ierrors.New("commitment input required with reward or BIC input")
+		return nil, iotago.ErrCommitmentInputMissing
 	}
 
 	var loadedCommitment *iotago.Commitment
 	if commitment != nil {
 		loadedCommitment, err = l.loadCommitment(commitment.CommitmentID)
 		if err != nil {
-			return nil, ierrors.Errorf("could not load commitment %s: %w", commitment.CommitmentID, err)
+			return nil, ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.Wrapf(err, "could not load commitment %s", commitment.CommitmentID))
 		}
 
 		resolvedInputs.CommitmentInput = loadedCommitment
@@ -59,10 +59,10 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	for _, inp := range bicInputs {
 		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, loadedCommitment.Index)
 		if accountErr != nil {
-			return nil, ierrors.Errorf("could not get BIC input for account %s in slot %d: %w", inp.AccountID, loadedCommitment.Index, accountErr)
+			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, loadedCommitment.Index))
 		}
 		if !exists {
-			return nil, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, loadedCommitment.Index)
+			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, loadedCommitment.Index))
 		}
 
 		bicInputSet[inp.AccountID] = accountData.Credits.Value
@@ -79,7 +79,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		case *iotago.AccountOutput:
 			stakingFeature := castOutput.FeatureSet().Staking()
 			if stakingFeature == nil {
-				return nil, ierrors.Errorf("cannot claim rewards from an AccountOutput %s at index %d without staking feature", outputID, inp.Index)
+				return nil, ierrors.Wrapf(iotago.ErrNoStakingFeature, "cannot claim rewards from an AccountOutput %s at index %d without staking feature", outputID, inp.Index)
 			}
 			accountID := castOutput.AccountID
 			if accountID.Empty() {
@@ -88,7 +88,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 			reward, rewardErr := l.sybilProtection.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			if rewardErr != nil {
-				return nil, ierrors.Errorf("failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimStakingReward, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			}
 
 			rewardInputSet[accountID] = reward
@@ -106,7 +106,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 			reward, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
 			if rewardErr != nil {
-				return nil, ierrors.Errorf("failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
+				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimDelegationReward, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}
 
 			rewardInputSet[delegationID] = reward

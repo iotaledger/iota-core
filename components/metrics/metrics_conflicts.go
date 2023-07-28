@@ -27,7 +27,7 @@ var ConflictMetrics = collector.NewCollection(conflictNamespace,
 					if block, blockExists := deps.Protocol.MainEngineInstance().BlockFromCache(firstAttachmentID); blockExists {
 						timeSinceIssuance := time.Since(block.IssuingTime()).Milliseconds()
 						timeIssuanceSeconds := float64(timeSinceIssuance) / 1000
-						deps.Collector.Update(conflictNamespace, resolutionTime, float64(timeIssuanceSeconds))
+						deps.Collector.Update(conflictNamespace, resolutionTime, timeIssuanceSeconds)
 					}
 				}
 			}, event.WithWorkerPool(Component.WorkerPool))
