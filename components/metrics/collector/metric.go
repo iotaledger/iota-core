@@ -43,8 +43,7 @@ type Metric struct {
 // NewMetric creates a new metric with given name and options.
 func NewMetric(name string, opts ...options.Option[Metric]) *Metric {
 	m := options.Apply(&Metric{
-		Name:        name,
-		collectFunc: func() (value float64, labelValues []string) { return 0, nil },
+		Name: name,
 	}, opts)
 
 	return m
@@ -91,13 +90,15 @@ func (m *Metric) collect() {
 	if m.resetEnabled {
 		m.Reset()
 	}
-	value, labelValues := m.collectFunc()
-	m.update(value, labelValues...)
+	if m.collectFunc != nil {
+		value, labelValues := m.collectFunc()
+		m.update(value, labelValues...)
+	}
 }
 
 func (m *Metric) update(metricValue float64, labelValues ...string) {
 	if len(labelValues) != len(m.labels) {
-		fmt.Println("Warning! Nothing updated, label values and labels length mismatch when updating metric", m.Name)
+		fmt.Println("Warning! Nothing updated, label values and labels length mismatch when updating metric", m.Name, labelValues, m.labels)
 
 		return
 	}
@@ -130,11 +131,11 @@ func (m *Metric) metricIncrement(labelValues ...string) {
 	switch metric := m.promMetric.(type) {
 	case prometheus.Gauge:
 		metric.Inc()
-	case prometheus.GaugeVec:
+	case *prometheus.GaugeVec:
 		metric.WithLabelValues(labelValues...).Inc()
 	case prometheus.Counter:
 		metric.Inc()
-	case prometheus.CounterVec:
+	case *prometheus.CounterVec:
 		metric.WithLabelValues(labelValues...).Inc()
 	}
 }
@@ -143,7 +144,7 @@ func (m *Metric) Reset() {
 	switch metric := m.promMetric.(type) {
 	case prometheus.Gauge:
 		metric.Set(0)
-	case prometheus.GaugeVec:
+	case *prometheus.GaugeVec:
 		metric.Reset()
 	case prometheus.Counter:
 		m.promMetric = prometheus.NewCounter(prometheus.CounterOpts{
@@ -151,7 +152,7 @@ func (m *Metric) Reset() {
 			Namespace: m.Namespace,
 			Help:      m.help,
 		})
-	case prometheus.CounterVec:
+	case *prometheus.CounterVec:
 		metric.Reset()
 	}
 }
