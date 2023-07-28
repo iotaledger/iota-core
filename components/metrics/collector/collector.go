@@ -65,7 +65,7 @@ func (c *Collector) Increment(subsystem, metricName string, labels ...string) {
 func (c *Collector) DeleteLabels(subsystem, metricName string, labelValues map[string]string) {
 	m := c.getMetric(subsystem, metricName)
 	if m != nil {
-		m.DeleteLabels(labelValues)
+		m.deleteLabels(labelValues)
 	}
 }
 
@@ -73,7 +73,7 @@ func (c *Collector) DeleteLabels(subsystem, metricName string, labelValues map[s
 func (c *Collector) ResetMetric(namespace string, metricName string) {
 	m := c.getMetric(namespace, metricName)
 	if m != nil {
-		m.Reset()
+		m.reset()
 	}
 }
 

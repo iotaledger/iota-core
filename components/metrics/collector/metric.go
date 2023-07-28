@@ -3,10 +3,12 @@ package collector
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/timed"
 )
 
 type MetricType uint8
@@ -25,14 +27,16 @@ const (
 // can be provided, so the Metric will keep its internal representation of metrics value,
 // and WithCollectFunc will use it instead requesting data directly form other components.
 type Metric struct {
-	Name          string
-	Type          MetricType
-	Namespace     string
-	help          string
-	labels        []string
-	collectFunc   func() (value float64, labelValues []string)
-	initValueFunc func() (value float64, labelValues []string)
-	initFunc      func()
+	Name            string
+	Type            MetricType
+	Namespace       string
+	help            string
+	labels          []string
+	pruningExecutor *timed.TaskExecutor[string]
+	pruningDelay    time.Duration
+	collectFunc     func() (value float64, labelValues []string)
+	initValueFunc   func() (value float64, labelValues []string)
+	initFunc        func()
 
 	promMetric   prometheus.Collector
 	resetEnabled bool // if enabled metric will be reset before each collectFunction call
@@ -88,7 +92,7 @@ func (m *Metric) initPromMetric() {
 
 func (m *Metric) collect() {
 	if m.resetEnabled {
-		m.Reset()
+		m.reset()
 	}
 	if m.collectFunc != nil {
 		value, labelValues := m.collectFunc()
@@ -103,6 +107,17 @@ func (m *Metric) update(metricValue float64, labelValues ...string) {
 		return
 	}
 	m.metricUpdate(metricValue, labelValues...)
+	m.schedulePruning(labelValues)
+}
+
+func (m *Metric) increment(labelValues ...string) {
+	if len(labelValues) != len(m.labels) {
+		fmt.Println("Warning! Nothing updated, label values and labels length mismatch when updating metric", m.Name)
+
+		return
+	}
+	m.metricIncrement(labelValues...)
+	m.schedulePruning(labelValues)
 }
 
 func (m *Metric) metricUpdate(value float64, labelValues ...string) {
@@ -118,15 +133,6 @@ func (m *Metric) metricUpdate(value float64, labelValues ...string) {
 	}
 }
 
-func (m *Metric) increment(labelValues ...string) {
-	if len(labelValues) != len(m.labels) {
-		fmt.Println("Warning! Nothing updated, label values and labels length mismatch when updating metric", m.Name)
-
-		return
-	}
-	m.metricIncrement(labelValues...)
-}
-
 func (m *Metric) metricIncrement(labelValues ...string) {
 	switch metric := m.promMetric.(type) {
 	case prometheus.Gauge:
@@ -140,7 +146,7 @@ func (m *Metric) metricIncrement(labelValues ...string) {
 	}
 }
 
-func (m *Metric) Reset() {
+func (m *Metric) reset() {
 	switch metric := m.promMetric.(type) {
 	case prometheus.Gauge:
 		metric.Set(0)
@@ -157,8 +163,8 @@ func (m *Metric) Reset() {
 	}
 }
 
-// DeleteLabels deletes the metric value matching the provided labels.
-func (m *Metric) DeleteLabels(labels map[string]string) {
+// deleteLabels deletes the metric value matching the provided labels.
+func (m *Metric) deleteLabels(labels map[string]string) {
 	// We can only reset labels if we initialized this metric to have labels in the first place.
 	if len(m.labels) == len(labels) {
 		switch m.Type {
@@ -169,6 +175,24 @@ func (m *Metric) DeleteLabels(labels map[string]string) {
 			//nolint:forcetypeassert // we can safely assume that this is a CounterVec
 			m.promMetric.(*prometheus.CounterVec).Delete(labels)
 		}
+	}
+}
+
+func (m *Metric) schedulePruning(labelValues []string) {
+	if m.pruningDelay > 0 {
+		var pruningIdentifier string
+		for _, label := range labelValues {
+			pruningIdentifier = fmt.Sprintf("%s_%s", pruningIdentifier, label)
+		}
+
+		m.pruningExecutor.Cancel(pruningIdentifier)
+		m.pruningExecutor.ExecuteAfter(pruningIdentifier, func() {
+			labelsMap := make(map[string]string)
+			for i, label := range m.labels {
+				labelsMap[label] = labelValues[i]
+			}
+			m.deleteLabels(labelsMap)
+		}, m.pruningDelay)
 	}
 }
 
@@ -190,6 +214,16 @@ func WithHelp(help string) options.Option[Metric] {
 func WithLabels(labels ...string) options.Option[Metric] {
 	return func(m *Metric) {
 		m.labels = labels
+	}
+}
+
+// WithPruningDelay sets the delay after which the metric will be pruned from the prometheus registry.
+// The pruning is label-aware: if the metric has labels, the pruning delay will apply to any unique set of labels
+// for this metric.
+func WithPruningDelay(pruningDelay time.Duration) options.Option[Metric] {
+	return func(m *Metric) {
+		m.pruningExecutor = timed.NewTaskExecutor[string](1)
+		m.pruningDelay = pruningDelay
 	}
 }
 
