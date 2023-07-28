@@ -176,8 +176,8 @@ func configure() error {
 		Component.LogDebugf("BlockScheduled: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block) {
-		Component.LogDebugf("BlockDropped: %s", block.ID())
+	deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block, err error) {
+		Component.LogDebugf("BlockDropped: %s; reason: %s", block.ID(), err)
 	})
 
 	deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {

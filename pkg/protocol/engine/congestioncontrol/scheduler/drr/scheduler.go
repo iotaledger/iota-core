@@ -227,7 +227,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 		// increment every issuer's deficit for the required number of rounds
 		for q := start; ; {
 			if err := s.incrementDeficit(q.IssuerID(), rounds); err != nil {
-				s.removeIssuer(q)
+				s.removeIssuer(q, err)
 				q = s.buffer.Current()
 			} else {
 				q = s.buffer.Next()
@@ -243,7 +243,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	// increment the deficit for all issuers before schedulingIssuer one more time
 	for q := start; q != schedulingIssuer; q = s.buffer.Next() {
 		if err := s.incrementDeficit(q.IssuerID(), 1); err != nil {
-			s.removeIssuer(q)
+			s.removeIssuer(q, err)
 
 			return
 		}
@@ -289,7 +289,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 			deficit, err := s.getDeficit(issuerID)
 			if err != nil {
 				// no deficit exists for this issuer queue, so remove it
-				s.removeIssuer(q)
+				s.removeIssuer(q, err)
 				issuerRemoved = true
 
 				break
@@ -300,7 +300,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 			quantum, err := s.quantum(issuerID)
 			if err != nil {
 				// if quantum, can't be retrieved, we need to remove this issuer.
-				s.removeIssuer(q)
+				s.removeIssuer(q, err)
 				issuerRemoved = true
 
 				break
@@ -329,10 +329,10 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 	return rounds, schedulingIssuer
 }
 
-func (s *Scheduler) removeIssuer(q *IssuerQueue) {
+func (s *Scheduler) removeIssuer(q *IssuerQueue, err error) {
 	q.submitted.ForEach(func(id iotago.BlockID, block *blocks.Block) bool {
 		block.SetDropped()
-		s.events.BlockDropped.Trigger(block)
+		s.events.BlockDropped.Trigger(block, err)
 
 		return true
 	})
@@ -340,7 +340,7 @@ func (s *Scheduler) removeIssuer(q *IssuerQueue) {
 	for q.inbox.Len() > 0 {
 		block := q.PopFront()
 		block.SetDropped()
-		s.events.BlockDropped.Trigger(block)
+		s.events.BlockDropped.Trigger(block, err)
 	}
 
 	s.buffer.RemoveIssuer(q.IssuerID())
