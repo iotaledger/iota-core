@@ -107,6 +107,11 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 				})
 
 				transactionMetadata.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
+					// if prevBlock is genesis, we do not need to update anything, bc the tx is included in the block we attached to at start.
+					if prevBlock.Index() == 0 {
+						return
+					}
+
 					if err := r.onAttachmentUpdated(prevBlock, newBlock, transactionMetadata.IsAccepted()); err != nil {
 						r.errorHandler(ierrors.Wrap(err, "failed to delete/store on AttachmentUpdated in retainer"))
 					}
