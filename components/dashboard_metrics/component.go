@@ -120,4 +120,8 @@ func configureComponentCountersEvents() {
 	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(b *blocks.Block) {
 		incComponentCounter(Booked)
 	})
+
+	deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(b *blocks.Block) {
+		incComponentCounter(Scheduled)
+	})
 }
