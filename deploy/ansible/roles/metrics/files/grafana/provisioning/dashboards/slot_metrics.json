@@ -128,7 +128,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "slots_total_blocks{instance=\"node-01.feature.shimmer.iota.cafe:9311\"}",
+          "expr": "slots_total_blocks{instance=~\"$instance\"}",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -421,6 +421,6 @@
   "timezone": "",
   "title": "Global Slots View",
   "uid": "9eivfEo4z",
-  "version": 5,
+  "version": 2,
   "weekStart": ""
 }
