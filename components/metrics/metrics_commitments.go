@@ -13,7 +13,7 @@ import (
 const (
 	commitmentsNamespace = "commitments"
 
-	lastCommitment      = "latest"
+	latestCommitment    = "latest"
 	finalizedCommitment = "finalized"
 	forksCount          = "forks_total"
 	missingRequested    = "missing_requested_total"
@@ -24,13 +24,13 @@ const (
 )
 
 var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
-	collector.WithMetric(collector.NewMetric(lastCommitment,
+	collector.WithMetric(collector.NewMetric(latestCommitment,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Last commitment of the node."),
 		collector.WithLabels("commitment"),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				deps.Collector.Update(commitmentsNamespace, lastCommitment, float64(details.Commitment.ID().Index()), details.Commitment.ID().String())
+				deps.Collector.Update(commitmentsNamespace, latestCommitment, float64(details.Commitment.ID().Index()), details.Commitment.ID().String())
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
@@ -38,7 +38,6 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Last commitment finalized by the node."),
 		collector.WithInitFunc(func() {
-			deps.Collector.ResetMetric(commitmentsNamespace, finalizedCommitment)
 			deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
 				deps.Collector.Update(commitmentsNamespace, finalizedCommitment, float64(slot))
 			}, event.WithWorkerPool(Component.WorkerPool))
@@ -82,17 +81,6 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
-	// collector.WithMetric(collector.NewMetric(transactions,
-	// 	collector.WithType(collector.GaugeVec),
-	// 	collector.WithHelp("Number of transactions by the node per slot."),
-	// 	collector.WithLabels("slot"),
-	// 	collector.WithResetBeforeCollecting(true),
-	// 	collector.WithInitFunc(func() {
-	// 		deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-	// 			deps.Collector.Update(commitmentsNamespace, transactions, collector.MultiLabelsValues([]string{strconv.Itoa(int(details.Commitment.Index()))}, details.AcceptedTransactions.Size()))
-	// 		}, event.WithWorkerPool(Component.WorkerPool))
-	// 	}),
-	// )),
 	collector.WithMetric(collector.NewMetric(validators,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of active validators per slot."),
