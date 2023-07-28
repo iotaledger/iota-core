@@ -15,20 +15,14 @@ type BlockMetadata struct {
 
 func (b *BlockMetadata) BlockMetadataResponse() *apimodels.BlockMetadataResponse {
 	response := &apimodels.BlockMetadataResponse{
-		BlockID:    b.BlockID.ToHex(),
-		BlockState: b.BlockState.String(),
-	}
-
-	if b.BlockFailureReason != apimodels.BlockFailureNone {
-		response.BlockFailureReason = b.BlockFailureReason
+		BlockID:            b.BlockID.ToHex(),
+		BlockState:         b.BlockState.String(),
+		BlockFailureReason: b.BlockFailureReason,
+		TxFailureReason:    b.TxFailureReason,
 	}
 
 	if b.TxState != apimodels.TransactionStateNoTransaction {
 		response.TxState = b.TxState.String()
-	}
-
-	if b.TxFailureReason != apimodels.TxFailureNone {
-		response.TxFailureReason = b.TxFailureReason
 	}
 
 	return response
