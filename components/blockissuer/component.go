@@ -64,6 +64,7 @@ func provide(c *dig.Container) error {
 			blockfactory.WithTipSelectionTimeout(ParamsBlockIssuer.TipSelectionTimeout),
 			blockfactory.WithTipSelectionRetryInterval(ParamsBlockIssuer.TipSelectionRetryInterval),
 			blockfactory.WithIncompleteBlockAccepted(restapi.ParamsRestAPI.AllowIncompleteBlock),
+			blockfactory.WithRateSetterEnabled(ParamsBlockIssuer.RateSetterEnabled),
 		)
 	})
 }
