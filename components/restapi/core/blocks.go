@@ -6,7 +6,6 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/runtime/contextutils"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -111,10 +110,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 		return nil, echo.ErrUnsupportedMediaType
 	}
 
-	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(c.Request().Context(), Component.Daemon().ContextStopped())
-	defer mergedCtxCancel()
-
-	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, iotaBlock)
+	blockID, err := deps.BlockIssuer.AttachBlock(c.Request().Context(), iotaBlock)
 	if err != nil {
 		switch {
 		case ierrors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):

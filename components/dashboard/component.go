@@ -73,6 +73,11 @@ func run() error {
 
 		stopped := make(chan struct{})
 		go func() {
+			server.Server.BaseContext = func(_ net.Listener) context.Context {
+				// set BaseContext to be the same as the plugin, so that requests being processed don't hang the shutdown procedure
+				return ctx
+			}
+
 			Component.LogInfof("%s started, bind-address=%s, basic-auth=%v", Component.Name, ParamsDashboard.BindAddress, ParamsDashboard.BasicAuth.Enabled)
 			if err := server.Start(ParamsDashboard.BindAddress); err != nil {
 				if !ierrors.Is(err, http.ErrServerClosed) {
