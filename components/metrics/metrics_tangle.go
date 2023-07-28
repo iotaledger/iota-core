@@ -1,8 +1,6 @@
 package metrics
 
 import (
-	"time"
-
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/components/metrics/collector"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -29,25 +27,25 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 	collector.WithMetric(collector.NewMetric(tipsCount,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of tips in the tangle"),
-		collector.WithCollectFunc(func() map[string]float64 {
+		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
 			count := len(deps.Protocol.MainEngineInstance().TipManager.StrongTips()) + len(deps.Protocol.MainEngineInstance().TipManager.WeakTips())
-			return collector.SingleValue(count)
+			return float64(count), nil
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(strongTipsCount,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of tips in the tangle"),
-		collector.WithCollectFunc(func() map[string]float64 {
+		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
 			count := len(deps.Protocol.MainEngineInstance().TipManager.StrongTips())
-			return collector.SingleValue(count)
+			return float64(count), nil
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(weakTipsCount,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of tips in the tangle"),
-		collector.WithCollectFunc(func() map[string]float64 {
+		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
 			count := len(deps.Protocol.MainEngineInstance().TipManager.WeakTips())
-			return collector.SingleValue(count)
+			return float64(count), nil
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(missingBlocksCount,
@@ -86,17 +84,17 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
-	collector.WithMetric(collector.NewMetric(timeSinceReceivedPerComponent,
-		collector.WithType(collector.CounterVec),
-		collector.WithHelp("Time since the block was received per component"),
-		collector.WithLabels("component"),
-		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-				timeSince := float64(time.Since(block.IssuingTime()).Milliseconds())
-				deps.Collector.Update(tangleNamespace, timeSinceReceivedPerComponent, collector.MultiLabelsValues([]string{"block"}, timeSince))
-			}, event.WithWorkerPool(Component.WorkerPool))
-		}),
-	)),
+	// collector.WithMetric(collector.NewMetric(timeSinceReceivedPerComponent,
+	// 	collector.WithType(collector.Counter),
+	// 	collector.WithHelp("Time since the block was received per component"),
+	// 	collector.WithLabels("component"),
+	// 	collector.WithInitFunc(func() {
+	// 		deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+	// 			timeSince := float64(time.Since(block.IssuingTime()).Milliseconds())
+	// 			deps.Collector.Update(tangleNamespace, timeSinceReceivedPerComponent, collector.MultiLabelsValues([]string{"block"}, timeSince))
+	// 		}, event.WithWorkerPool(Component.WorkerPool))
+	// 	}),
+	// )),
 )
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

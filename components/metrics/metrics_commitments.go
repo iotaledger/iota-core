@@ -25,13 +25,12 @@ const (
 
 var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 	collector.WithMetric(collector.NewMetric(lastCommitment,
-		collector.WithType(collector.GaugeVec),
+		collector.WithType(collector.Gauge),
 		collector.WithHelp("Last commitment of the node."),
 		collector.WithLabels("commitment"),
-		collector.WithLabelValuesCollection(),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				deps.Collector.Update(commitmentsNamespace, lastCommitment, collector.MultiLabels(details.Commitment.ID().String()), float64(details.Commitment.ID().Index()))
+				deps.Collector.Update(commitmentsNamespace, lastCommitment, float64(details.Commitment.ID().Index()), details.Commitment.ID().String())
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
@@ -41,7 +40,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithInitFunc(func() {
 			deps.Collector.ResetMetric(commitmentsNamespace, finalizedCommitment)
 			deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
-				deps.Collector.Update(commitmentsNamespace, finalizedCommitment, collector.SingleValue(slot))
+				deps.Collector.Update(commitmentsNamespace, finalizedCommitment, float64(slot))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
@@ -73,13 +72,13 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(acceptedBlocks,
-		collector.WithType(collector.GaugeVec),
+		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of accepted blocks by the node per slot."),
 		collector.WithLabels("slot"),
 		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				deps.Collector.Update(commitmentsNamespace, acceptedBlocks, collector.MultiLabelsValues([]string{strconv.Itoa(int(details.Commitment.Index()))}, details.AcceptedBlocks.Size()))
+				deps.Collector.Update(commitmentsNamespace, acceptedBlocks, float64(details.AcceptedBlocks.Size()), strconv.Itoa(int(details.Commitment.Index())))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
@@ -95,13 +94,13 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 	// 	}),
 	// )),
 	collector.WithMetric(collector.NewMetric(validators,
-		collector.WithType(collector.GaugeVec),
+		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of active validators per slot."),
 		collector.WithLabels("slot"),
 		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				deps.Collector.Update(commitmentsNamespace, validators, collector.MultiLabelsValues([]string{strconv.Itoa(int(details.Commitment.Index()))}, details.ActiveValidatorsCount))
+				deps.Collector.Update(commitmentsNamespace, validators, float64(details.ActiveValidatorsCount), strconv.Itoa(int(details.Commitment.Index())))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),

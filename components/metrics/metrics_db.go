@@ -7,25 +7,24 @@ import (
 const (
 	dbNamespace = "db"
 
-	sizeBytes = "size_bytes"
-
-	storagePermanentSizeLabel = "storage_permanent"
-	storagePrunableSizeLabel  = "storage_prunable"
-	retainerSizeLabel         = "retainer"
+	sizeBytesPermanent = "size_bytes_permanent"
+	sizeBytesPrunable  = "size_bytes_prunable"
+	sizeBytesRetainer  = "size_bytes_retainer"
 )
 
 var DBMetrics = collector.NewCollection(dbNamespace,
-	collector.WithMetric(collector.NewMetric(sizeBytes,
-		collector.WithType(collector.GaugeVec),
-		collector.WithHelp("DB size in bytes for permanent, prunable storage and retainer plugin"),
-		collector.WithLabels("type"),
-		collector.WithCollectFunc(func() map[string]float64 {
-			mainEngine := deps.Protocol.MainEngineInstance()
-			return collector.MultiLabelsValues(
-				[]string{storagePermanentSizeLabel, storagePrunableSizeLabel},
-				mainEngine.Storage.PermanentDatabaseSize(),
-				mainEngine.Storage.PrunableDatabaseSize(),
-			)
+	collector.WithMetric(collector.NewMetric(sizeBytesPermanent,
+		collector.WithType(collector.Gauge),
+		collector.WithHelp("DB size in bytes for permanent storage."),
+		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
+			return float64(deps.Protocol.MainEngineInstance().Storage.PermanentDatabaseSize()), nil
+		}),
+	)),
+	collector.WithMetric(collector.NewMetric(sizeBytesPrunable,
+		collector.WithType(collector.Gauge),
+		collector.WithHelp("DB size in bytes for prunable storage."),
+		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
+			return float64(deps.Protocol.MainEngineInstance().Storage.PrunableDatabaseSize()), nil
 		}),
 	)),
 )

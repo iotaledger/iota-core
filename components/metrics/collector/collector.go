@@ -21,9 +21,10 @@ func New() *Collector {
 func (c *Collector) RegisterCollection(coll *Collection) {
 	c.collections[coll.CollectionName] = coll
 	for _, m := range coll.metrics {
-		c.Registry.MustRegister(m.PromMetric)
+		c.Registry.MustRegister(m.promMetric)
 		if m.initValueFunc != nil {
-			m.Update(m.initValueFunc())
+			metricValue, labelValues := m.initValueFunc()
+			m.update(metricValue, labelValues...)
 		}
 		if m.initFunc != nil {
 			m.initFunc()
@@ -31,11 +32,48 @@ func (c *Collector) RegisterCollection(coll *Collection) {
 	}
 }
 
+// Collect collects all metrics from the registered collections.
 func (c *Collector) Collect() {
 	for _, collection := range c.collections {
 		for _, metric := range collection.metrics {
-			metric.Collect()
+			metric.collect()
 		}
+	}
+}
+
+// Update updates the value of the existing metric defined by the subsystem and metricName.
+// Note that the label values must be passed in the same order as they were defined in the metric, and must match the
+// number of labels defined in the metric.
+func (c *Collector) Update(subsystem, metricName string, metricValue float64, labelValues ...string) {
+	m := c.getMetric(subsystem, metricName)
+	if m != nil {
+		m.update(metricValue, labelValues...)
+	}
+}
+
+// Increment increments the value of the existing metric defined by the subsystem and metricName.
+// Note that the label values must be passed in the same order as they were defined in the metric, and must match the
+// number of labels defined in the metric.
+func (c *Collector) Increment(subsystem, metricName string, labels ...string) {
+	m := c.getMetric(subsystem, metricName)
+	if m != nil {
+		m.increment(labels...)
+	}
+}
+
+// DeleteLabels deletes the metric with the given labels values.
+func (c *Collector) DeleteLabels(subsystem, metricName string, labelValues map[string]string) {
+	m := c.getMetric(subsystem, metricName)
+	if m != nil {
+		m.DeleteLabels(labelValues)
+	}
+}
+
+// ResetMetric resets the metric with the given name.
+func (c *Collector) ResetMetric(namespace string, metricName string) {
+	m := c.getMetric(namespace, metricName)
+	if m != nil {
+		m.Reset()
 	}
 }
 
@@ -52,33 +90,4 @@ func (c *Collector) getCollection(subsystem string) *Collection {
 		return collection
 	}
 	return nil
-}
-
-// Update updates the value of the existing metric defined by the subsystem and metricName.
-func (c *Collector) Update(subsystem, metricName string, labelValues map[string]float64, metricValue ...float64) {
-	m := c.getMetric(subsystem, metricName)
-	if m != nil {
-		m.Update(labelValues, metricValue...)
-	}
-}
-
-func (c *Collector) Increment(subsystem, metricName string, labels ...string) {
-	m := c.getMetric(subsystem, metricName)
-	if m != nil {
-		m.Increment(labels...)
-	}
-}
-
-func (c *Collector) ResetMetricLabels(subsystem, metricName string, labelValues map[string]string) {
-	m := c.getMetric(subsystem, metricName)
-	if m != nil {
-		m.ResetLabels(labelValues)
-	}
-}
-
-func (c *Collector) ResetMetric(namespace string, node string) {
-	m := c.getMetric(namespace, node)
-	if m != nil {
-		m.Reset()
-	}
 }

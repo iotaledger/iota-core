@@ -15,15 +15,14 @@ const (
 
 var AccountMetrics = collector.NewCollection(accountNamespace,
 	collector.WithMetric(collector.NewMetric(credits,
-		collector.WithType(collector.GaugeVec),
+		collector.WithType(collector.Gauge),
 		collector.WithHelp("Credits per Account."),
 		collector.WithLabels("account"),
-		collector.WithLabelValuesCollection(),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 				accountData, exists, _ := deps.Protocol.MainEngineInstance().Ledger.Account(block.ProtocolBlock().IssuerID, deps.Protocol.SyncManager.LatestCommittedSlot())
 				if exists {
-					deps.Collector.Update(accountNamespace, credits, collector.MultiLabels(accountData.ID.String()), float64(accountData.Credits.Value))
+					deps.Collector.Update(accountNamespace, credits, float64(accountData.Credits.Value), accountData.ID.String())
 				}
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
@@ -31,8 +30,8 @@ var AccountMetrics = collector.NewCollection(accountNamespace,
 	collector.WithMetric(collector.NewMetric(activeSeats,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Seats seen as active by the node."),
-		collector.WithCollectFunc(func() map[string]float64 {
-				return collector.SingleValue(deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().OnlineCommittee().Size())
+		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
+			return float64(deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().OnlineCommittee().Size()), nil
 		}),
 	)),
 )

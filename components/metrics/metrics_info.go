@@ -18,35 +18,34 @@ const (
 
 var InfoMetrics = collector.NewCollection(infoNamespace,
 	collector.WithMetric(collector.NewMetric(nodeOS,
-		collector.WithType(collector.GaugeVec),
-		collector.WithHelp("Node OS."),
+		collector.WithType(collector.Gauge),
+		collector.WithHelp("Node OS data."),
 		collector.WithLabels("nodeID", "OS", "ARCH", "NUM_CPU"),
-		collector.WithLabelValuesCollection(), // when updating we set new label values otherwise we get inconsistent cardinality panic
-		collector.WithInitValue(func() map[string]float64 {
+		collector.WithInitValueFunc(func() (metricValue float64, labelValues []string) {
 			var nodeID string
 			if deps.Local != nil {
 				nodeID = deps.Local.ID().String()
 			}
-			return collector.MultiLabels(nodeID, runtime.GOOS, runtime.GOARCH, strconv.Itoa(runtime.GOMAXPROCS(0)))
+			return 0, []string{nodeID, runtime.GOOS, runtime.GOARCH, strconv.Itoa(runtime.GOMAXPROCS(0))}
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(syncStatus,
 		collector.WithType(collector.Gauge),
-		collector.WithHelp("Node sync status based on TangleTime."),
-		collector.WithCollectFunc(func() map[string]float64 {
+		collector.WithHelp("Node sync status based on ATT."),
+		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
 			if deps.Protocol.MainEngineInstance().IsSynced() {
-				return collector.SingleValue(1)
+				return 1, nil
 			}
-			return collector.SingleValue(0)
+			return 0, nil
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(memUsage,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("The memory usage in bytes of allocated heap objects"),
-		collector.WithCollectFunc(func() map[string]float64 {
+		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
-			return collector.SingleValue(float64(m.Alloc))
+			return float64(m.Alloc), nil
 		}),
 	)),
 )

@@ -13,7 +13,7 @@ import (
 
 const (
 	slotNamespace             = "slots"
-	labelName                 = "slot"
+	slotLabelName             = "slot"
 	metricEvictionOffset      = 6
 	totalBlocks               = "total_blocks"
 	acceptedBlocksInSlot      = "accepted_blocks"
@@ -31,8 +31,8 @@ const (
 
 var SlotMetrics = collector.NewCollection(slotNamespace,
 	collector.WithMetric(collector.NewMetric(totalBlocks,
-		collector.WithType(collector.CounterVec),
-		collector.WithLabels(labelName),
+		collector.WithType(collector.Counter),
+		collector.WithLabels(slotLabelName),
 		collector.WithHelp("Number of blocks seen by the node in a slot."),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
@@ -41,9 +41,7 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 
 				// need to initialize slot metrics with 0 to have consistent data for each slot
 				for _, metricName := range []string{acceptedBlocksInSlot, orphanedBlocks, invalidBlocks, subjectivelyInvalidBlocks, totalAttachments, orphanedAttachments, rejectedAttachments, acceptedAttachments, createdConflicts, acceptedConflicts, rejectedConflicts} {
-					deps.Collector.Update(slotNamespace, metricName, map[string]float64{
-						strconv.Itoa(eventSlot): 0,
-					})
+					deps.Collector.Update(slotNamespace, metricName, 0, strconv.Itoa(eventSlot))
 				}
 			}, event.WithWorkerPool(Component.WorkerPool))
 
@@ -54,8 +52,8 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 
 				// need to remove metrics for old slots, otherwise they would be stored in memory and always exposed to Prometheus, forever
 				for _, metricName := range []string{totalBlocks, acceptedBlocksInSlot, orphanedBlocks, invalidBlocks, subjectivelyInvalidBlocks, totalAttachments, orphanedAttachments, rejectedAttachments, acceptedAttachments, createdConflicts, acceptedConflicts, rejectedConflicts} {
-					deps.Collector.ResetMetricLabels(slotNamespace, metricName, map[string]string{
-						labelName: strconv.Itoa(slotToEvict),
+					deps.Collector.DeleteLabels(slotNamespace, metricName, map[string]string{
+						slotLabelName: strconv.Itoa(slotToEvict),
 					})
 				}
 			}, event.WithWorkerPool(Component.WorkerPool))
@@ -63,9 +61,9 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 	)),
 
 	collector.WithMetric(collector.NewMetric(acceptedBlocksInSlot,
-		collector.WithType(collector.CounterVec),
+		collector.WithType(collector.Counter),
 		collector.WithHelp("Number of accepted blocks in a slot."),
-		collector.WithLabels(labelName),
+		collector.WithLabels(slotLabelName),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 				eventSlot := int(block.ID().Index())
@@ -85,8 +83,8 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 	// 	}),
 	// )),
 	collector.WithMetric(collector.NewMetric(invalidBlocks,
-		collector.WithType(collector.CounterVec),
-		collector.WithLabels(labelName),
+		collector.WithType(collector.Counter),
+		collector.WithLabels(slotLabelName),
 		collector.WithHelp("Number of invalid blocks in a slot."),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
@@ -132,8 +130,8 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 	// 	}),
 	// )),
 	collector.WithMetric(collector.NewMetric(acceptedAttachments,
-		collector.WithType(collector.CounterVec),
-		collector.WithLabels(labelName),
+		collector.WithType(collector.Counter),
+		collector.WithLabels(slotLabelName),
 		collector.WithHelp("Number of accepted attachments by the node per slot."),
 		collector.WithInitFunc(func() {
 			deps.Protocol.MainEngineInstance().Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
@@ -148,8 +146,8 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(createdConflicts,
-		collector.WithType(collector.CounterVec),
-		collector.WithLabels(labelName),
+		collector.WithType(collector.Counter),
+		collector.WithLabels(slotLabelName),
 		collector.WithHelp("Number of conflicts created per slot."),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
@@ -162,8 +160,8 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(acceptedConflicts,
-		collector.WithType(collector.CounterVec),
-		collector.WithLabels(labelName),
+		collector.WithType(collector.Counter),
+		collector.WithLabels(slotLabelName),
 		collector.WithHelp("Number of conflicts accepted per slot."),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
