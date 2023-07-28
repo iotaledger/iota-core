@@ -25,6 +25,16 @@ linters-settings:
         block-size: 2
     stylecheck:
         initialisms: ["ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS", "SIP", "RTP", "AMQP", "DB", "TS"]
+    depguard:
+        rules:
+            main:
+                deny:
+                    - pkg: "errors"
+                      desc: Should be replaced with "github.com/iotaledger/hive.go/ierrors" package
+                    - pkg: "golang.org/x/xerrors"
+                      desc: Should be replaced with "github.com/iotaledger/hive.go/ierrors" package
+                    - pkg: "github.com/pkg/errors"
+                      desc: Should be replaced with "github.com/iotaledger/hive.go/ierrors" package
 
 linters:
     # Disable all linters.
@@ -45,7 +55,7 @@ linters:
         #- containedctx
         - contextcheck
         - decorder
-        #- depguard
+        - depguard
         - dogsled
         #- dupl
         - durationcheck

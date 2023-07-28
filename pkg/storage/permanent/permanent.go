@@ -63,7 +63,7 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 		}
 
 		p.settings = NewSettings(lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{settingsPrefix})))
-		p.commitments = NewCommitments(lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{commitmentsPrefix})), p.settings)
+		p.commitments = NewCommitments(lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{commitmentsPrefix})), p.settings.APIProvider())
 		p.sybilProtection = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{sybilProtectionPrefix}))
 		p.attestations = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{attestationsPrefix}))
 		p.ledger = lo.PanicOnErr(p.store.WithExtendedRealm(kvstore.Realm{ledgerPrefix}))

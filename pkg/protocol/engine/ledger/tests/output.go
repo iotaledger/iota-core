@@ -9,6 +9,11 @@ func (m *MockedOutput) Size() int {
 	panic("implement me")
 }
 
+func (m *MockedOutput) WorkScore(_ *iotago.WorkScoreStructure) (iotago.WorkScore, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *MockedOutput) VBytes(_ *iotago.RentStructure, _ iotago.VBytesFunc) iotago.VBytes {
 	//TODO implement me
 	panic("implement me")
