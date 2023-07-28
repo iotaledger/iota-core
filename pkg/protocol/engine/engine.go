@@ -477,17 +477,22 @@ func (e *Engine) setupPruning() {
 // If setting the root commitment based on the last evicted slot this basically means we won't be able to solidify another
 // chain beyond a window based on eviction, which in turn is based on acceptance. In case of a partition, this behavior is
 // clearly not desired.
-func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment *model.Commitment, valid bool) {
-	earliestRootCommitmentID, valid := e.EvictionState.EarliestRootCommitmentID(lastFinalizedSlot)
-	if !valid {
-		return nil, false
+func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment *model.Commitment) {
+	maxCommittableAge := e.APIForSlot(lastFinalizedSlot).ProtocolParameters().MaxCommittableAge()
+
+	var earliestRootCommitmentSlot iotago.SlotIndex
+	if lastFinalizedSlot <= maxCommittableAge {
+		earliestRootCommitmentSlot = 0
+	} else {
+		earliestRootCommitmentSlot = lastFinalizedSlot - maxCommittableAge
 	}
-	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentID.Index())
+
+	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentSlot)
 	if err != nil {
 		panic(fmt.Sprintln("could not load earliest commitment after engine initialization", err))
 	}
 
-	return rootCommitment, true
+	return rootCommitment
 }
 
 func (e *Engine) ErrorHandler(componentName string) func(error) {

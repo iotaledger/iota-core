@@ -140,10 +140,7 @@ func (p *Protocol) Run(ctx context.Context) error {
 
 	p.linkToEngine(p.mainEngine)
 
-	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
-	if !valid {
-		panic("no root commitment found")
-	}
+	rootCommitment := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
 
 	// The root commitment is the earliest commitment we will ever need to know to solidify commitment chains, we can
 	// then initialize the chain manager with it, and identify our engine to be on such chain.
@@ -244,10 +241,7 @@ func (p *Protocol) initChainManager() {
 	})
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		rootCommitment, valid := p.MainEngineInstance().EarliestRootCommitment(index)
-		if !valid {
-			return
-		}
+		rootCommitment := p.MainEngineInstance().EarliestRootCommitment(index)
 
 		// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
 		// we first specify the chain's cut-off point, and only then evict the state. It is also important to
