@@ -9,23 +9,23 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/app v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/autopeering v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/constraints v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230721122326-34450325011f
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/ds v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/lo v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/logger v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230721122326-34450325011f
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230721122326-34450325011f
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726135831-dd0c6ef61d5b
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230726135421-ca90b96ff054
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230727150449-e06af2d977a3
+	github.com/iotaledger/hive.go/ads v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/app v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/autopeering v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/ds v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/lo v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/logger v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230728083245-0d4d3a00c9ef
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230728083000-5d5bf43d8496
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230728082709-10877f09bdef
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/libp2p/go-libp2p v0.29.0
 	github.com/multiformats/go-multiaddr v0.10.1
@@ -37,7 +37,7 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.0
 	golang.org/x/crypto v0.11.0
-	google.golang.org/grpc v1.56.2
+	google.golang.org/grpc v1.57.0
 	google.golang.org/protobuf v1.31.0
 )
 
@@ -131,7 +131,7 @@ require (
 	github.com/prometheus/client_golang v1.16.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
-	github.com/prometheus/procfs v0.11.0 // indirect
+	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/qtls-go1-19 v0.3.2 // indirect
 	github.com/quic-go/qtls-go1-20 v0.2.2 // indirect
@@ -148,7 +148,7 @@ require (
 	go.uber.org/fx v1.20.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // indirect
+	golang.org/x/exp v0.0.0-20230724220655-d98519c11495 // indirect
 	golang.org/x/image v0.9.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
@@ -157,7 +157,7 @@ require (
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.11.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230725213213-b022f6e96895 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230726155614-23370e0ffb3e // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect

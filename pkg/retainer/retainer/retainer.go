@@ -184,7 +184,7 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, ap
 func (r *Retainer) transactionStatus(blockID iotago.BlockID) (apimodels.TransactionState, apimodels.TransactionFailureReason) {
 	txData, exists := r.store(blockID.Index()).GetTransaction(blockID)
 	if !exists {
-		return apimodels.TransactionStateUnknown, apimodels.TxFailureNone
+		return apimodels.TransactionStateNoTransaction, apimodels.TxFailureNone
 	}
 
 	// for confirmed and finalized we need to check for the block status
