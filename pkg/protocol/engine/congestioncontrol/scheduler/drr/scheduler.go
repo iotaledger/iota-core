@@ -201,6 +201,7 @@ func (s *Scheduler) quantum(accountID iotago.AccountID) (iotago.Mana, error) {
 
 	return mana / s.optsMinMana, err
 }
+
 func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()

@@ -42,8 +42,9 @@ type BlockIssuer struct {
 
 	optsTipSelectionTimeout       time.Duration
 	optsTipSelectionRetryInterval time.Duration
-	optsIncompleteBlockAccepted   bool
-	optsRateSetterEnabled         bool
+	// optsIncompleteBlockAccepted defines whether the node allows filling in incomplete block and issuing it for user.
+	optsIncompleteBlockAccepted bool
+	optsRateSetterEnabled       bool
 }
 
 func New(p *protocol.Protocol, account Account, opts ...options.Option[BlockIssuer]) *BlockIssuer {
