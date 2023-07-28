@@ -1,7 +1,6 @@
 package eviction
 
 import (
-	"errors"
 	"io"
 	"math"
 
@@ -344,7 +343,7 @@ func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 func (s *State) latestNonEmptySlot() iotago.SlotIndex {
 	latestNonEmptySlotBytes, err := s.latestNonEmptyStore.Get([]byte{latestNonEmptySlotKey})
 	if err != nil {
-		if errors.Is(err, kvstore.ErrKeyNotFound) {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return 0
 		}
 		panic(ierrors.Wrap(err, "failed to get latest non empty slot"))

@@ -19,7 +19,7 @@ import (
 
 // TODO: implement tests for staking and delegation transitions
 func Test_TransitionAccount(t *testing.T) {
-	oldGenesisOutputKey := utils.RandPubKey().ToEd25519()
+	oldGenesisOutputKey := utils.RandPubKey()
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
 		// Nil address will be replaced with the address generated from genesis seed.
 		// A single key may unlock multiple accounts; that's why it can't be used as a source for AccountID derivation.
@@ -51,14 +51,14 @@ func Test_TransitionAccount(t *testing.T) {
 		// TODO: why do we use the deposit here as credits?
 		Credits:  accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit*3), 0),
 		OutputID: genesisAccount.OutputID(),
-		PubKeys:  ds.NewSet(ed25519.PublicKey(oldGenesisOutputKey)),
+		PubKeys:  ds.NewSet(oldGenesisOutputKey),
 	}, ts.Nodes()...)
 
 	// MODIFY EXISTING GENESIS ACCOUNT AND PREPARE SOME BASIC OUTPUTS
 
 	newGenesisOutputKey := utils.RandPubKey()
 	{
-		accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount("Genesis:1", testsuite.AddBlockIssuerKey(newGenesisOutputKey[:]), testsuite.WithBlockIssuerExpirySlot(1))
+		accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount("Genesis:1", testsuite.AddBlockIssuerKey(newGenesisOutputKey), testsuite.WithBlockIssuerExpirySlot(1))
 		consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(5, "Genesis:0")
 
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
@@ -108,7 +108,7 @@ func Test_TransitionAccount(t *testing.T) {
 				&iotago.GovernorAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
 			}),
 			testsuite.WithBlockIssuerFeature(&iotago.BlockIssuerFeature{
-				BlockIssuerKeys: iotago.BlockIssuerKeys{newAccountBlockIssuerKey[:]},
+				BlockIssuerKeys: iotago.BlockIssuerKeys{newAccountBlockIssuerKey},
 			}),
 			testsuite.WithStakingFeature(&iotago.StakingFeature{
 				StakedAmount: 10000,
@@ -223,7 +223,7 @@ func Test_TransitionAccount(t *testing.T) {
 			ValidatorStakeChange:  0,
 			StakeEndEpochChange:   0,
 			FixedCostChange:       0,
-			DelegationStakeChange: 1914280,
+			DelegationStakeChange: 1914080,
 		}, false, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{

@@ -2,7 +2,6 @@ package accountsledger
 
 import (
 	"github.com/iotaledger/hive.go/ads"
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -159,7 +158,7 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	defer m.mutex.RUnlock()
 
 	// if m.latestCommittedSlot < m.commitmentEvictionAge we should have all history
-	if m.latestCommittedSlot >= m.commitmentEvictionAge && targetIndex < m.latestCommittedSlot-m.commitmentEvictionAge {
+	if m.latestCommittedSlot >= m.commitmentEvictionAge && targetIndex+m.commitmentEvictionAge < m.latestCommittedSlot {
 		return nil, false, ierrors.Errorf("can't calculate account, target slot index older than allowed (%d<%d)", targetIndex, m.latestCommittedSlot-m.commitmentEvictionAge)
 	}
 	if targetIndex > m.latestCommittedSlot {
@@ -183,6 +182,36 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	}
 
 	return loadedAccount, true, nil
+}
+
+// PastAccounts loads the past accounts' data at a specific slot index.
+func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) map[iotago.AccountID]*accounts.AccountData {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	result := make(map[iotago.AccountID]*accounts.AccountData)
+
+	for _, accountID := range accountIDs {
+		// read initial account data at the latest committed slot
+		loadedAccount, exists := m.accountsTree.Get(accountID)
+
+		if !exists {
+			loadedAccount = accounts.NewAccountData(accountID, accounts.WithCredits(accounts.NewBlockIssuanceCredits(0, targetIndex)))
+		}
+		wasDestroyed, err := m.rollbackAccountTo(loadedAccount, targetIndex)
+		if err != nil {
+			continue
+		}
+
+		// account not present in the accountsTree, and it was not marked as destroyed in slots between targetIndex and latestCommittedSlot
+		if !exists && !wasDestroyed {
+			continue
+		}
+
+		result[accountID] = loadedAccount
+	}
+
+	return result
 }
 
 // AddAccount adds a new account to the Account tree, allotting to it the balance on the given output.
@@ -213,7 +242,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 			//  but we shouldn't simply cast the iota value to credits here.
 			accounts.WithCredits(accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(accountOutput.Amount), m.latestCommittedSlot)),
 			accounts.WithOutputID(output.OutputID()),
-			accounts.WithPubKeys(ed25519.NativeToPublicKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys)...),
+			accounts.WithPubKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys...),
 		)...,
 	)
 

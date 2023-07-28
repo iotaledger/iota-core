@@ -111,5 +111,9 @@
     "conflicts": {
       "maxCount": 100
     }
+  },
+  "inx": {
+    "enabled": false,
+    "bindAddress": "localhost:9029"
   }
 }

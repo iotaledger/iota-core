@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
-	"github.com/iotaledger/iota-core/pkg/core/api"
+	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
@@ -201,16 +201,6 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	if err = m.storage.Settings().SetLatestCommitment(newModelCommitment); err != nil {
-		m.errorHandler(ierrors.Wrap(err, "failed to set latest commitment"))
-		return false
-	}
-
-	if err = m.storage.Commitments().Store(newModelCommitment); err != nil {
-		m.errorHandler(ierrors.Wrapf(err, "failed to store latest commitment %s", newModelCommitment.ID()))
-		return false
-	}
-
 	rootsStorage := m.storage.Roots(index)
 	if rootsStorage == nil {
 		m.errorHandler(ierrors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
@@ -221,11 +211,21 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
+	if err = m.storage.Commitments().Store(newModelCommitment); err != nil {
+		m.errorHandler(ierrors.Wrapf(err, "failed to store latest commitment %s", newModelCommitment.ID()))
+		return false
+	}
+
 	m.events.SlotCommitted.Trigger(&notarization.SlotCommittedDetails{
 		Commitment:            newModelCommitment,
 		AcceptedBlocks:        acceptedBlocks,
 		ActiveValidatorsCount: 0,
 	})
+
+	if err = m.storage.Settings().SetLatestCommitment(newModelCommitment); err != nil {
+		m.errorHandler(ierrors.Wrap(err, "failed to set latest commitment"))
+		return false
+	}
 
 	if err = m.slotMutations.Evict(index); err != nil {
 		m.errorHandler(ierrors.Wrapf(err, "failed to evict slotMutations at index: %d", index))

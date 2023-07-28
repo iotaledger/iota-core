@@ -21,7 +21,7 @@ func blockIssuanceCreditsForAccountID(c echo.Context) (*apimodels.BlockIssuanceC
 	slotIndex, err := httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
 	if err != nil {
 		// by default we return the balance for the latest slot
-		slotIndex = deps.Protocol.SyncManager.LatestCommittedSlot()
+		slotIndex = deps.Protocol.SyncManager.LatestCommitment().Index()
 	}
 	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
 	if err != nil {
@@ -67,7 +67,7 @@ func staking() (*apimodels.AccountStakingListResponse, error) {
 	resp := &apimodels.AccountStakingListResponse{
 		Stakers: make([]apimodels.ValidatorResponse, 0),
 	}
-	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommittedSlot()
+	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
 	activeValidators, err := deps.Protocol.MainEngineInstance().SybilProtection.EligibleValidators(nextEpoch)
@@ -94,7 +94,7 @@ func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommittedSlot()
+	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 
 	accountData, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
@@ -119,7 +119,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommittedSlot()
+	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 	latestRewardsReadyEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 
 	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
@@ -168,7 +168,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 }
 
 func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
-	timeProvider := deps.Protocol.APIForSlot(deps.Protocol.SyncManager.LatestCommittedSlot()).TimeProvider()
+	timeProvider := deps.Protocol.CurrentAPI().TimeProvider()
 
 	var slotIndex iotago.SlotIndex
 
