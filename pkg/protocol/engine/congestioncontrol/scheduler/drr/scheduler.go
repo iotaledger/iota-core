@@ -196,15 +196,6 @@ func (s *Scheduler) scheduleBlock(block *blocks.Block) {
 	}
 }
 
-func (s *Scheduler) skipBlock(block *blocks.Block) {
-	if block.SetSkipped() && block.SetScheduled() {
-		s.updateChildrenWithoutLocking(block)
-		s.selectBlockToScheduleWithoutLocking()
-
-		s.events.BlockSkipped.Trigger(block)
-	}
-}
-
 func (s *Scheduler) quantum(accountID iotago.AccountID) (iotago.Mana, error) {
 	mana, err := s.manaRetrieveFunc(accountID)
 
@@ -214,9 +205,6 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	s.selectBlockToScheduleWithoutLocking()
-}
-func (s *Scheduler) selectBlockToScheduleWithoutLocking() {
 	// already a block selected to be scheduled.
 	if len(s.blockChan) > 0 {
 		return
@@ -282,7 +270,11 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 
 		for block != nil && time.Now().After(block.IssuingTime()) {
 			if block.IsAccepted() && time.Since(block.IssuingTime()) > s.optsAcceptedBlockScheduleThreshold {
-				s.skipBlock(block)
+				if block.SetSkipped() {
+					s.updateChildrenWithoutLocking(block)
+					s.events.BlockSkipped.Trigger(block)
+				}
+
 				s.buffer.PopFront()
 
 				block = q.Front()
@@ -410,7 +402,7 @@ func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds int64) er
 }
 
 func (s *Scheduler) isEligible(block *blocks.Block) (eligible bool) {
-	return block.IsScheduled() || block.IsAccepted()
+	return block.IsSkipped() || block.IsScheduled() || block.IsAccepted()
 }
 
 // isReady returns true if the given blockID's parents are eligible.
