@@ -675,10 +675,10 @@ func (b *Block) Work() int {
 	// e.g. number of parents, payload type etc.
 	work := 1
 
-	payload := b.Payload()
-	if payload != nil {
-		work += payload.Size()
-	}
+	//payload := b.Payload()
+	//if payload != nil {
+	//	work += payload.Size()
+	//}
 
 	return work
 }

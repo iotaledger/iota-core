@@ -86,12 +86,12 @@ func New(opts ...options.Option[Scheduler]) *Scheduler {
 			events:                             scheduler.NewEvents(),
 			lastScheduleTime:                   time.Now(),
 			deficits:                           shrinkingmap.New[iotago.AccountID, uint64](),
-			optsRate:                           2000,
+			optsRate:                           200,
 			optsMaxBufferSize:                  300,
 			optsAcceptedBlockScheduleThreshold: 2 * time.Minute,
-			optsMaxDeficit:                     1000,
+			optsMaxDeficit:                     1,
 			optsMinMana:                        1,
-			optsTokenBucketSize:                1000,
+			optsTokenBucketSize:                1,
 		}, opts,
 	)
 }
