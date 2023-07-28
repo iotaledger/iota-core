@@ -2,6 +2,7 @@ package restapi
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"time"
 
@@ -114,6 +115,11 @@ func run() error {
 		bindAddr := deps.RestAPIBindAddress
 
 		go func() {
+			deps.Echo.Server.BaseContext = func(_ net.Listener) context.Context {
+				// set BaseContext to be the same as the plugin, so that requests being processed don't hang the shutdown procedure
+				return ctx
+			}
+
 			Component.LogInfof("You can now access the API using: http://%s", bindAddr)
 			if err := deps.Echo.Start(bindAddr); err != nil && !ierrors.Is(err, http.ErrServerClosed) {
 				Component.LogWarnf("Stopped REST-API server due to an error (%s)", err)
