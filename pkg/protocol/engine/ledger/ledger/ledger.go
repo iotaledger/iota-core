@@ -216,6 +216,10 @@ func (l *Ledger) Account(accountID iotago.AccountID, targetIndex iotago.SlotInde
 	return l.accountsLedger.Account(accountID, targetIndex)
 }
 
+func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) map[iotago.AccountID]*accounts.AccountData {
+	return l.accountsLedger.PastAccounts(accountIDs, targetIndex)
+}
+
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
 	if err != nil {
@@ -383,7 +387,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		oldPubKeysSet := accountData.PubKeys
 		newPubKeysSet := ds.NewSet[ed25519.PublicKey]()
 		for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
-			newPubKeysSet.Add(ed25519.PublicKey(pubKey))
+			newPubKeysSet.Add(pubKey)
 		}
 
 		// Add public keys that are not in the old set

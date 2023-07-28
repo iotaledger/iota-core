@@ -419,10 +419,10 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	}
 	if deposit > 0 {
 		accountDetails := snapshotcreator.AccountDetails{
-			Address:    iotago.Ed25519AddressFromPubKey(node.PubKey),
-			Amount:     deposit,
-			Mana:       iotago.Mana(deposit),
-			IssuerKey:  ed25519.PublicKey(node.PubKey),
+			Address:   iotago.Ed25519AddressFromPubKey(node.PubKey),
+			Amount:    deposit,
+			Mana:      iotago.Mana(deposit),
+			IssuerKey: ed25519.PublicKey(node.PubKey),
 			ExpirySlot: math.MaxUint64,
 		}
 		if validator {
