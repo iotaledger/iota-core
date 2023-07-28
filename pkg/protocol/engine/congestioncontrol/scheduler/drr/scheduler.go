@@ -376,6 +376,7 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error
 			return s.optsMaxDeficit
 		}
 
+		// TODO: use safemath package to prevent underflow
 		if int64(currentValue)+delta < 0 {
 			err = ierrors.Errorf("tried to decrease deficit to a negative value %d for issuer %s", int64(currentValue)+delta, accountID)
 			return 0
