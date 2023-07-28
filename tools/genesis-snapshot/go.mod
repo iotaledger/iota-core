@@ -10,7 +10,7 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230728082521-74f3f2957f0c
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230728082709-10877f09bdef
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230728101416-f7471b67a415
 	github.com/mr-tron/base58 v1.2.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.11.0
@@ -33,7 +33,7 @@ require (
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230728082521-74f3f2957f0c // indirect
 	github.com/iotaledger/hive.go/ds v0.0.0-20230728082521-74f3f2957f0c // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230728082521-74f3f2957f0c // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230728082521-74f3f2957f0c // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230728100039-3d97aada979b // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230728082521-74f3f2957f0c // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230728083245-0d4d3a00c9ef // indirect
 	github.com/kr/text v0.2.0 // indirect
