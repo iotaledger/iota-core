@@ -86,6 +86,11 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithHelp("Number of conflicts created per slot."),
 		collector.WithInitFunc(func() {
+			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+				eventSlot := int(block.ID().Index())
+				deps.Collector.Update(slotNamespace, createdConflicts, 0, strconv.Itoa(eventSlot))
+			}, event.WithWorkerPool(Component.WorkerPool))
+
 			deps.Protocol.Events.Engine.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
 				if txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadata(conflictID); exists {
 					for _, attachment := range txMetadata.Attachments() {
