@@ -136,7 +136,7 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
-		Component.LogDebugf("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
+		Component.LogDebugf("BlockPreFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
 	})
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {

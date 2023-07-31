@@ -25,6 +25,7 @@ import (
 )
 
 func TestProtocol_EngineSwitching(t *testing.T) {
+	// TODO: re-enable this test
 	t.Skip("Skipping engine switching test for now.")
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithGenesisTimestampOffset(19*10),

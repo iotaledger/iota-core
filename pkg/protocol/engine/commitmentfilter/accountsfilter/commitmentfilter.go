@@ -145,6 +145,26 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 		return
 	}
 
+	// Check that the issuer of this block has non-negative block issuance credit
+	if accountData.Credits.Value < 0 {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(ErrNegativeBIC, "block issuer account %s is locked due to negative BIC", block.ProtocolBlock().IssuerID),
+		})
+
+		return
+	}
+
+	// Check that the account is not expired
+	if accountData.ExpirySlot < block.ProtocolBlock().SlotCommitmentID.Index() {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().IssuerID, accountData.ExpirySlot, block.ProtocolBlock().SlotCommitmentID.Index()),
+		})
+
+		return
+	}
+
 	// Check that the issuer key is valid for this block issuer and that the signature is valid
 	edSig, isEdSig := block.ProtocolBlock().Signature.(*iotago.Ed25519Signature)
 	if !isEdSig {
@@ -164,7 +184,6 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 		return
 	}
 	signingMessage, err := block.ProtocolBlock().SigningMessage(c.apiProvider.LatestAPI())
-	hiveEd25519.Verify(edSig.PublicKey[:], signingMessage, edSig.Signature[:])
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
@@ -177,26 +196,6 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
 			Reason: ErrInvalidSignature,
-		})
-
-		return
-	}
-
-	// Check that the issuer of this block has non-negative block issuance credit
-	if accountData.Credits.Value < 0 {
-		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
-			Block:  block,
-			Reason: ierrors.Wrapf(ErrNegativeBIC, "block issuer account %s is locked due to negative BIC", block.ProtocolBlock().IssuerID),
-		})
-
-		return
-	}
-
-	// Check that the account is not expired
-	if accountData.ExpirySlot < block.ProtocolBlock().SlotCommitmentID.Index() {
-		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
-			Block:  block,
-			Reason: ierrors.Wrapf(ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().IssuerID, accountData.ExpirySlot, block.ProtocolBlock().SlotCommitmentID.Index()),
 		})
 
 		return

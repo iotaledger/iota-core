@@ -114,13 +114,11 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
 
-	// TODO: check if the following value is correctly set to twice eviction age
-	// maxCommittableSlot = 2 * evictionAge
-	maxCommittableSlot := apiForSlot.ProtocolParameters().MaxCommittableAge()
+	maxCommittableAge := apiForSlot.ProtocolParameters().MaxCommittableAge()
 
 	// If the committed slot is `maxCommittableSlot`
 	// away from the end of the epoch, then register a committee for the next epoch.
-	if timeProvider.EpochEnd(currentEpoch) == slot+maxCommittableSlot {
+	if timeProvider.EpochEnd(currentEpoch) == slot+maxCommittableAge {
 		if _, committeeExists := o.performanceTracker.LoadCommitteeForEpoch(nextEpoch); !committeeExists {
 			// If the committee for the epoch wasn't set before due to finalization of a slot,
 			// we promote the current committee to also serve in the next epoch.
@@ -151,8 +149,8 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 	}
 
 	var targetCommitteeEpoch iotago.EpochIndex
-	// TODO: check if it is correct to check against EvictionAge here
-	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) > slot+apiForSlot.ProtocolParameters().MaxCommittableAge() {
+
+	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) > slot+maxCommittableAge {
 		targetCommitteeEpoch = currentEpoch
 	} else {
 		targetCommitteeEpoch = nextEpoch
@@ -222,15 +220,12 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 	timeProvider := apiForSlot.TimeProvider()
 	epoch := timeProvider.EpochFromSlot(slot)
 
-	// TODO: check if the following value is correctly set to twice eviction age
-	// maxCommittableSlot = 2 * evictionAge
-	maxCommittableSlot := apiForSlot.ProtocolParameters().MaxCommittableAge()
-
 	// Only select new committee if the finalized slot is epochEndNearingThreshold slots from EpochEnd and the last
 	// committed slot is earlier than (the last slot of the epoch - maxCommittableAge).
 	// Otherwise, skip committee selection because it's too late and the committee has been reused.
 	epochEndSlot := timeProvider.EpochEnd(epoch)
-	if slot+apiForSlot.ProtocolParameters().EpochNearingThreshold() == epochEndSlot && epochEndSlot > o.lastCommittedSlot+maxCommittableSlot {
+	if slot+apiForSlot.ProtocolParameters().EpochNearingThreshold() == epochEndSlot &&
+		epochEndSlot > o.lastCommittedSlot+apiForSlot.ProtocolParameters().MaxCommittableAge() {
 		newCommittee := o.selectNewCommittee(slot)
 		o.events.CommitteeSelected.Trigger(newCommittee, epoch+1)
 	}
