@@ -200,6 +200,10 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		}
 	}
 
+	if err := m.stateTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "unable to commit state tree")
+	}
+
 	for i := uint64(0); i < slotDiffCount; i++ {
 		slotDiff, err := ReadSlotDiffToSnapshotReader(reader, m.apiProvider)
 		if err != nil {

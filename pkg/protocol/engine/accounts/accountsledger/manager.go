@@ -251,7 +251,13 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 		)...,
 	)
 
-	m.accountsTree.Set(accountOutput.AccountID, accountData)
+	if err := m.accountsTree.Set(accountOutput.AccountID, accountData); err != nil {
+		return ierrors.Wrapf(err, "can't add account, could not set account (%s) in accounts tree", accountOutput.AccountID)
+	}
+
+	if err := m.accountsTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "can't add account, could not commit accounts tree")
+	}
 
 	return nil
 }
@@ -411,6 +417,10 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) + diffChange.FixedCostChange)
 
 		m.accountsTree.Set(accountID, accountData)
+	}
+
+	if err := m.accountsTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "could not commit account tree")
 	}
 
 	return nil

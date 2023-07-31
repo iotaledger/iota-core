@@ -151,7 +151,7 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (ds.AuthenticatedMap[iotago.Acc
 		return nil, ierrors.Errorf("slot %d is smaller than attestation cutoffIndex %d thus we don't have attestations", index, cutoffIndex)
 	}
 
-	return m.adsMapStorage(cutoffIndex)
+	return m.attestationsForSlot(cutoffIndex)
 }
 
 // AddAttestationFromBlock adds an attestation from a block to the future attestations (beyond the attestation window).
@@ -253,7 +253,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	m.pendingAttestations.Evict(cutoffIndex)
 
 	// Store all attestations of cutoffIndex in bucketed storage via ads.Map / sparse merkle tree -> committed attestations.
-	tree, err := m.adsMapStorage(cutoffIndex)
+	tree, err := m.attestationsForSlot(cutoffIndex)
 	if err != nil {
 		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
 	}
@@ -266,6 +266,10 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 
 			m.lastCumulativeWeight++
 		}
+	}
+
+	if err := tree.Commit(); err != nil {
+		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to commit attestation storage when committing slot %d", index)
 	}
 
 	m.lastCommittedSlot = index

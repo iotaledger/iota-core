@@ -130,6 +130,10 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 		return true
 	})
+
+	if err := rewardsTree.Commit(); err != nil {
+		panic(ierrors.Wrapf(err, "failed to commit rewards for epoch %d", epoch))
+	}
 }
 
 func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {

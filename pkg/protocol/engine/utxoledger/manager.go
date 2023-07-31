@@ -199,6 +199,10 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 		m.stateTree.Delete(spent.OutputID())
 	}
 
+	if err := m.stateTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "failed to commit state tree")
+	}
+
 	return nil
 }
 
@@ -265,6 +269,10 @@ func (m *Manager) RollbackDiffWithoutLocking(index iotago.SlotIndex, newOutputs 
 	}
 	for _, output := range newOutputs {
 		m.stateTree.Delete(output.OutputID())
+	}
+
+	if err := m.stateTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "failed to commit state tree")
 	}
 
 	return nil

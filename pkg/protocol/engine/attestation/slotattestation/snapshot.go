@@ -94,7 +94,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 		var attestations []*iotago.Attestation
 		if i < attestationSlotIndex {
 			// Need to get attestations from storage.
-			attestationsStorage, err := m.adsMapStorage(i)
+			attestationsStorage, err := m.attestationsForSlot(i)
 			if err != nil {
 				return ierrors.Wrapf(err, "failed to get attestations of slot %d", i)
 			}

@@ -139,6 +139,10 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 			}
 			rewardsTree.Set(accountID, &reward)
 		}
+
+		if err := rewardsTree.Commit(); err != nil {
+			return ierrors.Wrapf(err, "unable to commit rewards for epoch index %d", epochIndex)
+		}
 	}
 
 	return nil
