@@ -15,10 +15,10 @@ type MetricType uint8
 
 const (
 	// Gauge is a metric that represents a single numerical value that can arbitrarily go up and down.
-	// during metric Update the collected value is set, thus previous value is overwritten.
+	// During metric Update the collected value is set, thus previous value is overwritten.
 	Gauge MetricType = iota
 	// Counter is a cumulative metric that represents a single numerical value that only ever goes up.
-	// during metric Update the collected value is added to its current value.
+	// During metric Update the collected value is added to its current value.
 	Counter
 )
 

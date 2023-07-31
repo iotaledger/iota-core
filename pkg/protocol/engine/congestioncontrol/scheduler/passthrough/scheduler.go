@@ -42,6 +42,30 @@ func (s *Scheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...*blocks.Block) b
 	return true
 }
 
+func (s *Scheduler) Rate() int {
+	return 0
+}
+
+func (s *Scheduler) BufferSize() int {
+	return 0
+}
+
+func (s *Scheduler) MaxBufferSize() int {
+	return 0
+}
+
+func (s *Scheduler) ReadyBlocksCount() int {
+	return 0
+}
+
+func (s *Scheduler) IssuerQueueSizeCount(_ iotago.AccountID) int {
+	return 0
+}
+
+func (s *Scheduler) IssuerQueueSizeWork(_ iotago.AccountID) int {
+	return 0
+}
+
 func (s *Scheduler) AddBlock(block *blocks.Block) {
 	if block.SetScheduled() {
 		s.events.BlockScheduled.Trigger(block)
