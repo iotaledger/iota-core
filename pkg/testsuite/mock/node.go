@@ -278,9 +278,9 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 		var acceptedBlocks []iotago.BlockID
-		_ = details.AcceptedBlocks.Stream(func(key iotago.BlockID) bool {
+		_ = details.AcceptedBlocks.Stream(func(key iotago.BlockID) error {
 			acceptedBlocks = append(acceptedBlocks, key)
-			return true
+			return nil
 		})
 		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks)
 	})
@@ -467,7 +467,6 @@ func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {
 			counter++
 			time.Sleep(1 * time.Second)
 		}
-
 	}()
 }
 

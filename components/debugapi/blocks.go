@@ -3,7 +3,7 @@ package debugapi
 import (
 	"sort"
 
-	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -16,7 +16,7 @@ func getSlotBlockIDs(index iotago.SlotIndex) (*BlockChangesResponse, error) {
 	}
 
 	includedBlocks := make([]string, 0)
-	tangleTree := ads.NewSet(mapdb.NewMapDB(), iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes)
+	tangleTree := ds.NewAuthenticatedSet(mapdb.NewMapDB(), iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes)
 
 	_ = blocksForSlot.ForEachBlockIDInSlot(func(blockID iotago.BlockID) error {
 		includedBlocks = append(includedBlocks, blockID.String())

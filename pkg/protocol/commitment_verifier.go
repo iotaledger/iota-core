@@ -1,10 +1,10 @@
 package protocol
 
 import (
-	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -26,14 +26,14 @@ func NewCommitmentVerifier(mainEngine *engine.Engine, forkingPoint *model.Commit
 		engine:                  mainEngine,
 		forkingPoint:            forkingPoint,
 		cumulativeWeight:        forkingPoint.CumulativeWeight(),
-		validatorAccountsAtFork: mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, forkingPoint.Index()),
+		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, forkingPoint.Index())),
 		// TODO: what happens if the committee rotated after the fork?
 	}
 }
 
 func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
 	// 1. Verify that the provided attestations are indeed the ones that were included in the commitment.
-	tree := ads.NewMap[iotago.AccountID, *iotago.Attestation](mapdb.NewMapDB(),
+	tree := ds.NewAuthenticatedMap(mapdb.NewMapDB(),
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
 		func(attestation *iotago.Attestation) ([]byte, error) {

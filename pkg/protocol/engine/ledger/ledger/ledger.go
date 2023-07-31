@@ -219,7 +219,7 @@ func (l *Ledger) Account(accountID iotago.AccountID, targetIndex iotago.SlotInde
 	return l.accountsLedger.Account(accountID, targetIndex)
 }
 
-func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) map[iotago.AccountID]*accounts.AccountData {
+func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) (accountDataMap map[iotago.AccountID]*accounts.AccountData, err error) {
 	return l.accountsLedger.PastAccounts(accountIDs, targetIndex)
 }
 

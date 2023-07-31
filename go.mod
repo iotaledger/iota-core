@@ -15,7 +15,7 @@ require (
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230728082521-74f3f2957f0c
-	github.com/iotaledger/hive.go/ds v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/ds v0.0.0-20230731151103-87c854d84352
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/lo v0.0.0-20230728082521-74f3f2957f0c
@@ -128,6 +128,7 @@ require (
 	github.com/petermattis/goid v0.0.0-20230518223814-80aa455d8761 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/pokt-network/smt v0.6.1 // indirect
 	github.com/prometheus/client_golang v1.16.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect

@@ -1,7 +1,7 @@
 package slotattestation
 
 import (
-	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -89,7 +89,7 @@ func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[io
 	), nil
 }
 
-func (m *Manager) adsMapStorage(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, *iotago.Attestation], error) {
+func (m *Manager) adsMapStorage(index iotago.SlotIndex) (ds.AuthenticatedMap[iotago.AccountID, *iotago.Attestation], error) {
 	attestationsStorage := m.bucketedStorage(index)
 	if attestationsStorage == nil {
 		return nil, ierrors.Errorf("failed to access storage for attestors of slot %d", index)
@@ -101,7 +101,7 @@ func (m *Manager) adsMapStorage(index iotago.SlotIndex) (*ads.Map[iotago.Account
 
 	api := m.apiProvider.APIForSlot(index)
 
-	return ads.NewMap(attestationsStorage,
+	return ds.NewAuthenticatedMap(attestationsStorage,
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
 		func(v *iotago.Attestation) ([]byte, error) {

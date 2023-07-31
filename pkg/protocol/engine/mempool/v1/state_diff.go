@@ -1,7 +1,7 @@
 package mempoolv1
 
 import (
-	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
@@ -20,16 +20,17 @@ type StateDiff struct {
 
 	stateUsageCounters *shrinkingmap.ShrinkingMap[iotago.OutputID, int]
 
-	mutations *ads.Set[iotago.TransactionID]
+	mutations ds.AuthenticatedSet[iotago.TransactionID]
 }
 
 func NewStateDiff(index iotago.SlotIndex) *StateDiff {
-	return &StateDiff{index: index,
+	return &StateDiff{
+		index:                index,
 		spentOutputs:         shrinkingmap.New[iotago.OutputID, mempool.StateMetadata](),
 		createdOutputs:       shrinkingmap.New[iotago.OutputID, mempool.StateMetadata](),
 		executedTransactions: orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata](),
 		stateUsageCounters:   shrinkingmap.New[iotago.OutputID, int](),
-		mutations:            ads.NewSet(mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes),
+		mutations:            ds.NewAuthenticatedSet(mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes),
 	}
 }
 
@@ -49,7 +50,7 @@ func (s *StateDiff) ExecutedTransactions() *orderedmap.OrderedMap[iotago.Transac
 	return s.executedTransactions
 }
 
-func (s *StateDiff) Mutations() *ads.Set[iotago.TransactionID] {
+func (s *StateDiff) Mutations() ds.AuthenticatedSet[iotago.TransactionID] {
 	return s.mutations
 }
 

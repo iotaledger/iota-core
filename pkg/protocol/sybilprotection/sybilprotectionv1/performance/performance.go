@@ -1,7 +1,6 @@
 package performance
 
 import (
-	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
@@ -99,7 +98,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		panic(ierrors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
-	rewardsTree := ads.NewMap[iotago.AccountID, *PoolRewards](t.rewardsStorage(epoch),
+	rewardsTree := ds.NewAuthenticatedMap(t.rewardsStorage(epoch),
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
 		(*PoolRewards).Bytes,

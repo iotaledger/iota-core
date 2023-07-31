@@ -29,12 +29,12 @@ func (t *TestSuite) AssertAttestationsForSlot(slotIndex iotago.SlotIndex, blocks
 			}
 
 			storedAttestations := make([]iotago.BlockID, 0)
-			err = attestationTree.Stream(func(key iotago.AccountID, att *iotago.Attestation) bool {
+			err = attestationTree.Stream(func(key iotago.AccountID, att *iotago.Attestation) error {
 				blockID, err := att.BlockID(t.API)
 				require.NoError(t.Testing, err)
 				storedAttestations = append(storedAttestations, blockID)
 
-				return true
+				return nil
 			})
 			if err != nil {
 				return ierrors.Wrapf(err, "AssertAttestationsForSlot: %s: error iterating over attestation tree", node.Name)

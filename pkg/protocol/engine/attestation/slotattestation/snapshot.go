@@ -98,9 +98,10 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 			if err != nil {
 				return ierrors.Wrapf(err, "failed to get attestations of slot %d", i)
 			}
-			err = attestationsStorage.Stream(func(key iotago.AccountID, value *iotago.Attestation) bool {
+			err = attestationsStorage.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
 				attestations = append(attestations, value)
-				return true
+
+				return nil
 			})
 			if err != nil {
 				return ierrors.Wrapf(err, "failed to stream attestations of slot %d", i)

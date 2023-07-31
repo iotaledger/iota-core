@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
@@ -138,7 +138,7 @@ func (t *TestFramework) AssertCommit(slot iotago.SlotIndex, expectedCW uint64, e
 
 	require.EqualValues(t.test, expectedCW, cw)
 
-	expectedTree := *ads.NewMap[iotago.AccountID, *iotago.Attestation](mapdb.NewMapDB(),
+	expectedTree := ds.NewAuthenticatedMap(mapdb.NewMapDB(),
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
 		func(attestation *iotago.Attestation) ([]byte, error) {
@@ -169,10 +169,11 @@ func (t *TestFramework) AssertCommit(slot iotago.SlotIndex, expectedCW uint64, e
 		require.NoError(t.test, err)
 	}
 
-	require.NoError(t.test, tree.Stream(func(key iotago.AccountID, value *iotago.Attestation) bool {
+	require.NoError(t.test, tree.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
 		attestationFromTree = append(attestationFromTree, value)
 		attestationBlockIDsFromTree = append(attestationBlockIDsFromTree, t.blockIDFromAttestation(value))
-		return true
+
+		return nil
 	}))
 
 	require.ElementsMatchf(t.test, expectedAttestations, attestationFromTree, "attestations from tree do not match expected ones: expected: %v, got: %v", lo.Values(expectedAttestationsAliases), attestationBlockIDsFromTree)

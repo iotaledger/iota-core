@@ -1,8 +1,8 @@
 package slotattestation
 
 import (
-	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/memstorage"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -126,10 +126,10 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 	}
 
 	attestations = make([]*iotago.Attestation, 0)
-	if err := adsMap.Stream(func(_ iotago.AccountID, attestation *iotago.Attestation) bool {
+	if err := adsMap.Stream(func(_ iotago.AccountID, attestation *iotago.Attestation) error {
 		attestations = append(attestations, attestation)
 
-		return true
+		return nil
 	}); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to stream attestations for slot %d", index)
 	}
@@ -137,9 +137,9 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 	return attestations, nil
 }
 
-// GetMap returns the attestations that are included in the commitment of the given slot as ads.Map.
+// GetMap returns the attestations that are included in the commitment of the given slot as ds.AuthenticatedMap.
 // If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
-func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, *iotago.Attestation], error) {
+func (m *Manager) GetMap(index iotago.SlotIndex) (ds.AuthenticatedMap[iotago.AccountID, *iotago.Attestation], error) {
 	m.commitmentMutex.RLock()
 	defer m.commitmentMutex.RUnlock()
 

@@ -1,7 +1,6 @@
 package accountsledger
 
 import (
-	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -28,7 +27,7 @@ type Manager struct {
 
 	// accountsTree represents the Block Issuer data vector for all registered accounts that have a block issuer feature
 	// at the latest committed slot, it is updated on the slot commitment.
-	accountsTree *ads.Map[iotago.AccountID, *accounts.AccountData]
+	accountsTree ds.AuthenticatedMap[iotago.AccountID, *accounts.AccountData]
 
 	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
 	slotDiff func(iotago.SlotIndex) *prunable.AccountDiffs
@@ -50,7 +49,7 @@ func New(
 ) *Manager {
 	return &Manager{
 		blockBurns: shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
-		accountsTree: ads.NewMap(accountsStore,
+		accountsTree: ds.NewAuthenticatedMap(accountsStore,
 			iotago.Identifier.Bytes,
 			iotago.IdentifierFromBytes,
 			(*accounts.AccountData).Bytes,
@@ -166,7 +165,10 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	}
 
 	// read initial account data at the latest committed slot
-	loadedAccount, exists := m.accountsTree.Get(accountID)
+	loadedAccount, exists, err := m.accountsTree.Get(accountID)
+	if err != nil {
+		return nil, false, ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+	}
 
 	if !exists {
 		loadedAccount = accounts.NewAccountData(accountID, accounts.WithCredits(accounts.NewBlockIssuanceCredits(0, targetIndex)))
@@ -185,7 +187,7 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 }
 
 // PastAccounts loads the past accounts' data at a specific slot index.
-func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) map[iotago.AccountID]*accounts.AccountData {
+func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) (pastAccounts map[iotago.AccountID]*accounts.AccountData, err error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -193,7 +195,10 @@ func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.
 
 	for _, accountID := range accountIDs {
 		// read initial account data at the latest committed slot
-		loadedAccount, exists := m.accountsTree.Get(accountID)
+		loadedAccount, exists, err := m.accountsTree.Get(accountID)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+		}
 
 		if !exists {
 			loadedAccount = accounts.NewAccountData(accountID, accounts.WithCredits(accounts.NewBlockIssuanceCredits(0, targetIndex)))
@@ -211,7 +216,7 @@ func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.
 		result[accountID] = loadedAccount
 	}
 
-	return result
+	return result, nil
 }
 
 // AddAccount adds a new account to the Account tree, allotting to it the balance on the given output.
@@ -296,11 +301,15 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 	return wasDestroyed, nil
 }
 
-func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prunable.AccountDiff {
+func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (accountDiff *prunable.AccountDiff, err error) {
 	// if any data is left on the account, we need to store in the diff, to be able to rollback
-	accountData, exists := m.accountsTree.Get(accountID)
+	accountData, exists, err := m.accountsTree.Get(accountID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+	}
+
 	if !exists {
-		return nil
+		return nil, err
 	}
 
 	// it does not matter if there are any changes in this slot, as the account was destroyed anyway and the data was lost
@@ -317,7 +326,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prun
 	slotDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
 	slotDiff.FixedCostChange = -int64(accountData.FixedCost)
 
-	return slotDiff
+	return slotDiff, err
 }
 
 func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]iotago.Mana, err error) {
@@ -345,7 +354,12 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 		destroyed := destroyedAccounts.Has(accountID)
 		if destroyed {
 			// TODO: should this diff be done in the same place as other diffs? it feels kind of out of place here
-			accountDiff = m.preserveDestroyedAccountData(accountID)
+			reconstructedAccountDiff, err := m.preserveDestroyedAccountData(accountID)
+			if err != nil {
+				return ierrors.Wrapf(err, "could not preserve destroyed account data for account %s", accountID)
+			}
+
+			accountDiff = reconstructedAccountDiff
 		}
 		err := diffStore.Store(accountID, accountDiff, destroyed)
 		if err != nil {
@@ -358,7 +372,7 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 	return nil
 }
 
-func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) {
+func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
 		// remove a destroyed account, no need to update with diffs
@@ -367,7 +381,11 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 			continue
 		}
 
-		accountData, exists := m.accountsTree.Get(accountID)
+		accountData, exists, err := m.accountsTree.Get(accountID)
+		if err != nil {
+			return ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+		}
+
 		if !exists {
 			accountData = accounts.NewAccountData(accountID)
 		}
@@ -394,6 +412,8 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 
 		m.accountsTree.Set(accountID, accountData)
 	}
+
+	return nil
 }
 
 func (m *Manager) evict(index iotago.SlotIndex) {
