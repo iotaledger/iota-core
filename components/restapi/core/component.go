@@ -86,10 +86,6 @@ const (
 	// GET returns the output IDs of all UTXO changes.
 	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
-	// RouteBlockIssuanceCredits is the route for getting block issuance credits balance for an account.
-	// GET returns the block issuance credits balance.
-	RouteBlockIssuanceCredits = "/accounts/:" + restapipkg.ParameterAccountID
-
 	// RouteCongestion is the route for getting the current congestion state and all account related useful details as block issuance credits.
 	// GET returns the congestion state related to the specified account.
 	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
@@ -283,15 +279,6 @@ func configure() error {
 
 	routeGroup.GET(RouteTransactionsIncludedBlockMetadata, func(c echo.Context) error {
 		resp, err := blockMetadataFromTransactionID(c)
-		if err != nil {
-			return err
-		}
-
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
-	}, checkNodeSynced())
-
-	routeGroup.GET(RouteBlockIssuanceCredits, func(c echo.Context) error {
-		resp, err := blockIssuanceCreditsForAccountID(c)
 		if err != nil {
 			return err
 		}

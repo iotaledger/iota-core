@@ -30,7 +30,7 @@ func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlo
 }
 
 func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*inx.BlockMetadata, error) {
-	metadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID.Unwrap())
+	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID.Unwrap())
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*in
 	//TODO: use enums
 	return &inx.BlockMetadata{
 		BlockId:     blockID,
-		BlockStatus: uint32(metadata.BlockStatus),
+		BlockStatus: uint32(blockMetadata.BlockState),
 	}, nil
 }
 

@@ -27,7 +27,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter/accountsfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/passthrough"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/drr"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -120,7 +120,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSyncManagerProvider:         trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:              ledger1.NewProvider(),
 		optsRetainerProvider:            retainer1.NewProvider(),
-		optsSchedulerProvider:           passthrough.NewProvider(),
+		optsSchedulerProvider:           drr.NewProvider(),
 		optsUpgradeOrchestratorProvider: signalingupgradeorchestrator.NewProvider(),
 
 		optsBaseDirectory:           "",
