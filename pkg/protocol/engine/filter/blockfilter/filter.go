@@ -121,7 +121,9 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 	// check that commitment input (if any) is within allowed range.
 	if basicBlock, isBasic := block.BasicBlock(); isBasic {
-		if tx, isTX := basicBlock.Payload.(*iotago.Transaction); isTX {
+		if basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
+
+			tx, _ := basicBlock.Payload.(*iotago.Transaction)
 			if cInput := tx.CommitmentInput(); cInput != nil {
 				cInputIndex := cInput.CommitmentID.Index()
 				// check that commitment input is not too recent.
