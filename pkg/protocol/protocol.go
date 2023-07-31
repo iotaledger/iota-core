@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/iotaledger/hive.go/ds/ringbuffer"
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -57,11 +60,12 @@ import (
 )
 
 type Protocol struct {
-	context       context.Context
-	Events        *Events
-	SyncManager   syncmanager.SyncManager
-	engineManager *enginemanager.EngineManager
-	ChainManager  *chainmanager.Manager
+	context             context.Context
+	Events              *Events
+	SyncManager         syncmanager.SyncManager
+	engineManager       *enginemanager.EngineManager
+	ChainManager        *chainmanager.Manager
+	incomingBlockBuffer *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]]]
 
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
@@ -103,6 +107,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	return options.Apply(&Protocol{
 		Events:                          NewEvents(),
 		Workers:                         workers,
+		incomingBlockBuffer:             shrinkingmap.New[iotago.SlotIndex, *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]]](),
 		supportVersions:                 apimodels.Versions{3},
 		dispatcher:                      dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
@@ -238,6 +243,15 @@ func (p *Protocol) initChainManager() {
 	// Else our own BlockIssuer might use a commitment that the ChainManager does not know yet.
 	p.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 		p.ChainManager.ProcessCommitment(details.Commitment)
+		buffer, deleted := p.incomingBlockBuffer.DeleteAndReturn(details.Commitment.ID().Index())
+		if deleted {
+			for _, tuple := range buffer.Elements() {
+				err := p.ProcessBlock(tuple.A, tuple.B)
+				if err != nil {
+					p.ErrorHandler()(err)
+				}
+			}
+		}
 	})
 
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
@@ -272,7 +286,16 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
+	// If the commitment is not solid (it is not known), we store the block in a small buffer and process it once we
+	// commit the slot to avoid requesting it again.
+	// TODO: is this actually correct? Shouldn't we combine this with the future blocks and store Index -> CommitmentID -> Blocks
 	if !chainCommitment.IsSolid() {
+		// TODO: protect buffers so that not arbitrary past/future blocks can be added to them
+		buffer, _ := p.incomingBlockBuffer.GetOrCreate(block.ProtocolBlock().SlotCommitmentID.Index(), func() *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]] {
+			return ringbuffer.NewRingBuffer[*types.Tuple[*model.Block, network.PeerID]](100)
+		})
+		buffer.Add(types.NewTuple(block, src))
+
 		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
 
