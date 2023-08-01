@@ -158,7 +158,7 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	defer m.mutex.RUnlock()
 
 	// if m.latestCommittedSlot < m.commitmentEvictionAge we should have all history
-	if m.latestCommittedSlot >= m.commitmentEvictionAge && targetIndex < m.latestCommittedSlot-m.commitmentEvictionAge {
+	if m.latestCommittedSlot >= m.commitmentEvictionAge && targetIndex+m.commitmentEvictionAge < m.latestCommittedSlot {
 		return nil, false, ierrors.Errorf("can't calculate account, target slot index older than allowed (%d<%d)", targetIndex, m.latestCommittedSlot-m.commitmentEvictionAge)
 	}
 	if targetIndex > m.latestCommittedSlot {
