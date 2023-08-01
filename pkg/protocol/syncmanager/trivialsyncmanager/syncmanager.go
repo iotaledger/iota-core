@@ -31,6 +31,9 @@ type SyncManager struct {
 	latestFinalizedSlot     iotago.SlotIndex
 	latestFinalizedSlotLock syncutils.RWMutex
 
+	lastPrunedSlot     iotago.SlotIndex
+	lastPrunedSlotLock syncutils.RWMutex
+
 	isBootstrappedFunc isBootstrappedFunc
 
 	module.Module
@@ -66,6 +69,12 @@ func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 			}
 		}, asyncOpt)
 
+		e.Events.StoragePruned.Hook(func(index iotago.SlotIndex) {
+			if s.updatePrunedSlot(index) {
+				s.triggerUpdate()
+			}
+		}, asyncOpt)
+
 		s.TriggerInitialized()
 
 		return s
@@ -88,10 +97,12 @@ func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
 	s.lastConfirmedBlockSlotLock.RLock()
 	s.latestCommitmentLock.RLock()
 	s.latestFinalizedSlotLock.RLock()
+	s.lastPrunedSlotLock.RLock()
 	defer s.lastAcceptedBlockSlotLock.RUnlock()
 	defer s.lastConfirmedBlockSlotLock.RUnlock()
 	defer s.latestCommitmentLock.RUnlock()
 	defer s.latestFinalizedSlotLock.RUnlock()
+	defer s.lastPrunedSlotLock.RUnlock()
 
 	return &syncmanager.SyncStatus{
 		NodeSynced:             s.isBootstrappedFunc(),
@@ -99,6 +110,7 @@ func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
 		LastConfirmedBlockSlot: s.lastConfirmedBlockSlot,
 		LatestCommitment:       s.latestCommitment,
 		LatestFinalizedSlot:    s.latestFinalizedSlot,
+		LatestPrunedSlot:       s.lastPrunedSlot,
 	}
 }
 
@@ -154,6 +166,18 @@ func (s *SyncManager) updateFinalizedSlot(index iotago.SlotIndex) (changed bool)
 	return false
 }
 
+func (s *SyncManager) updatePrunedSlot(index iotago.SlotIndex) (changed bool) {
+	s.lastPrunedSlotLock.Lock()
+	defer s.lastPrunedSlotLock.Unlock()
+
+	if s.lastPrunedSlot != index {
+		s.lastPrunedSlot = index
+		return true
+	}
+
+	return false
+}
+
 func (s *SyncManager) IsNodeSynced() bool {
 	return s.isBootstrappedFunc()
 }
@@ -184,6 +208,13 @@ func (s *SyncManager) LatestFinalizedSlot() iotago.SlotIndex {
 	defer s.latestFinalizedSlotLock.RUnlock()
 
 	return s.latestFinalizedSlot
+}
+
+func (s *SyncManager) LastPrunedSlot() iotago.SlotIndex {
+	s.lastPrunedSlotLock.RLock()
+	defer s.lastPrunedSlotLock.RUnlock()
+
+	return s.lastPrunedSlot
 }
 
 func (s *SyncManager) triggerUpdate() {

@@ -32,8 +32,7 @@ func info() (*apimodels.InfoResponse, error) {
 			LatestFinalizedSlot:         syncStatus.LatestFinalizedSlot,
 			LatestAcceptedBlockSlot:     syncStatus.LastAcceptedBlockSlot,
 			LatestConfirmedBlockSlot:    syncStatus.LastConfirmedBlockSlot,
-			// TODO: fill in pruningSlot
-			PruningSlot: 0,
+			PruningSlot:                 syncStatus.LatestPrunedSlot,
 		},
 		Metrics: &apimodels.InfoResNodeMetrics{
 			BlocksPerSecond:          metrics.BlocksPerSecond,
