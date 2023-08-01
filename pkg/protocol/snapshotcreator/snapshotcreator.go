@@ -136,20 +136,20 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 	return nil
 }
 
-func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine) (err error) {
+func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine) error {
 	// Account outputs start from Genesis TX index 1
-	for idx, account := range accounts {
-		output := createAccount(account.AccountID, account.Address, account.Amount, account.Mana, account.IssuerKey, account.ExpirySlot, account.StakedAmount, account.StakingEpochEnd, account.FixedCost)
+	for idx, genesisAccount := range accounts {
+		output := createAccount(genesisAccount.AccountID, genesisAccount.Address, genesisAccount.Amount, genesisAccount.Mana, genesisAccount.IssuerKey, genesisAccount.ExpirySlot, genesisAccount.StakedAmount, genesisAccount.StakingEpochEnd, genesisAccount.FixedCost)
 
-		if _, err = engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversStateRent(output, account.Amount); err != nil {
+		if _, err := engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversStateRent(output, genesisAccount.Amount); err != nil {
 			return ierrors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
 		}
 
 		accountOutput := utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)
-		if err = engineInstance.Ledger.AddUnspentOutput(accountOutput); err != nil {
+		if err := engineInstance.Ledger.AddUnspentOutput(accountOutput); err != nil {
 			return err
 		}
-		if err = engineInstance.Ledger.AddAccount(accountOutput); err != nil {
+		if err := engineInstance.Ledger.AddAccount(accountOutput, genesisAccount.BlockIssuanceCredits); err != nil {
 			return err
 		}
 	}

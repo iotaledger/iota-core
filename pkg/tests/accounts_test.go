@@ -34,6 +34,9 @@ func Test_TransitionAccount(t *testing.T) {
 		IssuerKey: oldGenesisOutputKey,
 		// Expiry Slot is the slot index at which the account expires.
 		ExpirySlot: math.MaxUint64,
+		// BlockIssuanceCredits on this account is custom because it never needs to issue.
+		// On Validator nodes it's unlimited (MaxInt64).
+		BlockIssuanceCredits: iotago.BlockIssuanceCredits(123),
 	}),
 		testsuite.WithGenesisTimestampOffset(100*10),
 		testsuite.WithMaxCommittableAge(100),
@@ -51,9 +54,8 @@ func Test_TransitionAccount(t *testing.T) {
 	genesisAccountOutput := genesisAccount.Output().(*iotago.AccountOutput)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID: genesisAccountOutput.AccountID,
-		// TODO: why do we use the deposit here as credits?
-		Credits:    accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit*3), 0),
+		ID:         genesisAccountOutput.AccountID,
+		Credits:    accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
 		OutputID:   genesisAccount.OutputID(),
 		ExpirySlot: math.MaxUint64,
 		PubKeys:    ds.NewSet(oldGenesisOutputKey),
@@ -82,7 +84,7 @@ func Test_TransitionAccount(t *testing.T) {
 	))
 
 	var slotIndexBlock1 iotago.SlotIndex = 1
-	var activeNodes []*mock.Node = []*mock.Node{node1}
+	activeNodes := []*mock.Node{node1}
 
 	block1 := ts.IssueBlockAtSlotWithOptions("block1", slotIndexBlock1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, blockfactory.WithPayload(tx1))
 
@@ -102,9 +104,9 @@ func Test_TransitionAccount(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID: genesisAccountOutput.AccountID,
 		// TODO: why do we use the deposit here as credits?
-		Credits:    accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit*3), 0),
+		Credits:    accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
 		OutputID:   iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
-		PubKeys:    ds.NewSet(ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey),
+		PubKeys:    ds.NewSet(oldGenesisOutputKey, newGenesisOutputKey),
 		ExpirySlot: 1,
 	}, ts.Nodes()...)
 
@@ -156,14 +158,14 @@ func Test_TransitionAccount(t *testing.T) {
 
 	// assert diff of a destroyed account, to make sure we can correctly restore it
 	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock2, &prunable.AccountDiff{
-		BICChange:             -iotago.BlockIssuanceCredits(testsuite.MinIssuerAccountDeposit * 3),
+		BICChange:             -iotago.BlockIssuanceCredits(123),
 		PreviousUpdatedTime:   0,
 		NewExpirySlot:         0,
 		PreviousExpirySlot:    1,
 		NewOutputID:           iotago.EmptyOutputID,
 		PreviousOutputID:      iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 		PubKeysAdded:          []ed25519.PublicKey{},
-		PubKeysRemoved:        []ed25519.PublicKey{ed25519.PublicKey(oldGenesisOutputKey), newGenesisOutputKey},
+		PubKeysRemoved:        []ed25519.PublicKey{oldGenesisOutputKey, newGenesisOutputKey},
 		ValidatorStakeChange:  0,
 		StakeEndEpochChange:   0,
 		FixedCostChange:       0,
@@ -208,7 +210,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithDelegationStartEpoch(2),
 	)
 
-	var slotIndexBlock3 iotago.SlotIndex = latestParent.ID().Index()
+	slotIndexBlock3 := latestParent.ID().Index()
 
 	tx3 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX3", newDelegationWallets,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
@@ -223,7 +225,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	block3 := ts.IssueBlockAtSlotWithOptions("block3", slotIndexBlock3, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, blockfactory.WithStrongParents(latestParent.ID()), blockfactory.WithPayload(tx3))
 
-	latestParent = ts.CommitUntilSlot(slotIndexBlock3, activeNodes, block3)
+	_ = ts.CommitUntilSlot(slotIndexBlock3, activeNodes, block3)
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock3, &prunable.AccountDiff{
 		BICChange:             0,

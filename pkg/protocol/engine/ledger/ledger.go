@@ -22,7 +22,7 @@ type Ledger interface {
 
 	Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error)
 	PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) map[iotago.AccountID]*accounts.AccountData
-	AddAccount(account *utxoledger.Output) error
+	AddAccount(account *utxoledger.Output, credits iotago.BlockIssuanceCredits) error
 
 	Output(id iotago.OutputID) (*utxoledger.Output, error)
 	OutputOrSpent(id iotago.OutputID) (output *utxoledger.Output, spent *utxoledger.Spent, err error)
