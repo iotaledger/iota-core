@@ -12,8 +12,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
-	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -34,11 +32,7 @@ const (
 )
 
 var (
-	defaultClientsURLs   = []string{"http://localhost:8080", "http://localhost:8090"}
-	dockerProtocolParams = func() iotago.ProtocolParameters {
-		options := snapshotcreator.NewOptions(presets.Docker...)
-		return options.ProtocolParameters
-	}
+	defaultClientsURLs = []string{"http://localhost:8080", "http://localhost:8090"}
 
 	dockerFaucetSeed = func() []byte {
 		genesisSeed, err := base58.Decode("7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih")
