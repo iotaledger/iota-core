@@ -135,6 +135,14 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 
 		p.ChainManager.ProcessCandidateCommitment(details.Commitment)
 
+		// TODO: it'd be better to do this for individual commitments instead of per slot.
+		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(details.Commitment.ID().Index()) {
+			err = p.ProcessBlock(tuple.A, tuple.B)
+			if err != nil {
+				p.ErrorHandler()(err)
+			}
+		}
+
 		if candidateEngineInstance.IsBootstrapped() &&
 			details.Commitment.CumulativeWeight() > p.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
 			p.switchEngines()
