@@ -6,7 +6,7 @@ import (
 )
 
 type CommitmentFilter interface {
-	// ProcessFilteredBlock processes block from the given source.
+	// ProcessPreFilteredBlock processes block from the given source.
 	ProcessPreFilteredBlock(block *model.Block)
 
 	module.Interface
