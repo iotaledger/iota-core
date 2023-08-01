@@ -20,7 +20,9 @@ func getSlotBlockIDs(index iotago.SlotIndex) (*BlockChangesResponse, error) {
 
 	_ = blocksForSlot.ForEachBlockIDInSlot(func(blockID iotago.BlockID) error {
 		includedBlocks = append(includedBlocks, blockID.String())
-		tangleTree.Add(blockID)
+		if err := tangleTree.Add(blockID); err != nil {
+			return ierrors.Wrapf(err, "failed to add block to tangle tree, blockID: %s", blockID.ToHex())
+		}
 
 		return nil
 	})

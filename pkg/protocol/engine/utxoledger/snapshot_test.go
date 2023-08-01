@@ -20,7 +20,6 @@ import (
 )
 
 func TestOutput_SnapshotBytes(t *testing.T) {
-
 	outputID := utils.RandOutputID(2)
 	blockID := utils.RandBlockID()
 	indexBooked := utils.RandSlotIndex()
@@ -197,17 +196,18 @@ func TestManager_Import(t *testing.T) {
 
 	output1 := tpkg.RandLedgerStateOutput()
 
-	require.NoError(t, manager.AddUnspentOutput(output1))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutput()))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutput()))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutput()))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutput()))
+	require.NoError(t, manager.AddGenesisUnspentOutput(output1))
+	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutput()))
+	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutput()))
+	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutput()))
+	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutput()))
 
 	ledgerIndex, err := manager.ReadLedgerIndex()
 	require.NoError(t, err)
 	require.Equal(t, iotago.SlotIndex(0), ledgerIndex)
 
 	mapDBAtIndex0 := mapdb.NewMapDB()
+	// Copy the current manager state to the mapDBAtIndex0
 	require.NoError(t, kvstore.Copy(mapDB, mapDBAtIndex0))
 
 	output2 := tpkg.RandLedgerStateOutput()
@@ -294,11 +294,11 @@ func TestManager_Export(t *testing.T) {
 
 	output1 := tpkg.RandLedgerStateOutput()
 
-	require.NoError(t, manager.AddUnspentOutput(output1))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutput()))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutput()))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutput()))
-	require.NoError(t, manager.AddUnspentOutput(tpkg.RandLedgerStateOutput()))
+	require.NoError(t, manager.AddGenesisUnspentOutput(output1))
+	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutput()))
+	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutput()))
+	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutput()))
+	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutput()))
 
 	output2 := tpkg.RandLedgerStateOutput()
 	require.NoError(t, manager.ApplyDiff(1,

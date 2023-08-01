@@ -328,7 +328,7 @@ func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAlias
 
 	for _, transactionAlias := range transactionAliases {
 		require.True(t.test, stateDiff.ExecutedTransactions().Has(t.TransactionID(transactionAlias)))
-		require.True(t.test, stateDiff.Mutations().Has(t.TransactionID(transactionAlias)))
+		require.True(t.test, lo.PanicOnErr(stateDiff.Mutations().Has(t.TransactionID(transactionAlias))))
 	}
 
 	for _, createdOutputAlias := range createdOutputAliases {

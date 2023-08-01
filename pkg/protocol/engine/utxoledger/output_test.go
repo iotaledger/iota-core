@@ -24,7 +24,7 @@ func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Out
 	outputID := output.OutputID()
 	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
-	require.NoError(t, manager.AddUnspentOutput(output))
+	require.NoError(t, manager.AddGenesisUnspentOutput(output))
 
 	// Read Output from DB and compare
 	readOutput, err := manager.ReadOutputByOutputID(outputID)

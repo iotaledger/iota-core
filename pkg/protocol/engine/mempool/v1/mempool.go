@@ -301,22 +301,28 @@ func (m *MemPool[VoteRank]) transactionByAttachment(blockID iotago.BlockID) (*Tr
 	return nil, false
 }
 
-func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, prevIndex iotago.SlotIndex, newIndex iotago.SlotIndex) {
+func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, prevIndex iotago.SlotIndex, newIndex iotago.SlotIndex) error {
 	if prevIndex == newIndex {
-		return
+		return nil
 	}
 
 	if prevIndex != 0 {
 		if prevSlot, exists := m.stateDiffs.Get(prevIndex); exists {
-			prevSlot.RollbackTransaction(transaction)
+			if err := prevSlot.RollbackTransaction(transaction); err != nil {
+				return ierrors.Wrapf(err, "failed to rollback transaction, txID: %s", transaction.ID())
+			}
 		}
 	}
 
 	if transaction.IsAccepted() && newIndex != 0 {
 		if stateDiff, evicted := m.stateDiff(newIndex); !evicted {
-			stateDiff.AddTransaction(transaction)
+			if err := stateDiff.AddTransaction(transaction); err != nil {
+				return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
+			}
 		}
 	}
+
+	return nil
 }
 
 func (m *MemPool[VoteRank]) setup() {
@@ -339,7 +345,10 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
 		if slotIndex := transaction.EarliestIncludedAttachment().Index(); slotIndex > 0 {
 			if stateDiff, evicted := m.stateDiff(slotIndex); !evicted {
-				stateDiff.AddTransaction(transaction)
+				if err := stateDiff.AddTransaction(transaction); err != nil {
+					// TODO: use errorhandler?
+					panic(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
+				}
 			}
 		}
 	})
@@ -361,7 +370,10 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	})
 
 	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
-		m.updateStateDiffs(transaction, prevBlock.Index(), newBlock.Index())
+		if err := m.updateStateDiffs(transaction, prevBlock.Index(), newBlock.Index()); err != nil {
+			// TODO: use errorhandler?
+			panic(ierrors.Wrap(err, "failed to update state diffs"))
+		}
 	})
 
 	transaction.OnEvicted(func() {

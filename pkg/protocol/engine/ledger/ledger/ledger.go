@@ -203,8 +203,8 @@ func (l *Ledger) AddAccount(output *utxoledger.Output, blockIssuanceCredits iota
 	return l.accountsLedger.AddAccount(output, blockIssuanceCredits)
 }
 
-func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
-	return l.utxoLedger.AddUnspentOutput(unspentOutput)
+func (l *Ledger) AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error {
+	return l.utxoLedger.AddGenesisUnspentOutput(unspentOutput)
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
@@ -219,7 +219,7 @@ func (l *Ledger) Account(accountID iotago.AccountID, targetIndex iotago.SlotInde
 	return l.accountsLedger.Account(accountID, targetIndex)
 }
 
-func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) map[iotago.AccountID]*accounts.AccountData {
+func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) (accountDataMap map[iotago.AccountID]*accounts.AccountData, err error) {
 	return l.accountsLedger.PastAccounts(accountIDs, targetIndex)
 }
 

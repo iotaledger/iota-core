@@ -35,7 +35,11 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 
 	// TODO: the epoch should be returned by the reward calculations and we should only loop until the current epoch, not epochEnd
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
-		rewardsForAccountInEpoch, exists := t.rewardsForAccount(validatorID, epochIndex)
+		rewardsForAccountInEpoch, exists, err := t.rewardsForAccount(validatorID, epochIndex)
+		if err != nil {
+			return 0, ierrors.Wrapf(err, "failed to get rewards for account %s in epoch %d", validatorID, epochIndex)
+		}
+
 		if !exists {
 			continue
 		}
@@ -75,7 +79,11 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 
 	// TODO: the epoch should be returned by the reward calculations and we should only loop until the current epoch, not epochEnd
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
-		rewardsForAccountInEpoch, exists := t.rewardsForAccount(validatorID, epochIndex)
+		rewardsForAccountInEpoch, exists, err := t.rewardsForAccount(validatorID, epochIndex)
+		if err != nil {
+			return 0, ierrors.Wrapf(err, "failed to get rewards for account %s in epoch %d", validatorID, epochIndex)
+		}
+
 		if !exists {
 			continue
 		}
@@ -109,7 +117,7 @@ func (t *Tracker) rewardsStorage(epochIndex iotago.EpochIndex) kvstore.KVStore {
 	return lo.PanicOnErr(t.rewardBaseStore.WithExtendedRealm(epochIndex.MustBytes()))
 }
 
-func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) *ads.Map[iotago.AccountID, *PoolRewards] {
+func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) ads.Map[iotago.AccountID, *PoolRewards] {
 	return ads.NewMap(t.rewardsStorage(epochIndex),
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
@@ -118,7 +126,7 @@ func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) *ads.Map[iotago.Accou
 	)
 }
 
-func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *PoolRewards, exists bool) {
+func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *PoolRewards, exists bool, err error) {
 	return t.rewardsMap(epochIndex).Get(accountID)
 }
 

@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -20,11 +21,12 @@ type StateDiff struct {
 
 	stateUsageCounters *shrinkingmap.ShrinkingMap[iotago.OutputID, int]
 
-	mutations *ads.Set[iotago.TransactionID]
+	mutations ads.Set[iotago.TransactionID]
 }
 
 func NewStateDiff(index iotago.SlotIndex) *StateDiff {
-	return &StateDiff{index: index,
+	return &StateDiff{
+		index:                index,
 		spentOutputs:         shrinkingmap.New[iotago.OutputID, mempool.StateMetadata](),
 		createdOutputs:       shrinkingmap.New[iotago.OutputID, mempool.StateMetadata](),
 		executedTransactions: orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata](),
@@ -49,7 +51,7 @@ func (s *StateDiff) ExecutedTransactions() *orderedmap.OrderedMap[iotago.Transac
 	return s.executedTransactions
 }
 
-func (s *StateDiff) Mutations() *ads.Set[iotago.TransactionID] {
+func (s *StateDiff) Mutations() ads.Set[iotago.TransactionID] {
 	return s.mutations
 }
 
@@ -67,22 +69,33 @@ func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata
 	})
 }
 
-func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) {
+func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) error {
 	if _, exists := s.executedTransactions.Set(transaction.ID(), transaction); !exists {
-		s.mutations.Add(transaction.ID())
+		if err := s.mutations.Add(transaction.ID()); err != nil {
+			return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
+		}
 		s.updateCompactedStateChanges(transaction, 1)
 
 		transaction.OnPending(func() {
-			s.RollbackTransaction(transaction)
+			if err := s.RollbackTransaction(transaction); err != nil {
+				// TODO: use error handler?
+				panic(ierrors.Wrapf(err, "failed to rollback transaction, txID: %s", transaction.ID()))
+			}
 		})
 	}
+
+	return nil
 }
 
-func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) {
+func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) error {
 	if s.executedTransactions.Delete(transaction.ID()) {
-		s.mutations.Delete(transaction.ID())
+		if _, err := s.mutations.Delete(transaction.ID()); err != nil {
+			return ierrors.Wrapf(err, "failed to delete transaction from state diff's mutations, txID: %s", transaction.ID())
+		}
 		s.updateCompactedStateChanges(transaction, -1)
 	}
+
+	return nil
 }
 
 func (s *StateDiff) compactStateChanges(output mempool.StateMetadata, newValue int) {
