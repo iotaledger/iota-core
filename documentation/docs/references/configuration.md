@@ -275,10 +275,11 @@ Example:
 
 ## <a id="protocol"></a> 9. Protocol
 
-| Name                           | Description                | Type   | Default value |
-| ------------------------------ | -------------------------- | ------ | ------------- |
-| [snapshot](#protocol_snapshot) | Configuration for snapshot | object |               |
-| [filter](#protocol_filter)     | Configuration for filter   | object |               |
+| Name                             | Description                 | Type   | Default value |
+| -------------------------------- | --------------------------- | ------ | ------------- |
+| [snapshot](#protocol_snapshot)   | Configuration for snapshot  | object |               |
+| [filter](#protocol_filter)       | Configuration for filter    | object |               |
+| [baseToken](#protocol_basetoken) | Configuration for baseToken | object |               |
 
 ### <a id="protocol_snapshot"></a> Snapshot
 
@@ -293,6 +294,17 @@ Example:
 | -------------------- | ------------------------------------------------------------------------------------------ | ------ | ------------- |
 | maxAllowedClockDrift | The maximum drift our wall clock can have to future blocks being received from the network | string | "5s"          |
 
+### <a id="protocol_basetoken"></a> BaseToken
+
+| Name            | Description                           | Type    | Default value |
+| --------------- | ------------------------------------- | ------- | ------------- |
+| name            | The base token name                   | string  | "Shimmer"     |
+| tickerSymbol    | The base token ticker symbol          | string  | "SMR"         |
+| unit            | The base token unit                   | string  | "SMR"         |
+| subunit         | The base token subunit                | string  | "glow"        |
+| decimals        | The base token amount of decimals     | uint    | 6             |
+| useMetricPrefix | The base token uses the metric prefix | boolean | false         |
+
 Example:
 
 ```json
@@ -304,6 +316,14 @@ Example:
       },
       "filter": {
         "maxAllowedClockDrift": "5s"
+      },
+      "baseToken": {
+        "name": "Shimmer",
+        "tickerSymbol": "SMR",
+        "unit": "SMR",
+        "subunit": "glow",
+        "decimals": 6,
+        "useMetricPrefix": false
       }
     }
   }
@@ -311,13 +331,14 @@ Example:
 
 ## <a id="blockissuer"></a> 10. BlockIssuer
 
-| Name                      | Description                                               | Type    | Default value |
-| ------------------------- | --------------------------------------------------------- | ------- | ------------- |
-| enabled                   | Whether the BlockIssuer component is enabled              | boolean | true          |
-| tipSelectionTimeout       | The timeout for tip selection                             | string  | "10s"         |
-| tipSelectionRetryInterval | The interval for retrying tip selection                   | string  | "200ms"       |
-| issuerAccount             | The accountID of the account that will issue the blocks   | string  | ""            |
-| privateKey                | The private key of the account that will issue the blocks | string  | ""            |
+| Name                      | Description                                                             | Type    | Default value |
+| ------------------------- | ----------------------------------------------------------------------- | ------- | ------------- |
+| enabled                   | Whether the BlockIssuer component is enabled                            | boolean | true          |
+| tipSelectionTimeout       | The timeout for tip selection                                           | string  | "10s"         |
+| tipSelectionRetryInterval | The interval for retrying tip selection                                 | string  | "200ms"       |
+| issuerAccount             | The accountID of the account that will issue the blocks                 | string  | ""            |
+| privateKey                | The private key of the account that will issue the blocks               | string  | ""            |
+| rateSetterEnabled         | Whether the RateSetter should be taken into account when issuing blocks | boolean | false         |
 
 Example:
 
@@ -328,7 +349,8 @@ Example:
       "tipSelectionTimeout": "10s",
       "tipSelectionRetryInterval": "200ms",
       "issuerAccount": "",
-      "privateKey": ""
+      "privateKey": "",
+      "rateSetterEnabled": false
     }
   }
 ```

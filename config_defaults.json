@@ -85,6 +85,14 @@
     },
     "filter": {
       "maxAllowedClockDrift": "5s"
+    },
+    "baseToken": {
+      "name": "Shimmer",
+      "tickerSymbol": "SMR",
+      "unit": "SMR",
+      "subunit": "glow",
+      "decimals": 6,
+      "useMetricPrefix": false
     }
   },
   "blockIssuer": {
@@ -92,7 +100,8 @@
     "tipSelectionTimeout": "10s",
     "tipSelectionRetryInterval": "200ms",
     "issuerAccount": "",
-    "privateKey": ""
+    "privateKey": "",
+    "rateSetterEnabled": false
   },
   "activity": {
     "enabled": true,

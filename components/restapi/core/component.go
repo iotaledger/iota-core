@@ -11,9 +11,10 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/metricstracker"
+	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
-	"github.com/iotaledger/iota-core/pkg/protocol"
+	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
@@ -130,9 +131,10 @@ type dependencies struct {
 
 	AppInfo          *app.Info
 	RestRouteManager *restapipkg.RestRouteManager
-	Protocol         *protocol.Protocol
+	Protocol         *protocolpkg.Protocol
 	BlockIssuer      *blockfactory.BlockIssuer `optional:"true"`
 	MetricsTracker   *metricstracker.MetricsTracker
+	BaseToken        *protocol.BaseToken
 }
 
 func configure() error {

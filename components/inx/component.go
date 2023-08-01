@@ -7,9 +7,10 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
+	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/daemon"
-	"github.com/iotaledger/iota-core/pkg/protocol"
+	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
@@ -34,11 +35,12 @@ var (
 
 type dependencies struct {
 	dig.In
-	Protocol         *protocol.Protocol
+	Protocol         *protocolpkg.Protocol
 	BlockIssuer      *blockfactory.BlockIssuer
 	Echo             *echo.Echo `optional:"true"`
 	RestRouteManager *restapipkg.RestRouteManager
 	INXServer        *Server
+	BaseToken        *protocol.BaseToken
 }
 
 func provide(c *dig.Container) error {
