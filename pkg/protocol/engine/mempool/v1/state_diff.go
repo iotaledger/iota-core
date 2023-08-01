@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -68,15 +69,19 @@ func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata
 	})
 }
 
-func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) {
+func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) error {
 	if _, exists := s.executedTransactions.Set(transaction.ID(), transaction); !exists {
-		s.mutations.Add(transaction.ID())
+		if err := s.mutations.Add(transaction.ID()); err != nil {
+			return ierrors.Wrapf(err, "failed to add transaction %s to state diff", transaction.ID())
+		}
 		s.updateCompactedStateChanges(transaction, 1)
 
 		transaction.OnPending(func() {
 			s.RollbackTransaction(transaction)
 		})
 	}
+
+	return nil
 }
 
 func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) {
