@@ -40,7 +40,9 @@ func (m *SlotMutations) AddAcceptedBlock(block *blocks.Block) (err error) {
 		return ierrors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
 	}
 
-	m.AcceptedBlocks(blockID.Index(), true).Add(blockID)
+	if err := m.AcceptedBlocks(blockID.Index(), true).Add(blockID); err != nil {
+		return ierrors.Wrap(err, "failed to add block to accepted blocks")
+	}
 
 	return
 }

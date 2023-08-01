@@ -308,7 +308,9 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 
 	if prevIndex != 0 {
 		if prevSlot, exists := m.stateDiffs.Get(prevIndex); exists {
-			prevSlot.RollbackTransaction(transaction)
+			if err := prevSlot.RollbackTransaction(transaction); err != nil {
+				return ierrors.Wrap(err, "failed to rollback transaction")
+			}
 		}
 	}
 

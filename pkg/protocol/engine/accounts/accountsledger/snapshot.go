@@ -85,7 +85,9 @@ func (m *Manager) importAccountTree(reader io.ReadSeeker, accountCount uint64) e
 			return ierrors.Wrap(err, "unable to read account data")
 		}
 
-		m.accountsTree.Set(accountData.ID, accountData)
+		if err := m.accountsTree.Set(accountData.ID, accountData); err != nil {
+			return ierrors.Wrapf(err, "unable to set account %s", accountData.ID)
+		}
 	}
 
 	return nil

@@ -123,11 +123,13 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			intermediateFactors = append(intermediateFactors, pf)
 		}
 
-		rewardsTree.Set(accountID, &PoolRewards{
+		if err := rewardsTree.Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
-		})
+		}); err != nil {
+			panic(ierrors.Wrapf(err, "failed to set rewards for account %s", accountID))
+		}
 
 		return true
 	})

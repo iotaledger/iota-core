@@ -193,10 +193,14 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 	}
 
 	for _, output := range newOutputs {
-		m.stateTree.Set(output.OutputID(), newStateMetadata(output))
+		if err := m.stateTree.Set(output.OutputID(), newStateMetadata(output)); err != nil {
+			return ierrors.Wrap(err, "failed to set new oputput in state tree")
+		}
 	}
 	for _, spent := range newSpents {
-		m.stateTree.Delete(spent.OutputID())
+		if _, err := m.stateTree.Delete(spent.OutputID()); err != nil {
+			return ierrors.Wrap(err, "failed to delete spent output from state tree")
+		}
 	}
 
 	if err := m.stateTree.Commit(); err != nil {
@@ -265,10 +269,14 @@ func (m *Manager) RollbackDiffWithoutLocking(index iotago.SlotIndex, newOutputs 
 	}
 
 	for _, spent := range newSpents {
-		m.stateTree.Set(spent.OutputID(), newStateMetadata(spent.Output()))
+		if err := m.stateTree.Set(spent.OutputID(), newStateMetadata(spent.Output())); err != nil {
+			return ierrors.Wrap(err, "failed to set new spent output in state tree")
+		}
 	}
 	for _, output := range newOutputs {
-		m.stateTree.Delete(output.OutputID())
+		if _, err := m.stateTree.Delete(output.OutputID()); err != nil {
+			return ierrors.Wrap(err, "failed to delete new output from state tree")
+		}
 	}
 
 	if err := m.stateTree.Commit(); err != nil {

@@ -382,7 +382,9 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 		}
 	}
 
-	m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts)
+	if err := m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
+		return ierrors.Wrap(err, "could not commit account tree")
+	}
 
 	return nil
 }
@@ -392,7 +394,9 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 	for accountID, diffChange := range accountDiffChanges {
 		// remove a destroyed account, no need to update with diffs
 		if destroyedAccounts.Has(accountID) {
-			m.accountsTree.Delete(accountID)
+			if _, err := m.accountsTree.Delete(accountID); err != nil {
+				return ierrors.Wrapf(err, "could not delete account (%s) from accounts tree", accountID)
+			}
 			continue
 		}
 
@@ -430,7 +434,9 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) + diffChange.StakeEndEpochChange)
 		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) + diffChange.FixedCostChange)
 
-		m.accountsTree.Set(accountID, accountData)
+		if err := m.accountsTree.Set(accountID, accountData); err != nil {
+			return ierrors.Wrapf(err, "could not set account (%s) in accounts tree", accountID)
+		}
 	}
 
 	if err := m.accountsTree.Commit(); err != nil {

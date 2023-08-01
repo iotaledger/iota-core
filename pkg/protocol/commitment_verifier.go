@@ -63,7 +63,9 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 	)
 
 	for _, att := range attestations {
-		tree.Set(att.IssuerID, att)
+		if err := tree.Set(att.IssuerID, att); err != nil {
+			return nil, 0, ierrors.Wrapf(err, "failed to set attestation for issuerID %s", att.IssuerID)
+		}
 	}
 	if !iotago.VerifyProof(merkleProof, iotago.Identifier(tree.Root()), commitment.RootsID()) {
 		return nil, 0, ierrors.Errorf("invalid merkle proof for attestations for commitment %s", commitment.ID())

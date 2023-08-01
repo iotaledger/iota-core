@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -52,7 +53,9 @@ func (m *Manager) CheckStateTree() bool {
 	)
 
 	if err := m.ForEachUnspentOutput(func(output *Output) bool {
-		comparisonTree.Set(output.OutputID(), newStateMetadata(output))
+		if err := comparisonTree.Set(output.OutputID(), newStateMetadata(output)); err != nil {
+			panic(ierrors.Wrap(err, "failed to set output in comparison tree"))
+		}
 
 		return true
 	}); err != nil {

@@ -262,7 +262,9 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	for _, a := range attestations {
 		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
 		if _, exists := m.committeeFunc(index).GetSeat(a.IssuerID); exists {
-			tree.Set(a.IssuerID, a)
+			if err := tree.Set(a.IssuerID, a); err != nil {
+				return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to set attestation %s in tree", a.IssuerID)
+			}
 
 			m.lastCumulativeWeight++
 		}

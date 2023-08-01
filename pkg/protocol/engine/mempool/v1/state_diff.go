@@ -77,18 +77,25 @@ func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) error {
 		s.updateCompactedStateChanges(transaction, 1)
 
 		transaction.OnPending(func() {
-			s.RollbackTransaction(transaction)
+			if err := s.RollbackTransaction(transaction); err != nil {
+				// TODO: use error handler?
+				panic(ierrors.Wrap(err, "failed to rollback transaction"))
+			}
 		})
 	}
 
 	return nil
 }
 
-func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) {
+func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) error {
 	if s.executedTransactions.Delete(transaction.ID()) {
-		s.mutations.Delete(transaction.ID())
+		if _, err := s.mutations.Delete(transaction.ID()); err != nil {
+			return ierrors.Wrap(err, "failed to delete transaction from state diff's mutations")
+		}
 		s.updateCompactedStateChanges(transaction, -1)
 	}
+
+	return nil
 }
 
 func (s *StateDiff) compactStateChanges(output mempool.StateMetadata, newValue int) {

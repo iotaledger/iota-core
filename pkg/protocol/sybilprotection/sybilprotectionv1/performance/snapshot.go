@@ -137,7 +137,10 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 			if err := binary.Read(reader, binary.LittleEndian, &reward); err != nil {
 				return ierrors.Wrapf(err, "unable to read reward for account %s and epoch index %d", accountID, epochIndex)
 			}
-			rewardsTree.Set(accountID, &reward)
+
+			if err := rewardsTree.Set(accountID, &reward); err != nil {
+				return ierrors.Wrapf(err, "unable to set reward for account %s and epoch index %d", accountID, epochIndex)
+			}
 		}
 
 		if err := rewardsTree.Commit(); err != nil {

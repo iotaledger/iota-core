@@ -156,7 +156,10 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 		targetCommitteeEpoch = nextEpoch
 	}
 
-	committeeRoot = o.committeeRoot(targetCommitteeEpoch)
+	committeeRoot, err := o.committeeRoot(targetCommitteeEpoch)
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to calculate committee root for epoch %d", targetCommitteeEpoch))
+	}
 
 	var targetRewardsEpoch iotago.EpochIndex
 	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) == slot {
@@ -172,7 +175,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 	return
 }
 
-func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) iotago.Identifier {
+func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) (committeeRoot iotago.Identifier, err error) {
 	committee, exists := o.performanceTracker.LoadCommitteeForEpoch(targetCommitteeEpoch)
 	if !exists {
 		panic(fmt.Sprintf("committee for a finished epoch %d not found", targetCommitteeEpoch))
@@ -183,13 +186,18 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		iotago.AccountID.Bytes,
 		iotago.IdentifierFromBytes,
 	)
+
+	var innerErr error
 	committee.ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
-		comitteeTree.Add(accountID)
+		if err := comitteeTree.Add(accountID); err != nil {
+			innerErr = ierrors.Wrapf(err, "failed to add account %s to committee tree", accountID)
+			return false
+		}
 
 		return true
 	})
 
-	return iotago.Identifier(comitteeTree.Root())
+	return iotago.Identifier(comitteeTree.Root()), innerErr
 }
 
 func (o *SybilProtection) SeatManager() seatmanager.SeatManager {
