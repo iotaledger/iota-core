@@ -33,11 +33,10 @@ func init() {
 		DepsFunc: func(cDeps dependencies) { deps = cDeps },
 		Params:   params,
 		Run:      run,
-		IsEnabled: func(container *dig.Container) bool {
-			if err := container.Provide(createCollector); err != nil {
-				panic(ierrors.Wrap(err, "failed to provide collector"))
-			}
-
+		Provide: func(c *dig.Container) error {
+			return c.Provide(createCollector)
+		},
+		IsEnabled: func(_ *dig.Container) bool {
 			return ParamsMetrics.Enabled
 		},
 	}

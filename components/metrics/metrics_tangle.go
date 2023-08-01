@@ -12,7 +12,7 @@ const (
 	strongTipsCount     = "strong_tips_count"
 	weakTipsCount       = "weak_tips_count"
 	blocksTotal         = "blocks_total"
-	missingBlocksCount  = "missing_block_total"
+	missingBlocksCount  = "missing_blocks_total"
 	acceptedBlocksCount = "accepted_blocks_count"
 )
 
@@ -35,21 +35,21 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 			return float64(count), nil
 		}),
 	)),
-	collector.WithMetric(collector.NewMetric(missingBlocksCount,
-		collector.WithType(collector.Counter),
-		collector.WithHelp("Number of blocks missing during the solidification in the tangle"),
-		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.BlockDAG.BlockMissing.Hook(func(_ *blocks.Block) {
-				deps.Collector.Increment(tangleNamespace, missingBlocksCount)
-			}, event.WithWorkerPool(Component.WorkerPool))
-		}),
-	)),
 	collector.WithMetric(collector.NewMetric(blocksTotal,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Total number of blocks attached."),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
 				deps.Collector.Increment(tangleNamespace, blocksTotal)
+			}, event.WithWorkerPool(Component.WorkerPool))
+		}),
+	)),
+	collector.WithMetric(collector.NewMetric(missingBlocksCount,
+		collector.WithType(collector.Counter),
+		collector.WithHelp("Number of blocks missing during the solidification in the tangle"),
+		collector.WithInitFunc(func() {
+			deps.Protocol.Events.Engine.BlockDAG.BlockMissing.Hook(func(_ *blocks.Block) {
+				deps.Collector.Increment(tangleNamespace, missingBlocksCount)
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),

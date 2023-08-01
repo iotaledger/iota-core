@@ -949,7 +949,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "irate(tangle_missing_block_total{instance=~\"$instance\"}[5m])",
+          "expr": "irate(tangle_missing_blocks_total{instance=~\"$instance\"}[5m])",
           "interval": "",
           "legendFormat": "Solidifier-requested blocks",
           "refId": "A"
@@ -1038,7 +1038,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "tangle_missing_block_total{instance=~\"$instance\"}",
+          "expr": "tangle_missing_blocks_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Solidifier-requested blocks",
           "refId": "A"
@@ -1757,7 +1757,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "tangle_missing_block_total{instance=~\"$instance\"}",
+          "expr": "tangle_missing_blocks_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Missing Blocks",
           "refId": "A"
