@@ -309,7 +309,7 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 	if prevIndex != 0 {
 		if prevSlot, exists := m.stateDiffs.Get(prevIndex); exists {
 			if err := prevSlot.RollbackTransaction(transaction); err != nil {
-				return ierrors.Wrap(err, "failed to rollback transaction")
+				return ierrors.Wrapf(err, "failed to rollback transaction, txID: %s", transaction.ID())
 			}
 		}
 	}
@@ -317,7 +317,7 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 	if transaction.IsAccepted() && newIndex != 0 {
 		if stateDiff, evicted := m.stateDiff(newIndex); !evicted {
 			if err := stateDiff.AddTransaction(transaction); err != nil {
-				return ierrors.Wrap(err, "failed to add transaction to state diff")
+				return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
 			}
 		}
 	}
@@ -347,7 +347,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 			if stateDiff, evicted := m.stateDiff(slotIndex); !evicted {
 				if err := stateDiff.AddTransaction(transaction); err != nil {
 					// TODO: use errorhandler?
-					panic(ierrors.Wrap(err, "failed to add transaction to state diff"))
+					panic(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
 				}
 			}
 		}

@@ -72,14 +72,14 @@ func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata
 func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) error {
 	if _, exists := s.executedTransactions.Set(transaction.ID(), transaction); !exists {
 		if err := s.mutations.Add(transaction.ID()); err != nil {
-			return ierrors.Wrapf(err, "failed to add transaction %s to state diff", transaction.ID())
+			return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
 		}
 		s.updateCompactedStateChanges(transaction, 1)
 
 		transaction.OnPending(func() {
 			if err := s.RollbackTransaction(transaction); err != nil {
 				// TODO: use error handler?
-				panic(ierrors.Wrap(err, "failed to rollback transaction"))
+				panic(ierrors.Wrapf(err, "failed to rollback transaction, txID: %s", transaction.ID()))
 			}
 		})
 	}
@@ -90,7 +90,7 @@ func (s *StateDiff) AddTransaction(transaction *TransactionMetadata) error {
 func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) error {
 	if s.executedTransactions.Delete(transaction.ID()) {
 		if _, err := s.mutations.Delete(transaction.ID()); err != nil {
-			return ierrors.Wrap(err, "failed to delete transaction from state diff's mutations")
+			return ierrors.Wrapf(err, "failed to delete transaction from state diff's mutations, txID: %s", transaction.ID())
 		}
 		s.updateCompactedStateChanges(transaction, -1)
 	}

@@ -165,8 +165,8 @@ github.com/iancoleman/orderedmap v0.3.0 h1:5cbR2grmZR/DiVt+VJopEhtVs9YGInGIxAoMJ
 github.com/iancoleman/orderedmap v0.3.0/go.mod h1:XuLcCUkdL5owUCQeF2Ue9uuw1EptkJDkXXS7VoV7XGE=
 github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 h1:dTrD7X2PTNgli6EbS4tV9qu3QAm/kBU3XaYZV2xdzys=
 github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7/go.mod h1:ZRdPu684P0fQ1z8sXz4dj9H5LWHhz4a9oCtvjunkSrw=
-github.com/iotaledger/hive.go/ads v0.0.0-20230801113032-46f01c898d87 h1:plW2laURR+YPnWZRsvHNj0gk8e4XnTvEUw3WZsA3rA4=
-github.com/iotaledger/hive.go/ads v0.0.0-20230801113032-46f01c898d87/go.mod h1:kMlqAAlP438cwcCQDMR8Tr7MKwHSPUxxdNI21oMpHFg=
+github.com/iotaledger/hive.go/ads v0.0.0-20230801123622-68977cefd26c h1:30IivAOlvB4ZIiQUP8fDKGbVS/wyFOKyWCEoYfE8HkU=
+github.com/iotaledger/hive.go/ads v0.0.0-20230801123622-68977cefd26c/go.mod h1:HE3XMMjj/HkoV5oiTJjSuGkf9Ub/vR0RsaPtckmMKLc=
 github.com/iotaledger/hive.go/app v0.0.0-20230801123622-68977cefd26c h1:x1Heb+wya6MfM8rG6OgT5RzD7n4TnUMcGGKowwgkuiQ=
 github.com/iotaledger/hive.go/app v0.0.0-20230801123622-68977cefd26c/go.mod h1:5hgF99ztZ6MS2GLb2hb1kL535HnLf3B6RmKN7TyBFA8=
 github.com/iotaledger/hive.go/constraints v0.0.0-20230801123622-68977cefd26c h1:moK/keZm9OFoENIfevmIoePT2cN3vOYBy0RqM393o6c=

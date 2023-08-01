@@ -259,7 +259,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 	}
 
 	if err := m.accountsTree.Commit(); err != nil {
-		return ierrors.Wrap(err, "can't add account, could not commit accounts tree")
+		return ierrors.Wrapf(err, "can't add account (%s), could not commit accounts tree", accountOutput.AccountID)
 	}
 
 	return nil

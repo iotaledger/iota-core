@@ -196,8 +196,11 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 
 		return true
 	})
+	if innerErr != nil {
+		return iotago.Identifier{}, innerErr
+	}
 
-	return iotago.Identifier(comitteeTree.Root()), innerErr
+	return iotago.Identifier(comitteeTree.Root()), nil
 }
 
 func (o *SybilProtection) SeatManager() seatmanager.SeatManager {

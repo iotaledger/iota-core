@@ -194,12 +194,12 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 
 	for _, output := range newOutputs {
 		if err := m.stateTree.Set(output.OutputID(), newStateMetadata(output)); err != nil {
-			return ierrors.Wrap(err, "failed to set new oputput in state tree")
+			return ierrors.Wrapf(err, "failed to set new oputput in state tree, outputID: %s", output.OutputID())
 		}
 	}
 	for _, spent := range newSpents {
 		if _, err := m.stateTree.Delete(spent.OutputID()); err != nil {
-			return ierrors.Wrap(err, "failed to delete spent output from state tree")
+			return ierrors.Wrapf(err, "failed to delete spent output from state tree, outputID: %s", spent.OutputID())
 		}
 	}
 
@@ -270,12 +270,12 @@ func (m *Manager) RollbackDiffWithoutLocking(index iotago.SlotIndex, newOutputs 
 
 	for _, spent := range newSpents {
 		if err := m.stateTree.Set(spent.OutputID(), newStateMetadata(spent.Output())); err != nil {
-			return ierrors.Wrap(err, "failed to set new spent output in state tree")
+			return ierrors.Wrapf(err, "failed to set new spent output in state tree, outputID: %s", spent.OutputID())
 		}
 	}
 	for _, output := range newOutputs {
 		if _, err := m.stateTree.Delete(output.OutputID()); err != nil {
-			return ierrors.Wrap(err, "failed to delete new output from state tree")
+			return ierrors.Wrapf(err, "failed to delete new output from state tree, outputID: %s", output.OutputID())
 		}
 	}
 
@@ -308,7 +308,7 @@ func (m *Manager) CheckLedgerState(tokenSupply iotago.BaseToken) error {
 
 func (m *Manager) AddGenesisUnspentOutputWithoutLocking(unspentOutput *Output) error {
 	if err := m.importUnspentOutputWithoutLocking(unspentOutput); err != nil {
-		return ierrors.Wrap(err, "failed to import unspent output")
+		return ierrors.Wrapf(err, "failed to import unspent output, outputID: %s", unspentOutput.OutputID())
 	}
 
 	if err := m.stateTree.Commit(); err != nil {
@@ -341,7 +341,7 @@ func (m *Manager) importUnspentOutputWithoutLocking(unspentOutput *Output) error
 	}
 
 	if err := m.stateTree.Set(unspentOutput.OutputID(), newStateMetadata(unspentOutput)); err != nil {
-		return ierrors.Wrap(err, "failed to set state tree entry")
+		return ierrors.Wrapf(err, "failed to set state tree entry for output, outputID: %s", unspentOutput.OutputID())
 	}
 
 	return nil

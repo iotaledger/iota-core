@@ -41,7 +41,7 @@ func (m *SlotMutations) AddAcceptedBlock(block *blocks.Block) (err error) {
 	}
 
 	if err := m.AcceptedBlocks(blockID.Index(), true).Add(blockID); err != nil {
-		return ierrors.Wrap(err, "failed to add block to accepted blocks")
+		return ierrors.Wrapf(err, "failed to add block to accepted blocks, blockID: %s", blockID.ToHex())
 	}
 
 	return

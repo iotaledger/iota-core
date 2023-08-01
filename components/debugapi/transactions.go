@@ -28,7 +28,7 @@ func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) error {
 	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.Identifier, txMeta mempool.TransactionMetadata) bool {
 		tcs.IncludedTransactions = append(tcs.IncludedTransactions, txMeta.ID().String())
 		if err := mutationsTree.Add(txMeta.ID()); err != nil {
-			innerErr = ierrors.Wrap(err, "failed to add transaction to mutations tree")
+			innerErr = ierrors.Wrapf(err, "failed to add transaction to mutations tree, txID: %s", txMeta.ID())
 
 			return false
 		}
