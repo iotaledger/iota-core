@@ -166,7 +166,7 @@ func (m *Metric) reset() {
 // deleteLabels deletes the metric value matching the provided labels.
 func (m *Metric) deleteLabels(labels map[string]string) {
 	// We can only reset labels if we initialized this metric to have labels in the first place.
-	if len(m.labels) == len(labels) {
+	if len(m.labels) > 0 && len(m.labels) == len(labels) {
 		switch m.Type {
 		case Gauge:
 			//nolint:forcetypeassert // we can safely assume that this is a GaugeVec
