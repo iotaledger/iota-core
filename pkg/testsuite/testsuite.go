@@ -100,9 +100,9 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsSlotsPerEpochExponent,
 				),
 				iotago.WithLivenessOptions(
+					t.optsLivenessThreshold,
 					t.optsMinCommittableAge,
 					t.optsMaxCommittableAge,
-					t.optsLivenessThreshold,
 					t.optsEpochNearingThreshold,
 				),
 				iotago.WithStakingOptions(1),

@@ -20,7 +20,6 @@ import (
 )
 
 func Test_Upgrade_Signaling(t *testing.T) {
-	t.Skip("TODO: re-enable this test")
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithLivenessThreshold(1),
 		testsuite.WithMinCommittableAge(1),
