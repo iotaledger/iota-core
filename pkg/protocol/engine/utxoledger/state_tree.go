@@ -3,7 +3,7 @@ package utxoledger
 import (
 	"bytes"
 
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -44,7 +44,7 @@ func (m *Manager) StateTreeRoot() iotago.Identifier {
 }
 
 func (m *Manager) CheckStateTree() bool {
-	comparisonTree := ds.NewAuthenticatedMap(mapdb.NewMapDB(),
+	comparisonTree := ads.NewMap(mapdb.NewMapDB(),
 		iotago.OutputID.Bytes,
 		iotago.OutputIDFromBytes,
 		(*stateTreeMetadata).Bytes,

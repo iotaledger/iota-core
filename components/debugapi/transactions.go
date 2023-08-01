@@ -1,7 +1,7 @@
 package debugapi
 
 import (
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -18,7 +18,7 @@ func init() {
 func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) {
 	slot := scd.Commitment.Index()
 	stateDiff := deps.Protocol.MainEngineInstance().Ledger.MemPool().StateDiff(slot)
-	mutationsTree := ds.NewAuthenticatedSet(mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes)
+	mutationsTree := ads.NewSet(mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes)
 	tcs := &TransactionsChangesResponse{
 		Index:                slot,
 		IncludedTransactions: make([]string, 0),

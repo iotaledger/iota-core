@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -180,7 +180,7 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		panic(fmt.Sprintf("committee for a finished epoch %d not found", targetCommitteeEpoch))
 	}
 
-	comitteeTree := ds.NewAuthenticatedSet(
+	comitteeTree := ads.NewSet(
 		mapdb.NewMapDB(),
 		iotago.AccountID.Bytes,
 		iotago.IdentifierFromBytes,

@@ -9,13 +9,13 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20230728082521-74f3f2957f0c
+	github.com/iotaledger/hive.go/ads v0.0.0-20230801113032-46f01c898d87
 	github.com/iotaledger/hive.go/app v0.0.0-20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/autopeering v0.0.0-20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230728082521-74f3f2957f0c
-	github.com/iotaledger/hive.go/ds v0.0.0-20230731151103-87c854d84352
+	github.com/iotaledger/hive.go/ds v0.0.0-20230801112644-fea872b897f6
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230728082521-74f3f2957f0c
 	github.com/iotaledger/hive.go/lo v0.0.0-20230728082521-74f3f2957f0c
@@ -46,7 +46,6 @@ require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
-	github.com/celestiaorg/smt v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect

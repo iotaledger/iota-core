@@ -1,7 +1,7 @@
 package slotnotarization
 
 import (
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
@@ -14,7 +14,7 @@ import (
 // SlotMutations is an in-memory data structure that enables the collection of mutations for uncommitted slots.
 type SlotMutations struct {
 	// acceptedBlocksBySlot stores the accepted blocks per slot.
-	acceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.AuthenticatedSet[iotago.BlockID]]
+	acceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ads.Set[iotago.BlockID]]
 
 	// latestCommittedIndex stores the index of the latest committed slot.
 	latestCommittedIndex iotago.SlotIndex
@@ -25,7 +25,7 @@ type SlotMutations struct {
 // NewSlotMutations creates a new SlotMutations instance.
 func NewSlotMutations(lastCommittedSlot iotago.SlotIndex) *SlotMutations {
 	return &SlotMutations{
-		acceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, ds.AuthenticatedSet[iotago.BlockID]](),
+		acceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, ads.Set[iotago.BlockID]](),
 		latestCommittedIndex: lastCommittedSlot,
 	}
 }
@@ -71,10 +71,10 @@ func (m *SlotMutations) Reset(index iotago.SlotIndex) {
 }
 
 // AcceptedBlocks returns the set of accepted blocks for the given slot.
-func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) ds.AuthenticatedSet[iotago.BlockID] {
+func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) ads.Set[iotago.BlockID] {
 	if len(createIfMissing) > 0 && createIfMissing[0] {
-		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, func() ds.AuthenticatedSet[iotago.SlotIdentifier] {
-			return ds.NewAuthenticatedSet(mapdb.NewMapDB(), iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes)
+		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, func() ads.Set[iotago.SlotIdentifier] {
+			return ads.NewSet(mapdb.NewMapDB(), iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes)
 		}))
 	}
 

@@ -1,7 +1,7 @@
 package mempool
 
 import (
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -22,5 +22,5 @@ type StateDiff interface {
 	ExecutedTransactions() *orderedmap.OrderedMap[iotago.TransactionID, TransactionMetadata]
 
 	// Mutations returns an authenticated data structure that allows to commit to the applied mutations.
-	Mutations() ds.AuthenticatedSet[iotago.TransactionID]
+	Mutations() ads.Set[iotago.TransactionID]
 }

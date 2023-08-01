@@ -1,7 +1,7 @@
 package performance
 
 import (
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -117,8 +117,8 @@ func (t *Tracker) rewardsStorage(epochIndex iotago.EpochIndex) kvstore.KVStore {
 	return lo.PanicOnErr(t.rewardBaseStore.WithExtendedRealm(epochIndex.MustBytes()))
 }
 
-func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) ds.AuthenticatedMap[iotago.AccountID, *PoolRewards] {
-	return ds.NewAuthenticatedMap(t.rewardsStorage(epochIndex),
+func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) ads.Map[iotago.AccountID, *PoolRewards] {
+	return ads.NewMap(t.rewardsStorage(epochIndex),
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
 		(*PoolRewards).Bytes,

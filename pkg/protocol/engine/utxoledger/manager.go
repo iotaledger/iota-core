@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 
-	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -20,7 +20,7 @@ type Manager struct {
 	store     kvstore.KVStore
 	storeLock syncutils.RWMutex
 
-	stateTree ds.AuthenticatedMap[iotago.OutputID, *stateTreeMetadata]
+	stateTree ads.Map[iotago.OutputID, *stateTreeMetadata]
 
 	apiProvider api.Provider
 }
@@ -28,7 +28,7 @@ type Manager struct {
 func New(store kvstore.KVStore, apiProvider api.Provider) *Manager {
 	return &Manager{
 		store: store,
-		stateTree: ds.NewAuthenticatedMap(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree})),
+		stateTree: ads.NewMap(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree})),
 			iotago.OutputID.Bytes,
 			iotago.OutputIDFromBytes,
 			(*stateTreeMetadata).Bytes,

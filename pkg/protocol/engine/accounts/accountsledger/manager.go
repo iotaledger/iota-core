@@ -1,6 +1,7 @@
 package accountsledger
 
 import (
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -27,7 +28,7 @@ type Manager struct {
 
 	// accountsTree represents the Block Issuer data vector for all registered accounts that have a block issuer feature
 	// at the latest committed slot, it is updated on the slot commitment.
-	accountsTree ds.AuthenticatedMap[iotago.AccountID, *accounts.AccountData]
+	accountsTree ads.Map[iotago.AccountID, *accounts.AccountData]
 
 	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
 	slotDiff func(iotago.SlotIndex) *prunable.AccountDiffs
@@ -49,7 +50,7 @@ func New(
 ) *Manager {
 	return &Manager{
 		blockBurns: shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
-		accountsTree: ds.NewAuthenticatedMap(accountsStore,
+		accountsTree: ads.NewMap(accountsStore,
 			iotago.Identifier.Bytes,
 			iotago.IdentifierFromBytes,
 			(*accounts.AccountData).Bytes,
