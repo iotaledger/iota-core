@@ -46,7 +46,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(3),
+				slotattestation.NewProvider(),
 			),
 		},
 		"node2": {
@@ -58,7 +58,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(3),
+				slotattestation.NewProvider(),
 			),
 		},
 	})
@@ -417,7 +417,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(3),
+				slotattestation.NewProvider(),
 			),
 		)
 		ts.Wait()
@@ -466,7 +466,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(3),
+				slotattestation.NewProvider(),
 			),
 		)
 		ts.Wait()
@@ -542,7 +542,7 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 }
 
 // TODO: refactor the test to test the empty slots in a simpler way
-//func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
+// func TestProtocol_StartNodeFromSnapshotAndDiskWithEmptySlot(t *testing.T) {
 //	ts := testsuite.NewTestSuite(t, testsuite.WithGenesisTimestampOffset(100*10))
 //	defer ts.Shutdown()
 //
@@ -1053,4 +1053,4 @@ func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
 //			ts.AssertAttestationsForSlot(12, ts.Blocks(), ts.Nodes()...)
 //		}
 //	}
-//}
+// }

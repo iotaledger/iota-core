@@ -51,7 +51,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			slotnotarization.NewProvider(),
 		),
 		protocol.WithAttestationProvider(
-			slotattestation.NewProvider(2),
+			slotattestation.NewProvider(),
 		),
 		protocol.WithChainManagerOptions(
 			chainmanager.WithCommitmentRequesterOptions(
