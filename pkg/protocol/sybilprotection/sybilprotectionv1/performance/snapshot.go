@@ -254,7 +254,7 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 	for epoch := targetEpoch; epoch > iotago.EpochIndex(0); epoch-- {
 		rewardsTree := t.rewardsMap(epoch)
 
-		// if the tree is new, we can skip this epoch and the previous ones, as we never stored any rewards
+		// if the tree was not present in storage we can skip this epoch and the previous ones, as we never stored any rewards
 		if !rewardsTree.WasRestoredFromStorage() {
 			break
 		}
