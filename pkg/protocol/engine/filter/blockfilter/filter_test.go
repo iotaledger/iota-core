@@ -226,7 +226,7 @@ func TestFilter_Commitments(t *testing.T) {
 	v3API := iotago.V3API(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithTimeProviderOptions(time.Now().Add(-20*time.Minute).Unix(), 10, 13),
-			iotago.WithLivenessOptions(10, 20, 3, 4),
+			iotago.WithLivenessOptions(3, 10, 20, 4),
 		),
 	)
 
@@ -266,7 +266,7 @@ func TestFilter_TransactionCommitmentInput(t *testing.T) {
 	v3API := iotago.V3API(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithTimeProviderOptions(time.Now().Add(-20*time.Minute).Unix(), 10, 13),
-			iotago.WithLivenessOptions(10, 20, 3, 4),
+			iotago.WithLivenessOptions(3, 10, 20, 4),
 		),
 	)
 
