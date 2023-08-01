@@ -67,9 +67,9 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230731083259-84bc933db7cd // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230731083259-84bc933db7cd // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230731083259-84bc933db7cd // indirect
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726135831-dd0c6ef61d5b // indirect
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230726135421-ca90b96ff054 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230731163927-74957cb14e00 // indirect
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230728083245-0d4d3a00c9ef // indirect
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230731154403-7e7f39549e54 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230801092445-15e4788d0d99 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
@@ -156,8 +156,8 @@ require (
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.11.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230725213213-b022f6e96895 // indirect
-	google.golang.org/grpc v1.56.2 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230726155614-23370e0ffb3e // indirect
+	google.golang.org/grpc v1.57.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
