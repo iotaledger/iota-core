@@ -51,7 +51,7 @@ func staking() (*apimodels.AccountStakingListResponse, error) {
 
 	for _, accountData := range activeValidators {
 		resp.Stakers = append(resp.Stakers, apimodels.ValidatorResponse{
-			AccountID:                      accountData.ID.ToHex(),
+			AccountID:                      accountData.ID,
 			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 			ValidatorStake:                 accountData.ValidatorStake,
 			FixedCost:                      accountData.FixedCost,
@@ -79,7 +79,7 @@ func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	}
 
 	return &apimodels.ValidatorResponse{
-		AccountID:                      accountID.ToHex(),
+		AccountID:                      accountID,
 		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 		ValidatorStake:                 accountData.ValidatorStake,
 		StakingEpochEnd:                accountData.StakeEndEpoch,
@@ -162,7 +162,7 @@ func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
 	committee := make([]apimodels.CommitteeMemberResponse, 0, seatedAccounts.Accounts().Size())
 	seatedAccounts.Accounts().ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
 		committee = append(committee, apimodels.CommitteeMemberResponse{
-			AccountID:      accountID.ToHex(),
+			AccountID:      accountID,
 			PoolStake:      seat.PoolStake,
 			ValidatorStake: seat.ValidatorStake,
 			FixedCost:      seat.FixedCost,

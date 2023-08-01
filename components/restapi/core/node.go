@@ -1,8 +1,6 @@
 package core
 
 import (
-	"encoding/json"
-
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
@@ -12,12 +10,6 @@ func info() (*apimodels.InfoResponse, error) {
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
 	protoParams := deps.Protocol.CurrentAPI().ProtocolParameters()
-
-	protoParamsBytes, err := deps.Protocol.CurrentAPI().JSONEncode(protoParams)
-	if err != nil {
-		return nil, err
-	}
-	protoParamsJSONRaw := json.RawMessage(protoParamsBytes)
 
 	return &apimodels.InfoResponse{
 		Name:    deps.AppInfo.Name,
@@ -41,7 +33,16 @@ func info() (*apimodels.InfoResponse, error) {
 			ConfirmationRate:         metrics.ConfirmedRate,
 		},
 		SupportedProtocolVersions: deps.Protocol.SupportedVersions(),
-		ProtocolParameters:        &protoParamsJSONRaw,
-		Features:                  features,
+		ProtocolParameters:        protoParams,
+		// TODO: fill in base token
+		BaseToken: &apimodels.InfoResBaseToken{
+			Name:            "IOTA",
+			TickerSymbol:    "todo",
+			Unit:            "todo",
+			Subunit:         "todo",
+			Decimals:        10,
+			UseMetricPrefix: false,
+		},
+		Features: features,
 	}, nil
 }

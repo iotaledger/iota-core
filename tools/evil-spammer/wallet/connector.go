@@ -205,7 +205,7 @@ func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
 
 		info, err := tmpClient.Info(context.Background())
 		if err == nil {
-			_ = tmpAPI.JSONDecode(*info.ProtocolParameters, &w.optsProtocolParams)
+			w.optsProtocolParams = info.ProtocolParameters
 		}
 
 		w.serixAPI = iotago.V3API(w.optsProtocolParams)

@@ -55,9 +55,9 @@ func blockIssuance(_ echo.Context) (*apimodels.IssuanceBlockHeaderResponse, erro
 	}
 
 	resp := &apimodels.IssuanceBlockHeaderResponse{
-		StrongParents:       references[iotago.StrongParentType].ToHex(),
-		WeakParents:         references[iotago.WeakParentType].ToHex(),
-		ShallowLikeParents:  references[iotago.ShallowLikeParentType].ToHex(),
+		StrongParents:       references[iotago.StrongParentType],
+		WeakParents:         references[iotago.WeakParentType],
+		ShallowLikeParents:  references[iotago.ShallowLikeParentType],
 		LatestFinalizedSlot: deps.Protocol.SyncManager.LatestFinalizedSlot(),
 		Commitment:          *slotCommitment.Commitment(),
 	}
@@ -125,6 +125,6 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 	}
 
 	return &apimodels.BlockCreatedResponse{
-		BlockID: blockID.ToHex(),
+		BlockID: blockID,
 	}, nil
 }
