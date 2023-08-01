@@ -118,7 +118,6 @@ func (c *CommitmentFilter) isFutureBlock(block *model.Block) (isFutureBlock bool
 }
 
 func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
-	// TODO: redo optimisations to mark future block rather than checking each time.
 	if c.isFutureBlock(block) {
 		return
 	}

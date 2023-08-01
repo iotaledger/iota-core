@@ -102,8 +102,7 @@ func Test_TransitionAccount(t *testing.T) {
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID: genesisAccountOutput.AccountID,
-		// TODO: why do we use the deposit here as credits?
+		ID:         genesisAccountOutput.AccountID,
 		Credits:    accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
 		OutputID:   iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 		PubKeys:    ds.NewSet(oldGenesisOutputKey, newGenesisOutputKey),
