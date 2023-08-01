@@ -56,10 +56,11 @@ type TestSuite struct {
 	optsWaitFor                time.Duration
 	optsTick                   time.Duration
 
-	uniqueCounter        atomic.Int64
-	mutex                syncutils.RWMutex
-	TransactionFramework *TransactionFramework
-	genesisSeed          [32]byte
+	uniqueBlockTimeCounter             atomic.Int64
+	automaticTransactionIssuingCounter atomic.Int64
+	mutex                              syncutils.RWMutex
+	TransactionFramework               *TransactionFramework
+	genesisSeed                        [32]byte
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {

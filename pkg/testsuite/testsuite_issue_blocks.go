@@ -52,7 +52,7 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	defer t.mutex.Unlock()
 
 	timeProvider := t.API.TimeProvider()
-	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
 
 	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
@@ -71,11 +71,30 @@ func (t *TestSuite) IssueValidationBlockAtSlotWithOptions(alias string, slot iot
 
 	timeProvider := t.API.TimeProvider()
 
-	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
 
 	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
 	block := node.IssueValidationBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime))...)
+
+	t.registerBlock(alias, block)
+
+	return block
+}
+
+func (t *TestSuite) IssueBasicBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockOpts, node)
+
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	timeProvider := t.API.TimeProvider()
+
+	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
+
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
+
+	block := node.IssueBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime))...)
 
 	t.registerBlock(alias, block)
 
@@ -89,7 +108,7 @@ func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIn
 	defer t.mutex.Unlock()
 
 	timeProvider := t.API.TimeProvider()
-	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
 
 	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
@@ -124,7 +143,22 @@ func (t *TestSuite) IssueBlockRowInSlot(slot iotago.SlotIndex, row int, parentsP
 		blockAlias := fmt.Sprintf("%d.%d-%s", slot, row, node.Name)
 		issuingOptionsCopy[node.Name] = append(issuingOptionsCopy[node.Name], blockfactory.WithStrongParents(strongParents...))
 
-		b := t.IssueValidationBlockAtSlotWithOptions(blockAlias, slot, node, issuingOptionsCopy[node.Name]...)
+		var b *blocks.Block
+		if node.Validator {
+			b = t.IssueValidationBlockAtSlotWithOptions(blockAlias, slot, node, issuingOptionsCopy[node.Name]...)
+		} else {
+			txCount := t.automaticTransactionIssuingCounter.Add(1)
+			inputAlias := fmt.Sprintf("automaticSpent-%d:0", txCount-1)
+			txAlias := fmt.Sprintf("automaticSpent-%d", txCount)
+			if txCount == 1 {
+				inputAlias = "Genesis:0"
+			}
+			tx, err := t.TransactionFramework.CreateSimpleTransaction(txAlias, 1, inputAlias)
+			require.NoError(t.Testing, err)
+
+			issuingOptionsCopy[node.Name] = append(issuingOptionsCopy[node.Name], blockfactory.WithPayload(tx))
+			b = t.IssueBasicBlockAtSlotWithOptions(blockAlias, slot, node, issuingOptionsCopy[node.Name]...)
+		}
 		blocksIssued = append(blocksIssued, b)
 	}
 
