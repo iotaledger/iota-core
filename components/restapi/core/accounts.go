@@ -39,7 +39,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 
 func staking() (*apimodels.AccountStakingListResponse, error) {
 	resp := &apimodels.AccountStakingListResponse{
-		Stakers: make([]apimodels.ValidatorResponse, 0),
+		Stakers: make([]*apimodels.ValidatorResponse, 0),
 	}
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
@@ -50,7 +50,7 @@ func staking() (*apimodels.AccountStakingListResponse, error) {
 	}
 
 	for _, accountData := range activeValidators {
-		resp.Stakers = append(resp.Stakers, apimodels.ValidatorResponse{
+		resp.Stakers = append(resp.Stakers, &apimodels.ValidatorResponse{
 			AccountID:                      accountData.ID,
 			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 			ValidatorStake:                 accountData.ValidatorStake,
@@ -159,9 +159,9 @@ func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
 	}
 
 	seatedAccounts := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(slotIndex)
-	committee := make([]apimodels.CommitteeMemberResponse, 0, seatedAccounts.Accounts().Size())
+	committee := make([]*apimodels.CommitteeMemberResponse, 0, seatedAccounts.Accounts().Size())
 	seatedAccounts.Accounts().ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
-		committee = append(committee, apimodels.CommitteeMemberResponse{
+		committee = append(committee, &apimodels.CommitteeMemberResponse{
 			AccountID:      accountID,
 			PoolStake:      seat.PoolStake,
 			ValidatorStake: seat.ValidatorStake,

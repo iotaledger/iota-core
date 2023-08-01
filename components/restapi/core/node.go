@@ -13,15 +13,9 @@ func protocolParameters() ([]*apimodels.InfoResProtocolParameters, error) {
 			continue
 		}
 
-		protoParamsBytes, err := deps.Protocol.CurrentAPI().JSONEncode(protocolParams)
-		if err != nil {
-			return nil, err
-		}
-		protoParamsJSONRaw := json.RawMessage(protoParamsBytes)
-
 		protoParams = append(protoParams, &apimodels.InfoResProtocolParameters{
 			StartEpoch: version.StartEpoch,
-			Parameters: &protoParamsJSONRaw,
+			Parameters: protocolParams,
 		})
 	}
 
@@ -43,11 +37,11 @@ func info() (*apimodels.InfoResponse, error) {
 		Version: deps.AppInfo.Version,
 		Status: &apimodels.InfoResNodeStatus{
 			IsHealthy:                   syncStatus.NodeSynced,
-			AcceptedTangleTime:          uint64(clSnapshot.AcceptedTime.UnixNano()),
-			RelativeAcceptedTangleTime:  uint64(clSnapshot.RelativeAcceptedTime.UnixNano()),
-			ConfirmedTangleTime:         uint64(clSnapshot.ConfirmedTime.UnixNano()),
-			RelativeConfirmedTangleTime: uint64(clSnapshot.RelativeConfirmedTime.UnixNano()),
-			LatestCommitmentID:          syncStatus.LatestCommitment.ID().ToHex(),
+			AcceptedTangleTime:          clSnapshot.AcceptedTime,
+			RelativeAcceptedTangleTime:  clSnapshot.RelativeAcceptedTime,
+			ConfirmedTangleTime:         clSnapshot.ConfirmedTime,
+			RelativeConfirmedTangleTime: clSnapshot.RelativeConfirmedTime,
+			LatestCommitmentID:          syncStatus.LatestCommitment.ID(),
 			LatestFinalizedSlot:         syncStatus.LatestFinalizedSlot,
 			LatestAcceptedBlockSlot:     syncStatus.LastAcceptedBlockSlot,
 			LatestConfirmedBlockSlot:    syncStatus.LastConfirmedBlockSlot,
@@ -59,8 +53,6 @@ func info() (*apimodels.InfoResponse, error) {
 			ConfirmationRate:         metrics.ConfirmedRate,
 		},
 		ProtocolParameters: protocolParams,
-		ProtocolParameters:        protoParams,
-		// TODO: fill in base token
 		BaseToken: &apimodels.InfoResBaseToken{
 			Name:            deps.BaseToken.Name,
 			TickerSymbol:    deps.BaseToken.TickerSymbol,
