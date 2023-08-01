@@ -10,19 +10,19 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/iotaledger/hive.go/ads v0.0.0-20230801113032-46f01c898d87
-	github.com/iotaledger/hive.go/app v0.0.0-20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/autopeering v0.0.0-20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/constraints v0.0.0-20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/ds v0.0.0-20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/lo v0.0.0-20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/logger v0.0.0-20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230801122522-6a9c0720fb6a
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230801122522-6a9c0720fb6a
+	github.com/iotaledger/hive.go/app v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/autopeering v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/ds v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/lo v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/logger v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230801123622-68977cefd26c
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230728083245-0d4d3a00c9ef
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230731154403-7e7f39549e54
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230801092445-15e4788d0d99
