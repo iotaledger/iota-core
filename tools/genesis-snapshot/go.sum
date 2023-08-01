@@ -51,8 +51,8 @@ github.com/iotaledger/hive.go/stringify v0.0.0-20230731083259-84bc933db7cd h1:qp
 github.com/iotaledger/hive.go/stringify v0.0.0-20230731083259-84bc933db7cd/go.mod h1:l/F3cA/+67QdNj+sohv2v4HhmsdOcWScoA+sVYoAE4c=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726135831-dd0c6ef61d5b h1:UTEDKQqCuggHIxicvmPUZiYUbI6EORyLgdY+vVhmB0w=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230726135831-dd0c6ef61d5b/go.mod h1:bCVbiVUZpvMs35hQy/KHM05iYBQ62HF9DKfGZmPtzSk=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230727110030-ef2685cb23e3 h1:l4UsjLVQN0NpnvFIqGJWRm+yzKCpJ/qz4T3c74SxXbo=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230727110030-ef2685cb23e3/go.mod h1:4IyZrkfhL9sXNKCwx/j8lhQOYo0tE2XIVla5WVP37LE=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230731163927-74957cb14e00 h1:sTg4zuVJAdxW12bALPzAaQryg7Adqq6dZZCKJP2u2hk=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230731163927-74957cb14e00/go.mod h1:t200rmGJFJZColNhPsuxo7RXaAjjDC+1jhQrZMKxUhA=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
