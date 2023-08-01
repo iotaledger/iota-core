@@ -35,10 +35,12 @@ func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*in
 		return nil, err
 	}
 
-	//TODO: use enums
 	return &inx.BlockMetadata{
-		BlockId:     blockID,
-		BlockStatus: uint32(blockMetadata.BlockState),
+		BlockId:            blockID,
+		BlockState:         inx.WrapBlockState(blockMetadata.BlockState),
+		BlockFailureReason: inx.WrapBlockFailureReason(blockMetadata.BlockFailureReason),
+		TxState:            inx.WrapTransactionState(blockMetadata.TxState),
+		TxFailureReason:    inx.WrapTransactionFailureReason(blockMetadata.TxFailureReason),
 	}, nil
 }
 

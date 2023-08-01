@@ -65,11 +65,11 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20230728082521-74f3f2957f0c // indirect
 	github.com/iotaledger/hive.go/logger v0.0.0-20230728082521-74f3f2957f0c // indirect
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230728082521-74f3f2957f0c // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230728082521-74f3f2957f0c // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230728100039-3d97aada979b // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230728082521-74f3f2957f0c // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230728083245-0d4d3a00c9ef // indirect
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230728083000-5d5bf43d8496 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230728082709-10877f09bdef // indirect
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230731154403-7e7f39549e54 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230728101416-f7471b67a415 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
