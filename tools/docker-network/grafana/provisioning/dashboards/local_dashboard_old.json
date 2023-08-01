@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -949,7 +949,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "irate(tangle_missing_blocks_total{instance=~\"$instance\"}[5m])",
+          "expr": "irate(tangle_missing_block_total{instance=~\"$instance\"}[5m])",
           "interval": "",
           "legendFormat": "Solidifier-requested blocks",
           "refId": "A"
@@ -1038,7 +1038,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "tangle_missing_blocks_total{instance=~\"$instance\"}",
+          "expr": "tangle_missing_block_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Solidifier-requested blocks",
           "refId": "A"
@@ -1087,8 +1087,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1146,8 +1145,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1202,8 +1200,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1261,8 +1258,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1319,8 +1315,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1374,8 +1369,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1429,8 +1423,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1484,8 +1477,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1539,8 +1531,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1757,7 +1748,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "tangle_missing_blocks_total{instance=~\"$instance\"}",
+          "expr": "tangle_missing_block_total{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "Missing Blocks",
           "refId": "A"
@@ -4856,8 +4847,8 @@
       {
         "current": {
           "selected": false,
-          "text": "node-01.feature.shimmer.iota.cafe:9311",
-          "value": "node-01.feature.shimmer.iota.cafe:9311"
+          "text": "faucet:9311",
+          "value": "faucet:9311"
         },
         "datasource": {
           "type": "prometheus",
@@ -4933,8 +4924,8 @@
     ]
   },
   "timezone": "",
-  "title": "iota-core Local Metrics",
+  "title": "iota-core Local Metrics (old)",
   "uid": "R-T27yW7k",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }
