@@ -134,4 +134,5 @@ func registerMetrics() {
 	deps.Collector.RegisterCollection(CommitmentsMetrics)
 	deps.Collector.RegisterCollection(SlotMetrics)
 	deps.Collector.RegisterCollection(AccountMetrics)
+	deps.Collector.RegisterCollection(SchedulerMetrics)
 }
