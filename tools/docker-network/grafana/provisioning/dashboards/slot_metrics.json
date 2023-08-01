@@ -174,7 +174,7 @@
               },
               "Value": {
                 "aggregations": [
-                  "max"
+                  "lastNotNull"
                 ],
                 "operation": "aggregate"
               },
@@ -209,33 +209,24 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
+            "axisSoftMax": 5,
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "linear",
             "lineWidth": 1,
-            "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -256,38 +247,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Created"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Accepted"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 6,
@@ -297,16 +257,25 @@
       },
       "id": 207,
       "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
         "tooltip": {
           "mode": "single",
           "sort": "none"
-        }
+        },
+        "xTickLabelRotation": 90,
+        "xTickLabelSpacing": 100
       },
       "pluginVersion": "9.5.6",
       "repeat": "instance",
@@ -318,9 +287,10 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_created_conflicts",
+          "expr": "slots_created_conflicts{instance=~\"$instance\"}",
           "format": "table",
-          "legendFormat": "__auto",
+          "hide": false,
+          "legendFormat": "Conflicts created",
           "range": true,
           "refId": "Created"
         },
@@ -330,17 +300,118 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "slots_accepted_conflicts\n",
+          "expr": "slots_accepted_conflicts{instance=~\"$instance\"}\n",
           "format": "table",
           "hide": false,
-          "legendFormat": "__auto",
+          "legendFormat": "Conflicts accepted",
           "range": true,
           "refId": "Accepted"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "slots_rejected_conflicts{instance=~\"$instance\"}",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "Conflicts rejected",
+          "range": true,
+          "refId": "Rejected"
         }
       ],
       "title": "Conflicts per slot $instance",
-      "transformations": [],
-      "type": "timeseries"
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "slot"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": false,
+                "field": "slot"
+              }
+            ]
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "Value": {
+                "aggregations": [
+                  "last"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #A": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #Accepted": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #Created": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #Rejected": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "__name__": {
+                "aggregations": []
+              },
+              "slot": {
+                "aggregations": [],
+                "operation": "groupby"
+              }
+            }
+          }
+        },
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "slot",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "string",
+                "targetField": "slot"
+              }
+            ],
+            "fields": {}
+          }
+        }
+      ],
+      "type": "barchart"
     }
   ],
   "refresh": "5s",
@@ -421,6 +492,6 @@
   "timezone": "",
   "title": "Global Slots View",
   "uid": "9eivfEo4z",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

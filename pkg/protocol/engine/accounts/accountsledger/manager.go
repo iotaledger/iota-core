@@ -223,7 +223,7 @@ func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.
 
 // AddAccount adds a new account to the Account tree, allotting to it the balance on the given output.
 // The Account will be created associating the given output as the latest state of the account.
-func (m *Manager) AddAccount(output *utxoledger.Output) error {
+func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iotago.BlockIssuanceCredits) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -245,9 +245,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 		accountOutput.AccountID,
 		append(
 			stakingOpts,
-			// TODO: this is only used during genesis snapshot generation,
-			//  but we shouldn't simply cast the iota value to credits here.
-			accounts.WithCredits(accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(accountOutput.Amount), m.latestCommittedSlot)),
+			accounts.WithCredits(accounts.NewBlockIssuanceCredits(blockIssuanceCredits, m.latestCommittedSlot)),
 			accounts.WithOutputID(output.OutputID()),
 			accounts.WithPubKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys...),
 			accounts.WithExpirySlot(accountOutput.FeatureSet().BlockIssuer().ExpirySlot),

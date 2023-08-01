@@ -83,11 +83,12 @@ func WithGenesisSeed(genesisSeed []byte) options.Option[Options] {
 type AccountDetails struct {
 	AccountID iotago.AccountID
 
-	Address    iotago.Address
-	Amount     iotago.BaseToken
-	Mana       iotago.Mana
-	IssuerKey  ed25519.PublicKey
-	ExpirySlot iotago.SlotIndex
+	Address              iotago.Address
+	Amount               iotago.BaseToken
+	Mana                 iotago.Mana
+	IssuerKey            ed25519.PublicKey
+	ExpirySlot           iotago.SlotIndex
+	BlockIssuanceCredits iotago.BlockIssuanceCredits
 
 	StakingEpochEnd iotago.EpochIndex
 	FixedCost       iotago.Mana
