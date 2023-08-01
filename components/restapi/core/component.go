@@ -150,10 +150,7 @@ func configure() error {
 	}
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
-		resp, err := info()
-		if err != nil {
-			return err
-		}
+		resp := info()
 
 		return responseByHeader(c, resp)
 	})

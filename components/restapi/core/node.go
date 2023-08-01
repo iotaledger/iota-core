@@ -4,7 +4,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-func protocolParameters() ([]*apimodels.InfoResProtocolParameters, error) {
+func protocolParameters() []*apimodels.InfoResProtocolParameters {
 	protoParams := make([]*apimodels.InfoResProtocolParameters, 0)
 	provider := deps.Protocol.MainEngineInstance().Storage.Settings().APIProvider()
 	for _, version := range provider.ProtocolEpochVersions() {
@@ -19,15 +19,10 @@ func protocolParameters() ([]*apimodels.InfoResProtocolParameters, error) {
 		})
 	}
 
-	return protoParams, nil
+	return protoParams
 }
 
-func info() (*apimodels.InfoResponse, error) {
-	protocolParams, err := protocolParameters()
-	if err != nil {
-		return nil, err
-	}
-
+func info() *apimodels.InfoResponse {
 	clSnapshot := deps.Protocol.MainEngineInstance().Clock.Snapshot()
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
@@ -52,7 +47,7 @@ func info() (*apimodels.InfoResponse, error) {
 			ConfirmedBlocksPerSecond: metrics.ConfirmedBlocksPerSecond,
 			ConfirmationRate:         metrics.ConfirmedRate,
 		},
-		ProtocolParameters: protocolParams,
+		ProtocolParameters: protocolParameters(),
 		BaseToken: &apimodels.InfoResBaseToken{
 			Name:            deps.BaseToken.Name,
 			TickerSymbol:    deps.BaseToken.TickerSymbol,
@@ -62,5 +57,5 @@ func info() (*apimodels.InfoResponse, error) {
 			UseMetricPrefix: deps.BaseToken.UseMetricPrefix,
 		},
 		Features: features,
-	}, nil
+	}
 }
