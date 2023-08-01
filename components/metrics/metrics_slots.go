@@ -86,6 +86,8 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithHelp("Number of conflicts created per slot."),
 		collector.WithInitFunc(func() {
+			// Attach to BlockAttached to initialize metric for the slot for improved readability in the Dashboard.
+			// Update for a counter doesn't override the value with 0, but rather adds 0 to the value.
 			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 				eventSlot := int(block.ID().Index())
 				deps.Collector.Update(slotNamespace, createdConflicts, 0, strconv.Itoa(eventSlot))
@@ -106,6 +108,13 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithHelp("Number of conflicts accepted per slot."),
 		collector.WithInitFunc(func() {
+			// Attach to BlockAttached to initialize metric for the slot for improved readability in the Dashboard.
+			// Update for a counter doesn't override the value with 0, but rather adds 0 to the value.
+			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+				eventSlot := int(block.ID().Index())
+				deps.Collector.Update(slotNamespace, acceptedConflicts, 0, strconv.Itoa(eventSlot))
+			}, event.WithWorkerPool(Component.WorkerPool))
+
 			deps.Protocol.Events.Engine.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
 				if txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadata(conflictID); exists {
 					for _, attachmentBlockID := range txMetadata.Attachments() {
@@ -123,6 +132,13 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithHelp("Number of conflicts rejected per slot."),
 		collector.WithInitFunc(func() {
+			// Attach to BlockAttached to initialize metric for the slot for improved readability in the Dashboard.
+			// Update for a counter doesn't override the value with 0, but rather adds 0 to the value.
+			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+				eventSlot := int(block.ID().Index())
+				deps.Collector.Update(slotNamespace, rejectedConflicts, 0, strconv.Itoa(eventSlot))
+			}, event.WithWorkerPool(Component.WorkerPool))
+
 			deps.Protocol.Events.Engine.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
 				if txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadata(conflictID); exists {
 					for _, attachmentBlockID := range txMetadata.Attachments() {

@@ -29,7 +29,7 @@ var InfoMetrics = collector.NewCollection(infoNamespace,
 				nodeID = deps.Local.ID().String()
 			}
 
-			return 0, []string{nodeID, runtime.GOOS, runtime.GOARCH, strconv.Itoa(runtime.GOMAXPROCS(0))}
+			return 0, []string{nodeID, runtime.GOOS, runtime.GOARCH, strconv.Itoa(runtime.NumCPU())}
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(syncStatus,

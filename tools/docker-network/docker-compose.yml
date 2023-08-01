@@ -135,6 +135,7 @@ services:
     environment:
       - GF_ALERTING_ENABLED=true
       - GF_UNIFIED_ALERTING_ENABLED=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/local_dashboard.json
     networks:
       - iota-core
     ports:
