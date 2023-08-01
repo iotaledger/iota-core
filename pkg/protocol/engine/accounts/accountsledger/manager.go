@@ -397,6 +397,7 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 			if _, err := m.accountsTree.Delete(accountID); err != nil {
 				return ierrors.Wrapf(err, "could not delete account (%s) from accounts tree", accountID)
 			}
+
 			continue
 		}
 
