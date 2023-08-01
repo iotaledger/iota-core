@@ -66,9 +66,9 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230801123622-68977cefd26c // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230801123622-68977cefd26c // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230801123622-68977cefd26c // indirect
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230728083245-0d4d3a00c9ef // indirect
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230731154403-7e7f39549e54 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230801092445-15e4788d0d99 // indirect
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230801163503-b55ade45411b // indirect
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230801163327-a72de1469de7 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230801163034-70beca23c22c // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
@@ -146,7 +146,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.11.0 // indirect
-	golang.org/x/exp v0.0.0-20230725093048-515e97ebf090 // indirect
+	golang.org/x/exp v0.0.0-20230724220655-d98519c11495 // indirect
 	golang.org/x/image v0.9.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.12.0 // indirect

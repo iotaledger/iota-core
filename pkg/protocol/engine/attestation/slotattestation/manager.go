@@ -7,12 +7,12 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 const (

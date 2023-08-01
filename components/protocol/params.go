@@ -22,6 +22,23 @@ type ParametersProtocol struct {
 		MinCommittableAge    uint64        `default:"6" usage:"the minimum age of a commitment or commitment input, relative to block issuance time"`
 		MaxCommittableAge    uint64        `default:"12" usage:"the maximum age of a commitment or commitment input, relative to block issuance time"`
 	}
+
+	BaseToken BaseToken
+}
+
+type BaseToken struct {
+	// the base token name
+	Name string `default:"Shimmer" usage:"the base token name"`
+	// the base token ticker symbol
+	TickerSymbol string `default:"SMR" usage:"the base token ticker symbol"`
+	// the base token unit
+	Unit string `default:"SMR" usage:"the base token unit"`
+	// the base token subunit
+	Subunit string `default:"glow" usage:"the base token subunit"`
+	// the base token amount of decimals
+	Decimals uint32 `default:"6" usage:"the base token amount of decimals"`
+	// the base token uses the metric prefix
+	UseMetricPrefix bool `default:"false" usage:"the base token uses the metric prefix"`
 }
 
 // ParametersDatabase contains the definition of configuration parameters used by the storage layer.

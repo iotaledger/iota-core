@@ -15,7 +15,7 @@ type BlockMetadata struct {
 
 func (b *BlockMetadata) BlockMetadataResponse() *apimodels.BlockMetadataResponse {
 	response := &apimodels.BlockMetadataResponse{
-		BlockID:            b.BlockID.ToHex(),
+		BlockID:            b.BlockID,
 		BlockState:         b.BlockState.String(),
 		BlockFailureReason: b.BlockFailureReason,
 		TxFailureReason:    b.TxFailureReason,

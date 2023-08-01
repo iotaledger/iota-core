@@ -9,8 +9,8 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/inx-app/pkg/api"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // ErrOutputsSumNotEqualTotalSupply is returned if the sum of the output deposits is not equal the total supply of tokens.

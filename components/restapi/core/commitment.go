@@ -33,15 +33,15 @@ func getUTXOChanges(index iotago.SlotIndex) (*apimodels.UTXOChangesResponse, err
 		return nil, err
 	}
 
-	createdOutputs := make([]string, len(diffs.Outputs))
-	consumedOutputs := make([]string, len(diffs.Spents))
+	createdOutputs := make(iotago.OutputIDs, len(diffs.Outputs))
+	consumedOutputs := make(iotago.OutputIDs, len(diffs.Spents))
 
 	for i, output := range diffs.Outputs {
-		createdOutputs[i] = output.OutputID().ToHex()
+		createdOutputs[i] = output.OutputID()
 	}
 
 	for i, output := range diffs.Spents {
-		consumedOutputs[i] = output.OutputID().ToHex()
+		consumedOutputs[i] = output.OutputID()
 	}
 
 	return &apimodels.UTXOChangesResponse{
