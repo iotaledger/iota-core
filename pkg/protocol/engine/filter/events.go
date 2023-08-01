@@ -7,20 +7,20 @@ import (
 )
 
 type Events struct {
-	BlockFiltered *event.Event1[*BlockFilteredEvent]
-	BlockAllowed  *event.Event1[*model.Block]
+	BlockPreFiltered *event.Event1[*BlockPreFilteredEvent]
+	BlockPreAllowed  *event.Event1[*model.Block]
 
 	event.Group[Events, *Events]
 }
 
 var NewEvents = event.CreateGroupConstructor(func() *Events {
 	return &Events{
-		BlockFiltered: event.New1[*BlockFilteredEvent](),
-		BlockAllowed:  event.New1[*model.Block](),
+		BlockPreFiltered: event.New1[*BlockPreFilteredEvent](),
+		BlockPreAllowed:  event.New1[*model.Block](),
 	}
 })
 
-type BlockFilteredEvent struct {
+type BlockPreFilteredEvent struct {
 	Block  *model.Block
 	Reason error
 	Source network.PeerID

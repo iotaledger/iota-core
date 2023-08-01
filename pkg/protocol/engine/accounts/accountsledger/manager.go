@@ -158,7 +158,7 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	defer m.mutex.RUnlock()
 
 	// if m.latestCommittedSlot < m.commitmentEvictionAge we should have all history
-	if m.latestCommittedSlot >= m.commitmentEvictionAge && targetIndex < m.latestCommittedSlot-m.commitmentEvictionAge {
+	if m.latestCommittedSlot >= m.commitmentEvictionAge && targetIndex+m.commitmentEvictionAge < m.latestCommittedSlot {
 		return nil, false, ierrors.Errorf("can't calculate account, target slot index older than allowed (%d<%d)", targetIndex, m.latestCommittedSlot-m.commitmentEvictionAge)
 	}
 	if targetIndex > m.latestCommittedSlot {
@@ -174,6 +174,7 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	if !exists {
 		loadedAccount = accounts.NewAccountData(accountID, accounts.WithCredits(accounts.NewBlockIssuanceCredits(0, targetIndex)))
 	}
+
 	wasDestroyed, err := m.rollbackAccountTo(loadedAccount, targetIndex)
 	if err != nil {
 		return nil, false, err
@@ -249,6 +250,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 			accounts.WithCredits(accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(accountOutput.Amount), m.latestCommittedSlot)),
 			accounts.WithOutputID(output.OutputID()),
 			accounts.WithPubKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys...),
+			accounts.WithExpirySlot(accountOutput.FeatureSet().BlockIssuer().ExpirySlot),
 		)...,
 	)
 
@@ -288,6 +290,10 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 
 		// update the account data with the diff
 		accountData.Credits.Update(-diffChange.BICChange, diffChange.PreviousUpdatedTime)
+		// update the expiry slot of the account if it was changed
+		if diffChange.PreviousExpirySlot != diffChange.NewExpirySlot {
+			accountData.ExpirySlot = diffChange.PreviousExpirySlot
+		}
 		// update the outputID only if the account got actually transitioned, not if it was only an allotment target
 		if diffChange.PreviousOutputID != iotago.EmptyOutputID {
 			accountData.OutputID = diffChange.PreviousOutputID
@@ -323,6 +329,8 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 	// we store the accountState in the form of a diff, so we can roll back to the previous state
 	slotDiff := prunable.NewAccountDiff()
 	slotDiff.BICChange = -accountData.Credits.Value
+	slotDiff.NewExpirySlot = iotago.SlotIndex(0)
+	slotDiff.PreviousExpirySlot = accountData.ExpirySlot
 	slotDiff.NewOutputID = iotago.EmptyOutputID
 	slotDiff.PreviousOutputID = accountData.OutputID
 	slotDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
@@ -401,6 +409,11 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 			// TODO: this needs to be decayed for (index - prevIndex) because update index is changed so it's impossible to use new decay
 			// //
 			accountData.Credits.Update(diffChange.BICChange, index)
+		}
+
+		// update the expiry slot of the account if it changed
+		if diffChange.PreviousExpirySlot != diffChange.NewExpirySlot {
+			accountData.ExpirySlot = diffChange.NewExpirySlot
 		}
 
 		// update the outputID only if the account got actually transitioned, not if it was only an allotment target

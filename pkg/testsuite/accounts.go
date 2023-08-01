@@ -37,6 +37,10 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected output %s, got %s", node.Name, accountData.ID, accountData.OutputID, actualAccountData.OutputID)
 			}
 
+			if accountData.ExpirySlot != actualAccountData.ExpirySlot {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected expiry slot %s, got %s", node.Name, accountData.ID, accountData.ExpirySlot, actualAccountData.ExpirySlot)
+			}
+
 			if !cmp.Equal(accountData.PubKeys.ToSlice(), actualAccountData.PubKeys.ToSlice()) {
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.PubKeys, actualAccountData.PubKeys)
 			}
@@ -73,6 +77,14 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 
 			if accountDiff.PreviousUpdatedTime != actualAccountDiff.PreviousUpdatedTime {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected previous updated time %d but actual %d for account %s at slot %d", node.Name, accountDiff.PreviousUpdatedTime, actualAccountDiff.PreviousUpdatedTime, accountID, index)
+			}
+
+			if accountDiff.NewExpirySlot != actualAccountDiff.NewExpirySlot {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected new expiry slot %d but actual %d for account %s at slot %d", node.Name, accountDiff.NewExpirySlot, actualAccountDiff.NewExpirySlot, accountID, index)
+			}
+
+			if accountDiff.PreviousExpirySlot != actualAccountDiff.PreviousExpirySlot {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected previous expiry slot %d but actual %d for account %s at slot %d", node.Name, accountDiff.PreviousExpirySlot, actualAccountDiff.PreviousExpirySlot, accountID, index)
 			}
 
 			if accountDiff.NewOutputID != actualAccountDiff.NewOutputID {

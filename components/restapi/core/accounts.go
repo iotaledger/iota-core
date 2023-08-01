@@ -19,12 +19,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		return nil, err
 	}
 
-	evictionAge := deps.Protocol.CurrentAPI().ProtocolParameters().EvictionAge()
-
-	slotIndex := deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time.Now())
-	if slotIndex >= evictionAge {
-		slotIndex -= evictionAge
-	}
+	slotIndex := deps.Protocol.SyncManager.LatestCommitment().Index()
 
 	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
 	if err != nil {

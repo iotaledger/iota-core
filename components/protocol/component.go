@@ -112,7 +112,6 @@ func provide(c *dig.Container) error {
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(
 					blockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
-					blockfilter.WithSignatureValidation(true),
 				),
 			),
 			// TODO: here we should pass the protocol parameters from the config.
@@ -136,8 +135,8 @@ func configure() error {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
-		Component.LogDebugf("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
+	deps.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+		Component.LogDebugf("BlockPreFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
 	})
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {

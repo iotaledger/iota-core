@@ -18,10 +18,11 @@ import (
 type AccountsData []*AccountData
 
 type AccountData struct {
-	ID       iotago.AccountID
-	Credits  *BlockIssuanceCredits
-	OutputID iotago.OutputID
-	PubKeys  ds.Set[ed25519.PublicKey]
+	ID         iotago.AccountID
+	Credits    *BlockIssuanceCredits
+	ExpirySlot iotago.SlotIndex
+	OutputID   iotago.OutputID
+	PubKeys    ds.Set[ed25519.PublicKey]
 
 	ValidatorStake  iotago.BaseToken
 	DelegationStake iotago.BaseToken
@@ -33,6 +34,7 @@ func NewAccountData(id iotago.AccountID, opts ...options.Option[AccountData]) *A
 	return options.Apply(&AccountData{
 		ID:              id,
 		Credits:         &BlockIssuanceCredits{},
+		ExpirySlot:      0,
 		OutputID:        iotago.EmptyOutputID,
 		PubKeys:         ds.NewSet[ed25519.PublicKey](),
 		ValidatorStake:  0,
@@ -70,8 +72,9 @@ func (a *AccountData) Clone() *AccountData {
 			Value:      a.Credits.Value,
 			UpdateTime: a.Credits.UpdateTime,
 		},
-		OutputID: a.OutputID,
-		PubKeys:  keyCopy,
+		ExpirySlot: a.ExpirySlot,
+		OutputID:   a.OutputID,
+		PubKeys:    keyCopy,
 
 		ValidatorStake:  a.ValidatorStake,
 		DelegationStake: a.DelegationStake,
@@ -109,6 +112,11 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read updatedTime for account balance for accountID %s", a.ID)
 	}
 	bytesConsumed += 8
+
+	if err := binary.Read(reader, binary.LittleEndian, &a.ExpirySlot); err != nil {
+		return bytesConsumed, ierrors.Wrapf(err, "unable to read expiry slot for accountID %s", a.ID)
+	}
+	bytesConsumed += iotago.SlotIndexLength
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.OutputID); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read outputID for accountID %s", a.ID)
@@ -165,6 +173,7 @@ func (a AccountData) Bytes() ([]byte, error) {
 	m := marshalutil.New()
 	m.WriteBytes(idBytes)
 	m.WriteBytes(lo.PanicOnErr(a.Credits.Bytes()))
+	m.WriteUint64(uint64(a.ExpirySlot))
 	m.WriteBytes(lo.PanicOnErr(a.OutputID.Bytes()))
 	m.WriteByte(byte(a.PubKeys.Size()))
 	a.PubKeys.Range(func(pubKey ed25519.PublicKey) {
@@ -182,6 +191,12 @@ func (a AccountData) Bytes() ([]byte, error) {
 func WithCredits(credits *BlockIssuanceCredits) options.Option[AccountData] {
 	return func(a *AccountData) {
 		a.Credits = credits
+	}
+}
+
+func WithExpirySlot(expirySlot iotago.SlotIndex) options.Option[AccountData] {
+	return func(a *AccountData) {
+		a.ExpirySlot = expirySlot
 	}
 }
 

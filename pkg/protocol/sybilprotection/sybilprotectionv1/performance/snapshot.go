@@ -340,7 +340,7 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 	apiForSlot := t.apiProvider.APIForSlot(targetSlot)
 	epochFromTargetSlot := apiForSlot.TimeProvider().EpochFromSlot(targetSlot)
 
-	pointOfNoReturn := apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) - apiForSlot.ProtocolParameters().EvictionAge()*2
+	pointOfNoReturn := apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) - apiForSlot.ProtocolParameters().MaxCommittableAge()
 
 	var innerErr error
 	err := t.committeeStore.KVStore().Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {

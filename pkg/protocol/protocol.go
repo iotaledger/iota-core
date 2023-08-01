@@ -24,6 +24,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter/accountsfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/drr"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
@@ -79,6 +81,7 @@ type Protocol struct {
 	optsStorageOptions      []options.Option[storage.Storage]
 
 	optsFilterProvider              module.Provider[*engine.Engine, filter.Filter]
+	optsCommitmentFilterProvider    module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
 	optsBlockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	optsTipManagerProvider          module.Provider[*engine.Engine, tipmanager.TipManager]
 	optsTipSelectionProvider        module.Provider[*engine.Engine, tipselection.TipSelection]
@@ -103,6 +106,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		supportVersions:                 apimodels.Versions{3},
 		dispatcher:                      dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
+		optsCommitmentFilterProvider:    accountsfilter.NewProvider(),
 		optsBlockDAGProvider:            inmemoryblockdag.NewProvider(),
 		optsTipManagerProvider:          tipmanagerv1.NewProvider(),
 		optsTipSelectionProvider:        tipselectionv1.NewProvider(),
@@ -205,6 +209,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsStorageOptions,
 		p.optsEngineOptions,
 		p.optsFilterProvider,
+		p.optsCommitmentFilterProvider,
 		p.optsBlockDAGProvider,
 		p.optsBookerProvider,
 		p.optsClockProvider,

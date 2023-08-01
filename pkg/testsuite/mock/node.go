@@ -26,6 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -260,12 +261,22 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.CurrentAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
-	events.Filter.BlockAllowed.Hook(func(block *model.Block) {
-		fmt.Printf("%s > [%s] Filter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
+	events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
+		fmt.Printf("%s > [%s] Filter.BlockPreAllowed: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
-		fmt.Printf("%s > [%s] Filter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+	events.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+		fmt.Printf("%s > [%s] Filter.BlockPreFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+		n.Testing.Fatal("no blocks should be prefiltered")
+	})
+
+	events.CommitmentFilter.BlockAllowed.Hook(func(block *model.Block) {
+		fmt.Printf("%s > [%s] CommitmentFilter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
+	})
+
+	events.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+		fmt.Printf("%s > [%s] CommitmentFilter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+		n.Testing.Fatal("no blocks should be filtered")
 	})
 
 	events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {

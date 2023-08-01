@@ -74,7 +74,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			// TODO: how do we want to handle changing API here?
 			iotagoAPI := l.apiProvider.CurrentAPI()
 			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), l.resolveAccountOutput)
-			l.accountsLedger.SetCommitmentEvictionAge(iotagoAPI.ProtocolParameters().EvictionAge())
+			l.accountsLedger.SetCommitmentEvictionAge(iotagoAPI.ProtocolParameters().MaxCommittableAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
@@ -380,6 +380,9 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		accountDiff.NewOutputID = createdOutput.OutputID()
 		accountDiff.PreviousOutputID = consumedOutput.OutputID()
 
+		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
+		accountDiff.PreviousExpirySlot = consumedOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
+
 		oldPubKeysSet := accountData.PubKeys
 		newPubKeysSet := ds.NewSet[ed25519.PublicKey]()
 		for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
@@ -423,6 +426,8 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 		// have some values from the allotment, so no need to set them explicitly.
 		accountDiff.NewOutputID = createdOutput.OutputID()
 		accountDiff.PreviousOutputID = iotago.EmptyOutputID
+		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
+		accountDiff.PreviousExpirySlot = 0
 		accountDiff.PubKeysAdded = createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
 
 		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
@@ -588,6 +593,10 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 				accountDiff.BICChange += iotago.BlockIssuanceCredits(allotment.Value)
 				accountDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
+
+				// we are not transitioning the allotted account, so the new and previous expiry slots are the same
+				accountDiff.PreviousExpirySlot = accountData.ExpirySlot
+				accountDiff.NewExpirySlot = accountData.ExpirySlot
 
 				// we are not transitioning the allotted account, so the new and previous outputIDs are the same
 				accountDiff.NewOutputID = accountData.OutputID
