@@ -195,13 +195,9 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 			return ierrors.Errorf("at pos %d: %w", i, err)
 		}
 
-		if err := m.AddUnspentOutputWithoutLocking(output); err != nil {
+		if err := m.importUnspentOutputWithoutLocking(output); err != nil {
 			return err
 		}
-	}
-
-	if err := m.stateTree.Commit(); err != nil {
-		return ierrors.Wrap(err, "unable to commit state tree")
 	}
 
 	for i := uint64(0); i < slotDiffCount; i++ {
@@ -217,6 +213,10 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
 			return err
 		}
+	}
+
+	if err := m.stateTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "unable to commit state tree")
 	}
 
 	return nil

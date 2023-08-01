@@ -298,7 +298,19 @@ func (m *Manager) CheckLedgerState(tokenSupply iotago.BaseToken) error {
 	return nil
 }
 
-func (m *Manager) AddUnspentOutputWithoutLocking(unspentOutput *Output) error {
+func (m *Manager) AddGenesisUnspentOutputWithoutLocking(unspentOutput *Output) error {
+	if err := m.importUnspentOutputWithoutLocking(unspentOutput); err != nil {
+		return ierrors.Wrap(err, "failed to import unspent output")
+	}
+
+	if err := m.stateTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "failed to commit state tree")
+	}
+
+	return nil
+}
+
+func (m *Manager) importUnspentOutputWithoutLocking(unspentOutput *Output) error {
 	mutations, err := m.store.Batched()
 	if err != nil {
 		return err
@@ -320,16 +332,18 @@ func (m *Manager) AddUnspentOutputWithoutLocking(unspentOutput *Output) error {
 		return err
 	}
 
-	m.stateTree.Set(unspentOutput.OutputID(), newStateMetadata(unspentOutput))
+	if err := m.stateTree.Set(unspentOutput.OutputID(), newStateMetadata(unspentOutput)); err != nil {
+		return ierrors.Wrap(err, "failed to set state tree entry")
+	}
 
 	return nil
 }
 
-func (m *Manager) AddUnspentOutput(unspentOutput *Output) error {
+func (m *Manager) AddGenesisUnspentOutput(unspentOutput *Output) error {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
-	return m.AddUnspentOutputWithoutLocking(unspentOutput)
+	return m.AddGenesisUnspentOutputWithoutLocking(unspentOutput)
 }
 
 func (m *Manager) LedgerStateSHA256Sum() ([]byte, error) {

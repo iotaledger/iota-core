@@ -203,8 +203,8 @@ func (l *Ledger) AddAccount(output *utxoledger.Output) error {
 	return l.accountsLedger.AddAccount(output)
 }
 
-func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
-	return l.utxoLedger.AddUnspentOutput(unspentOutput)
+func (l *Ledger) AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error {
+	return l.utxoLedger.AddGenesisUnspentOutput(unspentOutput)
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {

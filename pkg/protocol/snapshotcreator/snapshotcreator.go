@@ -126,7 +126,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 
 		// Genesis output is on Genesis TX index 0
 		// TODO: change genesis outputID from empty transaction id to some hash, to avoid problems when rolling back newly created accounts, whose previousOutputID is also emptyTrasactionID:0 (super edge case, but better have that covered)
-		if err := engineInstance.Ledger.AddUnspentOutput(utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0), iotago.EmptyBlockID(), 0, 0, output)); err != nil {
+		if err := engineInstance.Ledger.AddGenesisUnspentOutput(utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, 0), iotago.EmptyBlockID(), 0, 0, output)); err != nil {
 			return err
 		}
 	}
@@ -144,7 +144,7 @@ func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Eng
 		}
 
 		accountOutput := utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionID{}, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)
-		if err = engineInstance.Ledger.AddUnspentOutput(accountOutput); err != nil {
+		if err = engineInstance.Ledger.AddGenesisUnspentOutput(accountOutput); err != nil {
 			return err
 		}
 		if err = engineInstance.Ledger.AddAccount(accountOutput); err != nil {
