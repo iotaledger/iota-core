@@ -107,7 +107,7 @@ func provide(c *dig.Container) error {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
+				slotattestation.NewProvider(),
 			),
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(
