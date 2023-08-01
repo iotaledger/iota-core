@@ -59,10 +59,7 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 				c.PromoteFutureBlocksUntil(details.Commitment.Index())
 			})
 
-			e.Events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
-				c.ProcessPreFilteredBlock(block)
-			})
-
+			e.Events.Filter.BlockPreAllowed.Hook(c.ProcessPreFilteredBlock)
 			e.Events.CommitmentFilter.LinkTo(c.events)
 
 			c.TriggerInitialized()
@@ -93,7 +90,7 @@ func (c *CommitmentFilter) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
 		if storage := c.futureBlocks.Get(i, false); storage != nil {
 			if futureBlocks, exists := storage.Get(cm.ID()); exists {
 				_ = futureBlocks.ForEach(func(futureBlock *model.Block) (err error) {
-					c.ProcessPreFilteredBlock(futureBlock)
+					c.evaluateBlock(futureBlock)
 					return nil
 				})
 			}
@@ -121,11 +118,14 @@ func (c *CommitmentFilter) isFutureBlock(block *model.Block) (isFutureBlock bool
 }
 
 func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
-	// TODO: redo optimisations to mark future block rather than checking each time.
 	if c.isFutureBlock(block) {
 		return
 	}
 
+	c.evaluateBlock(block)
+}
+
+func (c *CommitmentFilter) evaluateBlock(block *model.Block) {
 	// check if the account exists in the specified slot.
 	accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Index())
 	if err != nil {
