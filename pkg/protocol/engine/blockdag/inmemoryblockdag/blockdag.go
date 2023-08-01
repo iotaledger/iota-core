@@ -1,13 +1,8 @@
 package inmemoryblockdag
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -18,7 +13,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
@@ -34,29 +28,11 @@ type BlockDAG struct {
 	// solidifier contains the solidifier instance used to determine the solidity of Blocks.
 	solidifier *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
-	// shouldParkFutureBlocksFunc is a function that returns whether the BlockDAG should park future Blocks.
-	shouldParkFutureBlocksFunc func() bool
-
-	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
-	commitmentFunc func(index iotago.SlotIndex) (*model.Commitment, error)
-
 	retainBlockFailure func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)
-
-	// futureBlocks contains blocks with a commitment in the future, that should not be passed to the booker yet.
-	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*blocks.Block]]
-
-	nextIndexToPromote iotago.SlotIndex
 
 	blockCache *blocks.Blocks
 
-	// The Queue always read-locks the eviction mutex of the solidifier, and then evaluates if the block is
-	// future thus read-locking the futureBlocks mutex. At the same time, when re-adding parked blocks,
-	// promoteFutureBlocksMethod write-locks the futureBlocks mutex, and then read-locks the eviction mutex
-	// of the solidifier. As the locks are non-starving, and locks are interlocked in different orders a
-	// deadlock can occur only when an eviction is triggered while the above scenario unfolds.
 	solidifierMutex syncutils.RWMutex
-
-	futureBlocksMutex syncutils.RWMutex
 
 	workers    *workerpool.Group
 	workerPool *workerpool.WorkerPool
@@ -68,19 +44,15 @@ type BlockDAG struct {
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.IsBootstrapped, e.Storage.Commitments().Load, e.ErrorHandler("blockdag"), opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
 			wp := b.workers.CreatePool("BlockDAG.Attach", 2)
 
-			e.Events.Filter.BlockAllowed.Hook(func(block *model.Block) {
+			e.Events.CommitmentFilter.BlockAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
 					b.errorHandler(ierrors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.ProtocolBlock().IssuerID))
 				}
-			}, event.WithWorkerPool(wp))
-
-			e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				b.promoteFutureBlocksUntil(details.Commitment.Index())
 			}, event.WithWorkerPool(wp))
 
 			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
@@ -95,17 +67,14 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, shouldParkBlocksFunc func() bool, latestCommitmentFunc func(iotago.SlotIndex) (*model.Commitment, error), errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
-		events:                     blockdag.NewEvents(),
-		evictionState:              evictionState,
-		shouldParkFutureBlocksFunc: shouldParkBlocksFunc,
-		commitmentFunc:             latestCommitmentFunc,
-		blockCache:                 blockCache,
-		futureBlocks:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*blocks.Block]](),
-		workers:                    workers,
-		workerPool:                 workers.CreatePool("Solidifier", 2),
-		errorHandler:               errorHandler,
+		events:        blockdag.NewEvents(),
+		evictionState: evictionState,
+		blockCache:    blockCache,
+		workers:       workers,
+		workerPool:    workers.CreatePool("Solidifier", 2),
+		errorHandler:  errorHandler,
 	}, opts,
 		func(b *BlockDAG) {
 			b.solidifier = causalorder.New(
@@ -150,31 +119,6 @@ func (b *BlockDAG) SetInvalid(block *blocks.Block, reason error) (wasUpdated boo
 	return
 }
 
-func (b *BlockDAG) promoteFutureBlocksUntil(index iotago.SlotIndex) {
-	b.solidifierMutex.RLock()
-	defer b.solidifierMutex.RUnlock()
-	b.futureBlocksMutex.Lock()
-	defer b.futureBlocksMutex.Unlock()
-
-	for i := b.nextIndexToPromote; i <= index; i++ {
-		cm, err := b.commitmentFunc(i)
-		if err != nil {
-			panic(fmt.Sprintf("failed to load commitment for index %d: %s", i, err))
-		}
-		if storage := b.futureBlocks.Get(i, false); storage != nil {
-			if futureBlocks, exists := storage.Get(cm.ID()); exists {
-				_ = futureBlocks.ForEach(func(futureBlock *blocks.Block) (err error) {
-					b.solidifier.Queue(futureBlock)
-					return nil
-				})
-			}
-		}
-		b.futureBlocks.Evict(i)
-	}
-
-	b.nextIndexToPromote = index + 1
-}
-
 func (b *BlockDAG) Shutdown() {
 	b.TriggerStopped()
 	b.workers.Shutdown()
@@ -193,65 +137,8 @@ func (b *BlockDAG) evictSlot(index iotago.SlotIndex) {
 }
 
 func (b *BlockDAG) markSolid(block *blocks.Block) (err error) {
-	// Future blocks already have passed these checks, as they are revisited again at a later point in time.
-	// It is important to note that this check only passes once for a specific future block, as it is not yet marked as
-	// such. The next time the block is added to the causal order and marked as solid (that is, when it got promoted),
-	// it will be marked solid straight away, without checking if it is still a future block: that's why this method
-	// must be only called at most twice for any block.
-	if !block.IsFuture() {
-		if err := b.checkParents(block); err != nil {
-			return err
-		}
-
-		if b.shouldParkFutureBlocksFunc() && b.isFutureBlock(block) {
-			return
-		}
-	}
-
-	// It is important to only set the block as solid when it was not "parked" as a future block.
-	// Future blocks are queued for solidification again when the slot is committed.
 	if block.SetSolid() {
 		b.events.BlockSolid.Trigger(block)
-	}
-
-	return nil
-}
-
-func (b *BlockDAG) isFutureBlock(block *blocks.Block) (isFutureBlock bool) {
-	b.futureBlocksMutex.RLock()
-	defer b.futureBlocksMutex.RUnlock()
-
-	// If we are not able to load the commitment for the block, it means we haven't committed this slot yet.
-	if _, err := b.commitmentFunc(block.SlotCommitmentID().Index()); err != nil {
-		// We set the block as future block so that we can skip some checks when revisiting it later in markSolid via the solidifier.
-		block.SetFuture()
-
-		lo.Return1(b.futureBlocks.Get(block.SlotCommitmentID().Index(), true).GetOrCreate(block.SlotCommitmentID(), func() ds.Set[*blocks.Block] {
-			return ds.NewSet[*blocks.Block]()
-		})).Add(block)
-
-		return true
-	}
-
-	return false
-}
-
-func (b *BlockDAG) checkParents(block *blocks.Block) (err error) {
-	for _, parentID := range block.Parents() {
-		parent, parentExists := b.blockCache.Block(parentID)
-		if !parentExists {
-			panic(fmt.Sprintf("parent %s of block %s should exist as block was marked ordered by the solidifier", parentID, block.ID()))
-		}
-
-		// check timestamp monotonicity
-		if parent.IssuingTime().After(block.IssuingTime()) {
-			return ierrors.Errorf("timestamp monotonicity check failed for parent %s with timestamp %s. block timestamp %s", parent.ID(), parent.IssuingTime(), block.IssuingTime())
-		}
-
-		// check commitment monotonicity
-		if parent.SlotCommitmentID().Index() > block.SlotCommitmentID().Index() {
-			return ierrors.Errorf("commitment monotonicity check failed for parent %s with commitment index %d. block commitment index %d", parentID, parent.SlotCommitmentID().Index(), block.SlotCommitmentID().Index())
-		}
 	}
 
 	return nil

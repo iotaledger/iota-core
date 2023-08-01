@@ -267,7 +267,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
 
-	defer i.protocol.Events.Engine.Filter.BlockFiltered.Hook(func(event *filter.BlockFilteredEvent) {
+	defer i.protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		if block.ID() != event.Block.ID() {
 			return
 		}

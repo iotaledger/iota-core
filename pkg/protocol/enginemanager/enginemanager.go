@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -51,6 +52,7 @@ type EngineManager struct {
 
 	engineOptions               []options.Option[engine.Engine]
 	filterProvider              module.Provider[*engine.Engine, filter.Filter]
+	commitmentFilterProvider    module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
 	blockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	bookerProvider              module.Provider[*engine.Engine, booker.Booker]
 	clockProvider               module.Provider[*engine.Engine, clock.Clock]
@@ -77,6 +79,7 @@ func New(
 	storageOptions []options.Option[storage.Storage],
 	engineOptions []options.Option[engine.Engine],
 	filterProvider module.Provider[*engine.Engine, filter.Filter],
+	commitmentFilterProvider module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter],
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],
 	clockProvider module.Provider[*engine.Engine, clock.Clock],
@@ -100,6 +103,7 @@ func New(
 		storageOptions:              storageOptions,
 		engineOptions:               engineOptions,
 		filterProvider:              filterProvider,
+		commitmentFilterProvider:    commitmentFilterProvider,
 		blockDAGProvider:            blockDAGProvider,
 		bookerProvider:              bookerProvider,
 		clockProvider:               clockProvider,
@@ -190,6 +194,7 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		errorHandler,
 		storage.New(e.directory.Path(dirName), e.dbVersion, errorHandler, e.storageOptions...),
 		e.filterProvider,
+		e.commitmentFilterProvider,
 		e.blockDAGProvider,
 		e.bookerProvider,
 		e.clockProvider,

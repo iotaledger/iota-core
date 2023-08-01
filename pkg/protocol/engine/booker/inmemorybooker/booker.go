@@ -101,7 +101,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
-	// Based on the assumption that we always fork and the UTXO and Tangle paste cones are always fully known.
+	// Based on the assumption that we always fork and the UTXO and Tangle past cones are always fully known.
 	transactionMetadata.OnBooked(func() {
 		block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs())
 		b.bookingOrder.Queue(block)

@@ -25,6 +25,9 @@ type AccountDiff struct {
 
 	PreviousUpdatedTime iotago.SlotIndex
 
+	NewExpirySlot      iotago.SlotIndex
+	PreviousExpirySlot iotago.SlotIndex
+
 	// OutputID to which the Account has been transitioned to.
 	NewOutputID iotago.OutputID
 
@@ -45,6 +48,8 @@ func NewAccountDiff() *AccountDiff {
 	return &AccountDiff{
 		BICChange:             0,
 		PreviousUpdatedTime:   0,
+		NewExpirySlot:         0,
+		PreviousExpirySlot:    0,
 		NewOutputID:           iotago.EmptyOutputID,
 		PreviousOutputID:      iotago.EmptyOutputID,
 		PubKeysAdded:          make([]ed25519.PublicKey, 0),
@@ -61,6 +66,8 @@ func (d AccountDiff) Bytes() ([]byte, error) {
 
 	m.WriteInt64(int64(d.BICChange))
 	m.WriteUint64(uint64(d.PreviousUpdatedTime))
+	m.WriteUint64(uint64(d.NewExpirySlot))
+	m.WriteUint64(uint64(d.PreviousExpirySlot))
 	m.WriteBytes(lo.PanicOnErr(d.NewOutputID.Bytes()))
 	m.WriteBytes(lo.PanicOnErr(d.PreviousOutputID.Bytes()))
 	m.WriteUint8(uint8(len(d.PubKeysAdded)))
@@ -84,6 +91,8 @@ func (d *AccountDiff) Clone() *AccountDiff {
 	return &AccountDiff{
 		BICChange:             d.BICChange,
 		PreviousUpdatedTime:   d.PreviousUpdatedTime,
+		NewExpirySlot:         d.NewExpirySlot,
+		PreviousExpirySlot:    d.PreviousExpirySlot,
 		NewOutputID:           d.NewOutputID,
 		PreviousOutputID:      d.PreviousOutputID,
 		PubKeysAdded:          lo.CopySlice(d.PubKeysAdded),
@@ -111,6 +120,16 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousUpdatedTime); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read previous updated time in the diff")
+	}
+	offset += 8
+
+	if err = binary.Read(reader, binary.LittleEndian, &d.NewExpirySlot); err != nil {
+		return offset, ierrors.Wrap(err, "unable to read new expiry slot in the diff")
+	}
+	offset += 8
+
+	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousExpirySlot); err != nil {
+		return offset, ierrors.Wrap(err, "unable to read previous expiry slot in the diff")
 	}
 	offset += 8
 

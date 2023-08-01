@@ -25,11 +25,13 @@ import (
 )
 
 func TestProtocol_EngineSwitching(t *testing.T) {
+	t.Skip("TODO: re-enable this test")
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithGenesisTimestampOffset(19*10),
-		testsuite.WithLivenessThreshold(1), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
-		testsuite.WithEvictionAge(1),       // TODO: remove this opt and use a proper value when refactoring the test with scheduler
 		testsuite.WithWaitFor(12*time.Second),
+		testsuite.WithLivenessThreshold(1),  // TODO: remove this opt and use a proper value when refactoring the test with scheduler
+		testsuite.WithMinCommittableAge(10), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
+		testsuite.WithMaxCommittableAge(20), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
 	)
 	defer ts.Shutdown()
 

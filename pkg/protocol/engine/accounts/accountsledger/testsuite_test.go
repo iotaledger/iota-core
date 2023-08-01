@@ -77,7 +77,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	}
 
 	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB())
-	manager.SetCommitmentEvictionAge(tpkg.TestAPI.ProtocolParameters().EvictionAge() << 1)
+	manager.SetCommitmentEvictionAge(tpkg.TestAPI.ProtocolParameters().MinCommittableAge())
 
 	return manager
 }
@@ -115,6 +115,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 				OutputID:       iotago.EmptyOutputID,
 				BICUpdatedAt:   0,
 				UpdatedInSlots: ds.NewSet[iotago.SlotIndex](),
+				ExpirySlot:     0,
 			}
 			t.latestFieldsPerAccount.Set(accountID, prevAccountFields)
 		}
@@ -126,6 +127,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 			PubKeysAdded:        t.PublicKeys(action.AddedKeys, true),
 			PubKeysRemoved:      t.PublicKeys(action.RemovedKeys, true),
 			PreviousUpdatedTime: prevAccountFields.BICUpdatedAt,
+			NewExpirySlot:       prevAccountFields.ExpirySlot,
 
 			DelegationStakeChange: action.DelegationStakeChange,
 			ValidatorStakeChange:  action.ValidatorStakeChange,
@@ -252,6 +254,8 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 
 	require.Equal(t.T, expectedAccountDiff.PreviousOutputID, actualDiff.PreviousOutputID)
 	require.Equal(t.T, expectedAccountDiff.PreviousUpdatedTime, actualDiff.PreviousUpdatedTime)
+	require.Equal(t.T, expectedAccountDiff.NewExpirySlot, actualDiff.NewExpirySlot)
+	require.Equal(t.T, expectedAccountDiff.PreviousExpirySlot, actualDiff.PreviousExpirySlot)
 
 	if expectedState.Destroyed {
 		require.Equal(t.T, expectedState.Destroyed, destroyed)
@@ -264,12 +268,14 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 			require.Equal(t.T, t.PublicKeys(previousAccountState[accountID].PubKeys, false), actualDiff.PubKeysRemoved)
 			require.Equal(t.T, -iotago.BlockIssuanceCredits(previousAccountState[accountID].BICAmount), actualDiff.BICChange)
 			require.Equal(t.T, iotago.EmptyOutputID, actualDiff.NewOutputID)
+			require.Equal(t.T, iotago.SlotIndex(0), actualDiff.NewExpirySlot)
 
 			return
 		}
 	}
 
 	require.Equal(t.T, expectedAccountDiff.NewOutputID, actualDiff.NewOutputID)
+	require.Equal(t.T, expectedAccountDiff.NewExpirySlot, actualDiff.NewExpirySlot)
 	require.Equal(t.T, expectedAccountDiff.BICChange-iotago.BlockIssuanceCredits(accountsSlotBuildData.Burns[accountID]), actualDiff.BICChange)
 	require.Equal(t.T, expectedAccountDiff.PubKeysAdded, actualDiff.PubKeysAdded)
 	require.Equal(t.T, expectedAccountDiff.PubKeysRemoved, actualDiff.PubKeysRemoved)
@@ -355,6 +361,7 @@ type latestAccountFields struct {
 	OutputID       iotago.OutputID
 	BICUpdatedAt   iotago.SlotIndex
 	UpdatedInSlots ds.Set[iotago.SlotIndex]
+	ExpirySlot     iotago.SlotIndex
 }
 
 type slotData struct {

@@ -22,6 +22,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -44,6 +45,7 @@ type Engine struct {
 	Events              *Events
 	Storage             *storage.Storage
 	Filter              filter.Filter
+	CommitmentFilter    commitmentfilter.CommitmentFilter
 	EvictionState       *eviction.State
 	BlockRequester      *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
 	BlockDAG            blockdag.BlockDAG
@@ -86,6 +88,7 @@ func New(
 	errorHandler func(error),
 	storageInstance *storage.Storage,
 	filterProvider module.Provider[*Engine, filter.Filter],
+	commitmentFilterProvider module.Provider[*Engine, commitmentfilter.CommitmentFilter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
 	clockProvider module.Provider[*Engine, clock.Clock],
@@ -139,6 +142,7 @@ func New(
 			e.SybilProtection = sybilProtectionProvider(e)
 			e.BlockDAG = blockDAGProvider(e)
 			e.Filter = filterProvider(e)
+			e.CommitmentFilter = commitmentFilterProvider(e)
 			e.Booker = bookerProvider(e)
 			e.Clock = clockProvider(e)
 			e.BlockGadget = blockGadgetProvider(e)
@@ -215,6 +219,7 @@ func (e *Engine) Shutdown() {
 		e.UpgradeOrchestrator.Shutdown()
 		e.TipManager.Shutdown()
 		e.Filter.Shutdown()
+		e.CommitmentFilter.Shutdown()
 		e.Scheduler.Shutdown()
 		e.Retainer.Shutdown()
 		e.Storage.Shutdown()
