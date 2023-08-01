@@ -6,7 +6,7 @@ import (
 )
 
 type Events struct {
-	// BlockEnqueued is triggered when a block is scheduled.
+	// BlockEnqueued is triggered when a block is added to the queue.
 	BlockEnqueued *event.Event1[*blocks.Block]
 	// BlockScheduled is triggered when a block is scheduled.
 	BlockScheduled *event.Event1[*blocks.Block]
