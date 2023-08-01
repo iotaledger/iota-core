@@ -7,9 +7,9 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
-	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Helpers to serialize/deserialize into/from snapshots
@@ -195,7 +195,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 			return ierrors.Errorf("at pos %d: %w", i, err)
 		}
 
-		if err := m.AddUnspentOutputWithoutLocking(output); err != nil {
+		if err := m.importUnspentOutputWithoutLocking(output); err != nil {
 			return err
 		}
 	}
@@ -213,6 +213,10 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
 			return err
 		}
+	}
+
+	if err := m.stateTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "unable to commit state tree")
 	}
 
 	return nil

@@ -12,13 +12,12 @@ import (
 
 func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 	return &inx.NodeStatus{
-		IsHealthy:              status.NodeSynced, //TODO: check if we have peers
-		IsSynced:               status.NodeSynced,
-		IsAlmostSynced:         status.NodeSynced, //TODO: check if we are close to sync
+		IsHealthy:              status.NodeSynced,
 		LastAcceptedBlockSlot:  uint64(status.LastAcceptedBlockSlot),
 		LastConfirmedBlockSlot: uint64(status.LastConfirmedBlockSlot),
 		LatestCommitment:       inxCommitment(status.LatestCommitment),
 		LatestFinalizedSlot:    uint64(status.LatestFinalizedSlot),
+		PruningSlot:            uint64(status.LatestPrunedSlot),
 	}
 }
 
@@ -53,7 +52,7 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 		nodeStatus := inxNodeStatus(status)
 
 		// Use cool-down if the node is syncing
-		if coolDownDuration > 0 && !nodeStatus.IsAlmostSynced {
+		if coolDownDuration > 0 && !nodeStatus.GetIsHealthy() {
 			timeSinceLastSent := time.Since(lastSent)
 			if timeSinceLastSent < coolDownDuration {
 				lastUpdateTimer = time.AfterFunc(coolDownDuration-timeSinceLastSent, func() {
@@ -100,12 +99,12 @@ func (s *Server) ReadNodeConfiguration(context.Context, *inx.NoParams) (*inx.Nod
 
 	return &inx.NodeConfiguration{
 		BaseToken: &inx.BaseToken{
-			//Name:            deps.BaseToken.Name,
-			//TickerSymbol:    deps.BaseToken.TickerSymbol,
-			//Unit:            deps.BaseToken.Unit,
-			//Subunit:         deps.BaseToken.Subunit,
-			//Decimals:        deps.BaseToken.Decimals,
-			//UseMetricPrefix: deps.BaseToken.UseMetricPrefix,
+			Name:            deps.BaseToken.Name,
+			TickerSymbol:    deps.BaseToken.TickerSymbol,
+			Unit:            deps.BaseToken.Unit,
+			Subunit:         deps.BaseToken.Subunit,
+			Decimals:        deps.BaseToken.Decimals,
+			UseMetricPrefix: deps.BaseToken.UseMetricPrefix,
 		},
 		ProtocolParameters: protoParams,
 	}, nil

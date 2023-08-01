@@ -7,12 +7,12 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 const (
@@ -126,10 +126,10 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 	}
 
 	attestations = make([]*iotago.Attestation, 0)
-	if err := adsMap.Stream(func(_ iotago.AccountID, attestation *iotago.Attestation) bool {
+	if err := adsMap.Stream(func(_ iotago.AccountID, attestation *iotago.Attestation) error {
 		attestations = append(attestations, attestation)
 
-		return true
+		return nil
 	}); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to stream attestations for slot %d", index)
 	}
@@ -137,9 +137,9 @@ func (m *Manager) Get(index iotago.SlotIndex) (attestations []*iotago.Attestatio
 	return attestations, nil
 }
 
-// GetMap returns the attestations that are included in the commitment of the given slot as ads.Map.
+// GetMap returns the attestations that are included in the commitment of the given slot as ds.AuthenticatedMap.
 // If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
-func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, *iotago.Attestation], error) {
+func (m *Manager) GetMap(index iotago.SlotIndex) (ads.Map[iotago.AccountID, *iotago.Attestation], error) {
 	m.commitmentMutex.RLock()
 	defer m.commitmentMutex.RUnlock()
 
@@ -151,7 +151,7 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, *io
 		return nil, ierrors.Errorf("slot %d is smaller than attestation cutoffIndex %d thus we don't have attestations", index, cutoffIndex)
 	}
 
-	return m.adsMapStorage(cutoffIndex)
+	return m.attestationsForSlot(cutoffIndex)
 }
 
 // AddAttestationFromBlock adds an attestation from a block to the future attestations (beyond the attestation window).
@@ -253,7 +253,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	m.pendingAttestations.Evict(cutoffIndex)
 
 	// Store all attestations of cutoffIndex in bucketed storage via ads.Map / sparse merkle tree -> committed attestations.
-	tree, err := m.adsMapStorage(cutoffIndex)
+	tree, err := m.attestationsForSlot(cutoffIndex)
 	if err != nil {
 		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
 	}
@@ -262,10 +262,16 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	for _, a := range attestations {
 		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
 		if _, exists := m.committeeFunc(index).GetSeat(a.IssuerID); exists {
-			tree.Set(a.IssuerID, a)
+			if err := tree.Set(a.IssuerID, a); err != nil {
+				return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to set attestation %s in tree", a.IssuerID)
+			}
 
 			m.lastCumulativeWeight++
 		}
+	}
+
+	if err := tree.Commit(); err != nil {
+		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to commit attestation storage when committing slot %d", index)
 	}
 
 	m.lastCommittedSlot = index

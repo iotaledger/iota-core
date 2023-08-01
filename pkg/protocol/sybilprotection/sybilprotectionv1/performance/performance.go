@@ -6,11 +6,11 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Tracker struct {
@@ -99,7 +99,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		panic(ierrors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
-	rewardsTree := ads.NewMap[iotago.AccountID, *PoolRewards](t.rewardsStorage(epoch),
+	rewardsTree := ads.NewMap(t.rewardsStorage(epoch),
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
 		(*PoolRewards).Bytes,
@@ -123,14 +123,20 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			intermediateFactors = append(intermediateFactors, pf)
 		}
 
-		rewardsTree.Set(accountID, &PoolRewards{
+		if err := rewardsTree.Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
-		})
+		}); err != nil {
+			panic(ierrors.Wrapf(err, "failed to set rewards for account %s", accountID))
+		}
 
 		return true
 	})
+
+	if err := rewardsTree.Commit(); err != nil {
+		panic(ierrors.Wrapf(err, "failed to commit rewards for epoch %d", epoch))
+	}
 }
 
 func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {

@@ -14,7 +14,7 @@ import (
 // SlotMutations is an in-memory data structure that enables the collection of mutations for uncommitted slots.
 type SlotMutations struct {
 	// acceptedBlocksBySlot stores the accepted blocks per slot.
-	acceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ads.Set[iotago.BlockID]]
+	acceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ads.Set[iotago.BlockID]]
 
 	// latestCommittedIndex stores the index of the latest committed slot.
 	latestCommittedIndex iotago.SlotIndex
@@ -25,7 +25,7 @@ type SlotMutations struct {
 // NewSlotMutations creates a new SlotMutations instance.
 func NewSlotMutations(lastCommittedSlot iotago.SlotIndex) *SlotMutations {
 	return &SlotMutations{
-		acceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, *ads.Set[iotago.BlockID]](),
+		acceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, ads.Set[iotago.BlockID]](),
 		latestCommittedIndex: lastCommittedSlot,
 	}
 }
@@ -40,7 +40,9 @@ func (m *SlotMutations) AddAcceptedBlock(block *blocks.Block) (err error) {
 		return ierrors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
 	}
 
-	m.AcceptedBlocks(blockID.Index(), true).Add(blockID)
+	if err := m.AcceptedBlocks(blockID.Index(), true).Add(blockID); err != nil {
+		return ierrors.Wrapf(err, "failed to add block to accepted blocks, blockID: %s", blockID.ToHex())
+	}
 
 	return
 }
@@ -71,9 +73,11 @@ func (m *SlotMutations) Reset(index iotago.SlotIndex) {
 }
 
 // AcceptedBlocks returns the set of accepted blocks for the given slot.
-func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) *ads.Set[iotago.BlockID] {
+func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) ads.Set[iotago.BlockID] {
 	if len(createIfMissing) > 0 && createIfMissing[0] {
-		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, newSet))
+		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, func() ads.Set[iotago.SlotIdentifier] {
+			return ads.NewSet(mapdb.NewMapDB(), iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes)
+		}))
 	}
 
 	return lo.Return1(m.acceptedBlocksBySlot.Get(index))
@@ -86,12 +90,4 @@ func (m *SlotMutations) evictUntil(index iotago.SlotIndex) {
 	}
 
 	m.latestCommittedIndex = index
-}
-
-// newSet is a helper constructor for a new in-memory ads.Set[iotago.BlockID].
-func newSet() *ads.Set[iotago.BlockID] {
-	return ads.NewSet(mapdb.NewMapDB(),
-		iotago.SlotIdentifier.Bytes,
-		iotago.SlotIdentifierFromBytes,
-	)
 }

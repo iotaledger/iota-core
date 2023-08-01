@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -98,7 +99,11 @@ func configure() error {
 		blocksPrunableStorage.PruneUntilSlot(index - iotago.SlotIndex(ParamsDebugAPI.PruningThreshold))
 	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", 1)))
 
-	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(storeTransactionsPerSlot)
+	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
+		if err := storeTransactionsPerSlot(scd); err != nil {
+			fmt.Printf(">> DebugAPI Error: %s\n", err)
+		}
+	})
 
 	deps.Protocol.Events.Engine.EvictionState.SlotEvicted.Hook(func(index iotago.SlotIndex) {
 		blocksInSlot, exists := blocksPerSlot.Get(index)

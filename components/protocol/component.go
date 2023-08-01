@@ -61,6 +61,7 @@ func initConfigParams(c *dig.Container) error {
 	type cfgResult struct {
 		dig.Out
 		DatabaseEngine hivedb.Engine `name:"databaseEngine"`
+		BaseToken      *BaseToken
 	}
 
 	if err := c.Provide(func() cfgResult {
@@ -71,6 +72,7 @@ func initConfigParams(c *dig.Container) error {
 
 		return cfgResult{
 			DatabaseEngine: dbEngine,
+			BaseToken:      &ParamsProtocol.BaseToken,
 		}
 	}); err != nil {
 		Component.LogPanic(err)
