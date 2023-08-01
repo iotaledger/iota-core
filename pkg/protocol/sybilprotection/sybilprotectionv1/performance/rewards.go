@@ -32,6 +32,8 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 	defer t.mutex.RUnlock()
 
 	var validatorReward iotago.Mana
+
+	// TODO: the epoch should be returned by the reward calculations and we should only loop until the current epoch, not epochEnd
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
 		rewardsForAccountInEpoch, exists := t.rewardsForAccount(validatorID, epochIndex)
 		if !exists {
@@ -70,6 +72,8 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 	defer t.mutex.RUnlock()
 
 	var delegatorsReward iotago.Mana
+
+	// TODO: the epoch should be returned by the reward calculations and we should only loop until the current epoch, not epochEnd
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
 		rewardsForAccountInEpoch, exists := t.rewardsForAccount(validatorID, epochIndex)
 		if !exists {

@@ -155,7 +155,7 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 
 			return err
 		}
-		if err = markAsUnspent(output, mutations); err != nil {
+		if err := markAsUnspent(output, mutations); err != nil {
 			mutations.Cancel()
 
 			return err
@@ -163,7 +163,7 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 	}
 
 	for _, spent := range newSpents {
-		if err = storeSpentAndMarkOutputAsSpent(spent, mutations); err != nil {
+		if err := storeSpentAndMarkOutputAsSpent(spent, mutations); err != nil {
 			mutations.Cancel()
 
 			return err
@@ -176,19 +176,19 @@ func (m *Manager) ApplyDiffWithoutLocking(index iotago.SlotIndex, newOutputs Out
 		Spents:  newSpents,
 	}
 
-	if err = storeDiff(slotDiff, mutations); err != nil {
+	if err := storeDiff(slotDiff, mutations); err != nil {
 		mutations.Cancel()
 
 		return err
 	}
 
-	if err = storeLedgerIndex(index, mutations); err != nil {
+	if err := storeLedgerIndex(index, mutations); err != nil {
 		mutations.Cancel()
 
 		return err
 	}
 
-	if err = mutations.Commit(); err != nil {
+	if err := mutations.Commit(); err != nil {
 		return err
 	}
 

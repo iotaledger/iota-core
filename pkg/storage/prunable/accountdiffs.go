@@ -126,6 +126,7 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 	if err = binary.Read(reader, binary.LittleEndian, &d.NewExpirySlot); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read new expiry slot in the diff")
 	}
+	offset += 8
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousExpirySlot); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read previous expiry slot in the diff")

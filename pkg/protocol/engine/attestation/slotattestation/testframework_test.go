@@ -99,7 +99,7 @@ func (t *TestFramework) AddFutureAttestation(issuerAlias string, attestationAlia
 	defer t.mutex.Unlock()
 
 	issuer := t.issuer(issuerAlias)
-	issuingTime := tpkg.TestAPI.TimeProvider().SlotStartTime(blockSlot).Add(time.Duration(t.uniqueCounter.Add(1)))
+	issuingTime := tpkg.TestAPI.TimeProvider().SlotStartTime(blockSlot).Add(time.Duration(t.uniqueCounter.Add(1))).UTC()
 
 	block, err := builder.NewBasicBlockBuilder(tpkg.TestAPI).
 		IssuingTime(issuingTime).

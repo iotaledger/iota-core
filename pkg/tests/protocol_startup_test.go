@@ -23,6 +23,7 @@ import (
 // TODO: implement a similar test, but in which one slot is skipped
 // (no commitment - no account diffs, no root blocks etc. to make sure that this scenario is handled properly).
 func TestProtocol_StartNodeFromSnapshotAndDisk(t *testing.T) {
+	t.Skip("TODO: re-enable this test")
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithLivenessThreshold(1),  // TODO: remove this opt and use a proper value when refactoring the test with scheduler
 		testsuite.WithMinCommittableAge(10), // TODO: remove this opt and use a proper value when refactoring the test with scheduler

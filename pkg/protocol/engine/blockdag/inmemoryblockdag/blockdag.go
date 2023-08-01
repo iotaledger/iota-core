@@ -1,8 +1,6 @@
 package inmemoryblockdag
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -16,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 // BlockDAG is a causally ordered DAG that forms the central data structure of the IOTA protocol.
@@ -28,6 +27,8 @@ type BlockDAG struct {
 
 	// solidifier contains the solidifier instance used to determine the solidity of Blocks.
 	solidifier *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
+
+	retainBlockFailure func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)
 
 	blockCache *blocks.Blocks
 
@@ -53,6 +54,8 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 					b.errorHandler(ierrors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.ProtocolBlock().IssuerID))
 				}
 			}, event.WithWorkerPool(wp))
+
+			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
 
 			e.Events.BlockDAG.LinkTo(b.events)
 
@@ -121,6 +124,10 @@ func (b *BlockDAG) Shutdown() {
 	b.workers.Shutdown()
 }
 
+func (b *BlockDAG) setRetainBlockFailureFunc(retainBlockFailure func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)) {
+	b.retainBlockFailure = retainBlockFailure
+}
+
 // evictSlot is used to evict Blocks from committed slots from the BlockDAG.
 func (b *BlockDAG) evictSlot(index iotago.SlotIndex) {
 	b.solidifierMutex.Lock()
@@ -132,27 +139,6 @@ func (b *BlockDAG) evictSlot(index iotago.SlotIndex) {
 func (b *BlockDAG) markSolid(block *blocks.Block) (err error) {
 	if block.SetSolid() {
 		b.events.BlockSolid.Trigger(block)
-	}
-
-	return nil
-}
-
-func (b *BlockDAG) checkParents(block *blocks.Block) (err error) {
-	for _, parentID := range block.Parents() {
-		parent, parentExists := b.blockCache.Block(parentID)
-		if !parentExists {
-			panic(fmt.Sprintf("parent %s of block %s should exist as block was marked ordered by the solidifier", parentID, block.ID()))
-		}
-
-		// check timestamp monotonicity
-		if parent.IssuingTime().After(block.IssuingTime()) {
-			return ierrors.Errorf("timestamp monotonicity check failed for parent %s with timestamp %s. block timestamp %s", parent.ID(), parent.IssuingTime(), block.IssuingTime())
-		}
-
-		// check commitment monotonicity
-		if parent.SlotCommitmentID().Index() > block.SlotCommitmentID().Index() {
-			return ierrors.Errorf("commitment monotonicity check failed for parent %s with commitment index %d. block commitment index %d", parentID, parent.SlotCommitmentID().Index(), block.SlotCommitmentID().Index())
-		}
 	}
 
 	return nil
@@ -173,7 +159,8 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	block, evicted, updated := b.blockCache.StoreOrUpdate(data)
 
 	if evicted {
-		return block, false, ierrors.New("block is too old")
+		b.retainBlockFailure(data.ID(), apimodels.BlockFailureIsTooOld)
+		return block, false, ierrors.New("cannot attach, block is too old, it was already evicted from the cache")
 	}
 
 	if updated {
@@ -190,6 +177,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 // canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
 func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
 	if b.evictionState.InRootBlockSlot(data.ID()) && !b.evictionState.IsRootBlock(data.ID()) {
+		b.retainBlockFailure(data.ID(), apimodels.BlockFailureIsTooOld)
 		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().IssuingTime)
 	}
 
@@ -213,6 +201,7 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid bool, err error) {
 	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
 		if b.evictionState.InRootBlockSlot(parentID) && !b.evictionState.IsRootBlock(parentID) {
+			b.retainBlockFailure(modelBlock.ID(), apimodels.BlockFailureParentIsTooOld)
 			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
 		}
 	}

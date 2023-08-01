@@ -635,6 +635,10 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("PreConfirmed", b.preConfirmed))
 	builder.AddField(stringify.NewStructField("ConfirmationRatifiers", b.confirmationRatifiers.String()))
 	builder.AddField(stringify.NewStructField("Confirmed", b.confirmed))
+	builder.AddField(stringify.NewStructField("Scheduled", b.scheduled))
+	builder.AddField(stringify.NewStructField("Dropped", b.dropped))
+	builder.AddField(stringify.NewStructField("Skipped", b.skipped))
+	builder.AddField(stringify.NewStructField("Enqueued", b.enqueued))
 
 	for index, child := range b.strongChildren {
 		builder.AddField(stringify.NewStructField(fmt.Sprintf("strongChildren%d", index), child.ID().String()))
@@ -671,10 +675,10 @@ func (b *Block) Work() int {
 	// e.g. number of parents, payload type etc.
 	work := 1
 
-	payload := b.Payload()
-	if payload != nil {
-		work += payload.Size()
-	}
+	//payload := b.Payload()
+	//if payload != nil {
+	//	work += payload.Size()
+	//}
 
 	return work
 }

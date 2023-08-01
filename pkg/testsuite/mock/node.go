@@ -249,8 +249,8 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] Scheduler.BlockSkipped: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.Scheduler.BlockDropped.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Scheduler.BlockDropped: %s\n", n.Name, engineName, block.ID())
+	events.Scheduler.BlockDropped.Hook(func(block *blocks.Block, err error) {
+		fmt.Printf("%s > [%s] Scheduler.BlockDropped: %s - %s\n", n.Name, engineName, block.ID(), err.Error())
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
@@ -266,7 +266,7 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
-		fmt.Printf("%s > [%s] Filter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+		fmt.Printf("%s > [%s] Filter.BlockPreFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
 		n.Testing.Fatal("no blocks should be prefiltered")
 	})
 

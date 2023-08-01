@@ -29,24 +29,20 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-var (
-	ErrUnexpectedUnderlyingType    = ierrors.New("unexpected underlying type provided by the interface")
-	ErrTransactionMetadataNotFOund = ierrors.New("TransactionMetadata not found")
-)
-
 type Ledger struct {
 	events *ledger.Events
 
 	apiProvider api.Provider
 
-	utxoLedger       *utxoledger.Manager
-	accountsLedger   *accountsledger.Manager
-	manaManager      *mana.Manager
-	sybilProtection  sybilprotection.SybilProtection
-	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
-	memPool          mempool.MemPool[ledger.BlockVoteRank]
-	conflictDAG      conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
-	errorHandler     func(error)
+	utxoLedger               *utxoledger.Manager
+	accountsLedger           *accountsledger.Manager
+	manaManager              *mana.Manager
+	sybilProtection          sybilprotection.SybilProtection
+	commitmentLoader         func(iotago.SlotIndex) (*model.Commitment, error)
+	memPool                  mempool.MemPool[ledger.BlockVoteRank]
+	conflictDAG              conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
+	retainTransactionFailure func(iotago.SlotIdentifier, error)
+	errorHandler             func(error)
 
 	module.Module
 }
@@ -69,6 +65,8 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Events.Ledger.LinkTo(l.events)
 			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
+
+			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
 
 			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
@@ -121,6 +119,10 @@ func New(
 	}
 }
 
+func (l *Ledger) setRetainTransactionFailureFunc(retainTransactionFailure func(iotago.SlotIdentifier, error)) {
+	l.retainTransactionFailure = retainTransactionFailure
+}
+
 func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
 	l.memPool.OnTransactionAttached(handler, opts...)
 }
@@ -129,6 +131,7 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 	if transaction, hasTransaction := block.Transaction(); hasTransaction {
 		transactionMetadata, err := l.memPool.AttachTransaction(transaction, block.ID())
 		if err != nil {
+			l.retainTransactionFailure(block.ID(), err)
 			l.errorHandler(err)
 
 			return nil, true
@@ -238,17 +241,13 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 			stateRequest.OnSuccess(func(loadedState mempool.State) {
 				concreteOutput, ok := loadedState.(*utxoledger.Output)
 				if !ok {
-					err = ErrUnexpectedUnderlyingType
+					err = iotago.ErrUnknownOutputType
 					return
 				}
 				output = concreteOutput
 			})
 			stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
 			stateRequest.WaitComplete()
-
-			if err != nil {
-				return nil, ierrors.Wrapf(ErrTransactionMetadataNotFOund, "error in getting output for %v", stateWithMetadata.ID())
-			}
 
 			return output, nil
 		}
@@ -257,7 +256,7 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 
 		tx, ok := txWithMetadata.Transaction().(*iotago.Transaction)
 		if !ok {
-			return nil, ErrUnexpectedUnderlyingType
+			return nil, iotago.ErrTxTypeInvalid
 		}
 
 		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
@@ -543,7 +542,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
 		if !ok {
-			err = ErrUnexpectedUnderlyingType
+			err = iotago.ErrTxTypeInvalid
 			return false
 		}
 		txCreationTime := tx.Essence.CreationTime
@@ -644,17 +643,17 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 
 	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
 	if err != nil {
-		return p.Reject(ierrors.Errorf("error while retrieving output %s: %w", stateRef.Ref(), err))
+		return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "error while retrieving output %s: %w", stateRef.Ref(), err))
 	}
 
 	if !isUnspent {
-		return p.Reject(ierrors.Errorf("unspent output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+		return p.Reject(ierrors.Join(iotago.ErrInputAlreadySpent, ierrors.Wrapf(mempool.ErrStateNotFound, "unspent output %s not found", stateRef.Ref())))
 	}
 
 	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
 	output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(stateRef.Ref())
 	if err != nil {
-		return p.Reject(ierrors.Errorf("output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
+		return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
 	}
 
 	return p.Resolve(output)

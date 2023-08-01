@@ -42,15 +42,21 @@ type BlockIssuer struct {
 
 	optsTipSelectionTimeout       time.Duration
 	optsTipSelectionRetryInterval time.Duration
-	optsIncompleteBlockAccepted   bool
+	// optsIncompleteBlockAccepted defines whether the node allows filling in incomplete block and issuing it for user.
+	optsIncompleteBlockAccepted bool
+	optsRateSetterEnabled       bool
 }
 
 func New(p *protocol.Protocol, account Account, opts ...options.Option[BlockIssuer]) *BlockIssuer {
 	return options.Apply(&BlockIssuer{
-		events:     NewEvents(),
-		workerPool: p.Workers.CreatePool("BlockIssuer"),
-		protocol:   p,
-		Account:    account,
+		events:                      NewEvents(),
+		workerPool:                  p.Workers.CreatePool("BlockIssuer"),
+		protocol:                    p,
+		Account:                     account,
+		optsIncompleteBlockAccepted: false,
+		optsRateSetterEnabled:       false,
+		//optsTipSelectionTimeout:       5 * time.Second, // TODO: what should the default be?
+		//optsTipSelectionRetryInterval: 200 * time.Millisecond, // TODO: what should the default be?
 	}, opts)
 }
 
@@ -319,9 +325,9 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		}
 
 		if len(iotaBlock.Parents()) == 0 {
-			references, err := i.getReferences(ctx, innerBlock.Payload)
-			if err != nil {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %w", err)
+			references, referencesErr := i.getReferences(ctx, innerBlock.Payload)
+			if referencesErr != nil {
+				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %w", referencesErr)
 			}
 
 			innerBlock.StrongParents = references[iotago.StrongParentType]
@@ -347,7 +353,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		resign = true
 	}
 
-	if err := i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Index(), references); err != nil {
+	if err = i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Index(), references); err != nil {
 		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
@@ -356,9 +362,9 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 			iotaBlock.IssuerID = i.Account.ID()
 
 			prvKey := i.Account.PrivateKey()
-			signature, err := iotaBlock.Sign(apiForVesion, iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
-			if err != nil {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", err)
+			signature, signatureErr := iotaBlock.Sign(apiForVesion, iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
+			if signatureErr != nil {
+				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
 			}
 
 			edSig, isEdSig := signature.(*iotago.Ed25519Signature)
@@ -377,10 +383,12 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	i.events.BlockConstructed.Trigger(modelBlock)
+	if !i.optsRateSetterEnabled || i.protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(modelBlock.ProtocolBlock().IssuerID) {
+		i.events.BlockConstructed.Trigger(modelBlock)
 
-	if err = i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error issuing model block")
+		if err = i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
+			return iotago.EmptyBlockID(), ierrors.Wrap(err, "error issuing model block")
+		}
 	}
 
 	return modelBlock.ID(), nil
@@ -463,5 +471,11 @@ func WithTipSelectionRetryInterval(interval time.Duration) options.Option[BlockI
 func WithIncompleteBlockAccepted(accepted bool) options.Option[BlockIssuer] {
 	return func(i *BlockIssuer) {
 		i.optsIncompleteBlockAccepted = accepted
+	}
+}
+
+func WithRateSetterEnabled(enabled bool) options.Option[BlockIssuer] {
+	return func(i *BlockIssuer) {
+		i.optsRateSetterEnabled = enabled
 	}
 }

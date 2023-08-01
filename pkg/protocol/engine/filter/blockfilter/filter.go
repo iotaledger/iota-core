@@ -91,12 +91,14 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 	minCommittableAge := blockSlotAPI.ProtocolParameters().MinCommittableAge()
 	maxCommittableAge := blockSlotAPI.ProtocolParameters().MaxCommittableAge()
+	commitmentIndex := block.ProtocolBlock().SlotCommitmentID.Index()
+	blockIndex := block.ID().Index()
 
-	// check that commitment is within allowed range.
-	if minCommittableAge > 0 &&
-		block.ProtocolBlock().SlotCommitmentID.Index() > 0 &&
-		(block.ProtocolBlock().SlotCommitmentID.Index() > block.ID().Index() ||
-			block.ID().Index()-block.ProtocolBlock().SlotCommitmentID.Index() < minCommittableAge) {
+	// check that commitment is not too recent.
+	if minCommittableAge > 0 && // don't filter anything for being too recent if minCommittableAge is 0
+		commitmentIndex > 0 && // don't filter commitments to genesis based on being too recent
+		(commitmentIndex > blockIndex || // filter commitments to future slots
+			blockIndex-commitmentIndex < minCommittableAge) {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
 			Reason: ierrors.Wrapf(ErrCommitmentTooRecent, "block at slot %d committing to slot %d", block.ID().Index(), block.ProtocolBlock().SlotCommitmentID.Index()),
@@ -105,7 +107,9 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 		return
 	}
-	if block.ID().Index() >= block.ProtocolBlock().SlotCommitmentID.Index() && block.ID().Index()-block.ProtocolBlock().SlotCommitmentID.Index() > maxCommittableAge {
+	// check that commitment is not too old.
+	if block.ID().Index() >= commitmentIndex && // underflow check
+		block.ID().Index()-commitmentIndex > maxCommittableAge {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
 			Reason: ierrors.Wrapf(ErrCommitmentTooOld, "block at slot %d committing to slot %d, max committable age %d", block.ID().Index(), block.ProtocolBlock().SlotCommitmentID.Index(), maxCommittableAge),
@@ -117,12 +121,16 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 	// check that commitment input (if any) is within allowed range.
 	if basicBlock, isBasic := block.BasicBlock(); isBasic {
-		if tx, isTX := basicBlock.Payload.(*iotago.Transaction); isTX {
+		if basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
+
+			tx, _ := basicBlock.Payload.(*iotago.Transaction)
 			if cInput := tx.CommitmentInput(); cInput != nil {
-				if minCommittableAge > 0 &&
-					cInput.CommitmentID.Index() > 0 &&
-					(cInput.CommitmentID.Index() > block.ID().Index() ||
-						block.ID().Index()-cInput.CommitmentID.Index() < minCommittableAge) {
+				cInputIndex := cInput.CommitmentID.Index()
+				// check that commitment input is not too recent.
+				if minCommittableAge > 0 && // don't filter anything for being too recent if minCommittableAge is 0
+					cInputIndex > 0 && // don't filter commitments to genesis based on being too recent
+					(cInputIndex > blockIndex || // filter commitments to future slots
+						blockIndex-cInputIndex < minCommittableAge) {
 					f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 						Block:  block,
 						Reason: ierrors.Wrapf(ErrCommitmentInputTooRecent, "block at slot %d with commitment input to slot %d", block.ID().Index(), cInput.CommitmentID.Index()),
@@ -131,7 +139,9 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID)
 
 					return
 				}
-				if block.ID().Index() >= cInput.CommitmentID.Index() && block.ID().Index()-cInput.CommitmentID.Index() > maxCommittableAge {
+				// check that commitment input is not too old.
+				if blockIndex >= cInputIndex && // underflow check
+					blockIndex-cInputIndex > maxCommittableAge {
 					f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 						Block:  block,
 						Reason: ierrors.Wrapf(ErrCommitmentInputTooOld, "block at slot %d committing to slot %d, max committable age %d", block.ID().Index(), cInput.CommitmentID.Index(), maxCommittableAge),

@@ -136,7 +136,7 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
-		Component.LogDebugf("BlockFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
+		Component.LogDebugf("BlockPreFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
 	})
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
@@ -169,6 +169,18 @@ func configure() error {
 
 	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		Component.LogInfof("SlotFinalized: %d", index)
+	})
+
+	deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+		Component.LogDebugf("BlockScheduled: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block, err error) {
+		Component.LogDebugf("BlockDropped: %s; reason: %s", block.ID(), err)
+	})
+
+	deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+		Component.LogDebugf("BlockSkipped: %s", block.ID())
 	})
 
 	deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {
