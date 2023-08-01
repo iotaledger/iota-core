@@ -79,7 +79,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 	}
 
 	if blockParams.IssuingTime == nil {
-		issuingTime := time.Now()
+		issuingTime := time.Now().UTC()
 		blockParams.IssuingTime = &issuingTime
 	}
 
@@ -177,7 +177,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	}
 
 	if blockParams.IssuingTime == nil {
-		issuingTime := time.Now()
+		issuingTime := time.Now().UTC()
 		blockParams.IssuingTime = &issuingTime
 	}
 
@@ -347,9 +347,8 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	references[iotago.StrongParentType] = iotaBlock.Block.StrongParentIDs().RemoveDupsAndSort()
 	references[iotago.WeakParentType] = iotaBlock.Block.WeakParentIDs().RemoveDupsAndSort()
 	references[iotago.ShallowLikeParentType] = iotaBlock.Block.ShallowLikeParentIDs().RemoveDupsAndSort()
-
-	if iotaBlock.IssuingTime.IsZero() {
-		iotaBlock.IssuingTime = time.Now()
+	if iotaBlock.IssuingTime.Equal(time.Unix(0, 0)) {
+		iotaBlock.IssuingTime = time.Now().UTC()
 		resign = true
 	}
 
