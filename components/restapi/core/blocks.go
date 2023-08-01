@@ -59,7 +59,7 @@ func blockIssuance(_ echo.Context) (*apimodels.IssuanceBlockHeaderResponse, erro
 		WeakParents:         references[iotago.WeakParentType],
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType],
 		LatestFinalizedSlot: deps.Protocol.SyncManager.LatestFinalizedSlot(),
-		Commitment:          *slotCommitment.Commitment(),
+		Commitment:          slotCommitment.Commitment(),
 	}
 
 	return resp, nil
