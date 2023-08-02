@@ -19,13 +19,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		return nil, err
 	}
 
-	mca := deps.Protocol.CurrentAPI().ProtocolParameters().MaxCommittableAge()
-	slotIndex := deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time.Now())
-
-	// TODO: do we really need to use MCA here or should we simply use the index of the latest commitment?
-	if slotIndex >= mca {
-		slotIndex -= mca
-	}
+	slotIndex := deps.Protocol.SyncManager.LatestCommitment().Index()
 
 	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
 	if err != nil {

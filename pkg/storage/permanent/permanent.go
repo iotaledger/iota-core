@@ -47,6 +47,7 @@ type Permanent struct {
 func New(dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) *Permanent {
 	return options.Apply(&Permanent{
 		errorHandler: errorHandler,
+		dbConfig:     dbConfig,
 	}, opts, func(p *Permanent) {
 		var err error
 		p.store, err = database.StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)

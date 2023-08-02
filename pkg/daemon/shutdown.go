@@ -15,4 +15,5 @@ const (
 	PriorityINX
 	PriorityDashboardMetrics
 	PriorityDashboard
+	PriorityMetrics
 )

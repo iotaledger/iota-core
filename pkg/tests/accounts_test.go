@@ -87,9 +87,6 @@ func Test_TransitionAccount(t *testing.T) {
 	block1 := ts.IssueBlockAtSlotWithOptions("block1", slotIndexBlock1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, blockfactory.WithPayload(tx1))
 
 	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Index(), activeNodes, block1)
-	// slotIndexChildrenBlock1 := ts.BlockID("block1").Index() + minSlotCommittableAge + 1
-	// ts.IssueBlockAtSlot("block2", slotIndexChildrenBlock1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.BlockIDs("block1")...)
-	// ts.IssueBlockAtSlot("block3", slotIndexChildrenBlock1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, ts.BlockIDs("block2")...)
 
 	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock1, &prunable.AccountDiff{
 		BICChange:           0,
