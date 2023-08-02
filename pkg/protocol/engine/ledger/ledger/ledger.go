@@ -635,28 +635,34 @@ func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iota
 	return accountOutput, nil
 }
 
-func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
+func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[mempool.State] {
 	p := promise.New[mempool.State]()
 
 	l.utxoLedger.ReadLockLedger()
 	defer l.utxoLedger.ReadUnlockLedger()
 
-	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
-	if err != nil {
-		return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "error while retrieving output %s: %w", stateRef.Ref(), err))
-	}
+	switch stateRef.Type() {
+	case iotago.InputUTXO:
+		concreteStateRef := stateRef.(*iotago.UTXOInput)
+		isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(concreteStateRef.Ref())
+		if err != nil {
+			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "error while retrieving output %s: %w", concreteStateRef.Ref(), err))
+		}
 
-	if !isUnspent {
-		return p.Reject(ierrors.Join(iotago.ErrInputAlreadySpent, ierrors.Wrapf(mempool.ErrStateNotFound, "unspent output %s not found", stateRef.Ref())))
-	}
+		if !isUnspent {
+			return p.Reject(ierrors.Join(iotago.ErrInputAlreadySpent, ierrors.Wrapf(mempool.ErrStateNotFound, "unspent output %s not found", concreteStateRef.Ref())))
+		}
 
-	// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
-	output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(stateRef.Ref())
-	if err != nil {
-		return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "output %s not found: %w", stateRef.Ref(), mempool.ErrStateNotFound))
-	}
+		// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
+		output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(concreteStateRef.Ref())
+		if err != nil {
+			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "output %s not found: %w", concreteStateRef.Ref(), mempool.ErrStateNotFound))
+		}
 
-	return p.Resolve(output)
+		return p.Resolve(output)
+	default:
+		return p.Reject(ierrors.Errorf("unsupported input type %s", stateRef.Type()))
+	}
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
