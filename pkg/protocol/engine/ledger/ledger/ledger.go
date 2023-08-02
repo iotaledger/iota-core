@@ -643,6 +643,7 @@ func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[mempool.St
 
 	switch stateRef.Type() {
 	case iotago.InputUTXO:
+		//nolint:forcetypeassert // we can safely assume that this is an UTXOInput
 		concreteStateRef := stateRef.(*iotago.UTXOInput)
 		isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(concreteStateRef.Ref())
 		if err != nil {
