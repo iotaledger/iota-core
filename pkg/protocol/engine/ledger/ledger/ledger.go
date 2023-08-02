@@ -643,6 +643,7 @@ func (l *Ledger) resolveState(stateRef iotago.IndexedUTXOReferencer) *promise.Pr
 
 	isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(stateRef.Ref())
 	if err != nil {
+		//nolint:forcetypeassert // we can safely assume that this is an UTXOInput
 		return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "error while retrieving output %s: %w", stateRef.Ref(), err))
 	}
 
