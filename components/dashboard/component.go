@@ -57,7 +57,6 @@ type dependencies struct {
 }
 
 func configure() error {
-	// TODO: register events here
 	configureServer()
 	return nil
 }

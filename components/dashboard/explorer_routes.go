@@ -88,7 +88,6 @@ func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
 	}
 
-	// TODO: metadata instead, or retainer
 	// blockMetadata, exists := deps.Retainer.BlockMetadata(blockID)
 	// if !exists {
 	// 	return nil, ierrors.Wrapf(ErrNotFound, "block metadata %s", blockID.Base58())
@@ -98,7 +97,6 @@ func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 }
 
 func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *ExplorerBlock {
-	// TODO: fill in missing fields
 	iotaBlk := block.ProtocolBlock()
 
 	sigBytes, err := iotaBlk.Signature.Encode()
@@ -151,7 +149,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *Explore
 			return payloadJSON
 		}(),
 		CommitmentID: iotaBlk.SlotCommitmentID.ToHex(),
-		// TODO: remove from explorer or add link to a separate route
+
 		// Commitment: CommitmentResponse{
 		//	Index:            uint64(iotaBlk.SlotCommitmentID.Index()),
 		//	PrevID:           iotaBlk.SlotCommitment.PrevID.ToHex(),
