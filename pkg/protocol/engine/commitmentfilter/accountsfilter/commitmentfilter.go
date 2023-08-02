@@ -66,10 +66,6 @@ func New(apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *Co
 }
 
 func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
-	if c.isFutureBlock(block) {
-		return
-	}
-
 	c.evaluateBlock(block)
 }
 
