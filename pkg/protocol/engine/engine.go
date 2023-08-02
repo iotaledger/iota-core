@@ -442,8 +442,8 @@ func (e *Engine) setupEvictionState() {
 		})
 	}, event.WithWorkerPool(wp))
 
-	e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		e.EvictionState.AdvanceActiveWindowToIndex(details.Commitment.Index())
+	e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+		e.EvictionState.AdvanceActiveWindowToIndex(commitment.Index())
 	}, event.WithWorkerPool(wp))
 
 	e.Events.EvictionState.SlotEvicted.Hook(e.BlockCache.EvictUntil)

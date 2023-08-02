@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -42,7 +41,7 @@ type SyncManager struct {
 // NewProvider creates a new SyncManager provider.
 func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 	return module.Provide(func(e *engine.Engine) syncmanager.SyncManager {
-		s := New(e.IsBootstrapped, e.Storage.Settings().LatestCommitment(), e.Storage.Settings().LatestFinalizedSlot()) //TODO: handle changes to the bootstrapped state to trigger updates
+		s := New(e.IsBootstrapped, e.Storage.Settings().LatestCommitment(), e.Storage.Settings().LatestFinalizedSlot()) // TODO: handle changes to the bootstrapped state to trigger updates
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("SyncManager", 1))
 
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
@@ -57,8 +56,8 @@ func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 			}
 		}, asyncOpt)
 
-		e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-			if s.updateLatestCommitment(details.Commitment) {
+		e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+			if s.updateLatestCommitment(commitment) {
 				s.triggerUpdate()
 			}
 		}, asyncOpt)

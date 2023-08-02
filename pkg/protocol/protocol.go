@@ -237,8 +237,11 @@ func (p *Protocol) initChainManager() {
 	// Else our own BlockIssuer might use a commitment that the ChainManager does not know yet.
 	p.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 		p.ChainManager.ProcessCommitment(details.Commitment)
+	})
 
-		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(details.Commitment.ID().Index()) {
+	p.Events.Engine.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+		// We need to make sure that this is called after the LatestCommitment in the settings of the engine is updated.
+		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(commitment.ID().Index()) {
 			err := p.ProcessBlock(tuple.A, tuple.B)
 			if err != nil {
 				p.ErrorHandler()(err)
@@ -284,7 +287,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	// TODO: is this actually correct? Shouldn't we combine this with the future blocks and store Index -> CommitmentID -> Blocks
 	if !chainCommitment.IsSolid() {
 		if !p.unsolidCommitmentBlocks.AddBlock(block, src) {
-			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid commitmentr buffer: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
+			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid commitment buffer: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 		}
 
 		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
@@ -293,14 +296,24 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	processed := false
 
 	if mainChain := mainEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
-		mainEngine.ProcessBlockFromPeer(block, src)
-		processed = true
+		if latestCommitmentID := mainEngine.Storage.Settings().LatestCommitment().ID(); block.ProtocolBlock().SlotCommitmentID.Index() > latestCommitmentID.Index() {
+			p.unsolidCommitmentBlocks.AddBlock(block, src)
+			p.ErrorHandler()(ierrors.Errorf("block from source %s was not processed: %s; block is from a future slot commitment: %s, latest commitment: %s", src, block.ID(), block.ProtocolBlock().SlotCommitmentID, latestCommitmentID))
+		} else {
+			mainEngine.ProcessBlockFromPeer(block, src)
+			processed = true
+		}
 	}
 
 	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil {
 		if candidateChain := candidateEngineInstance.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngineInstance.BlockRequester.HasTicker(block.ID()) {
-			candidateEngineInstance.ProcessBlockFromPeer(block, src)
-			processed = true
+			if latestCommitmentID := candidateEngineInstance.Storage.Settings().LatestCommitment().ID(); block.ProtocolBlock().SlotCommitmentID.Index() > latestCommitmentID.Index() {
+				p.unsolidCommitmentBlocks.AddBlock(block, src)
+				p.ErrorHandler()(ierrors.Errorf("block from source %s was not processed on candidate engine: %s; block is from a future slot commitment: %s, latest commitment: %s", src, block.ID(), block.ProtocolBlock().SlotCommitmentID, latestCommitmentID))
+			} else {
+				candidateEngineInstance.ProcessBlockFromPeer(block, src)
+				processed = true
+			}
 		}
 	}
 

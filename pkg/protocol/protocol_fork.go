@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
@@ -121,22 +120,22 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	}
 
 	// Attach slot commitments to the chain manager and detach as soon as we switch to that engine
-	detachProcessCommitment = candidateEngineInstance.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+	detachProcessCommitment = candidateEngineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		// Check whether the commitment produced by syncing the candidate engine is actually part of the forked chain.
-		if fork.ForkedChain.LatestCommitment().ID().Index() >= details.Commitment.Index() {
-			forkedChainCommitmentID := fork.ForkedChain.Commitment(details.Commitment.Index()).ID()
-			if forkedChainCommitmentID != details.Commitment.ID() {
-				p.ErrorHandler()(ierrors.Errorf("candidate engine %s produced a commitment %s that is not part of the forked chain %s", candidateEngineInstance.Name(), details.Commitment.ID(), forkedChainCommitmentID))
+		if fork.ForkedChain.LatestCommitment().ID().Index() >= commitment.Index() {
+			forkedChainCommitmentID := fork.ForkedChain.Commitment(commitment.Index()).ID()
+			if forkedChainCommitmentID != commitment.ID() {
+				p.ErrorHandler()(ierrors.Errorf("candidate engine %s produced a commitment %s that is not part of the forked chain %s", candidateEngineInstance.Name(), commitment.ID(), forkedChainCommitmentID))
 				cleanupFunc()
 
 				return
 			}
 		}
 
-		p.ChainManager.ProcessCandidateCommitment(details.Commitment)
+		p.ChainManager.ProcessCandidateCommitment(commitment)
 
 		// TODO: it'd be better to do this for individual commitments instead of per slot.
-		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(details.Commitment.ID().Index()) {
+		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(commitment.ID().Index()) {
 			err = p.ProcessBlock(tuple.A, tuple.B)
 			if err != nil {
 				p.ErrorHandler()(err)
@@ -144,7 +143,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 		}
 
 		if candidateEngineInstance.IsBootstrapped() &&
-			details.Commitment.CumulativeWeight() > p.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
+			commitment.CumulativeWeight() > p.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
 			p.switchEngines()
 		}
 	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("ProcessCandidateCommitment", 2))).Unhook

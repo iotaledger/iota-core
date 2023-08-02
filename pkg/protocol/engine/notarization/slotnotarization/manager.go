@@ -227,6 +227,8 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
+	m.events.LatestCommitmentUpdated.Trigger(newModelCommitment)
+
 	if err = m.slotMutations.Evict(index); err != nil {
 		m.errorHandler(ierrors.Wrapf(err, "failed to evict slotMutations at index: %d", index))
 	}

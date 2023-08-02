@@ -296,6 +296,10 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks)
 	})
 
+	events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+		fmt.Printf("%s > [%s] NotarizationManager.LatestCommitmentUpdated: %s\n", n.Name, engineName, commitment.ID())
+	})
+
 	events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
 	})
