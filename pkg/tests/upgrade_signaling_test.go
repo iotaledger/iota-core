@@ -74,20 +74,20 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		"nodeD": {blockfactory.WithHighestSupportedVersion(5), blockfactory.WithProtocolParametersHash(hash2)},
 	}
 
-	ts.IssueBlocksAtEpoch(1, 4, "Genesis", ts.Nodes(), true, issuingOptions)
-	ts.IssueBlocksAtEpoch(2, 4, "7.3", ts.Nodes(), true, issuingOptions)
-	ts.IssueBlocksAtEpoch(3, 4, "15.3", ts.Nodes(), true, issuingOptions)
-	ts.IssueBlocksAtEpoch(4, 4, "23.3", ts.Nodes(), true, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 1, 4, "Genesis", ts.Nodes(), true, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 2, 4, "7.3", ts.Nodes(), true, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 3, 4, "15.3", ts.Nodes(), true, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 4, 4, "23.3", ts.Nodes(), true, issuingOptions)
 
 	// Epoch 5: revoke vote of nodeA in last slot of epoch.
-	ts.IssueBlocksAtSlots(ts.SlotsForEpoch(5)[:ts.API.TimeProvider().EpochDurationSlots()-1], 4, "31.3", ts.Nodes(), true, issuingOptions)
+	ts.IssueBlocksAtSlots("", ts.SlotsForEpoch(5)[:ts.API.TimeProvider().EpochDurationSlots()-1], 4, "31.3", ts.Nodes(), true, issuingOptions)
 
 	issuingOptionsRevoke := lo.MergeMaps(map[string][]options.Option[blockfactory.BlockParams]{}, issuingOptions)
 	issuingOptionsRevoke["nodeA"] = []options.Option[blockfactory.BlockParams]{blockfactory.WithHighestSupportedVersion(5), blockfactory.WithProtocolParametersHash(iotago.Identifier{})}
-	ts.IssueBlocksAtSlots([]iotago.SlotIndex{39}, 4, "38.3", ts.Nodes(), true, issuingOptionsRevoke)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{39}, 4, "38.3", ts.Nodes(), true, issuingOptionsRevoke)
 
 	// Epoch 6: issue half before restarting and half after restarting.
-	ts.IssueBlocksAtSlots([]iotago.SlotIndex{40, 41, 42, 43}, 4, "39.3", ts.Nodes(), true, issuingOptions)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{40, 41, 42, 43}, 4, "39.3", ts.Nodes(), true, issuingOptions)
 
 	{
 		var expectedRootBlocks []*blocks.Block
@@ -100,7 +100,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			testsuite.WithActiveRootBlocks(expectedRootBlocks),
 		)
 
-		// Shutdown nodeA and restart it from disk. Verify state.
+		// Shutdown nodeE and restart it from disk. Verify state.
 		{
 			nodeE := ts.Node("nodeE")
 			nodeE.Shutdown()
@@ -140,13 +140,14 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}
 
 	// Can only continue to issue on nodeA, nodeB, nodeC, nodeD, nodeF. nodeE and nodeG were just restarted and don't have the latest unaccepted state.
-	ts.IssueBlocksAtSlots([]iotago.SlotIndex{44}, 4, "43.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, issuingOptions)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{44}, 4, "43.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, issuingOptions)
 
-	// Can't issue yet on nodeG as its account is not yet known.
-	ts.IssueBlocksAtSlots([]iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, issuingOptions)
+	// TODO: would be great to dynamically add accounts for later nodes.
+	// Can't issue on nodeG as its account is not known.
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, issuingOptions)
 
-	ts.IssueBlocksAtEpoch(7, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, issuingOptions)
-	ts.IssueBlocksAtEpoch(8, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 7, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 8, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, issuingOptions)
 
 	ts.AssertEpochVersions(map[iotago.Version]iotago.EpochIndex{
 		3: 0,

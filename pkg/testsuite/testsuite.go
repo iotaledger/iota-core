@@ -189,6 +189,43 @@ func (t *TestSuite) BlocksWithPrefix(prefix string) []*blocks.Block {
 	return b
 }
 
+func (t *TestSuite) BlocksWithPrefixes(prefixes ...string) []*blocks.Block {
+	b := make([]*blocks.Block, 0)
+
+	for _, prefix := range prefixes {
+		b = append(b, t.BlocksWithPrefix(prefix)...)
+	}
+
+	return b
+}
+
+func (t *TestSuite) BlocksWithSuffix(suffix string) []*blocks.Block {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	b := make([]*blocks.Block, 0)
+
+	t.blocks.ForEach(func(alias string, block *blocks.Block) bool {
+		if strings.HasSuffix(alias, suffix) {
+			b = append(b, block)
+		}
+
+		return true
+	})
+
+	return b
+}
+
+func (t *TestSuite) BlocksWithSuffixes(suffixes ...string) []*blocks.Block {
+	b := make([]*blocks.Block, 0)
+
+	for _, prefix := range suffixes {
+		b = append(b, t.BlocksWithSuffix(prefix)...)
+	}
+
+	return b
+}
+
 func (t *TestSuite) BlockIDsWithPrefix(prefix string) []iotago.BlockID {
 	blocksWithPrefix := t.BlocksWithPrefix(prefix)
 

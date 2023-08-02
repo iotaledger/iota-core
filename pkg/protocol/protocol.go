@@ -289,6 +289,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 		if !p.unsolidCommitmentBlocks.AddBlock(block, src) {
 			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid commitmentr buffer: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 		}
+
 		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
 

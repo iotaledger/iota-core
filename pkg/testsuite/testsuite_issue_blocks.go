@@ -132,15 +132,14 @@ func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...optio
 	return block
 }
 
-func (t *TestSuite) IssueBlockRowInSlot(slot iotago.SlotIndex, row int, parentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) []*blocks.Block {
+func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, row int, parentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) []*blocks.Block {
 	blocksIssued := make([]*blocks.Block, 0, len(nodes))
 
 	strongParents := t.BlockIDsWithPrefix(parentsPrefixAlias)
-	fmt.Println("issuing", slot, row, "strongParents", parentsPrefixAlias, strongParents)
 	issuingOptionsCopy := lo.MergeMaps(make(map[string][]options.Option[blockfactory.BlockParams]), issuingOptions)
 
 	for _, node := range nodes {
-		blockAlias := fmt.Sprintf("%d.%d-%s", slot, row, node.Name)
+		blockAlias := fmt.Sprintf("%s%d.%d-%s", prefix, slot, row, node.Name)
 		issuingOptionsCopy[node.Name] = append(issuingOptionsCopy[node.Name], blockfactory.WithStrongParents(strongParents...))
 
 		var b *blocks.Block
@@ -165,32 +164,32 @@ func (t *TestSuite) IssueBlockRowInSlot(slot iotago.SlotIndex, row int, parentsP
 	return blocksIssued
 }
 
-func (t *TestSuite) IssueBlockRowsInSlot(slot iotago.SlotIndex, rows int, initialParentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+func (t *TestSuite) IssueBlockRowsInSlot(prefix string, slot iotago.SlotIndex, rows int, initialParentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
 	var blocksIssued, lastBlockRowIssued []*blocks.Block
 	parentsPrefixAlias := initialParentsPrefixAlias
 
 	for row := 0; row < rows; row++ {
 		if row > 0 {
-			parentsPrefixAlias = fmt.Sprintf("%d.%d", slot, row-1)
+			parentsPrefixAlias = fmt.Sprintf("%s%d.%d", prefix, slot, row-1)
 		}
 
-		lastBlockRowIssued = t.IssueBlockRowInSlot(slot, row, parentsPrefixAlias, nodes, issuingOptions)
+		lastBlockRowIssued = t.IssueBlockRowInSlot(prefix, slot, row, parentsPrefixAlias, nodes, issuingOptions)
 		blocksIssued = append(blocksIssued, lastBlockRowIssued...)
 	}
 
 	return blocksIssued, lastBlockRowIssued
 }
 
-func (t *TestSuite) IssueBlocksAtSlots(slots []iotago.SlotIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
 	var blocksIssued, lastBlockRowIssued []*blocks.Block
 	parentsPrefixAlias := initialParentsPrefixAlias
 
 	for i, slot := range slots {
 		if i > 0 {
-			parentsPrefixAlias = fmt.Sprintf("%d.%d", slots[i-1], rowsPerSlot-1)
+			parentsPrefixAlias = fmt.Sprintf("%s%d.%d", prefix, slots[i-1], rowsPerSlot-1)
 		}
 
-		blocksInSlot, lastRowInSlot := t.IssueBlockRowsInSlot(slot, rowsPerSlot, parentsPrefixAlias, nodes, issuingOptions)
+		blocksInSlot, lastRowInSlot := t.IssueBlockRowsInSlot(prefix, slot, rowsPerSlot, parentsPrefixAlias, nodes, issuingOptions)
 		blocksIssued = append(blocksIssued, blocksInSlot...)
 		lastBlockRowIssued = lastRowInSlot
 
@@ -206,8 +205,8 @@ func (t *TestSuite) IssueBlocksAtSlots(slots []iotago.SlotIndex, rowsPerSlot int
 	return blocksIssued, lastBlockRowIssued
 }
 
-func (t *TestSuite) IssueBlocksAtEpoch(epoch iotago.EpochIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
-	return t.IssueBlocksAtSlots(t.SlotsForEpoch(epoch), rowsPerSlot, initialParentsPrefixAlias, nodes, waitForSlotsCommitted, issuingOptions)
+func (t *TestSuite) IssueBlocksAtEpoch(prefix string, epoch iotago.EpochIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+	return t.IssueBlocksAtSlots(prefix, t.SlotsForEpoch(epoch), rowsPerSlot, initialParentsPrefixAlias, nodes, waitForSlotsCommitted, issuingOptions)
 }
 
 func (t *TestSuite) SlotsForEpoch(epoch iotago.EpochIndex) []iotago.SlotIndex {

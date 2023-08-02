@@ -453,7 +453,10 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 	return block
 }
 
-func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {
+func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup, startSlot iotago.SlotIndex) {
+	issuingTime := n.Protocol.APIForSlot(startSlot).TimeProvider().SlotStartTime(startSlot)
+	start := time.Now()
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -467,12 +470,14 @@ func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup) {
 			}
 
 			blockAlias := fmt.Sprintf("%s-activity.%d", n.Name, counter)
+			timeOffset := time.Now().Sub(start)
 			n.IssueBlock(ctx, blockAlias,
 				blockfactory.WithPayload(
 					&iotago.TaggedData{
 						Tag: []byte(blockAlias),
 					},
 				),
+				blockfactory.WithIssuingTime(issuingTime.Add(timeOffset)),
 			)
 
 			counter++
