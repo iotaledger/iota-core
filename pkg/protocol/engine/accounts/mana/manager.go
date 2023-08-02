@@ -49,10 +49,11 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 			return 0, ierrors.Errorf("failed to resolve AccountOutput for %s in slot %s: %w", accountID, currentSlot, err)
 		}
 		minDeposit := m.rentStructure.MinDeposit(output.Output())
-		if output.BaseTokenAmount() < minDeposit {
-			return 0, ierrors.Errorf("account %s has insuffient base token amount to cover storage deposit in slot %s", accountID, currentSlot)
+		if output.BaseTokenAmount() <= minDeposit {
+			mana = accounts.NewMana(output.StoredMana(), 0, output.CreationTime())
+		} else {
+			mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.CreationTime())
 		}
-		mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.CreationTime())
 
 		m.manaVectorCache.Put(accountID, mana)
 	}
@@ -92,7 +93,9 @@ func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts ds.Set
 		mana, exists := m.manaVectorCache.Get(accountID)
 		if exists {
 			minDeposit := m.rentStructure.MinDeposit(output.Output())
-			if output.BaseTokenAmount() >= minDeposit {
+			if output.BaseTokenAmount() <= minDeposit {
+				mana.Update(output.StoredMana(), 0, slotIndex)
+			} else {
 				mana.Update(output.StoredMana(), output.BaseTokenAmount()-minDeposit, slotIndex)
 			}
 		}

@@ -14,20 +14,20 @@ type Mana struct {
 	mutex syncutils.RWMutex
 }
 
-func NewMana(value iotago.Mana, amount iotago.BaseToken, updateTime iotago.SlotIndex) *Mana {
+func NewMana(value iotago.Mana, excessBaseTokens iotago.BaseToken, updateTime iotago.SlotIndex) *Mana {
 	return &Mana{
 		value:            value,
-		excessBaseTokens: amount,
+		excessBaseTokens: excessBaseTokens,
 		updateTime:       updateTime,
 	}
 }
 
-func (m *Mana) Update(value iotago.Mana, amount iotago.BaseToken, updateTime iotago.SlotIndex) {
+func (m *Mana) Update(value iotago.Mana, excessBaseTokens iotago.BaseToken, updateTime iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	m.value = value
-	m.excessBaseTokens = amount
+	m.excessBaseTokens = excessBaseTokens
 	m.updateTime = updateTime
 }
 
