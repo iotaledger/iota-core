@@ -103,7 +103,7 @@ func (t *TestFramework) AddFutureAttestation(issuerAlias string, attestationAlia
 
 	block, err := builder.NewBasicBlockBuilder(tpkg.TestAPI).
 		IssuingTime(issuingTime).
-		SlotCommitmentID(iotago.NewCommitment(tpkg.TestAPI.Version(), attestedSlot, iotago.CommitmentID{}, iotago.Identifier{}, 0).MustID()).
+		SlotCommitmentID(iotago.NewCommitment(tpkg.TestAPI.Version(), attestedSlot, iotago.CommitmentID{}, iotago.Identifier{}, 0, 0).MustID()).
 		Sign(issuer.accountID, issuer.priv).
 		Build()
 	require.NoError(t.test, err)

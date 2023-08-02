@@ -14,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/rmc"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
@@ -36,6 +37,7 @@ type Manager struct {
 	ledger              ledger.Ledger
 	sybilProtection     sybilprotection.SybilProtection
 	upgradeOrchestrator upgrade.Orchestrator
+	rmcManager          *rmc.Manager
 
 	storage *storage.Storage
 
@@ -60,10 +62,12 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 			m.sybilProtection = e.SybilProtection
 			m.attestation = e.Attestations
 			m.upgradeOrchestrator = e.UpgradeOrchestrator
+			m.rmcManager = rmc.NewManager(e.Storage.Commitments().Load)
 
 			wpBlocks := m.workers.CreatePool("Blocks", 1) // Using just 1 worker to avoid contention
 
 			e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
+				m.rmcManager.BlockAccepted(block)
 				if err := m.notarizeAcceptedBlock(block); err != nil {
 					m.errorHandler(ierrors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 				}
@@ -188,12 +192,20 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		protocolParametersAndVersionsHash,
 	)
 
+	// calculate the new RMC
+	rmc, err := m.rmcManager.CommitSlot(index)
+	if err != nil {
+		m.errorHandler(ierrors.Wrapf(err, "failed to commit RMC for slot %d", index))
+		return false
+	}
+
 	newCommitment := iotago.NewCommitment(
 		apiForSlot.ProtocolParameters().Version(),
 		index,
 		latestCommitment.ID(),
 		roots.ID(),
 		cumulativeWeight,
+		rmc,
 	)
 
 	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, apiForSlot, serix.WithValidation())

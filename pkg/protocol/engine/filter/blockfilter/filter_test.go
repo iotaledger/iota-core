@@ -81,7 +81,7 @@ func (t *TestFramework) IssueUnsignedBlockAtSlotWithPayload(alias string, slot i
 	block, err := builder.NewBasicBlockBuilder(apiForSlot).
 		StrongParents(iotago.BlockIDs{}).
 		IssuingTime(apiForSlot.TimeProvider().SlotStartTime(slot)).
-		SlotCommitmentID(iotago.NewCommitment(apiForSlot.Version(), committing, iotago.CommitmentID{}, iotago.Identifier{}, 0).MustID()).
+		SlotCommitmentID(iotago.NewCommitment(apiForSlot.Version(), committing, iotago.CommitmentID{}, iotago.Identifier{}, 0, 0).MustID()).
 		Payload(payload).
 		Build()
 	require.NoError(t.Test, err)
@@ -95,7 +95,7 @@ func (t *TestFramework) IssueUnsignedBlockAtSlot(alias string, slot iotago.SlotI
 	block, err := builder.NewBasicBlockBuilder(apiForSlot).
 		StrongParents(iotago.BlockIDs{}).
 		IssuingTime(apiForSlot.TimeProvider().SlotStartTime(slot)).
-		SlotCommitmentID(iotago.NewCommitment(apiForSlot.Version(), committing, iotago.CommitmentID{}, iotago.Identifier{}, 0).MustID()).
+		SlotCommitmentID(iotago.NewCommitment(apiForSlot.Version(), committing, iotago.CommitmentID{}, iotago.Identifier{}, 0, 0).MustID()).
 		Build()
 	require.NoError(t.Test, err)
 
@@ -121,7 +121,7 @@ func (t *TestFramework) IssueBlockAtSlotWithVersion(alias string, index iotago.S
 		ProtocolVersion(version).
 		StrongParents(iotago.BlockIDs{iotago.BlockID{}}).
 		IssuingTime(api.TimeProvider().SlotStartTime(index)).
-		SlotCommitmentID(iotago.NewCommitment(api.Version(), index-api.ProtocolParameters().MinCommittableAge(), iotago.CommitmentID{}, iotago.Identifier{}, 0).MustID()).
+		SlotCommitmentID(iotago.NewCommitment(api.Version(), index-api.ProtocolParameters().MinCommittableAge(), iotago.CommitmentID{}, iotago.Identifier{}, 0, 0).MustID()).
 		Build()
 	require.NoError(t.Test, err)
 
