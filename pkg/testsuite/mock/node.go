@@ -403,8 +403,6 @@ func (n *Node) Shutdown() {
 		n.ctxCancel()
 	}
 
-	n.Workers.Shutdown()
-
 	<-stopped
 }
 
