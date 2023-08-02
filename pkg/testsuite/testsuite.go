@@ -31,8 +31,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-const MinIssuerAccountDeposit = iotago.BaseToken(84400)
-const MinValidatorAccountDeposit = iotago.BaseToken(88200)
+const MinIssuerAccountDeposit = iotago.BaseToken(372900)
+const MinValidatorAccountDeposit = iotago.BaseToken(702900)
 
 type TestSuite struct {
 	Testing     *testing.T
@@ -96,6 +96,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					100,
 					1,
 					10,
+					100,
+					100,
 				),
 				iotago.WithTimeProviderOptions(
 					time.Now().Truncate(10*time.Second).Unix()-t.optsGenesisTimestampOffset,
