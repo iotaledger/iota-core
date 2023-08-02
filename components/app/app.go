@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
 	coreapi "github.com/iotaledger/iota-core/components/restapi/core"
+	"github.com/iotaledger/iota-core/components/validator"
 )
 
 var (
@@ -41,6 +42,7 @@ func App() *app.App {
 			protocol.Component,
 			blockissuer.Component,
 			activity.Component,
+			validator.Component,
 			dashboardmetrics.Component,
 			dashboard.Component,
 			metrics.Component,
