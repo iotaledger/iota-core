@@ -37,6 +37,8 @@ type CommitmentFilter struct {
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
 	commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error)
 
+	rmcRetrieveFunc func(iotago.SlotIndex) (iotago.Mana, error)
+
 	accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (*accounts.AccountData, bool, error)
 
 	futureBlocksMutex sync.RWMutex
@@ -54,6 +56,8 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 			c.commitmentFunc = e.Storage.Commitments().Load
 
 			c.accountRetrieveFunc = e.Ledger.Account
+
+			c.rmcRetrieveFunc = e.Ledger.RMCManager().RMC
 
 			e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				c.PromoteFutureBlocksUntil(details.Commitment.Index())
@@ -143,6 +147,29 @@ func (c *CommitmentFilter) evaluateBlock(block *model.Block) {
 		})
 
 		return
+	}
+
+	// check that the block burns sufficient Mana
+	rmc, err := c.rmcRetrieveFunc(block.ProtocolBlock().SlotCommitmentID.Index())
+	if err != nil {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(err, "could not retrieve RMC for slot commitment %s", block.ProtocolBlock().SlotCommitmentID.Index()),
+		})
+	}
+	manaCost, err := block.ManaCost(rmc)
+	if err != nil {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(err, "could not calculate Mana cost for block"),
+		})
+	}
+	basicBlock, isBasic := block.BasicBlock()
+	if isBasic && manaCost < basicBlock.BurnedMana {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, rmc, basicBlock.BurnedMana),
+		})
 	}
 
 	// Check that the issuer of this block has non-negative block issuance credit
