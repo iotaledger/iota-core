@@ -7,27 +7,27 @@ import (
 
 // Mana is the stored and potential mana value of an account collected on the UTXO layer - used by the Scheduler.
 type Mana struct {
-	value      iotago.Mana      `serix:"0"`
-	deposit    iotago.BaseToken `serix:"1"`
-	updateTime iotago.SlotIndex `serix:"2"`
+	value            iotago.Mana      `serix:"0"`
+	excessBaseTokens iotago.BaseToken `serix:"1"`
+	updateTime       iotago.SlotIndex `serix:"2"`
 
 	mutex syncutils.RWMutex
 }
 
-func NewMana(value iotago.Mana, deposit iotago.BaseToken, updateTime iotago.SlotIndex) *Mana {
+func NewMana(value iotago.Mana, excessBaseTokens iotago.BaseToken, updateTime iotago.SlotIndex) *Mana {
 	return &Mana{
-		value:      value,
-		deposit:    deposit,
-		updateTime: updateTime,
+		value:            value,
+		excessBaseTokens: excessBaseTokens,
+		updateTime:       updateTime,
 	}
 }
 
-func (m *Mana) Update(value iotago.Mana, deposit iotago.BaseToken, updateTime iotago.SlotIndex) {
+func (m *Mana) Update(value iotago.Mana, excessBaseTokens iotago.BaseToken, updateTime iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	m.value = value
-	m.deposit = deposit
+	m.excessBaseTokens = excessBaseTokens
 	m.updateTime = updateTime
 }
 
@@ -46,11 +46,11 @@ func (m *Mana) Value() iotago.Mana {
 	return m.value
 }
 
-func (m *Mana) Deposit() iotago.BaseToken {
+func (m *Mana) ExcessBaseTokens() iotago.BaseToken {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	return m.deposit
+	return m.excessBaseTokens
 }
 
 func (m *Mana) UpdateTime() iotago.SlotIndex {

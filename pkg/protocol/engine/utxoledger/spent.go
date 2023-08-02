@@ -58,8 +58,8 @@ func (s *Spent) OutputType() iotago.OutputType {
 	return s.output.OutputType()
 }
 
-func (s *Spent) Deposit() iotago.BaseToken {
-	return s.output.Deposit()
+func (s *Spent) BaseTokenAmount() iotago.BaseToken {
+	return s.output.BaseTokenAmount()
 }
 
 // TransactionIDSpent returns the ID of the transaction that spent the output.
