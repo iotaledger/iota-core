@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/mana"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/rmc"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -37,6 +38,7 @@ type Ledger struct {
 	utxoLedger               *utxoledger.Manager
 	accountsLedger           *accountsledger.Manager
 	manaManager              *mana.Manager
+	rmcManager               *rmc.Manager
 	sybilProtection          sybilprotection.SybilProtection
 	commitmentLoader         func(iotago.SlotIndex) (*model.Commitment, error)
 	memPool                  mempool.MemPool[ledger.BlockVoteRank]
@@ -76,6 +78,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), iotagoAPI.ProtocolParameters().RentStructure(), l.resolveAccountOutput)
 			l.accountsLedger.SetCommitmentEvictionAge(iotagoAPI.ProtocolParameters().MaxCommittableAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
+			l.rmcManager = rmc.NewManager(e.Storage.Commitments().Load)
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
@@ -213,6 +216,10 @@ func (l *Ledger) BlockAccepted(block *blocks.Block) {
 	if _, hasTransaction := block.Transaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
 	}
+
+	if err := l.rmcManager.BlockAccepted(block); err != nil {
+		l.errorHandler(err)
+	}
 }
 
 func (l *Ledger) Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
@@ -339,6 +346,10 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 
 func (l *Ledger) ManaManager() *mana.Manager {
 	return l.manaManager
+}
+
+func (l *Ledger) RMCManager() *rmc.Manager {
+	return l.rmcManager
 }
 
 func (l *Ledger) Shutdown() {
