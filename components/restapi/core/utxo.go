@@ -45,11 +45,11 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 	latestCommitment := deps.Protocol.SyncManager.LatestCommitment()
 
 	resp := &apimodels.OutputMetadataResponse{
-		BlockID:            output.BlockID().ToHex(),
-		TransactionID:      output.OutputID().TransactionID().ToHex(),
+		BlockID:            output.BlockID(),
+		TransactionID:      output.OutputID().TransactionID(),
 		OutputIndex:        output.OutputID().Index(),
 		IsSpent:            false,
-		LatestCommitmentID: latestCommitment.ID().ToHex(),
+		LatestCommitmentID: latestCommitment.ID(),
 	}
 
 	includedSlotIndex := output.SlotBooked()
@@ -58,7 +58,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 		if err != nil {
 			return nil, err
 		}
-		resp.IncludedCommitmentID = includedCommitment.ID().ToHex()
+		resp.IncludedCommitmentID = includedCommitment.ID()
 	}
 
 	return resp, nil
@@ -68,12 +68,12 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 	latestCommitment := deps.Protocol.SyncManager.LatestCommitment()
 
 	resp := &apimodels.OutputMetadataResponse{
-		BlockID:            spent.BlockID().ToHex(),
-		TransactionID:      spent.OutputID().TransactionID().ToHex(),
+		BlockID:            spent.BlockID(),
+		TransactionID:      spent.OutputID().TransactionID(),
 		OutputIndex:        spent.OutputID().Index(),
 		IsSpent:            true,
-		TransactionIDSpent: spent.TransactionIDSpent().ToHex(),
-		LatestCommitmentID: latestCommitment.ID().ToHex(),
+		TransactionIDSpent: spent.TransactionIDSpent(),
+		LatestCommitmentID: latestCommitment.ID(),
 	}
 
 	includedSlotIndex := spent.Output().SlotBooked()
@@ -82,7 +82,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 		if err != nil {
 			return nil, err
 		}
-		resp.IncludedCommitmentID = includedCommitment.ID().ToHex()
+		resp.IncludedCommitmentID = includedCommitment.ID()
 	}
 
 	spentSlotIndex := spent.SlotIndexSpent()
@@ -91,7 +91,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 		if err != nil {
 			return nil, err
 		}
-		resp.CommitmentIDSpent = spentCommitment.ID().ToHex()
+		resp.CommitmentIDSpent = spentCommitment.ID()
 	}
 
 	return resp, nil

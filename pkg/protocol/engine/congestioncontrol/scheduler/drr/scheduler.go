@@ -115,6 +115,43 @@ func (s *Scheduler) Rate() int {
 	return s.optsRate
 }
 
+// IssuerQueueSizeCount returns the queue size of the given issuer as block count.
+func (s *Scheduler) IssuerQueueSizeCount(issuerID iotago.AccountID) int {
+	s.bufferMutex.RLock()
+	defer s.bufferMutex.RUnlock()
+
+	return s.buffer.IssuerQueue(issuerID).Size()
+}
+
+// IssuerQueueSizeWork returns the queue size of the given issuer in work units.
+func (s *Scheduler) IssuerQueueSizeWork(issuerID iotago.AccountID) int {
+	s.bufferMutex.RLock()
+	defer s.bufferMutex.RUnlock()
+
+	return s.buffer.IssuerQueue(issuerID).Work()
+}
+
+// BufferSize returns the current buffer size of the Scheduler as block count.
+func (s *Scheduler) BufferSize() int {
+	s.bufferMutex.RLock()
+	defer s.bufferMutex.RUnlock()
+
+	return s.buffer.Size()
+}
+
+// MaxBufferSize returns the max buffer size of the Scheduler as block count.
+func (s *Scheduler) MaxBufferSize() int {
+	return s.optsMaxBufferSize
+}
+
+// ReadyBlocksCount returns the number of ready blocks.
+func (s *Scheduler) ReadyBlocksCount() int {
+	s.bufferMutex.RLock()
+	defer s.bufferMutex.RUnlock()
+
+	return s.buffer.ReadyBlocksCount()
+}
+
 func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*blocks.Block) bool {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
@@ -153,8 +190,10 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 		b.SetDropped()
 		s.events.BlockDropped.Trigger(b, ierrors.New("block dropped from buffer"))
 	}
-	block.SetEnqueued()
-	s.tryReady(block)
+	if block.SetEnqueued() {
+		s.events.BlockEnqueued.Trigger(block)
+		s.tryReady(block)
+	}
 }
 
 func (s *Scheduler) mainLoop() {

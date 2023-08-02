@@ -89,7 +89,7 @@ func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[io
 	), nil
 }
 
-func (m *Manager) adsMapStorage(index iotago.SlotIndex) (*ads.Map[iotago.AccountID, *iotago.Attestation], error) {
+func (m *Manager) attestationsForSlot(index iotago.SlotIndex) (ads.Map[iotago.AccountID, *iotago.Attestation], error) {
 	attestationsStorage := m.bucketedStorage(index)
 	if attestationsStorage == nil {
 		return nil, ierrors.Errorf("failed to access storage for attestors of slot %d", index)

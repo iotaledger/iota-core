@@ -12,11 +12,11 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
-	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 	iotago_tpkg "github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -24,7 +24,7 @@ func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Out
 	outputID := output.OutputID()
 	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 
-	require.NoError(t, manager.AddUnspentOutput(output))
+	require.NoError(t, manager.AddGenesisUnspentOutput(output))
 
 	// Read Output from DB and compare
 	readOutput, err := manager.ReadOutputByOutputID(outputID)

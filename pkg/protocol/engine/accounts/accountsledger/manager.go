@@ -28,7 +28,7 @@ type Manager struct {
 
 	// accountsTree represents the Block Issuer data vector for all registered accounts that have a block issuer feature
 	// at the latest committed slot, it is updated on the slot commitment.
-	accountsTree *ads.Map[iotago.AccountID, *accounts.AccountData]
+	accountsTree ads.Map[iotago.AccountID, *accounts.AccountData]
 
 	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
 	slotDiff func(iotago.SlotIndex) *prunable.AccountDiffs
@@ -166,7 +166,11 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	}
 
 	// read initial account data at the latest committed slot
-	loadedAccount, exists := m.accountsTree.Get(accountID)
+	loadedAccount, exists, err := m.accountsTree.Get(accountID)
+	if err != nil {
+		return nil, false, ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+	}
+
 	if !exists {
 		loadedAccount = accounts.NewAccountData(accountID, accounts.WithCredits(accounts.NewBlockIssuanceCredits(0, targetIndex)))
 	}
@@ -185,7 +189,7 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 }
 
 // PastAccounts loads the past accounts' data at a specific slot index.
-func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) map[iotago.AccountID]*accounts.AccountData {
+func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) (pastAccounts map[iotago.AccountID]*accounts.AccountData, err error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -193,7 +197,10 @@ func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.
 
 	for _, accountID := range accountIDs {
 		// read initial account data at the latest committed slot
-		loadedAccount, exists := m.accountsTree.Get(accountID)
+		loadedAccount, exists, err := m.accountsTree.Get(accountID)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+		}
 
 		if !exists {
 			loadedAccount = accounts.NewAccountData(accountID, accounts.WithCredits(accounts.NewBlockIssuanceCredits(0, targetIndex)))
@@ -211,12 +218,12 @@ func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.
 		result[accountID] = loadedAccount
 	}
 
-	return result
+	return result, nil
 }
 
 // AddAccount adds a new account to the Account tree, allotting to it the balance on the given output.
 // The Account will be created associating the given output as the latest state of the account.
-func (m *Manager) AddAccount(output *utxoledger.Output) error {
+func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iotago.BlockIssuanceCredits) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -238,16 +245,20 @@ func (m *Manager) AddAccount(output *utxoledger.Output) error {
 		accountOutput.AccountID,
 		append(
 			stakingOpts,
-			// TODO: this is only used during genesis snapshot generation,
-			//  but we shouldn't simply cast the iota value to credits here.
-			accounts.WithCredits(accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(accountOutput.Amount), m.latestCommittedSlot)),
+			accounts.WithCredits(accounts.NewBlockIssuanceCredits(blockIssuanceCredits, m.latestCommittedSlot)),
 			accounts.WithOutputID(output.OutputID()),
 			accounts.WithPubKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys...),
 			accounts.WithExpirySlot(accountOutput.FeatureSet().BlockIssuer().ExpirySlot),
 		)...,
 	)
 
-	m.accountsTree.Set(accountOutput.AccountID, accountData)
+	if err := m.accountsTree.Set(accountOutput.AccountID, accountData); err != nil {
+		return ierrors.Wrapf(err, "can't add account, could not set account (%s) in accounts tree", accountOutput.AccountID)
+	}
+
+	if err := m.accountsTree.Commit(); err != nil {
+		return ierrors.Wrapf(err, "can't add account (%s), could not commit accounts tree", accountOutput.AccountID)
+	}
 
 	return nil
 }
@@ -301,11 +312,15 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 	return wasDestroyed, nil
 }
 
-func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prunable.AccountDiff {
+func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (accountDiff *prunable.AccountDiff, err error) {
 	// if any data is left on the account, we need to store in the diff, to be able to rollback
-	accountData, exists := m.accountsTree.Get(accountID)
+	accountData, exists, err := m.accountsTree.Get(accountID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+	}
+
 	if !exists {
-		return nil
+		return nil, err
 	}
 
 	// it does not matter if there are any changes in this slot, as the account was destroyed anyway and the data was lost
@@ -324,7 +339,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) *prun
 	slotDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
 	slotDiff.FixedCostChange = -int64(accountData.FixedCost)
 
-	return slotDiff
+	return slotDiff, err
 }
 
 func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]iotago.Mana, err error) {
@@ -352,7 +367,12 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 		destroyed := destroyedAccounts.Has(accountID)
 		if destroyed {
 			// TODO: should this diff be done in the same place as other diffs? it feels kind of out of place here
-			accountDiff = m.preserveDestroyedAccountData(accountID)
+			reconstructedAccountDiff, err := m.preserveDestroyedAccountData(accountID)
+			if err != nil {
+				return ierrors.Wrapf(err, "could not preserve destroyed account data for account %s", accountID)
+			}
+
+			accountDiff = reconstructedAccountDiff
 		}
 		err := diffStore.Store(accountID, accountDiff, destroyed)
 		if err != nil {
@@ -360,21 +380,30 @@ func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago
 		}
 	}
 
-	m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts)
+	if err := m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
+		return ierrors.Wrap(err, "could not commit account tree")
+	}
 
 	return nil
 }
 
-func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) {
+func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
 		// remove a destroyed account, no need to update with diffs
 		if destroyedAccounts.Has(accountID) {
-			m.accountsTree.Delete(accountID)
+			if _, err := m.accountsTree.Delete(accountID); err != nil {
+				return ierrors.Wrapf(err, "could not delete account (%s) from accounts tree", accountID)
+			}
+
 			continue
 		}
 
-		accountData, exists := m.accountsTree.Get(accountID)
+		accountData, exists, err := m.accountsTree.Get(accountID)
+		if err != nil {
+			return ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", accountID)
+		}
+
 		if !exists {
 			accountData = accounts.NewAccountData(accountID)
 		}
@@ -404,8 +433,16 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) + diffChange.StakeEndEpochChange)
 		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) + diffChange.FixedCostChange)
 
-		m.accountsTree.Set(accountID, accountData)
+		if err := m.accountsTree.Set(accountID, accountData); err != nil {
+			return ierrors.Wrapf(err, "could not set account (%s) in accounts tree", accountID)
+		}
 	}
+
+	if err := m.accountsTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "could not commit account tree")
+	}
+
+	return nil
 }
 
 func (m *Manager) evict(index iotago.SlotIndex) {

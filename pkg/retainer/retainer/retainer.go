@@ -129,6 +129,9 @@ func (r *Retainer) Shutdown() {
 
 func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
 	blockStatus, blockFailureReason := r.blockStatus(blockID)
+	if blockStatus == apimodels.BlockStateUnknown {
+		return nil, ierrors.Errorf("block %s not found", blockID.ToHex())
+	}
 
 	// we do not expose accepted flag
 	if blockStatus == apimodels.BlockStateAccepted {

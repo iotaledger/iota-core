@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -53,7 +52,7 @@ import (
 	retainer1 "github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Protocol struct {
@@ -67,7 +66,6 @@ type Protocol struct {
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
 	networkProtocol *core.Protocol
-	supportVersions apimodels.Versions
 
 	activeEngineMutex syncutils.RWMutex
 	mainEngine        *engine.Engine
@@ -105,7 +103,6 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		Events:                          NewEvents(),
 		Workers:                         workers,
 		unsolidCommitmentBlocks:         newUnsolidCommitmentBlocks(),
-		supportVersions:                 apimodels.Versions{3},
 		dispatcher:                      dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
 		optsCommitmentFilterProvider:    accountsfilter.NewProvider(),
@@ -354,10 +351,6 @@ func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
 
 func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return p.MainEngineInstance().APIForEpoch(epoch)
-}
-
-func (p *Protocol) SupportedVersions() apimodels.Versions {
-	return p.supportVersions
 }
 
 func (p *Protocol) ErrorHandler() func(error) {

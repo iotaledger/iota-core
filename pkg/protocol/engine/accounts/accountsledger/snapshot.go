@@ -85,7 +85,9 @@ func (m *Manager) importAccountTree(reader io.ReadSeeker, accountCount uint64) e
 			return ierrors.Wrap(err, "unable to read account data")
 		}
 
-		m.accountsTree.Set(accountData.ID, accountData)
+		if err := m.accountsTree.Set(accountData.ID, accountData); err != nil {
+			return ierrors.Wrapf(err, "unable to set account %s", accountData.ID)
+		}
 	}
 
 	return nil
@@ -93,25 +95,20 @@ func (m *Manager) importAccountTree(reader io.ReadSeeker, accountCount uint64) e
 
 // exportAccountTree exports the AccountTree at a certain target slot, returning the total amount of exported accounts.
 func (m *Manager) exportAccountTree(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64, err error) {
-	var innerErr error
-	if err = m.accountsTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) bool {
+	if err = m.accountsTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) error {
 		if _, err = m.rollbackAccountTo(accountData, targetIndex); err != nil {
-			innerErr = ierrors.Wrapf(err, "unable to rollback account %s", accountID)
-			return false
+			return ierrors.Wrapf(err, "unable to rollback account %s", accountID)
 		}
 
 		if err = writeAccountData(pWriter, accountData); err != nil {
-			innerErr = ierrors.Wrapf(err, "unable to write data for account %s", accountID)
-			return false
+			return ierrors.Wrapf(err, "unable to write data for account %s", accountID)
 		}
 
 		accountCount++
 
-		return true
+		return nil
 	}); err != nil {
 		return 0, ierrors.Wrap(err, "error in streaming account tree")
-	} else if innerErr != nil {
-		return 0, ierrors.Wrap(innerErr, "error in exporting account")
 	}
 
 	// we might have entries that were destroyed, that are present in diffs but not in the tree from the latestCommittedIndex we streamed above

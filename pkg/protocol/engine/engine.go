@@ -176,6 +176,9 @@ func New(
 				// Only mark any pruning indexes if we loaded a non-genesis snapshot
 				if e.Storage.Settings().LatestFinalizedSlot() > 0 {
 					e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
+					if index, pruned := e.Storage.LastPrunedSlot(); pruned {
+						e.Events.StoragePruned.Trigger(index)
+					}
 				}
 
 				if err := e.Storage.Settings().SetSnapshotImported(); err != nil {

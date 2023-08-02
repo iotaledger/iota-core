@@ -137,7 +137,14 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 			if err := binary.Read(reader, binary.LittleEndian, &reward); err != nil {
 				return ierrors.Wrapf(err, "unable to read reward for account %s and epoch index %d", accountID, epochIndex)
 			}
-			rewardsTree.Set(accountID, &reward)
+
+			if err := rewardsTree.Set(accountID, &reward); err != nil {
+				return ierrors.Wrapf(err, "unable to set reward for account %s and epoch index %d", accountID, epochIndex)
+			}
+		}
+
+		if err := rewardsTree.Commit(); err != nil {
+			return ierrors.Wrapf(err, "unable to commit rewards for epoch index %d", epochIndex)
 		}
 	}
 
@@ -250,8 +257,8 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 	for epoch := targetEpoch; epoch > iotago.EpochIndex(0); epoch-- {
 		rewardsTree := t.rewardsMap(epoch)
 
-		// if the tree is new, we can skip this epoch and the previous ones, as we never stored any rewards
-		if rewardsTree.IsNew() {
+		// if the tree was not present in storage we can skip this epoch and the previous ones, as we never stored any rewards
+		if !rewardsTree.WasRestoredFromStorage() {
 			break
 		}
 
@@ -264,24 +271,18 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 			return ierrors.Wrapf(err, "unable to write account count for epoch index %d", epoch)
 		}
 
-		var innerErr error
-		if err := rewardsTree.Stream(func(key iotago.AccountID, value *PoolRewards) bool {
+		if err := rewardsTree.Stream(func(key iotago.AccountID, value *PoolRewards) error {
 			if err := pWriter.WriteValue("account id", key); err != nil {
-				innerErr = ierrors.Wrapf(err, "unable to write account id for epoch index %d and accountID %s", epoch, key)
-				return false
+				return ierrors.Wrapf(err, "unable to write account id for epoch index %d and accountID %s", epoch, key)
 			}
 			if err := pWriter.WriteValue("account rewards", value); err != nil {
-				innerErr = ierrors.Wrapf(err, "unable to write account rewards for epoch index %d and accountID %s", epoch, key)
-				return false
+				return ierrors.Wrapf(err, "unable to write account rewards for epoch index %d and accountID %s", epoch, key)
 			}
 			accountCount++
 
-			return true
+			return nil
 		}); err != nil {
 			return ierrors.Wrapf(err, "unable to stream rewards for epoch index %d", epoch)
-		}
-		if innerErr != nil {
-			return innerErr
 		}
 
 		if err := pWriter.WriteValueAtBookmark("pool rewards account count", accountCount); err != nil {

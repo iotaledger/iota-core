@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -60,6 +61,7 @@ func initConfigParams(c *dig.Container) error {
 	type cfgResult struct {
 		dig.Out
 		DatabaseEngine hivedb.Engine `name:"databaseEngine"`
+		BaseToken      *BaseToken
 	}
 
 	if err := c.Provide(func() cfgResult {
@@ -70,6 +72,7 @@ func initConfigParams(c *dig.Container) error {
 
 		return cfgResult{
 			DatabaseEngine: dbEngine,
+			BaseToken:      &ParamsProtocol.BaseToken,
 		}
 	}); err != nil {
 		Component.LogPanic(err)
@@ -201,6 +204,13 @@ func configure() error {
 
 	deps.Protocol.Events.Engine.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
 		Component.LogWarnf("Booker BlockInvalid: Block %s - %s", block.ID(), err.Error())
+	})
+	deps.Protocol.Events.Engine.CommitmentFilter.BlockAllowed.Hook(func(block *model.Block) {
+		Component.LogDebugf("CommitmentFilter.BlockAllowed: %s\n", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+		Component.LogWarnf("CommitmentFilter.BlockFiltered: %s - %s\n", event.Block.ID(), event.Reason.Error())
 	})
 
 	// TODO: create a transaction invalid event in the booker instead of hooking to a specific engine instance

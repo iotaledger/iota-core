@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/inx-app/pkg/api"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -27,6 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Ledger struct {
@@ -199,12 +199,12 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	return l.utxoLedger.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), l.accountsLedger.AccountsTreeRoot(), nil
 }
 
-func (l *Ledger) AddAccount(output *utxoledger.Output) error {
-	return l.accountsLedger.AddAccount(output)
+func (l *Ledger) AddAccount(output *utxoledger.Output, blockIssuanceCredits iotago.BlockIssuanceCredits) error {
+	return l.accountsLedger.AddAccount(output, blockIssuanceCredits)
 }
 
-func (l *Ledger) AddUnspentOutput(unspentOutput *utxoledger.Output) error {
-	return l.utxoLedger.AddUnspentOutput(unspentOutput)
+func (l *Ledger) AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error {
+	return l.utxoLedger.AddGenesisUnspentOutput(unspentOutput)
 }
 
 func (l *Ledger) BlockAccepted(block *blocks.Block) {
@@ -219,7 +219,7 @@ func (l *Ledger) Account(accountID iotago.AccountID, targetIndex iotago.SlotInde
 	return l.accountsLedger.Account(accountID, targetIndex)
 }
 
-func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) map[iotago.AccountID]*accounts.AccountData {
+func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) (accountDataMap map[iotago.AccountID]*accounts.AccountData, err error) {
 	return l.accountsLedger.PastAccounts(accountIDs, targetIndex)
 }
 

@@ -39,7 +39,7 @@ func WrapInfoSnapshot(info *p2p.PeerInfoSnapshot) *apimodels.PeerResponse {
 }
 */
 
-func getPeer(_ echo.Context) (*apimodels.PeerResponse, error) {
+func getPeer(_ echo.Context) (*apimodels.PeerInfo, error) {
 	/*
 		peerID, err := restapipkg.ParsePeerIDParam(c)
 		if err != nil {
@@ -74,7 +74,7 @@ func removePeer(_ echo.Context) error {
 }
 
 //nolint:unparam // even if the error is never used, the structure of all routes should be the same
-func listPeers(_ echo.Context) ([]*apimodels.PeerResponse, error) {
+func listPeers(_ echo.Context) (*apimodels.PeersResponse, error) {
 	/*
 		peerInfos := deps.PeeringManager.PeerInfoSnapshots()
 		results := make([]*PeerResponse, len(peerInfos))
@@ -89,7 +89,7 @@ func listPeers(_ echo.Context) ([]*apimodels.PeerResponse, error) {
 	return nil, nil
 }
 
-func addPeer(_ echo.Context, _ *logger.Logger) (*apimodels.PeerResponse, error) {
+func addPeer(_ echo.Context, _ *logger.Logger) (*apimodels.PeerInfo, error) {
 	/*
 
 		request := &addPeerRequest{}
