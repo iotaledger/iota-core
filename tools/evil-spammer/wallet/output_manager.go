@@ -196,7 +196,7 @@ func (o *OutputManager) GetOutput(outputID iotago.OutputID) (output *Output) {
 		output = &Output{
 			OutputID:     outputID,
 			Address:      basicOutput.UnlockConditionSet().Address().Address,
-			Balance:      basicOutput.Deposit(),
+			Balance:      basicOutput.BaseTokenAmount(),
 			OutputStruct: basicOutput,
 		}
 	}

@@ -103,10 +103,10 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
 	}
 
-	totalAccountDeposit := lo.Reduce(opt.Accounts, func(accumulator iotago.BaseToken, details AccountDetails) iotago.BaseToken {
+	totalAccountAmount := lo.Reduce(opt.Accounts, func(accumulator iotago.BaseToken, details AccountDetails) iotago.BaseToken {
 		return accumulator + details.Amount
 	}, iotago.BaseToken(0))
-	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply()-totalAccountDeposit, opt.GenesisSeed, engineInstance); err != nil {
+	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply()-totalAccountAmount, opt.GenesisSeed, engineInstance); err != nil {
 		return ierrors.Wrap(err, "failed to create genesis outputs")
 	}
 
@@ -122,7 +122,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 		genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
 		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
 
-		if _, err = engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversStateRent(output, genesisTokenAmount); err != nil {
+		if _, err = engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversMinDeposit(output, genesisTokenAmount); err != nil {
 			return ierrors.Wrap(err, "min rent not covered by Genesis output with index 0")
 		}
 
@@ -141,7 +141,7 @@ func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Eng
 	for idx, genesisAccount := range accounts {
 		output := createAccount(genesisAccount.AccountID, genesisAccount.Address, genesisAccount.Amount, genesisAccount.Mana, genesisAccount.IssuerKey, genesisAccount.ExpirySlot, genesisAccount.StakedAmount, genesisAccount.StakingEpochEnd, genesisAccount.FixedCost)
 
-		if _, err := engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversStateRent(output, genesisAccount.Amount); err != nil {
+		if _, err := engineInstance.CurrentAPI().ProtocolParameters().RentStructure().CoversMinDeposit(output, genesisAccount.Amount); err != nil {
 			return ierrors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
 		}
 

@@ -86,18 +86,18 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		w.faucet = NewWallet()
 		w.faucet.seed = [32]byte(w.optFaucetSeed)
 
-		// get faucet output and deposit
-		var faucetDeposit iotago.BaseToken
+		// get faucet output and amount
+		var faucetAmount iotago.BaseToken
 
 		faucetOutput := clt.GetOutput(w.optFaucetUnspentOutputID)
 		if faucetOutput != nil {
-			faucetDeposit = faucetOutput.Deposit()
+			faucetAmount = faucetOutput.BaseTokenAmount()
 		} else {
 			// use the genesis output ID instead, if we relaunch the docker network
 			w.optFaucetUnspentOutputID = iotago.EmptyOutputID
 			faucetOutput = clt.GetOutput(w.optFaucetUnspentOutputID)
 			if faucetOutput != nil {
-				faucetDeposit = faucetOutput.Deposit()
+				faucetAmount = faucetOutput.BaseTokenAmount()
 			}
 		}
 
@@ -105,7 +105,7 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 			Address:      w.faucet.AddressOnIndex(0),
 			Index:        0,
 			OutputID:     w.optFaucetUnspentOutputID,
-			Balance:      faucetDeposit,
+			Balance:      faucetAmount,
 			OutputStruct: faucetOutput,
 		})
 	})
@@ -315,7 +315,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID(e.api)), 1),
 		Address:      faucetAddr,
 		Index:        0,
-		Balance:      tx.Essence.Outputs[1].Deposit(),
+		Balance:      tx.Essence.Outputs[1].BaseTokenAmount(),
 		OutputStruct: tx.Essence.Outputs[1],
 	})
 
@@ -468,7 +468,7 @@ func (e *EvilWallet) addOutputsToOutputManager(tx *iotago.Transaction, outWallet
 		out := &Output{
 			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID(e.api)), uint16(idx)),
 			Address:      addr,
-			Balance:      o.Deposit(),
+			Balance:      o.BaseTokenAmount(),
 			OutputStruct: o,
 		}
 
@@ -622,7 +622,7 @@ func (e *EvilWallet) matchOutputsWithAliases(buildOptions *Options, tempWallet *
 		}
 
 		outputs = append(outputs, &iotago.BasicOutput{
-			Amount: output.Deposit(),
+			Amount: output.BaseTokenAmount(),
 			Conditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: addr},
 			},
@@ -658,7 +658,7 @@ func (e *EvilWallet) prepareRemainderOutput(buildOptions *Options, outputs []iot
 
 	outputBalance := iotago.BaseToken(0)
 	for _, o := range outputs {
-		outputBalance += o.Deposit()
+		outputBalance += o.BaseTokenAmount()
 	}
 
 	// remainder balances is sent to one of the address in inputs

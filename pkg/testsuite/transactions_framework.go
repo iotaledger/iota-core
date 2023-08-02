@@ -104,21 +104,21 @@ func (t *TransactionFramework) CreateSimpleTransaction(alias string, outputCount
 
 func (t *TransactionFramework) CreateBasicOutputsEqually(outputCount int, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
 	inputStates := make([]*utxoledger.Output, 0, len(inputAliases))
-	totalInputDeposits := iotago.BaseToken(0)
+	totalInputAmounts := iotago.BaseToken(0)
 	totalInputStoredMana := iotago.Mana(0)
 
 	for _, inputAlias := range inputAliases {
 		output := t.Output(inputAlias)
 		inputStates = append(inputStates, output)
-		totalInputDeposits += output.Deposit()
+		totalInputAmounts += output.BaseTokenAmount()
 		totalInputStoredMana += output.StoredMana()
 	}
 
 	manaAmount := totalInputStoredMana / iotago.Mana(outputCount)
 	remainderMana := totalInputStoredMana
 
-	tokenAmount := totalInputDeposits / iotago.BaseToken(outputCount)
-	remainderFunds := totalInputDeposits
+	tokenAmount := totalInputAmounts / iotago.BaseToken(outputCount)
+	remainderFunds := totalInputAmounts
 
 	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
 	for i := 0; i < outputCount; i++ {
@@ -141,30 +141,30 @@ func (t *TransactionFramework) CreateBasicOutputsEqually(outputCount int, inputA
 	return inputStates, outputStates, []*mock.HDWallet{t.wallet}
 }
 
-func (t *TransactionFramework) CreateBasicOutputs(depositDistribution []iotago.BaseToken, manaDistribution []iotago.Mana, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
-	if len(depositDistribution) != len(manaDistribution) {
-		panic("deposit and mana distributions should have the same length")
+func (t *TransactionFramework) CreateBasicOutputs(amountDistribution []iotago.BaseToken, manaDistribution []iotago.Mana, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
+	if len(amountDistribution) != len(manaDistribution) {
+		panic("amount and mana distributions should have the same length")
 	}
 
 	inputStates := make([]*utxoledger.Output, 0, len(inputAliases))
-	totalInputDeposits := iotago.BaseToken(0)
+	totalInputAmounts := iotago.BaseToken(0)
 	totalInputStoredMana := iotago.Mana(0)
 
 	for _, inputAlias := range inputAliases {
 		output := t.Output(inputAlias)
 		inputStates = append(inputStates, output)
-		totalInputDeposits += output.Deposit()
+		totalInputAmounts += output.BaseTokenAmount()
 		totalInputStoredMana += output.StoredMana()
 	}
 
-	if lo.Sum(depositDistribution...) != totalInputDeposits {
-		panic("deposit on input and output side must be equal")
+	if lo.Sum(amountDistribution...) != totalInputAmounts {
+		panic("amount on input and output side must be equal")
 	}
 
-	outputStates := make(iotago.Outputs[iotago.Output], 0, len(depositDistribution))
-	for idx, outputDeposit := range depositDistribution {
+	outputStates := make(iotago.Outputs[iotago.Output], 0, len(amountDistribution))
+	for idx, outputAmount := range amountDistribution {
 		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount: outputDeposit,
+			Amount: outputAmount,
 			Conditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 			},
@@ -179,7 +179,7 @@ func (t *TransactionFramework) CreateAccountFromInput(inputAlias string, opts ..
 	input := t.Output(inputAlias)
 
 	accountOutput := options.Apply(&iotago.AccountOutput{
-		Amount: input.Deposit(),
+		Amount: input.BaseTokenAmount(),
 		Mana:   input.StoredMana(),
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: t.DefaultAddress()},
@@ -190,9 +190,9 @@ func (t *TransactionFramework) CreateAccountFromInput(inputAlias string, opts ..
 	outputStates := iotago.Outputs[iotago.Output]{accountOutput}
 
 	// if amount was set by options, a remainder output needs to be created
-	if accountOutput.Amount != input.Deposit() {
+	if accountOutput.Amount != input.BaseTokenAmount() {
 		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount: input.Deposit() - accountOutput.Amount,
+			Amount: input.BaseTokenAmount() - accountOutput.Amount,
 			Conditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 			},
@@ -210,8 +210,8 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 	input := t.Output(inputAlias)
 
 	delegationOutput := options.Apply(&iotago.DelegationOutput{
-		Amount:          input.Deposit(),
-		DelegatedAmount: input.Deposit(),
+		Amount:          input.BaseTokenAmount(),
+		DelegatedAmount: input.BaseTokenAmount(),
 		DelegationID:    iotago.DelegationID{},
 		ValidatorID:     iotago.AccountID{},
 		StartEpoch:      0,
@@ -230,9 +230,9 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 	outputStates := iotago.Outputs[iotago.Output]{delegationOutput}
 
 	// if options set an Amount, a remainder output needs to be created
-	if delegationOutput.Amount != input.Deposit() {
+	if delegationOutput.Amount != input.BaseTokenAmount() {
 		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount: input.Deposit() - delegationOutput.Amount,
+			Amount: input.BaseTokenAmount() - delegationOutput.Amount,
 			Conditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 			},
@@ -247,7 +247,7 @@ func (t *TransactionFramework) DestroyAccount(alias string) (consumedInputs *utx
 	output := t.Output(alias)
 
 	outputStates := iotago.Outputs[iotago.Output]{&iotago.BasicOutput{
-		Amount: output.Deposit(),
+		Amount: output.BaseTokenAmount(),
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 		},
@@ -343,9 +343,9 @@ func WithDelegationConditions(delegationConditions iotago.DelegationOutputUnlock
 	}
 }
 
-func WithDelegationDeposit(deposit iotago.BaseToken) options.Option[iotago.DelegationOutput] {
+func WithDelegationAmount(amount iotago.BaseToken) options.Option[iotago.DelegationOutput] {
 	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.Amount = deposit
+		delegationOutput.Amount = amount
 	}
 }
 
@@ -427,9 +427,9 @@ func WithAccountMana(mana iotago.Mana) options.Option[iotago.AccountOutput] {
 	}
 }
 
-func WithAccountDeposit(deposit iotago.BaseToken) options.Option[iotago.AccountOutput] {
+func WithAccountAmount(amount iotago.BaseToken) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
-		accountOutput.Amount = deposit
+		accountOutput.Amount = amount
 	}
 }
 
