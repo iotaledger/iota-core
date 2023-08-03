@@ -13,8 +13,8 @@ import (
 type SybilProtection interface {
 	BlockAccepted(block *blocks.Block)
 	EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error)
-	ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error)
-	DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error)
+	ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, usedStart, usedEnd iotago.EpochIndex, err error)
+	DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, usedStart, usedEnd iotago.EpochIndex, err error)
 	SeatManager() seatmanager.SeatManager
 	CommitSlot(iotago.SlotIndex) (iotago.Identifier, iotago.Identifier)
 	Import(io.ReadSeeker) error

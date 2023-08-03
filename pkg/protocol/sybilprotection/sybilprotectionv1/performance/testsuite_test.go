@@ -118,10 +118,10 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 		aux := (((1 << 31) * action.PoolStake) / totalStake) + ((2 << 31) * action.ValidatorStake / totalValidatorsStake)
 		aux2 := uint64(aux) * targetRewardPerEpoch * performanceFactor
 		expectedRewardWithFixedCost := iotago.Mana(aux2 >> 40)
-		actualValidatorReward, err := t.Instance.ValidatorReward(accountID, actions[alias].ValidatorStake, epochIndex, epochIndex)
+		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID, actions[alias].ValidatorStake, epochIndex, epochIndex)
 		require.NoError(t.T, err)
 		delegatorStake := actions[alias].PoolStake - actions[alias].ValidatorStake
-		actualDelegatorReward, err := t.Instance.DelegatorReward(accountID, delegatorStake, epochIndex, epochIndex)
+		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, delegatorStake, epochIndex, epochIndex)
 		require.NoError(t.T, err)
 		fmt.Printf("expected: %d, actual: %d\n", expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
 		// TODO: require.EqualValues(t.T, expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
@@ -150,12 +150,12 @@ func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[s
 		delegatorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
 		validatorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
 		for aliasAccount := range epochActions {
-			reward, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epochIndex, epochIndex)
+			reward, _, _, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epochIndex, epochIndex)
 			require.NoError(t.T, err)
 			delegatorRewardPerAccount[epochIndex][aliasAccount] = reward
 		}
 		for aliasAccount := range epochActions {
-			reward, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true), 1, epochIndex, epochIndex)
+			reward, _, _, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true), 1, epochIndex, epochIndex)
 			require.NoError(t.T, err)
 			validatorRewardPerAccount[epochIndex][aliasAccount] = reward
 		}

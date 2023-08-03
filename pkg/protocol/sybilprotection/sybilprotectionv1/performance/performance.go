@@ -19,6 +19,7 @@ type Tracker struct {
 	committeeStore  *kvstore.TypedStore[iotago.EpochIndex, *account.Accounts]
 
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
+	latestAppliedEpoch     iotago.EpochIndex
 
 	apiProvider api.Provider
 
@@ -137,6 +138,8 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	if err := rewardsTree.Commit(); err != nil {
 		panic(ierrors.Wrapf(err, "failed to commit rewards for epoch %d", epoch))
 	}
+
+	t.latestAppliedEpoch = epoch
 }
 
 func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {

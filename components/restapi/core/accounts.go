@@ -100,6 +100,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	}
 
 	var reward iotago.Mana
+	var actualStart, actualEnd iotago.EpochIndex
 	switch utxoOutput.OutputType() {
 	case iotago.OutputAccount:
 		//nolint:forcetypeassert
@@ -113,7 +114,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 		stakingFeature := feature.(*iotago.StakingFeature)
 
 		// check if the account is a validator
-		reward, err = deps.Protocol.MainEngineInstance().SybilProtection.ValidatorReward(
+		reward, actualStart, actualEnd, err = deps.Protocol.MainEngineInstance().SybilProtection.ValidatorReward(
 			accountOutput.AccountID,
 			stakingFeature.StakedAmount,
 			stakingFeature.StartEpoch,
@@ -123,7 +124,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	case iotago.OutputDelegation:
 		//nolint:forcetypeassert
 		delegationOutput := utxoOutput.Output().(*iotago.DelegationOutput)
-		reward, err = deps.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
+		reward, actualStart, actualEnd, err = deps.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
 			delegationOutput.ValidatorID,
 			delegationOutput.DelegatedAmount,
 			delegationOutput.StartEpoch,
@@ -134,13 +135,10 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 		return nil, ierrors.Wrapf(err, "failed to calculate reward for output %s", outputID)
 	}
 
-	// TODO: the epoch should be returned by the reward calculations
-	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
-	latestRewardsReadyEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
-
 	return &apimodels.ManaRewardsResponse{
-		EpochIndex: latestRewardsReadyEpoch,
-		Rewards:    reward,
+		EpochIndexStart: actualStart,
+		EpochIndexEnd:   actualEnd,
+		Rewards:         reward,
 	}, nil
 }
 

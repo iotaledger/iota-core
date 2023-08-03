@@ -207,11 +207,11 @@ func (o *SybilProtection) SeatManager() seatmanager.SeatManager {
 	return o.seatManager
 }
 
-func (o *SybilProtection) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, err error) {
+func (o *SybilProtection) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, actualEpochStart, actualEpochEnd iotago.EpochIndex, err error) {
 	return o.performanceTracker.ValidatorReward(validatorID, stakeAmount, epochStart, epochEnd)
 }
 
-func (o *SybilProtection) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, err error) {
+func (o *SybilProtection) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, actualEpochStart, actualEpochEnd iotago.EpochIndex, err error) {
 	return o.performanceTracker.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd)
 }
 
