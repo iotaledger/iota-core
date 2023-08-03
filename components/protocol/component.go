@@ -25,6 +25,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -132,22 +133,52 @@ func configure() error {
 		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})
 
-	// TODO: check whether we hooked to all events
-
 	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.BlockProcessed.Hook(func(blockID iotago.BlockID) {
+		Component.LogDebugf("BlockProcessed: %s", blockID)
+	})
+
+	deps.Protocol.Events.Engine.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
+		Component.LogDebugf("AcceptedBlockProcessed: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		Component.LogDebugf("BlockPreFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
 	})
 
+	deps.Protocol.Events.Engine.Filter.BlockPreAllowed.Hook(func(blk *model.Block) {
+		Component.LogDebugf("BlockPreAllowed: %s - %s", blk.ID())
+	})
+
+	deps.Protocol.Events.Engine.CommitmentFilter.BlockAllowed.Hook(func(block *model.Block) {
+		Component.LogDebugf("CommitmentFilter.BlockAllowed: %s\n", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+		Component.LogWarnf("CommitmentFilter.BlockFiltered: %s - %s\n", event.Block.ID(), event.Reason.Error())
+	})
+
+	deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tip tipmanager.TipMetadata) {
+		Component.LogDebugf("BlockAdded to tip pool: %s; is strong: %v; is weak: %v", tip.ID(), tip.IsStrongTip(), tip.IsWeakTip())
+	})
+
 	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockSolid: %s", block.ID())
 	})
 
+	deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+		Component.LogDebugf("BlockInvalid in blockDAG: %s, error: %v", block.ID(), err.Error())
+	})
+
 	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockBooked: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+		Component.LogDebugf("BlockInvalid in booker: %s, error: %v", block.ID(), err.Error())
 	})
 
 	deps.Protocol.Events.Engine.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
@@ -156,6 +187,14 @@ func configure() error {
 
 	deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockAccepted: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
+		Component.LogDebugf("BlockPreConfirmed: %s", block.ID())
+	})
+
+	deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+		Component.LogDebugf("BlockConfirmed: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
@@ -202,15 +241,20 @@ func configure() error {
 		Component.LogInfof("CommitteeSelected: Epoch %d - %s (reused: %t)", epoch, committee.IDs(), committee.IsReused())
 	})
 
+	deps.Protocol.Events.Engine.SybilProtection.RewardsCommitted.Hook(func(epoch iotago.EpochIndex) {
+		Component.LogInfof("RewardsCommitted: Epoch %d", epoch)
+	})
+
 	deps.Protocol.Events.Engine.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
 		Component.LogWarnf("Booker BlockInvalid: Block %s - %s", block.ID(), err.Error())
 	})
-	deps.Protocol.Events.Engine.CommitmentFilter.BlockAllowed.Hook(func(block *model.Block) {
-		Component.LogDebugf("CommitmentFilter.BlockAllowed: %s\n", block.ID())
+
+	deps.Protocol.Events.Engine.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seatIndex account.SeatIndex, account iotago.AccountID) {
+		Component.LogWarnf("OnlineCommitteeSeatAdded: %s - %d", account.ToHex(), seatIndex)
 	})
 
-	deps.Protocol.Events.Engine.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
-		Component.LogWarnf("CommitmentFilter.BlockFiltered: %s - %s\n", event.Block.ID(), event.Reason.Error())
+	deps.Protocol.Events.Engine.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seatIndex account.SeatIndex) {
+		Component.LogWarnf("OnlineCommitteeSeatRemoved: seatIndex: %d", seatIndex)
 	})
 
 	// TODO: create a transaction invalid event in the booker instead of hooking to a specific engine instance
