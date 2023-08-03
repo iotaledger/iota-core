@@ -206,7 +206,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 	for i, inputReference := range transaction.inputReferences {
 		stateReference, index := inputReference, i
 
-		request, _ := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[mempool.State] {
+		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[mempool.State] {
 			return m.requestState(stateReference, true)
 		})
 
@@ -214,6 +214,10 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 			switch state.Type() {
 			case iotago.InputUTXO:
 				outputStateMetadata := state.(*OutputStateMetadata)
+				if created {
+					m.setupState(outputStateMetadata)
+				}
+
 				transaction.publishInput(index, outputStateMetadata)
 			case iotago.InputCommitment, iotago.InputBlockIssuanceCredit, iotago.InputReward:
 			default:
@@ -292,7 +296,6 @@ func (m *MemPool[VoteRank]) requestState(stateRef iotago.Input, waitIfMissing ..
 				outputStateMetadata := NewOutputStateMetadata(state.(mempool.OutputState))
 				outputStateMetadata.setAccepted()
 				outputStateMetadata.setCommitted()
-				m.setupState(outputStateMetadata)
 
 				p.Resolve(outputStateMetadata)
 
