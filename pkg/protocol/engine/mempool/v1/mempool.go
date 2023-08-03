@@ -2,7 +2,6 @@ package mempoolv1
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds"
@@ -46,6 +45,8 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	// conflictDAG is the DAG that is used to keep track of the conflicts between transactions.
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank]
 
+	errorHandler func(error)
+
 	// executionWorkers is the worker pool that is used to execute the state transitions of transactions.
 	executionWorkers *workerpool.WorkerPool
 
@@ -61,7 +62,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 }
 
 // New is the constructor of the MemPool.
-func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider api.Provider, opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
+func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider api.Provider, errorHandler func(error), opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
 	return options.Apply(&MemPool[VoteRank]{
 		transactionAttached:    event.New1[mempool.TransactionMetadata](),
 		executeStateTransition: vm,
@@ -73,6 +74,7 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolv
 		executionWorkers:       workers.CreatePool("executionWorkers", 1),
 		conflictDAG:            conflictDAG,
 		apiProvider:            apiProvider,
+		errorHandler:           errorHandler,
 	}, opts, (*MemPool[VoteRank]).setup)
 }
 
@@ -244,8 +246,7 @@ func (m *MemPool[VoteRank]) forkTransaction(transaction *TransactionMetadata, re
 	if err := m.conflictDAG.UpdateConflictingResources(transaction.ID(), resourceIDs); err != nil {
 		transaction.setOrphaned()
 
-		// TODO: use errorHandler mechanism instead.
-		fmt.Println(err)
+		m.errorHandler(err)
 	}
 }
 
@@ -346,8 +347,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 		if slotIndex := transaction.EarliestIncludedAttachment().Index(); slotIndex > 0 {
 			if stateDiff, evicted := m.stateDiff(slotIndex); !evicted {
 				if err := stateDiff.AddTransaction(transaction); err != nil {
-					// TODO: use errorhandler?
-					panic(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
+					m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
 				}
 			}
 		}
@@ -371,8 +371,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 
 	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
 		if err := m.updateStateDiffs(transaction, prevBlock.Index(), newBlock.Index()); err != nil {
-			// TODO: use errorhandler?
-			panic(ierrors.Wrap(err, "failed to update state diffs"))
+			m.errorHandler(ierrors.Wrap(err, "failed to update state diffs"))
 		}
 	})
 
