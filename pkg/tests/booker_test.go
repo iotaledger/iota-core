@@ -1,7 +1,9 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -14,7 +16,7 @@ import (
 )
 
 func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
-	ts := testsuite.NewTestSuite(t)
+	ts := testsuite.NewTestSuite(t, testsuite.WithWaitFor(10*time.Minute))
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1")
@@ -26,6 +28,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 
 	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "tx1:0"))
 
+	fmt.Println(">> issue TX2")
 	ts.IssueBlock("block1", node1, blockfactory.WithPayload(tx2))
 
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx2"), true, node1)
@@ -34,6 +37,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx2"), false, node1)
 	// make sure that the block is not booked
 
+	fmt.Println(">> issue TX1")
 	ts.IssueBlock("block2", node1, blockfactory.WithPayload(tx1))
 
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)

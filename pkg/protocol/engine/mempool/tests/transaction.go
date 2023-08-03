@@ -30,7 +30,7 @@ func (t *Transaction) Inputs() ([]*iotago.UTXOInput, error) {
 }
 
 func (t *Transaction) ContextInputs() (iotago.TransactionContextInputs, error) {
-	panic("not implemented")
+	return nil, nil
 }
 
 func (t *Transaction) String() string {

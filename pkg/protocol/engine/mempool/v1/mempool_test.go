@@ -37,7 +37,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](func() int { return 0 })
 	mempoolInstance := New[vote.MockedRank](mempooltests.VM, func(reference iotago.Input) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference.(ledgertests.StoredStateReference).OutputID())
+		return ledgerState.ResolveOutputState(reference.(*iotago.UTXOInput).OutputID())
 	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI))
 
 	tf := mempooltests.NewTestFramework(t, mempoolInstance, conflictDAG, ledgerState, workers)
@@ -105,7 +105,7 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.Input) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference.(ledgertests.StoredStateReference).OutputID())
+		return ledgerState.ResolveOutputState(reference.(*iotago.UTXOInput).OutputID())
 	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI)), conflictDAG, ledgerState, workers)
 }
 
@@ -116,6 +116,6 @@ func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.Input) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference.(ledgertests.StoredStateReference).OutputID())
+		return ledgerState.ResolveOutputState(reference.(*iotago.UTXOInput).OutputID())
 	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
 }
