@@ -82,13 +82,13 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	// calculate the new RMC
 	var newRMC iotago.Mana
 	api := m.apiProvider.APIForSlot(index)
-	if currentSlotWork < api.ProtocolParameters().RMCDecreaseThreshold() {
+	if currentSlotWork < api.ProtocolParameters().RMCParameters().DecreaseThreshold {
 		// TODO: use safemath here
-		if lastRMC >= api.ProtocolParameters().RMCMin() {
-			newRMC = lastRMC - api.ProtocolParameters().RMCDecrease()
+		if lastRMC >= api.ProtocolParameters().RMCParameters().RMCMin {
+			newRMC = lastRMC - api.ProtocolParameters().RMCParameters().Decrease
 		}
-	} else if currentSlotWork > api.ProtocolParameters().RMCIncreaseThreshold() {
-		newRMC = lastRMC + api.ProtocolParameters().RMCIncrease()
+	} else if currentSlotWork > api.ProtocolParameters().RMCParameters().IncreaseThreshold {
+		newRMC = lastRMC + api.ProtocolParameters().RMCParameters().Increase
 	} else {
 		newRMC = lastRMC
 	}
