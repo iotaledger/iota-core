@@ -21,7 +21,6 @@ type Manager struct {
 	// blockBurns keep tracks of the block issues up to the LatestCommittedSlot. They are used to deduct the burned
 	// amount from the account's credits upon slot commitment.
 	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.BlockID]]
-	// TODO: add in memory shrink version of the slot diffs
 
 	// latestCommittedSlot is where the Account tree is kept at.
 	latestCommittedSlot iotago.SlotIndex
@@ -30,6 +29,7 @@ type Manager struct {
 	// at the latest committed slot, it is updated on the slot commitment.
 	accountsTree ads.Map[iotago.AccountID, *accounts.AccountData]
 
+	// TODO: add in memory shrink version of the slot diffs
 	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
 	slotDiff func(iotago.SlotIndex) *prunable.AccountDiffs
 
