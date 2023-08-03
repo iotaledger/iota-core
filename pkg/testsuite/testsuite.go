@@ -54,6 +54,11 @@ type TestSuite struct {
 	optsMaxCommittableAge      iotago.SlotIndex
 	optsSlotsPerEpochExponent  uint8
 	optsEpochNearingThreshold  iotago.SlotIndex
+	optsRMCMin                 iotago.Mana
+	optsRMCIncrease            iotago.Mana
+	optsRMCDecrease            iotago.Mana
+	optsRMCIncreaseThreshold   iotago.WorkScore
+	optsRMCDecreaseThreshold   iotago.WorkScore
 	optsAccounts               []snapshotcreator.AccountDetails
 	optsSnapshotOptions        []options.Option[snapshotcreator.Options]
 	optsWaitFor                time.Duration
@@ -83,6 +88,12 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsMaxCommittableAge:      20,
 		optsSlotsPerEpochExponent:  5,
 		optsEpochNearingThreshold:  16,
+		optsRMCMin:                 500,
+		optsRMCIncrease:            500,
+		optsRMCDecrease:            500,
+		// TODO: add scheduler param to increase/decrease threshold expression with issue #473
+		optsRMCIncreaseThreshold: 0.8 * 10,
+		optsRMCDecreaseThreshold: 0.2 * 10,
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name())
 		t.API = iotago.V3API(
@@ -107,6 +118,13 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsMinCommittableAge,
 					t.optsMaxCommittableAge,
 					t.optsEpochNearingThreshold,
+				),
+				iotago.WithRMCOptions(
+					t.optsRMCMin,
+					t.optsRMCIncrease,
+					t.optsRMCDecrease,
+					t.optsRMCIncreaseThreshold,
+					t.optsRMCDecreaseThreshold,
 				),
 				iotago.WithStakingOptions(1),
 			),
@@ -633,6 +651,36 @@ func WithSlotsPerEpochExponent(slotsPerEpochExponent uint8) options.Option[TestS
 func WithEpochNearingThreshold(epochNearingThreshold iotago.SlotIndex) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
 		opts.optsEpochNearingThreshold = epochNearingThreshold
+	}
+}
+
+func WithRMCMin(rmcMin iotago.Mana) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsRMCMin = rmcMin
+	}
+}
+
+func WithRMCIncrease(rmcIncrease iotago.Mana) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsRMCIncrease = rmcIncrease
+	}
+}
+
+func WithRMCDecrease(rmcDecrease iotago.Mana) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsRMCDecrease = rmcDecrease
+	}
+}
+
+func WithRMCIncreaseThreshold(rmcIncreaseThreshold iotago.WorkScore) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsRMCIncreaseThreshold = rmcIncreaseThreshold
+	}
+}
+
+func WithRMCDecreaseThreshold(rmcDecreaseThreshold iotago.WorkScore) options.Option[TestSuite] {
+	return func(opts *TestSuite) {
+		opts.optsRMCDecreaseThreshold = rmcDecreaseThreshold
 	}
 }
 
