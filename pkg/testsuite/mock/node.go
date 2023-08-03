@@ -51,8 +51,9 @@ type Node struct {
 	AccountID  iotago.AccountID
 	PeerID     network.PeerID
 
-	Endpoint *Endpoint
-	Workers  *workerpool.Group
+	Partition string
+	Endpoint  *Endpoint
+	Workers   *workerpool.Group
 
 	Protocol *protocol.Protocol
 
@@ -85,8 +86,9 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		AccountID:  accountID,
 		PeerID:     peerID,
 
-		Endpoint: net.Join(peerID, partition),
-		Workers:  workerpool.NewGroup(name),
+		Partition: partition,
+		Endpoint:  net.Join(peerID, partition),
+		Workers:   workerpool.NewGroup(name),
 
 		attachedBlocks: make([]*blocks.Block, 0),
 	}
@@ -472,7 +474,7 @@ func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup, startSlot 
 			}
 
 			blockAlias := fmt.Sprintf("%s-activity.%d", n.Name, counter)
-			timeOffset := time.Now().Sub(start)
+			timeOffset := time.Since(start)
 			n.IssueBlock(ctx, blockAlias,
 				blockfactory.WithPayload(
 					&iotago.TaggedData{

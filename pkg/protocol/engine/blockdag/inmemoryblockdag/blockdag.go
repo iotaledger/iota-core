@@ -1,8 +1,6 @@
 package inmemoryblockdag
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -159,8 +157,6 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	}
 
 	block, evicted, updated := b.blockCache.StoreOrUpdate(data)
-
-	fmt.Println("attach", block.ID(), evicted, updated)
 
 	if evicted {
 		b.retainBlockFailure(data.ID(), apimodels.BlockFailureIsTooOld)

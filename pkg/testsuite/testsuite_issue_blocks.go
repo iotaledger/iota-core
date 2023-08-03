@@ -146,7 +146,9 @@ func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, ro
 		if node.Validator {
 			b = t.IssueValidationBlockAtSlotWithOptions(blockAlias, slot, node, issuingOptionsCopy[node.Name]...)
 		} else {
-			txCount := t.automaticTransactionIssuingCounter.Add(1)
+			txCount := t.automaticTransactionIssuingCounters.Compute(node.Partition, func(currentValue int, exists bool) int {
+				return currentValue + 1
+			})
 			inputAlias := fmt.Sprintf("automaticSpent-%d:0", txCount-1)
 			txAlias := fmt.Sprintf("automaticSpent-%d", txCount)
 			if txCount == 1 {

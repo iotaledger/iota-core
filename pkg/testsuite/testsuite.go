@@ -56,22 +56,23 @@ type TestSuite struct {
 	optsWaitFor                time.Duration
 	optsTick                   time.Duration
 
-	uniqueBlockTimeCounter             atomic.Int64
-	automaticTransactionIssuingCounter atomic.Int64
-	mutex                              syncutils.RWMutex
-	TransactionFramework               *TransactionFramework
-	genesisSeed                        [32]byte
+	uniqueBlockTimeCounter              atomic.Int64
+	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
+	mutex                               syncutils.RWMutex
+	TransactionFramework                *TransactionFramework
+	genesisSeed                         [32]byte
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
 	return options.Apply(&TestSuite{
-		Testing:     testingT,
-		fakeTesting: &testing.T{},
-		genesisSeed: tpkg.RandEd25519Seed(),
-		Network:     mock.NewNetwork(),
-		Directory:   utils.NewDirectory(testingT.TempDir()),
-		nodes:       orderedmap.New[string, *mock.Node](),
-		blocks:      shrinkingmap.New[string, *blocks.Block](),
+		Testing:                             testingT,
+		fakeTesting:                         &testing.T{},
+		genesisSeed:                         tpkg.RandEd25519Seed(),
+		Network:                             mock.NewNetwork(),
+		Directory:                           utils.NewDirectory(testingT.TempDir()),
+		nodes:                               orderedmap.New[string, *mock.Node](),
+		blocks:                              shrinkingmap.New[string, *blocks.Block](),
+		automaticTransactionIssuingCounters: *shrinkingmap.New[string, int](),
 
 		optsWaitFor:                DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
 		optsTick:                   DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
