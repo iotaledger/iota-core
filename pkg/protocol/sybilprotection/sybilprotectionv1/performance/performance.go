@@ -22,6 +22,8 @@ type Tracker struct {
 
 	apiProvider api.Provider
 
+	errHandler func(error)
+
 	performanceFactorsMutex syncutils.RWMutex
 	mutex                   syncutils.RWMutex
 }
@@ -32,6 +34,7 @@ func NewTracker(
 	committeeStore kvstore.KVStore,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
 	apiProvider api.Provider,
+	errHandler func(error),
 ) *Tracker {
 	return &Tracker{
 		rewardBaseStore: rewardsBaseStore,
@@ -49,6 +52,7 @@ func NewTracker(
 		),
 		performanceFactorsFunc: performanceFactorsFunc,
 		apiProvider:            apiProvider,
+		errHandler:             errHandler,
 	}
 }
 
@@ -69,14 +73,12 @@ func (t *Tracker) BlockAccepted(block *blocks.Block) {
 	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
 	pf, err := performanceFactors.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
-		// TODO replace panic with errors in the future, like triggering an error event
-		panic(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
+		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 
 	err = performanceFactors.Store(block.ProtocolBlock().IssuerID, pf+1)
 	if err != nil {
-		// TODO replace panic with errors in the future, like triggering an error event
-		panic(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
+		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 }
 
