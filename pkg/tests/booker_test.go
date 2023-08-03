@@ -3,7 +3,6 @@ package tests
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -16,7 +15,7 @@ import (
 )
 
 func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
-	ts := testsuite.NewTestSuite(t, testsuite.WithWaitFor(10*time.Minute))
+	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1")
