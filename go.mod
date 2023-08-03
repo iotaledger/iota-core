@@ -9,7 +9,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20230801123622-68977cefd26c
+	github.com/iotaledger/hive.go/ads v0.0.0-20230802095618-99821a09a868
 	github.com/iotaledger/hive.go/app v0.0.0-20230802095618-99821a09a868
 	github.com/iotaledger/hive.go/autopeering v0.0.0-20230802095618-99821a09a868
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230802095618-99821a09a868
