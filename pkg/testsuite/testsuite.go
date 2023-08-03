@@ -91,7 +91,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsRMCMin:                 500,
 		optsRMCIncrease:            500,
 		optsRMCDecrease:            500,
-		// TODO: add scheduler param to increase/decrease threshold expression with issue #473
+		// TODO: add scheduler param to increase/decrease threshold expression with issue #264
 		optsRMCIncreaseThreshold: 0.8 * 10,
 		optsRMCDecreaseThreshold: 0.2 * 10,
 	}, opts, func(t *TestSuite) {
