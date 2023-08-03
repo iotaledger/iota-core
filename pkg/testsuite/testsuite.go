@@ -28,8 +28,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-const MinIssuerAccountDeposit = iotago.BaseToken(84400)
-const MinValidatorAccountDeposit = iotago.BaseToken(88200)
+const MinIssuerAccountAmount = iotago.BaseToken(84400)
+const MinValidatorAccountAmount = iotago.BaseToken(88200)
 
 type TestSuite struct {
 	Testing     *testing.T
@@ -301,7 +301,7 @@ func (t *TestSuite) Shutdown() {
 	// })
 }
 
-func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, optDeposit ...iotago.BaseToken) *mock.Node {
+func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, optAmount ...iotago.BaseToken) *mock.Node {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -312,15 +312,15 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	node := mock.NewNode(t.Testing, t.Network, partition, name, validator)
 	t.nodes.Set(name, node)
 
-	deposit := MinValidatorAccountDeposit
-	if len(optDeposit) > 0 {
-		deposit = optDeposit[0]
+	amount := MinValidatorAccountAmount
+	if len(optAmount) > 0 {
+		amount = optAmount[0]
 	}
-	if deposit > 0 {
+	if amount > 0 {
 		accountDetails := snapshotcreator.AccountDetails{
 			Address:              iotago.Ed25519AddressFromPubKey(node.PubKey),
-			Amount:               deposit,
-			Mana:                 iotago.Mana(deposit),
+			Amount:               amount,
+			Mana:                 iotago.Mana(amount),
 			IssuerKey:            ed25519.PublicKey(node.PubKey),
 			ExpirySlot:           math.MaxUint64,
 			BlockIssuanceCredits: iotago.BlockIssuanceCredits(math.MaxInt64),
@@ -337,20 +337,20 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	return node
 }
 
-func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, optDeposit ...iotago.BaseToken) *mock.Node {
-	return t.addNodeToPartition(name, partition, true, optDeposit...)
+func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, optAmount ...iotago.BaseToken) *mock.Node {
+	return t.addNodeToPartition(name, partition, true, optAmount...)
 }
 
-func (t *TestSuite) AddValidatorNode(name string, optDeposit ...iotago.BaseToken) *mock.Node {
-	return t.addNodeToPartition(name, mock.NetworkMainPartition, true, optDeposit...)
+func (t *TestSuite) AddValidatorNode(name string, optAmount ...iotago.BaseToken) *mock.Node {
+	return t.addNodeToPartition(name, mock.NetworkMainPartition, true, optAmount...)
 }
 
-func (t *TestSuite) AddNodeToPartition(name string, partition string, optDeposit ...iotago.BaseToken) *mock.Node {
-	return t.addNodeToPartition(name, partition, false, optDeposit...)
+func (t *TestSuite) AddNodeToPartition(name string, partition string, optAmount ...iotago.BaseToken) *mock.Node {
+	return t.addNodeToPartition(name, partition, false, optAmount...)
 }
 
-func (t *TestSuite) AddNode(name string, optDeposit ...iotago.BaseToken) *mock.Node {
-	return t.addNodeToPartition(name, mock.NetworkMainPartition, false, optDeposit...)
+func (t *TestSuite) AddNode(name string, optAmount ...iotago.BaseToken) *mock.Node {
+	return t.addNodeToPartition(name, mock.NetworkMainPartition, false, optAmount...)
 }
 
 func (t *TestSuite) RemoveNode(name string) {

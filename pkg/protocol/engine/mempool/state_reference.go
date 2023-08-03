@@ -6,4 +6,4 @@ import (
 )
 
 // StateReferenceResolver is a function that resolves a StateReference to a State.
-type StateReferenceResolver func(reference iotago.IndexedUTXOReferencer) *promise.Promise[State]
+type StateReferenceResolver func(reference iotago.Input) *promise.Promise[State]

@@ -28,7 +28,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Address: nil,
 		// Set 3 time min amount to cover the rent. If it's too little, then the snapshot creation will fail.
 		// We need more to cover an additional key that is added in the test.
-		Amount: testsuite.MinIssuerAccountDeposit * 3,
+		Amount: testsuite.MinIssuerAccountAmount * 3,
 		Mana:   0,
 		// AccountID is derived from this field, so this must be set uniquely for each account.
 		IssuerKey: oldGenesisOutputKey,
