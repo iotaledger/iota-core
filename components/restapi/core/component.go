@@ -65,6 +65,8 @@ const (
 
 	// RouteTransactionsIncludedBlockMetadata is the route for getting the block metadata that was first confirmed in the ledger for a given transaction ID.
 	// GET returns block metadata (including info about "promotion/reattachment needed").
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
 	RouteTransactionsIncludedBlockMetadata = "/transactions/:" + restapipkg.ParameterTransactionID + "/included-block/metadata"
 
 	// RouteCommitmentByID is the route for getting a slot commitment by its ID.
@@ -89,14 +91,20 @@ const (
 
 	// RouteCongestion is the route for getting the current congestion state and all account related useful details as block issuance credits.
 	// GET returns the congestion state related to the specified account.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
 	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
 
 	// RouteStaking is the route for getting informations about the current stakers.
 	// GET returns the stakers.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
 	RouteStaking = "/staking"
 
 	// RouteStakingAccount is the route for getting an account by its accountID.
 	// GET returns the account details.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
 	RouteStakingAccount = "/staking/:" + restapipkg.ParameterAccountID
 
 	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
@@ -105,6 +113,8 @@ const (
 
 	// RouteCommittee is the route for getting the current committee.
 	// GET returns the committee.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
 	RouteCommittee = "/committee"
 )
 
@@ -165,7 +175,6 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
-		// TODO: fill in blockReason, TxState, TxReason.
 		resp, err := blockMetadataByID(c)
 		if err != nil {
 			return err

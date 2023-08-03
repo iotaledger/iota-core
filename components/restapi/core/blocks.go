@@ -38,12 +38,12 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataRes
 }
 
 func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
-	block, err := blockByID(c)
+	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
 		return nil, err
 	}
 
-	return blockMetadataByBlockID(block.ID())
+	return blockMetadataByBlockID(blockID)
 }
 
 func blockIssuance(_ echo.Context) (*apimodels.IssuanceBlockHeaderResponse, error) {

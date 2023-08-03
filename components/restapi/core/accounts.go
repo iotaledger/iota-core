@@ -21,7 +21,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 
 	slotIndex := deps.Protocol.SyncManager.LatestCommitment().Index()
 
-	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
+	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -31,9 +31,9 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 
 	return &apimodels.CongestionResponse{
 		SlotIndex:            slotIndex,
-		Ready:                false, // TODO: update after scheduler is implemented
-		ReferenceManaCost:    0,     // TODO: update after RMC is implemented
-		BlockIssuanceCredits: account.Credits.Value,
+		Ready:                deps.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(accountID),
+		ReferenceManaCost:    0, // TODO: update after RMC is implemented
+		BlockIssuanceCredits: acc.Credits.Value,
 	}, nil
 }
 
@@ -56,7 +56,8 @@ func staking() (*apimodels.AccountStakingListResponse, error) {
 			ValidatorStake:                 accountData.ValidatorStake,
 			FixedCost:                      accountData.FixedCost,
 			StakingEpochEnd:                accountData.StakeEndEpoch,
-			LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
+			Active:                         true, // TODO: update after finishing up performance tracker for validatior activity tracking
+			LatestSupportedProtocolVersion: 1,    // TODO: update after protocol versioning is included in the account ledger
 		})
 	}
 
@@ -77,13 +78,15 @@ func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
-
+	// TODO: update after finishing up performance tracker for validatior activity tracking
+	// active := deps.Protocol.MainEngineInstance().SybilProtection.IsActive(accountID)
 	return &apimodels.ValidatorResponse{
 		AccountID:                      accountID,
 		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 		ValidatorStake:                 accountData.ValidatorStake,
 		StakingEpochEnd:                accountData.StakeEndEpoch,
 		FixedCost:                      accountData.FixedCost,
+		Active:                         true,
 		LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
 	}, nil
 }
