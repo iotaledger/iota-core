@@ -28,7 +28,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Address: nil,
 		// Set an amount enough to cover the rent and to cover an additional key that is added in the test.
 		// If it's too little, then the test will fail.
-		Amount: testsuite.MinIssuerAccountDeposit * 10,
+		Amount: testsuite.MinIssuerAccountAmount * 10,
 		Mana:   0,
 		// AccountID is derived from this field, so this must be set uniquely for each account.
 		IssuerKey: oldGenesisOutputKey,

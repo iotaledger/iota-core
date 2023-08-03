@@ -68,7 +68,7 @@ func (o *Options) isBalanceProvided() bool {
 	provided := false
 
 	for _, output := range o.aliasOutputs {
-		if output.Deposit() > 0 {
+		if output.BaseTokenAmount() > 0 {
 			provided = true
 		}
 	}
