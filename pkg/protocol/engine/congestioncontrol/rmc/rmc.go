@@ -133,11 +133,11 @@ func (m *Manager) RMC(slot iotago.SlotIndex) (iotago.Mana, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	if slot >= m.latestCommittedSlot {
+	if slot > m.latestCommittedSlot {
 		return 0, ierrors.Errorf("cannot get RMC for slot %d: not committed yet", slot)
 	}
 	// this should never happen when checking the RMC for a slot that is not committed yet
-	if slot < m.latestCommittedSlot-m.commitmentEvictionAge {
+	if m.latestCommittedSlot > m.commitmentEvictionAge && slot < m.latestCommittedSlot-m.commitmentEvictionAge {
 		return 0, ierrors.Errorf("cannot get RMC for slot %d: already evicted", slot)
 	}
 
@@ -147,5 +147,16 @@ func (m *Manager) RMC(slot iotago.SlotIndex) (iotago.Mana, error) {
 	}
 
 	return rmc, nil
+}
 
+func (m *Manager) AddGenesisRMC() error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// set the genesis RMC
+	if wasCreated := m.rmc.Set(0, m.rmcMin); !wasCreated {
+		return ierrors.New("failed to set genesis RMC")
+	}
+
+	return nil
 }

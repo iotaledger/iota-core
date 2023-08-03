@@ -133,10 +133,12 @@ func (blk *Block) String() string {
 }
 
 func (blk *Block) ManaCost(rmc iotago.Mana) (iotago.Mana, error) {
-	workScore, err := blk.protocolBlock.Block.WorkScore(blk.api.ProtocolParameters().WorkScoreStructure())
-	if err != nil {
-		return 0, err
-	}
+	// workScore, err := blk.protocolBlock.Block.WorkScore(blk.api.ProtocolParameters().WorkScoreStructure())
+	// if err != nil {
+	// 	return 0, err
+	// }
 
-	return iotago.Mana(workScore) * rmc, nil
+	// return iotago.Mana(workScore) * rmc, nil
+	// TODO: add workscore of block here
+	return rmc, nil
 }

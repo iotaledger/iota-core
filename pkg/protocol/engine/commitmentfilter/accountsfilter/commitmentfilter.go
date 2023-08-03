@@ -57,7 +57,9 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 
 			c.accountRetrieveFunc = e.Ledger.Account
 
-			c.rmcRetrieveFunc = e.Ledger.RMCManager().RMC
+			e.Ledger.HookConstructed(func() {
+				c.rmcRetrieveFunc = e.Ledger.RMCManager().RMC
+			})
 
 			e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				c.PromoteFutureBlocksUntil(details.Commitment.Index())
@@ -156,6 +158,8 @@ func (c *CommitmentFilter) evaluateBlock(block *model.Block) {
 			Block:  block,
 			Reason: ierrors.Wrapf(err, "could not retrieve RMC for slot commitment %s", block.ProtocolBlock().SlotCommitmentID.Index()),
 		})
+
+		return
 	}
 	manaCost, err := block.ManaCost(rmc)
 	if err != nil {
@@ -163,13 +167,16 @@ func (c *CommitmentFilter) evaluateBlock(block *model.Block) {
 			Block:  block,
 			Reason: ierrors.Wrapf(err, "could not calculate Mana cost for block"),
 		})
+
+		return
 	}
-	basicBlock, isBasic := block.BasicBlock()
-	if isBasic && manaCost < basicBlock.BurnedMana {
+	if basicBlock, isBasic := block.BasicBlock(); isBasic && basicBlock.BurnedMana < manaCost {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
 			Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, rmc, basicBlock.BurnedMana),
 		})
+
+		return
 	}
 
 	// Check that the issuer of this block has non-negative block issuance credit

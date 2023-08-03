@@ -114,6 +114,10 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		return ierrors.Wrap(err, "failed to create genesis account outputs")
 	}
 
+	if err := engineInstance.Ledger.RMCManager().AddGenesisRMC(); err != nil {
+		return ierrors.Wrap(err, "failed to create genesis RMC")
+	}
+
 	return engineInstance.WriteSnapshot(opt.FilePath)
 }
 
