@@ -1,6 +1,8 @@
 package inmemoryblockdag
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -158,6 +160,8 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 
 	block, evicted, updated := b.blockCache.StoreOrUpdate(data)
 
+	fmt.Println("attach", block.ID(), evicted, updated)
+
 	if evicted {
 		b.retainBlockFailure(data.ID(), apimodels.BlockFailureIsTooOld)
 		return block, false, ierrors.New("cannot attach, block is too old, it was already evicted from the cache")
@@ -183,7 +187,7 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 
 	storedBlock, storedBlockExists := b.blockCache.Block(data.ID())
 	// We already attached it before
-	if storedBlockExists && !storedBlock.IsMissing() {
+	if storedBlockExists && !storedBlock.IsMissing() && !storedBlock.IsFromDisk() {
 		return false, nil
 	}
 
@@ -223,8 +227,13 @@ func (b *BlockDAG) registerChild(child *blocks.Block, parent iotago.Parent) {
 		return newBlock
 	})
 
-	if parentBlock != nil {
-		parentBlock.AppendChild(child, parent.Type)
+	parentBlock.AppendChild(child, parent.Type)
+	if parentBlock.IsFromDisk() {
+		_, _, err := b.Attach(parentBlock.ModelBlock())
+		if err != nil {
+			b.errorHandler(ierrors.Wrapf(err, "failed to attach parent block from disk %s", parentBlock.ID()))
+		}
+		parentBlock.ResetFromDisk()
 	}
 }
 

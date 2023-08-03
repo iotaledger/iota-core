@@ -188,8 +188,9 @@ func New(
 			} else {
 				// Restore from Disk
 				e.Storage.Prunable.RestoreFromDisk()
-
 				e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
+				e.BlockCache.RestoreFromDisk(e.Storage.Blocks)
+
 				if err := e.Attestations.RestoreFromDisk(); err != nil {
 					panic(ierrors.Wrap(err, "failed to restore attestations from disk"))
 				}
