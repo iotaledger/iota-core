@@ -306,7 +306,7 @@ func (e *Engine) CurrentAPI() iotago.API {
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
 	if len(targetSlot) == 0 {
 		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index())
-	} else if targetSlot[0] <= lo.Return1(e.Storage.LastPrunedSlot()) {
+	} else if lastPrunedSlot, hasPruned := e.Storage.LastPrunedSlot(); hasPruned && targetSlot[0] <= lastPrunedSlot {
 		return ierrors.Errorf("impossible to create a snapshot for slot %d because it is pruned (last pruned slot %d)", targetSlot[0], lo.Return1(e.Storage.LastPrunedSlot()))
 	}
 

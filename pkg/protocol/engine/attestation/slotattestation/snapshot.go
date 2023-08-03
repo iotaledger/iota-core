@@ -4,7 +4,6 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -85,56 +84,64 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 	}
 
 	// Write slot count.
-	start := lo.Max(targetSlot-m.attestationCommitmentOffset, 0)
-	if err := stream.Write(writer, uint64(targetSlot-start+1)); err != nil {
-		return ierrors.Wrap(err, "failed to write slot count")
+	var start iotago.SlotIndex
+	if targetSlot < m.attestationCommitmentOffset {
+		start = 0
+	} else {
+		start = targetSlot - m.attestationCommitmentOffset
 	}
 
-	for i := start; i <= targetSlot; i++ {
-		var attestations []*iotago.Attestation
-		if i < attestationSlotIndex {
-			// Need to get attestations from storage.
-			attestationsStorage, err := m.attestationsForSlot(i)
-			if err != nil {
-				return ierrors.Wrapf(err, "failed to get attestations of slot %d", i)
-			}
-			err = attestationsStorage.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
-				attestations = append(attestations, value)
-
-				return nil
-			})
-			if err != nil {
-				return ierrors.Wrapf(err, "failed to stream attestations of slot %d", i)
-			}
-		} else {
-			// Need to get attestations from tracker.
-			attestations = m.determineAttestationsFromWindow(i)
-		}
-
-		// Write slot index.
-		if err := stream.Write(writer, uint64(i)); err != nil {
-			return ierrors.Wrapf(err, "failed to write slot %d", i)
-		}
-
-		api := m.apiProvider.APIForSlot(i)
-
-		// Write attestations.
-		if err := stream.WriteCollection(writer, func() (uint64, error) {
-			for _, a := range attestations {
-				bytes, err := api.Encode(a)
+	if err := stream.WriteCollection(writer, func() (uint64, error) {
+		for i := start; i <= targetSlot; i++ {
+			var attestations []*iotago.Attestation
+			if i < attestationSlotIndex {
+				// Need to get attestations from storage.
+				attestationsStorage, err := m.attestationsForSlot(i)
 				if err != nil {
-					return 0, ierrors.Wrapf(err, "failed to encode attestation %v", a)
+					return 0, ierrors.Wrapf(err, "failed to get attestations of slot %d", i)
 				}
+				err = attestationsStorage.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
+					attestations = append(attestations, value)
 
-				if writeErr := stream.WriteBlob(writer, bytes); writeErr != nil {
-					return 0, ierrors.Wrapf(writeErr, "failed to write attestation %v", a)
+					return nil
+				})
+				if err != nil {
+					return 0, ierrors.Wrapf(err, "failed to stream attestations of slot %d", i)
 				}
+			} else {
+				// Need to get attestations from tracker.
+				attestations = m.determineAttestationsFromWindow(i)
 			}
 
-			return uint64(len(attestations)), nil
-		}); err != nil {
-			return ierrors.Wrapf(err, "failed to write attestations of slot %d", i)
+			// Write slot index.
+			if err := stream.Write(writer, uint64(i)); err != nil {
+				return 0, ierrors.Wrapf(err, "failed to write slot %d", i)
+			}
+
+			api := m.apiProvider.APIForSlot(i)
+
+			// Write attestations.
+			if err := stream.WriteCollection(writer, func() (uint64, error) {
+				for _, a := range attestations {
+					bytes, err := api.Encode(a)
+					if err != nil {
+						return 0, ierrors.Wrapf(err, "failed to encode attestation %v", a)
+					}
+
+					if writeErr := stream.WriteBlob(writer, bytes); writeErr != nil {
+						return 0, ierrors.Wrapf(writeErr, "failed to write attestation %v", a)
+					}
+				}
+
+				return uint64(len(attestations)), nil
+			}); err != nil {
+				return 0, ierrors.Wrapf(err, "failed to write attestations of slot %d", i)
+			}
 		}
+
+		return uint64(targetSlot - start + 1), nil
+	}); err != nil {
+		return ierrors.Wrap(err, "failed to export attestations")
 	}
 
 	return nil

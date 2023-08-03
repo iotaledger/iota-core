@@ -175,7 +175,6 @@ func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitm
 		return nil, ierrors.Errorf("can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Index)
 	}
 
-	// TODO: this is probably off by one, also in the filter
 	if blockSlot < commitment.Index+protoParams.MinCommittableAge() {
 		if blockSlot < protoParams.MinCommittableAge() || commitment.Index < protoParams.MinCommittableAge() {
 			return commitment, nil
