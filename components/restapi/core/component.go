@@ -165,7 +165,6 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
-		// TODO: fill in blockReason, TxState, TxReason.
 		resp, err := blockMetadataByID(c)
 		if err != nil {
 			return err
@@ -361,21 +360,20 @@ func checkUpcomingUnsupportedProtocolVersion() echo.MiddlewareFunc {
 }
 
 func responseByHeader(c echo.Context, obj any) error {
-	mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
+	mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV2, echo.MIMEApplicationJSON)
 	if err != nil && err != httpserver.ErrNotAcceptable {
 		return err
 	}
 
 	switch mimeType {
-	// TODO: should this maybe already be V2 ?
-	case httpserver.MIMEApplicationVendorIOTASerializerV1:
+	case httpserver.MIMEApplicationVendorIOTASerializerV2:
 		// TODO: that should take the API that belongs to the object
 		b, err := deps.Protocol.CurrentAPI().Encode(obj)
 		if err != nil {
 			return err
 		}
 
-		return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV1, b)
+		return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV2, b)
 
 	// default to echo.MIMEApplicationJSON
 	default:
