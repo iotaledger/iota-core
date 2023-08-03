@@ -7,11 +7,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -47,6 +48,12 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				storage.WithPruningDelay(1000),
 			),
 		},
+		"nodeC": {
+			protocol.WithStorageOptions(
+				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+				storage.WithPruningDelay(1000),
+			),
+		},
 	})
 	ts.HookLogging()
 
@@ -77,7 +84,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
 	)
 
-	var expectedStorageRootBlocks []*blocks.Block
+	var expectedStorageRootBlocksFrom0, expectedStorageRootBlocksFrom9 []*blocks.Block
 
 	// Epoch 1: issue 4 rows per slot.
 	{
@@ -99,7 +106,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		}
 
 		for _, slot := range []iotago.SlotIndex{1, 2, 3, 4, 5, 6} {
-			expectedStorageRootBlocks = append(expectedStorageRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
 		}
 
 		ts.AssertNodeState(ts.Nodes(),
@@ -110,11 +117,11 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(5),
 			testsuite.WithEqualStoredCommitmentAtIndex(5),
 			testsuite.WithLatestCommitmentCumulativeWeight(4), // 2 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(5, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(5),
 			testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
-			testsuite.WithStorageRootBlocks(expectedStorageRootBlocks),
+			testsuite.WithStorageRootBlocks(expectedStorageRootBlocksFrom0),
 		)
 
 		for _, slot := range []iotago.SlotIndex{4, 5} {
@@ -140,13 +147,14 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.BlocksWithPrefixes("12", "13.0", "13.1", "13.2", "13.3"), true, ts.Nodes()...)
 
 		var expectedActiveRootBlocks []*blocks.Block
-		// TODO: we simply skip empty slots but do not extend the window?
 		for _, slot := range []iotago.SlotIndex{9, 11} {
-			expectedActiveRootBlocks = append(expectedActiveRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.5-", slot))...)
+			b := ts.BlocksWithPrefix(fmt.Sprintf("%d.5-", slot))
+			expectedActiveRootBlocks = append(expectedActiveRootBlocks, b...)
+			expectedStorageRootBlocksFrom9 = append(expectedStorageRootBlocksFrom9, b...)
 		}
 
 		for _, slot := range []iotago.SlotIndex{8, 9, 11} {
-			expectedStorageRootBlocks = append(expectedStorageRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.5-", slot))...)
+			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, ts.BlocksWithPrefix(fmt.Sprintf("%d.5-", slot))...)
 		}
 
 		ts.AssertNodeState(ts.Nodes(),
@@ -157,11 +165,11 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(11),
 			testsuite.WithEqualStoredCommitmentAtIndex(11),
 			testsuite.WithLatestCommitmentCumulativeWeight(16), // 2 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
-			testsuite.WithStorageRootBlocks(expectedStorageRootBlocks),
+			testsuite.WithStorageRootBlocks(expectedStorageRootBlocksFrom0),
 		)
 
 		for _, slot := range []iotago.SlotIndex{8, 9, 11} {
@@ -170,30 +178,36 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			})
 			ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes()...)
 		}
-		ts.AssertAttestationsForSlot(10, ts.Blocks("9.5-nodeA", "9.5-nodeB"), ts.Nodes()...) // We didn't issue in slot 10 but we still have the attestations from slot 9 in the window.
+		ts.AssertAttestationsForSlot(10, ts.Blocks("9.5-nodeA", "9.5-nodeB"), ts.Nodes()...) // We didn't issue in slot 10, but we still have the attestations from slot 9 in the window.
 
 		{
-			slot7Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(7))
-
 			// Restart nodeC from disk. Verify state.
 			{
 				nodeC := ts.Node("nodeC")
 				nodeC.Shutdown()
 				ts.RemoveNode("nodeC")
 
-				nodeE1 := ts.AddNode("nodeC-restarted")
-				nodeE1.CopyIdentityFromNode(nodeC)
-				nodeE1.Initialize(
+				nodeC1 := ts.AddNode("nodeC-restarted")
+				nodeC1.CopyIdentityFromNode(nodeC)
+				nodeC1.Initialize(
 					protocol.WithBaseDirectory(ts.Directory.Path(nodeC.Name)),
+					protocol.WithStorageOptions(
+						storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
+						storage.WithPruningDelay(1000),
+					),
+					protocol.WithEngineOptions(
+						engine.WithRequesterOptions(
+							eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](300*time.Millisecond),
+							eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
+						),
+					),
 				)
-				nodeE1.HookLogging()
+				nodeC1.HookLogging()
 				ts.Wait()
 
-				// TODO: why not available?
-				// ts.AssertBlocksExist(ts.BlocksWithPrefixes("12", "13.0", "13.1", "13.2", "13.3"), true, ts.Nodes("nodeC-restarted")...)
-				//  Everything that was accepted before shutting down should be available on disk.
-				ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11"), true, ts.Nodes("nodeC-restarted")...)
-				ts.AssertStorageRootBlocks(expectedStorageRootBlocks, ts.Nodes("nodeC-restarted")...)
+				// Everything that was accepted before shutting down should be available on disk (verifying that restoring the block cache from disk works).
+				ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13.0", "13.1", "13.2", "13.3"), true, ts.Nodes("nodeC-restarted")...)
+				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom0, ts.Nodes("nodeC-restarted")...)
 
 				for _, slot := range []iotago.SlotIndex{8, 9, 11} {
 					aliases := lo.Map([]string{"nodeA", "nodeB"}, func(s string) string {
@@ -201,7 +215,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 					})
 					ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes()...)
 				}
-				ts.AssertAttestationsForSlot(10, ts.Blocks("9.5-nodeA", "9.5-nodeB"), ts.Nodes()...) // We didn't issue in slot 10 but we still have the attestations from slot 9 in the window.
+				ts.AssertAttestationsForSlot(10, ts.Blocks("9.5-nodeA", "9.5-nodeB"), ts.Nodes()...) // We didn't issue in slot 10, but we still have the attestations from slot 9 in the window.
 			}
 
 			// Start a new node (nodeD) from a snapshot. Verify state.
@@ -211,14 +225,24 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
 
 				nodeD := ts.AddNode("nodeD")
+				nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.
 				nodeD.Initialize(
 					protocol.WithSnapshotPath(snapshotPath),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
+					protocol.WithEngineOptions(
+						engine.WithRequesterOptions(
+							eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](300*time.Millisecond),
+							eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
+						),
+					),
 				)
 				ts.Wait()
 				nodeD.HookLogging()
-				ts.AssertStorageRootBlocks(expectedActiveRootBlocks, ts.Nodes("nodeD")...)
+
+				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
 			}
+
+			slot7Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(7))
 
 			ts.AssertNodeState(ts.Nodes("nodeC-restarted", "nodeD"),
 				testsuite.WithSnapshotImported(true),
@@ -228,40 +252,45 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				testsuite.WithLatestCommitmentSlotIndex(11),
 				testsuite.WithEqualStoredCommitmentAtIndex(11),
 				testsuite.WithLatestCommitmentCumulativeWeight(16), // 2 for each slot starting from 4
-				testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
 				testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 				testsuite.WithEvictedSlot(11),
 				testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
 				testsuite.WithChainManagerIsSolid(),
 			)
-
-			// TODO: attestations are a mess, needs to be fixed.
-			//  though: do we need the old ones? or simply the ones in the tracker so that we can compute the new ones going forward ie from slot 12?
-			// TODO: for nodeD: we are not actually exporting already created attestations. Do we need to?
-			// for _, slot := range []iotago.SlotIndex{11} {
-			// 	aliases := lo.Map([]string{"nodeA", "nodeB"}, func(s string) string {
-			// 		return fmt.Sprintf("%d.5-%s", slot, s)
-			// 	})
-			// 	ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes()...)
-			// }
 		}
 
 		// Only issue on nodes that have the latest state in memory.
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{14, 15}, 6, "13.5", ts.Nodes("nodeA", "nodeB"), true, nil)
+
+		for _, slot := range []iotago.SlotIndex{12, 13} {
+			aliases := lo.Map([]string{"nodeA", "nodeB"}, func(s string) string {
+				return fmt.Sprintf("%d.5-%s", slot, s)
+			})
+			ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes()...)
+
+			rootBlocks := ts.BlocksWithPrefix(fmt.Sprintf("%d.5", slot))
+			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, rootBlocks...)
+			expectedStorageRootBlocksFrom9 = append(expectedStorageRootBlocksFrom9, rootBlocks...)
+		}
+
+		ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom0, ts.Nodes("nodeA", "nodeB", "nodeC-restarted")...)
+		ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
 	}
 
 	// Epoch 3-5
 	{
-		// TODO: remove this
-		debug.SetEnabled(true)
-
-		// TODO: would be great to dynamically add accounts for later nodes.
 		// Issue on all nodes except nodeD as its account is not yet known.
-		ts.IssueBlocksAtEpoch("", 3, 4, "15.5", ts.Nodes("nodeA", "nodeB", "nodeC-restarted"), true, nil)
+		ts.IssueBlocksAtEpoch("", 3, 4, "15.5", ts.Nodes(), true, nil)
 
 		// Issue on all nodes.
-		ts.IssueBlocksAtEpoch("", 4, 4, "23.3", ts.Nodes("nodeA", "nodeB", "nodeC-restarted"), true, nil)
-		ts.IssueBlocksAtEpoch("", 5, 4, "31.3", ts.Nodes("nodeA", "nodeB"), true, nil)
+		ts.IssueBlocksAtEpoch("", 4, 4, "23.3", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 5, 4, "31.3", ts.Nodes(), true, nil)
+
+		var expectedActiveRootBlocks []*blocks.Block
+		for _, slot := range []iotago.SlotIndex{35, 36, 37} {
+			expectedActiveRootBlocks = append(expectedActiveRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+		}
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
@@ -270,31 +299,27 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(37),
 			testsuite.WithEqualStoredCommitmentAtIndex(37),
 			testsuite.WithLatestCommitmentCumulativeWeight(68), // 2 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(37, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(37),
+			testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
 		)
 
-		indicesWithAttestations := []iotago.SlotIndex{12, 13, 14}
-		indicesWithAttestations = append(indicesWithAttestations, ts.SlotsForEpoch(3)...)
-		indicesWithAttestations = append(indicesWithAttestations, ts.SlotsForEpoch(4)...)
-		indicesWithAttestations = append(indicesWithAttestations, 32, 33, 34, 35, 36, 37)
-		for _, slot := range indicesWithAttestations {
-			row := 3
-			if slot <= 14 { // in Epoch 2 only with row 5
-				row = 5
-			}
+		acceptedSlots := ts.SlotsForEpoch(3)
+		acceptedSlots = append(acceptedSlots, ts.SlotsForEpoch(4)...)
+		acceptedSlots = append(acceptedSlots, 32, 33, 34, 35, 36, 37)
+		for _, slot := range acceptedSlots {
 			aliases := lo.Map([]string{"nodeA", "nodeB"}, func(s string) string {
-				return fmt.Sprintf("%d.%d-%s", slot, row, s)
+				return fmt.Sprintf("%d.3-%s", slot, s)
 			})
 			ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes()...)
-		}
-	}
 
-	// TODO: figure out why nodeB hangs on shutdown
-	fmt.Println("====== node states ======")
-	for _, node := range ts.Nodes() {
-		fmt.Println("====== node", node.Name, "======")
-		fmt.Println(node.Workers.String())
+			rootBlocks := ts.BlocksWithPrefix(fmt.Sprintf("%d.3", slot))
+			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, rootBlocks...)
+			expectedStorageRootBlocksFrom9 = append(expectedStorageRootBlocksFrom9, rootBlocks...)
+		}
+
+		ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom0, ts.Nodes("nodeA", "nodeB", "nodeC-restarted")...)
+		ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
 	}
 }
