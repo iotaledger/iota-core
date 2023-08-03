@@ -18,6 +18,8 @@ import (
 type Manager struct {
 	manaDecayProvider *iotago.ManaDecayProvider
 
+	rentStructure *iotago.RentStructure
+
 	manaVectorCache *cache.Cache[iotago.AccountID, *accounts.Mana]
 
 	accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)
@@ -27,9 +29,10 @@ type Manager struct {
 	module.Module
 }
 
-func NewManager(manaDecayProvider *iotago.ManaDecayProvider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
+func NewManager(manaDecayProvider *iotago.ManaDecayProvider, rentStructure *iotago.RentStructure, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
 	return &Manager{
 		manaDecayProvider:        manaDecayProvider,
+		rentStructure:            rentStructure,
 		accountOutputResolveFunc: accountOutputResolveFunc,
 		manaVectorCache:          cache.New[iotago.AccountID, *accounts.Mana](10000),
 	}
@@ -45,8 +48,12 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		if err != nil {
 			return 0, ierrors.Errorf("failed to resolve AccountOutput for %s in slot %s: %w", accountID, currentSlot, err)
 		}
-
-		mana = accounts.NewMana(output.StoredMana(), output.Deposit(), output.CreationTime())
+		minDeposit := m.rentStructure.MinDeposit(output.Output())
+		if output.BaseTokenAmount() <= minDeposit {
+			mana = accounts.NewMana(output.StoredMana(), 0, output.CreationTime())
+		} else {
+			mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.CreationTime())
+		}
 
 		m.manaVectorCache.Put(accountID, mana)
 	}
@@ -63,7 +70,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	updatedValue := manaStored
 
 	// get newly generated potential since last update and apply decay
-	manaPotential, err := m.manaDecayProvider.PotentialManaWithDecay(mana.Deposit(), mana.UpdateTime(), currentSlot)
+	manaPotential, err := m.manaDecayProvider.PotentialManaWithDecay(mana.ExcessBaseTokens(), mana.UpdateTime(), currentSlot)
 	if err != nil {
 		return 0, err
 	}
@@ -85,7 +92,12 @@ func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts ds.Set
 	for accountID, output := range accountOutputs {
 		mana, exists := m.manaVectorCache.Get(accountID)
 		if exists {
-			mana.Update(output.Output().StoredMana(), output.Output().Deposit(), slotIndex)
+			minDeposit := m.rentStructure.MinDeposit(output.Output())
+			if output.BaseTokenAmount() <= minDeposit {
+				mana.Update(output.StoredMana(), 0, slotIndex)
+			} else {
+				mana.Update(output.StoredMana(), output.BaseTokenAmount()-minDeposit, slotIndex)
+			}
 		}
 	}
 }
