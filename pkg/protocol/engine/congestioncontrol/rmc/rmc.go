@@ -7,9 +7,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Manager struct {
+	apiProvider api.Provider
+
 	// accumulated work from accepted blocks per slot
 	slotWork *shrinkingmap.ShrinkingMap[iotago.SlotIndex, iotago.WorkScore]
 
@@ -17,43 +20,21 @@ type Manager struct {
 	rmc *shrinkingmap.ShrinkingMap[iotago.SlotIndex, iotago.Mana]
 
 	// eviction parameters
-	latestCommittedSlot   iotago.SlotIndex
-	commitmentEvictionAge iotago.SlotIndex
+	latestCommittedSlot iotago.SlotIndex
 
 	// commitment loader
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)
 
-	// RMC parameters
-	rmcMin            iotago.Mana
-	rmcIncrease       iotago.Mana
-	rmcDecrease       iotago.Mana
-	increaseThreshold iotago.WorkScore
-	decreaseThreshold iotago.WorkScore
-
 	mutex syncutils.RWMutex
 }
 
-func NewManager(commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)) *Manager {
+func NewManager(apiProvider api.Provider, commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)) *Manager {
 	return &Manager{
+		apiProvider:      apiProvider,
 		slotWork:         shrinkingmap.New[iotago.SlotIndex, iotago.WorkScore](),
 		rmc:              shrinkingmap.New[iotago.SlotIndex, iotago.Mana](),
 		commitmentLoader: commitmentLoader,
 	}
-}
-
-func (m *Manager) SetRMCParameters(rmcMin iotago.Mana, rmcIncrease iotago.Mana, rmcDecrease iotago.Mana, increaseThreshold iotago.WorkScore, decreaseThreshold iotago.WorkScore) {
-	m.rmcMin = rmcMin
-	m.rmcIncrease = rmcIncrease
-	m.rmcDecrease = rmcDecrease
-	m.increaseThreshold = increaseThreshold
-	m.decreaseThreshold = decreaseThreshold
-}
-
-func (m *Manager) SetCommitmentEvictionAge(age iotago.SlotIndex) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.commitmentEvictionAge = age
 }
 
 func (m *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
@@ -100,13 +81,14 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	}
 	// calculate the new RMC
 	var newRMC iotago.Mana
-	if currentSlotWork < m.decreaseThreshold {
+	api := m.apiProvider.APIForSlot(index)
+	if currentSlotWork < api.ProtocolParameters().RMCDecreaseThreshold() {
 		// TODO: use safemath here
-		if lastRMC >= m.rmcMin {
-			newRMC = lastRMC - m.rmcDecrease
+		if lastRMC >= api.ProtocolParameters().RMCMin() {
+			newRMC = lastRMC - api.ProtocolParameters().RMCDecrease()
 		}
-	} else if currentSlotWork > m.increaseThreshold {
-		newRMC = lastRMC + m.rmcIncrease
+	} else if currentSlotWork > api.ProtocolParameters().RMCIncreaseThreshold() {
+		newRMC = lastRMC + api.ProtocolParameters().RMCIncrease()
 	} else {
 		newRMC = lastRMC
 	}
@@ -118,9 +100,10 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	// evict slotWork for the current slot
 	m.slotWork.Delete(index)
 
-	// evict old RMC from current slot - m.commitmentEvictionAge
-	if index > m.commitmentEvictionAge {
-		m.rmc.Delete(index - m.commitmentEvictionAge)
+	// evict old RMC from current slot - maxCommittableAge
+	maxCommittableAge := m.apiProvider.APIForSlot(index).ProtocolParameters().MaxCommittableAge()
+	if index > maxCommittableAge {
+		m.rmc.Delete(index - maxCommittableAge)
 	}
 
 	// update latestCommittedIndex
@@ -140,7 +123,8 @@ func (m *Manager) RMC(slot iotago.SlotIndex) (iotago.Mana, error) {
 		return 0, ierrors.Errorf("cannot get RMC for slot %d: not committed yet", slot)
 	}
 	// this should never happen when checking the RMC for a slot that is not committed yet
-	if slot+m.commitmentEvictionAge < m.latestCommittedSlot {
+
+	if slot+m.apiProvider.CurrentAPI().ProtocolParameters().MaxCommittableAge() < m.latestCommittedSlot {
 		return 0, ierrors.Errorf("cannot get RMC for slot %d: already evicted", slot)
 	}
 

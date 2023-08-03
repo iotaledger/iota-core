@@ -76,20 +76,10 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			// TODO: how do we want to handle changing API here?
 			iotagoAPI := l.apiProvider.CurrentAPI()
 			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), iotagoAPI.ProtocolParameters().RentStructure(), l.resolveAccountOutput)
-			maxCommittableAge := iotagoAPI.ProtocolParameters().MaxCommittableAge()
 			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Index()
-			l.accountsLedger.SetCommitmentEvictionAge(maxCommittableAge)
 			l.accountsLedger.SetLatestCommittedSlot(latestCommittedSlot)
-			l.rmcManager = rmc.NewManager(e.Storage.Commitments().Load)
-			l.rmcManager.SetCommitmentEvictionAge(maxCommittableAge)
+			l.rmcManager = rmc.NewManager(l.apiProvider, e.Storage.Commitments().Load)
 			l.rmcManager.SetLatestCommittedSlot(latestCommittedSlot)
-			l.rmcManager.SetRMCParameters(
-				iotagoAPI.ProtocolParameters().RMCMin(),
-				iotagoAPI.ProtocolParameters().RMCIncrease(),
-				iotagoAPI.ProtocolParameters().RMCDecrease(),
-				iotagoAPI.ProtocolParameters().RMCIncreaseThreshold(),
-				iotagoAPI.ProtocolParameters().RMCDecreaseThreshold(),
-			)
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
@@ -124,7 +114,7 @@ func New(
 	return &Ledger{
 		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
-		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore),
+		accountsLedger:   accountsledger.New(apiProvider, blocksFunc, slotDiffFunc, accountsStore),
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,

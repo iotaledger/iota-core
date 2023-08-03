@@ -139,6 +139,7 @@ func (blk *Block) ManaCost(rmc iotago.Mana) (iotago.Mana, error) {
 	// }
 
 	// return iotago.Mana(workScore) * rmc, nil
-	// TODO: add workscore of block here
+
+	// TODO: add implement workscore and move this to iota.go with issue #264
 	return rmc, nil
 }
