@@ -177,12 +177,17 @@ func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitm
 
 	// TODO: this is probably off by one, also in the filter
 	if blockSlot < commitment.Index+protoParams.MinCommittableAge() {
-		commitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(lo.Max(0, blockSlot-protoParams.MinCommittableAge()))
-		if err != nil {
-			return nil, ierrors.Wrap(err, "error loading valid commitment according to minCommittableAge from storage")
+		if blockSlot < protoParams.MinCommittableAge() || commitment.Index < protoParams.MinCommittableAge() {
+			return commitment, nil
 		}
 
-		return commitment.Commitment(), nil
+		commitmentSlot := commitment.Index - protoParams.MinCommittableAge()
+		loadedCommitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(commitmentSlot)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "error loading valid commitment of slot %d according to minCommittableAge from storage", commitmentSlot)
+		}
+
+		return loadedCommitment.Commitment(), nil
 	}
 
 	return commitment, nil
