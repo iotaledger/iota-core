@@ -88,9 +88,9 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	defer m.mutex.Unlock()
 
 	// load the last RMC
-	latestCommitment, err := m.commitmentLoader(index)
+	latestCommitment, err := m.commitmentLoader(index - 1)
 	if err != nil {
-		return 0, err
+		return 0, ierrors.Wrapf(err, "failed to load commitment for slot %d", index-1)
 	}
 	lastRMC := latestCommitment.Commitment().RMC
 	// load the slotWork for the current slot
@@ -101,7 +101,10 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	// calculate the new RMC
 	var newRMC iotago.Mana
 	if currentSlotWork < m.decreaseThreshold {
-		newRMC = lastRMC - m.rmcDecrease
+		// TODO: use safemath here
+		if lastRMC >= m.rmcMin {
+			newRMC = lastRMC - m.rmcDecrease
+		}
 	} else if currentSlotWork > m.increaseThreshold {
 		newRMC = lastRMC + m.rmcIncrease
 	} else {
@@ -130,33 +133,27 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 }
 
 func (m *Manager) RMC(slot iotago.SlotIndex) (iotago.Mana, error) {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	if slot > m.latestCommittedSlot {
 		return 0, ierrors.Errorf("cannot get RMC for slot %d: not committed yet", slot)
 	}
 	// this should never happen when checking the RMC for a slot that is not committed yet
-	if m.latestCommittedSlot > m.commitmentEvictionAge && slot < m.latestCommittedSlot-m.commitmentEvictionAge {
+	if slot+m.commitmentEvictionAge < m.latestCommittedSlot {
 		return 0, ierrors.Errorf("cannot get RMC for slot %d: already evicted", slot)
 	}
 
 	rmc, exists := m.rmc.Get(slot)
 	if !exists {
-		return 0, ierrors.Errorf("failed to get RMC for slot %d", slot)
+		// try to load the commitment
+		latestCommitment, err := m.commitmentLoader(slot)
+		if err != nil {
+			return 0, ierrors.Wrapf(err, "failed to get RMC for slot %d", slot)
+		}
+		rmc = latestCommitment.Commitment().RMC
+		m.rmc.Set(slot, rmc)
 	}
 
 	return rmc, nil
-}
-
-func (m *Manager) AddGenesisRMC() error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	// set the genesis RMC
-	if wasCreated := m.rmc.Set(0, m.rmcMin); !wasCreated {
-		return ierrors.New("failed to set genesis RMC")
-	}
-
-	return nil
 }

@@ -633,9 +633,12 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 }
 
 func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (*utxoledger.Output, error) {
-	accountMetadata, _, err := l.accountsLedger.Account(accountID, slotIndex)
+	accountMetadata, exists, err := l.accountsLedger.Account(accountID, slotIndex)
 	if err != nil {
 		return nil, ierrors.Errorf("could not get account information for account %s in slot %d: %w", accountID, slotIndex, err)
+	}
+	if !exists {
+		return nil, ierrors.Errorf("account %s does not exist in slot %d: %w", accountID, slotIndex, mempool.ErrStateNotFound)
 	}
 
 	l.utxoLedger.ReadLockLedger()
