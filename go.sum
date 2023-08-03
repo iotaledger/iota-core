@@ -254,8 +254,8 @@ github.com/iancoleman/orderedmap v0.3.0/go.mod h1:XuLcCUkdL5owUCQeF2Ue9uuw1EptkJ
 github.com/ianlancetaylor/demangle v0.0.0-20210905161508-09a460cdf81d/go.mod h1:aYm2/VgdVmcIU8iMfdMvDMsRAQjcfZSKFby6HOFvi/w=
 github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 h1:dTrD7X2PTNgli6EbS4tV9qu3QAm/kBU3XaYZV2xdzys=
 github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7/go.mod h1:ZRdPu684P0fQ1z8sXz4dj9H5LWHhz4a9oCtvjunkSrw=
-github.com/iotaledger/hive.go/ads v0.0.0-20230801123622-68977cefd26c h1:30IivAOlvB4ZIiQUP8fDKGbVS/wyFOKyWCEoYfE8HkU=
-github.com/iotaledger/hive.go/ads v0.0.0-20230801123622-68977cefd26c/go.mod h1:HE3XMMjj/HkoV5oiTJjSuGkf9Ub/vR0RsaPtckmMKLc=
+github.com/iotaledger/hive.go/ads v0.0.0-20230802095618-99821a09a868 h1:yCSVtDNw5ACQdQKnvucynPkMXhVvStsTsnqAC96q47U=
+github.com/iotaledger/hive.go/ads v0.0.0-20230802095618-99821a09a868/go.mod h1:HE3XMMjj/HkoV5oiTJjSuGkf9Ub/vR0RsaPtckmMKLc=
 github.com/iotaledger/hive.go/app v0.0.0-20230802095618-99821a09a868 h1:utzDU6fwyE/ySukPPBTk9Tk270yLkKI3KpTP8HEEKBM=
 github.com/iotaledger/hive.go/app v0.0.0-20230802095618-99821a09a868/go.mod h1:5hgF99ztZ6MS2GLb2hb1kL535HnLf3B6RmKN7TyBFA8=
 github.com/iotaledger/hive.go/autopeering v0.0.0-20230802095618-99821a09a868 h1:cMx+i8lYhCP+qOAwkYmyUGsiCUGHxezTfJhlumFiawM=
