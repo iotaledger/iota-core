@@ -1,6 +1,9 @@
 package ledgertests
 
-import iotago "github.com/iotaledger/iota.go/v4"
+import (
+	"github.com/iotaledger/hive.go/lo"
+	iotago "github.com/iotaledger/iota.go/v4"
+)
 
 type MockedState struct {
 	id           iotago.OutputID
@@ -14,6 +17,14 @@ func NewMockedState(transactionID iotago.TransactionID, index uint16) *MockedSta
 		output:       &MockedOutput{},
 		creationTime: iotago.SlotIndex(0),
 	}
+}
+
+func (m *MockedState) StateID() iotago.Identifier {
+	return iotago.IdentifierFromData(lo.PanicOnErr(m.id.Bytes()))
+}
+
+func (m *MockedState) Type() iotago.StateType {
+	return iotago.InputUTXO
 }
 
 func (m *MockedState) OutputID() iotago.OutputID {

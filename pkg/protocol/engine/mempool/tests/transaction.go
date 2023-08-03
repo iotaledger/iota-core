@@ -8,12 +8,12 @@ import (
 
 type Transaction struct {
 	id                 iotago.TransactionID
-	inputs             []iotago.IndexedUTXOReferencer
+	inputs             []*iotago.UTXOInput
 	outputCount        uint16
 	invalidTransaction bool
 }
 
-func NewTransaction(outputCount uint16, inputs ...iotago.IndexedUTXOReferencer) *Transaction {
+func NewTransaction(outputCount uint16, inputs ...*iotago.UTXOInput) *Transaction {
 	return &Transaction{
 		id:          tpkg.RandTransactionID(),
 		inputs:      inputs,
@@ -25,8 +25,12 @@ func (t *Transaction) ID(_ iotago.API) (iotago.TransactionID, error) {
 	return t.id, nil
 }
 
-func (t *Transaction) Inputs() ([]iotago.IndexedUTXOReferencer, error) {
+func (t *Transaction) Inputs() ([]*iotago.UTXOInput, error) {
 	return t.inputs, nil
+}
+
+func (t *Transaction) ContextInputs() (iotago.TransactionContextInputs, error) {
+	panic("not implemented")
 }
 
 func (t *Transaction) String() string {

@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/vm/stardust"
 )
 
-func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.State) ([]mempool.State, error) {
+func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.OutputState) ([]mempool.OutputState, error) {
 	tx, ok := stateTransition.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
@@ -27,7 +27,6 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		InputSet: inputSet,
 	}
 
-	// TODO: refactor resolution of ContextInputs to be handled by Mempool
 	bicInputs, err := tx.BICInputs()
 	if err != nil {
 		return nil, ierrors.Join(err, iotago.ErrBICInputInvalid)
@@ -38,7 +37,6 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		return nil, ierrors.Join(err, iotago.ErrRewardInputInvalid)
 	}
 
-	// resolve the commitment inputs from storage
 	commitment := tx.CommitmentInput()
 
 	if (len(rewardInputs) > 0 || len(bicInputs) > 0) && commitment == nil {
@@ -70,6 +68,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	resolvedInputs.BlockIssuanceCreditInputSet = bicInputSet
 
 	rewardInputSet := make(iotagovm.RewardsInputSet)
+	// TODO: remove this TODO
 	// TODO: when refactoring this to be resolved by the mempool, the function that resolves ContextInputs should
 	// receive a slice with promises of UTXO inputs and wait until the necessary inputs are available
 	for _, inp := range rewardInputs {
@@ -114,7 +113,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 	resolvedInputs.RewardsInputSet = rewardInputSet
 
-	//TODO: in which slot is this transaction?
+	// TODO: in which slot is this transaction?
 	api := l.apiProvider.APIForSlot(tx.Essence.CreationTime)
 
 	vmParams := &iotagovm.Params{
@@ -129,7 +128,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		return nil, err
 	}
 
-	created := make([]mempool.State, 0, len(outputSet))
+	created := make([]mempool.OutputState, 0, len(outputSet))
 	for outputID, output := range outputSet {
 		created = append(created, &ExecutionOutput{
 			outputID:     outputID,
@@ -144,11 +143,15 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.Commitment, error) {
 	c, err := l.commitmentLoader(inputCommitmentID.Index())
 	if err != nil {
-		return nil, ierrors.Errorf("could not get commitment inputs: %w", err)
+		return nil, ierrors.Wrap(err, "could not get commitment inputs")
+	}
+	// The commitment was not found
+	if c == nil {
+		return nil, nil
 	}
 	storedCommitmentID, err := c.Commitment().ID()
 	if err != nil {
-		return nil, ierrors.Errorf("could compute commitment ID: %w", err)
+		return nil, ierrors.Wrap(err, "could not compute commitment ID")
 	}
 	if storedCommitmentID != inputCommitmentID {
 		return nil, ierrors.Errorf("commitment ID of input %s different to stored commitment %s", inputCommitmentID, storedCommitmentID)

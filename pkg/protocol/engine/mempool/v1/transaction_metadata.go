@@ -16,9 +16,9 @@ import (
 
 type TransactionMetadata struct {
 	id                iotago.TransactionID
-	inputReferences   []iotago.IndexedUTXOReferencer
-	inputs            []*StateMetadata
-	outputs           []*StateMetadata
+	inputReferences   []iotago.Input
+	utxoInputs        []*OutputStateMetadata
+	outputs           []*OutputStateMetadata
 	transaction       mempool.Transaction
 	parentConflictIDs reactive.DerivedSet[iotago.TransactionID]
 	conflictIDs       reactive.DerivedSet[iotago.TransactionID]
@@ -56,27 +56,40 @@ func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction)
 		return nil, ierrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
 	}
 
-	inputReferences, inputsErr := transaction.Inputs()
+	utxoInputReferences, inputsErr := transaction.Inputs()
 	if inputsErr != nil {
 		return nil, ierrors.Join(iotago.ErrUnknownInputType, ierrors.Wrapf(inputsErr, "failed to retrieve inputReferences of transaction %s", transactionID))
+	}
+
+	contextInputReferences, contextInputsErr := transaction.ContextInputs()
+	if contextInputsErr != nil {
+		return nil, ierrors.Wrapf(contextInputsErr, "failed to retrieve contextInputReferences of transaction %s", transactionID)
+	}
+
+	inputReferences := make([]iotago.Input, 0, len(utxoInputReferences)+len(contextInputReferences))
+	for _, utxoInput := range utxoInputReferences {
+		inputReferences = append(inputReferences, utxoInput)
+	}
+	for _, contextInput := range contextInputReferences {
+		inputReferences = append(inputReferences, contextInput)
 	}
 
 	return (&TransactionMetadata{
 		id:                transactionID,
 		inputReferences:   inputReferences,
-		inputs:            make([]*StateMetadata, len(inputReferences)),
+		utxoInputs:        make([]*OutputStateMetadata, len(utxoInputReferences)),
 		transaction:       transaction,
 		parentConflictIDs: reactive.NewDerivedSet[iotago.TransactionID](),
 		conflictIDs:       reactive.NewDerivedSet[iotago.TransactionID](),
 
-		unsolidInputsCount: uint64(len(inputReferences)),
+		unsolidInputsCount: uint64(len(utxoInputReferences) + len(contextInputReferences)),
 		booked:             promise.NewEvent(),
 		solid:              promise.NewEvent(),
 		executed:           promise.NewEvent(),
 		invalid:            promise.NewEvent1[error](),
 		evicted:            promise.NewEvent(),
 
-		unacceptedInputsCount: uint64(len(inputReferences)),
+		unacceptedInputsCount: uint64(len(utxoInputReferences)),
 		allInputsAccepted:     reactive.NewVariable[bool](),
 		conflicting:           promise.NewEvent(),
 		conflictAccepted:      promise.NewEvent(),
@@ -97,23 +110,23 @@ func (t *TransactionMetadata) Transaction() mempool.Transaction {
 	return t.transaction
 }
 
-func (t *TransactionMetadata) Inputs() ds.Set[mempool.StateMetadata] {
+func (t *TransactionMetadata) Inputs() ds.Set[mempool.OutputStateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	inputs := ds.NewSet[mempool.StateMetadata]()
-	for _, input := range t.inputs {
+	inputs := ds.NewSet[mempool.OutputStateMetadata]()
+	for _, input := range t.utxoInputs {
 		inputs.Add(input)
 	}
 
 	return inputs
 }
 
-func (t *TransactionMetadata) Outputs() ds.Set[mempool.StateMetadata] {
+func (t *TransactionMetadata) Outputs() ds.Set[mempool.OutputStateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	outputs := ds.NewSet[mempool.StateMetadata]()
+	outputs := ds.NewSet[mempool.OutputStateMetadata]()
 	for _, output := range t.outputs {
 		outputs.Add(output)
 	}
@@ -125,19 +138,17 @@ func (t *TransactionMetadata) ConflictIDs() reactive.Set[iotago.TransactionID] {
 	return t.conflictIDs
 }
 
-func (t *TransactionMetadata) publishInputAndCheckSolidity(index int, input *StateMetadata) (allInputsSolid bool) {
-	t.inputs[index] = input
+func (t *TransactionMetadata) publishInput(index int, input *OutputStateMetadata) {
+	t.utxoInputs[index] = input
 
 	input.setupSpender(t)
 	t.setupInput(input)
-
-	return t.markInputSolid()
 }
 
-func (t *TransactionMetadata) setExecuted(outputStates []mempool.State) {
+func (t *TransactionMetadata) setExecuted(outputStates []mempool.OutputState) {
 	t.mutex.Lock()
 	for _, outputState := range outputStates {
-		t.outputs = append(t.outputs, NewStateMetadata(outputState, t))
+		t.outputs = append(t.outputs, NewOutputStateMetadata(outputState, t))
 	}
 	t.mutex.Unlock()
 
@@ -244,7 +255,7 @@ func (t *TransactionMetadata) setConflictAccepted() {
 	}
 }
 
-func (t *TransactionMetadata) setupInput(input *StateMetadata) {
+func (t *TransactionMetadata) setupInput(input *OutputStateMetadata) {
 	t.parentConflictIDs.InheritFrom(input.conflictIDs)
 
 	input.OnRejected(t.setRejected)

@@ -5,10 +5,10 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type StateMetadata interface {
-	ID() iotago.OutputID
+type OutputStateMetadata interface {
+	OutputID() iotago.OutputID
 
-	State() State
+	State() OutputState
 
 	ConflictIDs() reactive.Set[iotago.TransactionID]
 
