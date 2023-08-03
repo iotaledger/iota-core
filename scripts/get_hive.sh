@@ -1,7 +1,7 @@
 #!/bin/bash
 
 COMMIT=$1
-MODULES="app ierrors autopeering constraints core crypto ds kvstore lo logger objectstorage runtime serializer/v2 stringify"
+MODULES="ads app ierrors autopeering constraints core crypto ds kvstore lo logger objectstorage runtime serializer/v2 stringify"
 
 if [ -z "$COMMIT" ]
 then

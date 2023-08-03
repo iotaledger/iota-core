@@ -36,8 +36,8 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](func() int { return 0 })
-	mempoolInstance := New[vote.MockedRank](mempooltests.VM, func(reference iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveState(reference.Ref())
+	mempoolInstance := New[vote.MockedRank](mempooltests.VM, func(reference iotago.Input) *promise.Promise[mempool.State] {
+		return ledgerState.ResolveState(reference.(ledgertests.StoredStateReference).Ref())
 	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {})
 
 	tf := mempooltests.NewTestFramework(t, mempoolInstance, conflictDAG, ledgerState, workers)
@@ -104,8 +104,8 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
-	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveState(reference.Ref())
+	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.Input) *promise.Promise[mempool.State] {
+		return ledgerState.ResolveState(reference.(ledgertests.StoredStateReference).Ref())
 	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}), conflictDAG, ledgerState, workers)
 }
 
@@ -115,7 +115,7 @@ func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
-	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.IndexedUTXOReferencer) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveState(reference.Ref())
+	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.Input) *promise.Promise[mempool.State] {
+		return ledgerState.ResolveState(reference.(ledgertests.StoredStateReference).Ref())
 	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}, WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
 }
