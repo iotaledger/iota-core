@@ -256,7 +256,8 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	}
 	modelBlock, err := s.Load(id)
 	if err != nil {
-		// TODO: log error?
+		e.errorHandler(ierrors.Wrap(err, "failed to load block from storage"))
+
 		return nil, false
 	}
 
