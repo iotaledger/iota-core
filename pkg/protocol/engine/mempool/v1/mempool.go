@@ -214,11 +214,12 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 			switch state.Type() {
 			case iotago.InputUTXO:
 				outputStateMetadata := state.(*OutputStateMetadata)
+
+				transaction.publishInput(index, outputStateMetadata)
+
 				if created {
 					m.setupState(outputStateMetadata)
 				}
-
-				transaction.publishInput(index, outputStateMetadata)
 			case iotago.InputCommitment, iotago.InputBlockIssuanceCredit, iotago.InputReward:
 			default:
 				// TODO: how to handle error?
