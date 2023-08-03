@@ -3,40 +3,60 @@ package protocol
 import (
 	"sync"
 
+	"github.com/zyedidia/generic/cache"
+
+	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
-	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+const (
+	commitmentBufferMaxSize = 20
+	blockBufferMaxSize      = 100
+)
+
 type UnsolidCommitmentBlocks struct {
-	mutex           sync.RWMutex
-	lastEvictedSlot iotago.SlotIndex
-	blockBuffer     *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]]]
+	mutex            sync.RWMutex
+	lastEvictedSlot  iotago.SlotIndex
+	blockBuffers     *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]]]
+	commitmentBuffer *cache.Cache[iotago.CommitmentID, types.Empty]
 }
 
 func newUnsolidCommitmentBlocks() *UnsolidCommitmentBlocks {
-	return &UnsolidCommitmentBlocks{
-		blockBuffer: shrinkingmap.New[iotago.SlotIndex, *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]]](),
+	u := &UnsolidCommitmentBlocks{
+		blockBuffers:     memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]]](),
+		commitmentBuffer: cache.New[iotago.CommitmentID, types.Empty](commitmentBufferMaxSize),
 	}
+
+	u.commitmentBuffer.SetEvictCallback(func(commitmentID iotago.CommitmentID, _ types.Empty) {
+		if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Index(), false); blockBufferForCommitments != nil {
+			blockBufferForCommitments.Delete(commitmentID)
+		}
+	})
+
+	return u
 }
 
 func (u *UnsolidCommitmentBlocks) AddBlock(block *model.Block, src network.PeerID) bool {
 	u.mutex.RLock()
 	defer u.mutex.RUnlock()
-	commitmentSlot := block.ProtocolBlock().SlotCommitmentID.Index()
+	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
 
-	if commitmentSlot < u.lastEvictedSlot {
+	if slotCommitmentID.Index() < u.lastEvictedSlot {
 		return false
 	}
 
-	// TODO: protect blockBuffer so that not arbitrary future blocks can be added to them
-	buffer, _ := u.blockBuffer.GetOrCreate(commitmentSlot, func() *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]] {
-		return ringbuffer.NewRingBuffer[*types.Tuple[*model.Block, network.PeerID]](100)
+	blockBufferForCommitments := u.blockBuffers.Get(slotCommitmentID.Index(), true)
+
+	buffer, _ := blockBufferForCommitments.GetOrCreate(slotCommitmentID, func() *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]] {
+		return ringbuffer.NewRingBuffer[*types.Tuple[*model.Block, network.PeerID]](blockBufferMaxSize)
 	})
 	buffer.Add(types.NewTuple(block, src))
+
+	u.commitmentBuffer.Put(slotCommitmentID, types.Void)
 
 	return true
 }
@@ -46,17 +66,18 @@ func (u *UnsolidCommitmentBlocks) evict(lastEvictedSlot iotago.SlotIndex) {
 	defer u.mutex.Unlock()
 
 	u.lastEvictedSlot = lastEvictedSlot
-	u.blockBuffer.Delete(lastEvictedSlot)
+	u.blockBuffers.Evict(lastEvictedSlot)
 }
 
-func (u *UnsolidCommitmentBlocks) GetBlocks(slot iotago.SlotIndex) []*types.Tuple[*model.Block, network.PeerID] {
+func (u *UnsolidCommitmentBlocks) GetBlocks(commitmentID iotago.CommitmentID) []*types.Tuple[*model.Block, network.PeerID] {
 	u.mutex.RLock()
 	defer u.mutex.RUnlock()
 
-	buffer, deleted := u.blockBuffer.DeleteAndReturn(slot)
-	if !deleted {
-		return nil
+	if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Index()); blockBufferForCommitments != nil {
+		if buffer, exists := blockBufferForCommitments.Get(commitmentID); exists {
+			return buffer.Elements()
+		}
 	}
 
-	return buffer.Elements()
+	return nil
 }

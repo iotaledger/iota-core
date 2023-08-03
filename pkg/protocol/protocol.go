@@ -241,7 +241,7 @@ func (p *Protocol) initChainManager() {
 
 	p.Events.Engine.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		// We need to make sure that this is called after the LatestCommitment in the settings of the engine is updated.
-		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(commitment.ID().Index()) {
+		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(commitment.ID()) {
 			err := p.ProcessBlock(tuple.A, tuple.B)
 			if err != nil {
 				p.ErrorHandler()(err)

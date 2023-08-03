@@ -134,8 +134,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 
 		p.ChainManager.ProcessCandidateCommitment(commitment)
 
-		// TODO: it'd be better to do this for individual commitments instead of per slot.
-		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(commitment.ID().Index()) {
+		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(commitment.ID()) {
 			err = p.ProcessBlock(tuple.A, tuple.B)
 			if err != nil {
 				p.ErrorHandler()(err)
