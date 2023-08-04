@@ -22,7 +22,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("default", "rms"),
-			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10),
+			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10, 100, 100),
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
 			iotago.WithLivenessOptions(5, 10, 20, 30),
 			// TODO: add scheduler rate to increase/decrease threshold expressions with issue #264
@@ -96,7 +96,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("docker", "rms"),
-			iotago.WithSupplyOptions(10_000_000_000, 1, 1, 10),
+			iotago.WithSupplyOptions(10_000_000_000, 1, 1, 10, 100, 100),
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
 			iotago.WithLivenessOptions(5, 10, 20, 30),
 			// TODO: add scheduler rate to increase/decrease threshold expressions with issue #264
@@ -150,7 +150,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("feature", "rms"),
-			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10),
+			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10, 100, 100),
 			iotago.WithTimeProviderOptions(1689848996, 10, 13),
 			iotago.WithLivenessOptions(5, 10, 20, 30),
 			// TODO: add scheduler rate to increase/decrease threshold expressions with issue #264
