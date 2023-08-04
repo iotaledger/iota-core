@@ -17,7 +17,6 @@ import (
 
 type Block struct {
 	// BlockDAG block
-	fromDisk            bool
 	missing             bool
 	missingBlockID      iotago.BlockID
 	solid               bool
@@ -238,26 +237,6 @@ func (b *Block) IsMissing() (isMissing bool) {
 	defer b.mutex.RUnlock()
 
 	return b.missing
-}
-
-func (b *Block) IsFromDisk() (isFromDisk bool) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return b.fromDisk
-}
-
-func (b *Block) ResetFromDisk() (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if !b.fromDisk {
-		return false
-	}
-
-	b.fromDisk = false
-
-	return true
 }
 
 // IsSolid returns true if the Block is solid (the entire causal history is known).

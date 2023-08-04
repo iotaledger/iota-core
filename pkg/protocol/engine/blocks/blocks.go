@@ -2,12 +2,10 @@ package blocks
 
 import (
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -95,44 +93,4 @@ func (b *Blocks) StoreBlock(block *Block) (stored bool) {
 	storage := b.blocks.Get(block.ID().Index(), true)
 
 	return storage.Set(block.ID(), block)
-}
-
-func (b *Blocks) RestoreFromDisk(storageBlocksFunc func(iotago.SlotIndex) *prunable.Blocks) []*model.Block {
-	b.evictionMutex.Lock()
-	defer b.evictionMutex.Unlock()
-
-	// We start importing blocks from the first slot after the last evicted slot.
-	// In normal running state blocks are also kept in the cache until a slot is committed/evicted.
-	importStart := b.evictionState.LastEvictedSlot() + 1
-
-	var importedBlocks []*model.Block
-	for i := importStart; ; i++ {
-		storageBlocks := storageBlocksFunc(i)
-		if storageBlocks == nil {
-			break
-		}
-
-		// We import blocks to the cache as long as we can find blocks in the storage.
-		count := 0
-		if err := storageBlocks.ForEachBlockInSlot(func(block *model.Block) error {
-			slotCache := b.blocks.Get(i, true)
-
-			blockBlock := NewBlock(block)
-			blockBlock.fromDisk = true
-			slotCache.Set(block.ID(), blockBlock)
-
-			count++
-			importedBlocks = append(importedBlocks, block)
-
-			return nil
-		}); err != nil {
-			panic(ierrors.Wrapf(err, "failed to restore block cache from disk at slot %s", i))
-		}
-
-		if count == 0 {
-			break
-		}
-	}
-
-	return importedBlocks
 }

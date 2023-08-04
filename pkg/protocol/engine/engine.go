@@ -71,8 +71,9 @@ type Engine struct {
 	isBootstrapped      bool
 	isBootstrappedMutex syncutils.Mutex
 
-	chainID iotago.CommitmentID
-	mutex   syncutils.RWMutex
+	startupMaxBlockSlot iotago.SlotIndex
+	chainID             iotago.CommitmentID
+	mutex               syncutils.RWMutex
 
 	optsBootstrappedThreshold time.Duration
 	optsSnapshotPath          string
@@ -189,7 +190,6 @@ func New(
 				// Restore from Disk
 				e.Storage.Prunable.RestoreFromDisk()
 				e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
-				e.BlockCache.RestoreFromDisk(e.Storage.Blocks)
 
 				if err := e.Attestations.RestoreFromDisk(); err != nil {
 					panic(ierrors.Wrap(err, "failed to restore attestations from disk"))
@@ -197,7 +197,10 @@ func New(
 				if err := e.UpgradeOrchestrator.RestoreFromDisk(e.Storage.Settings().LatestCommitment().Index()); err != nil {
 					panic(ierrors.Wrap(err, "failed to restore upgrade orchestrator from disk"))
 				}
+
+				e.startupMaxBlockSlot = e.Storage.Settings().LatestCommitment().Index() + e.CurrentAPI().ProtocolParameters().MaxCommittableAge()
 			}
+
 		},
 		func(e *Engine) {
 			fmt.Println("Engine Settings", e.Storage.Settings().String())
@@ -247,7 +250,7 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	}
 
 	// The block should've been in the block cache, so there's no need to check the storage.
-	if !exists && id.Index() > e.Storage.Settings().LatestCommitment().Index() {
+	if !exists && id.Index() > e.startupMaxBlockSlot && id.Index() > e.Storage.Settings().LatestCommitment().Index() {
 		return nil, false
 	}
 
@@ -457,9 +460,26 @@ func (e *Engine) setupBlockRequester() {
 
 	e.Events.EvictionState.SlotEvicted.Hook(e.BlockRequester.EvictUntil)
 
+	wp := e.Workers.CreatePool("BlockMissingAttachFromStorage", 1)
 	// We need to hook to make sure that the request is created before the block arrives to avoid a race condition
 	// where we try to delete the request again before it is created. Thus, continuing to request forever.
 	e.Events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
+		if block.ID().Index() < e.startupMaxBlockSlot {
+			// We shortcut requesting blocks that are in the storage in case we did shut down and restart.
+			// We can safely ignore all errors.
+			if blockStorage := e.Storage.Blocks(block.ID().Index()); blockStorage != nil {
+				fmt.Println("skipping block request for", e.startupMaxBlockSlot, block.ID())
+				if storedBlock, _ := blockStorage.Load(block.ID()); storedBlock != nil {
+					// We need to attach the block to the DAG in a separate worker pool to avoid a deadlock with the block cache
+					// as the BlockMissing event is triggered within a GetOrCreate call.
+					wp.Submit(func() {
+						_, _, _ = e.BlockDAG.Attach(storedBlock)
+					})
+
+					return
+				}
+			}
+		}
 		// TODO: ONLY START REQUESTING WHEN NOT IN WARPSYNC RANGE (or just not attach outside)?
 		e.BlockRequester.StartTicker(block.ID())
 	})

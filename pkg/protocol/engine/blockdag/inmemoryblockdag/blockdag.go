@@ -183,7 +183,7 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 
 	storedBlock, storedBlockExists := b.blockCache.Block(data.ID())
 	// We already attached it before
-	if storedBlockExists && !storedBlock.IsMissing() && !storedBlock.IsFromDisk() {
+	if storedBlockExists && !storedBlock.IsMissing() {
 		return false, nil
 	}
 
@@ -224,13 +224,6 @@ func (b *BlockDAG) registerChild(child *blocks.Block, parent iotago.Parent) {
 	})
 
 	parentBlock.AppendChild(child, parent.Type)
-	if parentBlock.IsFromDisk() {
-		_, _, err := b.Attach(parentBlock.ModelBlock())
-		if err != nil {
-			b.errorHandler(ierrors.Wrapf(err, "failed to attach parent block from disk %s", parentBlock.ID()))
-		}
-		parentBlock.ResetFromDisk()
-	}
 }
 
 // checkReference checks if the reference between the child and its parent is valid.
