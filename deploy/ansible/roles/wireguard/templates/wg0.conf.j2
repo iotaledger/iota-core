@@ -1,5 +1,5 @@
 [Interface]
-Address = 10.0.0.1/32
+Address = 10.199.0.1/32
 ListenPort = 51820
 PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o ens10 -j MASQUERADE
 PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o ens10 -j MASQUERADE
@@ -7,4 +7,4 @@ PrivateKey = {{ wireguard_server_private_key }}
 
 [Peer]
 PublicKey = kOBZmG6CmdomFWamyNtDB25fWqrX3sHQy1C43ZCRnVE=
-AllowedIPs = 10.0.0.2/32
+AllowedIPs = 10.199.0.2/32
