@@ -72,6 +72,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 	}
 
 	accountID := iotago.AccountID(blake2b.Sum256(pub))
+	accountID.RegisterAlias(name)
 
 	peerID := network.PeerID(pub)
 	identity.RegisterIDAlias(peerID, name)
@@ -87,7 +88,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		PeerID:     peerID,
 
 		Partition: partition,
-		Endpoint:  net.Join(peerID, partition),
+		Endpoint:  net.JoinWithEndpointID(peerID, partition),
 		Workers:   workerpool.NewGroup(name),
 
 		attachedBlocks: make([]*blocks.Block, 0),
@@ -139,29 +140,29 @@ func (n *Node) HookLogging() {
 	n.attachEngineLogs(n.Protocol.MainEngineInstance())
 
 	events.Network.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
-		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
+		fmt.Printf("%s > network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
 	})
 
 	events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source identity.ID) {
-		fmt.Printf("%s > Network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
+		fmt.Printf("%s > network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
 	})
 
 	events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source identity.ID) {
-		fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
+		fmt.Printf("%s > network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
 	})
 
 	events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
-		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
+		fmt.Printf("%s > network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 
 	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
-		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
+		fmt.Printf("%s > network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
 			return lo.PanicOnErr(a.BlockID(lo.PanicOnErr(n.Protocol.APIForVersion(a.ProtocolVersion))))
 		}))
 	})
 
 	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source network.PeerID) {
-		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
+		fmt.Printf("%s > network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
 	events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
@@ -199,7 +200,7 @@ func (n *Node) HookLogging() {
 	})
 
 	events.Network.Error.Hook(func(err error, id identity.ID) {
-		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
+		fmt.Printf("%s > network.Error: from %s %s\n", n.Name, id, err)
 	})
 
 	events.Error.Hook(func(err error) {

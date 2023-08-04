@@ -34,7 +34,7 @@ const MinValidatorAccountAmount = iotago.BaseToken(88200)
 type TestSuite struct {
 	Testing     *testing.T
 	fakeTesting *testing.T
-	Network     *mock.Network
+	network     *mock.Network
 
 	Directory *utils.Directory
 	nodes     *orderedmap.OrderedMap[string, *mock.Node]
@@ -68,7 +68,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		Testing:                             testingT,
 		fakeTesting:                         &testing.T{},
 		genesisSeed:                         tpkg.RandEd25519Seed(),
-		Network:                             mock.NewNetwork(),
+		network:                             mock.NewNetwork(),
 		Directory:                           utils.NewDirectory(testingT.TempDir()),
 		nodes:                               orderedmap.New[string, *mock.Node](),
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
@@ -309,7 +309,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 		panic(fmt.Sprintf("cannot add validator node %s to partition %s: framework already running", name, partition))
 	}
 
-	node := mock.NewNode(t.Testing, t.Network, partition, name, validator)
+	node := mock.NewNode(t.Testing, t.network, partition, name, validator)
 	t.nodes.Set(name, node)
 
 	amount := MinValidatorAccountAmount
@@ -469,4 +469,17 @@ func mustNodes(nodes []*mock.Node) {
 	if len(nodes) == 0 {
 		panic("no nodes provided")
 	}
+}
+
+func (t *TestSuite) SplitIntoPartitions(partitions map[string][]*mock.Node) {
+	for partition, nodes := range partitions {
+		for _, node := range nodes {
+			node.Partition = partition
+			t.network.JoinWithEndpoint(node.Endpoint, partition)
+		}
+	}
+}
+
+func (t *TestSuite) MergePartitionsToMain(partitions ...string) {
+	t.network.MergePartitionsToMain(partitions...)
 }

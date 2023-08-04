@@ -24,6 +24,21 @@ func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Optio
 	t.AssertBlocksExist(t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...), true, node)
 }
 
+func (t *TestSuite) limitParentsCountInBlockOptions(blockOpts []options.Option[blockfactory.BlockParams], maxCount int) []options.Option[blockfactory.BlockParams] {
+	params := options.Apply(&blockfactory.BlockParams{}, blockOpts)
+	if len(params.References[iotago.StrongParentType]) > maxCount {
+		blockOpts = append(blockOpts, blockfactory.WithStrongParents(params.References[iotago.StrongParentType][:maxCount]...))
+	}
+	if len(params.References[iotago.WeakParentType]) > maxCount {
+		blockOpts = append(blockOpts, blockfactory.WithWeakParents(params.References[iotago.WeakParentType][:maxCount]...))
+	}
+	if len(params.References[iotago.ShallowLikeParentType]) > maxCount {
+		blockOpts = append(blockOpts, blockfactory.WithShallowLikeParents(params.References[iotago.ShallowLikeParentType][:maxCount]...))
+	}
+
+	return blockOpts
+}
+
 func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -158,6 +173,8 @@ func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, ro
 			require.NoError(t.Testing, err)
 
 			issuingOptionsCopy[node.Name] = append(issuingOptionsCopy[node.Name], blockfactory.WithPayload(tx))
+			issuingOptionsCopy[node.Name] = t.limitParentsCountInBlockOptions(issuingOptionsCopy[node.Name], iotago.BlockMaxParents)
+
 			b = t.IssueBasicBlockAtSlotWithOptions(blockAlias, slot, node, issuingOptionsCopy[node.Name]...)
 		}
 		blocksIssued = append(blocksIssued, b)
