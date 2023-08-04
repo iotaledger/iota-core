@@ -468,7 +468,6 @@ func (e *Engine) setupBlockRequester() {
 			// We shortcut requesting blocks that are in the storage in case we did shut down and restart.
 			// We can safely ignore all errors.
 			if blockStorage := e.Storage.Blocks(block.ID().Index()); blockStorage != nil {
-				fmt.Println("skipping block request for", e.startupMaxBlockSlot, block.ID())
 				if storedBlock, _ := blockStorage.Load(block.ID()); storedBlock != nil {
 					// We need to attach the block to the DAG in a separate worker pool to avoid a deadlock with the block cache
 					// as the BlockMissing event is triggered within a GetOrCreate call.
