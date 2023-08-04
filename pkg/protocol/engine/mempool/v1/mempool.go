@@ -139,8 +139,9 @@ func (m *MemPool[VoteRank]) OutputStateMetadata(stateReference *iotago.UTXOInput
 }
 
 func (m *MemPool[VoteRank]) PublishCommitmentState(commitment *iotago.Commitment) {
-	stateRequest, _ := m.cachedStateRequests.GetOrCreate(commitment.StateID(), lo.NoVariadic(promise.New[mempool.State]))
-	stateRequest.Resolve(commitment)
+	if stateRequest, exists := m.cachedStateRequests.Get(commitment.StateID()); exists {
+		stateRequest.Resolve(commitment)
+	}
 }
 
 // TransactionMetadataByAttachment returns the metadata of the transaction that was attached by the given block.
