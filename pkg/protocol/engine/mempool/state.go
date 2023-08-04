@@ -2,13 +2,6 @@ package mempool
 
 import iotago "github.com/iotaledger/iota.go/v4"
 
-// type StateType uint8
-
-// const (
-// 	OutputStateType StateType = iota
-// 	ContextStateType
-// )
-
 type State interface {
 	StateID() iotago.Identifier
 
