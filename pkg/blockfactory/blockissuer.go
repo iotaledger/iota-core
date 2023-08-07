@@ -69,10 +69,6 @@ func (i *BlockIssuer) Shutdown() {
 func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BlockParams{}, opts)
 
-	if blockParams.SlotCommitment == nil {
-		blockParams.SlotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
-	}
-
 	if blockParams.LatestFinalizedSlot == nil {
 		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		blockParams.LatestFinalizedSlot = &latestFinalizedSlot
@@ -81,6 +77,10 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 	if blockParams.IssuingTime == nil {
 		issuingTime := time.Now().UTC()
 		blockParams.IssuingTime = &issuingTime
+	}
+
+	if blockParams.SlotCommitment == nil {
+		blockParams.SlotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 	}
 
 	if blockParams.References == nil {
@@ -167,10 +167,6 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BlockParams{}, opts)
 
-	if blockParams.SlotCommitment == nil {
-		blockParams.SlotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
-	}
-
 	if blockParams.LatestFinalizedSlot == nil {
 		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		blockParams.LatestFinalizedSlot = &latestFinalizedSlot
@@ -179,6 +175,10 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	if blockParams.IssuingTime == nil {
 		issuingTime := time.Now().UTC()
 		blockParams.IssuingTime = &issuingTime
+	}
+
+	if blockParams.SlotCommitment == nil {
+		blockParams.SlotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 	}
 
 	if blockParams.References == nil {
