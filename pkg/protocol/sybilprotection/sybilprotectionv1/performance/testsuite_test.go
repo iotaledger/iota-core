@@ -21,7 +21,8 @@ import (
 type TestSuite struct {
 	T *testing.T
 
-	accounts map[string]iotago.AccountID
+	accounts             map[string]iotago.AccountID
+	latestCommittedEpoch iotago.EpochIndex
 
 	API iotago.API
 
@@ -62,7 +63,7 @@ func (t *TestSuite) InitRewardManager() {
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
 	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, api.SingleVersionProvider(t.API))
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, t.latestCommittedEpoch, api.SingleVersionProvider(t.API))
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -97,6 +98,7 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 	}
 
 	t.Instance.ApplyEpoch(epochIndex, committee)
+	t.latestCommittedEpoch = epochIndex
 }
 
 func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {

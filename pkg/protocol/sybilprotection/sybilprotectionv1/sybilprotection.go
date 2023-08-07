@@ -58,8 +58,10 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 				e.HookConstructed(func() {
 					o.ledger = e.Ledger
 
-					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, e)
-					o.lastCommittedSlot = e.Storage.Settings().LatestCommitment().Index()
+					latestCommitedSlot := e.Storage.Settings().LatestCommitment().Index()
+					latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommitedSlot).TimeProvider().EpochFromSlot(latestCommitedSlot)
+					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, latestCommittedEpoch, e)
+					o.lastCommittedSlot = latestCommitedSlot
 
 					if o.optsInitialCommittee != nil {
 						if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {

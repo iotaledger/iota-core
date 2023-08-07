@@ -32,6 +32,7 @@ func NewTracker(
 	poolStatsStore kvstore.KVStore,
 	committeeStore kvstore.KVStore,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
+	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider api.Provider,
 ) *Tracker {
 	return &Tracker{
@@ -49,6 +50,7 @@ func NewTracker(
 			account.AccountsFromBytes,
 		),
 		performanceFactorsFunc: performanceFactorsFunc,
+		latestAppliedEpoch:     latestAppliedEpoch,
 		apiProvider:            apiProvider,
 	}
 }
