@@ -32,7 +32,7 @@
 - name: systemd-resolved to listen on wg0 for remote resolution of local network
   lineinfile:
     path: /etc/systemd/resolved.conf
-    line: 'DNSStubListenerExtra=10.0.0.1'
+    line: 'DNSStubListenerExtra=10.199.0.1'
     regexp: '^DNSStubListenerExtra='
     state: present
 
