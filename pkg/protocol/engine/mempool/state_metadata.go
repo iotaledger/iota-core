@@ -20,3 +20,7 @@ type OutputStateMetadata interface {
 
 	inclusionFlags
 }
+
+type ContextStateMetadata interface {
+	State() ContextState
+}

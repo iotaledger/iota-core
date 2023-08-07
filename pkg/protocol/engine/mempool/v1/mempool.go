@@ -224,7 +224,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 			case iotago.InputCommitment:
 				contextStateMetadata := state.(*ContextStateMetadata)
 
-				contextStateMetadata.setupSpender(transaction)
+				transaction.publishCommitmentInput(contextStateMetadata)
 
 				if created {
 					contextStateMetadata.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(contextStateMetadata.StateID()) })
@@ -247,7 +247,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 
 func (m *MemPool[VoteRank]) executeTransaction(transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
-		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction(), lo.Map(transaction.utxoInputs, (*OutputStateMetadata).State)); err != nil {
+		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction(), lo.Map(transaction.utxoInputs, (*OutputStateMetadata).State), lo.Cond(transaction.CommitmentInput() != nil, transaction.CommitmentInput().State(), nil)); err != nil {
 			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)

@@ -29,6 +29,10 @@ func (t *Transaction) Inputs() ([]*iotago.UTXOInput, error) {
 	return t.inputs, nil
 }
 
+func (t *Transaction) CommitmentInput() *iotago.CommitmentInput {
+	return nil
+}
+
 func (t *Transaction) ContextInputs() (iotago.TransactionContextInputs, error) {
 	return nil, nil
 }

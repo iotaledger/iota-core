@@ -18,6 +18,7 @@ type TransactionMetadata struct {
 	id                iotago.TransactionID
 	inputReferences   []iotago.Input
 	utxoInputs        []*OutputStateMetadata
+	commitmentInput   *ContextStateMetadata
 	outputs           []*OutputStateMetadata
 	transaction       mempool.Transaction
 	parentConflictIDs reactive.DerivedSet[iotago.TransactionID]
@@ -122,6 +123,13 @@ func (t *TransactionMetadata) Inputs() ds.Set[mempool.OutputStateMetadata] {
 	return inputs
 }
 
+func (t *TransactionMetadata) CommitmentInput() mempool.ContextStateMetadata {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	return t.commitmentInput
+}
+
 func (t *TransactionMetadata) Outputs() ds.Set[mempool.OutputStateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
@@ -143,6 +151,15 @@ func (t *TransactionMetadata) publishInput(index int, input *OutputStateMetadata
 
 	input.setupSpender(t)
 	t.setupInput(input)
+}
+
+func (t *TransactionMetadata) publishCommitmentInput(commitment *ContextStateMetadata) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	t.commitmentInput = commitment
+
+	commitment.setupSpender(t)
 }
 
 func (t *TransactionMetadata) setExecuted(outputStates []mempool.OutputState) {

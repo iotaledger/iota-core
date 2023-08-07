@@ -11,6 +11,9 @@ type Transaction interface {
 	// Inputs returns the inputs of the Transaction.
 	Inputs() ([]*iotago.UTXOInput, error)
 
+	// CommitmentInput returns the commitment input of the Transaction, if present.
+	CommitmentInput() *iotago.CommitmentInput
+
 	// ContextInputs returns the context inputs of the Transaction.
 	ContextInputs() (iotago.TransactionContextInputs, error)
 
