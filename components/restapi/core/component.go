@@ -95,17 +95,17 @@ const (
 	// MIMEVendorIOTASerializer => bytes.
 	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
 
-	// RouteStaking is the route for getting informations about the current stakers.
-	// GET returns the stakers.
+	// RouteValidators is the route for getting informations about the current validators.
+	// GET returns the paginated response with the list of validators.
 	// MIMEApplicationJSON => json.
 	// MIMEVendorIOTASerializer => bytes.
-	RouteStaking = "/staking"
+	RouteValidators = "/validators"
 
-	// RouteStakingAccount is the route for getting an account by its accountID.
-	// GET returns the account details.
+	// RouteValidatorsAccount is the route for getting details about the validator by its accountID.
+	// GET returns the validator details.
 	// MIMEApplicationJSON => json.
 	// MIMEVendorIOTASerializer => bytes.
-	RouteStakingAccount = "/staking/:" + restapipkg.ParameterAccountID
+	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterAccountID
 
 	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
 	// GET returns the rewards.
@@ -303,7 +303,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteStaking, func(c echo.Context) error {
+	routeGroup.GET(RouteValidators, func(c echo.Context) error {
 		resp, err := staking(c)
 		if err != nil {
 			return err
@@ -312,7 +312,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteStakingAccount, func(c echo.Context) error {
+	routeGroup.GET(RouteValidatorsAccount, func(c echo.Context) error {
 		resp, err := stakingByAccountID(c)
 		if err != nil {
 			return err
