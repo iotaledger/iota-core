@@ -13,6 +13,11 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
+const (
+	RequestsMemoryCacheGranularity = 10
+	MaxRequestedSlotAge            = 10
+)
+
 func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
@@ -37,29 +42,47 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	}, nil
 }
 
-func staking() (*apimodels.AccountStakingListResponse, error) {
-	resp := &apimodels.AccountStakingListResponse{
-		Stakers: make([]*apimodels.ValidatorResponse, 0),
-	}
+func staking(c echo.Context) (*apimodels.AccountStakingListResponse, error) {
+	pageSize, _ := httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
+	coursor, _ := httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterCoursor)
+
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
+
+	var requestedSlotIndex iotago.SlotIndex
+	if coursor == 0 {
+		requestedSlotIndex = latestCommittedSlot
+	} else {
+		var err error
+		requestedSlotIndex, err = httpserver.ParseSlotQueryParam(c, restapipkg.QueryParameterRequestedAtSlot)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to parse %s", restapipkg.QueryParameterRequestedAtSlot)
+		}
+		// do not respond to really old requests
+		if requestedSlotIndex+MaxRequestedSlotAge < latestCommittedSlot {
+			return nil, ierrors.Errorf("request is too old, request started at %d, latest committed slot index is %d", requestedSlotIndex, latestCommittedSlot)
+		}
+	}
+
+	resp := &apimodels.AccountStakingListResponse{
+		Stakers:     make([]*apimodels.ValidatorResponse, 0),
+		PageSize:    pageSize,
+		RequestedAt: requestedSlotIndex,
+	}
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
-	activeValidators, err := deps.Protocol.MainEngineInstance().SybilProtection.EligibleValidators(nextEpoch)
-	if err != nil {
-		return nil, err
+	slotRange := uint32(requestedSlotIndex / RequestsMemoryCacheGranularity)
+	registeredValidators, exists := deps.Protocol.MainEngineInstance().Retainer.RegisteredValidatorsCache(slotRange)
+	if !exists {
+		var err error
+		registeredValidators, err = deps.Protocol.MainEngineInstance().SybilProtection.OrderedRegisteredValidatorsList(nextEpoch)
+		if err != nil {
+			return nil, err
+		}
+		deps.Protocol.MainEngineInstance().Retainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
 	}
+	page := registeredValidators[coursor : coursor+pageSize]
 
-	for _, accountData := range activeValidators {
-		resp.Stakers = append(resp.Stakers, &apimodels.ValidatorResponse{
-			AccountID:                      accountData.ID,
-			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
-			ValidatorStake:                 accountData.ValidatorStake,
-			FixedCost:                      accountData.FixedCost,
-			StakingEpochEnd:                accountData.StakeEndEpoch,
-			Active:                         true, // TODO: update after finishing up performance tracker for validatior activity tracking
-			LatestSupportedProtocolVersion: 1,    // TODO: update after protocol versioning is included in the account ledger
-		})
-	}
+	resp.Coursor = coursor + uint32(len(page))
 
 	return resp, nil
 }
@@ -78,15 +101,15 @@ func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
-	// TODO: update after finishing up performance tracker for validatior activity tracking
-	// active := deps.Protocol.MainEngineInstance().SybilProtection.IsActive(accountID)
+	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
+	active := deps.Protocol.MainEngineInstance().SybilProtection.IsActive(accountID, nextEpoch)
 	return &apimodels.ValidatorResponse{
 		AccountID:                      accountID,
 		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 		ValidatorStake:                 accountData.ValidatorStake,
 		StakingEpochEnd:                accountData.StakeEndEpoch,
 		FixedCost:                      accountData.FixedCost,
-		Active:                         true,
+		Active:                         active,
 		LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
 	}, nil
 }

@@ -143,7 +143,14 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 }
 
 func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
-	// TODO: we should choose candidates we tracked performance for
+	// TODO: we should choose candidates we tracked performance for, only active
+
+	return ds.NewSet[iotago.AccountID]()
+}
+
+// ValidatorCandidates returns the registered validator candidates for the given epoch.
+func (t *Tracker) ValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
+	// TODO: we should choose candidates we tracked performance for no matter if they were active
 
 	return ds.NewSet[iotago.AccountID]()
 }

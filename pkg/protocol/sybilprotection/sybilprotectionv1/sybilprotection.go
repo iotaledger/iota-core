@@ -2,7 +2,9 @@ package sybilprotectionv1
 
 import (
 	"fmt"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 	"io"
+	"sort"
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -309,6 +311,52 @@ func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.
 	}
 
 	return validators, nil
+}
+
+// IsActive returns true if the given validator is currently active.
+func (o *SybilProtection) IsActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) bool {
+	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+	return activeCandidates.Has(validatorID)
+}
+
+// OrderedRegisteredValidatorsList returns the currently known list of registered validator candidates for the given epoch.
+func (o *SybilProtection) OrderedRegisteredValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error) {
+	candidates := o.performanceTracker.ValidatorCandidates(epoch)
+	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+
+	validatorResp := make([]*apimodels.ValidatorResponse, 0, candidates.Size())
+	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
+		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
+		}
+		if accountData.StakeEndEpoch < epoch {
+			return nil
+		}
+		active := activeCandidates.Has(candidate)
+		validatorResp = append(validatorResp, &apimodels.ValidatorResponse{
+			AccountID:                      accountData.ID,
+			StakingEpochEnd:                accountData.StakeEndEpoch,
+			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
+			ValidatorStake:                 accountData.ValidatorStake,
+			FixedCost:                      accountData.FixedCost,
+			Active:                         active,
+			LatestSupportedProtocolVersion: 0, // TODO  add lates supported protocol version to account data
+		})
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	// sort candidates by stake
+	sort.Slice(validatorResp, func(i, j int) bool {
+		return validatorResp[i].ValidatorStake > validatorResp[j].ValidatorStake
+	})
+
+	return validatorResp, nil
 }
 
 // WithInitialCommittee registers the passed committee on a given slot.

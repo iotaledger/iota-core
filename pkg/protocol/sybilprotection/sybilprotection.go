@@ -1,6 +1,7 @@
 package sybilprotection
 
 import (
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 	"io"
 
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -13,6 +14,8 @@ import (
 type SybilProtection interface {
 	BlockAccepted(block *blocks.Block)
 	EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error)
+	OrderedRegisteredValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error)
+	IsActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) bool
 	ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, usedStart, usedEnd iotago.EpochIndex, err error)
 	DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, usedStart, usedEnd iotago.EpochIndex, err error)
 	SeatManager() seatmanager.SeatManager

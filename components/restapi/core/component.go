@@ -304,7 +304,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteStaking, func(c echo.Context) error {
-		resp, err := staking()
+		resp, err := staking(c)
 		if err != nil {
 			return err
 		}
