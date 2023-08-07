@@ -28,6 +28,7 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 
 	commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Index())
 	if err != nil {
+		p.ErrorHandler()(ierrors.Wrapf(err, "failed to load commitment %s", commitmentID))
 		return
 	}
 
@@ -37,15 +38,18 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 
 	attestations, err := mainEngine.Attestations.Get(commitmentID.Index())
 	if err != nil {
+		p.ErrorHandler()(ierrors.Wrapf(err, "failed to load attestations for commitment %s", commitmentID))
 		return
 	}
 
 	rootsStorage := mainEngine.Storage.Roots(commitmentID.Index())
 	if rootsStorage == nil {
+		p.ErrorHandler()(ierrors.Errorf("failed to load roots for commitment %s", commitmentID))
 		return
 	}
 	rootsBytes, err := rootsStorage.Get(kvstore.Key{prunable.RootsKey})
 	if err != nil {
+		p.ErrorHandler()(ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID))
 		return
 	}
 	var roots iotago.Roots
@@ -239,9 +243,9 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	}
 
 	var heavierCount int
-	// We start from the forking point + AttestationCommitmentOffset as that is where the CW of the chains starts diverging.
-	// Only at this slot can nodes start to commit to the different chains.
-	start := fork.ForkingPoint.Index() + p.MainEngineInstance().Attestations.AttestationCommitmentOffset()
+	// We start from the forking point + 1 to have all starting blocks for each slot. Even though the chain weight will only
+	// start to diverge at forking point + AttestationCommitmentOffset.
+	start := fork.ForkingPoint.Index() + 1
 	end := fork.ForkedChain.LatestCommitment().ID().Index()
 	for i := start; i <= end; i++ {
 		mainChainChainCommitment := fork.MainChain.Commitment(i)

@@ -36,8 +36,9 @@ func NewManualPOA() *ManualPOA {
 	return m
 }
 
-func NewManualPOAProvider(poa *ManualPOA) module.Provider[*engine.Engine, seatmanager.SeatManager] {
+func NewManualPOAProvider() module.Provider[*engine.Engine, seatmanager.SeatManager] {
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
+		poa := NewManualPOA()
 		e.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 			poa.events.BlockProcessed.Trigger(block)
 		})
