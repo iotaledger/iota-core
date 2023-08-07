@@ -2,6 +2,7 @@ package restapi
 
 import (
 	"context"
+	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	"net"
 	"net/http"
 	"time"
@@ -48,6 +49,8 @@ type dependencies struct {
 	RestAPIBindAddress string         `name:"restAPIBindAddress"`
 	NodePrivateKey     crypto.PrivKey `name:"nodePrivateKey"`
 	RestRouteManager   *restapi.RestRouteManager
+
+	Protocol *protocolpkg.Protocol
 }
 
 func initConfigParams(c *dig.Container) error {
