@@ -145,7 +145,7 @@ func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.
 	if err != nil {
 		return nil, ierrors.Wrap(err, "could not get commitment inputs")
 	}
-	// The commitment was not found
+	// The commitment with the specified ID was not found at that index: we are on a different chain.
 	if c == nil {
 		return nil, nil
 	}

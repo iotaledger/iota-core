@@ -219,9 +219,17 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 				transaction.publishInput(index, outputStateMetadata)
 
 				if created {
-					m.setupState(outputStateMetadata)
+					m.setupOutputState(outputStateMetadata)
 				}
-			case iotago.InputCommitment, iotago.InputBlockIssuanceCredit, iotago.InputReward:
+			case iotago.InputCommitment:
+				contextStateMetadata := state.(*ContextStateMetadata)
+
+				contextStateMetadata.setupSpender(transaction)
+
+				if created {
+					contextStateMetadata.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(contextStateMetadata.StateID()) })
+				}
+			case iotago.InputBlockIssuanceCredit, iotago.InputReward:
 			default:
 				// TODO: how to handle error?
 				panic(ierrors.New("invalid state type resolved"))
@@ -282,7 +290,7 @@ func (m *MemPool[VoteRank]) publishOutputStates(transaction *TransactionMetadata
 		stateRequest.Resolve(output)
 
 		if isNew {
-			m.setupState(output)
+			m.setupOutputState(output)
 		}
 	}
 }
@@ -292,7 +300,8 @@ func (m *MemPool[VoteRank]) requestState(stateRef iotago.Input, waitIfMissing ..
 		request := m.resolveState(stateRef)
 
 		request.OnSuccess(func(state mempool.State) {
-			if state.Type() == iotago.InputUTXO {
+			switch state.Type() {
+			case iotago.InputUTXO:
 				// The output was resolved from the ledger, meaning it was actually persisted as it was accepted and
 				// committed: otherwise we would have found it in cache or the request would have never resolved.
 				outputStateMetadata := NewOutputStateMetadata(state.(mempool.OutputState))
@@ -300,11 +309,15 @@ func (m *MemPool[VoteRank]) requestState(stateRef iotago.Input, waitIfMissing ..
 				outputStateMetadata.setCommitted()
 
 				p.Resolve(outputStateMetadata)
+			case iotago.InputCommitment:
+				commitmentStateMetadata := NewContextStateMetadata(state.(mempool.ContextState))
 
-				return
+				p.Resolve(commitmentStateMetadata)
+			case iotago.InputBlockIssuanceCredit, iotago.InputReward:
+				p.Resolve(state)
+			default:
+				p.Reject(ierrors.Errorf("unsupported input type %s", stateRef.Type()))
 			}
-
-			p.Resolve(state)
 		})
 
 		request.OnError(func(err error) {
@@ -425,7 +438,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	})
 }
 
-func (m *MemPool[VoteRank]) setupState(state *OutputStateMetadata) {
+func (m *MemPool[VoteRank]) setupOutputState(state *OutputStateMetadata) {
 	state.OnCommitted(func() {
 		if !m.cachedStateRequests.Delete(state.StateID(), state.HasNoSpenders) && m.cachedStateRequests.Has(state.StateID()) {
 			state.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(state.StateID(), state.HasNoSpenders) })
