@@ -18,7 +18,8 @@ type ContextStateMetadata struct {
 
 func NewContextStateMetadata(state mempool.ContextState, optSource ...*TransactionMetadata) *ContextStateMetadata {
 	return &ContextStateMetadata{
-		state: state,
+		state:              state,
+		allSpendersRemoved: event.New(),
 	}
 }
 

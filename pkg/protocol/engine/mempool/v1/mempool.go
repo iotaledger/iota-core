@@ -247,7 +247,12 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 
 func (m *MemPool[VoteRank]) executeTransaction(transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
-		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction(), lo.Map(transaction.utxoInputs, (*OutputStateMetadata).State), lo.Cond(transaction.CommitmentInput() != nil, transaction.CommitmentInput().State(), nil)); err != nil {
+		var timeReference mempool.ContextState
+		if commitmentStateMetadata, ok := transaction.CommitmentInput().(*ContextStateMetadata); ok && commitmentStateMetadata != nil {
+			timeReference = commitmentStateMetadata.State()
+		}
+
+		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction(), lo.Map(transaction.utxoInputs, (*OutputStateMetadata).State), timeReference); err != nil {
 			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)
