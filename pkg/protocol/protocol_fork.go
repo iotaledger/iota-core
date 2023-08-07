@@ -171,9 +171,6 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 		}
 	}()
 
-	// Add all the blocks from the forking point attestations to the requester since those will not be passed to the engine by the protocol
-	candidateEngineInstance.BlockRequester.StartTickers(blockIDs)
-
 	// Set the engine as the new candidate
 	p.activeEngineMutex.Lock()
 	oldCandidateEngine := p.candidateEngine
@@ -182,6 +179,9 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 		cleanupFunc: cleanupFunc,
 	}
 	p.activeEngineMutex.Unlock()
+
+	// Add all the blocks from the forking point attestations to the requester since those will not be passed to the engine by the protocol
+	candidateEngineInstance.BlockRequester.StartTickers(blockIDs)
 
 	p.Events.CandidateEngineActivated.Trigger(candidateEngineInstance)
 
@@ -206,7 +206,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	ch := make(chan *commitmentVerificationResult)
 	defer close(ch)
 
-	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.ForkingPoint)
+	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.MainChain.Commitment(fork.ForkingPoint.Index()-1).Commitment())
 	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
 		blockIDs, actualCumulativeWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 
@@ -243,9 +243,9 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	}
 
 	var heavierCount int
-	// We start from the forking point + 1 to have all starting blocks for each slot. Even though the chain weight will only
+	// We start from the forking point to have all starting blocks for each slot. Even though the chain weight will only
 	// start to diverge at forking point + AttestationCommitmentOffset.
-	start := fork.ForkingPoint.Index() + 1
+	start := fork.ForkingPoint.Index()
 	end := fork.ForkedChain.LatestCommitment().ID().Index()
 	for i := start; i <= end; i++ {
 		mainChainChainCommitment := fork.MainChain.Commitment(i)
