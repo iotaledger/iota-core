@@ -49,6 +49,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			if epochIndex < epochEnd && epochStart == epochIndex {
 				epochStart = epochIndex + 1
 			}
+
 			continue
 		}
 
@@ -57,6 +58,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			if epochIndex < epochEnd && epochStart == epochIndex {
 				epochStart = epochIndex + 1
 			}
+
 			continue
 		}
 
@@ -105,6 +107,7 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			if epochIndex < epochEnd && epochStart == epochIndex {
 				epochStart = epochIndex + 1
 			}
+
 			continue
 		}
 
@@ -113,6 +116,7 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			if epochIndex < epochEnd && epochStart == epochIndex {
 				epochStart = epochIndex + 1
 			}
+
 			continue
 		}
 

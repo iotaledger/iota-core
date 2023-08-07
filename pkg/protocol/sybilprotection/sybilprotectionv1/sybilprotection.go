@@ -2,7 +2,6 @@ package sybilprotectionv1
 
 import (
 	"fmt"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 	"io"
 	"sort"
 
@@ -23,6 +22,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1/performance"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type SybilProtection struct {
