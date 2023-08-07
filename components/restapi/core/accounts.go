@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -44,30 +45,18 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 
 func staking(c echo.Context) (*apimodels.AccountStakingListResponse, error) {
 	pageSize, _ := httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
-	coursor, _ := httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterCoursor)
-
+	requestedSlotIndex, cursorIndex, _ := httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 
-	var requestedSlotIndex iotago.SlotIndex
-	if coursor == 0 {
+	if cursorIndex == 0 {
 		requestedSlotIndex = latestCommittedSlot
 	} else {
-		var err error
-		requestedSlotIndex, err = httpserver.ParseSlotQueryParam(c, restapipkg.QueryParameterRequestedAtSlot)
-		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse %s", restapipkg.QueryParameterRequestedAtSlot)
-		}
 		// do not respond to really old requests
 		if requestedSlotIndex+MaxRequestedSlotAge < latestCommittedSlot {
 			return nil, ierrors.Errorf("request is too old, request started at %d, latest committed slot index is %d", requestedSlotIndex, latestCommittedSlot)
 		}
 	}
 
-	resp := &apimodels.AccountStakingListResponse{
-		Stakers:     make([]*apimodels.ValidatorResponse, 0),
-		PageSize:    pageSize,
-		RequestedAt: requestedSlotIndex,
-	}
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
 	slotRange := uint32(requestedSlotIndex / RequestsMemoryCacheGranularity)
@@ -80,9 +69,12 @@ func staking(c echo.Context) (*apimodels.AccountStakingListResponse, error) {
 		}
 		deps.Protocol.MainEngineInstance().Retainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
 	}
-	page := registeredValidators[coursor : coursor+pageSize]
-
-	resp.Coursor = coursor + uint32(len(page))
+	page := registeredValidators[cursorIndex : cursorIndex+pageSize]
+	resp := &apimodels.AccountStakingListResponse{
+		Stakers:  page,
+		PageSize: pageSize,
+		Cursor:   fmt.Sprintf("%d,%d", slotRange, cursorIndex+pageSize),
+	}
 
 	return resp, nil
 }

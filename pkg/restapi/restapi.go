@@ -36,11 +36,8 @@ const (
 	// QueryParameterPageSize is used to specify the page size.
 	QueryParameterPageSize = "pageSize"
 
-	// QueryParameterCoursor is used to specify the the point from which the response should continue for paginater results.
-	QueryParameterCoursor = "coursor"
-
-	// QueryParameterRequestedAtSlot is used to specify the slot index at which the paginated response was initiated.
-	QueryParameterRequestedAtSlot = "requestedAtSlot"
+	// QueryParameterCursor is used to specify the the point from which the response should continue for paginater results.
+	QueryParameterCursor = "coursor"
 )
 
 func ParsePeerIDParam(c echo.Context) (peer.ID, error) {
