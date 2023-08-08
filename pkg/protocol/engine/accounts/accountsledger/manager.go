@@ -146,7 +146,6 @@ func (m *Manager) ApplyDiff(
 	// set the index where the tree is now at
 	m.latestCommittedSlot = slotIndex
 
-	// TODO: when to exactly evict?
 	m.evict(slotIndex - m.commitmentEvictionAge - 1)
 
 	return nil

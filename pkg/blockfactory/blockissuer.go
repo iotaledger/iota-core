@@ -82,18 +82,18 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 	if blockParams.SlotCommitment == nil {
 		selectedCommitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 		blockIndex := i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime)
-		minCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MinCommittableAge()
-		maxCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MaxCommittableAge()
+		minCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MinCommittableAge() + 1
+		maxCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MaxCommittableAge() + 1
 
 		// If the latest commitment is either too recent or too old for the given issuing time,
 		// then use the latest possible commitment.
 		// The "+1" element is there because we're comparing against 'blockIndex' which is in the middle of a slot
 		// and the oldest possible committed slot is 'minCommittableAge' full slots in the past.
 		// So we need to subtract 1 to account for the blockIndex slot that is not finished yet.
-		if blockIndex < selectedCommitment.Index+minCommittableAge+1 {
+		if blockIndex < selectedCommitment.Index+minCommittableAge {
 			validCommitmentIndex := iotago.SlotIndex(0)
-			if blockIndex > minCommittableAge+1 {
-				validCommitmentIndex = blockIndex - 1 - minCommittableAge
+			if blockIndex > minCommittableAge {
+				validCommitmentIndex = blockIndex - minCommittableAge
 			}
 
 			commitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(validCommitmentIndex)
@@ -104,8 +104,8 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 			selectedCommitment = commitment.Commitment()
 		}
 
-		if blockIndex > selectedCommitment.Index+maxCommittableAge+1 {
-			return nil, ierrors.Errorf("error building block: do not have valid commitment for issuing time %s - latest available commitment: %d, latest valid commitment: %d", blockParams.IssuingTime.String(), selectedCommitment.Index, blockIndex-1-maxCommittableAge)
+		if blockIndex > selectedCommitment.Index+maxCommittableAge {
+			return nil, ierrors.Errorf("error building block: do not have valid commitment for issuing time %s - latest available commitment: %d, latest valid commitment: %d", blockParams.IssuingTime.String(), selectedCommitment.Index, blockIndex-maxCommittableAge)
 		}
 
 		blockParams.SlotCommitment = selectedCommitment
@@ -208,18 +208,19 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	if blockParams.SlotCommitment == nil {
 		selectedCommitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 		blockIndex := i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime)
-		minCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MinCommittableAge()
-		maxCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MaxCommittableAge()
 
-		// If the latest commitment is either too recent or too old for the given issuing time,
-		// then use the latest possible commitment.
 		// The "+1" element is there because we're comparing against 'blockIndex' which is in the middle of a slot
 		// and the oldest possible committed slot is 'minCommittableAge' full slots in the past.
 		// So we need to subtract 1 to account for the blockIndex slot that is not finished yet.
-		if blockIndex < selectedCommitment.Index+minCommittableAge+1 {
+		minCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MinCommittableAge() + 1
+		maxCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MaxCommittableAge() + 1
+
+		// If the latest commitment is either too recent or too old for the given issuing time,
+		// then use the latest possible commitment.
+		if blockIndex < selectedCommitment.Index+minCommittableAge {
 			validCommitmentIndex := iotago.SlotIndex(0)
-			if blockIndex > minCommittableAge+1 {
-				validCommitmentIndex = blockIndex - 1 - minCommittableAge
+			if blockIndex > minCommittableAge {
+				validCommitmentIndex = blockIndex - minCommittableAge
 			}
 
 			commitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(validCommitmentIndex)
@@ -230,8 +231,8 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 			selectedCommitment = commitment.Commitment()
 		}
 
-		if blockIndex > selectedCommitment.Index+maxCommittableAge+1 {
-			return nil, ierrors.Errorf("error building block: do not have valid commitment for issuing time %s - latest available commitment: %d, latest valid commitment: %d", blockParams.IssuingTime.String(), selectedCommitment.Index, blockIndex-1-maxCommittableAge)
+		if blockIndex > selectedCommitment.Index+maxCommittableAge {
+			return nil, ierrors.Errorf("error building block: do not have valid commitment for issuing time %s - latest available commitment: %d, latest valid commitment: %d", blockParams.IssuingTime.String(), selectedCommitment.Index, blockIndex-maxCommittableAge)
 		}
 
 		blockParams.SlotCommitment = selectedCommitment

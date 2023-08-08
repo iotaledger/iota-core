@@ -77,7 +77,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	}
 
 	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB())
-	manager.SetCommitmentEvictionAge(tpkg.TestAPI.ProtocolParameters().MinCommittableAge())
+	manager.SetCommitmentEvictionAge(tpkg.TestAPI.ProtocolParameters().MaxCommittableAge() + 1)
 
 	return manager
 }
