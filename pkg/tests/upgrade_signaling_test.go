@@ -38,7 +38,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			),
 		),
 		protocol.WithEngineOptions(
-			engine.WithRequesterOptions(
+			engine.WithBlockRequesterOptions(
 				eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
 				eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
 			),

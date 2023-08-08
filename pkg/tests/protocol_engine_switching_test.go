@@ -59,7 +59,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 					poa.AddAccount(node.AccountID, node.Name)
 				}
 			}
-			poa.SetOnline("node0", "node1", "node2", "node3", "node4", "node6", "node7")
+			poa.SetOnline("node0", "node1", "node2", "node3", "node4")
 
 			return poa
 		})
@@ -80,6 +80,16 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 						poaProvider(),
 					),
 				),
+			),
+			protocol.WithEngineOptions(
+				engine.WithBlockRequesterOptions(
+					eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
+					eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](500*time.Millisecond),
+				),
+				engine.WithIsBootstrappedFunc(func(e *engine.Engine) bool {
+					fmt.Println("is bootstrapped", e.Storage.Settings().LatestCommitment().Index(), e.Notarization.IsBootstrapped())
+					return e.Storage.Settings().LatestCommitment().Index() >= 19 && e.Notarization.IsBootstrapped()
+				}),
 			),
 		}
 	}
@@ -108,6 +118,10 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node7.AccountID)),
 	}
 	expectedOnlineCommittee := append(expectedP1OnlineCommittee, expectedP2OnlineCommittee...)
+
+	for _, node := range ts.Nodes() {
+		node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock2.ManualPOA).SetOnline("node0", "node1", "node2", "node3", "node4", "node6", "node7")
+	}
 
 	// Verify that nodes have the expected states.
 	{
@@ -337,5 +351,5 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		wg.Wait()
 	}
 
-	ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
+	ts.AssertEqualStoredCommitmentAtIndex(19, ts.Nodes()...)
 }

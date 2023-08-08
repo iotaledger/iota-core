@@ -76,6 +76,7 @@ type Engine struct {
 	mutex               syncutils.RWMutex
 
 	optsBootstrappedThreshold time.Duration
+	optsIsBootstrappedFunc    func(*Engine) bool
 	optsSnapshotPath          string
 	optsEntryPointsDepth      int
 	optsSnapshotDepth         int
@@ -118,7 +119,10 @@ func New(
 			Workers:       workers,
 			errorHandler:  errorHandler,
 
-			optsSnapshotPath:          "snapshot.bin",
+			optsSnapshotPath: "snapshot.bin",
+			optsIsBootstrappedFunc: func(e *Engine) bool {
+				return time.Since(e.Clock.Accepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsBootstrapped()
+			},
 			optsBootstrappedThreshold: 10 * time.Second,
 			optsSnapshotDepth:         5,
 		}, opts, func(e *Engine) {
@@ -275,7 +279,8 @@ func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 		return true
 	}
 
-	if isBootstrapped = time.Since(e.Clock.Accepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsBootstrapped(); isBootstrapped {
+	fmt.Println("IsBootstrapped", e.optsIsBootstrappedFunc(e))
+	if e.optsIsBootstrappedFunc(e) {
 		e.isBootstrapped = true
 	}
 
@@ -540,6 +545,12 @@ func WithBootstrapThreshold(threshold time.Duration) options.Option[Engine] {
 	}
 }
 
+func WithIsBootstrappedFunc(isBootstrappedFunc func(*Engine) bool) options.Option[Engine] {
+	return func(e *Engine) {
+		e.optsIsBootstrappedFunc = isBootstrappedFunc
+	}
+}
+
 func WithEntryPointsDepth(entryPointsDepth int) options.Option[Engine] {
 	return func(engine *Engine) {
 		engine.optsEntryPointsDepth = entryPointsDepth
@@ -552,7 +563,7 @@ func WithSnapshotDepth(depth int) options.Option[Engine] {
 	}
 }
 
-func WithRequesterOptions(opts ...options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]) options.Option[Engine] {
+func WithBlockRequesterOptions(opts ...options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]) options.Option[Engine] {
 	return func(e *Engine) {
 		e.optsBlockRequester = append(e.optsBlockRequester, opts...)
 	}

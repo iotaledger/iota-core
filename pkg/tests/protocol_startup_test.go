@@ -196,7 +196,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 						storage.WithPruningDelay(1000),
 					),
 					protocol.WithEngineOptions(
-						engine.WithRequesterOptions(
+						engine.WithBlockRequesterOptions(
 							eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](300*time.Millisecond),
 							eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
 						),
@@ -230,7 +230,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 					protocol.WithSnapshotPath(snapshotPath),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
 					protocol.WithEngineOptions(
-						engine.WithRequesterOptions(
+						engine.WithBlockRequesterOptions(
 							eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](300*time.Millisecond),
 							eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
 						),
