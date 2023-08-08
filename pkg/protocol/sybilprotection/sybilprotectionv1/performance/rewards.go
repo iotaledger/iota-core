@@ -102,22 +102,11 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to get rewards for account %s in epoch %d", validatorID, epochIndex)
 		}
 
-		if !exists {
+		if !exists || rewardsForAccountInEpoch.PoolStake == 0 {
 			// updating epoch start for beginning epochs without the reward
-			if epochIndex < epochEnd && epochStart == epochIndex {
+			if epochStart == epochIndex {
 				epochStart = epochIndex + 1
 			}
-
-			continue
-		}
-
-		if rewardsForAccountInEpoch.PoolStake == 0 {
-			// updating epoch start for beginning epochs without the reward
-			if epochIndex < epochEnd && epochStart == epochIndex {
-				epochStart = epochIndex + 1
-			}
-
-			continue
 		}
 
 		poolStats, err := t.poolStatsStore.Get(epochIndex)
