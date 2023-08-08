@@ -95,6 +95,7 @@ func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	}
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 	active := deps.Protocol.MainEngineInstance().SybilProtection.IsActive(accountID, nextEpoch)
+
 	return &apimodels.ValidatorResponse{
 		AccountID:                      accountID,
 		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,

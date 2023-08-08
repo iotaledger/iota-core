@@ -1,7 +1,6 @@
 package sybilprotection
 
 import (
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 	"io"
 
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -9,6 +8,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type SybilProtection interface {

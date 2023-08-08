@@ -24,6 +24,7 @@ func setupRoutes() {
 		if deps.Protocol.SyncManager.IsNodeSynced() {
 			return c.NoContent(http.StatusOK)
 		}
+
 		return c.NoContent(http.StatusServiceUnavailable)
 	})
 

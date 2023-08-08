@@ -2,7 +2,6 @@ package restapi
 
 import (
 	"context"
-	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	"net"
 	"net/http"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/jwt"
+	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 )
 
