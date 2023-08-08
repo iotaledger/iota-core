@@ -1,6 +1,7 @@
 package rmc
 
 import (
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -83,14 +84,16 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	var newRMC iotago.Mana
 	rmcParameters := m.apiProvider.APIForSlot(index).ProtocolParameters().RMCParameters()
 	if currentSlotWork < rmcParameters.DecreaseThreshold {
-		// TODO: use safemath here
 		if lastRMC >= rmcParameters.RMCMin {
-			newRMC = lastRMC - rmcParameters.Decrease
+			newRMC, err = safemath.SafeSub(lastRMC, rmcParameters.Decrease)
 		}
 	} else if currentSlotWork > rmcParameters.IncreaseThreshold {
-		newRMC = lastRMC + rmcParameters.Increase
+		newRMC, err = safemath.SafeAdd(lastRMC, rmcParameters.Increase)
 	} else {
 		newRMC = lastRMC
+	}
+	if err != nil {
+		return 0, ierrors.Wrapf(err, "failed to calculate RMC for slot %d", index)
 	}
 	// set the new RMC
 	if wasCreated := m.rmc.Set(index, newRMC); !wasCreated {

@@ -73,9 +73,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
-			// TODO: how do we want to handle changing API here?
-			iotagoAPI := l.apiProvider.CurrentAPI()
-			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), iotagoAPI.ProtocolParameters().RentStructure(), l.resolveAccountOutput)
+			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput)
 			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Index()
 			l.accountsLedger.SetLatestCommittedSlot(latestCommittedSlot)
 			l.rmcManager = rmc.NewManager(l.apiProvider, e.Storage.Commitments().Load)
