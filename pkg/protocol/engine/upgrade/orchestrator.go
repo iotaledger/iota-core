@@ -9,7 +9,7 @@ import (
 )
 
 type Orchestrator interface {
-	TrackBlock(block *blocks.Block)
+	TrackValidationBlock(block *blocks.Block)
 	Commit(slot iotago.SlotIndex) (protocolParametersAndVersionsHash iotago.Identifier, err error)
 
 	Import(reader io.ReadSeeker) error
