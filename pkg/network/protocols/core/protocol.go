@@ -127,6 +127,12 @@ func (p *Protocol) handlePacket(nbr network.PeerID, packet proto.Message) (err e
 		p.workerPool.Submit(func() {
 			p.onAttestationsRequest(packetBody.AttestationsRequest.GetCommitmentId(), nbr)
 		})
+	case *nwmodels.Packet_WarpSyncRequest:
+		p.workerPool.Submit(func() { p.onWarpSyncRequest(packetBody.WarpSyncRequest.GetCommitmentId(), nbr) })
+	case *nwmodels.Packet_WarpSyncResponse:
+		p.workerPool.Submit(func() {
+			p.onWarpSyncResponse(packetBody.WarpSyncResponse.GetCommitmentId(), packetBody.WarpSyncResponse.GetBlockIds(), nbr)
+		})
 	default:
 		return ierrors.Errorf("unsupported packet; packet=%+v, packetBody=%T-%+v", packet, packetBody, packetBody)
 	}
@@ -225,6 +231,33 @@ func (p *Protocol) onAttestationsRequest(commitmentIDBytes []byte, id network.Pe
 	}
 
 	p.Events.AttestationsRequestReceived.Trigger(iotago.CommitmentID(commitmentIDBytes), id)
+}
+
+func (p *Protocol) onWarpSyncRequest(commitmentIDBytes []byte, id network.PeerID) {
+	if len(commitmentIDBytes) != iotago.CommitmentIDLength {
+		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize commitmentID in warp sync request"), id)
+
+		return
+	}
+
+	p.Events.WarpSyncRequestReceived.Trigger(iotago.CommitmentID(commitmentIDBytes), id)
+}
+
+func (p *Protocol) onWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, id network.PeerID) {
+	if len(commitmentIDBytes) != iotago.CommitmentIDLength {
+		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize commitmentID in warp sync response"), id)
+
+		return
+	}
+
+	var blockIDs []iotago.BlockID
+	if _, err := lo.PanicOnErr(p.apiProvider.APIForVersion(iotago.Version(commitmentIDBytes[0]))).Decode(blockIDsBytes, &blockIDs, serix.WithValidation()); err != nil {
+		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize block ids"), id)
+
+		return
+	}
+
+	p.Events.WarpSyncResponseReceived.Trigger(iotago.CommitmentID(commitmentIDBytes), blockIDs, id)
 }
 
 func newPacket() proto.Message {
