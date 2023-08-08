@@ -43,18 +43,18 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	}, nil
 }
 
-func staking(c echo.Context) (*apimodels.AccountStakingListResponse, error) {
+func validators(c echo.Context) (*apimodels.AccountStakingListResponse, error) {
 	pageSize, _ := httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
-	requestedSlotIndex, cursorIndex, _ := httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
-
-	if cursorIndex == 0 {
+	requestedSlotIndex, cursorIndex, err := httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
+	if err != nil {
+		// no cursor provided, the first request
 		requestedSlotIndex = latestCommittedSlot
-	} else {
-		// do not respond to really old requests
-		if requestedSlotIndex+MaxRequestedSlotAge < latestCommittedSlot {
-			return nil, ierrors.Errorf("request is too old, request started at %d, latest committed slot index is %d", requestedSlotIndex, latestCommittedSlot)
-		}
+	}
+
+	// do not respond to really old requests
+	if requestedSlotIndex+MaxRequestedSlotAge < latestCommittedSlot {
+		return nil, ierrors.Errorf("request is too old, request started at %d, latest committed slot index is %d", requestedSlotIndex, latestCommittedSlot)
 	}
 
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
@@ -69,11 +69,17 @@ func staking(c echo.Context) (*apimodels.AccountStakingListResponse, error) {
 		}
 		deps.Protocol.MainEngineInstance().Retainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
 	}
+
 	page := registeredValidators[cursorIndex : cursorIndex+pageSize]
 	resp := &apimodels.AccountStakingListResponse{
 		Stakers:  page,
 		PageSize: pageSize,
-		Cursor:   fmt.Sprintf("%d,%d", slotRange, cursorIndex+pageSize),
+	}
+	// this is the last page
+	if int(cursorIndex+pageSize) > len(registeredValidators) {
+		resp.Cursor = ""
+	} else {
+		resp.Cursor = fmt.Sprintf("%d,%d", slotRange, cursorIndex+pageSize)
 	}
 
 	return resp, nil
