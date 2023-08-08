@@ -154,8 +154,13 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (ads.Map[iotago.AccountID, *iot
 	return m.attestationsForSlot(cutoffIndex)
 }
 
-// AddAttestationFromBlock adds an attestation from a block to the future attestations (beyond the attestation window).
-func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
+// AddAttestationFromValidationBlock adds an attestation from a block to the future attestations (beyond the attestation window).
+func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
+	// Only track validator blocks.
+	if _, isValidationBlock := block.ValidationBlock(); !isValidationBlock {
+		return
+	}
+
 	// Only track attestations of active committee members.
 	if _, exists := m.committeeFunc(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID); !exists {
 		return
