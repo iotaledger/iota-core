@@ -42,7 +42,7 @@ func EqualOutput(t *testing.T, expected *utxoledger.Output, actual *utxoledger.O
 	require.NotNil(t, expectedIdent)
 	require.NotNil(t, actualIdent)
 	require.True(t, expectedIdent.Equal(actualIdent))
-	require.Equal(t, expected.Deposit(), actual.Deposit())
+	require.Equal(t, expected.BaseTokenAmount(), actual.BaseTokenAmount())
 	require.EqualValues(t, expected.Output(), actual.Output())
 }
 

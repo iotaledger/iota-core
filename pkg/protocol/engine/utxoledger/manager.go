@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-// ErrOutputsSumNotEqualTotalSupply is returned if the sum of the output deposits is not equal the total supply of tokens.
+// ErrOutputsSumNotEqualTotalSupply is returned if the sum of the output base token amounts is not equal the total supply of tokens.
 var ErrOutputsSumNotEqualTotalSupply = ierrors.New("accumulated output balance is not equal to total supply")
 
 type Manager struct {

@@ -26,9 +26,9 @@ func Test_TransitionAccount(t *testing.T) {
 		// Nil address will be replaced with the address generated from genesis seed.
 		// A single key may unlock multiple accounts; that's why it can't be used as a source for AccountID derivation.
 		Address: nil,
-		// Set 3 time min amount to cover the rent. If it's too little, then the snapshot creation will fail.
-		// We need more to cover an additional key that is added in the test.
-		Amount: testsuite.MinIssuerAccountDeposit * 3,
+		// Set an amount enough to cover the rent and to cover an additional key that is added in the test.
+		// If it's too little, then the test will fail.
+		Amount: testsuite.MinIssuerAccountAmount * 10,
 		Mana:   0,
 		// AccountID is derived from this field, so this must be set uniquely for each account.
 		IssuerKey: oldGenesisOutputKey,
@@ -236,7 +236,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ValidatorStakeChange:  0,
 		StakeEndEpochChange:   0,
 		FixedCostChange:       0,
-		DelegationStakeChange: 1914080,
+		DelegationStakeChange: 973040,
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -247,7 +247,7 @@ func Test_TransitionAccount(t *testing.T) {
 		PubKeys:         ds.NewSet(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
-		DelegationStake: 1966240,
+		DelegationStake: 973040,
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 

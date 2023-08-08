@@ -74,7 +74,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			// TODO: how do we want to handle changing API here?
 			iotagoAPI := l.apiProvider.CurrentAPI()
-			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), l.resolveAccountOutput)
+			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), iotagoAPI.ProtocolParameters().RentStructure(), l.resolveAccountOutput)
 			l.accountsLedger.SetCommitmentEvictionAge(iotagoAPI.ProtocolParameters().MaxCommittableAge())
 			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
 
@@ -648,6 +648,7 @@ func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[mempool.St
 
 	switch stateRef.Type() {
 	case iotago.InputUTXO:
+		//nolint:forcetypeassert // we can safely assume that this is an UTXOInput
 		concreteStateRef := stateRef.(*iotago.UTXOInput)
 		isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(concreteStateRef.OutputID())
 		if err != nil {
