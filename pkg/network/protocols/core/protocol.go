@@ -102,7 +102,7 @@ func (p *Protocol) RequestAttestations(id iotago.CommitmentID, to ...network.Pee
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs []iotago.BlockID, to ...network.PeerID) {
+func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs []iotago.BlockID, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
 	serializer := p.apiProvider.APIForSlot(id.Index())
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_WarpSyncResponse{

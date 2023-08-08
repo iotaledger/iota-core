@@ -16,7 +16,7 @@ type Events struct {
 	AttestationsReceived          *event.Event4[*model.Commitment, []*iotago.Attestation, *merklehasher.Proof[iotago.Identifier], network.PeerID]
 	AttestationsRequestReceived   *event.Event2[iotago.CommitmentID, network.PeerID]
 	WarpSyncRequestReceived       *event.Event2[iotago.CommitmentID, network.PeerID]
-	WarpSyncResponseReceived      *event.Event3[iotago.CommitmentID, []iotago.BlockID, network.PeerID]
+	WarpSyncResponseReceived      *event.Event4[iotago.CommitmentID, []iotago.BlockID, *merklehasher.Proof[iotago.Identifier], network.PeerID]
 	Error                         *event.Event2[error, network.PeerID]
 
 	event.Group[Events, *Events]
@@ -32,7 +32,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		AttestationsReceived:          event.New4[*model.Commitment, []*iotago.Attestation, *merklehasher.Proof[iotago.Identifier], network.PeerID](),
 		AttestationsRequestReceived:   event.New2[iotago.CommitmentID, network.PeerID](),
 		WarpSyncRequestReceived:       event.New2[iotago.CommitmentID, network.PeerID](),
-		WarpSyncResponseReceived:      event.New3[iotago.CommitmentID, []iotago.BlockID, network.PeerID](),
+		WarpSyncResponseReceived:      event.New4[iotago.CommitmentID, []iotago.BlockID, *merklehasher.Proof[iotago.Identifier], network.PeerID](),
 		Error:                         event.New2[error, network.PeerID](),
 	}
 })
