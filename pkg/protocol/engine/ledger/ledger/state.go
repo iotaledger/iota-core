@@ -19,14 +19,14 @@ func (o *ExecutionOutput) Type() iotago.StateType {
 	return iotago.InputUTXO
 }
 
-func (s *ExecutionOutput) OutputID() iotago.OutputID {
-	return s.outputID
+func (o *ExecutionOutput) OutputID() iotago.OutputID {
+	return o.outputID
 }
 
-func (s *ExecutionOutput) Output() iotago.Output {
-	return s.output
+func (o *ExecutionOutput) Output() iotago.Output {
+	return o.output
 }
 
-func (s *ExecutionOutput) CreationTime() iotago.SlotIndex {
-	return s.creationTime
+func (o *ExecutionOutput) CreationTime() iotago.SlotIndex {
+	return o.creationTime
 }

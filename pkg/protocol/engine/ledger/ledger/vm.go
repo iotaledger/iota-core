@@ -63,9 +63,6 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	resolvedInputs.BlockIssuanceCreditInputSet = bicInputSet
 
 	rewardInputSet := make(iotagovm.RewardsInputSet)
-	// TODO: remove this TODO
-	// TODO: when refactoring this to be resolved by the mempool, the function that resolves ContextInputs should
-	// receive a slice with promises of UTXO inputs and wait until the necessary inputs are available
 	for _, inp := range rewardInputs {
 		outputID := inputStates[inp.Index].OutputID()
 
@@ -142,7 +139,7 @@ func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.
 	}
 	// The commitment with the specified ID was not found at that index: we are on a different chain.
 	if c == nil {
-		return nil, nil
+		return nil, ierrors.Errorf("commitment with ID %s not found at index %d: engine on different chain", inputCommitmentID, inputCommitmentID.Index())
 	}
 	storedCommitmentID, err := c.Commitment().ID()
 	if err != nil {

@@ -126,6 +126,7 @@ func (m *MemPool[VoteRank]) OutputStateMetadata(stateReference *iotago.UTXOInput
 	stateRequest.OnSuccess(func(loadedState mempool.State) {
 		switch loadedState.Type() {
 		case iotago.InputUTXO:
+			//nolint:forcetypeassert // we can safely assume that this is an OutputStateMetadata
 			state = loadedState.(mempool.OutputStateMetadata)
 		default:
 			// as we are waiting for this Promise completion, we can assign the outer err
@@ -138,6 +139,7 @@ func (m *MemPool[VoteRank]) OutputStateMetadata(stateReference *iotago.UTXOInput
 	return state, err
 }
 
+// PublishCommitmentState publishes the given commitment state to the MemPool.
 func (m *MemPool[VoteRank]) PublishCommitmentState(commitment *iotago.Commitment) {
 	if stateRequest, exists := m.cachedStateRequests.Get(commitment.StateID()); exists {
 		stateRequest.Resolve(commitment)
@@ -214,6 +216,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 		request.OnSuccess(func(state mempool.State) {
 			switch state.Type() {
 			case iotago.InputUTXO:
+				//nolint:forcetypeassert // we can safely assume that this is an OutputStateMetadata
 				outputStateMetadata := state.(*OutputStateMetadata)
 
 				transaction.publishInput(index, outputStateMetadata)
@@ -222,6 +225,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 					m.setupOutputState(outputStateMetadata)
 				}
 			case iotago.InputCommitment:
+				//nolint:forcetypeassert // we can safely assume that this is an ContextStateMetadata
 				contextStateMetadata := state.(*ContextStateMetadata)
 
 				transaction.publishCommitmentInput(contextStateMetadata)
@@ -235,7 +239,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 				panic(ierrors.New("invalid state type resolved"))
 			}
 
-			// an input has been succesfully resolved, decrease the unsolid input counter and check solidity.
+			// an input has been successfully resolved, decrease the unsolid input counter and check solidity.
 			if transaction.markInputSolid() {
 				m.executeTransaction(transaction)
 			}
@@ -309,12 +313,14 @@ func (m *MemPool[VoteRank]) requestState(stateRef iotago.Input, waitIfMissing ..
 			case iotago.InputUTXO:
 				// The output was resolved from the ledger, meaning it was actually persisted as it was accepted and
 				// committed: otherwise we would have found it in cache or the request would have never resolved.
+				//nolint:forcetypeassert // we can safely assume that this is an OutputState
 				outputStateMetadata := NewOutputStateMetadata(state.(mempool.OutputState))
 				outputStateMetadata.setAccepted()
 				outputStateMetadata.setCommitted()
 
 				p.Resolve(outputStateMetadata)
 			case iotago.InputCommitment:
+				//nolint:forcetypeassert // we can safely assume that this is an ContextState
 				commitmentStateMetadata := NewContextStateMetadata(state.(mempool.ContextState))
 
 				p.Resolve(commitmentStateMetadata)

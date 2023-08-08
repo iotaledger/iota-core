@@ -667,15 +667,11 @@ func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[mempool.St
 
 		return p.Resolve(output)
 	case iotago.InputCommitment:
+		//nolint:forcetypeassert // we can safely assume that this is an CommitmentInput
 		concreteStateRef := stateRef.(*iotago.CommitmentInput)
 		loadedCommitment, err := l.loadCommitment(concreteStateRef.CommitmentID)
 		if err != nil {
-			return p.Reject(ierrors.Wrapf(iotago.ErrCommitmentInputInvalid, "failed to load commitment %s: %w", concreteStateRef.CommitmentID, err))
-		}
-
-		// the commitment is not yet available: this should never happen, as it is in violation of Min and Max Committable Age parameters.
-		if loadedCommitment == nil {
-			return p.Reject(ierrors.Wrapf(iotago.ErrCommitmentInputInvalid, "failed to load commitment at index %d with ID %s: engine on a different chain", concreteStateRef.CommitmentID.Index(), concreteStateRef.CommitmentID))
+			return p.Reject(ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.Wrapf(err, "failed to load commitment %s", concreteStateRef.CommitmentID)))
 		}
 
 		return p.Resolve(loadedCommitment)
