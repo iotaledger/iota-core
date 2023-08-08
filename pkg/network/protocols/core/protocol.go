@@ -102,6 +102,25 @@ func (p *Protocol) RequestAttestations(id iotago.CommitmentID, to ...network.Pee
 	}}}, protocolID, to...)
 }
 
+func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs []iotago.BlockID, to ...network.PeerID) {
+	serializer := p.apiProvider.APIForSlot(id.Index())
+
+	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_WarpSyncResponse{
+		WarpSyncResponse: &nwmodels.WarpSyncResponse{
+			CommitmentId: lo.PanicOnErr(id.Bytes()),
+			BlockIds:     lo.PanicOnErr(serializer.Encode(blockIDs)),
+		},
+	}}, protocolID, to...)
+}
+
+func (p *Protocol) SendWarpSyncRequest(id iotago.CommitmentID, to ...network.PeerID) {
+	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_WarpSyncRequest{
+		WarpSyncRequest: &nwmodels.WarpSyncRequest{
+			CommitmentId: lo.PanicOnErr(id.Bytes()),
+		},
+	}}, protocolID, to...)
+}
+
 func (p *Protocol) Shutdown() {
 	p.network.UnregisterProtocol(protocolID)
 

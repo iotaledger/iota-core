@@ -62,4 +62,9 @@ func (p *Protocol) runNetworkProtocol() {
 	wpAttestations := p.Workers.CreatePool("NetworkEvents.Attestations", 1) // Using just 1 worker to avoid contention
 
 	p.Events.Network.AttestationsRequestReceived.Hook(p.processAttestationsRequest, event.WithWorkerPool(wpAttestations))
+
+	wpWarpSync := p.Workers.CreatePool("NetworkEvents.WarpSync", 1) // Using just 1 worker to avoid contention
+
+	p.Events.Network.WarpSyncRequestReceived.Hook(p.processWarpSyncRequest, event.WithWorkerPool(wpWarpSync))
+	p.Events.Network.WarpSyncResponseReceived.Hook(p.WarpSync, event.WithWorkerPool(wpWarpSync))
 }
