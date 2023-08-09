@@ -109,6 +109,7 @@ func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs []iotag
 		WarpSyncResponse: &nwmodels.WarpSyncResponse{
 			CommitmentId: lo.PanicOnErr(id.Bytes()),
 			BlockIds:     lo.PanicOnErr(serializer.Encode(blockIDs)),
+			MerkleProof:  lo.PanicOnErr(json.Marshal(merkleProof)),
 		},
 	}}, protocolID, to...)
 }
@@ -150,7 +151,7 @@ func (p *Protocol) handlePacket(nbr network.PeerID, packet proto.Message) (err e
 		p.workerPool.Submit(func() { p.onWarpSyncRequest(packetBody.WarpSyncRequest.GetCommitmentId(), nbr) })
 	case *nwmodels.Packet_WarpSyncResponse:
 		p.workerPool.Submit(func() {
-			p.onWarpSyncResponse(packetBody.WarpSyncResponse.GetCommitmentId(), packetBody.WarpSyncResponse.GetBlockIds(), nbr)
+			p.onWarpSyncResponse(packetBody.WarpSyncResponse.GetCommitmentId(), packetBody.WarpSyncResponse.GetBlockIds(), packetBody.WarpSyncResponse.GetMerkleProof(), nbr)
 		})
 	default:
 		return ierrors.Errorf("unsupported packet; packet=%+v, packetBody=%T-%+v", packet, packetBody, packetBody)
@@ -262,9 +263,10 @@ func (p *Protocol) onWarpSyncRequest(commitmentIDBytes []byte, id network.PeerID
 	p.Events.WarpSyncRequestReceived.Trigger(iotago.CommitmentID(commitmentIDBytes), id)
 }
 
-func (p *Protocol) onWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, id network.PeerID) {
-	if len(commitmentIDBytes) != iotago.CommitmentIDLength {
-		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize commitmentID in warp sync response"), id)
+func (p *Protocol) onWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, merkleProofBytes []byte, id network.PeerID) {
+	commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
+	if err != nil {
+		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize commitmentID in warp sync response"), id)
 
 		return
 	}
@@ -276,7 +278,14 @@ func (p *Protocol) onWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []
 		return
 	}
 
-	p.Events.WarpSyncResponseReceived.Trigger(iotago.CommitmentID(commitmentIDBytes), blockIDs, id)
+	merkleProof := new(merklehasher.Proof[iotago.Identifier])
+	if err = json.Unmarshal(merkleProofBytes, merkleProof); err != nil {
+		p.Events.Error.Trigger(ierrors.Wrapf(err, "failed to deserialize merkle proof when receiving attestations for commitment %s", commitmentID), id)
+
+		return
+	}
+
+	p.Events.WarpSyncResponseReceived.Trigger(iotago.CommitmentID(commitmentIDBytes), blockIDs, merkleProof, id)
 }
 
 func newPacket() proto.Message {

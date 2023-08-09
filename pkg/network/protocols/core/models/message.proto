@@ -50,4 +50,5 @@ message WarpSyncRequest {
 message WarpSyncResponse {
   bytes commitment_id = 1;
   bytes block_ids = 2;
+  bytes merkle_proof = 3;
 }
