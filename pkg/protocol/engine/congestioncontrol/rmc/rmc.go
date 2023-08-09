@@ -69,6 +69,11 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	// check if the slot is already committed
+	if index <= m.latestCommittedSlot {
+		return 0, ierrors.Errorf("cannot commit slot %d: already committed", index)
+	}
+
 	// load the last RMC
 	latestCommitment, err := m.commitmentLoader(index - 1)
 	if err != nil {
@@ -110,9 +115,6 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	}
 
 	// update latestCommittedIndex
-	if index <= m.latestCommittedSlot {
-		return 0, ierrors.Errorf("cannot commit slot %d: already committed", index)
-	}
 	m.latestCommittedSlot = index
 
 	return newRMC, nil
@@ -134,12 +136,12 @@ func (m *Manager) RMC(slot iotago.SlotIndex) (iotago.Mana, error) {
 	rmc, exists := m.rmc.Get(slot)
 	if !exists {
 		// try to load the commitment
+		// this should only be required when starting from a snapshot as we do not include RMC in snapshots
 		latestCommitment, err := m.commitmentLoader(slot)
 		if err != nil {
 			return 0, ierrors.Wrapf(err, "failed to get RMC for slot %d", slot)
 		}
 		rmc = latestCommitment.Commitment().RMC
-		m.rmc.Set(slot, rmc)
 	}
 
 	return rmc, nil

@@ -76,7 +76,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput)
 			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Index()
 			l.accountsLedger.SetLatestCommittedSlot(latestCommittedSlot)
-			l.rmcManager = rmc.NewManager(l.apiProvider, e.Storage.Commitments().Load)
 			l.rmcManager.SetLatestCommittedSlot(latestCommittedSlot)
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
@@ -113,6 +112,7 @@ func New(
 		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
 		accountsLedger:   accountsledger.New(apiProvider, blocksFunc, slotDiffFunc, accountsStore),
+		rmcManager:       rmc.NewManager(apiProvider, commitmentLoader),
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
