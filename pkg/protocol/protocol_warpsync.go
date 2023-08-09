@@ -4,16 +4,37 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-func (p *Protocol) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs []iotago.BlockID, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
-	// TODO: Only request blocks if we actually requested that slot (determine target chain).
-	targetChain := p.CandidateEngineInstance()
+func (p *Protocol) targetEngine(commitment *chainmanager.ChainCommitment) *engine.Engine {
+	chain := commitment.Chain()
+	if chain == nil {
+		return nil
+	}
 
+	if mainEngineInstance := p.MainEngineInstance(); mainEngineInstance.ChainID() == chain.ForkingPoint.Commitment().ID() {
+		return mainEngineInstance
+	}
+
+	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil && candidateEngineInstance.ChainID() == chain.ForkingPoint.Commitment().ID() {
+		return candidateEngineInstance
+	}
+
+	return nil
+}
+
+func (p *Protocol) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs []iotago.BlockID, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
 	commitment, exists := p.ChainManager.Commitment(commitmentID)
 	if !exists {
+		return
+	}
+
+	targetEngine := p.targetEngine(commitment)
+	if targetEngine == nil {
 		return
 	}
 
@@ -26,7 +47,9 @@ func (p *Protocol) processWarpSyncResponse(commitmentID iotago.CommitmentID, blo
 		return
 	}
 
-	targetChain.BlockRequester.StartTickers(blockIDs)
+	for _, blockID := range blockIDs {
+		targetEngine.BlockDAG.GetOrRequestBlock(blockID)
+	}
 }
 
 func (p *Protocol) processWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) {

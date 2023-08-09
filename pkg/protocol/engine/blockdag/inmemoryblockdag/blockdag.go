@@ -209,6 +209,15 @@ func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid boo
 	return true, nil
 }
 
+func (b *BlockDAG) GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Block, requested bool) {
+	return b.blockCache.GetOrCreate(blockID, func() (newBlock *blocks.Block) {
+		newBlock = blocks.NewMissingBlock(blockID)
+		b.events.BlockMissing.Trigger(newBlock)
+
+		return newBlock
+	})
+}
+
 // registerChild registers the given Block as a child of the parent. It triggers a BlockMissing event if the referenced
 // Block does not exist, yet.
 func (b *BlockDAG) registerChild(child *blocks.Block, parent iotago.Parent) {
@@ -216,14 +225,7 @@ func (b *BlockDAG) registerChild(child *blocks.Block, parent iotago.Parent) {
 		return
 	}
 
-	parentBlock, _ := b.blockCache.GetOrCreate(parent.ID, func() (newBlock *blocks.Block) {
-		newBlock = blocks.NewMissingBlock(parent.ID)
-		b.events.BlockMissing.Trigger(newBlock)
-
-		return newBlock
-	})
-
-	if parentBlock != nil {
+	if parentBlock, _ := b.GetOrRequestBlock(parent.ID); parentBlock != nil {
 		parentBlock.AppendChild(child, parent.Type)
 	}
 }
