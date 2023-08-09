@@ -108,6 +108,7 @@ const (
 	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterAccountID
 
 	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
+	// Rewards are decayed up to returned epochEnd index.
 	// GET returns the rewards.
 	RouteRewards = "/rewards/:" + restapipkg.ParameterOutputID
 
@@ -313,7 +314,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteValidatorsAccount, func(c echo.Context) error {
-		resp, err := stakingByAccountID(c)
+		resp, err := validatorByAccountID(c)
 		if err != nil {
 			return err
 		}

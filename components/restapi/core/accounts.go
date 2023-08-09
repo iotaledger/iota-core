@@ -43,7 +43,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	}, nil
 }
 
-func validators(c echo.Context) (*apimodels.AccountStakingListResponse, error) {
+func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	pageSize, _ := httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 	requestedSlotIndex, cursorIndex, err := httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
@@ -71,9 +71,9 @@ func validators(c echo.Context) (*apimodels.AccountStakingListResponse, error) {
 	}
 
 	page := registeredValidators[cursorIndex : cursorIndex+pageSize]
-	resp := &apimodels.AccountStakingListResponse{
-		Stakers:  page,
-		PageSize: pageSize,
+	resp := &apimodels.ValidatorsResponse{
+		Validators: page,
+		PageSize:   pageSize,
 	}
 	// this is the last page
 	if int(cursorIndex+pageSize) > len(registeredValidators) {
@@ -85,7 +85,7 @@ func validators(c echo.Context) (*apimodels.AccountStakingListResponse, error) {
 	return resp, nil
 }
 
-func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
+func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
 		return nil, err
@@ -161,9 +161,9 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	}
 
 	return &apimodels.ManaRewardsResponse{
-		EpochIndexStart: actualStart,
-		EpochIndexEnd:   actualEnd,
-		Rewards:         reward,
+		EpochStart: actualStart,
+		EpochEnd:   actualEnd,
+		Rewards:    reward,
 	}, nil
 }
 
