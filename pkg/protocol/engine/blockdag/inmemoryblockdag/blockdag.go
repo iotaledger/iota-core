@@ -110,6 +110,18 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 	return
 }
 
+// GetOrRequestBlock returns the Block with the given BlockID from the BlockDAG (and requests it from the network if it
+// is missing). If the requested Block is below the eviction threshold, then this method will return a nil block without
+// creating it.
+func (b *BlockDAG) GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Block, requested bool) {
+	return b.blockCache.GetOrCreate(blockID, func() (newBlock *blocks.Block) {
+		newBlock = blocks.NewMissingBlock(blockID)
+		b.events.BlockMissing.Trigger(newBlock)
+
+		return newBlock
+	})
+}
+
 // SetInvalid marks a Block as invalid.
 func (b *BlockDAG) SetInvalid(block *blocks.Block, reason error) (wasUpdated bool) {
 	if wasUpdated = block.SetInvalid(); wasUpdated {
@@ -207,15 +219,6 @@ func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid boo
 	}
 
 	return true, nil
-}
-
-func (b *BlockDAG) GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Block, requested bool) {
-	return b.blockCache.GetOrCreate(blockID, func() (newBlock *blocks.Block) {
-		newBlock = blocks.NewMissingBlock(blockID)
-		b.events.BlockMissing.Trigger(newBlock)
-
-		return newBlock
-	})
 }
 
 // registerChild registers the given Block as a child of the parent. It triggers a BlockMissing event if the referenced

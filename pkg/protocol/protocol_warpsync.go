@@ -10,6 +10,10 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
+const (
+	WarpSyncThreshold = iotago.SlotIndex(5)
+)
+
 func (p *Protocol) targetEngine(commitment *chainmanager.ChainCommitment) *engine.Engine {
 	chain := commitment.Chain()
 	if chain == nil {
