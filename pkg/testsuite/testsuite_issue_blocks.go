@@ -15,6 +15,17 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+func (t *TestSuite) assertParentsCommitmentExistFromBlockOptions(blockOpts []options.Option[blockfactory.BlockParams], node *mock.Node) {
+	params := options.Apply(&blockfactory.BlockParams{}, blockOpts)
+	parents := params.References[iotago.StrongParentType]
+	parents = append(parents, params.References[iotago.WeakParentType]...)
+	parents = append(parents, params.References[iotago.ShallowLikeParentType]...)
+
+	for _, block := range t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...) {
+		t.AssertCommitmentSlotIndexExists(block.SlotCommitmentID().Index(), node)
+	}
+}
+
 func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Option[blockfactory.BlockParams], node *mock.Node) {
 	params := options.Apply(&blockfactory.BlockParams{}, blockOpts)
 	parents := params.References[iotago.StrongParentType]
@@ -80,6 +91,7 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 
 func (t *TestSuite) IssueValidationBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	t.assertParentsExistFromBlockOptions(blockOpts, node)
+	t.assertParentsCommitmentExistFromBlockOptions(blockOpts, node)
 
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -99,6 +111,7 @@ func (t *TestSuite) IssueValidationBlockAtSlotWithOptions(alias string, slot iot
 
 func (t *TestSuite) IssueBasicBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	t.assertParentsExistFromBlockOptions(blockOpts, node)
+	t.assertParentsCommitmentExistFromBlockOptions(blockOpts, node)
 
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
