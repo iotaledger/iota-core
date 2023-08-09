@@ -269,7 +269,7 @@ func (p *Protocol) initChainManager() {
 		// stays in memory storage and with it the root commitment itself as well).
 		if rootCommitment.ID().Index() > 0 {
 			p.ChainManager.EvictUntil(rootCommitment.ID().Index() - 1)
-			p.unsolidCommitmentBlocks.Evict(index)
+			p.unsolidCommitmentBlocks.EvictUntil(index)
 		}
 	})
 

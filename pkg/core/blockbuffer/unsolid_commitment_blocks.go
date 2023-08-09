@@ -42,7 +42,7 @@ func (u *UnsolidCommitmentBlocks[V]) Add(commitmentID iotago.CommitmentID, value
 	u.mutex.RLock()
 	defer u.mutex.RUnlock()
 
-	if commitmentID.Index() < u.lastEvictedSlot {
+	if commitmentID.Index() <= u.lastEvictedSlot {
 		return false
 	}
 
@@ -61,12 +61,15 @@ func (u *UnsolidCommitmentBlocks[V]) Add(commitmentID iotago.CommitmentID, value
 	return true
 }
 
-func (u *UnsolidCommitmentBlocks[V]) Evict(lastEvictedSlot iotago.SlotIndex) {
+func (u *UnsolidCommitmentBlocks[V]) EvictUntil(slotToEvict iotago.SlotIndex) {
 	u.mutex.Lock()
 	defer u.mutex.Unlock()
 
-	u.lastEvictedSlot = lastEvictedSlot
-	u.blockBuffers.Evict(lastEvictedSlot)
+	for slot := u.lastEvictedSlot + 1; slot <= slotToEvict; slot++ {
+		u.blockBuffers.Evict(slot)
+	}
+
+	u.lastEvictedSlot = slotToEvict
 }
 
 func (u *UnsolidCommitmentBlocks[V]) GetBlocks(commitmentID iotago.CommitmentID) []V {

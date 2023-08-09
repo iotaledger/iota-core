@@ -70,7 +70,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 					b.solidifier.Queue(block)
 				}
 
-				b.uncommittedSlotBlocks.Evict(commitment.Index())
+				b.uncommittedSlotBlocks.EvictUntil(commitment.Index())
 			}, event.WithWorkerPool(wp))
 
 			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
