@@ -87,9 +87,6 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 
 		// If the latest commitment is either too recent or too old for the given issuing time,
 		// then use the latest possible commitment.
-		// The "+1" element is there because we're comparing against 'blockIndex' which is in the middle of a slot
-		// and the oldest possible committed slot is 'minCommittableAge' full slots in the past.
-		// So we need to subtract 1 to account for the blockIndex slot that is not finished yet.
 		if blockIndex < selectedCommitment.Index+minCommittableAge {
 			validCommitmentIndex := iotago.SlotIndex(0)
 			if blockIndex > minCommittableAge {
