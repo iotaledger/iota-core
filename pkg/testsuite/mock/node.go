@@ -473,9 +473,9 @@ func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Op
 func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
 	block := n.CreateBlock(ctx, alias, opts...)
 
-	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "failed to issue block with alias %s", alias)
+	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, alias)
 
-	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
+	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }
@@ -508,7 +508,7 @@ func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup, startSlot 
 
 			blockAlias := fmt.Sprintf("%s-activity.%d", n.Name, counter)
 			timeOffset := time.Since(start)
-			n.IssueBlock(ctx, blockAlias,
+			n.IssueValidationBlock(ctx, blockAlias,
 				blockfactory.WithPayload(
 					&iotago.TaggedData{
 						Tag: []byte(blockAlias),

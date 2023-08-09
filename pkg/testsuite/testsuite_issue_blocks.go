@@ -82,7 +82,12 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 
 	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
-	block := node.IssueBlock(context.Background(), alias, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...))
+	var block *blocks.Block
+	if node.Validator {
+		block = node.IssueValidationBlock(context.Background(), alias, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...))
+	} else {
+		block = node.IssueBlock(context.Background(), alias, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...))
+	}
 
 	t.registerBlock(alias, block)
 
@@ -154,6 +159,21 @@ func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...optio
 	defer t.mutex.Unlock()
 
 	block := node.IssueBlock(context.Background(), alias, blockOpts...)
+
+	t.registerBlock(alias, block)
+
+	return block
+}
+
+func (t *TestSuite) IssueValidationBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockOpts, node)
+
+	require.Truef(t.Testing, node.Validator, "node: %s: is not a validator node", node.Name)
+
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	block := node.IssueValidationBlock(context.Background(), alias, blockOpts...)
 
 	t.registerBlock(alias, block)
 
