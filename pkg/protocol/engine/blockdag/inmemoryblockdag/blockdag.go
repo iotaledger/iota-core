@@ -2,14 +2,13 @@ package inmemoryblockdag
 
 import (
 	"github.com/iotaledger/hive.go/core/causalorder"
-	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/blockbuffer"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
@@ -32,7 +31,7 @@ type BlockDAG struct {
 	solidifier *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
 	latestCommitmentFunc  func() *model.Commitment
-	uncommittedSlotBlocks *memstorage.IndexedStorage[iotago.SlotIndex, *blocks.Block, types.Empty]
+	uncommittedSlotBlocks *blockbuffer.UnsolidCommitmentBlocks[*blocks.Block]
 
 	retainBlockFailure func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)
 
@@ -66,11 +65,12 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 				b.solidifierMutex.RLock()
 				defer b.solidifierMutex.RUnlock()
 
-				if unsolidBlocks := b.uncommittedSlotBlocks.Evict(commitment.Index()); unsolidBlocks != nil {
-					for _, block := range unsolidBlocks.Keys() {
-						b.solidifier.Queue(block)
-					}
+				unsolidBlocks := b.uncommittedSlotBlocks.GetBlocks(commitment.ID())
+				for _, block := range unsolidBlocks {
+					b.solidifier.Queue(block)
 				}
+
+				b.uncommittedSlotBlocks.Evict(commitment.Index())
 			}, event.WithWorkerPool(wp))
 
 			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
@@ -95,7 +95,7 @@ func New(workers *workerpool.Group, apiProvider api.Provider, evictionState *evi
 		workers:               workers,
 		workerPool:            workers.CreatePool("Solidifier", 2),
 		errorHandler:          errorHandler,
-		uncommittedSlotBlocks: memstorage.NewIndexedStorage[iotago.SlotIndex, *blocks.Block, types.Empty](),
+		uncommittedSlotBlocks: blockbuffer.NewUnsolidCommitmentBlocks[*blocks.Block](10, 1000),
 	}, opts,
 		func(b *BlockDAG) {
 			b.solidifier = causalorder.New(
@@ -123,7 +123,7 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 		b.events.BlockAttached.Trigger(block)
 
 		if block.SlotCommitmentID().Index() > b.latestCommitmentFunc().Commitment().Index {
-			b.uncommittedSlotBlocks.Get(block.SlotCommitmentID().Index(), true).Set(block, types.Void)
+			b.uncommittedSlotBlocks.Add(block.SlotCommitmentID(), block)
 
 			return
 		}
