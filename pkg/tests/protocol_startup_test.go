@@ -35,7 +35,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	nodeB := ts.AddValidatorNode("nodeB")
 	ts.AddNode("nodeC")
 
-	ts.Run(map[string][]options.Option[protocol.Protocol]{
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
 		"nodeA": {
 			protocol.WithStorageOptions(
 				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
@@ -55,7 +55,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			),
 		},
 	})
-	ts.HookLogging()
 
 	ts.Wait()
 
@@ -189,7 +188,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 				nodeC1 := ts.AddNode("nodeC-restarted")
 				nodeC1.CopyIdentityFromNode(nodeC)
-				nodeC1.Initialize(
+				nodeC1.Initialize(true,
 					protocol.WithBaseDirectory(ts.Directory.Path(nodeC.Name)),
 					protocol.WithStorageOptions(
 						storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
@@ -202,7 +201,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 						),
 					),
 				)
-				nodeC1.HookLogging()
 				ts.Wait()
 
 				// Everything that was accepted before shutting down should be available on disk (verifying that restoring the block cache from disk works).
@@ -226,7 +224,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 				nodeD := ts.AddNode("nodeD")
 				nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.
-				nodeD.Initialize(
+				nodeD.Initialize(true,
 					protocol.WithSnapshotPath(snapshotPath),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
 					protocol.WithEngineOptions(
@@ -237,7 +235,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 					),
 				)
 				ts.Wait()
-				nodeD.HookLogging()
 
 				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
 			}

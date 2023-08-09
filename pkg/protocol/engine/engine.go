@@ -279,7 +279,6 @@ func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 		return true
 	}
 
-	fmt.Println("IsBootstrapped", e.optsIsBootstrappedFunc(e))
 	if e.optsIsBootstrappedFunc(e) {
 		e.isBootstrapped = true
 	}

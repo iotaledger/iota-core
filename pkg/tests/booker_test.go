@@ -18,9 +18,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1")
-	ts.Run(map[string][]options.Option[protocol.Protocol]{})
-
-	node1.HookLogging()
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
 
@@ -56,14 +54,12 @@ func Test_DoubleSpend(t *testing.T) {
 	node1 := ts.AddValidatorNode("node1")
 	node2 := ts.AddValidatorNode("node2")
 
-	ts.Run(map[string][]options.Option[protocol.Protocol]{})
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
 		node1.AccountID,
 		node2.AccountID,
 	}, ts.Nodes()...)
-
-	node1.HookLogging()
 
 	// Create and issue double spends
 	{
@@ -127,9 +123,7 @@ func Test_MultipleAttachments(t *testing.T) {
 	nodeA := ts.AddValidatorNode("nodeA")
 	nodeB := ts.AddValidatorNode("nodeB")
 
-	ts.Run(map[string][]options.Option[protocol.Protocol]{})
-
-	nodeA.HookLogging()
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	blocksConflicts := make(map[*blocks.Block][]string)
 

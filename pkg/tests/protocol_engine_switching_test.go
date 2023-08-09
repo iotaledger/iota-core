@@ -33,9 +33,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		testsuite.WithSlotsPerEpochExponent(3),
 		testsuite.WithGenesisTimestampOffset(1000*10),
 
-		testsuite.WithWaitFor(10*time.Second),
+		testsuite.WithWaitFor(15*time.Second),
 	)
-	// defer ts.Shutdown()
+	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
 	node1 := ts.AddValidatorNode("node1")
@@ -47,6 +47,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	node7 := ts.AddValidatorNode("node7")
 	node8 := ts.AddNode("node8")
 
+	const expectedCommittedSlotAfterPartitionMerge = 19
 	nodesP1 := []*mock.Node{node0, node1, node2, node3, node4, node5}
 	nodesP2 := []*mock.Node{node6, node7, node8}
 
@@ -87,15 +88,13 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 					eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](500*time.Millisecond),
 				),
 				engine.WithIsBootstrappedFunc(func(e *engine.Engine) bool {
-					fmt.Println("is bootstrapped", e.Storage.Settings().LatestCommitment().Index(), e.Notarization.IsBootstrapped())
-					return e.Storage.Settings().LatestCommitment().Index() >= 19 && e.Notarization.IsBootstrapped()
+					return e.Storage.Settings().LatestCommitment().Index() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
 				}),
 			),
 		}
 	}
 
-	ts.Run(nodeOptions)
-	ts.HookLogging()
+	ts.Run(false, nodeOptions)
 
 	expectedCommittee := []iotago.AccountID{
 		node0.AccountID,
@@ -351,5 +350,5 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		wg.Wait()
 	}
 
-	ts.AssertEqualStoredCommitmentAtIndex(19, ts.Nodes()...)
+	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 }

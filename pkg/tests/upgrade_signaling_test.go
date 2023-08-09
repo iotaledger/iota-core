@@ -52,7 +52,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.AddNode("nodeE")
 	ts.AddNode("nodeF")
 
-	ts.Run(map[string][]options.Option[protocol.Protocol]{
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
 		"nodeA": nodeOptions,
 		"nodeB": nodeOptions,
 		"nodeC": nodeOptions,
@@ -60,7 +60,6 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		"nodeE": nodeOptions,
 		"nodeF": nodeOptions,
 	})
-	ts.HookLogging()
 
 	ts.Wait()
 
@@ -108,12 +107,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 			nodeE1 := ts.AddNode("nodeE.1")
 			nodeE1.CopyIdentityFromNode(nodeE)
-			nodeE1.Initialize(
+			nodeE1.Initialize(true,
 				append(nodeOptions,
 					protocol.WithBaseDirectory(ts.Directory.Path(nodeE.Name)),
 				)...,
 			)
-			nodeE1.HookLogging()
 			ts.Wait()
 		}
 
@@ -123,14 +121,13 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 		{
 			nodeG := ts.AddNode("nodeG")
-			nodeG.Initialize(
+			nodeG.Initialize(true,
 				append(nodeOptions,
 					protocol.WithSnapshotPath(snapshotPath),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeG.Name)),
 				)...,
 			)
 			ts.Wait()
-			nodeG.HookLogging()
 
 			ts.AssertNodeState(ts.Nodes(),
 				testsuite.WithLatestCommitmentSlotIndex(41),

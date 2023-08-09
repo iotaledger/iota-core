@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/crypto/identity"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -31,6 +32,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -95,13 +97,14 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 	}
 }
 
-func (n *Node) Initialize(opts ...options.Option[protocol.Protocol]) {
+func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[protocol.Protocol]) {
 	n.Protocol = protocol.New(n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
 	)
 
 	n.hookEvents()
+	n.hookLogging(failOnBlockFiltered)
 
 	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
@@ -134,10 +137,10 @@ func (n *Node) hookEvents() {
 	events.MainEngineSwitched.Hook(func(e *engine.Engine) { n.mainEngineSwitchedCount.Add(1) })
 }
 
-func (n *Node) HookLogging() {
+func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	events := n.Protocol.Events
 
-	n.attachEngineLogs(n.Protocol.MainEngineInstance())
+	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngineInstance())
 
 	events.Network.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
 		fmt.Printf("%s > network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
@@ -192,7 +195,7 @@ func (n *Node) HookLogging() {
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
 		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
 
-		n.attachEngineLogs(e)
+		n.attachEngineLogs(failOnBlockFiltered, e)
 	})
 
 	events.MainEngineSwitched.Hook(func(e *engine.Engine) {
@@ -208,7 +211,7 @@ func (n *Node) HookLogging() {
 	})
 }
 
-func (n *Node) attachEngineLogs(instance *engine.Engine) {
+func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
 	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
 	events := instance.Events
 
@@ -270,7 +273,9 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		fmt.Printf("%s > [%s] Filter.BlockPreFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
-		n.Testing.Fatal("no blocks should be prefiltered")
+		if failOnBlockFiltered {
+			n.Testing.Fatal("no blocks should be prefiltered")
+		}
 	})
 
 	events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
@@ -279,7 +284,9 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 
 	events.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
 		fmt.Printf("%s > [%s] CommitmentFilter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
-		n.Testing.Fatal("no blocks should be filtered")
+		if failOnBlockFiltered {
+			n.Testing.Fatal("no blocks should be filtered")
+		}
 	})
 
 	events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
@@ -291,12 +298,37 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 	})
 
 	events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		var acceptedBlocks []iotago.BlockID
-		_ = details.AcceptedBlocks.Stream(func(key iotago.BlockID) error {
-			acceptedBlocks = append(acceptedBlocks, key)
+		var acceptedBlocks iotago.BlockIDs
+		err := details.AcceptedBlocks.Stream(func(id iotago.BlockID) error {
+			acceptedBlocks = append(acceptedBlocks, id)
 			return nil
 		})
-		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks)
+		require.NoError(n.Testing, err)
+
+		rootsStorage := instance.Storage.Roots(details.Commitment.ID().Index())
+		rootsBytes, err := rootsStorage.Get(kvstore.Key{prunable.RootsKey})
+		require.NoError(n.Testing, err)
+
+		var roots iotago.Roots
+		lo.PanicOnErr(n.Protocol.APIForSlot(details.Commitment.Index()).Decode(rootsBytes, &roots))
+
+		printRoots := func(r iotago.Roots) string {
+			return fmt.Sprintf(
+				"Roots(%s): TangleRoot: %s, StateMutationRoot: %s, StateRoot: %s, AccountRoot: %s, AttestationsRoot: %s, CommitteeRoot: %s, RewardsRoot: %s, ProtocolParametersHash: %s", r.ID(), r.TangleRoot, r.StateMutationRoot, r.StateRoot, r.AccountRoot, r.AttestationsRoot, r.CommitteeRoot, r.RewardsRoot, r.ProtocolParametersHash)
+		}
+
+		attestationBlockIDs := make([]iotago.BlockID, 0)
+		tree, err := instance.Attestations.GetMap(details.Commitment.Index())
+		if err == nil {
+			a := instance.APIForSlot(details.Commitment.Index())
+			err = tree.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
+				attestationBlockIDs = append(attestationBlockIDs, lo.PanicOnErr(value.BlockID(a)))
+				return nil
+			})
+			require.NoError(n.Testing, err)
+		}
+
+		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks, printRoots(roots), attestationBlockIDs)
 	})
 
 	events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {

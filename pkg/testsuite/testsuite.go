@@ -359,7 +359,7 @@ func (t *TestSuite) RemoveNode(name string) {
 	t.nodes.Delete(name)
 }
 
-func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
+func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -401,7 +401,7 @@ func (t *TestSuite) Run(nodesOptions ...map[string][]options.Option[protocol.Pro
 			}
 		}
 
-		node.Initialize(baseOpts...)
+		node.Initialize(failOnBlockFiltered, baseOpts...)
 
 		if t.TransactionFramework == nil {
 			t.TransactionFramework = NewTransactionFramework(node.Protocol, t.genesisSeed[:], t.optsAccounts...)
@@ -424,16 +424,6 @@ func (t *TestSuite) Validators() []*mock.Node {
 	})
 
 	return validators
-}
-
-func (t *TestSuite) HookLogging() {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
-	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
-		node.HookLogging()
-		return true
-	})
 }
 
 // Eventually asserts that given condition will be met in opts.waitFor time,
