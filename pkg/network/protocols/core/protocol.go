@@ -254,13 +254,14 @@ func (p *Protocol) onAttestationsRequest(commitmentIDBytes []byte, id network.Pe
 }
 
 func (p *Protocol) onWarpSyncRequest(commitmentIDBytes []byte, id network.PeerID) {
-	if len(commitmentIDBytes) != iotago.CommitmentIDLength {
-		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize commitmentID in warp sync request"), id)
+	commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
+	if err != nil {
+		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize commitmentID in warp sync request"), id)
 
 		return
 	}
 
-	p.Events.WarpSyncRequestReceived.Trigger(iotago.CommitmentID(commitmentIDBytes), id)
+	p.Events.WarpSyncRequestReceived.Trigger(commitmentID, id)
 }
 
 func (p *Protocol) onWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, merkleProofBytes []byte, id network.PeerID) {
