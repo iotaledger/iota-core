@@ -19,10 +19,12 @@ const (
 )
 
 type UnsolidCommitmentBlocks struct {
-	mutex            sync.RWMutex
-	lastEvictedSlot  iotago.SlotIndex
-	blockBuffers     *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]]]
-	commitmentBuffer *cache.Cache[iotago.CommitmentID, types.Empty]
+	mutex           sync.RWMutex
+	lastEvictedSlot iotago.SlotIndex
+	blockBuffers    *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ringbuffer.RingBuffer[*types.Tuple[*model.Block, network.PeerID]]]
+
+	commitmentBuffer      *cache.Cache[iotago.CommitmentID, types.Empty]
+	commitmentBufferMutex sync.Mutex
 }
 
 func newUnsolidCommitmentBlocks() *UnsolidCommitmentBlocks {
@@ -56,6 +58,8 @@ func (u *UnsolidCommitmentBlocks) AddBlock(block *model.Block, src network.PeerI
 	})
 	buffer.Add(types.NewTuple(block, src))
 
+	u.commitmentBufferMutex.Lock()
+	defer u.commitmentBufferMutex.Unlock()
 	u.commitmentBuffer.Put(slotCommitmentID, types.Void)
 
 	return true
