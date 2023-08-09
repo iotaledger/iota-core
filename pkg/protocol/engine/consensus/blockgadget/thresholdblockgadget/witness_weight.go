@@ -8,11 +8,9 @@ import (
 )
 
 func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
-	witness := votingBlock.ProtocolBlock().IssuerID
-
 	// Only track witness weight for issuers that are part of the committee.
-	seat, exists := g.seatManager.Committee(votingBlock.ID().Index()).GetSeat(witness)
-	if !exists {
+	seat, isValid := g.isCommitteeValidationBlock(votingBlock)
+	if !isValid {
 		return
 	}
 

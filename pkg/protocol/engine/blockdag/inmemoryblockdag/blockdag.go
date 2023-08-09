@@ -8,12 +8,14 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/blockbuffer"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
@@ -28,6 +30,9 @@ type BlockDAG struct {
 	// solidifier contains the solidifier instance used to determine the solidity of Blocks.
 	solidifier *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
+	latestCommitmentFunc  func() *model.Commitment
+	uncommittedSlotBlocks *blockbuffer.UnsolidCommitmentBlocks[*blocks.Block]
+
 	retainBlockFailure func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)
 
 	blockCache *blocks.Blocks
@@ -38,24 +43,38 @@ type BlockDAG struct {
 	workerPool *workerpool.WorkerPool
 
 	errorHandler func(error)
+	apiProvider  api.Provider
 
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), e, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
 			wp := b.workers.CreatePool("BlockDAG.Attach", 2)
 
-			e.Events.CommitmentFilter.BlockAllowed.Hook(func(block *model.Block) {
+			e.Events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
 					b.errorHandler(ierrors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.ProtocolBlock().IssuerID))
 				}
 			}, event.WithWorkerPool(wp))
 
+			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+				b.solidifierMutex.RLock()
+				defer b.solidifierMutex.RUnlock()
+
+				unsolidBlocks := b.uncommittedSlotBlocks.GetBlocks(commitment.ID())
+				for _, block := range unsolidBlocks {
+					b.solidifier.Queue(block)
+				}
+
+				b.uncommittedSlotBlocks.EvictUntil(commitment.Index())
+			}, event.WithWorkerPool(wp))
+
 			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
+			b.latestCommitmentFunc = e.Storage.Settings().LatestCommitment
 
 			e.Events.BlockDAG.LinkTo(b.events)
 
@@ -67,14 +86,16 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, apiProvider api.Provider, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
-		events:        blockdag.NewEvents(),
-		evictionState: evictionState,
-		blockCache:    blockCache,
-		workers:       workers,
-		workerPool:    workers.CreatePool("Solidifier", 2),
-		errorHandler:  errorHandler,
+		apiProvider:           apiProvider,
+		events:                blockdag.NewEvents(),
+		evictionState:         evictionState,
+		blockCache:            blockCache,
+		workers:               workers,
+		workerPool:            workers.CreatePool("Solidifier", 2),
+		errorHandler:          errorHandler,
+		uncommittedSlotBlocks: blockbuffer.NewUnsolidCommitmentBlocks[*blocks.Block](10, 1000),
 	}, opts,
 		func(b *BlockDAG) {
 			b.solidifier = causalorder.New(
@@ -100,6 +121,12 @@ var _ blockdag.BlockDAG = new(BlockDAG)
 func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached bool, err error) {
 	if block, wasAttached, err = b.attach(data); wasAttached {
 		b.events.BlockAttached.Trigger(block)
+
+		if block.SlotCommitmentID().Index() > b.latestCommitmentFunc().Commitment().Index {
+			b.uncommittedSlotBlocks.Add(block.SlotCommitmentID(), block)
+
+			return
+		}
 
 		b.solidifierMutex.RLock()
 		defer b.solidifierMutex.RUnlock()

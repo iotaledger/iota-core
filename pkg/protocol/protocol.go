@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/blockbuffer"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -56,11 +58,12 @@ import (
 )
 
 type Protocol struct {
-	context       context.Context
-	Events        *Events
-	SyncManager   syncmanager.SyncManager
-	engineManager *enginemanager.EngineManager
-	ChainManager  *chainmanager.Manager
+	context                 context.Context
+	Events                  *Events
+	SyncManager             syncmanager.SyncManager
+	engineManager           *enginemanager.EngineManager
+	ChainManager            *chainmanager.Manager
+	unsolidCommitmentBlocks *blockbuffer.UnsolidCommitmentBlocks[*types.Tuple[*model.Block, network.PeerID]]
 
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
@@ -101,6 +104,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	return options.Apply(&Protocol{
 		Events:                          NewEvents(),
 		Workers:                         workers,
+		unsolidCommitmentBlocks:         blockbuffer.NewUnsolidCommitmentBlocks[*types.Tuple[*model.Block, network.PeerID]](20, 100),
 		dispatcher:                      dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
 		optsCommitmentFilterProvider:    accountsfilter.NewProvider(),
@@ -113,7 +117,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsSlotGadgetProvider:          totalweightslotgadget.NewProvider(),
 		optsSybilProtectionProvider:     sybilprotectionv1.NewProvider(),
 		optsNotarizationProvider:        slotnotarization.NewProvider(),
-		optsAttestationProvider:         slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
+		optsAttestationProvider:         slotattestation.NewProvider(),
 		optsSyncManagerProvider:         trivialsyncmanager.NewProvider(),
 		optsLedgerProvider:              ledger1.NewProvider(),
 		optsRetainerProvider:            retainer1.NewProvider(),
@@ -137,10 +141,7 @@ func (p *Protocol) Run(ctx context.Context) error {
 
 	p.linkToEngine(p.mainEngine)
 
-	rootCommitment, valid := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
-	if !valid {
-		panic("no root commitment found")
-	}
+	rootCommitment := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
 
 	// The root commitment is the earliest commitment we will ever need to know to solidify commitment chains, we can
 	// then initialize the chain manager with it, and identify our engine to be on such chain.
@@ -240,11 +241,23 @@ func (p *Protocol) initChainManager() {
 		p.ChainManager.ProcessCommitment(details.Commitment)
 	})
 
-	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		rootCommitment, valid := p.MainEngineInstance().EarliestRootCommitment(index)
-		if !valid {
-			return
+	wp := p.Workers.CreatePool("Protocol.MissingCommitmentReceived", 1)
+	processUnsolidCommitmentBlocksFunc := func(id iotago.CommitmentID) {
+		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(id) {
+			err := p.ProcessBlock(tuple.A, tuple.B)
+			if err != nil {
+				p.ErrorHandler()(err)
+			}
 		}
+	}
+
+	p.Events.ChainManager.MissingCommitmentReceived.Hook(processUnsolidCommitmentBlocksFunc, event.WithWorkerPool(wp))
+	p.Events.Engine.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+		processUnsolidCommitmentBlocksFunc(commitment.ID())
+	}, event.WithWorkerPool(wp))
+
+	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		rootCommitment := p.MainEngineInstance().EarliestRootCommitment(index)
 
 		// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
 		// we first specify the chain's cut-off point, and only then evict the state. It is also important to
@@ -256,6 +269,7 @@ func (p *Protocol) initChainManager() {
 		// stays in memory storage and with it the root commitment itself as well).
 		if rootCommitment.ID().Index() > 0 {
 			p.ChainManager.EvictUntil(rootCommitment.ID().Index() - 1)
+			p.unsolidCommitmentBlocks.EvictUntil(index)
 		}
 	})
 
@@ -275,7 +289,13 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
+	// If the commitment is not solid (it is not known), we store the block in a small buffer and process it once we
+	// commit the slot to avoid requesting it again.
 	if !chainCommitment.IsSolid() {
+		if !p.unsolidCommitmentBlocks.Add(block.ProtocolBlock().SlotCommitmentID, types.NewTuple(block, src)) {
+			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid commitment buffer: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
+		}
+
 		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 	}
 

@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	DefaultAttestationCommitmentOffset = 4
-
 	prefixAttestationsADSMap byte = iota
 	prefixAttestationsTracker
 )
@@ -27,7 +25,7 @@ const (
 //  1. It stores "future" attestations temporarily until the corresponding slot becomes committable.
 //
 //  2. When a slot is being committed:
-//     a. Apply the future attestations of the committed slot to the pending attestations window.
+//     a. Apply the future attestations of the committed slot to the pending attestations window which is of size MaxCommittableAge.
 //     b. Determine attestations from window for current slot = committed slot - attestationCommitmentOffset and store in bucketed storage as committed attestations.
 //     c. Compute the new cumulative weight based on the newly committed attestations and the previous weight.
 //
@@ -44,7 +42,7 @@ const (
 //	Explanation:
 //	- Slots before 12 are committed according to their window.
 //	- When committing slot 13, the future attestations from 13 are applied to the pending attestations window and the attestations to be committed determined.
-//		- Attestations to be committed at 13 are those at the lower bound of the window, issuer.e. slot 11
+//		- Attestations to be committed at 13 are those at the lower bound of the window, i.e. slot 11
 //		- The lower bound of the window is advanced to slot 12.
 //		- The last committed slot is advanced to 13.
 //	- future attestations: everything above lastCommittedSlot
@@ -69,13 +67,14 @@ type Manager struct {
 	module.Module
 }
 
-func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*engine.Engine, attestation.Attestations] {
+func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 	return module.Provide(func(e *engine.Engine) attestation.Attestations {
 		latestCommitment := e.Storage.Settings().LatestCommitment()
+
 		return NewManager(
 			latestCommitment.Index(),
 			latestCommitment.CumulativeWeight(),
-			attestationCommitmentOffset,
+			e.CurrentAPI().ProtocolParameters().MaxCommittableAge(),
 			e.Storage.Prunable.Attestations,
 			e.SybilProtection.SeatManager().Committee,
 			e,
@@ -84,7 +83,7 @@ func NewProvider(attestationCommitmentOffset iotago.SlotIndex) module.Provider[*
 }
 
 func NewManager(
-	lastCommitedSlot iotago.SlotIndex,
+	lastCommittedSlot iotago.SlotIndex,
 	lastCumulativeWeight uint64,
 	attestationCommitmentOffset iotago.SlotIndex,
 	bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore,
@@ -92,7 +91,7 @@ func NewManager(
 	apiProvider api.Provider,
 ) *Manager {
 	m := &Manager{
-		lastCommittedSlot:           lastCommitedSlot,
+		lastCommittedSlot:           lastCommittedSlot,
 		lastCumulativeWeight:        lastCumulativeWeight,
 		attestationCommitmentOffset: attestationCommitmentOffset,
 		committeeFunc:               committeeFunc,
@@ -154,8 +153,13 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (ads.Map[iotago.AccountID, *iot
 	return m.attestationsForSlot(cutoffIndex)
 }
 
-// AddAttestationFromBlock adds an attestation from a block to the future attestations (beyond the attestation window).
-func (m *Manager) AddAttestationFromBlock(block *blocks.Block) {
+// AddAttestationFromValidationBlock adds an attestation from a block to the future attestations (beyond the attestation window).
+func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
+	// Only track validator blocks.
+	if _, isValidationBlock := block.ValidationBlock(); !isValidationBlock {
+		return
+	}
+
 	// Only track attestations of active committee members.
 	if _, exists := m.committeeFunc(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID); !exists {
 		return
