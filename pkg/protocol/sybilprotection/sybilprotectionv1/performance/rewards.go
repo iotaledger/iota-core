@@ -107,6 +107,8 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			if epochStart == epochIndex {
 				epochStart = epochIndex + 1
 			}
+
+			continue
 		}
 
 		poolStats, err := t.poolStatsStore.Get(epochIndex)
