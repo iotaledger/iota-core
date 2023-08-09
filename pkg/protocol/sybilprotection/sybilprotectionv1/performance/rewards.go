@@ -44,16 +44,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to get rewards for account %s in epoch %d", validatorID, epochIndex)
 		}
 
-		if !exists {
-			// updating epoch start for beginning epochs without the reward
-			if epochIndex < epochEnd && epochStart == epochIndex {
-				epochStart = epochIndex + 1
-			}
-
-			continue
-		}
-
-		if rewardsForAccountInEpoch.PoolStake == 0 {
+		if !exists || rewardsForAccountInEpoch.PoolStake == 0 {
 			// updating epoch start for beginning epochs without the reward
 			if epochIndex < epochEnd && epochStart == epochIndex {
 				epochStart = epochIndex + 1
