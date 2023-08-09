@@ -14,7 +14,8 @@ func (p *Protocol) processWarpSyncResponse(commitmentID iotago.CommitmentID, blo
 
 	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
 	for _, blockID := range blockIDs {
-		acceptedBlocks.Add(blockID)
+		// a mapdb can newer return an error
+		_ = acceptedBlocks.Add(blockID)
 	}
 
 	iotago.VerifyProof(merkleProof, iotago.Identifier(acceptedBlocks.Root()), iotago.Identifier{})
