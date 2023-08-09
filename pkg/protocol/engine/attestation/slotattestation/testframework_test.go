@@ -101,7 +101,7 @@ func (t *TestFramework) AddFutureAttestation(issuerAlias string, attestationAlia
 	issuer := t.issuer(issuerAlias)
 	issuingTime := tpkg.TestAPI.TimeProvider().SlotStartTime(blockSlot).Add(time.Duration(t.uniqueCounter.Add(1))).UTC()
 
-	block, err := builder.NewBasicBlockBuilder(tpkg.TestAPI).
+	block, err := builder.NewValidationBlockBuilder(tpkg.TestAPI).
 		IssuingTime(issuingTime).
 		SlotCommitmentID(iotago.NewCommitment(tpkg.TestAPI.Version(), attestedSlot, iotago.CommitmentID{}, iotago.Identifier{}, 0).MustID()).
 		Sign(issuer.accountID, issuer.priv).
@@ -115,7 +115,7 @@ func (t *TestFramework) AddFutureAttestation(issuerAlias string, attestationAlia
 	modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
 	require.NoError(t.test, err)
 
-	t.Instance.AddAttestationFromBlock(blocks.NewBlock(modelBlock))
+	t.Instance.AddAttestationFromValidationBlock(blocks.NewBlock(modelBlock))
 }
 
 func (t *TestFramework) blockIDFromAttestation(att *iotago.Attestation) iotago.BlockID {

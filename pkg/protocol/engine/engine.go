@@ -399,9 +399,9 @@ func (e *Engine) acceptanceHandler() {
 	wp := e.Workers.CreatePool("BlockAccepted", 1)
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		e.Ledger.BlockAccepted(block)
-		e.SybilProtection.BlockAccepted(block)
-		e.UpgradeOrchestrator.TrackBlock(block)
+		e.Ledger.TrackBlock(block)
+		e.SybilProtection.TrackValidationBlock(block)
+		e.UpgradeOrchestrator.TrackValidationBlock(block)
 
 		e.Events.AcceptedBlockProcessed.Trigger(block)
 	}, event.WithWorkerPool(wp))

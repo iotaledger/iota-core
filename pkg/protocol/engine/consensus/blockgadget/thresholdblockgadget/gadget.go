@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
@@ -89,6 +90,15 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 
 		walk.PushAll(block.Parents()...)
 	}
+}
+
+func (g *Gadget) isCommitteeValidationBlock(block *blocks.Block) (seat account.SeatIndex, isValid bool) {
+	if _, isValidationBlock := block.ValidationBlock(); isValidationBlock {
+		return 0, false
+	}
+
+	// Only accept blocks for issuers that are part of the committee.
+	return g.seatManager.Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
 }
 
 func anyChildInSet(block *blocks.Block, set ds.Set[iotago.BlockID]) bool {

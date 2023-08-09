@@ -39,7 +39,7 @@ type Ledger interface {
 
 	Import(reader io.ReadSeeker) error
 	Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error
-	BlockAccepted(block *blocks.Block)
+	TrackBlock(block *blocks.Block)
 
 	module.Interface
 }
