@@ -214,7 +214,7 @@ func (m *Manager) ComputeLedgerBalance(options ...IterateOption) (balance iotago
 	count = 0
 	consumerFunc := func(output *Output) bool {
 		count++
-		balance += output.Deposit()
+		balance += output.BaseTokenAmount()
 
 		return true
 	}

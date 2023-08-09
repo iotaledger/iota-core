@@ -29,6 +29,15 @@ services:
     networks:
       - iota-core
 
+  inx-indexer:
+    image: iotaledger/inx-indexer:2.0-alpha
+    stop_grace_period: 1m
+    command:
+      - "--inx.address=peer_master:9029"
+      - "--restAPI.bindAddress=inx-indexer:9091"
+    networks:
+      - iota-core
+
   peer_master2:
     image: docker-network-peer_master:latest
     stop_grace_period: 1m

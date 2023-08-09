@@ -42,3 +42,16 @@ services:
       --p2p.seed={{p2pSeed}}
       --blockIssuer.issuerAccount={{issuerAccount}}
       --blockIssuer.privateKey={{privKey}}
+      --inx.enabled=true
+      --inx.bindAddress=iota-core:9029
+
+  inx-indexer:
+    container_name: inx-indexer
+    image: iotaledger/inx-indexer:2.0-alpha
+    stop_grace_period: 5m
+    volumes:
+      - ./data:/app/database
+    command:
+      - "--inx.address=iota-core:9029"
+      - "--indexer.db.sqlite.path=database/indexer"
+      - "--restAPI.bindAddress=inx-indexer:9091"
