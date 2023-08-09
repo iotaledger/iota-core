@@ -159,11 +159,20 @@ func (m *Manager) Chain(ec iotago.CommitmentID) (chain *Chain) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	if commitment, exists := m.commitment(ec); exists {
+	if commitment, exists := m.Commitment(ec); exists {
 		return commitment.Chain()
 	}
 
 	return nil
+}
+
+func (m *Manager) Commitment(id iotago.CommitmentID) (commitment *ChainCommitment, exists bool) {
+	storage := m.commitmentsByID.Get(id.Index())
+	if storage == nil {
+		return nil, false
+	}
+
+	return storage.Get(id)
 }
 
 func (m *Manager) LoadCommitmentOrRequestMissing(id iotago.CommitmentID) *ChainCommitment {
@@ -185,7 +194,7 @@ func (m *Manager) Commitments(id iotago.CommitmentID, amount int) (commitments [
 	commitments = make([]*ChainCommitment, amount)
 
 	for i := 0; i < amount; i++ {
-		currentCommitment, _ := m.commitment(id)
+		currentCommitment, _ := m.Commitment(id)
 		if currentCommitment == nil {
 			return nil, ierrors.Wrap(ErrCommitmentUnknown, "not all commitments in the given range are known")
 		}
@@ -218,7 +227,7 @@ func (m *Manager) SwitchMainChain(head iotago.CommitmentID) error {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	commitment, _ := m.commitment(head)
+	commitment, _ := m.Commitment(head)
 	if commitment == nil {
 		return ierrors.Wrapf(ErrCommitmentUnknown, "unknown commitment %s", head)
 	}
@@ -277,15 +286,6 @@ func (m *Manager) getOrCreateCommitment(id iotago.CommitmentID) (commitment *Cha
 	return m.commitmentsByID.Get(id.Index(), true).GetOrCreate(id, func() *ChainCommitment {
 		return NewChainCommitment(id)
 	})
-}
-
-func (m *Manager) commitment(id iotago.CommitmentID) (commitment *ChainCommitment, exists bool) {
-	storage := m.commitmentsByID.Get(id.Index())
-	if storage == nil {
-		return nil, false
-	}
-
-	return storage.Get(id)
 }
 
 func (m *Manager) evaluateAgainstRootCommitment(commitment *iotago.Commitment) (isBelow, isRootCommitment bool) {
@@ -357,7 +357,7 @@ func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*Ch
 	for chain := commitment.Chain(); chain != m.rootCommitment.Chain(); chain = commitment.Chain() {
 		forkingCommitment = chain.ForkingPoint
 
-		if commitment, _ = m.commitment(forkingCommitment.Commitment().PrevID()); commitment == nil {
+		if commitment, _ = m.Commitment(forkingCommitment.Commitment().PrevID()); commitment == nil {
 			return nil, ierrors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingCommitment.Commitment().ID())
 		}
 	}
@@ -397,7 +397,7 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 		return nil
 	}
 
-	parentCommitment, _ := m.commitment(forkingPoint.Commitment().PrevID())
+	parentCommitment, _ := m.Commitment(forkingPoint.Commitment().PrevID())
 	if parentCommitment == nil {
 		return ierrors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingPoint.ID())
 	}
@@ -407,7 +407,7 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 
 	// For each forking point coming out of the main chain we need to reorg the children
 	for fp := commitment.Chain().ForkingPoint; ; {
-		fpParent, _ := m.commitment(fp.Commitment().PrevID())
+		fpParent, _ := m.Commitment(fp.Commitment().PrevID())
 
 		mainChild := fpParent.mainChild()
 		newChildChain := NewChain(mainChild)

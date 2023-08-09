@@ -100,7 +100,7 @@ func (t *TestFramework) commitment(alias string) *model.Commitment {
 }
 
 func (t *TestFramework) ChainCommitment(alias string) *ChainCommitment {
-	cm, exists := t.Instance.commitment(t.SlotCommitment(alias))
+	cm, exists := t.Instance.Commitment(t.SlotCommitment(alias))
 	require.True(t.test, exists)
 
 	return cm
@@ -165,7 +165,7 @@ func (t *TestFramework) AssertChainState(chains map[string]string) {
 			continue
 		}
 		if chainAlias == "evicted" {
-			_, exists := t.Instance.commitment(t.SlotCommitment(commitmentAlias))
+			_, exists := t.Instance.Commitment(t.SlotCommitment(commitmentAlias))
 			require.False(t.test, exists, "commitment %s should be evicted", commitmentAlias)
 			continue
 		}

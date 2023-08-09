@@ -9,18 +9,24 @@ import (
 )
 
 func (p *Protocol) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs []iotago.BlockID, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
-	// TODO: CHECK WHICH CHAIN ASKED FOR THE WARPSYNC
-	p.ChainManager.Chain(commitmentID)
+	// TODO: Only request blocks if we actually requested that slot (determine target chain).
+	targetChain := p.CandidateEngineInstance()
+
+	commitment, exists := p.ChainManager.Commitment(commitmentID)
+	if !exists {
+		return
+	}
 
 	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
 	for _, blockID := range blockIDs {
-		// a mapdb can newer return an error
-		_ = acceptedBlocks.Add(blockID)
+		_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
 	}
 
-	iotago.VerifyProof(merkleProof, iotago.Identifier(acceptedBlocks.Root()), iotago.Identifier{})
+	if !iotago.VerifyProof(merkleProof, iotago.Identifier(acceptedBlocks.Root()), commitment.Commitment().RootsID()) {
+		return
+	}
 
-	p.CandidateEngineInstance().BlockRequester.StartTickers(blockIDs)
+	targetChain.BlockRequester.StartTickers(blockIDs)
 }
 
 func (p *Protocol) processWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) {

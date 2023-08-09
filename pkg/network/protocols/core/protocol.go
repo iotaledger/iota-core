@@ -285,7 +285,7 @@ func (p *Protocol) onWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []
 		return
 	}
 
-	p.Events.WarpSyncResponseReceived.Trigger(iotago.CommitmentID(commitmentIDBytes), blockIDs, merkleProof, id)
+	p.Events.WarpSyncResponseReceived.Trigger(commitmentID, blockIDs, merkleProof, id)
 }
 
 func newPacket() proto.Message {
