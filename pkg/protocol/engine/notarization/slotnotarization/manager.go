@@ -116,7 +116,7 @@ func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 		return ierrors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
-	m.attestation.AddAttestationFromBlock(block)
+	m.attestation.AddAttestationFromValidationBlock(block)
 
 	return
 }
