@@ -82,8 +82,8 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 	if blockParams.SlotCommitment == nil {
 		selectedCommitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 		blockIndex := i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime)
-		minCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MinCommittableAge() + 1
-		maxCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MaxCommittableAge() + 1
+		minCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MinCommittableAge()
+		maxCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MaxCommittableAge()
 
 		// If the latest commitment is either too recent or too old for the given issuing time,
 		// then use the latest possible commitment.
@@ -209,11 +209,8 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 		selectedCommitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 		blockIndex := i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime)
 
-		// The "+1" element is there because we're comparing against 'blockIndex' which is in the middle of a slot
-		// and the oldest possible committed slot is 'minCommittableAge' full slots in the past.
-		// So we need to subtract 1 to account for the blockIndex slot that is not finished yet.
-		minCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MinCommittableAge() + 1
-		maxCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MaxCommittableAge() + 1
+		minCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MinCommittableAge()
+		maxCommittableAge := i.protocol.CurrentAPI().ProtocolParameters().MaxCommittableAge()
 
 		// If the latest commitment is either too recent or too old for the given issuing time,
 		// then use the latest possible commitment.
