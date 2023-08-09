@@ -312,11 +312,6 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		var roots iotago.Roots
 		lo.PanicOnErr(n.Protocol.APIForSlot(details.Commitment.Index()).Decode(rootsBytes, &roots))
 
-		printRoots := func(r iotago.Roots) string {
-			return fmt.Sprintf(
-				"Roots(%s): TangleRoot: %s, StateMutationRoot: %s, StateRoot: %s, AccountRoot: %s, AttestationsRoot: %s, CommitteeRoot: %s, RewardsRoot: %s, ProtocolParametersHash: %s", r.ID(), r.TangleRoot, r.StateMutationRoot, r.StateRoot, r.AccountRoot, r.AttestationsRoot, r.CommitteeRoot, r.RewardsRoot, r.ProtocolParametersHash)
-		}
-
 		attestationBlockIDs := make([]iotago.BlockID, 0)
 		tree, err := instance.Attestations.GetMap(details.Commitment.Index())
 		if err == nil {
@@ -328,7 +323,7 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 			require.NoError(n.Testing, err)
 		}
 
-		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks, printRoots(roots), attestationBlockIDs)
+		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks, roots, attestationBlockIDs)
 	})
 
 	events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
