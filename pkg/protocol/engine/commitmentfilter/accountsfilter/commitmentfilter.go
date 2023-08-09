@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -46,7 +47,7 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 
 			c.accountRetrieveFunc = e.Ledger.Account
 
-			e.Events.Filter.BlockPreAllowed.Hook(c.ProcessPreFilteredBlock)
+			e.Events.BlockDAG.BlockSolid.Hook(c.ProcessPreFilteredBlock)
 			e.Events.CommitmentFilter.LinkTo(c.events)
 
 			c.TriggerInitialized()
@@ -65,13 +66,13 @@ func New(apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *Co
 	)
 }
 
-func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
+func (c *CommitmentFilter) ProcessPreFilteredBlock(block *blocks.Block) {
 	c.evaluateBlock(block)
 }
 
-func (c *CommitmentFilter) evaluateBlock(block *model.Block) {
+func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	// check if the account exists in the specified slot.
-	accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Index())
+	accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Index())
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,

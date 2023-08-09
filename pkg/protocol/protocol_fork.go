@@ -138,18 +138,11 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 
 		p.ChainManager.ProcessCandidateCommitment(commitment)
 
-		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(commitment.ID()) {
-			err = p.ProcessBlock(tuple.A, tuple.B)
-			if err != nil {
-				p.ErrorHandler()(err)
-			}
-		}
-
 		if candidateEngineInstance.IsBootstrapped() &&
 			commitment.CumulativeWeight() > p.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
 			p.switchEngines()
 		}
-	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("ProcessCandidateCommitment", 2))).Unhook
+	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("ProcessCandidateCommitment", 1))).Unhook
 
 	// Clean up events when we switch to the candidate engine.
 	detachMainEngineSwitched = p.Events.MainEngineSwitched.Hook(func(_ *engine.Engine) {

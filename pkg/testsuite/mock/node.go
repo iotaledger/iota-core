@@ -273,7 +273,7 @@ func (n *Node) attachEngineLogs(instance *engine.Engine) {
 		n.Testing.Fatal("no blocks should be prefiltered")
 	})
 
-	events.CommitmentFilter.BlockAllowed.Hook(func(block *model.Block) {
+	events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] CommitmentFilter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
 	})
 
