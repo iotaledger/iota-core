@@ -79,8 +79,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsTick:                   DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 		optsGenesisTimestampOffset: 0,
 		optsLivenessThreshold:      3,
-		optsMinCommittableAge:      10,
-		optsMaxCommittableAge:      20,
+		optsMinCommittableAge:      11,
+		optsMaxCommittableAge:      21,
 		optsSlotsPerEpochExponent:  5,
 		optsEpochNearingThreshold:  16,
 	}, opts, func(t *TestSuite) {
@@ -280,7 +280,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, activeNodes []*mock.N
 	if latestCommittedSlot >= slot {
 		return parent
 	}
-	nextBlockSlot := lo.Min(slot+t.optsMinCommittableAge+1, latestCommittedSlot+t.optsMinCommittableAge+1)
+	nextBlockSlot := lo.Min(slot+t.optsMinCommittableAge, latestCommittedSlot+t.optsMinCommittableAge)
 	tip := parent
 	chainIndex := 0
 	for {
@@ -294,10 +294,10 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, activeNodes []*mock.N
 			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
 			tip = t.IssueBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
 		}
-		if nextBlockSlot == slot+t.optsMinCommittableAge+1 {
+		if nextBlockSlot == slot+t.optsMinCommittableAge {
 			break
 		}
-		nextBlockSlot = lo.Min(slot+t.optsMinCommittableAge+1, nextBlockSlot+t.optsMinCommittableAge+1)
+		nextBlockSlot = lo.Min(slot+t.optsMinCommittableAge, nextBlockSlot+t.optsMinCommittableAge)
 		chainIndex += 2
 	}
 
