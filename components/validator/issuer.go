@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
-	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -30,40 +29,26 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	var modelBlock *model.Block
-	if engineInstance.SybilProtection.SeatManager().Committee(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(accountID) {
-		var err error
-		modelBlock, err = deps.BlockIssuer.CreateValidationBlock(ctx,
-			blockfactory.WithIssuingTime(blockIssuingTime),
-			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
-			blockfactory.WithPayload(&iotago.TaggedData{
-				Tag: []byte("VALIDATOR BLOCK"),
-			}),
-		)
-		if err != nil {
-			Component.LogWarnf("error creating committee validator block: %s", err.Error())
+	modelBlock, err := deps.BlockIssuer.CreateValidationBlock(ctx,
+		blockfactory.WithIssuingTime(blockIssuingTime),
+		blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
+		blockfactory.WithPayload(&iotago.TaggedData{
+			Tag: []byte("VALIDATOR BLOCK"),
+		}),
+	)
+	if err != nil {
+		Component.LogWarnf("error creating validator block: %s", err.Error())
 
-			return
-		}
-	} else {
-		var err error
-		modelBlock, err = deps.BlockIssuer.CreateBlock(ctx,
-			blockfactory.WithIssuingTime(blockIssuingTime),
-			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
-			blockfactory.WithPayload(&iotago.TaggedData{
-				Tag: []byte("CANDIDATE BLOCK"),
-			}),
-		)
-		if err != nil {
-			Component.LogWarnf("error creating candidate validator block: %s", err.Error())
-
-			return
-		}
-
-		nextBroadcast = blockIssuingTime.Add(ParamsValidator.CommitteeBroadcastInterval)
+		return
 	}
 
-	if err := deps.BlockIssuer.IssueBlock(modelBlock); err != nil {
+	if !engineInstance.SybilProtection.SeatManager().Committee(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(accountID) {
+		// update nextBroadcast value here, so that this updated value is used in the `defer`
+		// callback to schedule issuing of the next block at a different interval than for committee members
+		nextBroadcast = blockIssuingTime.Add(ParamsValidator.CandidateBroadcastInterval)
+	}
+
+	if err = deps.BlockIssuer.IssueBlock(modelBlock); err != nil {
 		Component.LogWarnf("error issuing validator block: %s", err.Error())
 
 		return
