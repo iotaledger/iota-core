@@ -10,6 +10,12 @@ import (
 )
 
 func issueValidatorBlock(ctx context.Context) {
+	// Get the main engine instance in case it changes mid-execution.
+	engineInstance := deps.Protocol.MainEngineInstance()
+
+	// Get the latest commitment from the engine before to avoid race conditions if something is committed after we fix block issuing time.
+	latestCommitment := engineInstance.Storage.Settings().LatestCommitment()
+
 	blockIssuingTime := time.Now()
 	nextBroadcast := blockIssuingTime.Add(ParamsValidator.CommitteeBroadcastInterval)
 
@@ -18,17 +24,18 @@ func issueValidatorBlock(ctx context.Context) {
 		executor.ExecuteAt(accountID, func() { issueValidatorBlock(ctx) }, nextBroadcast)
 	}()
 
-	if !ParamsValidator.IgnoreBootstrapped && !deps.Protocol.MainEngineInstance().IsBootstrapped() {
+	if !ParamsValidator.IgnoreBootstrapped && !engineInstance.IsBootstrapped() {
 		Component.LogDebug("Not issuing validator block because node is not bootstrapped yet.")
 
 		return
 	}
 
 	var modelBlock *model.Block
-	if deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(accountID) {
+	if engineInstance.SybilProtection.SeatManager().Committee(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(accountID) {
 		var err error
 		modelBlock, err = deps.BlockIssuer.CreateValidationBlock(ctx,
 			blockfactory.WithIssuingTime(blockIssuingTime),
+			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
 			blockfactory.WithPayload(&iotago.TaggedData{
 				Tag: []byte("VALIDATOR BLOCK"),
 			}),
@@ -42,6 +49,7 @@ func issueValidatorBlock(ctx context.Context) {
 		var err error
 		modelBlock, err = deps.BlockIssuer.CreateBlock(ctx,
 			blockfactory.WithIssuingTime(blockIssuingTime),
+			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
 			blockfactory.WithPayload(&iotago.TaggedData{
 				Tag: []byte("CANDIDATE BLOCK"),
 			}),
