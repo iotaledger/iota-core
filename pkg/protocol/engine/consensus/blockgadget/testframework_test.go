@@ -94,7 +94,7 @@ func (t *TestFramework) CreateBlock(alias string, issuerAlias string, parents ..
 	_, priv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 
-	block, err := builder.NewBasicBlockBuilder(tpkg.TestAPI).
+	block, err := builder.NewValidationBlockBuilder(tpkg.TestAPI).
 		StrongParents(t.BlockIDs(parents...)).
 		Sign(t.SeatManager.AccountID(issuerAlias), priv).
 		IssuingTime(time.Now()).

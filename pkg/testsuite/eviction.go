@@ -22,10 +22,6 @@ func (t *TestSuite) AssertActiveRootBlocks(expectedBlocks []*blocks.Block, nodes
 		t.Eventually(func() error {
 			activeRootBlocks := node.Protocol.MainEngineInstance().EvictionState.ActiveRootBlocks()
 
-			if len(expectedBlocks) != len(activeRootBlocks) {
-				return ierrors.Errorf("AssertActiveRootBlocks: %s: expected %d active root blocks, got %d", node.Name, len(expectedBlocks), len(activeRootBlocks))
-			}
-
 			if !cmp.Equal(expectedRootBlocks, activeRootBlocks) {
 				return ierrors.Errorf("AssertActiveRootBlocks: %s: expected %v, got %v", node.Name, expectedRootBlocks, activeRootBlocks)
 			}

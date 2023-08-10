@@ -88,7 +88,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		totalweightslotgadget.NewProvider(),
 		sybilprotectionv1.NewProvider(sybilprotectionv1.WithInitialCommittee(accounts)),
 		slotnotarization.NewProvider(),
-		slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
+		slotattestation.NewProvider(),
 		opt.LedgerProvider(),
 		passthrough.NewProvider(),
 		tipmanagerv1.NewProvider(),

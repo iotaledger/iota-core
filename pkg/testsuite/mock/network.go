@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 )
 
-// region Network ////////////////////////////////////////////////////////////////////////////////////////////////
+// region network ////////////////////////////////////////////////////////////////////////////////////////////////
 
 const NetworkMainPartition = "main"
 
@@ -27,20 +27,40 @@ func NewNetwork() *Network {
 	}
 }
 
-func (n *Network) Join(endpointID network.PeerID, partition string) *Endpoint {
+func (n *Network) JoinWithEndpointID(endpointID network.PeerID, partition string) *Endpoint {
+	return n.JoinWithEndpoint(newMockedEndpoint(endpointID, n, partition), partition)
+}
+
+func (n *Network) JoinWithEndpoint(endpoint *Endpoint, newPartition string) *Endpoint {
 	n.dispatchersMutex.Lock()
 	defer n.dispatchersMutex.Unlock()
 
-	endpoint := newMockedEndpoint(endpointID, n, partition)
-
-	dispatchers, exists := n.dispatchersByPartition[partition]
-	if !exists {
-		dispatchers = make(map[network.PeerID]*Endpoint)
-		n.dispatchersByPartition[partition] = dispatchers
+	if endpoint.partition != newPartition {
+		n.deleteEndpointFromPartition(endpoint, endpoint.partition)
 	}
-	dispatchers[endpointID] = endpoint
+
+	n.addEndpointToPartition(endpoint, newPartition)
 
 	return endpoint
+}
+
+func (n *Network) addEndpointToPartition(endpoint *Endpoint, newPartition string) {
+	endpoint.partition = newPartition
+	dispatchers, exists := n.dispatchersByPartition[newPartition]
+	if !exists {
+		dispatchers = make(map[network.PeerID]*Endpoint)
+		n.dispatchersByPartition[newPartition] = dispatchers
+	}
+	dispatchers[endpoint.id] = endpoint
+}
+
+func (n *Network) deleteEndpointFromPartition(endpoint *Endpoint, partition string) {
+	endpoint.partition = ""
+	delete(n.dispatchersByPartition[partition], endpoint.id)
+
+	if len(n.dispatchersByPartition[partition]) == 0 {
+		delete(n.dispatchersByPartition, partition)
+	}
 }
 
 func (n *Network) MergePartitionsToMain(partitions ...string) {
@@ -56,18 +76,17 @@ func (n *Network) MergePartitionsToMain(partitions ...string) {
 			}
 		}
 	default:
-		for _, partitionID := range partitions {
-			n.mergePartition(partitionID)
+		for _, partition := range partitions {
+			n.mergePartition(partition)
 		}
 	}
 }
 
-func (n *Network) mergePartition(partitionID string) {
-	for _, endpoint := range n.dispatchersByPartition[partitionID] {
-		endpoint.partition = NetworkMainPartition
-		n.dispatchersByPartition[NetworkMainPartition][endpoint.id] = endpoint
+func (n *Network) mergePartition(partition string) {
+	for _, endpoint := range n.dispatchersByPartition[partition] {
+		n.addEndpointToPartition(endpoint, NetworkMainPartition)
 	}
-	delete(n.dispatchersByPartition, partitionID)
+	delete(n.dispatchersByPartition, partition)
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
