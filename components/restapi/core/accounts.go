@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -34,11 +35,18 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
 	}
-
+	rmcSlot, err := safemath.SafeSub(slotIndex, deps.Protocol.APIForSlot(slotIndex).ProtocolParameters().MaxCommittableAge())
+	if err != nil {
+		rmcSlot = 0
+	}
+	rmc, err := deps.Protocol.CandidateEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
+	if err != nil {
+		return nil, err
+	}
 	return &apimodels.CongestionResponse{
 		SlotIndex:            slotIndex,
 		Ready:                deps.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(accountID),
-		ReferenceManaCost:    0, // TODO: update after RMC is implemented
+		ReferenceManaCost:    rmc,
 		BlockIssuanceCredits: acc.Credits.Value,
 	}, nil
 }
