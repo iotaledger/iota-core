@@ -143,6 +143,11 @@ func (w *WarpSyncManager) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
+	if chainCommitment.Commitment().Index() <= latestCommitmentIndex+maxCommittableAge {
+		fmt.Println("WarpsyncManager.warpSyncIfNecessary: too close!")
+		return
+	}
+
 	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+maxCommittableAge; slotToWarpSync++ {
 		commitmentToSync := chain.Commitment(slotToWarpSync)
 		if commitmentToSync == nil {
