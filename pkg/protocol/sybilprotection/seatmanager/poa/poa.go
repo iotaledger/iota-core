@@ -1,6 +1,7 @@
 package poa
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -174,6 +175,7 @@ func (s *SeatManager) markSeatActive(seat account.SeatIndex, id iotago.AccountID
 	s.lastActivities.Set(seat, activityTime)
 
 	s.inactivityManager.ExecuteAfter(seat, func() { s.markSeatInactive(seat) }, activityTime.Add(s.optsActivityWindow).Sub(s.clock.Accepted().RelativeTime()))
+	fmt.Println("markSeatActive @ ", time.Now(), "seat:", seat, id, "activity time:", activityTime, "relative accepted time:", s.clock.Accepted().RelativeTime(), "mark inactive at", activityTime.Add(s.optsActivityWindow).Sub(s.clock.Accepted().RelativeTime()))
 }
 
 func (s *SeatManager) markSeatInactive(seat account.SeatIndex) {
