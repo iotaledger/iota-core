@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"time"
 
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -248,8 +249,15 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	blockBuilder.IssuingTime(*blockParams.IssuingTime)
 
 	// TODO: add workscore here with issue #264
-	rmc := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().RMC
-	blockBuilder.BurnedMana(rmc)
+	rmcSlot, err := safemath.SafeSub(api.TimeProvider().SlotFromTime(*blockParams.IssuingTime), api.ProtocolParameters().MaxCommittableAge())
+	if err != nil {
+		rmcSlot = 0
+	}
+	rmcCommitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(rmcSlot)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
+	}
+	blockBuilder.BurnedMana(rmcCommitment.Commitment().RMC)
 
 	if strongParents, exists := blockParams.References[iotago.StrongParentType]; exists && len(strongParents) > 0 {
 		blockBuilder.StrongParents(strongParents)

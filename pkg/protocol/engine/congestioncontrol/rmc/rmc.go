@@ -127,7 +127,7 @@ func (m *Manager) RMC(slot iotago.SlotIndex) (iotago.Mana, error) {
 	}
 	// this should never happen when checking the RMC for a slot that is not committed yet
 
-	if slot+m.apiProvider.CurrentAPI().ProtocolParameters().MaxCommittableAge() < m.latestCommittedSlot {
+	if slot+m.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge() < m.latestCommittedSlot {
 		return 0, ierrors.Errorf("cannot get RMC for slot %d: already evicted", slot)
 	}
 

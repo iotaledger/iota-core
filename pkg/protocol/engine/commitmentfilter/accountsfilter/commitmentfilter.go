@@ -1,9 +1,8 @@
 package accountsfilter
 
 import (
-	"github.com/iotaledger/hive.go/core/memstorage"
+	"github.com/iotaledger/hive.go/core/safemath"
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -25,8 +24,6 @@ var (
 type CommitmentFilter struct {
 	// Events contains the Events of the CommitmentFilter
 	events *commitmentfilter.Events
-	// futureBlocks contains blocks with a commitment in the future, that should not be passed to the blockdag yet.
-	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*model.Block]]
 
 	apiProvider api.Provider
 
@@ -65,9 +62,8 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 
 func New(apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
 	return options.Apply(&CommitmentFilter{
-		apiProvider:  apiProvider,
-		events:       commitmentfilter.NewEvents(),
-		futureBlocks: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*model.Block]](),
+		apiProvider: apiProvider,
+		events:      commitmentfilter.NewEvents(),
 	}, opts,
 	)
 }
@@ -96,12 +92,25 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 		return
 	}
 
-	// check that the block burns sufficient Mana
-	rmc, err := c.rmcRetrieveFunc(block.ProtocolBlock().SlotCommitmentID.Index())
+	// get the api for the block
+	blockAPI, err := c.apiProvider.APIForVersion(block.ProtocolBlock().BlockHeader.ProtocolVersion)
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: ierrors.Wrapf(err, "could not retrieve RMC for slot commitment %s", block.ProtocolBlock().SlotCommitmentID.Index()),
+			Reason: ierrors.Wrapf(err, "could not retrieve API for block version %d", block.ProtocolBlock().BlockHeader.ProtocolVersion),
+		})
+	}
+	// check that the block burns sufficient Mana
+	blockSlot := blockAPI.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
+	rmcSlot, err := safemath.SafeSub(blockSlot, blockAPI.ProtocolParameters().MaxCommittableAge())
+	if err != nil {
+		rmcSlot = 0
+	}
+	rmc, err := c.rmcRetrieveFunc(rmcSlot)
+	if err != nil {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(err, "could not retrieve RMC for slot commitment %s", rmcSlot),
 		})
 
 		return
@@ -162,7 +171,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 
 		return
 	}
-	signingMessage, err := block.ProtocolBlock().SigningMessage(c.apiProvider.LatestAPI())
+	signingMessage, err := block.ProtocolBlock().SigningMessage(blockAPI)
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
