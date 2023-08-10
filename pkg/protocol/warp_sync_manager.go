@@ -31,9 +31,10 @@ type WarpSyncManager struct {
 
 func NewWarpSyncManager(protocol *Protocol) *WarpSyncManager {
 	w := &WarpSyncManager{
-		protocol:  protocol,
-		workers:   protocol.Workers.CreatePool("WarpSyncManager", 1),
-		requester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
+		protocol:                  protocol,
+		workers:                   protocol.Workers.CreatePool("WarpSyncManager", 1),
+		requester:                 eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
+		verifiedWarpSyncResponses: ds.NewSet[iotago.CommitmentID](),
 	}
 
 	w.protocol.HookConstructed(func() {
