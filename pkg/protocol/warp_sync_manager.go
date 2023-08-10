@@ -55,6 +55,10 @@ func (w *WarpSyncManager) ProcessWarpSyncResponse(commitmentID iotago.Commitment
 		w.warpSyncResponseMutex.Lock(commitmentID)
 		defer w.warpSyncResponseMutex.Unlock(commitmentID)
 
+		if w.verifiedWarpSyncResponses.Has(commitmentID) {
+			return
+		}
+
 		chainCommitment, exists := w.protocol.ChainManager.Commitment(commitmentID)
 		if !exists {
 			return
@@ -73,6 +77,7 @@ func (w *WarpSyncManager) ProcessWarpSyncResponse(commitmentID iotago.Commitment
 		if !iotago.VerifyProof(merkleProof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.Commitment().RootsID()) {
 			return
 		}
+		w.verifiedWarpSyncResponses.Add(commitmentID)
 
 		w.requester.StopTicker(commitmentID)
 
