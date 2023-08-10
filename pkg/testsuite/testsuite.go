@@ -78,8 +78,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsTick:                   DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 		optsGenesisTimestampOffset: 0,
 		optsLivenessThreshold:      3,
-		optsMinCommittableAge:      11,
-		optsMaxCommittableAge:      21,
+		optsMinCommittableAge:      10,
+		optsMaxCommittableAge:      20,
 		optsSlotsPerEpochExponent:  5,
 		optsEpochNearingThreshold:  16,
 	}, opts, func(t *TestSuite) {
