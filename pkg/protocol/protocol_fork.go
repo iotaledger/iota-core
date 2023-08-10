@@ -96,6 +96,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 		p.ErrorHandler()(ierrors.Wrap(err, "error creating new candidate engine"))
 		return
 	}
+	p.warpSyncManager.MonitorEngine(candidateEngineInstance)
 
 	// Set the chain to the correct forking point
 	candidateEngineInstance.SetChainID(fork.ForkingPoint.ID())

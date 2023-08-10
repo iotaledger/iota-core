@@ -61,6 +61,7 @@ type Protocol struct {
 	context                 context.Context
 	Events                  *Events
 	SyncManager             syncmanager.SyncManager
+	warpSyncManager         *WarpSyncManager
 	engineManager           *enginemanager.EngineManager
 	ChainManager            *chainmanager.Manager
 	unsolidCommitmentBlocks *blockbuffer.UnsolidCommitmentBlocks[*types.Tuple[*model.Block, network.PeerID]]
@@ -127,6 +128,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsBaseDirectory:           "",
 		optsChainSwitchingThreshold: 3,
 	}, opts,
+		(*Protocol).initWarpSyncManager,
 		(*Protocol).initEngineManager,
 		(*Protocol).initChainManager,
 	)
@@ -198,6 +200,10 @@ func (p *Protocol) shutdown() {
 	p.SyncManager.Shutdown()
 }
 
+func (p *Protocol) initWarpSyncManager() {
+	p.warpSyncManager = NewWarpSyncManager(p)
+}
+
 func (p *Protocol) initEngineManager() {
 	p.engineManager = enginemanager.New(
 		p.Workers.CreateGroup("EngineManager"),
@@ -228,6 +234,8 @@ func (p *Protocol) initEngineManager() {
 	if err != nil {
 		panic(fmt.Sprintf("could not load active engine: %s", err))
 	}
+	p.warpSyncManager.MonitorEngine(mainEngine)
+
 	p.mainEngine = mainEngine
 }
 
