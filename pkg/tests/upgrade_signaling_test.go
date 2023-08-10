@@ -20,11 +20,10 @@ import (
 )
 
 func Test_Upgrade_Signaling(t *testing.T) {
-	t.Skip("TODO: re-enable this test")
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithLivenessThreshold(1),
 		testsuite.WithMinCommittableAge(1),
-		testsuite.WithMaxCommittableAge(2),
+		testsuite.WithMaxCommittableAge(3),
 		testsuite.WithEpochNearingThreshold(2),
 		testsuite.WithSlotsPerEpochExponent(3),
 		testsuite.WithGenesisTimestampOffset(1000*10),
@@ -39,7 +38,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			),
 		),
 		protocol.WithEngineOptions(
-			engine.WithRequesterOptions(
+			engine.WithBlockRequesterOptions(
 				eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
 				eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
 			),
@@ -53,7 +52,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.AddNode("nodeE")
 	ts.AddNode("nodeF")
 
-	ts.Run(map[string][]options.Option[protocol.Protocol]{
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
 		"nodeA": nodeOptions,
 		"nodeB": nodeOptions,
 		"nodeC": nodeOptions,
@@ -61,7 +60,6 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		"nodeE": nodeOptions,
 		"nodeF": nodeOptions,
 	})
-	ts.HookLogging()
 
 	ts.Wait()
 
@@ -75,29 +73,33 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		"nodeD": {blockfactory.WithHighestSupportedVersion(5), blockfactory.WithProtocolParametersHash(hash2)},
 	}
 
-	issueBlocksAtSlotsInEpoch(ts, 1, []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7}, issuingOptions)
-	issueBlocksAtSlotsInEpoch(ts, 2, []iotago.SlotIndex{0, 1, 2, 3, 4, 5, 6, 7}, issuingOptions)
-	issueBlocksAtSlotsInEpoch(ts, 3, []iotago.SlotIndex{0, 1, 2, 3, 4, 5, 6, 7}, issuingOptions)
-	issueBlocksAtSlotsInEpoch(ts, 4, []iotago.SlotIndex{0, 1, 2, 3, 4, 5, 6, 7}, issuingOptions)
-	issueBlocksAtSlotsInEpoch(ts, 5, []iotago.SlotIndex{0, 1, 2, 3, 4, 5, 6}, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 1, 4, "Genesis", ts.Nodes(), true, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 2, 4, "7.3", ts.Nodes(), true, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 3, 4, "15.3", ts.Nodes(), true, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 4, 4, "23.3", ts.Nodes(), true, issuingOptions)
+
+	// Epoch 5: revoke vote of nodeA in last slot of epoch.
+	ts.IssueBlocksAtSlots("", ts.SlotsForEpoch(5)[:ts.API.TimeProvider().EpochDurationSlots()-1], 4, "31.3", ts.Nodes(), true, issuingOptions)
 
 	issuingOptionsRevoke := lo.MergeMaps(map[string][]options.Option[blockfactory.BlockParams]{}, issuingOptions)
 	issuingOptionsRevoke["nodeA"] = []options.Option[blockfactory.BlockParams]{blockfactory.WithHighestSupportedVersion(5), blockfactory.WithProtocolParametersHash(iotago.Identifier{})}
-	issueBlocksAtSlotsInEpoch(ts, 5, []iotago.SlotIndex{7}, issuingOptionsRevoke)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{39}, 4, "38.3", ts.Nodes(), true, issuingOptionsRevoke)
 
-	issueBlocksAtSlotsInEpoch(ts, 6, []iotago.SlotIndex{0, 1, 2, 3, 4}, issuingOptions)
+	// Epoch 6: issue half before restarting and half after restarting.
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{40, 41, 42, 43}, 4, "39.3", ts.Nodes(), true, issuingOptions)
 
 	{
+		var expectedRootBlocks []*blocks.Block
+		for _, slot := range []iotago.SlotIndex{39, 40, 41} {
+			expectedRootBlocks = append(expectedRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+		}
+
 		ts.AssertNodeState(ts.Nodes(),
-			testsuite.WithLatestCommitmentSlotIndex(40),
-			testsuite.WithActiveRootBlocks(ts.Blocks(
-				"5.6-nodeA", "5.6-nodeB", "5.6-nodeC", "5.6-nodeD",
-				"5.7-nodeA", "5.7-nodeB", "5.7-nodeC", "5.7-nodeD",
-				"6.0-nodeA", "6.0-nodeB", "6.0-nodeC", "6.0-nodeD",
-			)),
+			testsuite.WithLatestCommitmentSlotIndex(41),
+			testsuite.WithActiveRootBlocks(expectedRootBlocks),
 		)
 
-		// Shutdown nodeA and restart it from disk. Verify state.
+		// Shutdown nodeE and restart it from disk. Verify state.
 		{
 			nodeE := ts.Node("nodeE")
 			nodeE.Shutdown()
@@ -105,12 +107,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 			nodeE1 := ts.AddNode("nodeE.1")
 			nodeE1.CopyIdentityFromNode(nodeE)
-			nodeE1.Initialize(
+			nodeE1.Initialize(true,
 				append(nodeOptions,
 					protocol.WithBaseDirectory(ts.Directory.Path(nodeE.Name)),
 				)...,
 			)
-			nodeE1.HookLogging()
 			ts.Wait()
 		}
 
@@ -120,7 +121,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 		{
 			nodeG := ts.AddNode("nodeG")
-			nodeG.Initialize(
+			nodeG.Initialize(true,
 				append(nodeOptions,
 					protocol.WithSnapshotPath(snapshotPath),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeG.Name)),
@@ -129,19 +130,21 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			ts.Wait()
 
 			ts.AssertNodeState(ts.Nodes(),
-				testsuite.WithLatestCommitmentSlotIndex(40),
-				testsuite.WithActiveRootBlocks(ts.Blocks(
-					"5.6-nodeA", "5.6-nodeB", "5.6-nodeC", "5.6-nodeD",
-					"5.7-nodeA", "5.7-nodeB", "5.7-nodeC", "5.7-nodeD",
-					"6.0-nodeA", "6.0-nodeB", "6.0-nodeC", "6.0-nodeD",
-				)),
+				testsuite.WithLatestCommitmentSlotIndex(41),
+				testsuite.WithActiveRootBlocks(expectedRootBlocks),
 			)
 		}
 	}
 
-	issueBlocksAtSlotsInEpoch(ts, 6, []iotago.SlotIndex{5, 6, 7}, issuingOptions)
-	issueBlocksAtSlotsInEpoch(ts, 7, []iotago.SlotIndex{0, 1, 2, 3, 4, 5, 6, 7}, issuingOptions)
-	issueBlocksAtSlotsInEpoch(ts, 8, []iotago.SlotIndex{0, 1, 2, 3, 4, 5, 6, 7}, issuingOptions)
+	// Can only continue to issue on nodeA, nodeB, nodeC, nodeD, nodeF. nodeE and nodeG were just restarted and don't have the latest unaccepted state.
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{44}, 4, "43.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, issuingOptions)
+
+	// TODO: would be great to dynamically add accounts for later nodes.
+	// Can't issue on nodeG as its account is not known.
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, issuingOptions)
+
+	ts.IssueBlocksAtEpoch("", 7, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, issuingOptions)
+	ts.IssueBlocksAtEpoch("", 8, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, issuingOptions)
 
 	ts.AssertEpochVersions(map[iotago.Version]iotago.EpochIndex{
 		3: 0,
@@ -157,47 +160,4 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		3: lo.PanicOnErr(ts.API.ProtocolParameters().Hash()),
 		5: hash1,
 	}, ts.Nodes()...)
-}
-
-func issueBlocksAtSlotsInEpoch(ts *testsuite.TestSuite, epoch iotago.EpochIndex, slotsWithinEpoch []iotago.SlotIndex, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) {
-	for _, slotWithinEpoch := range slotsWithinEpoch {
-		parentsPrefix := fmt.Sprintf("%d.%d", epoch, slotWithinEpoch-1)
-		if epoch == 1 && slotWithinEpoch == 1 {
-			parentsPrefix = fmt.Sprintf("Genesis")
-		} else if slotWithinEpoch == 0 {
-			parentsPrefix = fmt.Sprintf("%d.%d", epoch-1, 7)
-		}
-
-		issuedBlocks := issueBlockAllNodes(ts, epoch, slotWithinEpoch, ts.BlockIDsWithPrefix(parentsPrefix), issuingOptions)
-
-		actualSlot := ts.API.TimeProvider().EpochStart(epoch) + slotWithinEpoch
-		// We can assert only after slot 5:
-		// MinCommittableAge=1 -> when we accept in slot 3 we can commit slot 1.
-		// Since we issue per slot only once, we accept in slot 3 when issuing in slot 5.
-		if actualSlot >= 5 {
-			ts.AssertCommitmentSlotIndexExists(actualSlot-4, ts.Nodes()...)
-		} else {
-			ts.AssertBlocksExist(issuedBlocks, true, ts.Nodes()...)
-		}
-	}
-}
-
-func issueBlockAllNodes(ts *testsuite.TestSuite, epoch iotago.EpochIndex, slotWithinEpoch iotago.SlotIndex, strongParents iotago.BlockIDs, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) []*blocks.Block {
-	issuedBlocks := make([]*blocks.Block, 0)
-
-	if issuingOptions == nil {
-		issuingOptions = make(map[string][]options.Option[blockfactory.BlockParams])
-	}
-
-	for _, node := range ts.Validators() {
-		blockAlias := fmt.Sprintf("%d.%d-%s", epoch, slotWithinEpoch, node.Name)
-		if strongParents != nil {
-			issuingOptions[node.Name] = append(issuingOptions[node.Name], blockfactory.WithStrongParents(strongParents...))
-		}
-
-		b := ts.IssueValidationBlockAtSlotWithinEpochWithOptions(blockAlias, epoch, slotWithinEpoch, node, issuingOptions[node.Name]...)
-		issuedBlocks = append(issuedBlocks, b)
-	}
-
-	return issuedBlocks
 }

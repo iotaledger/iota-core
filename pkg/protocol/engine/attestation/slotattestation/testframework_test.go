@@ -67,13 +67,20 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		return accounts.SelectCommittee(members...)
 	}
 
+	testAPI := iotago.V3API(
+		iotago.NewV3ProtocolParameters(
+			iotago.WithNetworkOptions("TestJungle", "tgl"),
+			iotago.WithSupplyOptions(10000, 0, 0, 0, 0, 0),
+			iotago.WithLivenessOptions(1, 1, 2, 8),
+		),
+	)
+
 	t.Instance = slotattestation.NewManager(
 		0,
 		0,
-		2,
 		bucketedStorage,
 		committeeFunc,
-		api.SingleVersionProvider(tpkg.TestAPI),
+		api.SingleVersionProvider(testAPI),
 	)
 
 	return t
