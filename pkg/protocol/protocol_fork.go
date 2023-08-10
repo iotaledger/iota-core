@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
@@ -29,6 +28,7 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 
 	commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Index())
 	if err != nil {
+		p.ErrorHandler()(ierrors.Wrapf(err, "failed to load commitment %s", commitmentID))
 		return
 	}
 
@@ -38,15 +38,18 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 
 	attestations, err := mainEngine.Attestations.Get(commitmentID.Index())
 	if err != nil {
+		p.ErrorHandler()(ierrors.Wrapf(err, "failed to load attestations for commitment %s", commitmentID))
 		return
 	}
 
 	rootsStorage := mainEngine.Storage.Roots(commitmentID.Index())
 	if rootsStorage == nil {
+		p.ErrorHandler()(ierrors.Errorf("failed to load roots for commitment %s", commitmentID))
 		return
 	}
 	rootsBytes, err := rootsStorage.Get(kvstore.Key{prunable.RootsKey})
 	if err != nil {
+		p.ErrorHandler()(ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID))
 		return
 	}
 	var roots iotago.Roots
@@ -121,25 +124,25 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	}
 
 	// Attach slot commitments to the chain manager and detach as soon as we switch to that engine
-	detachProcessCommitment = candidateEngineInstance.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+	detachProcessCommitment = candidateEngineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		// Check whether the commitment produced by syncing the candidate engine is actually part of the forked chain.
-		if fork.ForkedChain.LatestCommitment().ID().Index() >= details.Commitment.Index() {
-			forkedChainCommitmentID := fork.ForkedChain.Commitment(details.Commitment.Index()).ID()
-			if forkedChainCommitmentID != details.Commitment.ID() {
-				p.ErrorHandler()(ierrors.Errorf("candidate engine %s produced a commitment %s that is not part of the forked chain %s", candidateEngineInstance.Name(), details.Commitment.ID(), forkedChainCommitmentID))
+		if fork.ForkedChain.LatestCommitment().ID().Index() >= commitment.Index() {
+			forkedChainCommitmentID := fork.ForkedChain.Commitment(commitment.Index()).ID()
+			if forkedChainCommitmentID != commitment.ID() {
+				p.ErrorHandler()(ierrors.Errorf("candidate engine %s produced a commitment %s that is not part of the forked chain %s", candidateEngineInstance.Name(), commitment.ID(), forkedChainCommitmentID))
 				cleanupFunc()
 
 				return
 			}
 		}
 
-		p.ChainManager.ProcessCandidateCommitment(details.Commitment)
+		p.ChainManager.ProcessCandidateCommitment(commitment)
 
 		if candidateEngineInstance.IsBootstrapped() &&
-			details.Commitment.CumulativeWeight() > p.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
+			commitment.CumulativeWeight() > p.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
 			p.switchEngines()
 		}
-	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("ProcessCandidateCommitment", 2))).Unhook
+	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("ProcessCandidateCommitment", 1))).Unhook
 
 	// Clean up events when we switch to the candidate engine.
 	detachMainEngineSwitched = p.Events.MainEngineSwitched.Hook(func(_ *engine.Engine) {
@@ -161,9 +164,6 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 		}
 	}()
 
-	// Add all the blocks from the forking point attestations to the requester since those will not be passed to the engine by the protocol
-	candidateEngineInstance.BlockRequester.StartTickers(blockIDs)
-
 	// Set the engine as the new candidate
 	p.activeEngineMutex.Lock()
 	oldCandidateEngine := p.candidateEngine
@@ -172,6 +172,9 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 		cleanupFunc: cleanupFunc,
 	}
 	p.activeEngineMutex.Unlock()
+
+	// Add all the blocks from the forking point attestations to the requester since those will not be passed to the engine by the protocol
+	candidateEngineInstance.BlockRequester.StartTickers(blockIDs)
 
 	p.Events.CandidateEngineActivated.Trigger(candidateEngineInstance)
 
@@ -196,7 +199,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	ch := make(chan *commitmentVerificationResult)
 	defer close(ch)
 
-	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.ForkingPoint)
+	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.MainChain.Commitment(fork.ForkingPoint.Index()-1).Commitment())
 	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
 		blockIDs, actualCumulativeWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 
@@ -233,9 +236,9 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	}
 
 	var heavierCount int
-	// We start from the forking point + AttestationCommitmentOffset as that is where the CW of the chains starts diverging.
-	// Only at this slot can nodes start to commit to the different chains.
-	start := fork.ForkingPoint.Index() + p.MainEngineInstance().Attestations.AttestationCommitmentOffset()
+	// We start from the forking point to have all starting blocks for each slot. Even though the chain weight will only
+	// start to diverge at forking point + AttestationCommitmentOffset.
+	start := fork.ForkingPoint.Index()
 	end := fork.ForkedChain.LatestCommitment().ID().Index()
 	for i := start; i <= end; i++ {
 		mainChainChainCommitment := fork.MainChain.Commitment(i)

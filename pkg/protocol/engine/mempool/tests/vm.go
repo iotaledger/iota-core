@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-func VM(_ context.Context, inputTransaction mempool.Transaction, _ []mempool.State) (outputs []mempool.State, err error) {
+func VM(_ context.Context, inputTransaction mempool.Transaction, _ []mempool.OutputState, _ mempool.ContextState) (outputs []mempool.OutputState, err error) {
 	transaction, ok := inputTransaction.(*Transaction)
 	if !ok {
 		return nil, ierrors.New("invalid transaction type in MockedVM")

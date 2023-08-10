@@ -2,10 +2,12 @@ package account
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/stringify"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -89,4 +91,14 @@ func (s *SeatedAccounts) Accounts() *Accounts {
 	})
 
 	return accounts
+}
+
+func (s *SeatedAccounts) String() string {
+	builder := stringify.NewStructBuilder("SeatedAccounts")
+
+	for accountID, seat := range s.seatsByAccount.AsMap() {
+		builder.AddField(stringify.NewStructField(fmt.Sprintf("seat%d", seat), accountID))
+	}
+
+	return builder.String()
 }
