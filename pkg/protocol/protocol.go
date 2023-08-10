@@ -241,8 +241,6 @@ func (p *Protocol) initEngineManager() {
 	if err != nil {
 		panic(fmt.Sprintf("could not load active engine: %s", err))
 	}
-	p.warpSyncManager.MonitorEngine(mainEngine)
-
 	p.mainEngine = mainEngine
 }
 

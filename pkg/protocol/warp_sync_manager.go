@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -17,27 +18,29 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-const (
-	WarpSyncRetryInterval = 1 * time.Minute
-)
-
 type WarpSyncManager struct {
-	protocol                  *Protocol
-	workers                   *workerpool.WorkerPool
-	requester                 *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
-	verifiedWarpSyncResponses ds.Set[iotago.CommitmentID]
+	protocol          *Protocol
+	workerPool        *workerpool.WorkerPool
+	pendingRequests   *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+	processedRequests ds.Set[iotago.CommitmentID]
+	isShutdown        reactive.Event
 }
 
 func NewWarpSyncManager(protocol *Protocol) *WarpSyncManager {
 	w := &WarpSyncManager{
-		protocol:                  protocol,
-		workers:                   protocol.Workers.CreatePool("WarpSyncManager", 1),
-		requester:                 eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
-		verifiedWarpSyncResponses: ds.NewSet[iotago.CommitmentID](),
+		protocol:          protocol,
+		workerPool:        protocol.Workers.CreatePool("WarpSyncManager", 1),
+		pendingRequests:   eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
+		processedRequests: ds.NewSet[iotago.CommitmentID](),
+		isShutdown:        reactive.NewEvent(),
 	}
 
 	w.protocol.HookConstructed(func() {
-		w.protocol.ChainManager.Events.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
+		w.monitorLatestCommitmentUpdated(protocol.mainEngine)
+
+		protocol.engineManager.OnEngineCreated(w.monitorLatestCommitmentUpdated)
+
+		protocol.ChainManager.Events.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
 			chainCommitment.IsSolid().OnTrigger(func() {
 				w.warpSyncIfNecessary(w.targetEngine(chainCommitment), chainCommitment)
 			})
@@ -47,91 +50,118 @@ func NewWarpSyncManager(protocol *Protocol) *WarpSyncManager {
 	return w
 }
 
-func (w *WarpSyncManager) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
-	w.workers.Submit(func() {
-		if w.verifiedWarpSyncResponses.Has(commitmentID) {
-			return
-		}
-
-		chainCommitment, exists := w.protocol.ChainManager.Commitment(commitmentID)
-		if !exists {
-			return
-		}
-
-		targetEngine := w.targetEngine(chainCommitment)
-		if targetEngine == nil {
-			return
-		}
-
-		acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
-		for _, blockID := range blockIDs {
-			_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
-		}
-
-		if !iotago.VerifyProof(merkleProof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.Commitment().RootsID()) {
-			return
-		}
-		w.verifiedWarpSyncResponses.Add(commitmentID)
-
-		w.requester.StopTicker(commitmentID)
-
-		for _, blockID := range blockIDs {
-			targetEngine.BlockDAG.GetOrRequestBlock(blockID)
-		}
-	})
-}
-
 func (w *WarpSyncManager) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
-	w.workers.Submit(func() {
-		committedSlot, err := w.protocol.MainEngineInstance().CommittedSlot(commitmentID.Index())
-		if err != nil {
-			fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: committedSlot == nil")
-			return
+	w.isShutdown.Compute(func(isShutdown bool) bool {
+		if !isShutdown {
+			w.workerPool.Submit(func() {
+				w.processWarpSyncRequest(commitmentID, src)
+			})
 		}
 
-		commitment, err := committedSlot.Commitment()
-		if err != nil || commitment.ID() != commitmentID {
-			fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: commitment == nil")
-			return
-		}
-
-		blockIDs, err := committedSlot.BlockIDs()
-		if err != nil {
-			fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: blockIDs == nil")
-			return
-		}
-
-		roots, err := committedSlot.Roots()
-		if err != nil {
-			fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: roots == nil")
-			return
-		}
-
-		w.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.AttestationsProof(), src)
+		return isShutdown
 	})
 }
 
-func (w *WarpSyncManager) MonitorEngine(engineInstance *engine.Engine) {
+func (w *WarpSyncManager) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
+	w.isShutdown.Compute(func(isShutdown bool) bool {
+		if !isShutdown {
+			w.workerPool.Submit(func() {
+				w.processWarpSyncResponse(commitmentID, blockIDs, merkleProof)
+			})
+		}
+
+		return isShutdown
+	})
+}
+
+func (w *WarpSyncManager) monitorLatestCommitmentUpdated(engineInstance *engine.Engine) {
 	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		chainCommitment, exists := w.protocol.ChainManager.Commitment(commitment.ID())
 		if !exists {
 			return
 		}
 
-		w.verifiedWarpSyncResponses.Delete(commitment.ID())
+		w.processedRequests.Delete(commitment.ID())
 
 		maxCommittableAge := engineInstance.APIForSlot(commitment.Index()).ProtocolParameters().MaxCommittableAge()
 		warpSyncCommitment := chainCommitment.Chain().Commitment(commitment.Index() + maxCommittableAge)
 		if warpSyncCommitment != nil {
-			w.requester.StartTicker(warpSyncCommitment.ID())
+			w.pendingRequests.StartTicker(warpSyncCommitment.ID())
 		}
 	}).Unhook)
 }
 
 func (w *WarpSyncManager) Shutdown() {
-	w.requester.Shutdown()
+	w.pendingRequests.Shutdown()
 
-	w.workers.Shutdown(true).ShutdownComplete.Wait()
+	w.workerPool.Shutdown(true).ShutdownComplete.Wait()
+}
+
+func (w *WarpSyncManager) IsShutdown() reactive.Event {
+	return w.isShutdown
+}
+
+func (w *WarpSyncManager) processWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
+	// TODO: check if the peer is allowed to request the warp sync
+
+	committedSlot, err := w.protocol.MainEngineInstance().CommittedSlot(commitmentID.Index())
+	if err != nil {
+		fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: committedSlot == nil")
+		return
+	}
+
+	commitment, err := committedSlot.Commitment()
+	if err != nil || commitment.ID() != commitmentID {
+		fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: commitment == nil")
+		return
+	}
+
+	blockIDs, err := committedSlot.BlockIDs()
+	if err != nil {
+		fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: blockIDs == nil")
+		return
+	}
+
+	roots, err := committedSlot.Roots()
+	if err != nil {
+		fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: roots == nil")
+		return
+	}
+
+	w.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.AttestationsProof(), src)
+}
+
+func (w *WarpSyncManager) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier]) {
+	if w.processedRequests.Has(commitmentID) {
+		return
+	}
+
+	chainCommitment, exists := w.protocol.ChainManager.Commitment(commitmentID)
+	if !exists {
+		return
+	}
+
+	targetEngine := w.targetEngine(chainCommitment)
+	if targetEngine == nil {
+		return
+	}
+
+	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
+	for _, blockID := range blockIDs {
+		_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
+	}
+
+	if !iotago.VerifyProof(merkleProof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.Commitment().RootsID()) {
+		return
+	}
+
+	w.pendingRequests.StopTicker(commitmentID)
+
+	w.processedRequests.Add(commitmentID)
+
+	for _, blockID := range blockIDs {
+		targetEngine.BlockDAG.GetOrRequestBlock(blockID)
+	}
 }
 
 func (w *WarpSyncManager) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
@@ -156,7 +186,7 @@ func (w *WarpSyncManager) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 		}
 
 		fmt.Println("WarpSyncManager.warpSyncIfNecessary: WarpSyncing", commitmentToSync.ID())
-		w.requester.StartTicker(commitmentToSync.ID())
+		w.pendingRequests.StartTicker(commitmentToSync.ID())
 	}
 }
 
@@ -175,3 +205,7 @@ func (w *WarpSyncManager) targetEngine(commitment *chainmanager.ChainCommitment)
 
 	return nil
 }
+
+const (
+	WarpSyncRetryInterval = 1 * time.Minute
+)

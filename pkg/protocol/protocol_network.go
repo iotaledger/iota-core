@@ -68,7 +68,7 @@ func (p *Protocol) runNetworkProtocol() {
 	p.Events.Network.WarpSyncRequestReceived.Hook(p.warpSyncManager.ProcessWarpSyncRequest, event.WithWorkerPool(wpWarpSync))
 	p.Events.Network.WarpSyncResponseReceived.Hook(p.warpSyncManager.ProcessWarpSyncResponse, event.WithWorkerPool(wpWarpSync))
 
-	p.warpSyncManager.requester.Events.Tick.Hook(func(id iotago.CommitmentID) {
+	p.warpSyncManager.pendingRequests.Events.Tick.Hook(func(id iotago.CommitmentID) {
 		p.networkProtocol.SendWarpSyncRequest(id)
 	})
 }
