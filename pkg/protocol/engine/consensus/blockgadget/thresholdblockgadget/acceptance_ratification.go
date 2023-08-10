@@ -8,11 +8,9 @@ import (
 )
 
 func (g *Gadget) trackAcceptanceRatifierWeight(votingBlock *blocks.Block) {
-	ratifier := votingBlock.ProtocolBlock().IssuerID
-
 	// Only track ratifier weight for issuers that are part of the committee.
-	seat, exists := g.seatManager.Committee(votingBlock.ID().Index()).GetSeat(ratifier)
-	if !exists {
+	seat, isValid := g.isCommitteeValidationBlock(votingBlock)
+	if !isValid {
 		return
 	}
 

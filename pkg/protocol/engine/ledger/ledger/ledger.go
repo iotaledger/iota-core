@@ -207,7 +207,7 @@ func (l *Ledger) AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error
 	return l.utxoLedger.AddGenesisUnspentOutput(unspentOutput)
 }
 
-func (l *Ledger) BlockAccepted(block *blocks.Block) {
+func (l *Ledger) TrackBlock(block *blocks.Block) {
 	l.accountsLedger.TrackBlock(block)
 
 	if _, hasTransaction := block.Transaction(); hasTransaction {

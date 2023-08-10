@@ -12,7 +12,7 @@ import (
 )
 
 type SybilProtection interface {
-	BlockAccepted(block *blocks.Block)
+	TrackValidationBlock(block *blocks.Block)
 	EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error)
 	OrderedRegisteredValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error)
 	IsActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) bool

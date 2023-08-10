@@ -138,7 +138,7 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochInde
 			block := tpkg.RandBasicBlockWithIssuerAndBurnedMana(accountID, 10)
 			block.IssuingTime = t.API.TimeProvider().SlotStartTime(slot)
 			modelBlock, err := model.BlockFromBlock(block, t.API)
-			t.Instance.BlockAccepted(blocks.NewBlock(modelBlock))
+			t.Instance.TrackValidationBlock(blocks.NewBlock(modelBlock))
 
 			require.NoError(t.T, err)
 		}

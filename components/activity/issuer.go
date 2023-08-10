@@ -13,7 +13,7 @@ func issueActivityBlock(ctx context.Context) {
 		return
 	}
 
-	modelBlock, err := deps.BlockIssuer.CreateBlock(ctx, blockfactory.WithPayload(&iotago.TaggedData{
+	modelBlock, err := deps.BlockIssuer.CreateValidationBlock(ctx, blockfactory.WithPayload(&iotago.TaggedData{
 		Tag: []byte("ACTIVITY"),
 	}))
 	if err != nil {
