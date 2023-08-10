@@ -74,6 +74,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 	}
 
 	if blockParams.References == nil {
+		// TODO: change this to get references for validator block
 		references, err := i.getReferences(ctx, blockParams.Payload, blockParams.ParentsCount)
 		if err != nil {
 			return nil, ierrors.Wrap(err, "error building block")
