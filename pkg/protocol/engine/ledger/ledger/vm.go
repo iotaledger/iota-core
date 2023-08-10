@@ -131,23 +131,3 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 	return created, nil
 }
-
-func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.Commitment, error) {
-	c, err := l.commitmentLoader(inputCommitmentID.Index())
-	if err != nil {
-		return nil, ierrors.Wrap(err, "could not get commitment inputs")
-	}
-	// The commitment with the specified ID was not found at that index: we are on a different chain.
-	if c == nil {
-		return nil, ierrors.Errorf("commitment with ID %s not found at index %d: engine on different chain", inputCommitmentID, inputCommitmentID.Index())
-	}
-	storedCommitmentID, err := c.Commitment().ID()
-	if err != nil {
-		return nil, ierrors.Wrap(err, "could not compute commitment ID")
-	}
-	if storedCommitmentID != inputCommitmentID {
-		return nil, ierrors.Errorf("commitment ID of input %s different to stored commitment %s", inputCommitmentID, storedCommitmentID)
-	}
-
-	return c.Commitment(), nil
-}

@@ -235,7 +235,6 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 				}
 			case iotago.InputBlockIssuanceCredit, iotago.InputReward:
 			default:
-				// TODO: how to handle error?
 				panic(ierrors.New("invalid state type resolved"))
 			}
 
