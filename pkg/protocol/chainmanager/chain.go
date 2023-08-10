@@ -1,6 +1,7 @@
 package chainmanager
 
 import (
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -31,10 +32,7 @@ func NewChain(forkingPoint *ChainCommitment) (fork *Chain) {
 	return c
 }
 
-func (c *Chain) IsSolid() (isSolid bool) {
-	c.RLock()
-	defer c.RUnlock()
-
+func (c *Chain) IsSolid() reactive.Event {
 	return c.ForkingPoint.IsSolid()
 }
 

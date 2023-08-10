@@ -291,7 +291,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
 	// If the commitment is not solid (it is not known), we store the block in a small buffer and process it once we
 	// commit the slot to avoid requesting it again.
-	if !chainCommitment.IsSolid() {
+	if !chainCommitment.IsSolid().Get() {
 		if !p.unsolidCommitmentBlocks.Add(block.ProtocolBlock().SlotCommitmentID, types.NewTuple(block, src)) {
 			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid commitment buffer: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
 		}

@@ -3,6 +3,7 @@ package chainmanager
 import (
 	"fmt"
 
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -16,7 +17,7 @@ type ChainCommitment struct {
 	id         iotago.CommitmentID
 	commitment *model.Commitment
 
-	solid       bool
+	solid       reactive.Event
 	mainChildID iotago.CommitmentID
 	children    *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *ChainCommitment]
 	chain       *Chain
@@ -27,6 +28,7 @@ type ChainCommitment struct {
 func NewChainCommitment(id iotago.CommitmentID) *ChainCommitment {
 	return &ChainCommitment{
 		id:       id,
+		solid:    reactive.NewEvent(),
 		children: shrinkingmap.New[iotago.CommitmentID, *ChainCommitment](),
 	}
 }
@@ -59,22 +61,8 @@ func (c *ChainCommitment) Chain() (chain *Chain) {
 	return c.chain
 }
 
-func (c *ChainCommitment) IsSolid() (isSolid bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-
+func (c *ChainCommitment) IsSolid() reactive.Event {
 	return c.solid
-}
-
-func (c *ChainCommitment) SetSolid(solid bool) (updated bool) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	if updated = c.solid != solid; updated {
-		c.solid = solid
-	}
-
-	return
 }
 
 func (c *ChainCommitment) PublishCommitment(commitment *model.Commitment) (published bool) {
@@ -97,10 +85,10 @@ func (c *ChainCommitment) registerChild(child *ChainCommitment) (isSolid bool, c
 	}
 
 	if c.children.Set(child.ID(), child); c.children.Size() > 1 {
-		return c.solid, NewChain(child), true
+		return c.solid.Get(), NewChain(child), true
 	}
 
-	return c.solid, c.chain, false
+	return c.solid.Get(), c.chain, false
 }
 
 func (c *ChainCommitment) deleteChild(child *ChainCommitment) {
