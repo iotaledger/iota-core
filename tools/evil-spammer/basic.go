@@ -26,7 +26,7 @@ type CustomSpamParams struct {
 }
 
 func CustomSpam(params *CustomSpamParams) {
-	outputID := iotago.EmptyOutputID
+	outputID := iotago.OutputIDFromTransactionIDAndIndex(iotago.IdentifierFromData([]byte("genesis")), 0)
 	if params.config.LastFaucetUnspentOutputID != "" {
 		outputID, _ = iotago.OutputIDFromHex(params.config.LastFaucetUnspentOutputID)
 	}
