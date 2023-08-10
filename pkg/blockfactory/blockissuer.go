@@ -247,6 +247,10 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	blockBuilder.LatestFinalizedSlot(*blockParams.LatestFinalizedSlot)
 	blockBuilder.IssuingTime(*blockParams.IssuingTime)
 
+	// TODO: add workscore here with issue #264
+	rmc := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().RMC
+	blockBuilder.BurnedMana(rmc)
+
 	if strongParents, exists := blockParams.References[iotago.StrongParentType]; exists && len(strongParents) > 0 {
 		blockBuilder.StrongParents(strongParents)
 	} else {

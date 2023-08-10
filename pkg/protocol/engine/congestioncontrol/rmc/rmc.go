@@ -58,9 +58,7 @@ func (m *Manager) BlockAccepted(block *blocks.Block) error {
 	if !exists {
 		slotWork = 0
 	}
-	if wasCreated := m.slotWork.Set(blockID.Index(), slotWork+block.WorkScore()); !wasCreated {
-		return ierrors.Errorf("failed to add block to accepted blocks, blockID: %s", blockID)
-	}
+	m.slotWork.Set(blockID.Index(), slotWork+block.WorkScore())
 
 	return nil
 }
