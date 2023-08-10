@@ -167,7 +167,7 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 		work = iotago.MaxBlockSize
 	}
 	for _, block := range blocks {
-		work += block.Work()
+		work += int(block.WorkScore())
 	}
 	deficit, err := s.getDeficit(accountID)
 	if err != nil {
@@ -206,7 +206,7 @@ loop:
 			break loop
 		// when a block is pushed by the buffer
 		case blockToSchedule = <-s.blockChan:
-			tokensRequired := float64(blockToSchedule.Work()) - (s.tokenBucket + float64(s.optsRate)*time.Since(s.lastScheduleTime).Seconds())
+			tokensRequired := float64(blockToSchedule.WorkScore()) - (s.tokenBucket + float64(s.optsRate)*time.Since(s.lastScheduleTime).Seconds())
 			if tokensRequired > 0 {
 				// wait until sufficient tokens in token bucket
 				timer := time.NewTimer(time.Duration(tokensRequired/float64(s.optsRate)) * time.Second)
@@ -225,7 +225,7 @@ loop:
 func (s *Scheduler) scheduleBlock(block *blocks.Block) {
 	if block.SetScheduled() {
 		// deduct tokens from the token bucket according to the scheduled block's work.
-		s.tokenBucket -= float64(block.Work())
+		s.tokenBucket -= float64(block.WorkScore())
 
 		// check for another block ready to schedule
 		s.updateChildrenWithLocking(block)
@@ -291,7 +291,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	// remove the block from the buffer and adjust issuer's deficit
 	block := s.buffer.PopFront()
 	issuerID := block.ProtocolBlock().IssuerID
-	err := s.updateDeficit(issuerID, int64(-block.Work()))
+	err := s.updateDeficit(issuerID, int64(-block.WorkScore()))
 	if err != nil {
 		// if something goes wrong with deficit update, drop the block instead of scheduling it.
 		block.SetDropped()
@@ -334,7 +334,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 				break
 			}
 
-			remainingDeficit := int64(block.Work()) - int64(deficit)
+			remainingDeficit := int64(block.WorkScore()) - int64(deficit)
 			// calculate how many rounds we need to skip to accumulate enough deficit.
 			quantum, err := s.quantum(issuerID)
 			if err != nil {
