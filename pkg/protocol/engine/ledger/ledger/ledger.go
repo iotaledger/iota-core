@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/mana"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/rmc"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -38,6 +39,7 @@ type Ledger struct {
 	utxoLedger               *utxoledger.Manager
 	accountsLedger           *accountsledger.Manager
 	manaManager              *mana.Manager
+	rmcManager               *rmc.Manager
 	sybilProtection          sybilprotection.SybilProtection
 	commitmentLoader         func(iotago.SlotIndex) (*model.Commitment, error)
 	memPool                  mempool.MemPool[ledger.BlockVoteRank]
@@ -72,11 +74,10 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
-			// TODO: how do we want to handle changing API here?
-			iotagoAPI := l.apiProvider.CurrentAPI()
-			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), iotagoAPI.ProtocolParameters().RentStructure(), l.resolveAccountOutput)
-			l.accountsLedger.SetCommitmentEvictionAge(iotagoAPI.ProtocolParameters().MaxCommittableAge())
-			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
+			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput)
+			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Index()
+			l.accountsLedger.SetLatestCommittedSlot(latestCommittedSlot)
+			l.rmcManager.SetLatestCommittedSlot(latestCommittedSlot)
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
@@ -115,7 +116,8 @@ func New(
 	return &Ledger{
 		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
-		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore),
+		accountsLedger:   accountsledger.New(apiProvider, blocksFunc, slotDiffFunc, accountsStore),
+		rmcManager:       rmc.NewManager(apiProvider, commitmentLoader),
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
@@ -217,6 +219,10 @@ func (l *Ledger) TrackBlock(block *blocks.Block) {
 
 	if _, hasTransaction := block.Transaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
+	}
+
+	if err := l.rmcManager.BlockAccepted(block); err != nil {
+		l.errorHandler(err)
 	}
 }
 
@@ -344,6 +350,10 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 
 func (l *Ledger) ManaManager() *mana.Manager {
 	return l.manaManager
+}
+
+func (l *Ledger) RMCManager() *rmc.Manager {
+	return l.rmcManager
 }
 
 func (l *Ledger) Shutdown() {
@@ -616,9 +626,12 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 }
 
 func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (*utxoledger.Output, error) {
-	accountMetadata, _, err := l.accountsLedger.Account(accountID, slotIndex)
+	accountMetadata, exists, err := l.accountsLedger.Account(accountID, slotIndex)
 	if err != nil {
 		return nil, ierrors.Errorf("could not get account information for account %s in slot %d: %w", accountID, slotIndex, err)
+	}
+	if !exists {
+		return nil, ierrors.Errorf("account %s does not exist in slot %d: %w", accountID, slotIndex, mempool.ErrStateNotFound)
 	}
 
 	l.utxoLedger.ReadLockLedger()

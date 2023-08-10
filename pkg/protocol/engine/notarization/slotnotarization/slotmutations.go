@@ -47,7 +47,7 @@ func (m *SlotMutations) AddAcceptedBlock(block *blocks.Block) (err error) {
 	return
 }
 
-// Evict evicts the given slot and returns the corresponding mutation sets.
+// Evict evicts the given slot.
 func (m *SlotMutations) Evict(index iotago.SlotIndex) error {
 	m.evictionMutex.Lock()
 	defer m.evictionMutex.Unlock()
