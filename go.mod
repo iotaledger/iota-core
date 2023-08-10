@@ -25,7 +25,7 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230803080824-b9183942b168
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230801163503-b55ade45411b
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230801163327-a72de1469de7
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230810094156-3fec1b98b0f8
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230810124506-b41821eee383
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/libp2p/go-libp2p v0.29.0
 	github.com/multiformats/go-multiaddr v0.10.1
@@ -57,7 +57,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/ethereum/go-ethereum v1.12.0 // indirect
+	github.com/ethereum/go-ethereum v1.12.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
