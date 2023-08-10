@@ -106,22 +106,22 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 
 		return
 	}
-	manaCost, err := block.ManaCost(rmc)
-	if err != nil {
-		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
-			Block:  block,
-			Reason: ierrors.Wrapf(err, "could not calculate Mana cost for block"),
-		})
+	if basicBlock, isBasic := block.BasicBlock(); isBasic {
+		manaCost, err := basicBlock.ManaCost(rmc)
+		if err != nil {
+			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Wrapf(err, "could not calculate Mana cost for block"),
+			})
+		}
+		if basicBlock.BurnedMana < manaCost {
+			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, rmc, basicBlock.BurnedMana),
+			})
 
-		return
-	}
-	if basicBlock, isBasic := block.BasicBlock(); isBasic && basicBlock.BurnedMana < manaCost {
-		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
-			Block:  block,
-			Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, rmc, basicBlock.BurnedMana),
-		})
-
-		return
+			return
+		}
 	}
 
 	// Check that the issuer of this block has non-negative block issuance credit

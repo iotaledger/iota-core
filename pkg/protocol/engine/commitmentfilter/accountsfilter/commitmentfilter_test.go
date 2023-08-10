@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -60,7 +61,7 @@ func NewTestFramework(t *testing.T, apiProvider api.Provider, optsFilter ...opti
 		return iotago.Mana(0), ierrors.Errorf("no rmc available for slot index %d", slotIndex)
 	}
 
-	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *model.Block) {
+	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
 		t.Logf("BlockAllowed: %s", block.ID())
 	})
 
@@ -83,6 +84,8 @@ func (t *TestFramework) AddRMCData(slotIndex iotago.SlotIndex, rmcData iotago.Ma
 	t.rmcData[slotIndex] = rmcData
 }
 
+// q: how to get an engine block.Block from protocol block
+
 func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) {
 	apiForVersion, err := t.apiProvider.APIForVersion(block.ProtocolVersion)
 	require.NoError(t.Test, err)
@@ -91,7 +94,7 @@ func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) 
 	require.NoError(t.Test, err)
 
 	modelBlock.ID().RegisterAlias(alias)
-	t.CommitmentFilter.ProcessPreFilteredBlock(modelBlock)
+	t.CommitmentFilter.ProcessPreFilteredBlock(blocks.NewBlock(modelBlock))
 }
 
 func (t *TestFramework) processBlockWithAPI(alias string, block *iotago.ProtocolBlock, api iotago.API) {
@@ -99,7 +102,7 @@ func (t *TestFramework) processBlockWithAPI(alias string, block *iotago.Protocol
 	require.NoError(t.Test, err)
 
 	modelBlock.ID().RegisterAlias(alias)
-	t.CommitmentFilter.ProcessPreFilteredBlock(modelBlock)
+	t.CommitmentFilter.ProcessPreFilteredBlock(blocks.NewBlock(modelBlock))
 }
 
 func (t *TestFramework) IssueSignedBlockAtSlot(alias string, slot iotago.SlotIndex, commitmentID iotago.SlotIdentifier, keyPair ed25519.KeyPair) {
@@ -140,7 +143,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		api.SingleVersionProvider(testAPI),
 	)
 
-	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *model.Block) {
+	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
 		require.NotEqual(t, "noAccount", block.ID().Alias())
 	})
 
@@ -188,7 +191,7 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 		api.SingleVersionProvider(testAPI),
 	)
 
-	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *model.Block) {
+	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
 		require.NotEqual(t, "insuffientBurnedMana", block.ID().Alias())
 	})
 
@@ -236,7 +239,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 		api.SingleVersionProvider(testAPI),
 	)
 
-	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *model.Block) {
+	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
 		require.NotEqual(t, "expired", block.ID().Alias())
 	})
 
