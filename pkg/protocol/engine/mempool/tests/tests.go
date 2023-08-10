@@ -59,7 +59,7 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
-	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
+	_ = tx1Metadata.Outputs().ForEach(func(state mempool.OutputStateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.Equal(t, 1, state.PendingSpenderCount())
 
@@ -69,7 +69,7 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	tx2Metadata, exists := tf.TransactionMetadata("tx2")
 	require.True(t, exists)
 
-	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
+	_ = tx2Metadata.Outputs().ForEach(func(state mempool.OutputStateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.Equal(t, 0, state.PendingSpenderCount())
 
@@ -91,7 +91,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
-	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
+	_ = tx1Metadata.Outputs().ForEach(func(state mempool.OutputStateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.Equal(t, 1, state.PendingSpenderCount())
 
@@ -101,7 +101,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	tx2Metadata, exists := tf.TransactionMetadata("tx2")
 	require.True(t, exists)
 
-	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
+	_ = tx2Metadata.Outputs().ForEach(func(state mempool.OutputStateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.Equal(t, 1, state.PendingSpenderCount())
 
@@ -111,7 +111,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	tx3Metadata, exists := tf.TransactionMetadata("tx3")
 	require.True(t, exists)
 
-	_ = tx3Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
+	_ = tx3Metadata.Outputs().ForEach(func(state mempool.OutputStateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.Equal(t, 0, state.PendingSpenderCount())
 
@@ -148,7 +148,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	tf.CommitSlot(1)
-	//time.Sleep(1 * time.Second)
+	// time.Sleep(1 * time.Second)
 	transactionDeletionState := map[string]bool{"tx1": true, "tx2": false, "tx3": false}
 	tf.RequireTransactionsEvicted(transactionDeletionState)
 
@@ -161,7 +161,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tf.RequireBooked("tx3")
 
 	tf.CommitSlot(2)
-	//time.Sleep(1 * time.Second)
+	// time.Sleep(1 * time.Second)
 	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx2": true}))
 	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block2": true}))
 
@@ -172,7 +172,7 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tf.RequireAccepted(map[string]bool{"tx3": true})
 
 	tf.CommitSlot(3)
-	//time.Sleep(1 * time.Second)
+	// time.Sleep(1 * time.Second)
 	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx3": true}))
 
 	require.False(t, tx1Metadata.IsOrphaned())
