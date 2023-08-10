@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
@@ -28,15 +27,13 @@ type WarpSyncManager struct {
 	workers                   *workerpool.WorkerPool
 	requester                 *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 	verifiedWarpSyncResponses ds.Set[iotago.CommitmentID]
-	warpSyncResponseMutex     *syncutils.DAGMutex[iotago.CommitmentID]
 }
 
 func NewWarpSyncManager(protocol *Protocol) *WarpSyncManager {
 	w := &WarpSyncManager{
-		protocol:              protocol,
-		workers:               protocol.Workers.CreatePool("WarpSyncManager", 1),
-		requester:             eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
-		warpSyncResponseMutex: syncutils.NewDAGMutex[iotago.CommitmentID](),
+		protocol:  protocol,
+		workers:   protocol.Workers.CreatePool("WarpSyncManager", 1),
+		requester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
 	}
 
 	w.protocol.HookConstructed(func() {
@@ -52,9 +49,6 @@ func NewWarpSyncManager(protocol *Protocol) *WarpSyncManager {
 
 func (w *WarpSyncManager) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs []iotago.BlockID, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
 	w.workers.Submit(func() {
-		w.warpSyncResponseMutex.Lock(commitmentID)
-		defer w.warpSyncResponseMutex.Unlock(commitmentID)
-
 		if w.verifiedWarpSyncResponses.Has(commitmentID) {
 			return
 		}
@@ -124,6 +118,8 @@ func (w *WarpSyncManager) MonitorEngine(engineInstance *engine.Engine) {
 			return
 		}
 
+		w.verifiedWarpSyncResponses.Delete(commitment.ID())
+
 		warpSyncCommitment := chainCommitment.Chain().Commitment(commitment.Index() + WarpSyncThreshold)
 		if warpSyncCommitment != nil {
 			w.requester.StartTicker(warpSyncCommitment.ID())
@@ -138,7 +134,7 @@ func (w *WarpSyncManager) Shutdown() {
 }
 
 func (w *WarpSyncManager) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
-	if e == nil {
+	if e == nil || chainCommitment == nil {
 		return
 	}
 
@@ -156,6 +152,7 @@ func (w *WarpSyncManager) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 			return
 		}
 
+		fmt.Println("WarpSyncManager.warpSyncIfNecessary: WarpSyncing", commitmentToSync.ID())
 		w.requester.StartTicker(commitmentToSync.ID())
 	}
 }
