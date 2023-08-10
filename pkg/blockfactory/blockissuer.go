@@ -55,8 +55,8 @@ func New(p *protocol.Protocol, account Account, opts ...options.Option[BlockIssu
 		Account:                     account,
 		optsIncompleteBlockAccepted: false,
 		optsRateSetterEnabled:       false,
-		//optsTipSelectionTimeout:       5 * time.Second, // TODO: what should the default be?
-		//optsTipSelectionRetryInterval: 200 * time.Millisecond, // TODO: what should the default be?
+		// optsTipSelectionTimeout:       5 * time.Second, // TODO: what should the default be?
+		// optsTipSelectionRetryInterval: 200 * time.Millisecond, // TODO: what should the default be?
 	}, opts)
 }
 
@@ -69,18 +69,22 @@ func (i *BlockIssuer) Shutdown() {
 func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BlockParams{}, opts)
 
+	if blockParams.IssuingTime == nil {
+		issuingTime := time.Now().UTC()
+		blockParams.IssuingTime = &issuingTime
+	}
+
 	if blockParams.SlotCommitment == nil {
-		blockParams.SlotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		var err error
+		blockParams.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime))
+		if err != nil {
+			return nil, ierrors.Wrap(err, "error getting commitment")
+		}
 	}
 
 	if blockParams.LatestFinalizedSlot == nil {
 		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		blockParams.LatestFinalizedSlot = &latestFinalizedSlot
-	}
-
-	if blockParams.IssuingTime == nil {
-		issuingTime := time.Now().UTC()
-		blockParams.IssuingTime = &issuingTime
 	}
 
 	if blockParams.References == nil {
@@ -163,22 +167,51 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 	return modelBlock, nil
 }
 
+func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
+	protoParams := i.protocol.CurrentAPI().ProtocolParameters()
+	commitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+
+	if blockSlot > commitment.Index+protoParams.MaxCommittableAge() {
+		return nil, ierrors.Errorf("can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Index)
+	}
+
+	if blockSlot < commitment.Index+protoParams.MinCommittableAge() {
+		if blockSlot < protoParams.MinCommittableAge() || commitment.Index < protoParams.MinCommittableAge() {
+			return commitment, nil
+		}
+
+		commitmentSlot := commitment.Index - protoParams.MinCommittableAge()
+		loadedCommitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(commitmentSlot)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "error loading valid commitment of slot %d according to minCommittableAge from storage", commitmentSlot)
+		}
+
+		return loadedCommitment.Commitment(), nil
+	}
+
+	return commitment, nil
+}
+
 // CreateBlock creates a new block with the options.
 func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BlockParams{}, opts)
 
+	if blockParams.IssuingTime == nil {
+		issuingTime := time.Now().UTC()
+		blockParams.IssuingTime = &issuingTime
+	}
+
 	if blockParams.SlotCommitment == nil {
-		blockParams.SlotCommitment = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		var err error
+		blockParams.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime))
+		if err != nil {
+			return nil, ierrors.Wrap(err, "error getting commitment")
+		}
 	}
 
 	if blockParams.LatestFinalizedSlot == nil {
 		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		blockParams.LatestFinalizedSlot = &latestFinalizedSlot
-	}
-
-	if blockParams.IssuingTime == nil {
-		issuingTime := time.Now().UTC()
-		blockParams.IssuingTime = &issuingTime
 	}
 
 	if blockParams.References == nil {

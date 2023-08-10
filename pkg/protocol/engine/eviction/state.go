@@ -2,7 +2,6 @@ package eviction
 
 import (
 	"io"
-	"math"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
@@ -70,53 +69,6 @@ func (s *State) LastEvictedSlot() iotago.SlotIndex {
 	defer s.evictionMutex.RUnlock()
 
 	return s.lastEvictedSlot
-}
-
-// EarliestRootCommitmentID returns the earliest commitment that rootblocks are committing to across all rootblocks.
-func (s *State) EarliestRootCommitmentID(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment iotago.CommitmentID, valid bool) {
-	s.evictionMutex.RLock()
-	defer s.evictionMutex.RUnlock()
-
-	earliestCommitment = iotago.NewSlotIdentifier(math.MaxInt64, [32]byte{})
-
-	start, _ := s.delayedBlockEvictionThreshold(lastFinalizedSlot)
-	for index := start; index <= lastFinalizedSlot; index++ {
-		// Try loading from the cache first.
-		slotBlocks := s.rootBlocks.Get(index, false)
-		if slotBlocks != nil {
-			slotBlocks.ForEach(func(id iotago.BlockID, commitmentID iotago.CommitmentID) bool {
-				if commitmentID.Index() < earliestCommitment.Index() {
-					earliestCommitment = commitmentID
-				}
-
-				return true
-			})
-
-			continue
-		}
-
-		// Load rootblocks from the storage.
-		storage := s.rootBlockStorageFunc(index)
-		if storage == nil {
-			continue
-		}
-		err := storage.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
-			if commitmentID.Index() < earliestCommitment.Index() {
-				earliestCommitment = commitmentID
-			}
-
-			return nil
-		})
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	if earliestCommitment.Index() == math.MaxInt64 {
-		return iotago.CommitmentID{}, false
-	}
-
-	return earliestCommitment, true
 }
 
 // InRootBlockSlot checks if the Block associated with the given id is too old.

@@ -116,7 +116,7 @@ func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 		return ierrors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
-	m.attestation.AddAttestationFromBlock(block)
+	m.attestation.AddAttestationFromValidationBlock(block)
 
 	return
 }
@@ -155,6 +155,10 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 
 	// Set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
 	acceptedBlocks := m.slotMutations.AcceptedBlocks(index, true)
+	if err := acceptedBlocks.Commit(); err != nil {
+		m.errorHandler(ierrors.Wrap(err, "failed to commit accepted blocks"))
+		return false
+	}
 
 	cumulativeWeight, attestationsRoot, err := m.attestation.Commit(index)
 	if err != nil {
@@ -214,7 +218,7 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		m.errorHandler(ierrors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
 		return false
 	}
-	if err := rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(apiForSlot.Encode(roots))); err != nil {
+	if err = rootsStorage.Set(kvstore.Key{prunable.RootsKey}, lo.PanicOnErr(apiForSlot.Encode(roots))); err != nil {
 		m.errorHandler(ierrors.Wrapf(err, "failed to store latest roots for commitment %s", newModelCommitment.ID()))
 		return false
 	}
@@ -234,6 +238,8 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		m.errorHandler(ierrors.Wrap(err, "failed to set latest commitment"))
 		return false
 	}
+
+	m.events.LatestCommitmentUpdated.Trigger(newModelCommitment)
 
 	if err = m.slotMutations.Evict(index); err != nil {
 		m.errorHandler(ierrors.Wrapf(err, "failed to evict slotMutations at index: %d", index))

@@ -137,19 +137,19 @@ func (o *Orchestrator) Shutdown() {
 	o.TriggerStopped()
 }
 
-func (o *Orchestrator) TrackBlock(block *blocks.Block) {
-	committee := o.seatManager.Committee(block.ID().Index())
-	seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
-	if !exists {
-		return
-	}
-
+func (o *Orchestrator) TrackValidationBlock(block *blocks.Block) {
 	// Not a validation block.
 	validationBlock, isValidationBlock := block.ValidationBlock()
 	if !isValidationBlock {
 		return
 	}
 	newSignaledBlock := prunable.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
+
+	committee := o.seatManager.Committee(block.ID().Index())
+	seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
+	if !exists {
+		return
+	}
 
 	// Do not track any version that we already know about. This includes past, current and future versions that are already
 	// successfully signaled and scheduled to start in a future epoch.
