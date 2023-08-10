@@ -39,9 +39,11 @@ func NewWarpSyncManager(protocol *Protocol) *WarpSyncManager {
 		warpSyncResponseMutex: syncutils.NewDAGMutex[iotago.CommitmentID](),
 	}
 
-	w.protocol.ChainManager.Events.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
-		chainCommitment.IsSolid().OnTrigger(func() {
-			w.warpSyncIfNecessary(w.targetEngine(chainCommitment), chainCommitment)
+	w.protocol.HookConstructed(func() {
+		w.protocol.ChainManager.Events.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
+			chainCommitment.IsSolid().OnTrigger(func() {
+				w.warpSyncIfNecessary(w.targetEngine(chainCommitment), chainCommitment)
+			})
 		})
 	})
 

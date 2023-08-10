@@ -99,6 +99,8 @@ type Protocol struct {
 	optsRetainerProvider            module.Provider[*engine.Engine, retainer.Retainer]
 	optsSchedulerProvider           module.Provider[*engine.Engine, scheduler.Scheduler]
 	optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
+
+	module.Module
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -131,6 +133,8 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		(*Protocol).initWarpSyncManager,
 		(*Protocol).initEngineManager,
 		(*Protocol).initChainManager,
+		(*Protocol).TriggerConstructed,
+		(*Protocol).TriggerInitialized,
 	)
 }
 
@@ -187,6 +191,7 @@ func (p *Protocol) shutdown() {
 		p.networkProtocol.Shutdown()
 	}
 
+	p.warpSyncManager.Shutdown()
 	p.ChainManager.Shutdown()
 	p.Workers.Shutdown()
 
@@ -198,6 +203,8 @@ func (p *Protocol) shutdown() {
 	p.activeEngineMutex.RUnlock()
 
 	p.SyncManager.Shutdown()
+
+	p.TriggerStopped()
 }
 
 func (p *Protocol) initWarpSyncManager() {
