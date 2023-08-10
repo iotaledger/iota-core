@@ -102,7 +102,7 @@ func (p *Protocol) RequestAttestations(id iotago.CommitmentID, to ...network.Pee
 	}}}, protocolID, to...)
 }
 
-func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs []iotago.BlockID, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
+func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
 	serializer := p.apiProvider.APIForSlot(id.Index())
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_WarpSyncResponse{
@@ -272,8 +272,8 @@ func (p *Protocol) onWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []
 		return
 	}
 
-	var blockIDs []iotago.BlockID
-	if _, err := lo.PanicOnErr(p.apiProvider.APIForVersion(iotago.Version(commitmentIDBytes[0]))).Decode(blockIDsBytes, &blockIDs, serix.WithValidation()); err != nil {
+	var blockIDs iotago.BlockIDs
+	if _, err = p.apiProvider.APIForSlot(commitmentID.Index()).Decode(blockIDsBytes, &blockIDs, serix.WithValidation()); err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize block ids"), id)
 
 		return

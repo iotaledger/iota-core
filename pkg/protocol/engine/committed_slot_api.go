@@ -59,7 +59,7 @@ func (c *CommittedSlotAPI) Roots() (roots iotago.Roots, err error) {
 }
 
 // BlockIDs returns the accepted block IDs of the slot.
-func (c *CommittedSlotAPI) BlockIDs() (blockIDs []iotago.BlockID, err error) {
+func (c *CommittedSlotAPI) BlockIDs() (blockIDs iotago.BlockIDs, err error) {
 	if c.engine.Storage.Settings().LatestCommitment().Index() < c.slotIndex {
 		return blockIDs, ierrors.Errorf("slot %d is not committed yet", c.slotIndex)
 	}

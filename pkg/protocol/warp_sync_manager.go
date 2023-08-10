@@ -18,7 +18,6 @@ import (
 )
 
 const (
-	WarpSyncThreshold     = iotago.SlotIndex(5)
 	WarpSyncRetryInterval = 1 * time.Minute
 )
 
@@ -48,7 +47,7 @@ func NewWarpSyncManager(protocol *Protocol) *WarpSyncManager {
 	return w
 }
 
-func (w *WarpSyncManager) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs []iotago.BlockID, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
+func (w *WarpSyncManager) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
 	w.workers.Submit(func() {
 		if w.verifiedWarpSyncResponses.Has(commitmentID) {
 			return
@@ -121,7 +120,8 @@ func (w *WarpSyncManager) MonitorEngine(engineInstance *engine.Engine) {
 
 		w.verifiedWarpSyncResponses.Delete(commitment.ID())
 
-		warpSyncCommitment := chainCommitment.Chain().Commitment(commitment.Index() + WarpSyncThreshold)
+		maxCommittableAge := engineInstance.APIForSlot(commitment.Index()).ProtocolParameters().MaxCommittableAge()
+		warpSyncCommitment := chainCommitment.Chain().Commitment(commitment.Index() + maxCommittableAge)
 		if warpSyncCommitment != nil {
 			w.requester.StartTicker(warpSyncCommitment.ID())
 		}
@@ -140,13 +140,10 @@ func (w *WarpSyncManager) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	}
 
 	chain := chainCommitment.Chain()
-
+	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
-	if chainCommitment.Commitment().Index() <= latestCommitmentIndex+WarpSyncThreshold {
-		return
-	}
 
-	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+WarpSyncThreshold; slotToWarpSync++ {
+	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+maxCommittableAge; slotToWarpSync++ {
 		commitmentToSync := chain.Commitment(slotToWarpSync)
 		if commitmentToSync == nil {
 			fmt.Println("WarpSyncManager.warpSyncIfNecessary: commitmentToSync == nil")

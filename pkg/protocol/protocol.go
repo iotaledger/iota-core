@@ -317,8 +317,12 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	processed := false
 
 	if mainChain := mainEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
-		if block.ID().Index() <= mainEngine.Storage.Settings().LatestCommitment().Index()+WarpSyncThreshold {
+		maxCommittableAge := mainEngine.APIForSlot(block.ProtocolBlock().SlotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
+
+		if block.ID().Index() <= mainEngine.Storage.Settings().LatestCommitment().Index()+maxCommittableAge {
 			mainEngine.ProcessBlockFromPeer(block, src)
+		} else {
+			fmt.Println("block from source", src, "was not processed:", block.ID(), "; commits to:", block.ProtocolBlock().SlotCommitmentID)
 		}
 
 		processed = true
@@ -326,8 +330,12 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 
 	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil {
 		if candidateChain := candidateEngineInstance.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngineInstance.BlockRequester.HasTicker(block.ID()) {
-			if block.ID().Index() <= mainEngine.Storage.Settings().LatestCommitment().Index()+WarpSyncThreshold {
+			maxCommittableAge := candidateEngineInstance.APIForSlot(block.ProtocolBlock().SlotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
+
+			if block.ID().Index() <= mainEngine.Storage.Settings().LatestCommitment().Index()+maxCommittableAge {
 				candidateEngineInstance.ProcessBlockFromPeer(block, src)
+			} else {
+				fmt.Println("block from source", src, "was not processed:", block.ID(), "; commits to:", block.ProtocolBlock().SlotCommitmentID)
 			}
 
 			processed = true
