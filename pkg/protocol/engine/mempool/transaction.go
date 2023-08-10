@@ -9,7 +9,13 @@ type Transaction interface {
 	ID(iotago.API) (iotago.TransactionID, error)
 
 	// Inputs returns the inputs of the Transaction.
-	Inputs() ([]iotago.IndexedUTXOReferencer, error)
+	Inputs() ([]*iotago.UTXOInput, error)
+
+	// CommitmentInput returns the commitment input of the Transaction, if present.
+	CommitmentInput() *iotago.CommitmentInput
+
+	// ContextInputs returns the context inputs of the Transaction.
+	ContextInputs() (iotago.TransactionContextInputs, error)
 
 	// String returns a human-readable version of the Transaction.
 	String() string
