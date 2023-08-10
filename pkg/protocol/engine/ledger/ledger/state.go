@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -10,14 +11,22 @@ type ExecutionOutput struct {
 	creationTime iotago.SlotIndex
 }
 
-func (s *ExecutionOutput) OutputID() iotago.OutputID {
-	return s.outputID
+func (o *ExecutionOutput) StateID() iotago.Identifier {
+	return iotago.IdentifierFromData(lo.PanicOnErr(o.outputID.Bytes()))
 }
 
-func (s *ExecutionOutput) Output() iotago.Output {
-	return s.output
+func (o *ExecutionOutput) Type() iotago.StateType {
+	return iotago.InputUTXO
 }
 
-func (s *ExecutionOutput) CreationTime() iotago.SlotIndex {
-	return s.creationTime
+func (o *ExecutionOutput) OutputID() iotago.OutputID {
+	return o.outputID
+}
+
+func (o *ExecutionOutput) Output() iotago.Output {
+	return o.output
+}
+
+func (o *ExecutionOutput) CreationTime() iotago.SlotIndex {
+	return o.creationTime
 }

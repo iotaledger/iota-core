@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/vm/stardust"
 )
 
-func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.State) ([]mempool.State, error) {
+func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.OutputState, timeReference mempool.ContextState) ([]mempool.OutputState, error) {
 	tx, ok := stateTransition.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
@@ -27,7 +27,6 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		InputSet: inputSet,
 	}
 
-	// TODO: refactor resolution of ContextInputs to be handled by Mempool
 	bicInputs, err := tx.BICInputs()
 	if err != nil {
 		return nil, ierrors.Join(err, iotago.ErrBICInputInvalid)
@@ -38,31 +37,25 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		return nil, ierrors.Join(err, iotago.ErrRewardInputInvalid)
 	}
 
-	// resolve the commitment inputs from storage
-	commitment := tx.CommitmentInput()
-
-	if (len(rewardInputs) > 0 || len(bicInputs) > 0) && commitment == nil {
-		return nil, iotago.ErrCommitmentInputMissing
+	commitmentInput, ok := timeReference.(*iotago.Commitment)
+	if commitmentInput != nil && !ok {
+		return nil, ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.New("unsupported type for time reference"))
 	}
 
-	var loadedCommitment *iotago.Commitment
-	if commitment != nil {
-		loadedCommitment, err = l.loadCommitment(commitment.CommitmentID)
-		if err != nil {
-			return nil, ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.Wrapf(err, "could not load commitment %s", commitment.CommitmentID))
-		}
+	resolvedInputs.CommitmentInput = commitmentInput
 
-		resolvedInputs.CommitmentInput = loadedCommitment
+	if (len(rewardInputs) > 0 || len(bicInputs) > 0) && commitmentInput == nil {
+		return nil, iotago.ErrCommitmentInputMissing
 	}
 
 	bicInputSet := make(iotagovm.BlockIssuanceCreditInputSet)
 	for _, inp := range bicInputs {
-		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, loadedCommitment.Index)
+		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, commitmentInput.Index)
 		if accountErr != nil {
-			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, loadedCommitment.Index))
+			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, commitmentInput.Index))
 		}
 		if !exists {
-			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, loadedCommitment.Index))
+			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, commitmentInput.Index))
 		}
 
 		bicInputSet[inp.AccountID] = accountData.Credits.Value
@@ -70,8 +63,6 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	resolvedInputs.BlockIssuanceCreditInputSet = bicInputSet
 
 	rewardInputSet := make(iotagovm.RewardsInputSet)
-	// TODO: when refactoring this to be resolved by the mempool, the function that resolves ContextInputs should
-	// receive a slice with promises of UTXO inputs and wait until the necessary inputs are available
 	for _, inp := range rewardInputs {
 		outputID := inputStates[inp.Index].OutputID()
 
@@ -101,7 +92,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 			delegationEnd := castOutput.EndEpoch
 			if delegationEnd == 0 {
-				delegationEnd = l.apiProvider.APIForSlot(loadedCommitment.Index).TimeProvider().EpochFromSlot(loadedCommitment.Index) - iotago.EpochIndex(1)
+				delegationEnd = l.apiProvider.APIForSlot(commitmentInput.Index).TimeProvider().EpochFromSlot(commitmentInput.Index) - iotago.EpochIndex(1)
 			}
 
 			reward, _, _, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
@@ -114,7 +105,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 	resolvedInputs.RewardsInputSet = rewardInputSet
 
-	//TODO: in which slot is this transaction?
+	// TODO: in which slot is this transaction?
 	api := l.apiProvider.APIForSlot(tx.Essence.CreationTime)
 
 	vmParams := &iotagovm.Params{
@@ -129,7 +120,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		return nil, err
 	}
 
-	created := make([]mempool.State, 0, len(outputSet))
+	created := make([]mempool.OutputState, 0, len(outputSet))
 	for outputID, output := range outputSet {
 		created = append(created, &ExecutionOutput{
 			outputID:     outputID,
@@ -139,20 +130,4 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 
 	return created, nil
-}
-
-func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.Commitment, error) {
-	c, err := l.commitmentLoader(inputCommitmentID.Index())
-	if err != nil {
-		return nil, ierrors.Errorf("could not get commitment inputs: %w", err)
-	}
-	storedCommitmentID, err := c.Commitment().ID()
-	if err != nil {
-		return nil, ierrors.Errorf("could compute commitment ID: %w", err)
-	}
-	if storedCommitmentID != inputCommitmentID {
-		return nil, ierrors.Errorf("commitment ID of input %s different to stored commitment %s", inputCommitmentID, storedCommitmentID)
-	}
-
-	return c.Commitment(), nil
 }

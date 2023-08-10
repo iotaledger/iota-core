@@ -111,14 +111,14 @@ func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, s
 func (t *TestFramework) CommitSlot(slotIndex iotago.SlotIndex) {
 	stateDiff := t.Instance.StateDiff(slotIndex)
 
-	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.StateMetadata) bool {
-		t.ledgerState.AddState(state.State())
+	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.OutputStateMetadata) bool {
+		t.ledgerState.AddOutputState(state.State())
 
 		return true
 	})
 
-	stateDiff.DestroyedStates().ForEach(func(id iotago.OutputID, _ mempool.StateMetadata) bool {
-		t.ledgerState.DestroyState(id)
+	stateDiff.DestroyedStates().ForEach(func(outputID iotago.OutputID, _ mempool.OutputStateMetadata) bool {
+		t.ledgerState.DestroyOutputState(outputID)
 
 		return true
 	})
@@ -138,11 +138,11 @@ func (t *TestFramework) TransactionMetadataByAttachment(alias string) (mempool.T
 	return t.Instance.TransactionMetadataByAttachment(t.BlockID(alias))
 }
 
-func (t *TestFramework) StateMetadata(alias string) (mempool.StateMetadata, error) {
-	return t.Instance.StateMetadata(t.stateReference(alias))
+func (t *TestFramework) OutputStateMetadata(alias string) (mempool.OutputStateMetadata, error) {
+	return t.Instance.OutputStateMetadata(t.stateReference(alias))
 }
 
-func (t *TestFramework) StateID(alias string) iotago.OutputID {
+func (t *TestFramework) OutputID(alias string) iotago.OutputID {
 	if alias == "genesis" {
 		return iotago.OutputID{}
 	}
@@ -275,8 +275,13 @@ func (t *TestFramework) setupHookedEvents() {
 	})
 }
 
-func (t *TestFramework) stateReference(alias string) iotago.IndexedUTXOReferencer {
-	return ledgertests.StoredStateReference(t.StateID(alias))
+func (t *TestFramework) stateReference(alias string) *iotago.UTXOInput {
+	outputID := t.OutputID(alias)
+
+	return &iotago.UTXOInput{
+		TransactionID:          outputID.TransactionID(),
+		TransactionOutputIndex: outputID.Index(),
+	}
 }
 
 func (t *TestFramework) waitBooked(transactionAliases ...string) {
@@ -332,13 +337,12 @@ func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAlias
 	}
 
 	for _, createdOutputAlias := range createdOutputAliases {
-		require.True(t.test, stateDiff.CreatedStates().Has(t.StateID(createdOutputAlias)))
+		require.True(t.test, stateDiff.CreatedStates().Has(t.OutputID(createdOutputAlias)))
 	}
 
 	for _, spentOutputAlias := range spentOutputAliases {
-		require.True(t.test, stateDiff.DestroyedStates().Has(t.StateID(spentOutputAlias)))
+		require.True(t.test, stateDiff.DestroyedStates().Has(t.OutputID(spentOutputAlias)))
 	}
-
 }
 
 func (t *TestFramework) WaitChildren() {
