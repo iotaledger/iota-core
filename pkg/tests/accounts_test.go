@@ -47,8 +47,7 @@ func Test_TransitionAccount(t *testing.T) {
 	node1 := ts.AddValidatorNode("node1")
 	_ = ts.AddNode("node2")
 
-	ts.Run(map[string][]options.Option[protocol.Protocol]{})
-	ts.HookLogging()
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	genesisAccount := ts.AccountOutput("Genesis:1")
 	genesisAccountOutput := genesisAccount.Output().(*iotago.AccountOutput)

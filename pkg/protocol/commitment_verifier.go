@@ -15,19 +15,17 @@ import (
 
 type CommitmentVerifier struct {
 	engine                  *engine.Engine
-	forkingPoint            *model.Commitment
 	cumulativeWeight        uint64
 	validatorAccountsAtFork map[iotago.AccountID]*accounts.AccountData
 }
 
-func NewCommitmentVerifier(mainEngine *engine.Engine, forkingPoint *model.Commitment) *CommitmentVerifier {
-	committeeAtForkingPoint := mainEngine.SybilProtection.SeatManager().Committee(forkingPoint.Index()).Accounts().IDs()
+func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) *CommitmentVerifier {
+	committeeAtForkingPoint := mainEngine.SybilProtection.SeatManager().Committee(lastCommonCommitmentBeforeFork.Index()).Accounts().IDs()
 
 	return &CommitmentVerifier{
 		engine:                  mainEngine,
-		forkingPoint:            forkingPoint,
-		cumulativeWeight:        forkingPoint.CumulativeWeight(),
-		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, forkingPoint.Index())),
+		cumulativeWeight:        lastCommonCommitmentBeforeFork.CumulativeWeight(),
+		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, lastCommonCommitmentBeforeFork.Index())),
 		// TODO: what happens if the committee rotated after the fork?
 	}
 }

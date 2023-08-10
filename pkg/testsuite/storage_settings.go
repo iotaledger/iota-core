@@ -53,6 +53,10 @@ func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, nodes
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
+			if node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().ID().Index() < slot {
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment with at least %v not found in settings.LatestCommitment()", node.Name, slot)
+			}
+
 			cm, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
 			if err != nil {
 				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: expected %v, got error %v", node.Name, slot, err)

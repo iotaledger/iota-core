@@ -35,7 +35,7 @@ func TestConfirmationFlags(t *testing.T) {
 		nodeC.AccountID,
 		nodeD.AccountID,
 	}
-	ts.Run(map[string][]options.Option[protocol.Protocol]{
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
 		"nodeA": {
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(),
@@ -85,7 +85,6 @@ func TestConfirmationFlags(t *testing.T) {
 			),
 		},
 	})
-	ts.HookLogging()
 
 	// Verify that nodes have the expected states.
 	ts.AssertNodeState(ts.Nodes(),
