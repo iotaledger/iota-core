@@ -93,7 +93,7 @@ func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(bl
 }
 
 func (g *Gadget) isCommitteeValidationBlock(block *blocks.Block) (seat account.SeatIndex, isValid bool) {
-	if _, isValidationBlock := block.ValidationBlock(); isValidationBlock {
+	if _, isValidationBlock := block.ValidationBlock(); !isValidationBlock {
 		return 0, false
 	}
 

@@ -38,11 +38,11 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.sybilProtectionOnlineCommittee != nil {
 		t.AssertSybilProtectionOnlineCommittee(*state.sybilProtectionOnlineCommittee, nodes...)
 	}
-	if state.storageCommitments != nil {
-		t.AssertStorageCommitments(*state.storageCommitments, nodes...)
-	}
 	if state.storageCommitmentAtIndex != nil {
 		t.AssertEqualStoredCommitmentAtIndex(*state.storageCommitmentAtIndex, nodes...)
+	}
+	if state.storageCommitments != nil {
+		t.AssertStorageCommitments(*state.storageCommitments, nodes...)
 	}
 	if state.storageRootBlocks != nil {
 		t.AssertStorageRootBlocks(*state.storageRootBlocks, nodes...)

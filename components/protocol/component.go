@@ -110,7 +110,7 @@ func provide(c *dig.Container) error {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
+				slotattestation.NewProvider(),
 			),
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(
@@ -205,7 +205,7 @@ func configure() error {
 	deps.Protocol.Events.Engine.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
 		Component.LogWarnf("Booker BlockInvalid: Block %s - %s", block.ID(), err.Error())
 	})
-	deps.Protocol.Events.Engine.CommitmentFilter.BlockAllowed.Hook(func(block *model.Block) {
+	deps.Protocol.Events.Engine.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("CommitmentFilter.BlockAllowed: %s\n", block.ID())
 	})
 
