@@ -317,9 +317,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	processed := false
 
 	if mainChain := mainEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
-		if block.ProtocolBlock().SlotCommitmentID.Index() > mainEngine.Storage.Settings().LatestCommitment().Index()+WarpSyncThreshold {
-			// TRIGGER WARPSYNC
-		} else {
+		if block.ID().Index() <= mainEngine.Storage.Settings().LatestCommitment().Index()+WarpSyncThreshold {
 			mainEngine.ProcessBlockFromPeer(block, src)
 		}
 
@@ -328,7 +326,9 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 
 	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil {
 		if candidateChain := candidateEngineInstance.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngineInstance.BlockRequester.HasTicker(block.ID()) {
-			candidateEngineInstance.ProcessBlockFromPeer(block, src)
+			if block.ID().Index() <= mainEngine.Storage.Settings().LatestCommitment().Index()+WarpSyncThreshold {
+				candidateEngineInstance.ProcessBlockFromPeer(block, src)
+			}
 
 			processed = true
 		}
