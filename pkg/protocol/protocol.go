@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/core/blockbuffer"
+	"github.com/iotaledger/iota-core/pkg/core/buffer"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -64,7 +64,7 @@ type Protocol struct {
 	warpSyncManager         *WarpSyncManager
 	engineManager           *enginemanager.EngineManager
 	ChainManager            *chainmanager.Manager
-	unsolidCommitmentBlocks *blockbuffer.UnsolidCommitmentBlocks[*types.Tuple[*model.Block, network.PeerID]]
+	unsolidCommitmentBlocks *buffer.UnsolidCommitmentBuffer[*types.Tuple[*model.Block, network.PeerID]]
 
 	Workers         *workerpool.Group
 	dispatcher      network.Endpoint
@@ -105,7 +105,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	return options.Apply(&Protocol{
 		Events:                          NewEvents(),
 		Workers:                         workers,
-		unsolidCommitmentBlocks:         blockbuffer.NewUnsolidCommitmentBlocks[*types.Tuple[*model.Block, network.PeerID]](20, 100),
+		unsolidCommitmentBlocks:         buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, network.PeerID]](20, 100),
 		dispatcher:                      dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
 		optsCommitmentFilterProvider:    accountsfilter.NewProvider(),
@@ -251,7 +251,7 @@ func (p *Protocol) initChainManager() {
 
 	wp := p.Workers.CreatePool("Protocol.MissingCommitmentReceived", 1)
 	processUnsolidCommitmentBlocksFunc := func(id iotago.CommitmentID) {
-		for _, tuple := range p.unsolidCommitmentBlocks.GetBlocks(id) {
+		for _, tuple := range p.unsolidCommitmentBlocks.GetValues(id) {
 			err := p.ProcessBlock(tuple.A, tuple.B)
 			if err != nil {
 				p.ErrorHandler()(err)
@@ -297,8 +297,8 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	}
 
 	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
-	// If the commitment is not solid (it is not known), we store the block in a small buffer and process it once we
-	// commit the slot to avoid requesting it again.
+	// If the commitment is not solid (its chain not known), we store the block in a small buffer and process it once we
+	// receive the commitment (or commit the slot ourselves).
 	if !chainCommitment.IsSolid().Get() {
 		if !p.unsolidCommitmentBlocks.Add(block.ProtocolBlock().SlotCommitmentID, types.NewTuple(block, src)) {
 			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid commitment buffer: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())

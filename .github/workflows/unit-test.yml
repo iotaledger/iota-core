@@ -5,10 +5,6 @@ on:
     paths-ignore:
       - 'documentation/**'
 
-env:
-  CI_UNIT_TESTS_WAIT_FOR: 60s
-  CI_UNIT_TESTS_TICK: 100ms
-
 jobs:
   unit-tests:
     name: Unit tests
@@ -26,7 +22,7 @@ jobs:
         run: go version
 
       - name: Run Tests
-        run: go test ./... -tags rocksdb -count=1 -timeout 40m
+        run: go test ./... -tags rocksdb -count=1 -timeout 20m
 
 
   unit-tests-race:
@@ -45,4 +41,4 @@ jobs:
         run: go version
 
       - name: Run Tests with -race
-        run: go test ./... -tags rocksdb -count=1 -race -short -timeout 60m
+        run: go test ./... -tags rocksdb -count=1 -race -short -timeout 30m

@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/core/blockbuffer"
+	"github.com/iotaledger/iota-core/pkg/core/buffer"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
@@ -31,7 +31,7 @@ type BlockDAG struct {
 	solidifier *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
 	latestCommitmentFunc  func() *model.Commitment
-	uncommittedSlotBlocks *blockbuffer.UnsolidCommitmentBlocks[*blocks.Block]
+	uncommittedSlotBlocks *buffer.UnsolidCommitmentBuffer[*blocks.Block]
 
 	retainBlockFailure func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)
 
@@ -62,15 +62,14 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 			}, event.WithWorkerPool(wp))
 
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+				unsolidBlocks := b.uncommittedSlotBlocks.GetValuesAndEvict(commitment.ID())
+
 				b.solidifierMutex.RLock()
 				defer b.solidifierMutex.RUnlock()
 
-				unsolidBlocks := b.uncommittedSlotBlocks.GetBlocks(commitment.ID())
 				for _, block := range unsolidBlocks {
 					b.solidifier.Queue(block)
 				}
-
-				b.uncommittedSlotBlocks.EvictUntil(commitment.Index())
 			}, event.WithWorkerPool(wp))
 
 			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
@@ -95,7 +94,7 @@ func New(workers *workerpool.Group, apiProvider api.Provider, evictionState *evi
 		workers:               workers,
 		workerPool:            workers.CreatePool("Solidifier", 2),
 		errorHandler:          errorHandler,
-		uncommittedSlotBlocks: blockbuffer.NewUnsolidCommitmentBlocks[*blocks.Block](10, 1000),
+		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](10, 1000),
 	}, opts,
 		func(b *BlockDAG) {
 			b.solidifier = causalorder.New(
@@ -122,9 +121,17 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 	if block, wasAttached, err = b.attach(data); wasAttached {
 		b.events.BlockAttached.Trigger(block)
 
-		if block.SlotCommitmentID().Index() > b.latestCommitmentFunc().Commitment().Index {
-			b.uncommittedSlotBlocks.Add(block.SlotCommitmentID(), block)
-
+		// We add blocks that commit to a commitment we haven't committed ourselves yet to this limited size buffer and
+		// only let them become solid once we committed said slot ourselves (to the same commitment).
+		// This is necessary in order to make sure that all necessary state is available after a block is solid (specifically
+		// the state of the referenced commitment for the commitment filter). All the while, we need to make sure that
+		// the requesting of missing blocks (done in b.attach) continues so that we can advance our state and eventually
+		// commit the slot.
+		// This limited size buffer has a nice side effect: In normal behavior (e.g. no attack of a neighbor that sends you
+		// unsolidifiable blocks in your committed slots) it will prevent the node from storing too many blocks in memory.
+		if b.uncommittedSlotBlocks.AddWithFunc(block.SlotCommitmentID(), block, func() bool {
+			return block.SlotCommitmentID().Index() > b.latestCommitmentFunc().Commitment().Index
+		}) {
 			return
 		}
 

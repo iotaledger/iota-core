@@ -83,7 +83,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsSlotsPerEpochExponent:  5,
 		optsEpochNearingThreshold:  16,
 	}, opts, func(t *TestSuite) {
-		fmt.Println("Setup TestSuite -", testingT.Name())
+		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 		t.API = iotago.V3API(
 			iotago.NewV3ProtocolParameters(
 				iotago.WithNetworkOptions(

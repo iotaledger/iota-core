@@ -71,9 +71,9 @@ type Engine struct {
 	isBootstrapped      bool
 	isBootstrappedMutex syncutils.Mutex
 
-	startupMaxBlockSlot iotago.SlotIndex
-	chainID             iotago.CommitmentID
-	mutex               syncutils.RWMutex
+	startupAvailableBlocksWindow iotago.SlotIndex
+	chainID                      iotago.CommitmentID
+	mutex                        syncutils.RWMutex
 
 	optsBootstrappedThreshold time.Duration
 	optsIsBootstrappedFunc    func(*Engine) bool
@@ -202,7 +202,9 @@ func New(
 					panic(ierrors.Wrap(err, "failed to restore upgrade orchestrator from disk"))
 				}
 
-				e.startupMaxBlockSlot = e.Storage.Settings().LatestCommitment().Index() + e.CurrentAPI().ProtocolParameters().MaxCommittableAge()
+				// When we start from disk we potentially have previously accepted blocks in window (latestCommitment, latestCommitment + maxCommittableAge]
+				// on disk. We store this information that we can load blocks instead of requesting them again.
+				e.startupAvailableBlocksWindow = e.Storage.Settings().LatestCommitment().Index() + e.CurrentAPI().ProtocolParameters().MaxCommittableAge()
 			}
 
 		},
@@ -254,7 +256,7 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	}
 
 	// The block should've been in the block cache, so there's no need to check the storage.
-	if !exists && id.Index() > e.startupMaxBlockSlot && id.Index() > e.Storage.Settings().LatestCommitment().Index() {
+	if !exists && id.Index() > e.startupAvailableBlocksWindow && id.Index() > e.Storage.Settings().LatestCommitment().Index() {
 		return nil, false
 	}
 
@@ -477,7 +479,7 @@ func (e *Engine) setupBlockRequester() {
 	// We need to hook to make sure that the request is created before the block arrives to avoid a race condition
 	// where we try to delete the request again before it is created. Thus, continuing to request forever.
 	e.Events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
-		if block.ID().Index() < e.startupMaxBlockSlot {
+		if block.ID().Index() < e.startupAvailableBlocksWindow {
 			// We shortcut requesting blocks that are in the storage in case we did shut down and restart.
 			// We can safely ignore all errors.
 			if blockStorage := e.Storage.Blocks(block.ID().Index()); blockStorage != nil {

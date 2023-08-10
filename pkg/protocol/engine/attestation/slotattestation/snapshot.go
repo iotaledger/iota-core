@@ -66,7 +66,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 	attestationSlotIndex, isValid := m.computeAttestationCommitmentOffset(targetSlot)
 	if !isValid {
 		if err := stream.Write(writer, uint64(0)); err != nil {
-			return ierrors.Wrap(err, "failed to 0 attestation count")
+			return ierrors.Wrap(err, "failed to write 0 attestation count")
 		}
 
 		return nil
