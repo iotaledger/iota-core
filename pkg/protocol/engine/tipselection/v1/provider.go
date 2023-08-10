@@ -1,8 +1,6 @@
 package tipselectionv1
 
 import (
-	"time"
-
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -18,9 +16,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 		e.HookConstructed(func() {
 			e.Ledger.HookInitialized(func() {
 				e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
-					//t.SetLivenessThreshold(block.IssuingTime().Add(-e.CurrentAPI().LivenessThresholdDuration()))
-					livenessThresholdDuration := time.Duration(int64(e.CurrentAPI().ProtocolParameters().LivenessThreshold())*e.CurrentAPI().TimeProvider().SlotDurationSeconds()) * time.Second
-					t.SetLivenessThreshold(block.IssuingTime().Add(-livenessThresholdDuration))
+					t.SetLivenessThreshold(block.IssuingTime().Add(-e.CurrentAPI().LivenessThresholdDuration()))
 				})
 
 				t.conflictDAG = e.Ledger.ConflictDAG()
