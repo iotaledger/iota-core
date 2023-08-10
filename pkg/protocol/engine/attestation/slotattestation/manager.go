@@ -50,8 +50,7 @@ const (
 //		- obtain and evict from it attestations that *commit to* lastCommittedSlot-attestationCommitmentOffset
 //	- committed attestations: retrieved at slot that we are committing, stored at slot lastCommittedSlot-attestationCommitmentOffset
 type Manager struct {
-	committeeFunc               func(index iotago.SlotIndex) *account.SeatedAccounts
-	attestationCommitmentOffset iotago.SlotIndex
+	committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts
 
 	futureAttestations  *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
 	pendingAttestations *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
@@ -74,7 +73,6 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 		return NewManager(
 			latestCommitment.Index(),
 			latestCommitment.CumulativeWeight(),
-			e.CurrentAPI().ProtocolParameters().MaxCommittableAge(),
 			e.Storage.Prunable.Attestations,
 			e.SybilProtection.SeatManager().Committee,
 			e,
@@ -85,20 +83,18 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 func NewManager(
 	lastCommittedSlot iotago.SlotIndex,
 	lastCumulativeWeight uint64,
-	attestationCommitmentOffset iotago.SlotIndex,
 	bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore,
 	committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts,
 	apiProvider api.Provider,
 ) *Manager {
 	m := &Manager{
-		lastCommittedSlot:           lastCommittedSlot,
-		lastCumulativeWeight:        lastCumulativeWeight,
-		attestationCommitmentOffset: attestationCommitmentOffset,
-		committeeFunc:               committeeFunc,
-		bucketedStorage:             bucketedStorage,
-		futureAttestations:          memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
-		pendingAttestations:         memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
-		apiProvider:                 apiProvider,
+		lastCommittedSlot:    lastCommittedSlot,
+		lastCumulativeWeight: lastCumulativeWeight,
+		committeeFunc:        committeeFunc,
+		bucketedStorage:      bucketedStorage,
+		futureAttestations:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
+		pendingAttestations:  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation](),
+		apiProvider:          apiProvider,
 	}
 	m.TriggerConstructed()
 
@@ -110,10 +106,6 @@ func (m *Manager) Shutdown() {
 		panic(err)
 	}
 	m.TriggerStopped()
-}
-
-func (m *Manager) AttestationCommitmentOffset() iotago.SlotIndex {
-	return m.attestationCommitmentOffset
 }
 
 // Get returns the attestations that are included in the commitment of the given slot as list.
@@ -284,9 +276,9 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 }
 
 func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cutoffIndex iotago.SlotIndex, isValid bool) {
-	if slot < m.attestationCommitmentOffset {
+	if slot < m.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge() {
 		return 0, false
 	}
 
-	return slot - m.attestationCommitmentOffset, true
+	return slot - m.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge(), true
 }
