@@ -104,9 +104,9 @@ func (m *Manager) tryCommitUntil(block *blocks.Block) {
 
 // IsBootstrapped returns if the Manager finished committing all pending slots up to the current acceptance time.
 func (m *Manager) IsBootstrapped() bool {
-	// If acceptance time is in slot 10, then the latest committable index is 3 (with minCommittableAge=6), because there are 6 full slots between slot 10 and slot 3.
-	// All slots smaller than 4 are committable, so in order to check if slot 3 is committed it's necessary to do m.minCommittableAge-1,
-	// otherwise we'd expect slot 4 to be committed in order to be fully committed, which is impossible.
+	// If acceptance time is in slot 10, then the latest committable index is 4 (with minCommittableAge=6),
+	//because there are 5 full slots and 1 that is still not finished between slot 10 and slot 4.
+	// All slots smaller or equal to 4 are committable.
 	latestIndex := m.storage.Settings().LatestCommitment().Index()
 	return latestIndex+m.minCommittableAge >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())
 }
