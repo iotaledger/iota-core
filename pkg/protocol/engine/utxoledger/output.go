@@ -6,6 +6,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -38,6 +39,14 @@ type Output struct {
 	encodedOutput []byte
 	outputOnce    sync.Once
 	output        iotago.Output
+}
+
+func (o *Output) StateID() iotago.Identifier {
+	return iotago.IdentifierFromData(lo.PanicOnErr(o.outputID.Bytes()))
+}
+
+func (o *Output) Type() iotago.StateType {
+	return iotago.InputUTXO
 }
 
 func (o *Output) OutputID() iotago.OutputID {
