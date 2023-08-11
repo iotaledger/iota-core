@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
+	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -16,6 +17,7 @@ import (
 )
 
 const (
+	DefaultPageSize                = 50
 	RequestsMemoryCacheGranularity = 10
 	MaxRequestedSlotAge            = 10
 )
@@ -53,12 +55,26 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 }
 
 func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
-	pageSize, _ := httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
+	var err error
+	pageSize := restapi.ParamsRestAPI.MaxPageSize
+	if len(c.QueryParam(restapipkg.QueryParameterPageSize)) > 0 {
+		pageSize, err = httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.QueryParameterPageSize)
+		}
+		if pageSize > restapi.ParamsRestAPI.MaxPageSize {
+			pageSize = restapi.ParamsRestAPI.MaxPageSize
+		}
+	}
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
-	requestedSlotIndex, cursorIndex, err := httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
-	if err != nil {
-		// no cursor provided, the first request
-		requestedSlotIndex = latestCommittedSlot
+	// no cursor provided will be the first request
+	requestedSlotIndex := latestCommittedSlot
+	var cursorIndex uint32
+	if len(c.QueryParam(restapipkg.QueryParameterCursor)) != 0 {
+		requestedSlotIndex, cursorIndex, err = httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.QueryParameterCursor)
+		}
 	}
 
 	// do not respond to really old requests
@@ -71,7 +87,6 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	slotRange := uint32(requestedSlotIndex / RequestsMemoryCacheGranularity)
 	registeredValidators, exists := deps.Protocol.MainEngineInstance().Retainer.RegisteredValidatorsCache(slotRange)
 	if !exists {
-		var err error
 		registeredValidators, err = deps.Protocol.MainEngineInstance().SybilProtection.OrderedRegisteredValidatorsList(nextEpoch)
 		if err != nil {
 			return nil, err
