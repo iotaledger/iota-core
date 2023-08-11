@@ -53,7 +53,7 @@ func NewWarpSync(protocol *Protocol) *WarpSync {
 
 		protocol.ChainManager.Events.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
 			chainCommitment.IsSolid().OnTrigger(func() {
-				fmt.Println(chainCommitment.ID(), "IsSolid")
+				fmt.Println("IsSolid", chainCommitment.ID())
 
 				w.warpSyncIfNecessary(w.targetEngine(chainCommitment), chainCommitment)
 			})
@@ -62,6 +62,7 @@ func NewWarpSync(protocol *Protocol) *WarpSync {
 
 	protocol.HookInitialized(func() {
 		w.pendingRequests.Events.Tick.Hook(func(id iotago.CommitmentID) {
+			fmt.Println("Sending WarpSyncRequest for", id)
 			protocol.networkProtocol.SendWarpSyncRequest(id)
 		})
 
@@ -85,11 +86,13 @@ func (w *WarpSync) ShouldProcess(engine *engine.Engine, block *model.Block) bool
 	latestCommitment := engine.Storage.Settings().LatestCommitment()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
 
-	fmt.Println(">>", latestCommitment)
-	fmt.Println(">>", slotCommitmentID)
-	fmt.Println(">>", maxCommittableAge)
+	shouldProcess := block.ID().Index() > latestCommitment.Index()+2*maxCommittableAge && slotCommitmentID.Index() > latestCommitment.Index()
 
-	return block.ID().Index() > latestCommitment.Index()+maxCommittableAge && slotCommitmentID.Index() > latestCommitment.Index()
+	if shouldProcess {
+		fmt.Println(">> Should process: latest", latestCommitment.Index(), "committing to", slotCommitmentID.Index(), "MCA", maxCommittableAge)
+	}
+
+	return shouldProcess
 }
 
 func (w *WarpSync) IsShutdown() reactive.Event {
@@ -111,6 +114,7 @@ func (w *WarpSync) processRequest(commitmentID iotago.CommitmentID, src network.
 }
 
 func (w *WarpSync) processResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
+	fmt.Println(">> warpSync PROCESSRESPONSE", commitmentID)
 	w.isShutdown.Compute(func(isShutdown bool) bool {
 		if !isShutdown {
 			fmt.Println("WarpSyncManager.ProcessResponse: received response for", commitmentID)
@@ -129,7 +133,7 @@ func (w *WarpSync) processRequestSync(commitmentID iotago.CommitmentID, src netw
 
 	committedSlot, err := w.protocol.MainEngineInstance().CommittedSlot(commitmentID.Index())
 	if err != nil {
-		fmt.Println("WarpSyncManager.ProcessRequest: committedSlot == nil")
+		fmt.Println("WarpSyncManager.ProcessRequest: err != nil", err)
 		return
 	}
 
@@ -151,21 +155,26 @@ func (w *WarpSync) processRequestSync(commitmentID iotago.CommitmentID, src netw
 		return
 	}
 
-	w.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.AttestationsProof(), src)
+	fmt.Println("WarpSyncManager.ProcessRequest: sending response to", src, "for", commitmentID, "with", len(blockIDs), "blocks")
+
+	w.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), src)
 }
 
 func (w *WarpSync) processResponseSync(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier]) {
 	if w.processedRequests.Has(commitmentID) {
+		fmt.Println("WarpSyncManager.ProcessResponse: already processed", commitmentID)
 		return
 	}
 
 	chainCommitment, exists := w.protocol.ChainManager.Commitment(commitmentID)
 	if !exists {
+		fmt.Println("WarpSyncManager.ProcessResponse: chainCommitment == nil")
 		return
 	}
 
 	targetEngine := w.targetEngine(chainCommitment)
 	if targetEngine == nil {
+		fmt.Println("WarpSyncManager.ProcessResponse: targetEngine == nil")
 		return
 	}
 
@@ -175,6 +184,7 @@ func (w *WarpSync) processResponseSync(commitmentID iotago.CommitmentID, blockID
 	}
 
 	if !iotago.VerifyProof(merkleProof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.Commitment().RootsID()) {
+		fmt.Println("WarpSyncManager.ProcessResponse: !iotago.VerifyProof")
 		return
 	}
 
@@ -182,6 +192,7 @@ func (w *WarpSync) processResponseSync(commitmentID iotago.CommitmentID, blockID
 
 	w.processedRequests.Add(commitmentID)
 
+	fmt.Println("WarpSyncManager.ProcessResponse: PROCESS FEEDING", commitmentID.Index())
 	for _, blockID := range blockIDs {
 		targetEngine.BlockDAG.GetOrRequestBlock(blockID)
 	}
@@ -198,8 +209,7 @@ func (w *WarpSync) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainm
 	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
-	fmt.Println("WarpSyncManager.warpSyncIfNecessary: latestCommitmentIndex", latestCommitmentIndex)
-	fmt.Println("WarpSyncManager.warpSyncIfNecessary: chainCommitment.Commitment().Index()", chainCommitment.Commitment().Index())
+	fmt.Println("WarpSyncManager.warpSyncIfNecessary: latest", latestCommitmentIndex, "chainCommitment", chainCommitment.Commitment().Index())
 
 	if chainCommitment.Commitment().Index() <= latestCommitmentIndex+maxCommittableAge {
 		fmt.Println("WarpsyncManager.warpSyncIfNecessary: too close!", chainCommitment.Commitment().Index())
@@ -236,6 +246,7 @@ func (w *WarpSync) targetEngine(commitment *chainmanager.ChainCommitment) *engin
 
 func (w *WarpSync) monitorLatestCommitmentUpdated(engineInstance *engine.Engine) {
 	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+		fmt.Println(">> monitorLatestCommitmentUpdated Committed", commitment.Index())
 		chainCommitment, exists := w.protocol.ChainManager.Commitment(commitment.ID())
 		if !exists {
 			return
@@ -243,11 +254,7 @@ func (w *WarpSync) monitorLatestCommitmentUpdated(engineInstance *engine.Engine)
 
 		w.processedRequests.Delete(commitment.ID())
 
-		maxCommittableAge := engineInstance.APIForSlot(commitment.Index()).ProtocolParameters().MaxCommittableAge()
-		warpSyncCommitment := chainCommitment.Chain().Commitment(commitment.Index() + maxCommittableAge)
-		if warpSyncCommitment != nil {
-			w.pendingRequests.StartTicker(warpSyncCommitment.ID())
-		}
+		w.warpSyncIfNecessary(engineInstance, chainCommitment)
 	}).Unhook)
 }
 

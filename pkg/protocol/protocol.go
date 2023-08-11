@@ -311,7 +311,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	processed := false
 
 	if mainChain := mainEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
-		if !p.WarpSync.ShouldProcess(mainEngine, block) {
+		if mainEngine.BlockRequester.HasTicker(block.ID()) || !p.WarpSync.ShouldProcess(mainEngine, block) {
 			mainEngine.ProcessBlockFromPeer(block, src)
 		} else {
 			fmt.Println("block2 from source", src, "was not processed:", block.ID(), "; commits to:", slotCommitmentID)
@@ -322,7 +322,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 
 	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil {
 		if candidateChain := candidateEngineInstance.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngineInstance.BlockRequester.HasTicker(block.ID()) {
-			if !p.WarpSync.ShouldProcess(candidateEngineInstance, block) {
+			if candidateEngineInstance.BlockRequester.HasTicker(block.ID()) || !p.WarpSync.ShouldProcess(candidateEngineInstance, block) {
 				candidateEngineInstance.ProcessBlockFromPeer(block, src)
 			} else {
 				fmt.Println("block1 from source", src, "was not processed:", block.ID(), "; commits to:", slotCommitmentID)
