@@ -192,12 +192,20 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		protocolParametersAndVersionsHash,
 	)
 
+	// calculate the new RMC
+	rmc, err := m.ledger.RMCManager().CommitSlot(index)
+	if err != nil {
+		m.errorHandler(ierrors.Wrapf(err, "failed to commit RMC for slot %d", index))
+		return false
+	}
+
 	newCommitment := iotago.NewCommitment(
 		apiForSlot.ProtocolParameters().Version(),
 		index,
 		latestCommitment.ID(),
 		roots.ID(),
 		cumulativeWeight,
+		rmc,
 	)
 
 	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, apiForSlot, serix.WithValidation())
