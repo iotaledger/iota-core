@@ -34,6 +34,8 @@ const (
 var (
 	defaultClientsURLs = []string{"http://localhost:8080", "http://localhost:8090"}
 
+	genesisTransactionID = iotago.IdentifierFromData([]byte("genesis"))
+
 	dockerFaucetSeed = func() []byte {
 		genesisSeed, err := base58.Decode("7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih")
 		if err != nil {
@@ -66,7 +68,7 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		wallets:                  NewWallets(),
 		aliasManager:             NewAliasManager(),
 		optFaucetSeed:            dockerFaucetSeed(),
-		optFaucetUnspentOutputID: iotago.OutputIDFromTransactionIDAndIndex(iotago.IdentifierFromData([]byte("genesis")), 0),
+		optFaucetUnspentOutputID: iotago.OutputIDFromTransactionIDAndIndex(genesisTransactionID, 0),
 		optsClientURLs:           defaultClientsURLs,
 	}, opts, func(w *EvilWallet) {
 		connector := NewWebClients(w.optsClientURLs)
@@ -87,7 +89,7 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 			faucetAmount = faucetOutput.BaseTokenAmount()
 		} else {
 			// use the genesis output ID instead, if we relaunch the docker network
-			w.optFaucetUnspentOutputID = iotago.OutputIDFromTransactionIDAndIndex(iotago.IdentifierFromData([]byte("genesis")), 0)
+			w.optFaucetUnspentOutputID = iotago.OutputIDFromTransactionIDAndIndex(genesisTransactionID, 0)
 			faucetOutput = clt.GetOutput(w.optFaucetUnspentOutputID)
 			if faucetOutput != nil {
 				faucetAmount = faucetOutput.BaseTokenAmount()

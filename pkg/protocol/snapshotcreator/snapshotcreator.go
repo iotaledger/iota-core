@@ -43,6 +43,8 @@ import (
 // | node1       | node1       |
 // | node2       | node2       |.
 
+var GenesisTransactionID = iotago.IdentifierFromData([]byte("genesis"))
+
 func CreateSnapshot(opts ...options.Option[Options]) error {
 	opt := NewOptions(opts...)
 
@@ -127,7 +129,7 @@ func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte
 		}
 
 		// Genesis output is on Genesis TX index 0
-		if err := engineInstance.Ledger.AddGenesisUnspentOutput(utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(iotago.IdentifierFromData([]byte("genesis")), 0), iotago.EmptyBlockID(), 0, 0, output)); err != nil {
+		if err := engineInstance.Ledger.AddGenesisUnspentOutput(utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(GenesisTransactionID, 0), iotago.EmptyBlockID(), 0, 0, output)); err != nil {
 			return err
 		}
 	}
@@ -144,7 +146,7 @@ func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Eng
 			return ierrors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
 		}
 
-		accountOutput := utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(iotago.IdentifierFromData([]byte("genesis")), uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)
+		accountOutput := utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(GenesisTransactionID, uint16(idx+1)), iotago.EmptyBlockID(), 0, 0, output)
 		if err := engineInstance.Ledger.AddGenesisUnspentOutput(accountOutput); err != nil {
 			return err
 		}
