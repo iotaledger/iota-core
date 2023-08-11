@@ -189,7 +189,7 @@ func (p *Protocol) shutdown() {
 		p.networkProtocol.Shutdown()
 	}
 
-	p.WarpSync.Shutdown()
+	p.WarpSync.shutdown()
 	p.ChainManager.Shutdown()
 	p.Workers.Shutdown()
 
@@ -311,10 +311,10 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	processed := false
 
 	if mainChain := mainEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
-		if block.ID().Index() <= p.WarpSync.Threshold(mainEngine, slotCommitmentID.Index()) {
+		if !p.WarpSync.ShouldProcess(mainEngine, block) {
 			mainEngine.ProcessBlockFromPeer(block, src)
 		} else {
-			fmt.Println("block from source", src, "was not processed:", block.ID(), "; commits to:", slotCommitmentID)
+			fmt.Println("block2 from source", src, "was not processed:", block.ID(), "; commits to:", slotCommitmentID)
 		}
 
 		processed = true
@@ -322,10 +322,10 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 
 	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil {
 		if candidateChain := candidateEngineInstance.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngineInstance.BlockRequester.HasTicker(block.ID()) {
-			if block.ID().Index() <= p.WarpSync.Threshold(candidateEngineInstance, slotCommitmentID.Index()) {
+			if !p.WarpSync.ShouldProcess(candidateEngineInstance, block) {
 				candidateEngineInstance.ProcessBlockFromPeer(block, src)
 			} else {
-				fmt.Println("block from source", src, "was not processed:", block.ID(), "; commits to:", slotCommitmentID)
+				fmt.Println("block1 from source", src, "was not processed:", block.ID(), "; commits to:", slotCommitmentID)
 			}
 
 			processed = true

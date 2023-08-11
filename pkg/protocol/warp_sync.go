@@ -53,6 +53,8 @@ func NewWarpSync(protocol *Protocol) *WarpSync {
 
 		protocol.ChainManager.Events.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
 			chainCommitment.IsSolid().OnTrigger(func() {
+				fmt.Println(chainCommitment.ID(), "IsSolid")
+
 				w.warpSyncIfNecessary(w.targetEngine(chainCommitment), chainCommitment)
 			})
 		})
@@ -64,70 +66,65 @@ func NewWarpSync(protocol *Protocol) *WarpSync {
 		})
 
 		protocol.Events.Started.Hook(func() {
-			protocol.Events.Network.WarpSyncRequestReceived.Hook(w.ProcessRequest)
-			protocol.Events.Network.WarpSyncResponseReceived.Hook(w.ProcessResponse)
+			protocol.Events.Network.WarpSyncRequestReceived.Hook(w.processRequest)
+			protocol.Events.Network.WarpSyncResponseReceived.Hook(w.processResponse)
 		})
 	})
+
+	protocol.HookStopped(w.shutdown)
 
 	return w
 }
 
-func (w *WarpSync) ProcessRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
-	w.isShutdown.Compute(func(isShutdown bool) bool {
-		if !isShutdown {
-			w.workerPool.Submit(func() {
-				w.processWarpSyncRequest(commitmentID, src)
-			})
-		}
+// ShouldProcess returns whether the given block should be processed by the WarpSync instance instead of the engine.
+//
+// This is the case if the block is more than a warp sync threshold ahead of the latest commitment while also committing
+// to an unknown slot that can potentially be warp synced.
+func (w *WarpSync) ShouldProcess(engine *engine.Engine, block *model.Block) bool {
+	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
+	latestCommitment := engine.Storage.Settings().LatestCommitment()
+	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
 
-		return isShutdown
-	})
-}
+	fmt.Println(">>", latestCommitment)
+	fmt.Println(">>", slotCommitmentID)
+	fmt.Println(">>", maxCommittableAge)
 
-func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
-	w.isShutdown.Compute(func(isShutdown bool) bool {
-		if !isShutdown {
-			w.workerPool.Submit(func() {
-				w.processWarpSyncResponse(commitmentID, blockIDs, merkleProof)
-			})
-		}
-
-		return isShutdown
-	})
-}
-
-func (w *WarpSync) Threshold(mainEngine *engine.Engine, index iotago.SlotIndex) iotago.SlotIndex {
-	return mainEngine.Storage.Settings().LatestCommitment().Index() + mainEngine.APIForSlot(index).ProtocolParameters().MaxCommittableAge()
-}
-
-func (w *WarpSync) monitorLatestCommitmentUpdated(engineInstance *engine.Engine) {
-	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-		chainCommitment, exists := w.protocol.ChainManager.Commitment(commitment.ID())
-		if !exists {
-			return
-		}
-
-		w.processedRequests.Delete(commitment.ID())
-
-		maxCommittableAge := engineInstance.APIForSlot(commitment.Index()).ProtocolParameters().MaxCommittableAge()
-		warpSyncCommitment := chainCommitment.Chain().Commitment(commitment.Index() + maxCommittableAge)
-		if warpSyncCommitment != nil {
-			w.pendingRequests.StartTicker(warpSyncCommitment.ID())
-		}
-	}).Unhook)
-}
-
-func (w *WarpSync) Shutdown() {
-	w.pendingRequests.Shutdown()
-
-	w.workerPool.Shutdown(true).ShutdownComplete.Wait()
+	return block.ID().Index() > latestCommitment.Index()+maxCommittableAge && slotCommitmentID.Index() > latestCommitment.Index()
 }
 
 func (w *WarpSync) IsShutdown() reactive.Event {
 	return w.isShutdown
 }
 
-func (w *WarpSync) processWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
+func (w *WarpSync) processRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
+	w.isShutdown.Compute(func(isShutdown bool) bool {
+		if !isShutdown {
+			fmt.Println("WarpSyncManager.ProcessRequest: received request from", src)
+
+			w.workerPool.Submit(func() {
+				w.processRequestSync(commitmentID, src)
+			})
+		}
+
+		return isShutdown
+	})
+}
+
+func (w *WarpSync) processResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
+	w.isShutdown.Compute(func(isShutdown bool) bool {
+		if !isShutdown {
+			fmt.Println("WarpSyncManager.ProcessResponse: received response for", commitmentID)
+
+			w.workerPool.Submit(func() {
+				w.processResponseSync(commitmentID, blockIDs, merkleProof)
+			})
+		}
+
+		return isShutdown
+	})
+}
+
+func (w *WarpSync) processRequestSync(commitmentID iotago.CommitmentID, src network.PeerID) {
 	// TODO: check if the peer is allowed to request the warp sync
 
 	committedSlot, err := w.protocol.MainEngineInstance().CommittedSlot(commitmentID.Index())
@@ -157,7 +154,7 @@ func (w *WarpSync) processWarpSyncRequest(commitmentID iotago.CommitmentID, src 
 	w.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.AttestationsProof(), src)
 }
 
-func (w *WarpSync) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier]) {
+func (w *WarpSync) processResponseSync(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier]) {
 	if w.processedRequests.Has(commitmentID) {
 		return
 	}
@@ -191,6 +188,8 @@ func (w *WarpSync) processWarpSyncResponse(commitmentID iotago.CommitmentID, blo
 }
 
 func (w *WarpSync) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
+	fmt.Println("WarpSyncManager.warpSyncIfNecessary")
+
 	if e == nil || chainCommitment == nil {
 		return
 	}
@@ -199,8 +198,11 @@ func (w *WarpSync) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainm
 	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
+	fmt.Println("WarpSyncManager.warpSyncIfNecessary: latestCommitmentIndex", latestCommitmentIndex)
+	fmt.Println("WarpSyncManager.warpSyncIfNecessary: chainCommitment.Commitment().Index()", chainCommitment.Commitment().Index())
+
 	if chainCommitment.Commitment().Index() <= latestCommitmentIndex+maxCommittableAge {
-		fmt.Println("WarpsyncManager.warpSyncIfNecessary: too close!")
+		fmt.Println("WarpsyncManager.warpSyncIfNecessary: too close!", chainCommitment.Commitment().Index())
 		return
 	}
 
@@ -230,6 +232,35 @@ func (w *WarpSync) targetEngine(commitment *chainmanager.ChainCommitment) *engin
 	}
 
 	return nil
+}
+
+func (w *WarpSync) monitorLatestCommitmentUpdated(engineInstance *engine.Engine) {
+	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+		chainCommitment, exists := w.protocol.ChainManager.Commitment(commitment.ID())
+		if !exists {
+			return
+		}
+
+		w.processedRequests.Delete(commitment.ID())
+
+		maxCommittableAge := engineInstance.APIForSlot(commitment.Index()).ProtocolParameters().MaxCommittableAge()
+		warpSyncCommitment := chainCommitment.Chain().Commitment(commitment.Index() + maxCommittableAge)
+		if warpSyncCommitment != nil {
+			w.pendingRequests.StartTicker(warpSyncCommitment.ID())
+		}
+	}).Unhook)
+}
+
+func (w *WarpSync) shutdown() {
+	w.isShutdown.Compute(func(isShutdown bool) bool {
+		if !isShutdown {
+			w.pendingRequests.Shutdown()
+
+			w.workerPool.Shutdown(true).ShutdownComplete.Wait()
+		}
+
+		return true
+	})
 }
 
 const (

@@ -104,7 +104,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 	)
 
 	n.hookEvents()
-	n.hookLogging(failOnBlockFiltered)
+	///n.hookLogging(failOnBlockFiltered)
 
 	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
