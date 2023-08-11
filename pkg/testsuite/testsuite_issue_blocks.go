@@ -246,8 +246,8 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 		lastBlockRowIssued = lastRowInSlot
 
 		if waitForSlotsCommitted {
-			if slot > t.API.ProtocolParameters().MinCommittableAge()+1 {
-				t.AssertCommitmentSlotIndexExists(slot-(t.API.ProtocolParameters().MinCommittableAge()+1), nodes...)
+			if slot > t.API.ProtocolParameters().MinCommittableAge() {
+				t.AssertCommitmentSlotIndexExists(slot-(t.API.ProtocolParameters().MinCommittableAge()), nodes...)
 			} else {
 				t.AssertBlocksExist(blocksInSlot, true, nodes...)
 			}
@@ -286,7 +286,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, activeNodes []*mock.N
 	if latestCommittedSlot >= slot {
 		return parent
 	}
-	nextBlockSlot := lo.Min(slot+t.optsMinCommittableAge+1, latestCommittedSlot+t.optsMinCommittableAge+1)
+	nextBlockSlot := lo.Min(slot+t.optsMinCommittableAge, latestCommittedSlot+t.optsMinCommittableAge)
 	tip := parent
 	chainIndex := 0
 	for {
@@ -300,10 +300,10 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, activeNodes []*mock.N
 			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
 			tip = t.IssueBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
 		}
-		if nextBlockSlot == slot+t.optsMinCommittableAge+1 {
+		if nextBlockSlot == slot+t.optsMinCommittableAge {
 			break
 		}
-		nextBlockSlot = lo.Min(slot+t.optsMinCommittableAge+1, nextBlockSlot+t.optsMinCommittableAge+1)
+		nextBlockSlot = lo.Min(slot+t.optsMinCommittableAge, nextBlockSlot+t.optsMinCommittableAge)
 		chainIndex += 2
 	}
 
