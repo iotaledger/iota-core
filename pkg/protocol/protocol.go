@@ -129,12 +129,9 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 
 		optsBaseDirectory:           "",
 		optsChainSwitchingThreshold: 3,
-	}, opts,
-		(*Protocol).initWarpSyncManager,
-		(*Protocol).initEngineManager,
-		(*Protocol).initChainManager,
-		(*Protocol).TriggerConstructed,
-	)
+	}, opts, func(p *Protocol) {
+		p.WarpSync = NewWarpSync(p)
+	}, (*Protocol).initEngineManager, (*Protocol).initChainManager, (*Protocol).TriggerConstructed)
 }
 
 // Run runs the protocol.
@@ -206,10 +203,6 @@ func (p *Protocol) shutdown() {
 	p.SyncManager.Shutdown()
 
 	p.TriggerStopped()
-}
-
-func (p *Protocol) initWarpSyncManager() {
-	p.WarpSync = NewWarpSync(p)
 }
 
 func (p *Protocol) initEngineManager() {

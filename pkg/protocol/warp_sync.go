@@ -72,10 +72,6 @@ func NewWarpSync(protocol *Protocol) *WarpSync {
 	return w
 }
 
-func (w *WarpSync) Threshold(mainEngine *engine.Engine, index iotago.SlotIndex) iotago.SlotIndex {
-	return mainEngine.Storage.Settings().LatestCommitment().Index() + mainEngine.APIForSlot(index).ProtocolParameters().MaxCommittableAge()
-}
-
 func (w *WarpSync) ProcessRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
 	w.isShutdown.Compute(func(isShutdown bool) bool {
 		if !isShutdown {
@@ -98,6 +94,10 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDs io
 
 		return isShutdown
 	})
+}
+
+func (w *WarpSync) Threshold(mainEngine *engine.Engine, index iotago.SlotIndex) iotago.SlotIndex {
+	return mainEngine.Storage.Settings().LatestCommitment().Index() + mainEngine.APIForSlot(index).ProtocolParameters().MaxCommittableAge()
 }
 
 func (w *WarpSync) monitorLatestCommitmentUpdated(engineInstance *engine.Engine) {
