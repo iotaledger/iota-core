@@ -87,7 +87,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	slotRange := uint32(requestedSlotIndex / RequestsMemoryCacheGranularity)
 	registeredValidators, exists := deps.Protocol.MainEngineInstance().Retainer.RegisteredValidatorsCache(slotRange)
 	if !exists {
-		registeredValidators, err = deps.Protocol.MainEngineInstance().SybilProtection.OrderedRegisteredValidatorsList(nextEpoch)
+		registeredValidators, err = deps.Protocol.MainEngineInstance().SybilProtection.OrderedRegisteredCandidateValidatorsList(nextEpoch)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to get ordered registered validators list for epoch %d", nextEpoch)
 		}

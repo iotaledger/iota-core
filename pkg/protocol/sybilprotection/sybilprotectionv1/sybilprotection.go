@@ -280,8 +280,8 @@ func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.
 	return validators, nil
 }
 
-// OrderedRegisteredValidatorsList returns the currently known list of registered validator candidates for the given epoch.
-func (o *SybilProtection) OrderedRegisteredValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error) {
+// OrderedRegisteredCandidateValidatorsList returns the currently known list of registered validator candidates for the given epoch.
+func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error) {
 	candidates := o.performanceTracker.ValidatorCandidates(epoch)
 	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
 

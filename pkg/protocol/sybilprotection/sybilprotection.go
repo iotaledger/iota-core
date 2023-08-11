@@ -14,7 +14,7 @@ import (
 type SybilProtection interface {
 	TrackValidationBlock(block *blocks.Block)
 	EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error)
-	OrderedRegisteredValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error)
+	OrderedRegisteredCandidateValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error)
 	IsCandidateActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) bool
 	// ValidatorReward returns the amount of mana that a validator has earned in a given epoch range.
 	// The actual used epoch range is returned, only untill usedEnd the decay was applied.
