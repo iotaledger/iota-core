@@ -14,24 +14,20 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Scheduler struct {
 	events *scheduler.Events
 
-	optsRate                           int // rate is specified in units of work per second
-	optsMaxBufferSize                  int
-	optsAcceptedBlockScheduleThreshold time.Duration
-	optsMaxDeficit                     uint64
-	optsMinMana                        iotago.Mana
-	optsTokenBucketSize                float64
+	quantumFunc func(iotago.AccountID) (iotago.Mana, error)
 
-	manaRetrieveFunc func(iotago.AccountID) (iotago.Mana, error)
+	apiProvider api.Provider
 
 	buffer      *BufferQueue
 	bufferMutex syncutils.RWMutex
 
-	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, uint64]
+	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, iotago.WorkScore]
 
 	tokenBucket      float64
 	lastScheduleTime time.Time
@@ -47,24 +43,26 @@ type Scheduler struct {
 
 func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engine, scheduler.Scheduler] {
 	return module.Provide(func(e *engine.Engine) scheduler.Scheduler {
-		s := New(opts...)
-		s.buffer = NewBufferQueue(s.optsMaxBufferSize)
+		s := New(e, opts...)
+		s.buffer = NewBufferQueue(int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize))
 		e.HookConstructed(func() {
 			s.blockCache = e.BlockCache
 			e.Events.Scheduler.LinkTo(s.events)
 			e.Ledger.HookInitialized(func() {
-				s.manaRetrieveFunc = func(accountID iotago.AccountID) (iotago.Mana, error) {
+				// Mana retrieve function gets the account's Mana and returns the quantum for that account
+				s.quantumFunc = func(accountID iotago.AccountID) (iotago.Mana, error) {
 					manaSlot := e.Storage.Settings().LatestCommitment().Index()
 					mana, err := e.Ledger.ManaManager().GetManaOnAccount(accountID, manaSlot)
 					if err != nil {
 						return 0, err
 					}
 
-					if mana < s.optsMinMana {
-						return mana, ierrors.Errorf("account %s has insufficient Mana for block to be scheduled: account Mana %d, min Mana %d", accountID, mana, s.optsMinMana)
+					minMana := s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MinMana
+					if mana < minMana {
+						return mana, ierrors.Errorf("account %s has insufficient Mana for block to be scheduled: account Mana %d, min Mana %d", accountID, mana, minMana)
 					}
 
-					return mana, nil
+					return mana / minMana, nil
 				}
 			})
 			s.TriggerConstructed()
@@ -80,18 +78,13 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 	})
 }
 
-func New(opts ...options.Option[Scheduler]) *Scheduler {
+func New(apiProvider api.Provider, opts ...options.Option[Scheduler]) *Scheduler {
 	return options.Apply(
 		&Scheduler{
-			events:                             scheduler.NewEvents(),
-			lastScheduleTime:                   time.Now(),
-			deficits:                           shrinkingmap.New[iotago.AccountID, uint64](),
-			optsRate:                           200,
-			optsMaxBufferSize:                  300,
-			optsAcceptedBlockScheduleThreshold: 2 * time.Minute,
-			optsMaxDeficit:                     1,
-			optsMinMana:                        1,
-			optsTokenBucketSize:                1,
+			events:           scheduler.NewEvents(),
+			lastScheduleTime: time.Now(),
+			deficits:         shrinkingmap.New[iotago.AccountID, iotago.WorkScore](),
+			apiProvider:      apiProvider,
 		}, opts,
 	)
 }
@@ -111,20 +104,20 @@ func (s *Scheduler) Start() {
 }
 
 // Rate gets the rate of the scheduler in units of work per second.
-func (s *Scheduler) Rate() int {
-	return s.optsRate
+func (s *Scheduler) Rate() iotago.WorkScore {
+	return s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().SchedulerRate
 }
 
 // IssuerQueueSizeCount returns the queue size of the given issuer as block count.
-func (s *Scheduler) IssuerQueueSizeCount(issuerID iotago.AccountID) int {
+func (s *Scheduler) IssuerQueueBlockCount(issuerID iotago.AccountID) int {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
 	return s.buffer.IssuerQueue(issuerID).Size()
 }
 
-// IssuerQueueSizeWork returns the queue size of the given issuer in work units.
-func (s *Scheduler) IssuerQueueSizeWork(issuerID iotago.AccountID) int {
+// IssuerQueueWork returns the queue size of the given issuer in work units.
+func (s *Scheduler) IssuerQueueWork(issuerID iotago.AccountID) iotago.WorkScore {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
@@ -141,7 +134,7 @@ func (s *Scheduler) BufferSize() int {
 
 // MaxBufferSize returns the max buffer size of the Scheduler as block count.
 func (s *Scheduler) MaxBufferSize() int {
-	return s.optsMaxBufferSize
+	return int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize)
 }
 
 // ReadyBlocksCount returns the number of ready blocks.
@@ -160,28 +153,28 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 	if s.buffer.Size() == 0 {
 		return true
 	}
-	work := 0
+	work := iotago.WorkScore(0)
 	// if no specific block(s) is provided, assume max block size
-	// TODO: Define max block work instead of using size
+	currentAPI := s.apiProvider.CurrentAPI()
 	if len(blocks) == 0 {
-		work = iotago.MaxBlockSize
+		work = currentAPI.MaxBlockWork()
 	}
 	for _, block := range blocks {
-		work += int(block.WorkScore())
+		work += block.WorkScore()
 	}
 	deficit, err := s.getDeficit(accountID)
 	if err != nil {
 		return false
 	}
 
-	return deficit >= uint64(work+s.buffer.IssuerQueue(accountID).Work())
+	return deficit >= work+s.buffer.IssuerQueue(accountID).Work()
 }
 
 func (s *Scheduler) AddBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	droppedBlocks, err := s.buffer.Submit(block, s.manaRetrieveFunc)
+	droppedBlocks, err := s.buffer.Submit(block, s.quantumFunc)
 	// error submitting indicates that the block was already submitted so we do nothing else.
 	if err != nil {
 		return
@@ -206,15 +199,17 @@ loop:
 			break loop
 		// when a block is pushed by the buffer
 		case blockToSchedule = <-s.blockChan:
-			tokensRequired := float64(blockToSchedule.WorkScore()) - (s.tokenBucket + float64(s.optsRate)*time.Since(s.lastScheduleTime).Seconds())
+			currentAPI := s.apiProvider.CurrentAPI()
+			rate := currentAPI.ProtocolParameters().CongestionControlParameters().SchedulerRate
+			tokensRequired := float64(blockToSchedule.WorkScore()) - (s.tokenBucket + float64(rate)*time.Since(s.lastScheduleTime).Seconds())
 			if tokensRequired > 0 {
 				// wait until sufficient tokens in token bucket
-				timer := time.NewTimer(time.Duration(tokensRequired/float64(s.optsRate)) * time.Second)
+				timer := time.NewTimer(time.Duration(tokensRequired/float64(rate)) * time.Second)
 				<-timer.C
 			}
 			s.tokenBucket = lo.Min(
-				s.optsTokenBucketSize,
-				s.tokenBucket+float64(s.optsRate)*time.Since(s.lastScheduleTime).Seconds(),
+				float64(currentAPI.MaxBlockWork()),
+				s.tokenBucket+float64(rate)*time.Since(s.lastScheduleTime).Seconds(),
 			)
 			s.lastScheduleTime = time.Now()
 			s.scheduleBlock(blockToSchedule)
@@ -233,12 +228,6 @@ func (s *Scheduler) scheduleBlock(block *blocks.Block) {
 
 		s.events.BlockScheduled.Trigger(block)
 	}
-}
-
-func (s *Scheduler) quantum(accountID iotago.AccountID) (iotago.Mana, error) {
-	mana, err := s.manaRetrieveFunc(accountID)
-
-	return mana / s.optsMinMana, err
 }
 
 func (s *Scheduler) selectBlockToScheduleWithLocking() {
@@ -309,7 +298,8 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 		var issuerRemoved bool
 
 		for block != nil && time.Now().After(block.IssuingTime()) {
-			if block.IsAccepted() && time.Since(block.IssuingTime()) > s.optsAcceptedBlockScheduleThreshold {
+			currentAPI := s.apiProvider.CurrentAPI()
+			if block.IsAccepted() && time.Since(block.IssuingTime()) > time.Duration(currentAPI.TimeProvider().SlotDurationSeconds()*int64(currentAPI.ProtocolParameters().MaxCommittableAge())) {
 				if block.SetSkipped() {
 					s.updateChildrenWithoutLocking(block)
 					s.events.BlockSkipped.Trigger(block)
@@ -336,7 +326,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 
 			remainingDeficit := int64(block.WorkScore()) - int64(deficit)
 			// calculate how many rounds we need to skip to accumulate enough deficit.
-			quantum, err := s.quantum(issuerID)
+			quantum, err := s.quantumFunc(issuerID)
 			if err != nil {
 				// if quantum, can't be retrieved, we need to remove this issuer.
 				s.removeIssuer(q, err)
@@ -385,16 +375,16 @@ func (s *Scheduler) removeIssuer(q *IssuerQueue, err error) {
 	s.buffer.RemoveIssuer(q.IssuerID())
 }
 
-func (s *Scheduler) getDeficit(accountID iotago.AccountID) (uint64, error) {
+func (s *Scheduler) getDeficit(accountID iotago.AccountID) (iotago.WorkScore, error) {
 	d, exists := s.deficits.Get(accountID)
 	if !exists {
-		_, err := s.manaRetrieveFunc(accountID)
-		// manaRetrieveFunc return error if mana is less than MinMana or the Mana can not be retrieved for the account.
+		_, err := s.quantumFunc(accountID)
+		// quantumFunc returns error if mana is less than MinMana or the Mana can not be retrieved for the account.
 		if err != nil {
 			return 0, ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
 		}
 		// load with max deficit if the issuer has Mana but has been removed from the deficits map
-		return s.optsMaxDeficit, nil
+		return s.apiProvider.CurrentAPI().MaxBlockWork(), nil
 	}
 
 	return d, nil
@@ -402,17 +392,17 @@ func (s *Scheduler) getDeficit(accountID iotago.AccountID) (uint64, error) {
 
 func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error {
 	var err error
-	s.deficits.Compute(accountID, func(currentValue uint64, exists bool) uint64 {
+	s.deficits.Compute(accountID, func(currentValue iotago.WorkScore, exists bool) iotago.WorkScore {
 		if !exists {
-			_, err = s.manaRetrieveFunc(accountID)
-			// manaRetrieveFunc return error if mana is less than MinMana or the Mana can not be retrieved for the account.
+			_, err = s.quantumFunc(accountID)
+			// quantumFunc returns error if mana is less than MinMana or the Mana can not be retrieved for the account.
 			if err != nil {
 				err = ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
 				return 0
 			}
 
 			// load with max deficit if the issuer has Mana but has been removed from the deficits map
-			return s.optsMaxDeficit
+			return s.apiProvider.CurrentAPI().MaxBlockWork()
 		}
 
 		// TODO: use safemath package to prevent underflow
@@ -421,7 +411,7 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error
 			return 0
 		}
 
-		return lo.Min(uint64(int64(currentValue)+delta), s.optsMaxDeficit)
+		return lo.Min(iotago.WorkScore(int64(currentValue)+delta), s.apiProvider.CurrentAPI().MaxBlockWork())
 	})
 
 	if err != nil {
@@ -434,7 +424,7 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error
 }
 
 func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds int64) error {
-	quantum, err := s.quantum(issuerID)
+	quantum, err := s.quantumFunc(issuerID)
 	if err != nil {
 		return err
 	}
@@ -488,43 +478,5 @@ func (s *Scheduler) updateChildrenWithoutLocking(block *blocks.Block) {
 		if _, childBlockExists := s.blockCache.Block(childBlock.ID()); childBlockExists && childBlock.IsEnqueued() {
 			s.tryReady(childBlock)
 		}
-	}
-}
-
-// region Options ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func WithAcceptedBlockScheduleThreshold(acceptedBlockScheduleThreshold time.Duration) options.Option[Scheduler] {
-	return func(s *Scheduler) {
-		s.optsAcceptedBlockScheduleThreshold = acceptedBlockScheduleThreshold
-	}
-}
-
-func WithMaxBufferSize(maxBufferSize int) options.Option[Scheduler] {
-	return func(s *Scheduler) {
-		s.optsMaxBufferSize = maxBufferSize
-	}
-}
-
-func WithRate(rate int) options.Option[Scheduler] {
-	return func(s *Scheduler) {
-		s.optsRate = rate
-	}
-}
-
-func WithMaxDeficit(maxDef int) options.Option[Scheduler] {
-	return func(s *Scheduler) {
-		s.optsMaxDeficit = uint64(maxDef)
-	}
-}
-
-func WithMinMana(minMana int) options.Option[Scheduler] {
-	return func(s *Scheduler) {
-		s.optsMaxDeficit = uint64(minMana)
-	}
-}
-
-func WithTokenBucketSize(tokenBucketSize float64) options.Option[Scheduler] {
-	return func(s *Scheduler) {
-		s.optsTokenBucketSize = tokenBucketSize
 	}
 }

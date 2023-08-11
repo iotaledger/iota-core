@@ -42,7 +42,7 @@ func (s *Scheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...*blocks.Block) b
 	return true
 }
 
-func (s *Scheduler) Rate() int {
+func (s *Scheduler) Rate() iotago.WorkScore {
 	return 0
 }
 
@@ -58,11 +58,11 @@ func (s *Scheduler) ReadyBlocksCount() int {
 	return 0
 }
 
-func (s *Scheduler) IssuerQueueSizeCount(_ iotago.AccountID) int {
+func (s *Scheduler) IssuerQueueBlockCount(_ iotago.AccountID) int {
 	return 0
 }
 
-func (s *Scheduler) IssuerQueueSizeWork(_ iotago.AccountID) int {
+func (s *Scheduler) IssuerQueueWork(_ iotago.AccountID) iotago.WorkScore {
 	return 0
 }
 
