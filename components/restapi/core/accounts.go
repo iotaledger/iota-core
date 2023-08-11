@@ -32,7 +32,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 
 	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to get account: %s form the Ledger", accountID.ToHex())
 	}
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
@@ -43,7 +43,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	}
 	rmc, err := deps.Protocol.CandidateEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to get RMC for slot: %d", rmcSlot)
 	}
 
 	return &apimodels.CongestionResponse{
@@ -89,7 +89,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	if !exists {
 		registeredValidators, err = deps.Protocol.MainEngineInstance().SybilProtection.OrderedRegisteredValidatorsList(nextEpoch)
 		if err != nil {
-			return nil, err
+			return nil, ierrors.Wrapf(err, "failed to get ordered registered validators list for epoch %d", nextEpoch)
 		}
 		deps.Protocol.MainEngineInstance().Retainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
 	}
@@ -112,13 +112,13 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterAccountID)
 	}
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 
 	accountData, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to get account: %s form the Ledger", accountID.ToHex())
 	}
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
@@ -140,7 +140,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterOutputID)
 	}
 
 	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
