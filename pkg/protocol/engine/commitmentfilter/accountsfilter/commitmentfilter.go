@@ -116,7 +116,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 		return
 	}
 	if basicBlock, isBasic := block.BasicBlock(); isBasic {
-		manaCost, err := basicBlock.ManaCost(rmc)
+		manaCost, err := basicBlock.ManaCost(rmc, blockAPI.ProtocolParameters().WorkScoreStructure())
 		if err != nil {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,

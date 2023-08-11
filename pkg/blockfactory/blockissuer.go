@@ -249,7 +249,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 	blockBuilder.LatestFinalizedSlot(*blockParams.LatestFinalizedSlot)
 	blockBuilder.IssuingTime(*blockParams.IssuingTime)
 
-	// TODO: add workscore here with issue #264
+	// TODO: add workscore here with issue #264. Requires a function to precompute the workScore before constructing the block.
 	rmcSlot, err := safemath.SafeSub(api.TimeProvider().SlotFromTime(*blockParams.IssuingTime), api.ProtocolParameters().MaxCommittableAge())
 	if err != nil {
 		rmcSlot = 0
