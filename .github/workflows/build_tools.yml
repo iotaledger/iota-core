@@ -1,0 +1,32 @@
+name: Build internal tools
+
+on:
+  pull_request:
+    paths:
+      - 'tools/evil-spammer/**'
+      - 'tools/genesis-snapshot/**'
+jobs:
+
+  build:
+    name: Import Check
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Go 1.20
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.20
+
+      - name: Print Go version
+        run: go version
+
+      - name: Build evil-spammer tool
+        working-directory: tools/evil-spammer
+        run: go mod tidy && go build .
+
+      - name: Build genesis-snapshot tool
+        working-directory: tools/genesis-snapshot
+        run: go mod tidy && go build .
