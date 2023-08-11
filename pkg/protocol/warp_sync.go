@@ -18,16 +18,27 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-type WarpSyncManager struct {
-	protocol          *Protocol
-	workerPool        *workerpool.WorkerPool
-	pendingRequests   *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+// WarpSync is a protocol that is responsible for syncing the node with the network by requesting the content of slots.
+type WarpSync struct {
+	// protocol is the protocol instance that is using this WarpSync instance.
+	protocol *Protocol
+
+	// workerPool is the worker pool that is used to process the requests and responses.
+	workerPool *workerpool.WorkerPool
+
+	// pendingRequests is the set of pending requests that are waiting to be processed.
+	pendingRequests *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+
+	// processedRequests is the set of processed requests.
 	processedRequests ds.Set[iotago.CommitmentID]
-	isShutdown        reactive.Event
+
+	// isShutdown is a reactive event that is triggered when the WarpSync instance is shutdown.
+	isShutdown reactive.Event
 }
 
-func NewWarpSyncManager(protocol *Protocol) *WarpSyncManager {
-	w := &WarpSyncManager{
+// NewWarpSync creates a new WarpSync instance.
+func NewWarpSync(protocol *Protocol) *WarpSync {
+	w := &WarpSync{
 		protocol:          protocol,
 		workerPool:        protocol.Workers.CreatePool("WarpSyncManager", 1),
 		pendingRequests:   eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
@@ -35,7 +46,7 @@ func NewWarpSyncManager(protocol *Protocol) *WarpSyncManager {
 		isShutdown:        reactive.NewEvent(),
 	}
 
-	w.protocol.HookConstructed(func() {
+	protocol.HookConstructed(func() {
 		w.monitorLatestCommitmentUpdated(protocol.mainEngine)
 
 		protocol.engineManager.OnEngineCreated(w.monitorLatestCommitmentUpdated)
@@ -47,10 +58,25 @@ func NewWarpSyncManager(protocol *Protocol) *WarpSyncManager {
 		})
 	})
 
+	protocol.HookInitialized(func() {
+		w.pendingRequests.Events.Tick.Hook(func(id iotago.CommitmentID) {
+			protocol.networkProtocol.SendWarpSyncRequest(id)
+		})
+
+		protocol.Events.Started.Hook(func() {
+			protocol.Events.Network.WarpSyncRequestReceived.Hook(w.ProcessRequest)
+			protocol.Events.Network.WarpSyncResponseReceived.Hook(w.ProcessResponse)
+		})
+	})
+
 	return w
 }
 
-func (w *WarpSyncManager) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
+func (w *WarpSync) Threshold(mainEngine *engine.Engine, index iotago.SlotIndex) iotago.SlotIndex {
+	return mainEngine.Storage.Settings().LatestCommitment().Index() + mainEngine.APIForSlot(index).ProtocolParameters().MaxCommittableAge()
+}
+
+func (w *WarpSync) ProcessRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
 	w.isShutdown.Compute(func(isShutdown bool) bool {
 		if !isShutdown {
 			w.workerPool.Submit(func() {
@@ -62,7 +88,7 @@ func (w *WarpSyncManager) ProcessWarpSyncRequest(commitmentID iotago.CommitmentI
 	})
 }
 
-func (w *WarpSyncManager) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
+func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
 	w.isShutdown.Compute(func(isShutdown bool) bool {
 		if !isShutdown {
 			w.workerPool.Submit(func() {
@@ -74,7 +100,7 @@ func (w *WarpSyncManager) ProcessWarpSyncResponse(commitmentID iotago.Commitment
 	})
 }
 
-func (w *WarpSyncManager) monitorLatestCommitmentUpdated(engineInstance *engine.Engine) {
+func (w *WarpSync) monitorLatestCommitmentUpdated(engineInstance *engine.Engine) {
 	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		chainCommitment, exists := w.protocol.ChainManager.Commitment(commitment.ID())
 		if !exists {
@@ -91,47 +117,47 @@ func (w *WarpSyncManager) monitorLatestCommitmentUpdated(engineInstance *engine.
 	}).Unhook)
 }
 
-func (w *WarpSyncManager) Shutdown() {
+func (w *WarpSync) Shutdown() {
 	w.pendingRequests.Shutdown()
 
 	w.workerPool.Shutdown(true).ShutdownComplete.Wait()
 }
 
-func (w *WarpSyncManager) IsShutdown() reactive.Event {
+func (w *WarpSync) IsShutdown() reactive.Event {
 	return w.isShutdown
 }
 
-func (w *WarpSyncManager) processWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
+func (w *WarpSync) processWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
 	// TODO: check if the peer is allowed to request the warp sync
 
 	committedSlot, err := w.protocol.MainEngineInstance().CommittedSlot(commitmentID.Index())
 	if err != nil {
-		fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: committedSlot == nil")
+		fmt.Println("WarpSyncManager.ProcessRequest: committedSlot == nil")
 		return
 	}
 
 	commitment, err := committedSlot.Commitment()
 	if err != nil || commitment.ID() != commitmentID {
-		fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: commitment == nil")
+		fmt.Println("WarpSyncManager.ProcessRequest: commitment == nil")
 		return
 	}
 
 	blockIDs, err := committedSlot.BlockIDs()
 	if err != nil {
-		fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: blockIDs == nil")
+		fmt.Println("WarpSyncManager.ProcessRequest: blockIDs == nil")
 		return
 	}
 
 	roots, err := committedSlot.Roots()
 	if err != nil {
-		fmt.Println("WarpSyncManager.ProcessWarpSyncRequest: roots == nil")
+		fmt.Println("WarpSyncManager.ProcessRequest: roots == nil")
 		return
 	}
 
 	w.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.AttestationsProof(), src)
 }
 
-func (w *WarpSyncManager) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier]) {
+func (w *WarpSync) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier]) {
 	if w.processedRequests.Has(commitmentID) {
 		return
 	}
@@ -164,7 +190,7 @@ func (w *WarpSyncManager) processWarpSyncResponse(commitmentID iotago.Commitment
 	}
 }
 
-func (w *WarpSyncManager) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
+func (w *WarpSync) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
 	if e == nil || chainCommitment == nil {
 		return
 	}
@@ -190,7 +216,7 @@ func (w *WarpSyncManager) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	}
 }
 
-func (w *WarpSyncManager) targetEngine(commitment *chainmanager.ChainCommitment) *engine.Engine {
+func (w *WarpSync) targetEngine(commitment *chainmanager.ChainCommitment) *engine.Engine {
 	if chain := commitment.Chain(); chain != nil {
 		chainID := chain.ForkingPoint.Commitment().ID()
 
