@@ -20,11 +20,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TestSuite struct {
 	T *testing.T
+
+	apiProvider api.Provider
 
 	accounts map[string]iotago.AccountID
 	pubKeys  map[string]ed25519.PublicKey
@@ -38,11 +41,14 @@ type TestSuite struct {
 }
 
 func NewTestSuite(test *testing.T) *TestSuite {
+	testAPI := tpkg.TestAPI
+
 	t := &TestSuite{
-		T:        test,
-		accounts: make(map[string]iotago.AccountID),
-		pubKeys:  make(map[string]ed25519.PublicKey),
-		outputs:  make(map[string]iotago.OutputID),
+		T:           test,
+		apiProvider: api.SingleVersionProvider(testAPI),
+		accounts:    make(map[string]iotago.AccountID),
+		pubKeys:     make(map[string]ed25519.PublicKey),
+		outputs:     make(map[string]iotago.OutputID),
 
 		blocks:                 memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block](),
 		slotData:               shrinkingmap.New[iotago.SlotIndex, *slotData](),
@@ -76,8 +82,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 		return storage.Get(id)
 	}
 
-	manager := accountsledger.New(blockFunc, slotDiffFunc, mapdb.NewMapDB())
-	manager.SetCommitmentEvictionAge(tpkg.TestAPI.ProtocolParameters().MaxCommittableAge())
+	manager := accountsledger.New(t.apiProvider, blockFunc, slotDiffFunc, mapdb.NewMapDB())
 
 	return manager
 }

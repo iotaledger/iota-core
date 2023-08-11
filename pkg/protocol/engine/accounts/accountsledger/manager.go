@@ -14,10 +14,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Manager is a Block Issuer Credits module responsible for tracking block issuance credit balances.
 type Manager struct {
+	apiProvider api.Provider
 	// blockBurns keep tracks of the block issues up to the LatestCommittedSlot. They are used to deduct the burned
 	// amount from the account's credits upon slot commitment.
 	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.BlockID]]
@@ -36,20 +38,20 @@ type Manager struct {
 	// block is a function that returns a block from the cache or from the database.
 	block func(id iotago.BlockID) (*blocks.Block, bool)
 
-	commitmentEvictionAge iotago.SlotIndex
-
 	mutex syncutils.RWMutex
 
 	module.Module
 }
 
 func New(
+	apiProvider api.Provider,
 	blockFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
 	accountsStore kvstore.KVStore,
 ) *Manager {
 	return &Manager{
-		blockBurns: shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
+		apiProvider: apiProvider,
+		blockBurns:  shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
 		accountsTree: ads.NewMap(accountsStore,
 			iotago.Identifier.Bytes,
 			iotago.IdentifierFromBytes,
@@ -74,13 +76,6 @@ func (m *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
 	defer m.mutex.Unlock()
 
 	m.latestCommittedSlot = index
-}
-
-func (m *Manager) SetCommitmentEvictionAge(commitmentEvictionAge iotago.SlotIndex) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.commitmentEvictionAge = commitmentEvictionAge
 }
 
 // TrackBlock adds the block to the blockBurns set to deduct the burn from credits upon slot commitment.
@@ -146,7 +141,7 @@ func (m *Manager) ApplyDiff(
 	// set the index where the tree is now at
 	m.latestCommittedSlot = slotIndex
 
-	m.evict(slotIndex - m.commitmentEvictionAge - 1)
+	m.evict(slotIndex - m.apiProvider.APIForSlot(slotIndex).ProtocolParameters().MaxCommittableAge() - 1)
 
 	return nil
 }
@@ -156,9 +151,10 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	// if m.latestCommittedSlot < m.commitmentEvictionAge we should have all history
-	if m.latestCommittedSlot >= m.commitmentEvictionAge && targetIndex+m.commitmentEvictionAge < m.latestCommittedSlot {
-		return nil, false, ierrors.Errorf("can't calculate account, target slot index older than allowed (%d<%d)", targetIndex, m.latestCommittedSlot-m.commitmentEvictionAge)
+	// if m.latestCommittedSlot < maxCommittableAge we should have all history
+	maxCommittableAge := m.apiProvider.APIForSlot(targetIndex).ProtocolParameters().MaxCommittableAge()
+	if m.latestCommittedSlot >= maxCommittableAge && targetIndex+maxCommittableAge < m.latestCommittedSlot {
+		return nil, false, ierrors.Errorf("can't calculate account, target slot index older than allowed (%d<%d)", targetIndex, m.latestCommittedSlot-maxCommittableAge)
 	}
 	if targetIndex > m.latestCommittedSlot {
 		return nil, false, ierrors.Errorf("can't retrieve account, slot %d is not committed yet, latest committed slot: %d", targetIndex, m.latestCommittedSlot)

@@ -1,9 +1,8 @@
 package accountsfilter
 
 import (
-	"github.com/iotaledger/hive.go/core/memstorage"
+	"github.com/iotaledger/hive.go/core/safemath"
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -25,13 +24,13 @@ var (
 type CommitmentFilter struct {
 	// Events contains the Events of the CommitmentFilter
 	events *commitmentfilter.Events
-	// futureBlocks contains blocks with a commitment in the future, that should not be passed to the blockdag yet.
-	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*model.Block]]
 
 	apiProvider api.Provider
 
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
 	commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error)
+
+	rmcRetrieveFunc func(iotago.SlotIndex) (iotago.Mana, error)
 
 	accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (*accounts.AccountData, bool, error)
 
@@ -47,6 +46,10 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 
 			c.accountRetrieveFunc = e.Ledger.Account
 
+			e.Ledger.HookConstructed(func() {
+				c.rmcRetrieveFunc = e.Ledger.RMCManager().RMC
+			})
+
 			e.Events.BlockDAG.BlockSolid.Hook(c.ProcessPreFilteredBlock)
 			e.Events.CommitmentFilter.LinkTo(c.events)
 
@@ -59,9 +62,8 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 
 func New(apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
 	return options.Apply(&CommitmentFilter{
-		apiProvider:  apiProvider,
-		events:       commitmentfilter.NewEvents(),
-		futureBlocks: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*model.Block]](),
+		apiProvider: apiProvider,
+		events:      commitmentfilter.NewEvents(),
 	}, opts,
 	)
 }
@@ -88,6 +90,47 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 		})
 
 		return
+	}
+
+	// get the api for the block
+	blockAPI, err := c.apiProvider.APIForVersion(block.ProtocolBlock().BlockHeader.ProtocolVersion)
+	if err != nil {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(err, "could not retrieve API for block version %d", block.ProtocolBlock().BlockHeader.ProtocolVersion),
+		})
+	}
+	// check that the block burns sufficient Mana
+	blockSlot := blockAPI.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
+	rmcSlot, err := safemath.SafeSub(blockSlot, blockAPI.ProtocolParameters().MaxCommittableAge())
+	if err != nil {
+		rmcSlot = 0
+	}
+	rmc, err := c.rmcRetrieveFunc(rmcSlot)
+	if err != nil {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(err, "could not retrieve RMC for slot commitment %s", rmcSlot),
+		})
+
+		return
+	}
+	if basicBlock, isBasic := block.BasicBlock(); isBasic {
+		manaCost, err := basicBlock.ManaCost(rmc)
+		if err != nil {
+			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Wrapf(err, "could not calculate Mana cost for block"),
+			})
+		}
+		if basicBlock.BurnedMana < manaCost {
+			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, rmc, basicBlock.BurnedMana),
+			})
+
+			return
+		}
 	}
 
 	// Check that the issuer of this block has non-negative block issuance credit
@@ -128,7 +171,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 
 		return
 	}
-	signingMessage, err := block.ProtocolBlock().SigningMessage(c.apiProvider.LatestAPI())
+	signingMessage, err := block.ProtocolBlock().SigningMessage(blockAPI)
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
