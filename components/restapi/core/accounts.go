@@ -124,7 +124,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 		return nil, ierrors.Errorf("account not found: %s for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
-	active := deps.Protocol.MainEngineInstance().SybilProtection.IsActive(accountID, nextEpoch)
+	active := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, nextEpoch)
 
 	return &apimodels.ValidatorResponse{
 		AccountID:                      accountID,

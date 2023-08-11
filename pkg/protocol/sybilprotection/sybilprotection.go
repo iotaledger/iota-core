@@ -15,9 +15,13 @@ type SybilProtection interface {
 	TrackValidationBlock(block *blocks.Block)
 	EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error)
 	OrderedRegisteredValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error)
-	IsActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) bool
-	ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, usedStart, usedEnd iotago.EpochIndex, err error)
-	DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, usedStart, usedEnd iotago.EpochIndex, err error)
+	IsCandidateActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) bool
+	// ValidatorReward returns the amount of mana that a validator has earned in a given epoch range.
+	// The actual used epoch range is returned, only untill usedEnd the decay was applied.
+	ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, decayedStart, decayedEnd iotago.EpochIndex, err error)
+	// DelegatorReward returns the amount of mana that a delegator has earned in a given epoch range.
+	// The actual used epoch range is returned, only untill usedEnd the decay was applied.
+	DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, decayedStart, decayedEnd iotago.EpochIndex, err error)
 	SeatManager() seatmanager.SeatManager
 	CommitSlot(iotago.SlotIndex) (iotago.Identifier, iotago.Identifier)
 	Import(io.ReadSeeker) error

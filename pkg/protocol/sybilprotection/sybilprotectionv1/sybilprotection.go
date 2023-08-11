@@ -246,6 +246,81 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 	}
 }
 
+// IsCandidateActive returns true if the given validator is currently active.
+func (o *SybilProtection) IsCandidateActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) bool {
+	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+	return activeCandidates.Has(validatorID)
+}
+
+// EligibleValidators returns the currently known list of recently active validator candidates for the given epoch.
+func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error) {
+	candidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+	validators := make(accounts.AccountsData, 0)
+
+	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
+		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to load account data for candidate %s", candidate)
+		}
+		if !exists {
+			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
+		}
+		// TODO: not needed if EligibleValidatorsCandidates will take care of it
+		// if `End Epoch` is the current one or has passed, validator is no longer considered for validator selection
+		if accountData.StakeEndEpoch <= epoch {
+			return nil
+		}
+		validators = append(validators, accountData.Clone())
+
+		return nil
+	}); err != nil {
+		return nil, ierrors.Wrapf(err, "failed to iterate over eligible validator candidates")
+	}
+
+	return validators, nil
+}
+
+// OrderedRegisteredValidatorsList returns the currently known list of registered validator candidates for the given epoch.
+func (o *SybilProtection) OrderedRegisteredValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error) {
+	candidates := o.performanceTracker.ValidatorCandidates(epoch)
+	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+
+	validatorResp := make([]*apimodels.ValidatorResponse, 0, candidates.Size())
+	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
+		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to get account %s", candidate)
+		}
+		if !exists {
+			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
+		}
+		// if `End Epoch` is the current one or has passed, validator is no longer considered for validator selection
+		if accountData.StakeEndEpoch <= epoch {
+			return nil
+		}
+		active := activeCandidates.Has(candidate)
+		validatorResp = append(validatorResp, &apimodels.ValidatorResponse{
+			AccountID:                      accountData.ID,
+			StakingEpochEnd:                accountData.StakeEndEpoch,
+			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
+			ValidatorStake:                 accountData.ValidatorStake,
+			FixedCost:                      accountData.FixedCost,
+			Active:                         active,
+			LatestSupportedProtocolVersion: 0, // TODO  add lates supported protocol version to account data
+		})
+
+		return nil
+	}); err != nil {
+		return nil, ierrors.Wrapf(err, "failed to iterate over eligible validator candidates")
+	}
+	// sort candidates by stake
+	sort.Slice(validatorResp, func(i, j int) bool {
+		return validatorResp[i].ValidatorStake > validatorResp[j].ValidatorStake
+	})
+
+	return validatorResp, nil
+}
+
 func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
 	timeProvider := o.apiProvider.APIForSlot(slot).TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
@@ -286,79 +361,6 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 	}
 
 	return weightedCommittee
-}
-
-// EligibleValidators returns the currently known list of recently active validator candidates for the given epoch.
-func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error) {
-	candidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
-	validators := make(accounts.AccountsData, 0)
-
-	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
-		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
-		}
-		// TODO: not needed if EligibleValidatorsCandidates will take care of it
-		if accountData.StakeEndEpoch < epoch {
-			return nil
-		}
-		validators = append(validators, accountData.Clone())
-
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	return validators, nil
-}
-
-// IsActive returns true if the given validator is currently active.
-func (o *SybilProtection) IsActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) bool {
-	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
-	return activeCandidates.Has(validatorID)
-}
-
-// OrderedRegisteredValidatorsList returns the currently known list of registered validator candidates for the given epoch.
-func (o *SybilProtection) OrderedRegisteredValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error) {
-	candidates := o.performanceTracker.ValidatorCandidates(epoch)
-	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
-
-	validatorResp := make([]*apimodels.ValidatorResponse, 0, candidates.Size())
-	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
-		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
-		}
-		if accountData.StakeEndEpoch < epoch {
-			return nil
-		}
-		active := activeCandidates.Has(candidate)
-		validatorResp = append(validatorResp, &apimodels.ValidatorResponse{
-			AccountID:                      accountData.ID,
-			StakingEpochEnd:                accountData.StakeEndEpoch,
-			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
-			ValidatorStake:                 accountData.ValidatorStake,
-			FixedCost:                      accountData.FixedCost,
-			Active:                         active,
-			LatestSupportedProtocolVersion: 0, // TODO  add lates supported protocol version to account data
-		})
-
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	// sort candidates by stake
-	sort.Slice(validatorResp, func(i, j int) bool {
-		return validatorResp[i].ValidatorStake > validatorResp[j].ValidatorStake
-	})
-
-	return validatorResp, nil
 }
 
 // WithInitialCommittee registers the passed committee on a given slot.
