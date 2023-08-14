@@ -3,7 +3,6 @@ package performance
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -33,15 +32,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 	ts := &TestSuite{
 		T:        t,
 		accounts: make(map[string]iotago.AccountID),
-		API: iotago.V3API(
-			iotago.NewV3ProtocolParameters(
-				iotago.WithTimeProviderOptions(
-					time.Now().Unix(),
-					10,
-					1,
-				),
-			),
-		),
+		API:      iotago.V3API(iotago.NewV3ProtocolParameters()),
 	}
 	ts.InitRewardManager()
 
@@ -50,7 +41,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 
 func (t *TestSuite) InitRewardManager() {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
-	perforanceFactorFunc := func(index iotago.SlotIndex) *prunable.PerformanceFactors {
+	perforanceFactorFunc := func(index iotago.SlotIndex) *prunable.VlidatorSlotPerformance {
 		if _, exists := prunableStores[index]; !exists {
 			prunableStores[index] = mapdb.NewMapDB()
 		}

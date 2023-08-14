@@ -77,7 +77,7 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
 	return NewAccountDiffs(slot, store, p.apiProvider.APIForSlot(slot))
 }
 
-func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *PerformanceFactors {
+func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *VlidatorSlotPerformance {
 	// TODO: make sure that the minimum pruning delay for this is at least 1 epoch, otherwise we won't be able to calculate the reward pools
 	store := p.manager.Get(slot, kvstore.Realm{performanceFactorsPrefix})
 	if store == nil {

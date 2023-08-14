@@ -1,6 +1,9 @@
 package performance
 
 import (
+	"math/bits"
+	"time"
+
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -18,8 +21,8 @@ type Tracker struct {
 	poolStatsStore  *kvstore.TypedStore[iotago.EpochIndex, *PoolsStats]
 	committeeStore  *kvstore.TypedStore[iotago.EpochIndex, *account.Accounts]
 
-	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
-	latestAppliedEpoch     iotago.EpochIndex
+	validatorSlotPerformanceFunc func(slot iotago.SlotIndex) *prunable.VlidatorSlotPerformance
+	latestAppliedEpoch           iotago.EpochIndex
 
 	apiProvider api.Provider
 
@@ -31,7 +34,7 @@ func NewTracker(
 	rewardsBaseStore kvstore.KVStore,
 	poolStatsStore kvstore.KVStore,
 	committeeStore kvstore.KVStore,
-	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
+	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.VlidatorSlotPerformance,
 	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider api.Provider,
 ) *Tracker {
@@ -49,9 +52,9 @@ func NewTracker(
 			(*account.Accounts).Bytes,
 			account.AccountsFromBytes,
 		),
-		performanceFactorsFunc: performanceFactorsFunc,
-		latestAppliedEpoch:     latestAppliedEpoch,
-		apiProvider:            apiProvider,
+		validatorSlotPerformanceFunc: performanceFactorsFunc,
+		latestAppliedEpoch:           latestAppliedEpoch,
+		apiProvider:                  apiProvider,
 	}
 }
 
@@ -71,21 +74,43 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	t.performanceFactorsMutex.Lock()
 	defer t.performanceFactorsMutex.Unlock()
 
-	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
-	pf, err := performanceFactors.Load(block.ProtocolBlock().IssuerID)
+	validatorSlotPerformanceStore := t.validatorSlotPerformanceFunc(block.ID().Index())
+	validatorPerformance, err := validatorSlotPerformanceStore.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
 		// TODO replace panic with errors in the future, like triggering an error event
 		panic(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
+	updatedPerformance := t.updateSlotPerformanceBitMap(validatorPerformance, block.ID().Index(), block.ProtocolBlock().IssuingTime)
+	if updatedPerformance.BlockIssuedCount == validatorBlocksPerSlot {
+		// no need to store larger number and we can fit into uint8
+		updatedPerformance.BlockIssuedCount = validatorBlocksPerSlot + 1
+	} else {
+		updatedPerformance.BlockIssuedCount++
+	}
+	updatedPerformance.HighestSupportedVersion = validatorBlock.HighestSupportedVersion
 
-	// TODO: store highest supported version per validator?
-	_ = validatorBlock.HighestSupportedVersion
-
-	err = performanceFactors.Store(block.ProtocolBlock().IssuerID, pf+1)
+	err = validatorSlotPerformanceStore.Store(block.ProtocolBlock().IssuerID, updatedPerformance)
 	if err != nil {
 		// TODO replace panic with errors in the future, like triggering an error event
 		panic(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
+}
+
+func (t *Tracker) updateSlotPerformanceBitMap(pf *prunable.ValidatorPerformance, slotIndex iotago.SlotIndex, issuingTime time.Time) *prunable.ValidatorPerformance {
+	subslotIndex := t.subslotIndex(slotIndex, issuingTime)
+	// set bit at subslotIndex to 1 to indicate activity in that subslot
+	pf.SlotActivityVector = pf.SlotActivityVector | (1 << subslotIndex)
+
+	return pf
+}
+
+// subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validatorBlocksPerSlot equal parts.
+func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int {
+	valBlocksNum := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).ProtocolParameters().ValidatorBlocksPerSlot()
+	subslotDur := time.Duration(t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
+	slotStart := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotStartTime(slot)
+
+	return int(issuingTime.Sub(slotStart) / subslotDur)
 }
 
 func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) {
@@ -115,25 +140,26 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	)
 
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
-		intermediateFactors := make([]uint64, 0, epochEndSlot+1-epochStartSlot)
+		validatorPerformances := make([]*prunable.ValidatorPerformance, 0, epochEndSlot+1-epochStartSlot)
 		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
-			performanceFactorStorage := t.performanceFactorsFunc(slot)
+			performanceFactorStorage := t.validatorSlotPerformanceFunc(slot)
 			if performanceFactorStorage == nil {
-				intermediateFactors = append(intermediateFactors, 0)
+				validatorPerformances = append(validatorPerformances, &prunable.ValidatorPerformance{})
+
 				continue
 			}
 
-			pf, err := performanceFactorStorage.Load(accountID)
+			validatorPerformance, err := performanceFactorStorage.Load(accountID)
 			if err != nil {
 				panic(ierrors.Wrapf(err, "failed to load performance factor for account %s", accountID))
 			}
 
-			intermediateFactors = append(intermediateFactors, pf)
+			validatorPerformances = append(validatorPerformances, validatorPerformance)
 		}
 
 		if err := rewardsTree.Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
-			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
+			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(validatorPerformances)),
 			FixedCost:   pool.FixedCost,
 		}); err != nil {
 			panic(ierrors.Wrapf(err, "failed to set rewards for account %s", accountID))
@@ -174,21 +200,23 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 	return c, true
 }
 
-func (t *Tracker) aggregatePerformanceFactors(issuedBlocksPerSlot []uint64) uint64 {
-	if len(issuedBlocksPerSlot) == 0 {
+func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*prunable.ValidatorPerformance) uint64 {
+	if len(slotActivityVector) == 0 {
 		return 0
 	}
 
-	var sum uint64
-	for _, issuedBlocks := range issuedBlocksPerSlot {
-		if issuedBlocks > uint64(validatorBlocksPerSlot) {
+	var epochPerformanceFactor uint64
+	for _, pf := range slotActivityVector {
+		// each one bit represents at least one block issued in that subslot,
+		// we reward not only total number of blocks issued, but also regularity based on block timestamp
+		slotPerformanceFactor := bits.OnesCount32(pf.SlotActivityVector)
+
+		if pf.BlockIssuedCount > validatorBlocksPerSlot {
 			// we harshly punish validators that issue any blocks more than allowed
 			return 0
 		}
-		sum += issuedBlocks
+		epochPerformanceFactor += uint64(slotPerformanceFactor)
 	}
 
-	// TODO: we should scale the result by the amount of slots per epoch,
-	// otherwise we lose a lot of precision here.
-	return sum / uint64(len(issuedBlocksPerSlot))
+	return epochPerformanceFactor
 }

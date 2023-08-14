@@ -6,6 +6,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -87,18 +88,18 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "unable to read accounts count for slot index %d", slotIndex)
 		}
 
-		performanceFactors := t.performanceFactorsFunc(slotIndex)
+		performanceFactors := t.validatorSlotPerformanceFunc(slotIndex)
 		for j := uint64(0); j < accountsCount; j++ {
 			var accountID iotago.AccountID
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
 				return ierrors.Wrapf(err, "unable to read account id for the slot index %d", slotIndex)
 			}
-			// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
-			var performanceFactor uint64
+			// TODO: performance factor activity vector can be decreased to uint16 or uint32 depending on the size of parameter ValidatorBlocksPerSlot
+			var performanceFactor prunable.ValidatorPerformance
 			if err := binary.Read(reader, binary.LittleEndian, &performanceFactor); err != nil {
 				return ierrors.Wrapf(err, "unable to read performance factor for account %s and slot index %d", accountID, slotIndex)
 			}
-			err := performanceFactors.Store(accountID, performanceFactor)
+			err := performanceFactors.Store(accountID, &performanceFactor)
 			if err != nil {
 				return ierrors.Wrapf(err, "unable to store performance factor for account %s and slot index %d", accountID, slotIndex)
 			}
@@ -218,11 +219,11 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 			return ierrors.Wrapf(err, "unable to write pf accounts count for slot index %d", currentSlot)
 		}
 		// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
-		if err := t.performanceFactorsFunc(currentSlot).ForEachPerformanceFactor(func(accountID iotago.AccountID, pf uint64) error {
+		if err := t.validatorSlotPerformanceFunc(currentSlot).ForEachPerformanceFactor(func(accountID iotago.AccountID, pf *prunable.ValidatorPerformance) error {
 			if err := pWriter.WriteValue("account id", accountID); err != nil {
 				return ierrors.Wrapf(err, "unable to write account id %s for slot %d", accountID, currentSlot)
 			}
-			if err := pWriter.WriteValue("performance factor", pf); err != nil {
+			if err := pWriter.WriteBytes(pf.Bytes()); err != nil {
 				return ierrors.Wrapf(err, "unable to write performance factor for accountID %s and slot index %d", accountID, currentSlot)
 			}
 			accountsCount++
