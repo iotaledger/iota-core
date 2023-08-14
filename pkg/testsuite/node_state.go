@@ -53,8 +53,8 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.evictedSlot != nil {
 		t.AssertEvictedSlot(*state.evictedSlot, nodes...)
 	}
-	if state.prunedSlot != nil {
-		t.AssertPrunedSlot(*state.prunedSlot, state.hasPruned, nodes...)
+	if state.prunedEpoch != nil {
+		t.AssertPrunedEpoch(*state.prunedEpoch, state.hasPruned, nodes...)
 	}
 	if state.chainManagerSolid != nil && *state.chainManagerSolid {
 		t.AssertChainManagerIsSolid(nodes...)
@@ -81,7 +81,7 @@ type NodeState struct {
 	activeRootBlocks  *[]*blocks.Block
 
 	evictedSlot *iotago.SlotIndex
-	prunedSlot  *iotago.SlotIndex
+	prunedEpoch *iotago.EpochIndex
 	hasPruned   bool
 
 	chainManagerSolid *bool
@@ -172,9 +172,9 @@ func WithEvictedSlot(slotIndex iotago.SlotIndex) options.Option[NodeState] {
 	}
 }
 
-func WithPrunedSlot(slotIndex iotago.SlotIndex, hasPruned bool) options.Option[NodeState] {
+func WithPrunedSlot(epochIndex iotago.EpochIndex, hasPruned bool) options.Option[NodeState] {
 	return func(state *NodeState) {
-		state.prunedSlot = &slotIndex
+		state.prunedEpoch = &epochIndex
 		state.hasPruned = hasPruned
 	}
 }

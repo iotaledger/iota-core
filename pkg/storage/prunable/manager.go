@@ -16,33 +16,30 @@ import (
 )
 
 type Manager struct {
-	openDBs      *cache.Cache[iotago.SlotIndex, *dbInstance]
+	openDBs      *cache.Cache[iotago.EpochIndex, *dbInstance]
 	openDBsMutex syncutils.Mutex
 
-	lastPrunedSlot *model.EvictionIndex
-	pruningMutex   syncutils.RWMutex
+	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
+	pruningMutex    syncutils.RWMutex
 
 	dbConfig     database.Config
 	errorHandler func(error)
 
-	dbSizes *shrinkingmap.ShrinkingMap[iotago.SlotIndex, int64]
+	dbSizes *shrinkingmap.ShrinkingMap[iotago.EpochIndex, int64]
 
-	// The granularity of the DB instances (i.e. how many buckets/slots are stored in one DB).
-	optsGranularity int64
-	optsMaxOpenDBs  int
+	optsMaxOpenDBs int
 }
 
 func NewManager(dbConfig database.Config, errorHandler func(error), opts ...options.Option[Manager]) *Manager {
 	return options.Apply(&Manager{
-		optsGranularity: 10,
 		optsMaxOpenDBs:  10,
 		dbConfig:        dbConfig,
 		errorHandler:    errorHandler,
-		dbSizes:         shrinkingmap.New[iotago.SlotIndex, int64](),
-		lastPrunedSlot:  model.NewEvictionIndex(),
+		dbSizes:         shrinkingmap.New[iotago.EpochIndex, int64](),
+		lastPrunedEpoch: model.NewEvictionIndex[iotago.EpochIndex](),
 	}, opts, func(m *Manager) {
-		m.openDBs = cache.New[iotago.SlotIndex, *dbInstance](m.optsMaxOpenDBs)
-		m.openDBs.SetEvictCallback(func(baseIndex iotago.SlotIndex, db *dbInstance) {
+		m.openDBs = cache.New[iotago.EpochIndex, *dbInstance](m.optsMaxOpenDBs)
+		m.openDBs.SetEvictCallback(func(baseIndex iotago.EpochIndex, db *dbInstance) {
 			db.Close()
 
 			size, err := dbPrunableDirectorySize(dbConfig.Directory, baseIndex)
@@ -55,15 +52,15 @@ func NewManager(dbConfig database.Config, errorHandler func(error), opts ...opti
 	})
 }
 
-// IsTooOld checks if the index is in a pruned slot.
-func (m *Manager) IsTooOld(index iotago.SlotIndex) (isTooOld bool) {
+// IsTooOld checks if the index is in a pruned epoch.
+func (m *Manager) IsTooOld(index iotago.EpochIndex) (isTooOld bool) {
 	m.pruningMutex.RLock()
 	defer m.pruningMutex.RUnlock()
 
-	return index < m.lastPrunedSlot.NextIndex()
+	return index < m.lastPrunedEpoch.NextIndex()
 }
 
-func (m *Manager) Get(index iotago.SlotIndex, realm kvstore.Realm) kvstore.KVStore {
+func (m *Manager) Get(index iotago.EpochIndex, realm kvstore.Realm) kvstore.KVStore {
 	if m.IsTooOld(index) {
 		return nil
 	}
@@ -77,24 +74,17 @@ func (m *Manager) Get(index iotago.SlotIndex, realm kvstore.Realm) kvstore.KVSto
 	return withRealm
 }
 
-func (m *Manager) PruneUntilSlot(index iotago.SlotIndex) {
+func (m *Manager) PruneUntilEpoch(index iotago.EpochIndex) {
 	m.pruningMutex.Lock()
 	defer m.pruningMutex.Unlock()
 
-	computedIndex := m.computeDBBaseIndex(index)
-	var baseIndexToPrune iotago.SlotIndex
-
-	if computedIndex+iotago.SlotIndex(m.optsGranularity)-1 == index {
-		baseIndexToPrune = index
-	} else if computedIndex > 1 {
-		baseIndexToPrune = computedIndex - 1
-	} else {
+	if index < m.lastPrunedEpoch.NextIndex() {
 		return
 	}
 
-	for currentIndex := m.lastPrunedSlot.NextIndex(); currentIndex <= baseIndexToPrune; currentIndex += iotago.SlotIndex(m.optsGranularity) {
+	for currentIndex := m.lastPrunedEpoch.NextIndex(); currentIndex <= index; currentIndex++ {
 		m.prune(currentIndex)
-		m.lastPrunedSlot.MarkEvicted(currentIndex)
+		m.lastPrunedEpoch.MarkEvicted(currentIndex)
 	}
 }
 
@@ -102,23 +92,23 @@ func (m *Manager) Shutdown() {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
-	m.openDBs.Each(func(index iotago.SlotIndex, db *dbInstance) {
+	m.openDBs.Each(func(index iotago.EpochIndex, db *dbInstance) {
 		db.Close()
 	})
 }
 
-func (m *Manager) LastPrunedSlot() (index iotago.SlotIndex, hasPruned bool) {
+func (m *Manager) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
 	m.pruningMutex.RLock()
 	defer m.pruningMutex.RUnlock()
 
-	return m.lastPrunedSlot.Index()
+	return m.lastPrunedEpoch.Index()
 }
 
 // PrunableStorageSize returns the size of the prunable storage containing all db instances.
 func (m *Manager) PrunableStorageSize() int64 {
 	// Sum up all the evicted databases
 	var sum int64
-	m.dbSizes.ForEach(func(index iotago.SlotIndex, i int64) bool {
+	m.dbSizes.ForEach(func(index iotago.EpochIndex, i int64) bool {
 		sum += i
 		return true
 	})
@@ -127,7 +117,7 @@ func (m *Manager) PrunableStorageSize() int64 {
 	defer m.openDBsMutex.Unlock()
 
 	// Add up all the open databases
-	m.openDBs.Each(func(key iotago.SlotIndex, val *dbInstance) {
+	m.openDBs.Each(func(key iotago.EpochIndex, val *dbInstance) {
 		size, err := dbPrunableDirectorySize(m.dbConfig.Directory, key)
 		if err != nil {
 			m.errorHandler(ierrors.Wrapf(err, "dbPrunableDirectorySize failed for %s: %s", m.dbConfig.Directory, key))
@@ -147,12 +137,12 @@ func (m *Manager) RestoreFromDisk() {
 		return
 	}
 
-	// Set the maxPruned slot to the baseIndex-1 of the oldest dbInstance.
+	// Set the maxPruned epoch to the baseIndex-1 of the oldest dbInstance.
 	m.pruningMutex.Lock()
 	if dbInfos[0].baseIndex > 0 {
-		m.lastPrunedSlot.MarkEvicted(dbInfos[0].baseIndex - 1)
+		m.lastPrunedEpoch.MarkEvicted(dbInfos[0].baseIndex - 1)
 	} else {
-		m.lastPrunedSlot.MarkEvicted(0)
+		m.lastPrunedEpoch.MarkEvicted(0)
 	}
 	m.pruningMutex.Unlock()
 
@@ -162,70 +152,43 @@ func (m *Manager) RestoreFromDisk() {
 	}
 }
 
-// getDBInstance returns the DB instance for the given baseIndex or creates a new one if it does not yet exist.
-// DBs are created as follows where each db is located in m.basedir/<starting baseIndex>/
-// (assuming a bucket granularity=2):
+// getDBInstance returns the DB instance for the given epochIndex or creates a new one if it does not yet exist.
+// DBs are created as follows where each db is located in m.basedir/<starting epochIndex>/
 //
-//	baseIndex 0 -> db 0
-//	baseIndex 1 -> db 0
-//	baseIndex 2 -> db 2
-func (m *Manager) getDBInstance(index iotago.SlotIndex) (db *dbInstance) {
-	baseIndex := m.computeDBBaseIndex(index)
-
+//	epochIndex 0 -> db 0
+//	epochIndex 1 -> db 1
+//	epochIndex 2 -> db 2
+func (m *Manager) getDBInstance(index iotago.EpochIndex) (db *dbInstance) {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
 	// check if exists again, as other goroutine might have created it in parallel
-	db, exists := m.openDBs.Get(baseIndex)
+	db, exists := m.openDBs.Get(index)
 	if !exists {
-		db = newDBInstance(baseIndex, m.dbConfig.WithDirectory(dbPathFromIndex(m.dbConfig.Directory, baseIndex)))
+		db = newDBInstance(index, m.dbConfig.WithDirectory(dbPathFromIndex(m.dbConfig.Directory, index)))
 
 		// Remove the cached db size since we will open the db
-		m.dbSizes.Delete(baseIndex)
-		m.openDBs.Put(baseIndex, db)
+		m.dbSizes.Delete(index)
+		m.openDBs.Put(index, db)
 	}
 
 	return db
 }
 
-// getBucket returns the bucket for the given baseIndex or creates a new one if it does not yet exist.
+// getBucket returns the bucket for the given epochIndex or creates a new one if it does not yet exist.
 // A bucket is marked as dirty by default.
-// Buckets are created as follows (assuming a bucket granularity=2):
+// Buckets are created as follows:
 //
-//	baseIndex 0 -> db 0 / bucket 0
-//	baseIndex 1 -> db 0 / bucket 1
-//	baseIndex 2 -> db 2 / bucket 2
-//	baseIndex 3 -> db 2 / bucket 3
-func (m *Manager) getBucket(index iotago.SlotIndex) (bucket kvstore.KVStore) {
-	_, bucket = m.getDBAndBucket(index)
-	return bucket
+//	epochIndex 0 -> db 0 / bucket 0
+//	epochIndex 1 -> db 1 / bucket 1
+//	epochIndex 2 -> db 2 / bucket 2
+//	epochIndex 3 -> db 3 / bucket 3
+func (m *Manager) getBucket(index iotago.EpochIndex) (bucket kvstore.KVStore) {
+	db := m.getDBInstance(index)
+	return db.store
 }
 
-func (m *Manager) getDBAndBucket(index iotago.SlotIndex) (db *dbInstance, bucket kvstore.KVStore) {
-	db = m.getDBInstance(index)
-	return db, m.createBucket(db, index)
-}
-
-// createBucket creates a new bucket for the given baseIndex. It uses the baseIndex as a realm on the underlying DB.
-func (m *Manager) createBucket(db *dbInstance, index iotago.SlotIndex) (bucket kvstore.KVStore) {
-	bucket, err := db.store.WithExtendedRealm(indexToRealm(index))
-	if err != nil {
-		panic(err)
-	}
-
-	return bucket
-}
-
-func (m *Manager) computeDBBaseIndex(index iotago.SlotIndex) iotago.SlotIndex {
-	return index / iotago.SlotIndex(m.optsGranularity) * iotago.SlotIndex(m.optsGranularity)
-}
-
-func (m *Manager) prune(index iotago.SlotIndex) {
-	dbBaseIndex := m.computeDBBaseIndex(index)
-	m.removeDBInstance(dbBaseIndex)
-}
-
-func (m *Manager) removeDBInstance(dbBaseIndex iotago.SlotIndex) {
+func (m *Manager) prune(dbBaseIndex iotago.EpochIndex) {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 

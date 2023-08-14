@@ -3,6 +3,7 @@ package prunable
 import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -24,22 +25,19 @@ const (
 )
 
 type Prunable struct {
-	pruningDelay iotago.SlotIndex
+	pruningDelay iotago.EpochIndex
 	apiProvider  api.Provider
 	manager      *Manager
 	errorHandler func(error)
 }
 
-func New(dbConfig database.Config, pruningDelay iotago.SlotIndex, errorHandler func(error), opts ...options.Option[Manager]) *Prunable {
+func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[Manager]) *Prunable {
 	return &Prunable{
 		pruningDelay: pruningDelay,
+		apiProvider:  apiProvider,
 		errorHandler: errorHandler,
 		manager:      NewManager(dbConfig, errorHandler, opts...),
 	}
-}
-
-func (p *Prunable) Initialize(apiProvider api.Provider) {
-	p.apiProvider = apiProvider
 }
 
 func (p *Prunable) RestoreFromDisk() {
@@ -47,7 +45,8 @@ func (p *Prunable) RestoreFromDisk() {
 }
 
 func (p *Prunable) Blocks(slot iotago.SlotIndex) *Blocks {
-	store := p.manager.Get(slot, kvstore.Realm{blocksPrefix})
+	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(slot)
+	store := p.manager.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), []byte{blocksPrefix}))
 	if store == nil {
 		return nil
 	}
@@ -56,7 +55,8 @@ func (p *Prunable) Blocks(slot iotago.SlotIndex) *Blocks {
 }
 
 func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *RootBlocks {
-	store := p.manager.Get(slot, kvstore.Realm{rootBlocksPrefix})
+	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(slot)
+	store := p.manager.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), []byte{rootBlocksPrefix}))
 	if store == nil {
 		return nil
 	}
@@ -65,21 +65,24 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *RootBlocks {
 }
 
 func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
-	return p.manager.Get(slot, kvstore.Realm{attestationsPrefix})
+	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(slot)
+
+	return p.manager.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), []byte{attestationsPrefix}))
 }
 
 func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
-	store := p.manager.Get(slot, kvstore.Realm{accountDiffsPrefix})
+	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(slot)
+	store := p.manager.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), []byte{accountDiffsPrefix}))
 	if store == nil {
 		return nil
 	}
 
-	return NewAccountDiffs(slot, store, p.apiProvider.APIForSlot(slot))
+	return NewAccountDiffs(slot, store, p.apiProvider.APIForEpoch(epoch))
 }
 
 func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *PerformanceFactors {
-	// TODO: make sure that the minimum pruning delay for this is at least 1 epoch, otherwise we won't be able to calculate the reward pools
-	store := p.manager.Get(slot, kvstore.Realm{performanceFactorsPrefix})
+	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(slot)
+	store := p.manager.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), []byte{performanceFactorsPrefix}))
 	if store == nil {
 		return nil
 	}
@@ -88,8 +91,8 @@ func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *PerformanceFactors
 }
 
 func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *UpgradeSignals {
-	// TODO: make sure that the minimum pruning delay for this is at least 1 epoch, otherwise we won't be able to properly determine the upgrade signals.
-	store := p.manager.Get(slot, kvstore.Realm{upgradeSignalsPrefix})
+	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(slot)
+	store := p.manager.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), []byte{upgradeSignalsPrefix}))
 	if store == nil {
 		return nil
 	}
@@ -98,11 +101,13 @@ func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *UpgradeSignals {
 }
 
 func (p *Prunable) Roots(slot iotago.SlotIndex) kvstore.KVStore {
-	return p.manager.Get(slot, kvstore.Realm{rootsPrefix})
+	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(slot)
+	return p.manager.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), []byte{rootsPrefix}))
 }
 
 func (p *Prunable) Retainer(slot iotago.SlotIndex) *Retainer {
-	store := p.manager.Get(slot, kvstore.Realm{retainerPrefix})
+	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(slot)
+	store := p.manager.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), []byte{retainerPrefix}))
 	if store == nil {
 		return nil
 	}
@@ -112,11 +117,12 @@ func (p *Prunable) Retainer(slot iotago.SlotIndex) *Retainer {
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.
 func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
-	if index < p.pruningDelay {
+	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(index)
+	if epoch < p.pruningDelay {
 		return
 	}
 
-	p.manager.PruneUntilSlot(index - p.pruningDelay)
+	p.manager.PruneUntilEpoch(epoch - p.pruningDelay)
 }
 
 func (p *Prunable) Size() int64 {
@@ -127,6 +133,6 @@ func (p *Prunable) Shutdown() {
 	p.manager.Shutdown()
 }
 
-func (p *Prunable) LastPrunedSlot() (index iotago.SlotIndex, hasPruned bool) {
-	return p.manager.LastPrunedSlot()
+func (p *Prunable) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
+	return p.manager.LastPrunedEpoch()
 }

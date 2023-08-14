@@ -34,7 +34,7 @@ type Storage struct {
 
 	optsDBEngine               hivedb.Engine
 	optsAllowedDBEngines       []hivedb.Engine
-	optsPruningDelay           iotago.SlotIndex
+	optsPruningDelay           iotago.EpochIndex
 	optsPrunableManagerOptions []options.Option[prunable.Manager]
 }
 
@@ -44,7 +44,7 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 		dir:              utils.NewDirectory(directory, true),
 		errorHandler:     errorHandler,
 		optsDBEngine:     hivedb.EngineRocksDB,
-		optsPruningDelay: 360,
+		optsPruningDelay: 2, // TODO: what's the default now?
 	}, opts,
 		func(s *Storage) {
 			dbConfig := database.Config{
@@ -55,10 +55,7 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 			}
 
 			s.Permanent = permanent.New(dbConfig, errorHandler)
-			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPruningDelay, errorHandler, s.optsPrunableManagerOptions...)
-
-			// TODO: fix initialization order
-			s.Prunable.Initialize(s.Settings().APIProvider())
+			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPruningDelay, s.Settings().APIProvider(), errorHandler, s.optsPrunableManagerOptions...)
 		})
 }
 

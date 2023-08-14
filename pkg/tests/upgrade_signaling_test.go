@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -42,6 +43,9 @@ func Test_Upgrade_Signaling(t *testing.T) {
 				eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
 				eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
 			),
+		),
+		protocol.WithStorageOptions(
+			storage.WithPruningDelay(20),
 		),
 	}
 

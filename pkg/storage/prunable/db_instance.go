@@ -8,12 +8,12 @@ import (
 )
 
 type dbInstance struct {
-	index         iotago.SlotIndex
+	index         iotago.EpochIndex
 	store         kvstore.KVStore // KVStore that is used to access the DB instance
 	healthTracker *kvstore.StoreHealthTracker
 }
 
-func newDBInstance(index iotago.SlotIndex, dbConfig database.Config) *dbInstance {
+func newDBInstance(index iotago.EpochIndex, dbConfig database.Config) *dbInstance {
 	db, err := database.StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
 	if err != nil {
 		panic(err)

@@ -181,7 +181,7 @@ func New(
 				// Only mark any pruning indexes if we loaded a non-genesis snapshot
 				if e.Storage.Settings().LatestFinalizedSlot() > 0 {
 					e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
-					if index, pruned := e.Storage.LastPrunedSlot(); pruned {
+					if index, pruned := e.Storage.LastPrunedEpoch(); pruned {
 						e.Events.StoragePruned.Trigger(index)
 					}
 				}
@@ -315,8 +315,8 @@ func (e *Engine) CurrentAPI() iotago.API {
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
 	if len(targetSlot) == 0 {
 		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index())
-	} else if lastPrunedSlot, hasPruned := e.Storage.LastPrunedSlot(); hasPruned && targetSlot[0] <= lastPrunedSlot {
-		return ierrors.Errorf("impossible to create a snapshot for slot %d because it is pruned (last pruned slot %d)", targetSlot[0], lo.Return1(e.Storage.LastPrunedSlot()))
+	} else if lastPrunedEpoch, hasPruned := e.Storage.LastPrunedEpoch(); hasPruned && e.CurrentAPI().TimeProvider().EpochFromSlot(targetSlot[0]) <= lastPrunedEpoch {
+		return ierrors.Errorf("impossible to create a snapshot for slot %d because it is pruned (last pruned slot %d)", targetSlot[0], lo.Return1(e.Storage.LastPrunedEpoch()))
 	}
 
 	if fileHandle, err := os.Create(filePath); err != nil {
