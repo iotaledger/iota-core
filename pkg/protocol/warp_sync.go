@@ -242,6 +242,10 @@ func (w *WarpSync) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainm
 			return
 		}
 
+		if w.processedRequests.Has(commitmentToSync.ID()) {
+			continue
+		}
+
 		fmt.Println("WarpSyncManager.warpSyncIfNecessary: WarpSyncing", commitmentToSync.ID())
 		w.pendingRequests.StartTicker(commitmentToSync.ID())
 	}
