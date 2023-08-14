@@ -6,14 +6,21 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+func (p *Prunable) getKVStoreFromSlot(slot iotago.SlotIndex, prefix kvstore.Realm) kvstore.KVStore {
+	epoch := p.apiProvider.APIForSlot(slot).TimeProvider().EpochFromSlot(slot)
+
+	return p.manager.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), prefix))
+}
+
 func (p *Prunable) Blocks(slot iotago.SlotIndex) *slotstore.Blocks {
-	kv := p.manager.Get(slot, kvstore.Realm{blocksPrefix})
+	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{blocksPrefix})
 	if kv == nil {
 		return nil
 	}
@@ -22,7 +29,7 @@ func (p *Prunable) Blocks(slot iotago.SlotIndex) *slotstore.Blocks {
 }
 
 func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *slotstore.Store[iotago.BlockID, iotago.CommitmentID] {
-	kv := p.manager.Get(slot, kvstore.Realm{rootBlocksPrefix})
+	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{rootBlocksPrefix})
 	if kv == nil {
 		return nil
 	}
@@ -36,11 +43,11 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *slotstore.Store[iotago.Blo
 }
 
 func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
-	return p.manager.Get(slot, kvstore.Realm{attestationsPrefix})
+	return p.getKVStoreFromSlot(slot, kvstore.Realm{attestationsPrefix})
 }
 
 func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *slotstore.AccountDiffs {
-	kv := p.manager.Get(slot, kvstore.Realm{accountDiffsPrefix})
+	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{accountDiffsPrefix})
 	if kv == nil {
 		return nil
 	}
@@ -50,7 +57,7 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *slotstore.AccountDiffs {
 
 func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64] {
 	// TODO: make sure that the minimum pruning delay for this is at least 1 epoch, otherwise we won't be able to calculate the reward pools
-	kv := p.manager.Get(slot, kvstore.Realm{performanceFactorsPrefix})
+	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{performanceFactorsPrefix})
 	if kv == nil {
 		return nil
 	}
@@ -83,7 +90,7 @@ func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *slotstore.Store[io
 }
 func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *slotstore.Store[account.SeatIndex, *model.SignaledBlock] {
 	// TODO: make sure that the minimum pruning delay for this is at least 1 epoch, otherwise we won't be able to properly determine the upgrade signals.
-	kv := p.manager.Get(slot, kvstore.Realm{upgradeSignalsPrefix})
+	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{upgradeSignalsPrefix})
 	if kv == nil {
 		return nil
 	}
@@ -101,7 +108,7 @@ func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *slotstore.Store[accoun
 }
 
 func (p *Prunable) Roots(slot iotago.SlotIndex) *slotstore.Store[iotago.CommitmentID, *iotago.Roots] {
-	kv := p.manager.Get(slot, kvstore.Realm{rootsPrefix})
+	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{rootsPrefix})
 	if kv == nil {
 		return nil
 	}
@@ -129,7 +136,7 @@ func (p *Prunable) Roots(slot iotago.SlotIndex) *slotstore.Store[iotago.Commitme
 }
 
 func (p *Prunable) Retainer(slot iotago.SlotIndex) *slotstore.Retainer {
-	store := p.manager.Get(slot, kvstore.Realm{retainerPrefix})
+	store := p.getKVStoreFromSlot(slot, kvstore.Realm{retainerPrefix})
 	if store == nil {
 		return nil
 	}

@@ -191,14 +191,13 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 			if storage == nil {
 				continue
 			}
-			// TODO: here we should introduce a .StreamBytes() method to avoid deserialize and serialize again.
-			if err = storage.Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
-				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
-					return ierrors.Wrapf(err, "failed to write root block ID %s", rootBlockID)
+			if err = storage.StreamBytes(func(rootBlockIDBytes []byte, commitmentIDBytes []byte) (err error) {
+				if err = stream.WriteBlob(writer, rootBlockIDBytes); err != nil {
+					return ierrors.Wrapf(err, "failed to write root block ID %s", rootBlockIDBytes)
 				}
 
-				if err = stream.WriteSerializable(writer, commitmentID, iotago.CommitmentIDLength); err != nil {
-					return ierrors.Wrapf(err, "failed to write root block's %s commitment %s", rootBlockID, commitmentID)
+				if err = stream.WriteBlob(writer, commitmentIDBytes); err != nil {
+					return ierrors.Wrapf(err, "failed to write root block's %s commitment %s", rootBlockIDBytes, commitmentIDBytes)
 				}
 
 				elementsCount++
@@ -232,7 +231,8 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 // Import imports the root blocks from the given reader.
 func (s *State) Import(reader io.ReadSeeker) error {
 	if err := stream.ReadCollection(reader, func(i int) error {
-		blockIDBytes, err := stream.ReadBytes(reader, iotago.BlockIDLength)
+
+		blockIDBytes, err := stream.ReadBlob(reader)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to read root block id %d", i)
 		}
@@ -242,7 +242,7 @@ func (s *State) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "failed to parse root block id %d", i)
 		}
 
-		commitmentIDBytes, err := stream.ReadBytes(reader, iotago.CommitmentIDLength)
+		commitmentIDBytes, err := stream.ReadBlob(reader)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
 		}
