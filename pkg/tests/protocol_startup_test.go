@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -35,25 +34,16 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	nodeB := ts.AddValidatorNode("nodeB")
 	ts.AddNode("nodeC")
 
+	nodeOptions := []options.Option[protocol.Protocol]{
+		protocol.WithStorageOptions(
+			storage.WithPruningDelay(20),
+		),
+	}
+
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
-		"nodeA": {
-			protocol.WithStorageOptions(
-				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
-				storage.WithPruningDelay(1000),
-			),
-		},
-		"nodeB": {
-			protocol.WithStorageOptions(
-				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
-				storage.WithPruningDelay(1000),
-			),
-		},
-		"nodeC": {
-			protocol.WithStorageOptions(
-				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
-				storage.WithPruningDelay(1000),
-			),
-		},
+		"nodeA": nodeOptions,
+		"nodeB": nodeOptions,
+		"nodeC": nodeOptions,
 	})
 
 	ts.Wait()
@@ -191,7 +181,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				nodeC1.Initialize(true,
 					protocol.WithBaseDirectory(ts.Directory.Path(nodeC.Name)),
 					protocol.WithStorageOptions(
-						storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 						storage.WithPruningDelay(1000),
 					),
 					protocol.WithEngineOptions(
@@ -224,7 +213,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 				nodeD := ts.AddNode("nodeD")
 				nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.
-				nodeD.Initialize(true,
+				nodeD.Initialize(true, append(nodeOptions,
 					protocol.WithSnapshotPath(snapshotPath),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
 					protocol.WithEngineOptions(
@@ -233,6 +222,9 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 							eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
 						),
 					),
+					protocol.WithStorageOptions(
+						storage.WithPruningDelay(20),
+					))...,
 				)
 				ts.Wait()
 

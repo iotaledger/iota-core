@@ -25,7 +25,7 @@ func WithPrunableManagerOptions(opts ...options.Option[prunable.Manager]) option
 	}
 }
 
-func WithPruningDelay(optsPruningDelay iotago.SlotIndex) options.Option[Storage] {
+func WithPruningDelay(optsPruningDelay iotago.EpochIndex) options.Option[Storage] {
 	return func(s *Storage) {
 		s.optsPruningDelay = optsPruningDelay
 	}

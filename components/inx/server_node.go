@@ -17,7 +17,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 		LastConfirmedBlockSlot: uint64(status.LastConfirmedBlockSlot),
 		LatestCommitment:       inxCommitment(status.LatestCommitment),
 		LatestFinalizedSlot:    uint64(status.LatestFinalizedSlot),
-		PruningSlot:            uint64(status.LatestPrunedSlot),
+		PruningSlot:            uint64(status.LatestPrunedEpoch), // TODO: change name to PruningEpoch
 	}
 }
 

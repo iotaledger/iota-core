@@ -80,7 +80,7 @@ func configure() error {
 		PrefixHealth: []byte{0},
 	}, func(err error) {
 		fmt.Printf(">> DebugAPI Error: %s\n", err)
-	}, prunable.WithGranularity(ParamsDebugAPI.DBGranularity), prunable.WithMaxOpenDBs(ParamsDebugAPI.MaxOpenDBs),
+	}, prunable.WithMaxOpenDBs(ParamsDebugAPI.MaxOpenDBs),
 	)
 
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v2")
@@ -92,11 +92,12 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		if index < iotago.SlotIndex(ParamsDebugAPI.PruningThreshold) {
+		epoch := deps.Protocol.APIForSlot(index).TimeProvider().EpochFromSlot(index)
+		if epoch < iotago.EpochIndex(ParamsDebugAPI.PruningThreshold) {
 			return
 		}
 
-		blocksPrunableStorage.PruneUntilSlot(index - iotago.SlotIndex(ParamsDebugAPI.PruningThreshold))
+		blocksPrunableStorage.PruneUntilEpoch(epoch - iotago.EpochIndex(ParamsDebugAPI.PruningThreshold))
 	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", 1)))
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
@@ -117,7 +118,8 @@ func configure() error {
 				continue
 			}
 
-			blockStore := blocksPrunableStorage.Get(block.ID().Index(), []byte{1})
+			epoch := deps.Protocol.APIForSlot(block.ID().Index()).TimeProvider().EpochFromSlot(block.ID().Index())
+			blockStore := blocksPrunableStorage.Get(epoch, []byte{1})
 
 			err := blockStore.Set(lo.PanicOnErr(block.ID().Bytes()), lo.PanicOnErr(json.Marshal(BlockMetadataResponseFromBlock(block))))
 			if err != nil {
@@ -141,7 +143,8 @@ func configure() error {
 
 		}
 
-		blockStore := blocksPrunableStorage.Get(blockID.Index(), []byte{1})
+		epoch := deps.Protocol.APIForSlot(blockID.Index()).TimeProvider().EpochFromSlot(blockID.Index())
+		blockStore := blocksPrunableStorage.Get(epoch, []byte{1})
 
 		blockJSON, err := blockStore.Get(lo.PanicOnErr(blockID.Bytes()))
 		if err != nil {

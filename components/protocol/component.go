@@ -96,9 +96,8 @@ func provide(c *dig.Container) error {
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
 			protocol.WithStorageOptions(
 				storage.WithDBEngine(deps.DatabaseEngine),
-				storage.WithPruningDelay(iotago.SlotIndex(ParamsDatabase.PruningThreshold)),
+				storage.WithPruningDelay(iotago.EpochIndex(ParamsDatabase.PruningThreshold)),
 				storage.WithPrunableManagerOptions(
-					prunable.WithGranularity(ParamsDatabase.DBGranularity),
 					prunable.WithMaxOpenDBs(ParamsDatabase.MaxOpenDBs),
 				),
 			),
