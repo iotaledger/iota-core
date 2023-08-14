@@ -226,6 +226,7 @@ func (w *WarpSync) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainm
 
 	chain := chainCommitment.Chain()
 	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
+	minCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MinCommittableAge()
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
 	fmt.Println("WarpSyncManager.warpSyncIfNecessary: latest", latestCommitmentIndex, "chainCommitment", chainCommitment.Commitment().Index())
@@ -235,7 +236,7 @@ func (w *WarpSync) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainm
 		return
 	}
 
-	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+maxCommittableAge; slotToWarpSync++ {
+	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+minCommittableAge; slotToWarpSync++ {
 		commitmentToSync := chain.Commitment(slotToWarpSync)
 		if commitmentToSync == nil {
 			fmt.Println("WarpSyncManager.warpSyncIfNecessary: commitmentToSync == nil")
