@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/reactive"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -53,8 +54,6 @@ func NewWarpSync(protocol *Protocol) *WarpSync {
 
 		protocol.ChainManager.Events.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
 			chainCommitment.IsSolid().OnTrigger(func() {
-				fmt.Println("IsSolid", chainCommitment.ID())
-
 				w.warpSyncIfNecessary(w.targetEngine(chainCommitment), chainCommitment)
 			})
 		})
@@ -77,11 +76,35 @@ func NewWarpSync(protocol *Protocol) *WarpSync {
 	return w
 }
 
-// ShouldProcess returns whether the given block should be processed by the WarpSync instance instead of the engine.
+func (w *WarpSync) ProcessBlock(block *model.Block, slotCommitment *chainmanager.ChainCommitment, src network.PeerID) error {
+	err := ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), slotCommitment.ID())
+
+	for _, engine := range []*engine.Engine{w.protocol.MainEngineInstance(), w.protocol.CandidateEngineInstance()} {
+		if engine != nil && engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID()) {
+			err = nil
+
+			if !w.shouldProcess(engine, block) {
+				engine.ProcessBlockFromPeer(block, src)
+			}
+		}
+	}
+
+	return err
+}
+
+func (w *WarpSync) IsShutdown() reactive.Event {
+	return w.isShutdown
+}
+
+// shouldProcess returns whether the given block should be processed by the WarpSync instance instead of the engine.
 //
 // This is the case if the block is more than a warp sync threshold ahead of the latest commitment while also committing
 // to an unknown slot that can potentially be warp synced.
-func (w *WarpSync) ShouldProcess(engine *engine.Engine, block *model.Block) bool {
+func (w *WarpSync) shouldProcess(engine *engine.Engine, block *model.Block) bool {
+	if engine.BlockRequester.HasTicker(block.ID()) {
+		return false
+	}
+
 	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
 	latestCommitment := engine.Storage.Settings().LatestCommitment()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
@@ -93,10 +116,6 @@ func (w *WarpSync) ShouldProcess(engine *engine.Engine, block *model.Block) bool
 	}
 
 	return shouldProcess
-}
-
-func (w *WarpSync) IsShutdown() reactive.Event {
-	return w.isShutdown
 }
 
 func (w *WarpSync) processRequest(commitmentID iotago.CommitmentID, src network.PeerID) {

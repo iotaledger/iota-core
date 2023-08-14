@@ -289,54 +289,19 @@ func (p *Protocol) ProcessOwnBlock(block *model.Block) error {
 }
 
 func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
-	mainEngine := p.MainEngineInstance()
+	slotCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
 
-	if !mainEngine.WasInitialized() {
-		return ierrors.New("protocol engine not yet initialized")
-	}
-
-	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
-
-	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(slotCommitmentID)
-	// If the commitment is not solid (its chain not known), we store the block in a small buffer and process it once we
-	// receive the commitment (or commit the slot ourselves).
-	if !chainCommitment.IsSolid().Get() {
-		if !p.unsolidCommitmentBlocks.Add(slotCommitmentID, types.NewTuple(block, src)) {
-			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid commitment buffer: slotcommitment: %s, latest commitment: %s, block ID: %s", slotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
+	// If the slotCommitment is not solid (its chain not known), we store the block in a small buffer and process it once we
+	// receive the slotCommitment (or commit the slot ourselves).
+	if !slotCommitment.IsSolid().Get() {
+		if !p.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
+			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid slotCommitment buffer: slotcommitment: %s, block ID: %s", slotCommitmentID, block.ID())
 		}
 
-		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", slotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
+		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, block ID: %s", slotCommitment.ID(), block.ID())
 	}
 
-	processed := false
-
-	if mainChain := mainEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
-		if mainEngine.BlockRequester.HasTicker(block.ID()) || !p.WarpSync.ShouldProcess(mainEngine, block) {
-			mainEngine.ProcessBlockFromPeer(block, src)
-		} else {
-			fmt.Println("block2 from source", src, "was not processed:", block.ID(), "; commits to:", slotCommitmentID)
-		}
-
-		processed = true
-	}
-
-	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil {
-		if candidateChain := candidateEngineInstance.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngineInstance.BlockRequester.HasTicker(block.ID()) {
-			if candidateEngineInstance.BlockRequester.HasTicker(block.ID()) || !p.WarpSync.ShouldProcess(candidateEngineInstance, block) {
-				candidateEngineInstance.ProcessBlockFromPeer(block, src)
-			} else {
-				fmt.Println("block1 from source", src, "was not processed:", block.ID(), "; commits to:", slotCommitmentID)
-			}
-
-			processed = true
-		}
-	}
-
-	if !processed {
-		return ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), slotCommitmentID)
-	}
-
-	return nil
+	return p.WarpSync.ProcessBlock(block, slotCommitment, src)
 }
 
 func (p *Protocol) MainEngineInstance() *engine.Engine {
