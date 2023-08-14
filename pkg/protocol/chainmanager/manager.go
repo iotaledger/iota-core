@@ -60,7 +60,7 @@ func (m *Manager) Initialize(c *model.Commitment) {
 
 	m.rootCommitment, _ = m.getOrCreateCommitment(c.ID())
 	m.rootCommitment.PublishCommitment(c)
-	m.rootCommitment.IsSolid().Set(true)
+	m.rootCommitment.Solid().Set(true)
 	m.rootCommitment.publishChain(NewChain(m.rootCommitment))
 }
 
@@ -348,7 +348,7 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 }
 
 func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*ChainCommitment, error) {
-	if !commitment.IsSolid().Get() || commitment.Chain() == nil {
+	if !commitment.Solid().Get() || commitment.Chain() == nil {
 		return nil, ierrors.Wrapf(ErrCommitmentNotSolid, "commitment %s is not solid", commitment)
 	}
 
@@ -374,7 +374,7 @@ func (m *Manager) registerCommitment(commitment *model.Commitment) (isNew bool, 
 	chainCommitment, created := m.getOrCreateCommitment(commitment.ID())
 
 	if !chainCommitment.PublishCommitment(commitment) {
-		return false, chainCommitment.IsSolid().Get(), false, chainCommitment
+		return false, chainCommitment.Solid().Get(), false, chainCommitment
 	}
 
 	m.Events.CommitmentPublished.Trigger(chainCommitment)
@@ -443,7 +443,7 @@ func (m *Manager) registerChild(parent *ChainCommitment, child *ChainCommitment)
 	if isSolid, chain, wasForked = parent.registerChild(child); chain != nil {
 		chain.addCommitment(child)
 		child.publishChain(chain)
-		child.IsSolid().Set(isSolid)
+		child.Solid().Set(isSolid)
 	}
 
 	return
@@ -486,7 +486,7 @@ func (m *Manager) propagateSolidity(child *ChainCommitment) (childrenToUpdate []
 	m.commitmentEntityMutex.Lock(child.ID())
 	defer m.commitmentEntityMutex.Unlock(child.ID())
 
-	if !child.IsSolid().Set(true) {
+	if !child.Solid().Set(true) {
 		childrenToUpdate = child.Children()
 	}
 

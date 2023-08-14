@@ -53,7 +53,7 @@ func NewWarpSync(protocol *Protocol) *WarpSync {
 		protocol.engineManager.OnEngineCreated(w.monitorLatestCommitmentUpdated)
 
 		protocol.ChainManager.Events.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
-			chainCommitment.IsSolid().OnTrigger(func() {
+			chainCommitment.Solid().OnTrigger(func() {
 				w.warpSyncIfNecessary(w.targetEngine(chainCommitment), chainCommitment)
 			})
 		})

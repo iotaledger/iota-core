@@ -22,7 +22,7 @@ func (t *TestSuite) AssertChainManagerIsSolid(nodes ...*mock.Node) {
 			if latestCommitment.ID() != latestChainCommitment.ID() {
 				return ierrors.Errorf("AssertChainManagerIsSolid: %s: latest commitment is not equal, expected %d, got %d", node.Name, latestCommitment.ID(), latestChainCommitment.ID())
 			}
-			if !latestChainCommitment.IsSolid().Get() {
+			if !latestChainCommitment.Solid().Get() {
 				return ierrors.Errorf("AssertChainManagerIsSolid: %s: is not solid", node.Name)
 			}
 
