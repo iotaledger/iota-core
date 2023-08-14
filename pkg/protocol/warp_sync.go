@@ -236,7 +236,7 @@ func (w *WarpSync) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainm
 		return
 	}
 
-	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+minCommittableAge + 2; slotToWarpSync++ {
+	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+minCommittableAge+2; slotToWarpSync++ {
 		commitmentToSync := chain.Commitment(slotToWarpSync)
 		if commitmentToSync == nil {
 			fmt.Println("WarpSyncManager.warpSyncIfNecessary: commitmentToSync == nil")

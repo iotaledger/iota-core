@@ -65,6 +65,7 @@ func (u *UnsolidCommitmentBuffer[V]) add(commitmentID iotago.CommitmentID, value
 		if u.blockBufferMaxSize > 0 {
 			return ringbuffer.NewRingBuffer[V](u.blockBufferMaxSize)
 		}
+
 		return ds.NewSet[V]()
 	})
 	buffer.Add(value)
