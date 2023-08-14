@@ -107,7 +107,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	return options.Apply(&Protocol{
 		Events:                          NewEvents(),
 		Workers:                         workers,
-		unsolidCommitmentBlocks:         buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, network.PeerID]](20),
+		unsolidCommitmentBlocks:         buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, network.PeerID]](20, 100),
 		dispatcher:                      dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
 		optsCommitmentFilterProvider:    accountsfilter.NewProvider(),
@@ -293,7 +293,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 
 	// If the slotCommitment is not solid (its chain not known), we store the block in a small buffer and process it once we
 	// receive the slotCommitment (or commit the slot ourselves).
-	if !slotCommitment.IsSolid().Get() {
+	if !slotCommitment.Solid().Get() {
 		if !p.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
 			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid slotCommitment buffer: slotcommitment: %s, block ID: %s", slotCommitment.ID(), block.ID())
 		}

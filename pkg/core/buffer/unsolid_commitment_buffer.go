@@ -7,25 +7,35 @@ import (
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/ringbuffer"
 	"github.com/iotaledger/hive.go/ds/types"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
+
+type optionalSizedBuffer[V comparable] interface {
+	ToSlice() []V
+	Add(value V) bool
+}
 
 type UnsolidCommitmentBuffer[V comparable] struct {
 	blockBufferMaxSize int
 
 	mutex           sync.RWMutex
 	lastEvictedSlot iotago.SlotIndex
-	blockBuffers    *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[V]]
+	blockBuffers    *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, optionalSizedBuffer[V]]
 
 	commitmentBuffer      *cache.Cache[iotago.CommitmentID, types.Empty]
 	commitmentBufferMutex sync.Mutex
 }
 
-func NewUnsolidCommitmentBuffer[V comparable](commitmentBufferMaxSize int) *UnsolidCommitmentBuffer[V] {
+func NewUnsolidCommitmentBuffer[V comparable](commitmentBufferMaxSize int, blockBufferMaxSize ...int) *UnsolidCommitmentBuffer[V] {
 	u := &UnsolidCommitmentBuffer[V]{
-		blockBuffers:     memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[V]](),
+		blockBuffers:     memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, optionalSizedBuffer[V]](),
 		commitmentBuffer: cache.New[iotago.CommitmentID, types.Empty](commitmentBufferMaxSize),
+	}
+
+	if len(blockBufferMaxSize) > 0 {
+		u.blockBufferMaxSize = blockBufferMaxSize[0]
 	}
 
 	u.commitmentBuffer.SetEvictCallback(func(commitmentID iotago.CommitmentID, _ types.Empty) {
@@ -51,7 +61,10 @@ func (u *UnsolidCommitmentBuffer[V]) Add(commitmentID iotago.CommitmentID, value
 }
 
 func (u *UnsolidCommitmentBuffer[V]) add(commitmentID iotago.CommitmentID, value V) {
-	buffer, _ := u.blockBuffers.Get(commitmentID.Index(), true).GetOrCreate(commitmentID, func() ds.Set[V] {
+	buffer, _ := u.blockBuffers.Get(commitmentID.Index(), true).GetOrCreate(commitmentID, func() optionalSizedBuffer[V] {
+		if u.blockBufferMaxSize > 0 {
+			return ringbuffer.NewRingBuffer[V](u.blockBufferMaxSize)
+		}
 		return ds.NewSet[V]()
 	})
 	buffer.Add(value)
