@@ -94,7 +94,7 @@ func New(workers *workerpool.Group, apiProvider api.Provider, evictionState *evi
 		workers:               workers,
 		workerPool:            workers.CreatePool("Solidifier", 2),
 		errorHandler:          errorHandler,
-		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](int(apiProvider.CurrentAPI().ProtocolParameters().MaxCommittableAge())*2, 1500),
+		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](int(apiProvider.CurrentAPI().ProtocolParameters().MaxCommittableAge()) * 2),
 	}, opts,
 		func(b *BlockDAG) {
 			b.solidifier = causalorder.New(

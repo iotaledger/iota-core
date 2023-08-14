@@ -107,7 +107,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	return options.Apply(&Protocol{
 		Events:                          NewEvents(),
 		Workers:                         workers,
-		unsolidCommitmentBlocks:         buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, network.PeerID]](20, 100),
+		unsolidCommitmentBlocks:         buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, network.PeerID]](20),
 		dispatcher:                      dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
 		optsCommitmentFilterProvider:    accountsfilter.NewProvider(),
