@@ -4,7 +4,6 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -40,7 +39,7 @@ func (o *Orchestrator) Import(reader io.ReadSeeker) error {
 		return ierrors.Wrapf(err, "failed to import upgrade signals for slot %d", slot)
 	}
 
-	upgradeSignals := o.upgradeSignalsFunc(slot)
+	upgradeSignals := o.upgradeSignalsPerSlotFunc(slot)
 	for seat, signaledBlock := range upgradeSignalMap {
 		if err := upgradeSignals.Store(seat, signaledBlock); err != nil {
 			o.errorHandler(ierrors.Wrapf(err, "failed to store upgrade signals %d:%v", seat, signaledBlock))
@@ -59,12 +58,12 @@ func (o *Orchestrator) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "failed to read epoch")
 		}
 
-		versionAndHash, err := stream.ReadFunc(reader, VersionAndHashFromBytes)
+		versionAndHash, err := stream.ReadFunc(reader, model.VersionAndHashFromBytes)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to read versionAndHash")
 		}
 
-		if err := o.permanentUpgradeSignals.Set(epoch, versionAndHash); err != nil {
+		if err := o.decidedUpgradeSignals.Store(epoch, versionAndHash); err != nil {
 			return ierrors.Wrapf(err, "failed to set permanent upgrade signals for epoch %d", epoch)
 		}
 
@@ -88,7 +87,7 @@ func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 	if err := stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		var exportedCount uint64
 
-		upgradeSignals := o.upgradeSignalsFunc(targetSlot)
+		upgradeSignals := o.upgradeSignalsPerSlotFunc(targetSlot)
 		if err := upgradeSignals.StreamBytes(func(seatBytes []byte, signaledBlockBytes []byte) error {
 			if err := stream.Write(writer, seatBytes); err != nil {
 				return ierrors.Wrap(err, "failed to write seat")
@@ -116,17 +115,16 @@ func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 
 		currentEpoch := o.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(targetSlot)
 		for epoch := o.signalingWindowStart(currentEpoch); epoch <= currentEpoch; epoch++ {
-			versionAndHash, err := o.permanentUpgradeSignals.Get(epoch)
+			versionAndHash, err := o.decidedUpgradeSignals.Load(epoch)
 			if err != nil {
-				// We don't write anything to the storage if no supermajority was reached (or no signaling was going on).
-				// So it's safe to ignore this here and skip to the next epoch.
-				if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-					continue
-				}
-
 				if err != nil {
 					return 0, ierrors.Wrapf(err, "failed to get permanent upgrade signals for epoch %d", epoch)
 				}
+			}
+			if versionAndHash.Version == 0 {
+				// We don't write anything to the storage if no supermajority was reached (or no signaling was going on).
+				// So it's safe to ignore this here and skip to the next epoch.
+				continue
 			}
 
 			if err := stream.Write(writer, epoch); err != nil {

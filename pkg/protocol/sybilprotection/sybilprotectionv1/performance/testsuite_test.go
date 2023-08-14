@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -86,10 +87,11 @@ func (t *TestSuite) InitRewardManager() {
 		return p
 	}
 
-	rewardsStore := mapdb.NewMapDB()
-	poolStatsStore := mapdb.NewMapDB()
-	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, performanceFactorFunc, api.SingleVersionProvider(t.API))
+	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), 0)
+	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
+	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
+
+	t.Instance = NewTracker(rewardsStore.GetEpoch, poolStatsStore, committeeStore, performanceFactorFunc, api.SingleVersionProvider(t.API))
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {

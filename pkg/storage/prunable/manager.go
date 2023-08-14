@@ -16,7 +16,7 @@ import (
 )
 
 type Manager struct {
-	openDBs      *cache.Cache[iotago.EpochIndex, *dbInstance]
+	openDBs      *cache.Cache[iotago.EpochIndex, *database.DBInstance]
 	openDBsMutex syncutils.Mutex
 
 	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
@@ -38,8 +38,8 @@ func NewManager(dbConfig database.Config, errorHandler func(error), opts ...opti
 		dbSizes:         shrinkingmap.New[iotago.EpochIndex, int64](),
 		lastPrunedEpoch: model.NewEvictionIndex[iotago.EpochIndex](),
 	}, opts, func(m *Manager) {
-		m.openDBs = cache.New[iotago.EpochIndex, *dbInstance](m.optsMaxOpenDBs)
-		m.openDBs.SetEvictCallback(func(baseIndex iotago.EpochIndex, db *dbInstance) {
+		m.openDBs = cache.New[iotago.EpochIndex, *database.DBInstance](m.optsMaxOpenDBs)
+		m.openDBs.SetEvictCallback(func(baseIndex iotago.EpochIndex, db *database.DBInstance) {
 			db.Close()
 
 			size, err := dbPrunableDirectorySize(dbConfig.Directory, baseIndex)
@@ -65,8 +65,8 @@ func (m *Manager) Get(index iotago.EpochIndex, realm kvstore.Realm) kvstore.KVSt
 		return nil
 	}
 
-	bucket := m.getBucket(index)
-	withRealm, err := bucket.WithExtendedRealm(realm)
+	kv := m.getDBInstance(index).KVStore()
+	withRealm, err := kv.WithExtendedRealm(realm)
 	if err != nil {
 		panic(err)
 	}
@@ -92,7 +92,7 @@ func (m *Manager) Shutdown() {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
-	m.openDBs.Each(func(index iotago.EpochIndex, db *dbInstance) {
+	m.openDBs.Each(func(index iotago.EpochIndex, db *database.DBInstance) {
 		db.Close()
 	})
 }
@@ -117,7 +117,7 @@ func (m *Manager) PrunableStorageSize() int64 {
 	defer m.openDBsMutex.Unlock()
 
 	// Add up all the open databases
-	m.openDBs.Each(func(key iotago.EpochIndex, val *dbInstance) {
+	m.openDBs.Each(func(key iotago.EpochIndex, val *database.DBInstance) {
 		size, err := dbPrunableDirectorySize(m.dbConfig.Directory, key)
 		if err != nil {
 			m.errorHandler(ierrors.Wrapf(err, "dbPrunableDirectorySize failed for %s: %s", m.dbConfig.Directory, key))
@@ -158,14 +158,14 @@ func (m *Manager) RestoreFromDisk() {
 //	epochIndex 0 -> db 0
 //	epochIndex 1 -> db 1
 //	epochIndex 2 -> db 2
-func (m *Manager) getDBInstance(index iotago.EpochIndex) (db *dbInstance) {
+func (m *Manager) getDBInstance(index iotago.EpochIndex) (db *database.DBInstance) {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
 	// check if exists again, as other goroutine might have created it in parallel
 	db, exists := m.openDBs.Get(index)
 	if !exists {
-		db = newDBInstance(index, m.dbConfig.WithDirectory(dbPathFromIndex(m.dbConfig.Directory, index)))
+		db = database.NewDBInstance(m.dbConfig.WithDirectory(dbPathFromIndex(m.dbConfig.Directory, index)))
 
 		// Remove the cached db size since we will open the db
 		m.dbSizes.Delete(index)
@@ -173,19 +173,6 @@ func (m *Manager) getDBInstance(index iotago.EpochIndex) (db *dbInstance) {
 	}
 
 	return db
-}
-
-// getBucket returns the bucket for the given epochIndex or creates a new one if it does not yet exist.
-// A bucket is marked as dirty by default.
-// Buckets are created as follows:
-//
-//	epochIndex 0 -> db 0 / bucket 0
-//	epochIndex 1 -> db 1 / bucket 1
-//	epochIndex 2 -> db 2 / bucket 2
-//	epochIndex 3 -> db 3 / bucket 3
-func (m *Manager) getBucket(index iotago.EpochIndex) (bucket kvstore.KVStore) {
-	db := m.getDBInstance(index)
-	return db.store
 }
 
 func (m *Manager) prune(dbBaseIndex iotago.EpochIndex) {

@@ -4,18 +4,17 @@ import (
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	"github.com/iotaledger/iota-core/pkg/votes"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -58,9 +57,9 @@ type Orchestrator struct {
 	errorHandler      func(error)
 	lastCommittedSlot iotago.SlotIndex
 
-	latestSignals           *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock]
-	upgradeSignalsFunc      func(slot iotago.SlotIndex) *slotstore.Store[account.SeatIndex, *model.SignaledBlock]
-	permanentUpgradeSignals *kvstore.TypedStore[iotago.EpochIndex, VersionAndHash]
+	latestSignals             *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock]
+	upgradeSignalsPerSlotFunc func(slot iotago.SlotIndex) *slotstore.Store[account.SeatIndex, *model.SignaledBlock]
+	decidedUpgradeSignals     *epochstore.Store[model.VersionAndHash]
 
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error
 	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error)
@@ -78,7 +77,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 	return module.Provide(func(e *engine.Engine) upgrade.Orchestrator {
 		o := NewOrchestrator(
 			e.ErrorHandler("upgradegadget"),
-			e.Storage.Permanent.UpgradeSignals(),
+			e.Storage.Prunable.DecidedUpgradeSignals(),
 			e.Storage.Prunable.UpgradeSignals,
 			e.Storage.Settings().APIProvider(),
 			e.Storage.Settings().StoreFutureProtocolParametersHash,
@@ -110,7 +109,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 }
 
 func NewOrchestrator(errorHandler func(error),
-	permanentUpgradeSignal kvstore.KVStore,
+	decidedUpgradeSignals *epochstore.Store[model.VersionAndHash],
 	upgradeSignalsFunc func(slot iotago.SlotIndex) *slotstore.Store[account.SeatIndex, *model.SignaledBlock],
 	apiProvider api.Provider,
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error,
@@ -118,10 +117,10 @@ func NewOrchestrator(errorHandler func(error),
 	epochForVersionFunc func(iotago.Version) (iotago.EpochIndex, bool),
 	seatManager seatmanager.SeatManager, opts ...options.Option[Orchestrator]) *Orchestrator {
 	return options.Apply(&Orchestrator{
-		errorHandler:            errorHandler,
-		latestSignals:           memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock](),
-		permanentUpgradeSignals: kvstore.NewTypedStore(permanentUpgradeSignal, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, VersionAndHash.Bytes, VersionAndHashFromBytes),
-		upgradeSignalsFunc:      upgradeSignalsFunc,
+		errorHandler:              errorHandler,
+		latestSignals:             memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock](),
+		decidedUpgradeSignals:     decidedUpgradeSignals,
+		upgradeSignalsPerSlotFunc: upgradeSignalsFunc,
 
 		setProtocolParametersEpochMappingFunc: setProtocolParametersEpochMappingFunc,
 		protocolParametersAndVersionsHashFunc: protocolParametersAndVersionsHashFunc,
@@ -198,7 +197,7 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 		signaledBlockPerSeat := latestSignalsForSlot.AsMap()
 
 		// Store upgrade signals for this slot.
-		upgradeSignals := o.upgradeSignalsFunc(slot)
+		upgradeSignals := o.upgradeSignalsPerSlotFunc(slot)
 		for seat, signaledBlock := range signaledBlockPerSeat {
 			if err := upgradeSignals.Store(seat, signaledBlock); err != nil {
 				o.errorHandler(ierrors.Wrapf(err, "failed to store upgrade signals %d:%v", seat, signaledBlock))
@@ -231,9 +230,9 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 		return
 	}
 
-	versionAndHashSupporters := make(map[VersionAndHash]int)
+	versionAndHashSupporters := make(map[model.VersionAndHash]int)
 	for _, signaledBlock := range signaledBlockPerSeat {
-		versionAndHash := VersionAndHash{
+		versionAndHash := model.VersionAndHash{
 			Version: signaledBlock.HighestSupportedVersion,
 			Hash:    signaledBlock.ProtocolParametersHash,
 		}
@@ -256,7 +255,7 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 	}
 
 	// Store information that threshold for version was reached for this epoch.
-	if err := o.permanentUpgradeSignals.Set(currentEpoch, versionAndHashWithMostSupporters); err != nil {
+	if err := o.decidedUpgradeSignals.Store(currentEpoch, versionAndHashWithMostSupporters); err != nil {
 		o.errorHandler(ierrors.Wrap(err, "failed to store permanent upgrade signals"))
 		return
 	}
@@ -275,8 +274,8 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 	}
 }
 
-func (o *Orchestrator) maxVersionByCount(versionSupporters map[VersionAndHash]int) (VersionAndHash, int) {
-	var versionWithMostSupporters VersionAndHash
+func (o *Orchestrator) maxVersionByCount(versionSupporters map[model.VersionAndHash]int) (model.VersionAndHash, int) {
+	var versionWithMostSupporters model.VersionAndHash
 	var mostSupporters int
 	for versionAndHash, supportersCount := range versionSupporters {
 		if supportersCount > mostSupporters {
@@ -288,19 +287,18 @@ func (o *Orchestrator) maxVersionByCount(versionSupporters map[VersionAndHash]in
 	return versionWithMostSupporters, mostSupporters
 }
 
-func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex) (VersionAndHash, bool) {
-	epochVersions := make(map[VersionAndHash]int)
+func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex) (model.VersionAndHash, bool) {
+	epochVersions := make(map[model.VersionAndHash]int)
 
 	for epoch := o.signalingWindowStart(currentEpoch); epoch <= currentEpoch; epoch++ {
-		version, err := o.permanentUpgradeSignals.Get(epoch)
+		version, err := o.decidedUpgradeSignals.Load(epoch)
 		if err != nil {
-			if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-				continue
-			}
-
 			o.errorHandler(ierrors.Wrap(err, "failed to get permanent upgrade signals"))
 
-			return VersionAndHash{}, false
+			return model.VersionAndHash{}, false
+		}
+		if version.Version == 0 {
+			continue
 		}
 
 		epochVersions[version]++
@@ -312,7 +310,7 @@ func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex)
 
 	// Check whether the signaling window threshold is reached.
 	if signaledCount < int(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().WindowTargetRatio) {
-		return VersionAndHash{}, false
+		return model.VersionAndHash{}, false
 	}
 
 	return versionMostSignaled, true
@@ -326,28 +324,4 @@ func (o *Orchestrator) signalingWindowStart(epoch iotago.EpochIndex) iotago.Epoc
 	}
 
 	return epoch - windowSize
-}
-
-type VersionAndHash struct {
-	Version iotago.Version
-	Hash    iotago.Identifier
-}
-
-func (v VersionAndHash) Bytes() ([]byte, error) {
-	// iotago.Version and iotago.Identifier can't panic on .Bytes() call.
-	return byteutils.ConcatBytes(lo.PanicOnErr(v.Version.Bytes()), lo.PanicOnErr(v.Hash.Bytes())), nil
-}
-
-func VersionAndHashFromBytes(bytes []byte) (VersionAndHash, int, error) {
-	version, versionBytesConsumed, err := iotago.VersionFromBytes(bytes)
-	if err != nil {
-		return VersionAndHash{}, 0, ierrors.Wrap(err, "failed to parse version")
-	}
-
-	hash, hashBytesConsumed, err := iotago.IdentifierFromBytes(bytes[versionBytesConsumed:])
-	if err != nil {
-		return VersionAndHash{}, 0, ierrors.Wrap(err, "failed to parse hash")
-	}
-
-	return VersionAndHash{version, hash}, versionBytesConsumed + hashBytesConsumed, nil
 }

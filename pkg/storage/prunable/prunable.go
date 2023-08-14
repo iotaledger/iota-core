@@ -1,36 +1,43 @@
 package prunable
 
 import (
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-const (
-	blocksPrefix byte = iota
-	rootBlocksPrefix
-	attestationsPrefix
-	accountDiffsPrefix
-	performanceFactorsPrefix
-	upgradeSignalsPrefix
-	rootsPrefix
-	retainerPrefix
-)
-
 type Prunable struct {
-	pruningDelay iotago.EpochIndex
-	apiProvider  api.Provider
-	manager      *Manager
-	errorHandler func(error)
+	defaultPruningDelay iotago.EpochIndex
+	apiProvider         api.Provider
+	manager             *Manager
+	errorHandler        func(error)
+
+	semiPermanentDB       *database.DBInstance
+	decidedUpgradeSignals *epochstore.Store[model.VersionAndHash]
+	poolRewards           *epochstore.EpochKVStore
+	poolStats             *epochstore.Store[*model.PoolsStats]
+	committee             *epochstore.Store[*account.Accounts]
 }
 
 func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[Manager]) *Prunable {
+	semiPermanentDB := database.NewDBInstance(dbConfig)
+
 	return &Prunable{
-		pruningDelay: pruningDelay,
-		apiProvider:  apiProvider,
-		errorHandler: errorHandler,
-		manager:      NewManager(dbConfig, errorHandler, opts...),
+		defaultPruningDelay: pruningDelay,
+		apiProvider:         apiProvider,
+		errorHandler:        errorHandler,
+		manager:             NewManager(dbConfig, errorHandler, opts...),
+
+		semiPermanentDB:       semiPermanentDB,
+		decidedUpgradeSignals: epochstore.NewStore(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, semiPermanentDB.KVStore(), pruningDelayDecidedUpgradeSignals, model.VersionAndHash.Bytes, model.VersionAndHashFromBytes),
+		poolRewards:           epochstore.NewEpochKVStore(kvstore.Realm{epochPrefixPoolRewards}, semiPermanentDB.KVStore(), pruningDelayPoolRewards),
+		poolStats:             epochstore.NewStore(kvstore.Realm{epochPrefixPoolStats}, semiPermanentDB.KVStore(), pruningDelayPoolStats, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes),
+		committee:             epochstore.NewStore(kvstore.Realm{epochPrefixCommittee}, semiPermanentDB.KVStore(), pruningDelayCommittee, (*account.Accounts).Bytes, account.AccountsFromBytes),
 	}
 }
 
@@ -38,16 +45,14 @@ func (p *Prunable) RestoreFromDisk() {
 	p.manager.RestoreFromDisk()
 }
 
-
-
 // PruneUntilSlot prunes storage slots less than and equal to the given index.
 func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
 	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(index)
-	if epoch < p.pruningDelay {
+	if epoch < p.defaultPruningDelay {
 		return
 	}
 
-	p.manager.PruneUntilEpoch(epoch - p.pruningDelay)
+	p.manager.PruneUntilEpoch(epoch - p.defaultPruningDelay)
 }
 
 func (p *Prunable) Size() int64 {
@@ -56,6 +61,7 @@ func (p *Prunable) Size() int64 {
 
 func (p *Prunable) Shutdown() {
 	p.manager.Shutdown()
+	p.semiPermanentDB.Close()
 }
 
 func (p *Prunable) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
