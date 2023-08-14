@@ -90,7 +90,6 @@ services:
       --blockIssuer.issuerAccount=0xd057230f48fdf59ae093e2179857c590e960b05389399399ce69ad169a9c7f37
       --blockIssuer.privateKey=dcf7adb000f03826f1964a3e5378874b1972c38229fb740a8e47f2c421cddcf9a54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39
       --restAPI.allowIncompleteBlock=true
-      --logger.level=debug
 
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
