@@ -80,7 +80,7 @@ func (w *WarpSync) ProcessBlock(block *model.Block, slotCommitment *chainmanager
 	err := ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), slotCommitment.ID())
 
 	for _, engine := range []*engine.Engine{w.protocol.MainEngineInstance(), w.protocol.CandidateEngineInstance()} {
-		if engine != nil && engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID()) {
+		if engine != nil && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
 			err = nil
 
 			if !w.shouldProcess(engine, block) {
