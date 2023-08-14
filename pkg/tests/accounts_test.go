@@ -9,10 +9,10 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/utils"
@@ -89,7 +89,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Index(), activeNodes, block1)
 
-	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock1, &prunable.AccountDiff{
+	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock1, &model.AccountDiff{
 		BICChange:           0,
 		PreviousUpdatedTime: 0,
 		PreviousExpirySlot:  math.MaxUint64,
@@ -155,7 +155,7 @@ func Test_TransitionAccount(t *testing.T) {
 	latestParent = ts.CommitUntilSlot(slotIndexBlock2, activeNodes, block2)
 
 	// assert diff of a destroyed account, to make sure we can correctly restore it
-	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock2, &prunable.AccountDiff{
+	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock2, &model.AccountDiff{
 		BICChange:             -iotago.BlockIssuanceCredits(123),
 		PreviousUpdatedTime:   0,
 		NewExpirySlot:         0,
@@ -173,7 +173,7 @@ func Test_TransitionAccount(t *testing.T) {
 	newAccount := ts.AccountOutput("TX2:0")
 	newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
 
-	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock2, &prunable.AccountDiff{
+	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock2, &model.AccountDiff{
 		BICChange:             0,
 		PreviousUpdatedTime:   0,
 		NewExpirySlot:         newAccountExpirySlot,
@@ -225,7 +225,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	_ = ts.CommitUntilSlot(slotIndexBlock3, activeNodes, block3)
 
-	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock3, &prunable.AccountDiff{
+	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock3, &model.AccountDiff{
 		BICChange:             0,
 		PreviousUpdatedTime:   0,
 		NewOutputID:           iotago.EmptyOutputID,

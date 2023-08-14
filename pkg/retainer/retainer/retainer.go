@@ -9,14 +9,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/retainer"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type (
 	//nolint:revive
-	RetainerFunc            func(iotago.SlotIndex) *prunable.Retainer
+	RetainerFunc            func(iotago.SlotIndex) *slotstore.Retainer
 	LatestCommittedSlotFunc func() iotago.SlotIndex
 	FinalizedSlotFunc       func() iotago.SlotIndex
 )

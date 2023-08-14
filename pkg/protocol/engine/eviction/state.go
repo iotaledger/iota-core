@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -23,7 +23,7 @@ type State struct {
 
 	rootBlocks           *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID]
 	latestRootBlocks     *ringbuffer.RingBuffer[iotago.BlockID]
-	rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks
+	rootBlockStorageFunc func(iotago.SlotIndex) *slotstore.Store[iotago.BlockID, iotago.CommitmentID]
 	lastEvictedSlot      iotago.SlotIndex
 	latestNonEmptyStore  kvstore.KVStore
 	evictionMutex        syncutils.RWMutex
@@ -32,7 +32,7 @@ type State struct {
 }
 
 // NewState creates a new eviction State.
-func NewState(latestNonEmptyStore kvstore.KVStore, rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks, opts ...options.Option[State]) (state *State) {
+func NewState(latestNonEmptyStore kvstore.KVStore, rootBlockStorageFunc func(iotago.SlotIndex) *slotstore.Store[iotago.BlockID, iotago.CommitmentID], opts ...options.Option[State]) (state *State) {
 	return options.Apply(&State{
 		Events:                      NewEvents(),
 		rootBlocks:                  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID](),

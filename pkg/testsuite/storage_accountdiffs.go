@@ -4,12 +4,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertStorageAccountDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, nodes ...*mock.Node) {
+func (t *TestSuite) AssertStorageAccountDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*model.AccountDiff, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {

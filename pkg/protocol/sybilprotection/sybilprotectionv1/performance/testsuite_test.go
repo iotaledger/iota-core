@@ -1,6 +1,8 @@
 package performance
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"testing"
 	"time"
@@ -9,10 +11,11 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -49,12 +52,36 @@ func NewTestSuite(t *testing.T) *TestSuite {
 
 func (t *TestSuite) InitRewardManager() {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
-	perforanceFactorFunc := func(index iotago.SlotIndex) *prunable.PerformanceFactors {
+	performanceFactorFunc := func(index iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64] {
 		if _, exists := prunableStores[index]; !exists {
 			prunableStores[index] = mapdb.NewMapDB()
 		}
 
-		p := prunable.NewPerformanceFactors(index, prunableStores[index])
+		uint64Bytes := func(value uint64) ([]byte, error) {
+			buf := bytes.NewBuffer(make([]byte, 0, serializer.UInt64ByteSize))
+			if err := binary.Write(buf, binary.LittleEndian, value); err != nil {
+				return nil, err
+			}
+
+			return buf.Bytes(), nil
+		}
+
+		uint64FromBytes := func(b []byte) (uint64, int, error) {
+			buf := bytes.NewBuffer(b)
+			var value uint64
+			if err := binary.Read(buf, binary.LittleEndian, &value); err != nil {
+				return 0, 0, err
+			}
+
+			return value, serializer.UInt64ByteSize, nil
+		}
+
+		p := slotstore.NewStore(index, prunableStores[index],
+			iotago.AccountID.Bytes,
+			iotago.IdentifierFromBytes,
+			uint64Bytes,
+			uint64FromBytes,
+		)
 
 		return p
 	}
@@ -62,7 +89,7 @@ func (t *TestSuite) InitRewardManager() {
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
 	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, api.SingleVersionProvider(t.API))
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, performanceFactorFunc, api.SingleVersionProvider(t.API))
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {

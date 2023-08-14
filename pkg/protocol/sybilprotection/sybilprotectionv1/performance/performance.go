@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -18,7 +18,7 @@ type Tracker struct {
 	poolStatsStore  *kvstore.TypedStore[iotago.EpochIndex, *PoolsStats]
 	committeeStore  *kvstore.TypedStore[iotago.EpochIndex, *account.Accounts]
 
-	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
+	performanceFactorsFunc func(slot iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64]
 
 	apiProvider api.Provider
 
@@ -30,7 +30,7 @@ func NewTracker(
 	rewardsBaseStore kvstore.KVStore,
 	poolStatsStore kvstore.KVStore,
 	committeeStore kvstore.KVStore,
-	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
+	performanceFactorsFunc func(slot iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64],
 	apiProvider api.Provider,
 ) *Tracker {
 	return &Tracker{

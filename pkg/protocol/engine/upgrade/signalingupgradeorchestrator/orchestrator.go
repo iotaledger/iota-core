@@ -11,11 +11,12 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	"github.com/iotaledger/iota-core/pkg/votes"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -57,8 +58,8 @@ type Orchestrator struct {
 	errorHandler      func(error)
 	lastCommittedSlot iotago.SlotIndex
 
-	latestSignals           *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignaledBlock]
-	upgradeSignalsFunc      func(slot iotago.SlotIndex) *prunable.UpgradeSignals
+	latestSignals           *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock]
+	upgradeSignalsFunc      func(slot iotago.SlotIndex) *slotstore.Store[account.SeatIndex, *model.SignaledBlock]
 	permanentUpgradeSignals *kvstore.TypedStore[iotago.EpochIndex, VersionAndHash]
 
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error
@@ -110,7 +111,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 
 func NewOrchestrator(errorHandler func(error),
 	permanentUpgradeSignal kvstore.KVStore,
-	upgradeSignalsFunc func(slot iotago.SlotIndex) *prunable.UpgradeSignals,
+	upgradeSignalsFunc func(slot iotago.SlotIndex) *slotstore.Store[account.SeatIndex, *model.SignaledBlock],
 	apiProvider api.Provider,
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error,
 	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error),
@@ -118,7 +119,7 @@ func NewOrchestrator(errorHandler func(error),
 	seatManager seatmanager.SeatManager, opts ...options.Option[Orchestrator]) *Orchestrator {
 	return options.Apply(&Orchestrator{
 		errorHandler:            errorHandler,
-		latestSignals:           memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignaledBlock](),
+		latestSignals:           memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock](),
 		permanentUpgradeSignals: kvstore.NewTypedStore(permanentUpgradeSignal, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, VersionAndHash.Bytes, VersionAndHashFromBytes),
 		upgradeSignalsFunc:      upgradeSignalsFunc,
 
@@ -143,7 +144,7 @@ func (o *Orchestrator) TrackValidationBlock(block *blocks.Block) {
 	if !isValidationBlock {
 		return
 	}
-	newSignaledBlock := prunable.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
+	newSignaledBlock := model.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
 
 	committee := o.seatManager.Committee(block.ID().Index())
 	seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
@@ -164,8 +165,8 @@ func (o *Orchestrator) TrackValidationBlock(block *blocks.Block) {
 	o.addNewSignaledBlock(latestSignalsForEpoch, seat, newSignaledBlock)
 }
 
-func (o *Orchestrator) addNewSignaledBlock(latestSignalsForEpoch *shrinkingmap.ShrinkingMap[account.SeatIndex, *prunable.SignaledBlock], seat account.SeatIndex, newSignaledBlock *prunable.SignaledBlock) {
-	latestSignalsForEpoch.Compute(seat, func(currentValue *prunable.SignaledBlock, exists bool) *prunable.SignaledBlock {
+func (o *Orchestrator) addNewSignaledBlock(latestSignalsForEpoch *shrinkingmap.ShrinkingMap[account.SeatIndex, *model.SignaledBlock], seat account.SeatIndex, newSignaledBlock *model.SignaledBlock) {
+	latestSignalsForEpoch.Compute(seat, func(currentValue *model.SignaledBlock, exists bool) *model.SignaledBlock {
 		if !exists {
 			return newSignaledBlock
 		}
@@ -187,7 +188,7 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 	o.evictionMutex.Lock()
 	defer o.evictionMutex.Unlock()
 
-	signaledBlockPerSeat := func() map[account.SeatIndex]*prunable.SignaledBlock {
+	signaledBlockPerSeat := func() map[account.SeatIndex]*model.SignaledBlock {
 		// Evict and get latest signals for slot.
 		latestSignalsForSlot := o.latestSignals.Evict(slot)
 		if latestSignalsForSlot == nil {
@@ -198,9 +199,11 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 
 		// Store upgrade signals for this slot.
 		upgradeSignals := o.upgradeSignalsFunc(slot)
-		if err := upgradeSignals.Store(signaledBlockPerSeat); err != nil {
-			o.errorHandler(ierrors.Wrap(err, "failed to store upgrade signals"))
-			return nil
+		for seat, signaledBlock := range signaledBlockPerSeat {
+			if err := upgradeSignals.Store(seat, signaledBlock); err != nil {
+				o.errorHandler(ierrors.Wrapf(err, "failed to store upgrade signals %d:%v", seat, signaledBlock))
+				return nil
+			}
 		}
 
 		// Merge latest signals for slot and next slot if next slot is in same epoch. I.e. we carry over the latest signals
@@ -222,7 +225,7 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 	return o.protocolParametersAndVersionsHashFunc()
 }
 
-func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoch bool, signaledBlockPerSeat map[account.SeatIndex]*prunable.SignaledBlock) {
+func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoch bool, signaledBlockPerSeat map[account.SeatIndex]*model.SignaledBlock) {
 	// If the threshold was reached in this epoch and this is the last slot of the epoch we want to evaluate whether the window threshold was reached potentially upgrade the version.
 	if signaledBlockPerSeat == nil || !lastSlotInEpoch {
 		return

@@ -6,8 +6,8 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -196,7 +196,7 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 				return ierrors.Wrapf(err, "unable to read destroyed flag for accountID %s", accountID)
 			}
 
-			accountDiff := prunable.NewAccountDiff()
+			accountDiff := model.NewAccountDiff()
 			if !destroyed {
 				if err := accountDiff.FromReader(reader); err != nil {
 					return ierrors.Wrapf(err, "unable to read account diff for accountID %s", accountID)
@@ -242,7 +242,7 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 			continue
 		}
 
-		if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff *prunable.AccountDiff, destroyed bool) bool {
+		if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff *model.AccountDiff, destroyed bool) bool {
 			if err = pWriter.WriteBytes(lo.PanicOnErr(accountID.Bytes())); err != nil {
 				innerErr = ierrors.Wrapf(err, "unable to write accountID for account %s", accountID)
 			}

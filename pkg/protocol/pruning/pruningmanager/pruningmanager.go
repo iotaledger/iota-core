@@ -21,8 +21,8 @@ import (
 // account diffs: prunable      |     slot finalized
 // roots: prunable              |     slot finalized
 // retainer: prunable           |     1 epoch?
-// protocol upgrades: prunable  |     7 epochs
 
+// protocol upgrades: prunable  |     7 epochs
 // pool stats: move to prunable        |     1 year
 // rewards: move to prunable           |     1 year
 

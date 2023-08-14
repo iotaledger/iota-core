@@ -17,7 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -43,8 +43,13 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		SeatManager: mock.NewManualPOA(),
 	}
 
-	evictionState := eviction.NewState(mapdb.NewMapDB(), func(index iotago.SlotIndex) *prunable.RootBlocks {
-		return prunable.NewRootBlocks(index, mapdb.NewMapDB())
+	evictionState := eviction.NewState(mapdb.NewMapDB(), func(index iotago.SlotIndex) *slotstore.Store[iotago.BlockID, iotago.CommitmentID] {
+		return slotstore.NewStore(index, mapdb.NewMapDB(),
+			iotago.SlotIdentifier.Bytes,
+			iotago.SlotIdentifierFromBytes,
+			iotago.SlotIdentifier.Bytes,
+			iotago.SlotIdentifierFromBytes,
+		)
 	})
 
 	t.blockCache = blocks.New(evictionState, api.SingleVersionProvider(tpkg.TestAPI))

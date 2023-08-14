@@ -18,7 +18,7 @@ func getSlotBlockIDs(index iotago.SlotIndex) (*BlockChangesResponse, error) {
 	includedBlocks := make([]string, 0)
 	tangleTree := ads.NewSet(mapdb.NewMapDB(), iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes)
 
-	_ = blocksForSlot.ForEachBlockIDInSlot(func(blockID iotago.BlockID) error {
+	_ = blocksForSlot.StreamKeys(func(blockID iotago.BlockID) error {
 		includedBlocks = append(includedBlocks, blockID.String())
 		if err := tangleTree.Add(blockID); err != nil {
 			return ierrors.Wrapf(err, "failed to add block to tangle tree, blockID: %s", blockID.ToHex())

@@ -7,7 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/core/account"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -21,14 +21,14 @@ func (o *Orchestrator) Import(reader io.ReadSeeker) error {
 	}
 	o.lastCommittedSlot = slot
 
-	upgradeSignalMap := make(map[account.SeatIndex]*prunable.SignaledBlock)
+	upgradeSignalMap := make(map[account.SeatIndex]*model.SignaledBlock)
 	if err := stream.ReadCollection(reader, func(i int) error {
 		seat, err := stream.Read[account.SeatIndex](reader)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to read seat")
 		}
 
-		signaledBlock, err := stream.ReadFunc(reader, prunable.SignaledBlockFromBytesFunc(o.apiProvider.APIForSlot(slot)))
+		signaledBlock, err := stream.ReadFunc(reader, model.SignaledBlockFromBytesFunc(o.apiProvider.APIForSlot(slot)))
 		if err != nil {
 			return ierrors.Wrap(err, "failed to read signaled block")
 		}
@@ -41,8 +41,11 @@ func (o *Orchestrator) Import(reader io.ReadSeeker) error {
 	}
 
 	upgradeSignals := o.upgradeSignalsFunc(slot)
-	if err := upgradeSignals.Store(upgradeSignalMap); err != nil {
-		return ierrors.Wrap(err, "failed to store upgrade signals")
+	for seat, signaledBlock := range upgradeSignalMap {
+		if err := upgradeSignals.Store(seat, signaledBlock); err != nil {
+			o.errorHandler(ierrors.Wrapf(err, "failed to store upgrade signals %d:%v", seat, signaledBlock))
+			return nil
+		}
 	}
 	// Load latest signals into cache into the next slot (necessary so that we have the correct information when we commit that slot).
 	latestSignals := o.latestSignals.Get(slot+1, true)

@@ -17,13 +17,9 @@ func (t *TestSuite) AssertStorageRootBlocks(blocks []*blocks.Block, nodes ...*mo
 					return ierrors.Errorf("AssertStorageRootBlocks: %s: storage for %s is nil", node.Name, block.ID().Index())
 				}
 
-				loadedBlockID, loadedCommitmentID, err := storage.Load(block.ID())
+				loadedCommitmentID, err := storage.Load(block.ID())
 				if err != nil {
 					return ierrors.Wrapf(err, "AssertStorageRootBlocks: %s: failed to load root block %s", node.Name, block.ID())
-				}
-
-				if block.ID() != loadedBlockID {
-					return ierrors.Errorf("AssertStorageRootBlocks: %s: expected block %s, got %s", node.Name, block.ID(), loadedBlockID)
 				}
 
 				if block.SlotCommitmentID() != loadedCommitmentID {
