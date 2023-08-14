@@ -1,8 +1,10 @@
 package prunable
 
 import (
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -15,6 +17,7 @@ import (
 type Prunable struct {
 	defaultPruningDelay iotago.EpochIndex
 	apiProvider         api.Provider
+	dbConfig            database.Config
 	manager             *Manager
 	errorHandler        func(error)
 
@@ -29,6 +32,7 @@ func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider a
 	semiPermanentDB := database.NewDBInstance(dbConfig)
 
 	return &Prunable{
+		dbConfig:            dbConfig,
 		defaultPruningDelay: pruningDelay,
 		apiProvider:         apiProvider,
 		errorHandler:        errorHandler,
@@ -56,8 +60,6 @@ func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
 	// prune prunable_epoch
 	start := lo.Return1(p.manager.LastPrunedEpoch()) + 1
 	for currentIndex := start; currentIndex <= epoch; currentIndex++ {
-		// TODO: does this cleans up entirely if an epoch is empty?
-		// ref: pkg/storage/prunable/manager.go: prune()
 		p.decidedUpgradeSignals.Prune(epoch)
 		p.poolRewards.Prune(epoch)
 		p.poolStats.Prune(epoch)
@@ -69,8 +71,12 @@ func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
 }
 
 func (p *Prunable) Size() int64 {
-	// TODO: add size of prunable_epoch
-	return p.manager.PrunableStorageSize()
+	semiSize, err := ioutils.FolderSize(p.dbConfig.Directory)
+	if err != nil {
+		p.errorHandler(ierrors.Wrapf(err, "get semiPermanentDB failed for %s", p.dbConfig.Directory))
+	}
+
+	return p.manager.PrunableStorageSize() + semiSize
 }
 
 func (p *Prunable) Shutdown() {
