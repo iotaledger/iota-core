@@ -35,27 +35,28 @@ func (c *CommittedSlotAPI) Commitment() (commitment *model.Commitment, err error
 }
 
 // Roots returns the roots of the slot.
-func (c *CommittedSlotAPI) Roots() (roots iotago.Roots, err error) {
+func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
 	if c.engine.Storage.Settings().LatestCommitment().Index() < c.slotIndex {
-		return roots, ierrors.Errorf("slot %d is not committed yet", c.slotIndex)
+		return nil, ierrors.Errorf("slot %d is not committed yet", c.slotIndex)
 	}
 
 	rootsStorage := c.engine.Storage.Roots(c.slotIndex)
 	if rootsStorage == nil {
-		return roots, ierrors.Errorf("no roots storage for slot %d", c.slotIndex)
+		return nil, ierrors.Errorf("no roots storage for slot %d", c.slotIndex)
 	}
 
 	rootsBytes, err := rootsStorage.Get(kvstore.Key{prunable.RootsKey})
 	if err != nil {
-		return roots, ierrors.Wrapf(err, "failed to load roots for slot %d", c.slotIndex)
+		return nil, ierrors.Wrapf(err, "failed to load roots for slot %d", c.slotIndex)
 	}
 
+	var roots iotago.Roots
 	_, err = c.engine.APIForSlot(c.slotIndex).Decode(rootsBytes, &roots)
 	if err != nil {
-		return roots, ierrors.Wrapf(err, "failed to decode roots for slot %d", c.slotIndex)
+		return nil, ierrors.Wrapf(err, "failed to decode roots for slot %d", c.slotIndex)
 	}
 
-	return roots, nil
+	return &roots, nil
 }
 
 // BlockIDs returns the accepted block IDs of the slot.

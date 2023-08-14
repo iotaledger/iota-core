@@ -295,7 +295,7 @@ func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
 	// receive the slotCommitment (or commit the slot ourselves).
 	if !slotCommitment.IsSolid().Get() {
 		if !p.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
-			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid slotCommitment buffer: slotcommitment: %s, block ID: %s", slotCommitmentID, block.ID())
+			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid slotCommitment buffer: slotcommitment: %s, block ID: %s", slotCommitment.ID(), block.ID())
 		}
 
 		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, block ID: %s", slotCommitment.ID(), block.ID())
