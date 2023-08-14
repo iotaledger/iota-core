@@ -104,11 +104,11 @@ func (m *Manager) tryCommitUntil(block *blocks.Block) {
 
 // IsBootstrapped returns if the Manager finished committing all pending slots up to the current acceptance time.
 func (m *Manager) IsBootstrapped() bool {
-	// If acceptance time is in slot 10, then the latest committable index is 3 (with minCommittableAge=6), because there are 6 full slots between slot 10 and slot 3.
-	// All slots smaller than 4 are committable, so in order to check if slot 3 is committed it's necessary to do m.minCommittableAge-1,
-	// otherwise we'd expect slot 4 to be committed in order to be fully committed, which is impossible.
+	// If acceptance time is somewhere in the middle of slot 10, then the latest committable index is 4 (with minCommittableAge=6),
+	//because there are 5 full slots and 1 that is still not finished between slot 10 and slot 4.
+	// All slots smaller or equal to 4 are committable.
 	latestIndex := m.storage.Settings().LatestCommitment().Index()
-	return latestIndex+m.minCommittableAge+1 >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())
+	return latestIndex+m.minCommittableAge >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
@@ -119,11 +119,6 @@ func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 	m.attestation.AddAttestationFromValidationBlock(block)
 
 	return
-}
-
-// MinCommittableAge returns the minimum age of a slot to be committable.
-func (m *Manager) MinCommittableAge() iotago.SlotIndex {
-	return m.minCommittableAge
 }
 
 func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
@@ -143,7 +138,7 @@ func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
 }
 
 func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool {
-	return index+m.minCommittableAge < acceptedBlockIndex
+	return index+m.minCommittableAge <= acceptedBlockIndex
 }
 
 func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
@@ -192,12 +187,20 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		protocolParametersAndVersionsHash,
 	)
 
+	// calculate the new RMC
+	rmc, err := m.ledger.RMCManager().CommitSlot(index)
+	if err != nil {
+		m.errorHandler(ierrors.Wrapf(err, "failed to commit RMC for slot %d", index))
+		return false
+	}
+
 	newCommitment := iotago.NewCommitment(
 		apiForSlot.ProtocolParameters().Version(),
 		index,
 		latestCommitment.ID(),
 		roots.ID(),
 		cumulativeWeight,
+		rmc,
 	)
 
 	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, apiForSlot, serix.WithValidation())

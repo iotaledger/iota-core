@@ -71,7 +71,7 @@ func (q *IssuerQueue) Submit(element *blocks.Block) bool {
 
 	q.submitted.Set(element.ID(), element)
 	q.size.Inc()
-	q.work.Add(int64(element.Work()))
+	q.work.Add(int64(element.WorkScore()))
 
 	return true
 }
@@ -84,7 +84,7 @@ func (q *IssuerQueue) Unsubmit(block *blocks.Block) bool {
 
 	q.submitted.Delete(block.ID())
 	q.size.Dec()
-	q.work.Sub(int64(block.Work()))
+	q.work.Sub(int64(block.WorkScore()))
 
 	return true
 }
@@ -133,7 +133,7 @@ func (q *IssuerQueue) PopFront() *blocks.Block {
 	}
 	blk := heapElement.Value
 	q.size.Dec()
-	q.work.Sub(int64(blk.Work()))
+	q.work.Sub(int64(blk.WorkScore()))
 
 	return blk
 }
@@ -166,7 +166,7 @@ func (q *IssuerQueue) RemoveTail() *blocks.Block {
 	}
 	blk := heapElement.Value
 	q.size.Dec()
-	q.work.Sub(int64(blk.Work()))
+	q.work.Sub(int64(blk.WorkScore()))
 
 	return blk
 }
