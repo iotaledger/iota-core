@@ -70,22 +70,8 @@ func (i *BlockIssuer) Shutdown() {
 func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BlockParams{}, opts)
 
-	if blockParams.IssuingTime == nil {
-		issuingTime := time.Now().UTC()
-		blockParams.IssuingTime = &issuingTime
-	}
-
-	if blockParams.SlotCommitment == nil {
-		var err error
-		blockParams.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime))
-		if err != nil {
-			return nil, ierrors.Wrap(err, "error getting commitment")
-		}
-	}
-
-	if blockParams.LatestFinalizedSlot == nil {
-		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
-		blockParams.LatestFinalizedSlot = &latestFinalizedSlot
+	if err := i.setDefaultBlockParams(blockParams); err != nil {
+		return nil, err
 	}
 
 	if blockParams.References == nil {
@@ -95,10 +81,6 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 			return nil, ierrors.Wrap(err, "error building block")
 		}
 		blockParams.References = references
-	}
-
-	if blockParams.Issuer == nil {
-		blockParams.Issuer = NewEd25519Account(i.Account.ID(), i.Account.PrivateKey())
 	}
 
 	if blockParams.HighestSupportedVersion == nil {
@@ -198,22 +180,8 @@ func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitm
 func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BlockParams{}, opts)
 
-	if blockParams.IssuingTime == nil {
-		issuingTime := time.Now().UTC()
-		blockParams.IssuingTime = &issuingTime
-	}
-
-	if blockParams.SlotCommitment == nil {
-		var err error
-		blockParams.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime))
-		if err != nil {
-			return nil, ierrors.Wrap(err, "error getting commitment")
-		}
-	}
-
-	if blockParams.LatestFinalizedSlot == nil {
-		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
-		blockParams.LatestFinalizedSlot = &latestFinalizedSlot
+	if err := i.setDefaultBlockParams(blockParams); err != nil {
+		return nil, err
 	}
 
 	if blockParams.References == nil {
@@ -222,10 +190,6 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Bl
 			return nil, ierrors.Wrap(err, "error building block")
 		}
 		blockParams.References = references
-	}
-
-	if blockParams.Issuer == nil {
-		blockParams.Issuer = NewEd25519Account(i.Account.ID(), i.Account.PrivateKey())
 	}
 
 	if err := i.validateReferences(*blockParams.IssuingTime, blockParams.SlotCommitment.Index, blockParams.References); err != nil {
@@ -437,6 +401,32 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	return modelBlock.ID(), nil
+}
+
+func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockParams) error {
+	if blockParams.IssuingTime == nil {
+		issuingTime := time.Now().UTC()
+		blockParams.IssuingTime = &issuingTime
+	}
+
+	if blockParams.SlotCommitment == nil {
+		var err error
+		blockParams.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime))
+		if err != nil {
+			return ierrors.Wrap(err, "error getting commitment")
+		}
+	}
+
+	if blockParams.LatestFinalizedSlot == nil {
+		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
+		blockParams.LatestFinalizedSlot = &latestFinalizedSlot
+	}
+
+	if blockParams.Issuer == nil {
+		blockParams.Issuer = NewEd25519Account(i.Account.ID(), i.Account.PrivateKey())
+	}
+
+	return nil
 }
 
 func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, strongParentsCountOpt ...int) (model.ParentReferences, error) {
