@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func issueValidatorBlock(ctx context.Context) {
@@ -29,12 +28,20 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
+	protocolParametersHash, err := deps.Protocol.CurrentAPI().ProtocolParameters().Hash()
+	if err != nil {
+		Component.LogWarnf("failed to get protocol parameters hash: %s", err.Error())
+
+		return
+	}
+
 	modelBlock, err := deps.BlockIssuer.CreateValidationBlock(ctx,
-		blockfactory.WithIssuingTime(blockIssuingTime),
-		blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
-		blockfactory.WithPayload(&iotago.TaggedData{
-			Tag: []byte("VALIDATOR BLOCK"),
-		}),
+		blockfactory.WithValidationBlockHeaderOptions(
+			blockfactory.WithIssuingTime(blockIssuingTime),
+			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
+		),
+		blockfactory.WithProtocolParametersHash(protocolParametersHash),
+		blockfactory.WithHighestSupportedVersion(deps.Protocol.LatestAPI().Version()),
 	)
 	if err != nil {
 		Component.LogWarnf("error creating validator block: %s", err.Error())

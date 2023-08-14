@@ -48,10 +48,12 @@ type Node struct {
 
 	blockIssuer *blockfactory.BlockIssuer
 
-	privateKey ed25519.PrivateKey
-	PubKey     ed25519.PublicKey
-	AccountID  iotago.AccountID
-	PeerID     network.PeerID
+	privateKey              ed25519.PrivateKey
+	PubKey                  ed25519.PublicKey
+	AccountID               iotago.AccountID
+	PeerID                  network.PeerID
+	protocolParametersHash  iotago.Identifier
+	highestSupportedVersion iotago.Version
 
 	Partition string
 	Endpoint  *Endpoint
@@ -447,7 +449,31 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 	n.Validator = otherNode.Validator
 }
 
-func (n *Node) CreateValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+func (n *Node) ProtocolParametersHash() iotago.Identifier {
+	if n.protocolParametersHash == iotago.EmptyIdentifier {
+		return lo.PanicOnErr(n.Protocol.CurrentAPI().ProtocolParameters().Hash())
+	}
+
+	return n.protocolParametersHash
+}
+
+func (n *Node) SetProtocolParametersHash(hash iotago.Identifier) {
+	n.protocolParametersHash = hash
+}
+
+func (n *Node) HighestSupportedVersion() iotago.Version {
+	if n.highestSupportedVersion == 0 {
+		return n.Protocol.LatestAPI().Version()
+	}
+
+	return n.highestSupportedVersion
+}
+
+func (n *Node) SetHighestSupportedVersion(version iotago.Version) {
+	n.highestSupportedVersion = version
+}
+
+func (n *Node) CreateValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
 	modelBlock, err := n.blockIssuer.CreateValidationBlock(ctx, opts...)
 	require.NoError(n.Testing, err)
 
@@ -456,7 +482,7 @@ func (n *Node) CreateValidationBlock(ctx context.Context, alias string, opts ...
 	return blocks.NewBlock(modelBlock)
 }
 
-func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BasicBlockParams]) *blocks.Block {
 	modelBlock, err := n.blockIssuer.CreateBlock(ctx, opts...)
 	require.NoError(n.Testing, err)
 
@@ -465,7 +491,7 @@ func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Op
 	return blocks.NewBlock(modelBlock)
 }
 
-func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BasicBlockParams]) *blocks.Block {
 	block := n.CreateBlock(ctx, alias, opts...)
 
 	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, alias)
@@ -475,7 +501,7 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 	return block
 }
 
-func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
+func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
 	block := n.CreateValidationBlock(ctx, alias, opts...)
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
@@ -504,12 +530,9 @@ func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup, startSlot 
 			blockAlias := fmt.Sprintf("%s-activity.%d", n.Name, counter)
 			timeOffset := time.Since(start)
 			n.IssueValidationBlock(ctx, blockAlias,
-				blockfactory.WithPayload(
-					&iotago.TaggedData{
-						Tag: []byte(blockAlias),
-					},
+				blockfactory.WithValidationBlockHeaderOptions(
+					blockfactory.WithIssuingTime(issuingTime.Add(timeOffset)),
 				),
-				blockfactory.WithIssuingTime(issuingTime.Add(timeOffset)),
 			)
 
 			counter++
