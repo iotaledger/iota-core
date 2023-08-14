@@ -1,21 +1,16 @@
 package accountsfilter
 
 import (
-	"fmt"
-	"sync"
-
-	"github.com/iotaledger/hive.go/core/memstorage"
+	"github.com/iotaledger/hive.go/core/safemath"
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -29,19 +24,15 @@ var (
 type CommitmentFilter struct {
 	// Events contains the Events of the CommitmentFilter
 	events *commitmentfilter.Events
-	// futureBlocks contains blocks with a commitment in the future, that should not be passed to the blockdag yet.
-	futureBlocks *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*model.Block]]
 
 	apiProvider api.Provider
 
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
 	commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error)
 
+	rmcRetrieveFunc func(iotago.SlotIndex) (iotago.Mana, error)
+
 	accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (*accounts.AccountData, bool, error)
-
-	futureBlocksMutex sync.RWMutex
-
-	nextIndexToPromote iotago.SlotIndex
 
 	module.Module
 }
@@ -55,11 +46,11 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 
 			c.accountRetrieveFunc = e.Ledger.Account
 
-			e.Events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				c.PromoteFutureBlocksUntil(details.Commitment.Index())
+			e.Ledger.HookConstructed(func() {
+				c.rmcRetrieveFunc = e.Ledger.RMCManager().RMC
 			})
 
-			e.Events.Filter.BlockPreAllowed.Hook(c.ProcessPreFilteredBlock)
+			e.Events.BlockDAG.BlockSolid.Hook(c.ProcessPreFilteredBlock)
 			e.Events.CommitmentFilter.LinkTo(c.events)
 
 			c.TriggerInitialized()
@@ -71,63 +62,19 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 
 func New(apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
 	return options.Apply(&CommitmentFilter{
-		apiProvider:  apiProvider,
-		events:       commitmentfilter.NewEvents(),
-		futureBlocks: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, ds.Set[*model.Block]](),
+		apiProvider: apiProvider,
+		events:      commitmentfilter.NewEvents(),
 	}, opts,
 	)
 }
 
-func (c *CommitmentFilter) PromoteFutureBlocksUntil(index iotago.SlotIndex) {
-	c.futureBlocksMutex.Lock()
-	defer c.futureBlocksMutex.Unlock()
-
-	for i := c.nextIndexToPromote; i <= index; i++ {
-		cm, err := c.commitmentFunc(i)
-		if err != nil {
-			panic(fmt.Sprintf("failed to load commitment for index %d: %s", i, err))
-		}
-		if storage := c.futureBlocks.Get(i, false); storage != nil {
-			if futureBlocks, exists := storage.Get(cm.ID()); exists {
-				_ = futureBlocks.ForEach(func(futureBlock *model.Block) (err error) {
-					c.evaluateBlock(futureBlock)
-					return nil
-				})
-			}
-		}
-		c.futureBlocks.Evict(i)
-	}
-
-	c.nextIndexToPromote = index + 1
-}
-
-func (c *CommitmentFilter) isFutureBlock(block *model.Block) (isFutureBlock bool) {
-	c.futureBlocksMutex.RLock()
-	defer c.futureBlocksMutex.RUnlock()
-
-	// If we are not able to load the commitment for the block, it means we haven't committed this slot yet.
-	if _, err := c.commitmentFunc(block.ProtocolBlock().SlotCommitmentID.Index()); err != nil {
-		lo.Return1(c.futureBlocks.Get(block.ProtocolBlock().SlotCommitmentID.Index(), true).GetOrCreate(block.ProtocolBlock().SlotCommitmentID, func() ds.Set[*model.Block] {
-			return ds.NewSet[*model.Block]()
-		})).Add(block)
-
-		return true
-	}
-
-	return false
-}
-
-func (c *CommitmentFilter) ProcessPreFilteredBlock(block *model.Block) {
-	if c.isFutureBlock(block) {
-		return
-	}
-
+func (c *CommitmentFilter) ProcessPreFilteredBlock(block *blocks.Block) {
 	c.evaluateBlock(block)
 }
 
-func (c *CommitmentFilter) evaluateBlock(block *model.Block) {
+func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	// check if the account exists in the specified slot.
-	accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Index())
+	accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Index())
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
@@ -143,6 +90,47 @@ func (c *CommitmentFilter) evaluateBlock(block *model.Block) {
 		})
 
 		return
+	}
+
+	// get the api for the block
+	blockAPI, err := c.apiProvider.APIForVersion(block.ProtocolBlock().BlockHeader.ProtocolVersion)
+	if err != nil {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(err, "could not retrieve API for block version %d", block.ProtocolBlock().BlockHeader.ProtocolVersion),
+		})
+	}
+	// check that the block burns sufficient Mana
+	blockSlot := blockAPI.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
+	rmcSlot, err := safemath.SafeSub(blockSlot, blockAPI.ProtocolParameters().MaxCommittableAge())
+	if err != nil {
+		rmcSlot = 0
+	}
+	rmc, err := c.rmcRetrieveFunc(rmcSlot)
+	if err != nil {
+		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(err, "could not retrieve RMC for slot commitment %s", rmcSlot),
+		})
+
+		return
+	}
+	if basicBlock, isBasic := block.BasicBlock(); isBasic {
+		manaCost, err := basicBlock.ManaCost(rmc)
+		if err != nil {
+			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Wrapf(err, "could not calculate Mana cost for block"),
+			})
+		}
+		if basicBlock.BurnedMana < manaCost {
+			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, rmc, basicBlock.BurnedMana),
+			})
+
+			return
+		}
 	}
 
 	// Check that the issuer of this block has non-negative block issuance credit
@@ -183,7 +171,7 @@ func (c *CommitmentFilter) evaluateBlock(block *model.Block) {
 
 		return
 	}
-	signingMessage, err := block.ProtocolBlock().SigningMessage(c.apiProvider.LatestAPI())
+	signingMessage, err := block.ProtocolBlock().SigningMessage(blockAPI)
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,

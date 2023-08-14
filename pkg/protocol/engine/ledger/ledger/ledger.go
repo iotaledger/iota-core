@@ -17,11 +17,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/mana"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/rmc"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -37,6 +39,7 @@ type Ledger struct {
 	utxoLedger               *utxoledger.Manager
 	accountsLedger           *accountsledger.Manager
 	manaManager              *mana.Manager
+	rmcManager               *rmc.Manager
 	sybilProtection          sybilprotection.SybilProtection
 	commitmentLoader         func(iotago.SlotIndex) (*model.Commitment, error)
 	memPool                  mempool.MemPool[ledger.BlockVoteRank]
@@ -71,13 +74,16 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
-			// TODO: how do we want to handle changing API here?
-			iotagoAPI := l.apiProvider.CurrentAPI()
-			l.manaManager = mana.NewManager(iotagoAPI.ManaDecayProvider(), iotagoAPI.ProtocolParameters().RentStructure(), l.resolveAccountOutput)
-			l.accountsLedger.SetCommitmentEvictionAge(iotagoAPI.ProtocolParameters().MaxCommittableAge())
-			l.accountsLedger.SetLatestCommittedSlot(e.Storage.Settings().LatestCommitment().Index())
+			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput)
+			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Index()
+			l.accountsLedger.SetLatestCommittedSlot(latestCommittedSlot)
+			l.rmcManager.SetLatestCommittedSlot(latestCommittedSlot)
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
+
+			e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
+				l.memPool.PublishCommitmentState(scd.Commitment.Commitment())
+			})
 
 			e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 				l.utxoLedger.WriteLockLedger()
@@ -110,7 +116,8 @@ func New(
 	return &Ledger{
 		events:           ledger.NewEvents(),
 		apiProvider:      apiProvider,
-		accountsLedger:   accountsledger.New(blocksFunc, slotDiffFunc, accountsStore),
+		accountsLedger:   accountsledger.New(apiProvider, blocksFunc, slotDiffFunc, accountsStore),
+		rmcManager:       rmc.NewManager(apiProvider, commitmentLoader),
 		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
@@ -207,11 +214,15 @@ func (l *Ledger) AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error
 	return l.utxoLedger.AddGenesisUnspentOutput(unspentOutput)
 }
 
-func (l *Ledger) BlockAccepted(block *blocks.Block) {
+func (l *Ledger) TrackBlock(block *blocks.Block) {
 	l.accountsLedger.TrackBlock(block)
 
 	if _, hasTransaction := block.Transaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
+	}
+
+	if err := l.rmcManager.BlockAccepted(block); err != nil {
+		l.errorHandler(err)
 	}
 }
 
@@ -224,7 +235,7 @@ func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.S
 }
 
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
-	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
+	stateWithMetadata, err := l.memPool.OutputStateMetadata(outputID.UTXOInput())
 	if err != nil {
 		return nil, err
 	}
@@ -339,6 +350,10 @@ func (l *Ledger) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) err
 
 func (l *Ledger) ManaManager() *mana.Manager {
 	return l.manaManager
+}
+
+func (l *Ledger) RMCManager() *rmc.Manager {
+	return l.rmcManager
 }
 
 func (l *Ledger) Shutdown() {
@@ -557,7 +572,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 		{
 			// input side
 			for _, inputRef := range inputRefs {
-				inputState, outputErr := l.Output(inputRef.Ref())
+				inputState, outputErr := l.Output(inputRef.OutputID())
 				if outputErr != nil {
 					err = ierrors.Errorf("failed to retrieve outputs of %s: %w", txID, errInput)
 					return false
@@ -568,7 +583,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 			}
 
 			// output side
-			txWithMeta.Outputs().Range(func(stateMetadata mempool.StateMetadata) {
+			txWithMeta.Outputs().Range(func(stateMetadata mempool.OutputStateMetadata) {
 				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationTime, stateMetadata.State().Output())
 				outputs = append(outputs, output)
 			})
@@ -611,9 +626,12 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 }
 
 func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (*utxoledger.Output, error) {
-	accountMetadata, _, err := l.accountsLedger.Account(accountID, slotIndex)
+	accountMetadata, exists, err := l.accountsLedger.Account(accountID, slotIndex)
 	if err != nil {
 		return nil, ierrors.Errorf("could not get account information for account %s in slot %d: %w", accountID, slotIndex, err)
+	}
+	if !exists {
+		return nil, ierrors.Errorf("account %s does not exist in slot %d: %w", accountID, slotIndex, mempool.ErrStateNotFound)
 	}
 
 	l.utxoLedger.ReadLockLedger()
@@ -645,22 +663,34 @@ func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[mempool.St
 	case iotago.InputUTXO:
 		//nolint:forcetypeassert // we can safely assume that this is an UTXOInput
 		concreteStateRef := stateRef.(*iotago.UTXOInput)
-		isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(concreteStateRef.Ref())
+		isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(concreteStateRef.OutputID())
 		if err != nil {
-			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "error while retrieving output %s: %w", concreteStateRef.Ref(), err))
+			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "error while retrieving output %s: %w", concreteStateRef.OutputID(), err))
 		}
 
 		if !isUnspent {
-			return p.Reject(ierrors.Join(iotago.ErrInputAlreadySpent, ierrors.Wrapf(mempool.ErrStateNotFound, "unspent output %s not found", concreteStateRef.Ref())))
+			return p.Reject(ierrors.Join(iotago.ErrInputAlreadySpent, ierrors.Wrapf(mempool.ErrStateNotFound, "unspent output %s not found", concreteStateRef.OutputID())))
 		}
 
 		// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
-		output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(concreteStateRef.Ref())
+		output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(concreteStateRef.OutputID())
 		if err != nil {
-			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "output %s not found: %w", concreteStateRef.Ref(), mempool.ErrStateNotFound))
+			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "output %s not found: %w", concreteStateRef.OutputID(), mempool.ErrStateNotFound))
 		}
 
 		return p.Resolve(output)
+	case iotago.InputCommitment:
+		//nolint:forcetypeassert // we can safely assume that this is an CommitmentInput
+		concreteStateRef := stateRef.(*iotago.CommitmentInput)
+		loadedCommitment, err := l.loadCommitment(concreteStateRef.CommitmentID)
+		if err != nil {
+			return p.Reject(ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.Wrapf(err, "failed to load commitment %s", concreteStateRef.CommitmentID)))
+		}
+
+		return p.Resolve(loadedCommitment)
+	case iotago.InputBlockIssuanceCredit, iotago.InputReward:
+		// these are always resolved as they depend on the commitment or UTXO inputs
+		return p.Resolve(stateRef)
 	default:
 		return p.Reject(ierrors.Errorf("unsupported input type %s", stateRef.Type()))
 	}
@@ -679,6 +709,26 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 		//  Do we track witness weight of invalid blocks?
 		l.errorHandler(ierrors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
+}
+
+func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.Commitment, error) {
+	c, err := l.commitmentLoader(inputCommitmentID.Index())
+	if err != nil {
+		return nil, ierrors.Wrap(err, "could not get commitment inputs")
+	}
+	// The commitment with the specified ID was not found at that index: we are on a different chain.
+	if c == nil {
+		return nil, ierrors.Errorf("commitment with ID %s not found at index %d: engine on different chain", inputCommitmentID, inputCommitmentID.Index())
+	}
+	storedCommitmentID, err := c.Commitment().ID()
+	if err != nil {
+		return nil, ierrors.Wrap(err, "could not compute commitment ID")
+	}
+	if storedCommitmentID != inputCommitmentID {
+		return nil, ierrors.Errorf("commitment ID of input %s different to stored commitment %s", inputCommitmentID, storedCommitmentID)
+	}
+
+	return c.Commitment(), nil
 }
 
 func getAccountDiff(accountDiffs map[iotago.AccountID]*prunable.AccountDiff, accountID iotago.AccountID) *prunable.AccountDiff {

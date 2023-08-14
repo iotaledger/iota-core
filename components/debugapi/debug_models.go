@@ -23,7 +23,6 @@ type (
 		Solid        bool `json:"solid"`
 		Invalid      bool `json:"invalid"`
 		Booked       bool `json:"booked"`
-		Future       bool `json:"future"`
 		PreAccepted  bool `json:"preAccepted"`
 		Accepted     bool `json:"accepted"`
 		PreConfirmed bool `json:"preConfirmed"`
@@ -70,7 +69,6 @@ func BlockMetadataResponseFromBlock(block *blocks.Block) *BlockMetadataResponse 
 		Solid:              block.IsSolid(),
 		Invalid:            block.IsInvalid(),
 		Booked:             block.IsBooked(),
-		Future:             block.IsFuture(),
 		PreAccepted:        block.IsPreAccepted(),
 		Accepted:           block.IsAccepted(),
 		PreConfirmed:       block.IsPreConfirmed(),

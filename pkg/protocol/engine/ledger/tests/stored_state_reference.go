@@ -1,14 +1,19 @@
 package ledgertests
 
 import (
+	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // StoredStateReference is a reference to a State that is stored in the ledger state.
 type StoredStateReference iotago.OutputID
 
+func (l StoredStateReference) StateID() iotago.Identifier {
+	return iotago.IdentifierFromData(lo.PanicOnErr(l.OutputID().Bytes()))
+}
+
 // Type returns the type of the StateReference.
-func (l StoredStateReference) Type() iotago.InputType {
+func (l StoredStateReference) Type() iotago.StateType {
 	return 0
 }
 
@@ -22,8 +27,8 @@ func (l StoredStateReference) WorkScore(_ *iotago.WorkScoreStructure) (iotago.Wo
 	return 0, nil
 }
 
-// Ref returns the ID of the referenced State in the ledger state.
-func (l StoredStateReference) Ref() iotago.OutputID {
+// OutputID returns the ID of the referenced State in the ledger state.
+func (l StoredStateReference) OutputID() iotago.OutputID {
 	return iotago.OutputID(l)
 }
 

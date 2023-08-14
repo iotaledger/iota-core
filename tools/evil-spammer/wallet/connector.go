@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
@@ -175,12 +176,34 @@ type Client interface {
 	GetTransaction(txID iotago.TransactionID) (resp *iotago.Transaction, err error)
 	// GetBlockIssuance returns the latest commitment and data needed to create a new block.
 	GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error)
+
+	api.Provider
 }
 
 // WebClient contains a GoShimmer web API to interact with a node.
 type WebClient struct {
 	client *nodeclient.Client
 	url    string
+}
+
+func (c *WebClient) APIForVersion(version iotago.Version) (iotago.API, error) {
+	return c.client.APIForVersion(version)
+}
+
+func (c *WebClient) APIForSlot(index iotago.SlotIndex) iotago.API {
+	return c.client.APIForSlot(index)
+}
+
+func (c *WebClient) APIForEpoch(index iotago.EpochIndex) iotago.API {
+	return c.client.APIForEpoch(index)
+}
+
+func (c *WebClient) CurrentAPI() iotago.API {
+	return c.client.CurrentAPI()
+}
+
+func (c *WebClient) LatestAPI() iotago.API {
+	return c.client.LatestAPI()
 }
 
 // URL returns a client API Url.

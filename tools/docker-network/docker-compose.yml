@@ -14,7 +14,7 @@ services:
       --blockIssuer.rateSetterEnabled=true
       --blockIssuer.issuerAccount=0x907c02e9302e0f0571f10f885594e56d8c54ff0708ab7a39bc1b74d396b93b12
       --blockIssuer.privateKey=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
-      --activity.ignoreBootstrapped=true
+      --validator.ignoreBootstrapped=true
       --restAPI.allowIncompleteBlock=true
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029

@@ -1,7 +1,6 @@
 package testsuite
 
 import (
-	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -29,7 +28,7 @@ type TransactionFramework struct {
 
 func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, accounts ...snapshotcreator.AccountDetails) *TransactionFramework {
 	// The genesis output is on index 0 of the genesis TX
-	genesisOutput, err := protocol.MainEngineInstance().Ledger.Output(iotago.OutputID{})
+	genesisOutput, err := protocol.MainEngineInstance().Ledger.Output(iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 0))
 	if err != nil {
 		panic(err)
 	}
@@ -43,9 +42,8 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 
 	for idx := range accounts {
 		// Genesis TX
-		outputID := iotago.OutputID{}
-		// Accounts start from index 1 of the genesis TX
-		binary.LittleEndian.PutUint16(outputID[iotago.TransactionIDLength:], uint16(idx+1))
+		outputID := iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, uint16(idx+1))
+
 		if tf.states[fmt.Sprintf("Genesis:%d", idx+1)], err = protocol.MainEngineInstance().Ledger.Output(outputID); err != nil {
 			panic(err)
 		}

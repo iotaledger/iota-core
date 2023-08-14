@@ -13,10 +13,10 @@ type StateDiff interface {
 	Index() iotago.SlotIndex
 
 	// DestroyedStates returns a compacted list of all the states that were destroyed in the slot.
-	DestroyedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, StateMetadata]
+	DestroyedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, OutputStateMetadata]
 
 	// CreatedStates returns a compacted list of all the states that were created in the slot.
-	CreatedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, StateMetadata]
+	CreatedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, OutputStateMetadata]
 
 	// ExecutedTransactions returns an un-compacted list of all the transactions that were executed in the slot.
 	ExecutedTransactions() *orderedmap.OrderedMap[iotago.TransactionID, TransactionMetadata]

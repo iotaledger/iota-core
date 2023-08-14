@@ -10,15 +10,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Manager is used to access stored and potential mana of an account in order.
 // For stored Mana added to account, or stored/potential Mana spent, we will update on commitment.
 // For potential Mana updates and decay, we update on demand if the Mana vector is accessed (by the scheduler).
 type Manager struct {
-	manaDecayProvider *iotago.ManaDecayProvider
-
-	rentStructure *iotago.RentStructure
+	apiProvider api.Provider
 
 	manaVectorCache *cache.Cache[iotago.AccountID, *accounts.Mana]
 
@@ -29,10 +28,9 @@ type Manager struct {
 	module.Module
 }
 
-func NewManager(manaDecayProvider *iotago.ManaDecayProvider, rentStructure *iotago.RentStructure, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
+func NewManager(apiProvider api.Provider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
 	return &Manager{
-		manaDecayProvider:        manaDecayProvider,
-		rentStructure:            rentStructure,
+		apiProvider:              apiProvider,
 		accountOutputResolveFunc: accountOutputResolveFunc,
 		manaVectorCache:          cache.New[iotago.AccountID, *accounts.Mana](10000),
 	}
@@ -48,7 +46,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		if err != nil {
 			return 0, ierrors.Errorf("failed to resolve AccountOutput for %s in slot %s: %w", accountID, currentSlot, err)
 		}
-		minDeposit := m.rentStructure.MinDeposit(output.Output())
+		minDeposit := m.apiProvider.CurrentAPI().ProtocolParameters().RentStructure().MinDeposit(output.Output())
 		if output.BaseTokenAmount() <= minDeposit {
 			mana = accounts.NewMana(output.StoredMana(), 0, output.CreationTime())
 		} else {
@@ -62,15 +60,16 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		return mana.Value(), nil
 	}
 
+	manaDecayProvider := m.apiProvider.CurrentAPI().ManaDecayProvider()
 	// apply decay to stored Mana and potential that was added on last update
-	manaStored, err := m.manaDecayProvider.StoredManaWithDecay(mana.Value(), mana.UpdateTime(), currentSlot)
+	manaStored, err := manaDecayProvider.StoredManaWithDecay(mana.Value(), mana.UpdateTime(), currentSlot)
 	if err != nil {
 		return 0, err
 	}
 	updatedValue := manaStored
 
 	// get newly generated potential since last update and apply decay
-	manaPotential, err := m.manaDecayProvider.PotentialManaWithDecay(mana.ExcessBaseTokens(), mana.UpdateTime(), currentSlot)
+	manaPotential, err := manaDecayProvider.PotentialManaWithDecay(mana.ExcessBaseTokens(), mana.UpdateTime(), currentSlot)
 	if err != nil {
 		return 0, err
 	}
@@ -92,7 +91,7 @@ func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts ds.Set
 	for accountID, output := range accountOutputs {
 		mana, exists := m.manaVectorCache.Get(accountID)
 		if exists {
-			minDeposit := m.rentStructure.MinDeposit(output.Output())
+			minDeposit := m.apiProvider.CurrentAPI().ProtocolParameters().RentStructure().MinDeposit(output.Output())
 			if output.BaseTokenAmount() <= minDeposit {
 				mana.Update(output.StoredMana(), 0, slotIndex)
 			} else {

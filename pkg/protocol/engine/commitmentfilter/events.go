@@ -2,12 +2,12 @@ package commitmentfilter
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 
 type Events struct {
 	BlockFiltered *event.Event1[*BlockFilteredEvent]
-	BlockAllowed  *event.Event1[*model.Block]
+	BlockAllowed  *event.Event1[*blocks.Block]
 
 	event.Group[Events, *Events]
 }
@@ -15,11 +15,11 @@ type Events struct {
 var NewEvents = event.CreateGroupConstructor(func() *Events {
 	return &Events{
 		BlockFiltered: event.New1[*BlockFilteredEvent](),
-		BlockAllowed:  event.New1[*model.Block](),
+		BlockAllowed:  event.New1[*blocks.Block](),
 	}
 })
 
 type BlockFilteredEvent struct {
-	Block  *model.Block
+	Block  *blocks.Block
 	Reason error
 }

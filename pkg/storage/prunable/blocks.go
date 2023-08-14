@@ -66,3 +66,27 @@ func (b *Blocks) ForEachBlockIDInSlot(consumer func(blockID iotago.BlockID) erro
 
 	return nil
 }
+
+func (b *Blocks) ForEachBlockInSlot(consumer func(block *model.Block) error) error {
+	var innerErr error
+	if err := b.store.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
+		var id iotago.BlockID
+		id, _, innerErr = iotago.SlotIdentifierFromBytes(key)
+		var block *model.Block
+		block, innerErr = model.BlockFromIDAndBytes(id, value, b.apiProvider.APIForSlot(b.slot))
+
+		if innerErr != nil {
+			return false
+		}
+
+		return consumer(block) == nil
+	}); err != nil {
+		return ierrors.Wrapf(err, "failed to stream blocks for slot %s", b.slot)
+	}
+
+	if innerErr != nil {
+		return ierrors.Wrapf(innerErr, "failed to deserialize blocks for slot %s", b.slot)
+	}
+
+	return nil
+}

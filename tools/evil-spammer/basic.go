@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -26,7 +27,7 @@ type CustomSpamParams struct {
 }
 
 func CustomSpam(params *CustomSpamParams) {
-	outputID := iotago.EmptyOutputID
+	outputID := iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 0)
 	if params.config.LastFaucetUnspentOutputID != "" {
 		outputID, _ = iotago.OutputIDFromHex(params.config.LastFaucetUnspentOutputID)
 	}

@@ -47,8 +47,7 @@ func Test_TransitionAccount(t *testing.T) {
 	node1 := ts.AddValidatorNode("node1")
 	_ = ts.AddNode("node2")
 
-	ts.Run(map[string][]options.Option[protocol.Protocol]{})
-	ts.HookLogging()
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	genesisAccount := ts.AccountOutput("Genesis:1")
 	genesisAccountOutput := genesisAccount.Output().(*iotago.AccountOutput)
@@ -113,8 +112,8 @@ func Test_TransitionAccount(t *testing.T) {
 
 	// commit until the expiry slot of the transitioned genesis account plus one
 	latestParent = ts.CommitUntilSlot(accountOutputs[0].FeatureSet().BlockIssuer().ExpirySlot+1, activeNodes, latestParent)
-	// set the expiry slof of the transitioned genesis account to the latest committed + Max CommittableAge + 1
-	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index() + ts.API.ProtocolParameters().MaxCommittableAge() + 1
+	// set the expiry slof of the transitioned genesis account to the latest committed + MaxCommittableAge
+	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index() + ts.API.ProtocolParameters().MaxCommittableAge()
 	inputForNewAccount, newAccountOutputs, newAccountWallets := ts.TransactionFramework.CreateAccountFromInput("TX1:1",
 		testsuite.WithAccountConditions(iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
