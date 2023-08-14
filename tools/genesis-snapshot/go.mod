@@ -10,10 +10,10 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20230803080824-b9183942b168
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230803080824-b9183942b168
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230802140830-5a196b94e5f8
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230810150756-f4780f58482f
 	github.com/mr-tron/base58 v1.2.0
 	github.com/spf13/pflag v1.0.5
-	golang.org/x/crypto v0.11.0
+	golang.org/x/crypto v0.12.0
 )
 
 require (
@@ -46,7 +46,7 @@ require (
 	github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

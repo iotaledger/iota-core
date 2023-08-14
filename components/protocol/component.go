@@ -111,7 +111,7 @@ func provide(c *dig.Container) error {
 				slotnotarization.NewProvider(),
 			),
 			protocol.WithAttestationProvider(
-				slotattestation.NewProvider(slotattestation.DefaultAttestationCommitmentOffset),
+				slotattestation.NewProvider(),
 			),
 			protocol.WithFilterProvider(
 				blockfilter.NewProvider(
@@ -153,7 +153,7 @@ func configure() error {
 		Component.LogDebugf("BlockPreAllowed: %s - %s", blk.ID())
 	})
 
-	deps.Protocol.Events.Engine.CommitmentFilter.BlockAllowed.Hook(func(block *model.Block) {
+	deps.Protocol.Events.Engine.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("CommitmentFilter.BlockAllowed: %s\n", block.ID())
 	})
 

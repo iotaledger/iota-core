@@ -21,7 +21,6 @@ type Block struct {
 	missingBlockID      iotago.BlockID
 	solid               bool
 	invalid             bool
-	future              bool
 	strongChildren      []*Block
 	weakChildren        []*Block
 	shallowLikeChildren []*Block
@@ -254,28 +253,6 @@ func (b *Block) IsInvalid() (isInvalid bool) {
 	defer b.mutex.RUnlock()
 
 	return b.invalid
-}
-
-// IsFuture returns true if the Block is a future Block (we haven't committed to its commitment slot yet).
-func (b *Block) IsFuture() (isFuture bool) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
-	return b.future
-}
-
-// SetFuture marks the Block as future block.
-func (b *Block) SetFuture() (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if b.future {
-		return false
-	}
-
-	b.future = true
-
-	return true
 }
 
 // Children returns the children of the Block.
@@ -626,7 +603,6 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("Missing", b.missing))
 	builder.AddField(stringify.NewStructField("Solid", b.solid))
 	builder.AddField(stringify.NewStructField("Invalid", b.invalid))
-	builder.AddField(stringify.NewStructField("Future", b.future))
 	builder.AddField(stringify.NewStructField("Booked", b.booked))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
 	builder.AddField(stringify.NewStructField("PreAccepted", b.preAccepted))
@@ -670,15 +646,8 @@ func (b *Block) ModelBlock() *model.Block {
 	return b.modelBlock
 }
 
-func (b *Block) Work() int {
-	// TODO: define a work function which takes more than just payload size into account
-	// e.g. number of parents, payload type etc.
-	work := 1
+func (b *Block) WorkScore() iotago.WorkScore {
+	// TODO: enable work score calculate from iota.go
+	return iotago.WorkScore(1)
 
-	//payload := b.Payload()
-	//if payload != nil {
-	//	work += payload.Size()
-	//}
-
-	return work
 }

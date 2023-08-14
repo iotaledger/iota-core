@@ -104,8 +104,8 @@ func (o *SybilProtection) Shutdown() {
 	o.TriggerStopped()
 }
 
-func (o *SybilProtection) BlockAccepted(block *blocks.Block) {
-	o.performanceTracker.BlockAccepted(block)
+func (o *SybilProtection) TrackValidationBlock(block *blocks.Block) {
+	o.performanceTracker.TrackValidationBlock(block)
 }
 
 func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewardsRoot iotago.Identifier) {

@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/restapi"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/hexutil"
@@ -26,8 +25,8 @@ type SearchResult struct {
 }
 
 func setupExplorerRoutes(routeGroup *echo.Group) {
-	routeGroup.GET("/block/:"+restapi.ParameterBlockID, func(c echo.Context) (err error) {
-		blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+	routeGroup.GET("/block/:"+restapipkg.ParameterBlockID, func(c echo.Context) (err error) {
+		blockID, err := httpserver.ParseBlockIDParam(c, restapipkg.ParameterBlockID)
 		if err != nil {
 			return ierrors.Errorf("parse block ID error: %w", err)
 		}
@@ -84,9 +83,6 @@ func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 	}
 
 	cachedBlock, _ := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID)
-	if !exists {
-		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
-	}
 
 	// blockMetadata, exists := deps.Retainer.BlockMetadata(blockID)
 	// if !exists {
@@ -114,39 +110,45 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *Explore
 	}
 
 	t := &ExplorerBlock{
-		ID:                  block.ID().ToHex(),
-		ProtocolVersion:     iotaBlk.ProtocolVersion,
-		NetworkID:           iotaBlk.NetworkID,
-		IssuanceTimestamp:   iotaBlk.IssuingTime.Unix(),
-		IssuerID:            iotaBlk.IssuerID.String(),
-		Signature:           hexutil.EncodeHex(sigBytes),
-		StrongParents:       iotaBlk.Block.StrongParentIDs().ToHex(),
-		WeakParents:         iotaBlk.Block.WeakParentIDs().ToHex(),
-		ShallowLikedParents: iotaBlk.Block.ShallowLikeParentIDs().ToHex(),
+		ID:                      block.ID().ToHex(),
+		NetworkID:               iotaBlk.NetworkID,
+		ProtocolVersion:         iotaBlk.ProtocolVersion,
+		SolidificationTimestamp: 0,
+		IssuanceTimestamp:       iotaBlk.IssuingTime.Unix(),
+		SequenceNumber:          0,
+		IssuerID:                iotaBlk.IssuerID.String(),
+		Signature:               hexutil.EncodeHex(sigBytes),
+		StrongParents:           iotaBlk.Block.StrongParentIDs().ToHex(),
+		WeakParents:             iotaBlk.Block.WeakParentIDs().ToHex(),
+		ShallowLikedParents:     iotaBlk.Block.ShallowLikeParentIDs().ToHex(),
 
 		PayloadType: func() iotago.PayloadType {
 			if isBasic && basicBlock.Payload != nil {
 				return basicBlock.Payload.PayloadType()
 			}
+
 			return iotago.PayloadType(0)
 		}(),
+		Payload: func() json.RawMessage {
+			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
+				tx, _ := basicBlock.Payload.(*iotago.Transaction)
+				txResponse := NewTransaction(tx)
+				bytes, _ := json.Marshal(txResponse)
+
+				return bytes
+			}
+
+			return payloadJSON
+		}(),
 		TransactionID: func() string {
-			if basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
-				tx := basicBlock.Payload.(*iotago.Transaction)
+			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
+				tx, _ := basicBlock.Payload.(*iotago.Transaction)
 				id, _ := tx.ID(lo.PanicOnErr(deps.Protocol.APIForVersion(iotaBlk.ProtocolVersion)))
 
 				return id.ToHex()
 			}
-			return ""
-		}(),
-		Payload: func() json.RawMessage {
-			if basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
-				tx := NewTransaction(basicBlock.Payload.(*iotago.Transaction))
-				bytes, _ := json.Marshal(tx)
 
-				return bytes
-			}
-			return payloadJSON
+			return ""
 		}(),
 		CommitmentID: iotaBlk.SlotCommitmentID.ToHex(),
 
@@ -163,6 +165,21 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *Explore
 		t.Solid = cachedBlock.IsSolid()
 		t.Booked = cachedBlock.IsBooked()
 		t.Acceptance = cachedBlock.IsAccepted()
+		t.Confirmation = cachedBlock.IsConfirmed()
+		t.Scheduled = cachedBlock.IsScheduled()
+		t.ObjectivelyInvalid = cachedBlock.IsInvalid()
+		t.StrongChildren = lo.Map(cachedBlock.StrongChildren(), func(childBlock *blocks.Block) string {
+			return childBlock.ID().String()
+		})
+		t.WeakChildren = lo.Map(cachedBlock.WeakChildren(), func(childBlock *blocks.Block) string {
+			return childBlock.ID().String()
+		})
+		t.LikedInsteadChildren = lo.Map(cachedBlock.ShallowLikeChildren(), func(childBlock *blocks.Block) string {
+			return childBlock.ID().String()
+		})
+		t.ConflictIDs = lo.Map(cachedBlock.ConflictIDs().ToSlice(), func(conflictID iotago.TransactionID) string {
+			return conflictID.String()
+		})
 	}
 
 	return t

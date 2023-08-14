@@ -191,7 +191,7 @@ func NewInput(input iotago.Input) *Input {
 
 	return &Input{
 		Type:               input.Type().String(),
-		ReferencedOutputID: NewOutputID(utxoInput.Ref()),
+		ReferencedOutputID: NewOutputID(utxoInput.OutputID()),
 	}
 }
 

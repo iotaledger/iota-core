@@ -35,7 +35,7 @@ func TestConfirmationFlags(t *testing.T) {
 		nodeC.AccountID,
 		nodeD.AccountID,
 	}
-	ts.Run(map[string][]options.Option[protocol.Protocol]{
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
 		"nodeA": {
 			protocol.WithNotarizationProvider(
 				slotnotarization.NewProvider(),
@@ -85,7 +85,6 @@ func TestConfirmationFlags(t *testing.T) {
 			),
 		},
 	})
-	ts.HookLogging()
 
 	// Verify that nodes have the expected states.
 	ts.AssertNodeState(ts.Nodes(),
@@ -117,7 +116,7 @@ func TestConfirmationFlags(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.Blocks("A.1.0", "A.1.1", "A.2.0", "A.2.1", "A.3.0"), false, ts.Nodes()...)
 
 		// Make slot 1 committed.
-		slot1CommittableIndex := 1 + ts.API.ProtocolParameters().MinCommittableAge() + 1
+		slot1CommittableIndex := 1 + ts.API.ProtocolParameters().MinCommittableAge()
 		alias1A0 := fmt.Sprintf("A.%d.0", slot1CommittableIndex)
 		alias1A1 := fmt.Sprintf("A.%d.1", slot1CommittableIndex)
 		ts.IssueBlockAtSlot(alias1A0, slot1CommittableIndex, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.3.0"))

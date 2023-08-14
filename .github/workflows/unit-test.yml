@@ -5,14 +5,10 @@ on:
     paths-ignore:
       - 'documentation/**'
 
-env:
-  CI_UNIT_TESTS_WAIT_FOR: 60s
-  CI_UNIT_TESTS_TICK: 100ms
-
 jobs:
   unit-tests:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -31,7 +27,7 @@ jobs:
 
   unit-tests-race:
     name: Unit tests -race
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -45,4 +41,4 @@ jobs:
         run: go version
 
       - name: Run Tests with -race
-        run: go test ./... -tags rocksdb -count=1 -race -short -timeout 40m
+        run: go test ./... -tags rocksdb -count=1 -race -short -timeout 30m

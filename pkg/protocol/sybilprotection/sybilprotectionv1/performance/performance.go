@@ -60,21 +60,26 @@ func (t *Tracker) RegisterCommittee(epoch iotago.EpochIndex, committee *account.
 	return t.committeeStore.Set(epoch, committee)
 }
 
-func (t *Tracker) BlockAccepted(block *blocks.Block) {
+func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
+	validatorBlock, isValidationBlock := block.ValidationBlock()
+	if !isValidationBlock {
+		return
+	}
+
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
 	t.performanceFactorsMutex.Lock()
 	defer t.performanceFactorsMutex.Unlock()
 
-	// TODO: check if this block is a validator block
-	// TODO: include wannabe validator performance in the snapshot
-
 	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
 	pf, err := performanceFactors.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
+
+	// TODO: store highest supported version per validator?
+	_ = validatorBlock.HighestSupportedVersion
 
 	err = performanceFactors.Store(block.ProtocolBlock().IssuerID, pf+1)
 	if err != nil {

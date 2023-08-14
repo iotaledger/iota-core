@@ -26,9 +26,9 @@ func Test_TransitionAccount(t *testing.T) {
 		// Nil address will be replaced with the address generated from genesis seed.
 		// A single key may unlock multiple accounts; that's why it can't be used as a source for AccountID derivation.
 		Address: nil,
-		// Set 3 time min amount to cover the rent. If it's too little, then the snapshot creation will fail.
-		// We need more to cover an additional key that is added in the test.
-		Amount: testsuite.MinIssuerAccountAmount * 3,
+		// Set an amount enough to cover the rent and to cover an additional key that is added in the test.
+		// If it's too little, then the test will fail.
+		Amount: testsuite.MinIssuerAccountAmount * 10,
 		Mana:   0,
 		// AccountID is derived from this field, so this must be set uniquely for each account.
 		IssuerKey: oldGenesisOutputKey,
@@ -47,8 +47,7 @@ func Test_TransitionAccount(t *testing.T) {
 	node1 := ts.AddValidatorNode("node1")
 	_ = ts.AddNode("node2")
 
-	ts.Run(map[string][]options.Option[protocol.Protocol]{})
-	ts.HookLogging()
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	genesisAccount := ts.AccountOutput("Genesis:1")
 	genesisAccountOutput := genesisAccount.Output().(*iotago.AccountOutput)
@@ -113,8 +112,8 @@ func Test_TransitionAccount(t *testing.T) {
 
 	// commit until the expiry slot of the transitioned genesis account plus one
 	latestParent = ts.CommitUntilSlot(accountOutputs[0].FeatureSet().BlockIssuer().ExpirySlot+1, activeNodes, latestParent)
-	// set the expiry slof of the transitioned genesis account to the latest committed + Max CommittableAge + 1
-	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index() + ts.API.ProtocolParameters().MaxCommittableAge() + 1
+	// set the expiry slof of the transitioned genesis account to the latest committed + MaxCommittableAge
+	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index() + ts.API.ProtocolParameters().MaxCommittableAge()
 	inputForNewAccount, newAccountOutputs, newAccountWallets := ts.TransactionFramework.CreateAccountFromInput("TX1:1",
 		testsuite.WithAccountConditions(iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
@@ -236,7 +235,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ValidatorStakeChange:  0,
 		StakeEndEpochChange:   0,
 		FixedCostChange:       0,
-		DelegationStakeChange: 1914080,
+		DelegationStakeChange: 973040,
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -247,7 +246,7 @@ func Test_TransitionAccount(t *testing.T) {
 		PubKeys:         ds.NewSet(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
-		DelegationStake: 1966240,
+		DelegationStake: 973040,
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 

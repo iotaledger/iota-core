@@ -17,15 +17,13 @@ type Attestations interface {
 	// GetMap returns the attestations that are included in the commitment of the given slot as ads.Map.
 	// If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
 	GetMap(index iotago.SlotIndex) (attestations ads.Map[iotago.AccountID, *iotago.Attestation], err error)
-	AddAttestationFromBlock(block *blocks.Block)
+	AddAttestationFromValidationBlock(block *blocks.Block)
 	Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot iotago.Identifier, err error)
 
 	Import(reader io.ReadSeeker) (err error)
 	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error)
 
 	RestoreFromDisk() (err error)
-
-	AttestationCommitmentOffset() iotago.SlotIndex
 
 	module.Interface
 }
