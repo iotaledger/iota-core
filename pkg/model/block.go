@@ -133,9 +133,8 @@ func (blk *Block) String() string {
 }
 
 func (blk *Block) WorkScore() iotago.WorkScore {
-	workScoreStructure := blk.api.ProtocolParameters().WorkScoreStructure()
 	if basicBlock, isBasic := blk.BasicBlock(); isBasic {
-		workScore, err := basicBlock.WorkScore(workScoreStructure)
+		workScore, err := basicBlock.WorkScore(blk.api.ProtocolParameters().WorkScoreStructure())
 		if err != nil {
 			panic(err)
 		}
