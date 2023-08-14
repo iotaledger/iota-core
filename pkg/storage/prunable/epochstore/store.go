@@ -73,3 +73,13 @@ func (s *Store[V]) StreamBytes(consumer func([]byte, []byte) error) error {
 
 	return innerErr
 }
+
+func (s *Store[V]) Prune(epochIndex iotago.EpochIndex) error {
+	if epochIndex <= s.pruningDelay {
+		return ierrors.Errorf("epoch index %d is smaller than pruning delay %d", epochIndex, s.pruningDelay)
+	}
+
+	targetIndex := epochIndex - s.pruningDelay
+
+	return s.kv.DeletePrefix(targetIndex.MustBytes())
+}

@@ -2,6 +2,7 @@ package prunable
 
 import (
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -52,10 +53,23 @@ func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
 		return
 	}
 
+	// prune prunable_epoch
+	start := lo.Return1(p.manager.LastPrunedEpoch()) + 1
+	for currentIndex := start; currentIndex <= epoch; currentIndex++ {
+		// TODO: does this cleans up entirely if an epoch is empty?
+		// ref: pkg/storage/prunable/manager.go: prune()
+		p.decidedUpgradeSignals.Prune(epoch)
+		p.poolRewards.Prune(epoch)
+		p.poolStats.Prune(epoch)
+		p.committee.Prune(epoch)
+	}
+
+	// prune prunable_slot
 	p.manager.PruneUntilEpoch(epoch - p.defaultPruningDelay)
 }
 
 func (p *Prunable) Size() int64 {
+	// TODO: add size of prunable_epoch
 	return p.manager.PrunableStorageSize()
 }
 
