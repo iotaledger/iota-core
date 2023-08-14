@@ -126,7 +126,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 		if basicBlock.BurnedMana < manaCost {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, rmc, basicBlock.BurnedMana),
+				Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, manaCost, basicBlock.BurnedMana),
 			})
 
 			return
