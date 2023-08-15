@@ -104,41 +104,35 @@ func NewBlockDispatcher(protocol *Protocol) *BlockDispatcher {
 }
 
 func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error {
-	if slotCommitment := b.protocol.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID); !slotCommitment.Solid().Get() {
-		return b.handleUnsolidCommitmentBlock(block, slotCommitment, src)
-	} else {
-		return b.handleSolidCommitmentBlock(block, slotCommitment, src)
+	slotCommitment := b.protocol.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
+	if !slotCommitment.Solid().Get() {
+		if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
+			return ierrors.Errorf("protocol Dispatch failed. chain is not solid and could not add to unsolid slotCommitment buffer: slotcommitment: %s, block ID: %s", slotCommitment.ID(), block.ID())
+		}
+
+		return ierrors.Errorf("protocol Dispatch failed. chain is not solid: slotcommitment: %s, block ID: %s", slotCommitment.ID(), block.ID())
 	}
+
+	matchingEngineFound := false
+	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
+		if engine != nil && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
+			if !b.inWarpSyncRange(engine, block) {
+				engine.ProcessBlockFromPeer(block, src)
+			}
+
+			matchingEngineFound = true
+		}
+	}
+
+	if !matchingEngineFound {
+		ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), slotCommitment.ID())
+	}
+
+	return nil
 }
 
 func (b *BlockDispatcher) Shutdown() reactive.Event {
 	return b.isShutdown
-}
-
-// If the slotCommitment is not solid (its chain not known), we store the block in a small buffer and process it once we
-// receive the slotCommitment (or commit the slot ourselves).
-func (b *BlockDispatcher) handleUnsolidCommitmentBlock(block *model.Block, slotCommitment *chainmanager.ChainCommitment, src network.PeerID) error {
-	if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
-		return ierrors.Errorf("protocol Dispatch failed. chain is not solid and could not add to unsolid slotCommitment buffer: slotcommitment: %s, block ID: %s", slotCommitment.ID(), block.ID())
-	}
-
-	return ierrors.Errorf("protocol Dispatch failed. chain is not solid: slotcommitment: %s, block ID: %s", slotCommitment.ID(), block.ID())
-}
-
-func (b *BlockDispatcher) handleSolidCommitmentBlock(block *model.Block, slotCommitment *chainmanager.ChainCommitment, src network.PeerID) error {
-	err := ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), slotCommitment.ID())
-
-	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
-		if engine != nil && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
-			err = nil
-
-			if !b.inWarpSyncRange(engine, block) {
-				engine.ProcessBlockFromPeer(block, src)
-			}
-		}
-	}
-
-	return err
 }
 
 // inWarpSyncRange returns whether the given block should be processed by the BlockDispatcher instance instead of the engine.
