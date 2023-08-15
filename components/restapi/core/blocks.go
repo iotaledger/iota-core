@@ -31,19 +31,19 @@ func blockByID(c echo.Context) (*model.Block, error) {
 func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
 	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to get block metadata: %s", blockID.ToHex())
 	}
 
 	return blockMetadata.BlockMetadataResponse(), nil
 }
 
 func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
-	block, err := blockByID(c)
+	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
 	}
 
-	return blockMetadataByBlockID(block.ID())
+	return blockMetadataByBlockID(blockID)
 }
 
 func blockIssuance(_ echo.Context) (*apimodels.IssuanceBlockHeaderResponse, error) {
@@ -68,7 +68,7 @@ func blockIssuance(_ echo.Context) (*apimodels.IssuanceBlockHeaderResponse, erro
 func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV2, echo.MIMEApplicationJSON)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 	}
 
 	var iotaBlock = &iotago.ProtocolBlock{}

@@ -14,7 +14,7 @@ import (
 func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
 	txID, err := httpserver.ParseTransactionIDParam(c, restapipkg.ParameterTransactionID)
 	if err != nil {
-		return iotago.EmptyBlockID(), err
+		return iotago.EmptyBlockID(), ierrors.Wrapf(err, "failed to parse transaction ID: %s", c.Param(restapipkg.ParameterTransactionID))
 	}
 
 	return blockIDFromTransactionID(txID)
@@ -27,7 +27,7 @@ func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockI
 
 	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
-		return iotago.EmptyBlockID(), err
+		return iotago.EmptyBlockID(), ierrors.Wrapf(err, "failed to get output: %s", outputID.String())
 	}
 
 	return output.BlockID(), nil
@@ -36,7 +36,7 @@ func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockI
 func blockByTransactionID(c echo.Context) (*model.Block, error) {
 	blockID, err := blockIDByTransactionID(c)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to get block ID by transaction ID")
 	}
 
 	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
@@ -50,7 +50,7 @@ func blockByTransactionID(c echo.Context) (*model.Block, error) {
 func blockMetadataFromTransactionID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
 	blockID, err := blockIDByTransactionID(c)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to get block ID by transaction ID")
 	}
 
 	return blockMetadataByBlockID(blockID)
