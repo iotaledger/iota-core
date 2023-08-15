@@ -19,7 +19,7 @@ func WithAllowedDBEngines(optsAllowedDBEngines []hivedb.Engine) options.Option[S
 	}
 }
 
-func WithPrunableManagerOptions(opts ...options.Option[prunable.Manager]) options.Option[Storage] {
+func WithPrunableManagerOptions(opts ...options.Option[prunable.PrunableSlotManager]) options.Option[Storage] {
 	return func(s *Storage) {
 		s.optsPrunableManagerOptions = append(s.optsPrunableManagerOptions, opts...)
 	}

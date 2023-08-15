@@ -26,8 +26,11 @@ const (
 
 func (p *Prunable) getKVStoreFromSlot(slot iotago.SlotIndex, prefix kvstore.Realm) kvstore.KVStore {
 	epoch := p.apiProvider.APIForSlot(slot).TimeProvider().EpochFromSlot(slot)
+	if p.IsTooOld(epoch) {
+		return nil
+	}
 
-	return p.manager.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), prefix))
+	return p.prunableSlotStore.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), prefix))
 }
 
 func (p *Prunable) Blocks(slot iotago.SlotIndex) *slotstore.Blocks {

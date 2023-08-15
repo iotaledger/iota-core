@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/dig"
@@ -54,7 +55,10 @@ var (
 	deps      dependencies
 
 	blocksPerSlot         *shrinkingmap.ShrinkingMap[iotago.SlotIndex, []*blocks.Block]
-	blocksPrunableStorage *prunable.Manager
+	blocksPrunableStorage *prunable.PrunableSlotManager
+
+	lastPrunedEpoch iotago.EpochIndex
+	prunedMutex     sync.RWMutex
 )
 
 type dependencies struct {
@@ -72,7 +76,7 @@ func configure() error {
 	}
 
 	blocksPerSlot = shrinkingmap.New[iotago.SlotIndex, []*blocks.Block]()
-	blocksPrunableStorage = prunable.NewManager(database.Config{
+	blocksPrunableStorage = prunable.NewPrunableSlotManager(database.Config{
 		Engine:    hivedb.EngineRocksDB,
 		Directory: ParamsDebugAPI.Path,
 
@@ -97,7 +101,12 @@ func configure() error {
 			return
 		}
 
-		blocksPrunableStorage.PruneUntilEpoch(epoch - iotago.EpochIndex(ParamsDebugAPI.PruningThreshold))
+		prunedMutex.Lock()
+		defer prunedMutex.Unlock()
+
+		blocksPrunableStorage.PruneUntilEpoch(lastPrunedEpoch, epoch-iotago.EpochIndex(ParamsDebugAPI.PruningThreshold))
+		lastPrunedEpoch = epoch - iotago.EpochIndex(ParamsDebugAPI.PruningThreshold)
+
 	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", 1)))
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {

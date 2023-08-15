@@ -3,9 +3,9 @@ package prunable
 import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -18,7 +18,7 @@ type Prunable struct {
 	defaultPruningDelay iotago.EpochIndex
 	apiProvider         api.Provider
 	dbConfig            database.Config
-	manager             *Manager
+	prunableSlotStore   *PrunableSlotManager
 	errorHandler        func(error)
 
 	semiPermanentDB       *database.DBInstance
@@ -26,9 +26,12 @@ type Prunable struct {
 	poolRewards           *epochstore.EpochKVStore
 	poolStats             *epochstore.Store[*model.PoolsStats]
 	committee             *epochstore.Store[*account.Accounts]
+
+	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
+	pruningMutex    syncutils.RWMutex
 }
 
-func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[Manager]) *Prunable {
+func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[PrunableSlotManager]) *Prunable {
 	semiPermanentDB := database.NewDBInstance(dbConfig)
 
 	return &Prunable{
@@ -36,7 +39,9 @@ func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider a
 		defaultPruningDelay: pruningDelay,
 		apiProvider:         apiProvider,
 		errorHandler:        errorHandler,
-		manager:             NewManager(dbConfig, errorHandler, opts...),
+		prunableSlotStore:   NewPrunableSlotManager(dbConfig, errorHandler, opts...),
+
+		lastPrunedEpoch: model.NewEvictionIndex[iotago.EpochIndex](),
 
 		semiPermanentDB:       semiPermanentDB,
 		decidedUpgradeSignals: epochstore.NewStore(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, semiPermanentDB.KVStore(), pruningDelayDecidedUpgradeSignals, model.VersionAndHash.Bytes, model.VersionAndHashFromBytes),
@@ -47,27 +52,53 @@ func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider a
 }
 
 func (p *Prunable) RestoreFromDisk() {
-	p.manager.RestoreFromDisk()
+	lastPrunedEpoch := p.prunableSlotStore.RestoreFromDisk()
+
+	p.pruningMutex.Lock()
+	p.lastPrunedEpoch.MarkEvicted(lastPrunedEpoch)
+	p.pruningMutex.Unlock()
+}
+
+// IsTooOld checks if the index is in a pruned epoch.
+func (p *Prunable) IsTooOld(index iotago.EpochIndex) (isTooOld bool) {
+	p.pruningMutex.RLock()
+	defer p.pruningMutex.RUnlock()
+
+	return index < p.lastPrunedEpoch.NextIndex()
 }
 
 // PruneUntilSlot prunes storage slots less than and equal to the given index.
 func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
-	epoch := p.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(index)
+	epoch := p.apiProvider.APIForSlot(index).TimeProvider().EpochFromSlot(index)
 	if epoch < p.defaultPruningDelay {
 		return
 	}
 
+	p.PruneUntilEpoch(epoch)
+}
+
+func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) {
+	p.pruningMutex.Lock()
+	defer p.pruningMutex.Unlock()
+
+	if epoch < p.lastPrunedEpoch.NextIndex() || epoch < p.defaultPruningDelay {
+		return
+	}
+
+	// prune prunable_slot
+	start := p.lastPrunedEpoch.NextIndex()
+	p.prunableSlotStore.PruneUntilEpoch(start, epoch-p.defaultPruningDelay)
+	p.lastPrunedEpoch.MarkEvicted(epoch - p.defaultPruningDelay)
+
 	// prune prunable_epoch
-	start := lo.Return1(p.manager.LastPrunedEpoch()) + 1
+	// defaultPruningDelay is larger than the threshold
+	// default should be maximum, the other thresholds should be minimum
 	for currentIndex := start; currentIndex <= epoch; currentIndex++ {
 		p.decidedUpgradeSignals.Prune(currentIndex)
 		p.poolRewards.Prune(currentIndex)
 		p.poolStats.Prune(currentIndex)
 		p.committee.Prune(currentIndex)
 	}
-
-	// prune prunable_slot
-	p.manager.PruneUntilEpoch(epoch - p.defaultPruningDelay)
 }
 
 func (p *Prunable) Size() int64 {
@@ -76,14 +107,17 @@ func (p *Prunable) Size() int64 {
 		p.errorHandler(ierrors.Wrapf(err, "get semiPermanentDB failed for %s", p.dbConfig.Directory))
 	}
 
-	return p.manager.PrunableStorageSize() + semiSize
+	return p.prunableSlotStore.PrunableSlotStorageSize() + semiSize
 }
 
 func (p *Prunable) Shutdown() {
-	p.manager.Shutdown()
+	p.prunableSlotStore.Shutdown()
 	p.semiPermanentDB.Close()
 }
 
 func (p *Prunable) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
-	return p.manager.LastPrunedEpoch()
+	p.pruningMutex.RLock()
+	defer p.pruningMutex.RUnlock()
+
+	return p.lastPrunedEpoch.Index()
 }

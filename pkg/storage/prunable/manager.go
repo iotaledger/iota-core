@@ -10,17 +10,13 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type Manager struct {
+type PrunableSlotManager struct {
 	openDBs      *cache.Cache[iotago.EpochIndex, *database.DBInstance]
 	openDBsMutex syncutils.Mutex
-
-	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
-	pruningMutex    syncutils.RWMutex
 
 	dbConfig     database.Config
 	errorHandler func(error)
@@ -30,14 +26,13 @@ type Manager struct {
 	optsMaxOpenDBs int
 }
 
-func NewManager(dbConfig database.Config, errorHandler func(error), opts ...options.Option[Manager]) *Manager {
-	return options.Apply(&Manager{
-		optsMaxOpenDBs:  10,
-		dbConfig:        dbConfig,
-		errorHandler:    errorHandler,
-		dbSizes:         shrinkingmap.New[iotago.EpochIndex, int64](),
-		lastPrunedEpoch: model.NewEvictionIndex[iotago.EpochIndex](),
-	}, opts, func(m *Manager) {
+func NewPrunableSlotManager(dbConfig database.Config, errorHandler func(error), opts ...options.Option[PrunableSlotManager]) *PrunableSlotManager {
+	return options.Apply(&PrunableSlotManager{
+		optsMaxOpenDBs: 10,
+		dbConfig:       dbConfig,
+		errorHandler:   errorHandler,
+		dbSizes:        shrinkingmap.New[iotago.EpochIndex, int64](),
+	}, opts, func(m *PrunableSlotManager) {
 		m.openDBs = cache.New[iotago.EpochIndex, *database.DBInstance](m.optsMaxOpenDBs)
 		m.openDBs.SetEvictCallback(func(baseIndex iotago.EpochIndex, db *database.DBInstance) {
 			db.Close()
@@ -52,19 +47,7 @@ func NewManager(dbConfig database.Config, errorHandler func(error), opts ...opti
 	})
 }
 
-// IsTooOld checks if the index is in a pruned epoch.
-func (m *Manager) IsTooOld(index iotago.EpochIndex) (isTooOld bool) {
-	m.pruningMutex.RLock()
-	defer m.pruningMutex.RUnlock()
-
-	return index < m.lastPrunedEpoch.NextIndex()
-}
-
-func (m *Manager) Get(index iotago.EpochIndex, realm kvstore.Realm) kvstore.KVStore {
-	if m.IsTooOld(index) {
-		return nil
-	}
-
+func (m *PrunableSlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) kvstore.KVStore {
 	kv := m.getDBInstance(index).KVStore()
 	withRealm, err := kv.WithExtendedRealm(realm)
 	if err != nil {
@@ -74,21 +57,13 @@ func (m *Manager) Get(index iotago.EpochIndex, realm kvstore.Realm) kvstore.KVSt
 	return withRealm
 }
 
-func (m *Manager) PruneUntilEpoch(index iotago.EpochIndex) {
-	m.pruningMutex.Lock()
-	defer m.pruningMutex.Unlock()
-
-	if index < m.lastPrunedEpoch.NextIndex() {
-		return
-	}
-
-	for currentIndex := m.lastPrunedEpoch.NextIndex(); currentIndex <= index; currentIndex++ {
+func (m *PrunableSlotManager) PruneUntilEpoch(start, end iotago.EpochIndex) {
+	for currentIndex := start; currentIndex <= end; currentIndex++ {
 		m.prune(currentIndex)
-		m.lastPrunedEpoch.MarkEvicted(currentIndex)
 	}
 }
 
-func (m *Manager) Shutdown() {
+func (m *PrunableSlotManager) Shutdown() {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
@@ -97,15 +72,8 @@ func (m *Manager) Shutdown() {
 	})
 }
 
-func (m *Manager) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
-	m.pruningMutex.RLock()
-	defer m.pruningMutex.RUnlock()
-
-	return m.lastPrunedEpoch.Index()
-}
-
-// PrunableStorageSize returns the size of the prunable storage containing all db instances.
-func (m *Manager) PrunableStorageSize() int64 {
+// PrunableSlotStorageSize returns the size of the prunable storage containing all db instances.
+func (m *PrunableSlotManager) PrunableSlotStorageSize() int64 {
 	// Sum up all the evicted databases
 	var sum int64
 	m.dbSizes.ForEach(func(index iotago.EpochIndex, i int64) bool {
@@ -129,27 +97,28 @@ func (m *Manager) PrunableStorageSize() int64 {
 	return sum
 }
 
-func (m *Manager) RestoreFromDisk() {
+func (m *PrunableSlotManager) RestoreFromDisk() iotago.EpochIndex {
 	dbInfos := getSortedDBInstancesFromDisk(m.dbConfig.Directory)
 
 	// There are no dbInstances on disk -> nothing to restore.
 	if len(dbInfos) == 0 {
-		return
+		return 0
 	}
 
+	var lastPrunedEpoch iotago.EpochIndex
 	// Set the maxPruned epoch to the baseIndex-1 of the oldest dbInstance.
-	m.pruningMutex.Lock()
 	if dbInfos[0].baseIndex > 0 {
-		m.lastPrunedEpoch.MarkEvicted(dbInfos[0].baseIndex - 1)
+		lastPrunedEpoch = dbInfos[0].baseIndex - 1
 	} else {
-		m.lastPrunedEpoch.MarkEvicted(0)
+		lastPrunedEpoch = 0
 	}
-	m.pruningMutex.Unlock()
 
 	// Open all the dbInstances (perform health checks) and add them to the openDBs cache. Also fills the dbSizes map (when evicted from the cache).
 	for _, dbInfo := range dbInfos {
 		m.getDBInstance(dbInfo.baseIndex)
 	}
+
+	return lastPrunedEpoch
 }
 
 // getDBInstance returns the DB instance for the given epochIndex or creates a new one if it does not yet exist.
@@ -158,7 +127,7 @@ func (m *Manager) RestoreFromDisk() {
 //	epochIndex 0 -> db 0
 //	epochIndex 1 -> db 1
 //	epochIndex 2 -> db 2
-func (m *Manager) getDBInstance(index iotago.EpochIndex) (db *database.DBInstance) {
+func (m *PrunableSlotManager) getDBInstance(index iotago.EpochIndex) (db *database.DBInstance) {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
@@ -175,7 +144,7 @@ func (m *Manager) getDBInstance(index iotago.EpochIndex) (db *database.DBInstanc
 	return db
 }
 
-func (m *Manager) prune(dbBaseIndex iotago.EpochIndex) {
+func (m *PrunableSlotManager) prune(dbBaseIndex iotago.EpochIndex) {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 

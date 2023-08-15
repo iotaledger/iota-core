@@ -76,7 +76,7 @@ func (s *Store[V]) StreamBytes(consumer func([]byte, []byte) error) error {
 
 func (s *Store[V]) Prune(epochIndex iotago.EpochIndex) error {
 	if epochIndex <= s.pruningDelay {
-		return ierrors.Errorf("epoch index %d is smaller than pruning delay %d", epochIndex, s.pruningDelay)
+		return nil
 	}
 
 	targetIndex := epochIndex - s.pruningDelay
