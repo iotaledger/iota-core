@@ -65,6 +65,8 @@ const (
 
 	// RouteTransactionsIncludedBlockMetadata is the route for getting the block metadata that was first confirmed in the ledger for a given transaction ID.
 	// GET returns block metadata (including info about "promotion/reattachment needed").
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
 	RouteTransactionsIncludedBlockMetadata = "/transactions/:" + restapipkg.ParameterTransactionID + "/included-block/metadata"
 
 	// RouteCommitmentByID is the route for getting a slot commitment by its ID.
@@ -89,22 +91,31 @@ const (
 
 	// RouteCongestion is the route for getting the current congestion state and all account related useful details as block issuance credits.
 	// GET returns the congestion state related to the specified account.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
 	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
 
-	// RouteStaking is the route for getting informations about the current stakers.
-	// GET returns the stakers.
-	RouteStaking = "/staking"
+	// RouteValidators is the route for getting informations about the current validators.
+	// GET returns the paginated response with the list of validators.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
+	RouteValidators = "/validators"
 
-	// RouteStakingAccount is the route for getting an account by its accountID.
-	// GET returns the account details.
-	RouteStakingAccount = "/staking/:" + restapipkg.ParameterAccountID
+	// RouteValidatorsAccount is the route for getting details about the validator by its accountID.
+	// GET returns the validator details.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
+	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterAccountID
 
 	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
+	// Rewards are decayed up to returned epochEnd index.
 	// GET returns the rewards.
 	RouteRewards = "/rewards/:" + restapipkg.ParameterOutputID
 
 	// RouteCommittee is the route for getting the current committee.
 	// GET returns the committee.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
 	RouteCommittee = "/committee"
 )
 
@@ -165,7 +176,6 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
-		// TODO: fill in blockReason, TxState, TxReason.
 		resp, err := blockMetadataByID(c)
 		if err != nil {
 			return err
@@ -294,8 +304,8 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteStaking, func(c echo.Context) error {
-		resp, err := staking()
+	routeGroup.GET(RouteValidators, func(c echo.Context) error {
+		resp, err := validators(c)
 		if err != nil {
 			return err
 		}
@@ -303,8 +313,8 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteStakingAccount, func(c echo.Context) error {
-		resp, err := stakingByAccountID(c)
+	routeGroup.GET(RouteValidatorsAccount, func(c echo.Context) error {
+		resp, err := validatorByAccountID(c)
 		if err != nil {
 			return err
 		}

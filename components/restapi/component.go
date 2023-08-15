@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/jwt"
+	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 )
 
@@ -48,6 +49,8 @@ type dependencies struct {
 	RestAPIBindAddress string         `name:"restAPIBindAddress"`
 	NodePrivateKey     crypto.PrivKey `name:"nodePrivateKey"`
 	RestRouteManager   *restapi.RestRouteManager
+
+	Protocol *protocolpkg.Protocol
 }
 
 func initConfigParams(c *dig.Container) error {

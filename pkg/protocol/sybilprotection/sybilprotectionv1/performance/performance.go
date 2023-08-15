@@ -19,6 +19,7 @@ type Tracker struct {
 	committeeStore  *kvstore.TypedStore[iotago.EpochIndex, *account.Accounts]
 
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors
+	latestAppliedEpoch     iotago.EpochIndex
 
 	apiProvider api.Provider
 
@@ -31,6 +32,7 @@ func NewTracker(
 	poolStatsStore kvstore.KVStore,
 	committeeStore kvstore.KVStore,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.PerformanceFactors,
+	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider api.Provider,
 ) *Tracker {
 	return &Tracker{
@@ -48,6 +50,7 @@ func NewTracker(
 			account.AccountsFromBytes,
 		),
 		performanceFactorsFunc: performanceFactorsFunc,
+		latestAppliedEpoch:     latestAppliedEpoch,
 		apiProvider:            apiProvider,
 	}
 }
@@ -142,10 +145,19 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	if err := rewardsTree.Commit(); err != nil {
 		panic(ierrors.Wrapf(err, "failed to commit rewards for epoch %d", epoch))
 	}
+
+	t.latestAppliedEpoch = epoch
 }
 
 func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
-	// TODO: we should choose candidates we tracked performance for
+	// TODO: we should choose candidates we tracked performance for, only active
+
+	return ds.NewSet[iotago.AccountID]()
+}
+
+// ValidatorCandidates returns the registered validator candidates for the given epoch.
+func (t *Tracker) ValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
+	// TODO: we should choose candidates we tracked performance for no matter if they were active
 
 	return ds.NewSet[iotago.AccountID]()
 }
