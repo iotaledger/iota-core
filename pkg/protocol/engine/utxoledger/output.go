@@ -53,7 +53,7 @@ func (o *Output) OutputID() iotago.OutputID {
 	return o.outputID
 }
 
-func (o *Output) CreationTime() iotago.SlotIndex {
+func (o *Output) CreationSlot() iotago.SlotIndex {
 	return o.slotCreated
 }
 

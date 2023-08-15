@@ -18,9 +18,9 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 	inputSet := iotagovm.InputSet{}
 	for _, inputState := range inputStates {
-		inputSet[inputState.OutputID()] = iotagovm.OutputWithCreationTime{
+		inputSet[inputState.OutputID()] = iotagovm.OutputWithCreationSlot{
 			Output:       inputState.Output(),
-			CreationTime: inputState.CreationTime(),
+			CreationSlot: inputState.CreationSlot(),
 		}
 	}
 	resolvedInputs := iotagovm.ResolvedInputs{
@@ -106,7 +106,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	resolvedInputs.RewardsInputSet = rewardInputSet
 
 	// TODO: in which slot is this transaction?
-	api := l.apiProvider.APIForSlot(tx.Essence.CreationTime)
+	api := l.apiProvider.APIForSlot(tx.Essence.CreationSlot)
 
 	vmParams := &iotagovm.Params{
 		API: api,
@@ -125,7 +125,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		created = append(created, &ExecutionOutput{
 			outputID:     outputID,
 			output:       output,
-			creationTime: tx.Essence.CreationTime,
+			creationSlot: tx.Essence.CreationSlot,
 		})
 	}
 
