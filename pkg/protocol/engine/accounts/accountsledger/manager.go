@@ -130,9 +130,24 @@ func (m *Manager) ApplyDiff(
 		return ierrors.Wrap(err, "could not update slot diff with burns")
 	}
 
-	// store the diff and apply it to the account vector tree, obtaining the new root
-	if err := m.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
-		return ierrors.Wrap(err, "could not apply diff to account tree")
+	for accountID, accountDiff := range accountDiffs {
+		destroyed := destroyedAccounts.Has(accountID)
+		if destroyed {
+			reconstructedAccountDiff, err := m.preserveDestroyedAccountData(accountID)
+			if err != nil {
+				return ierrors.Wrapf(err, "could not preserve destroyed account data for account %s", accountID)
+			}
+
+			accountDiff = reconstructedAccountDiff
+		}
+		err := m.slotDiff(slotIndex).Store(accountID, accountDiff, destroyed)
+		if err != nil {
+			return ierrors.Wrapf(err, "could not store diff to slot %d", slotIndex)
+		}
+	}
+
+	if err := m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
+		return ierrors.Wrap(err, "could not commit account tree")
 	}
 
 	// set the index where the tree is now at
@@ -368,33 +383,6 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 	}
 
 	return burns, nil
-}
-
-func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
-	// Load diffs storage for the slot. The storage can never be nil (pruned) because we are just committing the slot.
-	diffStore := m.slotDiff(slotIndex)
-	for accountID, accountDiff := range accountDiffs {
-		destroyed := destroyedAccounts.Has(accountID)
-		if destroyed {
-			// TODO: should this diff be done in the same place as other diffs? it feels kind of out of place here
-			reconstructedAccountDiff, err := m.preserveDestroyedAccountData(accountID)
-			if err != nil {
-				return ierrors.Wrapf(err, "could not preserve destroyed account data for account %s", accountID)
-			}
-
-			accountDiff = reconstructedAccountDiff
-		}
-		err := diffStore.Store(accountID, accountDiff, destroyed)
-		if err != nil {
-			return ierrors.Wrapf(err, "could not store diff to slot %d", slotIndex)
-		}
-	}
-
-	if err := m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
-		return ierrors.Wrap(err, "could not commit account tree")
-	}
-
-	return nil
 }
 
 func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
