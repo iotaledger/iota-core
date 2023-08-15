@@ -50,3 +50,10 @@ func (c *BlockIssuanceCredits) Update(change iotago.BlockIssuanceCredits, update
 		c.UpdateTime = updateTime[0]
 	}
 }
+
+func (c *BlockIssuanceCredits) Set(credits iotago.BlockIssuanceCredits, updateTime ...iotago.SlotIndex) {
+	c.Value = credits
+	if len(updateTime) > 0 {
+		c.UpdateTime = updateTime[0]
+	}
+}

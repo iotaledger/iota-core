@@ -407,9 +407,16 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		}
 
 		if diffChange.BICChange != 0 || !exists {
-			// TODO: this needs to be decayed for (index - prevIndex) because update index is changed so it's impossible to use new decay
-			// //
-			accountData.Credits.Update(diffChange.BICChange, index)
+			decayedCredits := iotago.Mana(diffChange.BICChange)
+			// decay the credits to the current slot if the account exists
+			if exists {
+				decayedCredits, err = m.apiProvider.APIForSlot(index).ManaDecayProvider().StoredManaWithDecay(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateTime, index)
+				if err != nil {
+					return ierrors.Wrapf(err, "can't retrieve account, could not decay credits for account (%s) in slot (%d)", accountData.ID, index)
+				}
+			}
+
+			accountData.Credits.Set(iotago.BlockIssuanceCredits(decayedCredits), index)
 		}
 
 		// update the expiry slot of the account if it changed
