@@ -58,7 +58,6 @@ export class UnlockBlock {
     type: string;
     referencedIndex: number;
     signatureType: number;
-    // TODO: make it any and add struct for other types of signature.
     signature: SignatureEd25519;
 }
 
