@@ -204,5 +204,4 @@ type CommitmentResponse struct {
 	PrevID           string `json:"prevID"`
 	RootsID          string `json:"rootsID"`
 	CumulativeWeight uint64 `json:"cumulativeWeight"`
-	// TODO: might add roots of different trees here
 }

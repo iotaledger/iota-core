@@ -10,6 +10,9 @@ import (
 type Retainer interface {
 	BlockMetadata(blockID iotago.BlockID) (*BlockMetadata, error)
 
+	RegisteredValidatorsCache(uint32) ([]*apimodels.ValidatorResponse, bool)
+	RetainRegisteredValidatorsCache(uint32, []*apimodels.ValidatorResponse)
+
 	RetainBlockFailure(iotago.BlockID, apimodels.BlockFailureReason)
 	RetainTransactionFailure(iotago.BlockID, error)
 
