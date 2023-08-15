@@ -173,8 +173,8 @@ func (o *Output) KVStorableKey() (key []byte) {
 }
 
 func (o *Output) KVStorableValue() (value []byte) {
-	ms := marshalutil.New(48)
-	ms.WriteBytes(o.blockID[:])              // 32 bytes
+	ms := marshalutil.New(56)
+	ms.WriteBytes(o.blockID[:])              // 40 bytes
 	ms.WriteBytes(o.slotBooked.MustBytes())  // 8 bytes
 	ms.WriteBytes(o.slotCreated.MustBytes()) // 8 bytes
 	ms.WriteBytes(o.encodedOutput)
