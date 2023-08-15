@@ -70,10 +70,6 @@ func (p *Prunable) IsTooOld(index iotago.EpochIndex) (isTooOld bool) {
 // PruneUntilSlot prunes storage slots less than and equal to the given index.
 func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
 	epoch := p.apiProvider.APIForSlot(index).TimeProvider().EpochFromSlot(index)
-	if epoch < p.defaultPruningDelay {
-		return
-	}
-
 	p.PruneUntilEpoch(epoch)
 }
 

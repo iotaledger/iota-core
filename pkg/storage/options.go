@@ -30,3 +30,21 @@ func WithPruningDelay(optsPruningDelay iotago.EpochIndex) options.Option[Storage
 		s.optsPruningDelay = optsPruningDelay
 	}
 }
+
+func WithPruningSizeMaxTargetSizeBytes(pruningSizeTargetSizeBytes int64) options.Option[Storage] {
+	return func(p *Storage) {
+		p.optPruningSizeMaxTargetSizeBytes = pruningSizeTargetSizeBytes
+	}
+}
+
+func WithStartPruningSizeThresholdPercentage(pruningSizeThresholdPercentage float64) options.Option[Storage] {
+	return func(p *Storage) {
+		p.optStartPruningSizeThresholdPercentage = pruningSizeThresholdPercentage
+	}
+}
+
+func WithStopPruningSizeThresholdPercentage(pruningSizeThresholdPercentage float64) options.Option[Storage] {
+	return func(p *Storage) {
+		p.optStopPruningSizeThresholdPercentage = pruningSizeThresholdPercentage
+	}
+}
