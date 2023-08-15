@@ -202,7 +202,7 @@ func (p *Protocol) shutdown() {
 func (p *Protocol) initEngineManager() {
 	p.engineManager = enginemanager.New(
 		p.Workers.CreateGroup("EngineManager"),
-		p.ErrorHandler(),
+		p.HandleError,
 		p.optsBaseDirectory,
 		DatabaseVersion,
 		p.optsStorageOptions,
@@ -308,8 +308,8 @@ func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return p.MainEngineInstance().APIForEpoch(epoch)
 }
 
-func (p *Protocol) ErrorHandler() func(error) {
-	return func(err error) {
+func (p *Protocol) HandleError(err error) {
+	if err != nil {
 		p.Events.Error.Trigger(err)
 	}
 }

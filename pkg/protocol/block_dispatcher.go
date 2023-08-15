@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -42,8 +43,8 @@ type BlockDispatcher struct {
 	// processedWarpSyncRequests is the set of processed requests.
 	processedWarpSyncRequests ds.Set[iotago.CommitmentID]
 
-	// isShutdown is a reactive event that is triggered when the BlockDispatcher instance is shutdown.
-	isShutdown reactive.Event
+	// shutdownEvent is a reactive event that is triggered when the BlockDispatcher instance is stopped.
+	shutdownEvent reactive.Event
 }
 
 // NewBlockDispatcher creates a new BlockDispatcher instance.
@@ -55,49 +56,11 @@ func NewBlockDispatcher(protocol *Protocol) *BlockDispatcher {
 		unsolidCommitmentBlocks:   buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, network.PeerID]](20, 100),
 		pendingWarpSyncRequests:   eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
 		processedWarpSyncRequests: ds.NewSet[iotago.CommitmentID](),
-		isShutdown:                reactive.NewEvent(),
+		shutdownEvent:             reactive.NewEvent(),
 	}
 
-	protocol.HookConstructed(func() {
-		b.monitorLatestCommitmentUpdated(protocol.mainEngine)
-
-		protocol.engineManager.OnEngineCreated(b.monitorLatestCommitmentUpdated)
-
-		protocol.Events.ChainManager.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
-			chainCommitment.Solid().OnTrigger(func() {
-				b.warpSyncIfNecessary(b.targetEngine(chainCommitment), chainCommitment)
-			})
-		})
-
-		// TODO: Shouldn't this happen on solid?
-		protocol.Events.ChainManager.MissingCommitmentReceived.Hook(b.injectUnsolidCommitmentBlocks, event.WithWorkerPool(b.dispatchWorkers))
-
-		protocol.Events.Engine.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-			b.injectUnsolidCommitmentBlocks(commitment.ID())
-		}, event.WithWorkerPool(b.dispatchWorkers))
-
-		protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(b.evict)
-	})
-
-	protocol.HookInitialized(func() {
-		protocol.Events.Engine.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
-			protocol.networkProtocol.RequestBlock(blockID)
-		}, event.WithWorkerPool(b.dispatchWorkers))
-
-		b.pendingWarpSyncRequests.Events.Tick.Hook(func(id iotago.CommitmentID) {
-			fmt.Println("Sending WarpSyncRequest for", id)
-			protocol.networkProtocol.SendWarpSyncRequest(id)
-		})
-
-		protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {
-			if err := b.Dispatch(block, id); err != nil {
-				protocol.ErrorHandler()(err)
-			}
-		}, event.WithWorkerPool(b.dispatchWorkers))
-		protocol.Events.Network.WarpSyncRequestReceived.Hook(b.queueWarpSyncRequest)
-		protocol.Events.Network.WarpSyncResponseReceived.Hook(b.queueWarpSyncResponse)
-	})
-
+	protocol.HookConstructed(b.initEngineMonitoring)
+	protocol.HookInitialized(b.initNetworkConnection)
 	protocol.HookStopped(b.shutdown)
 
 	return b
@@ -131,8 +94,59 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error
 	return nil
 }
 
-func (b *BlockDispatcher) Shutdown() reactive.Event {
-	return b.isShutdown
+func (b *BlockDispatcher) ShutdownEvent() reactive.Event {
+	return b.shutdownEvent
+}
+
+func (b *BlockDispatcher) initEngineMonitoring() {
+	b.monitorLatestCommitmentUpdated(b.protocol.mainEngine)
+
+	b.protocol.engineManager.OnEngineCreated(b.monitorLatestCommitmentUpdated)
+
+	b.protocol.Events.ChainManager.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
+		chainCommitment.Solid().OnTrigger(func() {
+			b.injectUnsolidCommitmentBlocks(chainCommitment.Commitment().ID())
+			b.warpSyncIfNecessary(b.targetEngine(chainCommitment), chainCommitment)
+		})
+	})
+
+	b.protocol.Events.Engine.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+		b.injectUnsolidCommitmentBlocks(commitment.ID())
+	}, event.WithWorkerPool(b.dispatchWorkers))
+
+	b.protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(b.evict)
+}
+
+func (b *BlockDispatcher) initNetworkConnection() {
+	b.protocol.Events.Engine.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
+		b.runTask(func() {
+			b.protocol.networkProtocol.RequestBlock(blockID)
+		}, b.dispatchWorkers)
+	})
+
+	b.pendingWarpSyncRequests.Events.Tick.Hook(func(id iotago.CommitmentID) {
+		b.runTask(func() {
+			b.protocol.networkProtocol.SendWarpSyncRequest(id)
+		}, b.dispatchWorkers)
+	})
+
+	b.protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, src network.PeerID) {
+		b.runTask(func() {
+			b.protocol.HandleError(b.Dispatch(block, src))
+		}, b.dispatchWorkers)
+	})
+
+	b.protocol.Events.Network.WarpSyncRequestReceived.Hook(func(commitmentID iotago.CommitmentID, src network.PeerID) {
+		b.runTask(func() {
+			b.protocol.HandleError(b.processWarpSyncRequest(commitmentID, src))
+		}, b.warpSyncWorkers)
+	})
+
+	b.protocol.Events.Network.WarpSyncResponseReceived.Hook(func(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], src network.PeerID) {
+		b.runTask(func() {
+			b.protocol.HandleError(b.processWarpSyncResponse(commitmentID, blockIDs, merkleProof, src))
+		}, b.warpSyncWorkers)
+	})
 }
 
 // inWarpSyncRange returns whether the given block should be processed by the BlockDispatcher instance instead of the engine.
@@ -157,109 +171,86 @@ func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Bl
 	return shouldProcess
 }
 
-func (b *BlockDispatcher) queueWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
-	fmt.Println("WarpSyncManager.ProcessRequest: received request from", src)
-
-	processWarpSyncRequest := func(commitmentID iotago.CommitmentID, src network.PeerID) {
-		// TODO: check if the peer is allowed to request the warp sync
-
-		committedSlot, err := b.protocol.MainEngineInstance().CommittedSlot(commitmentID.Index())
-		if err != nil {
-			fmt.Println("WarpSyncManager.ProcessRequest: err != nil", err)
-			return
-		}
-
-		commitment, err := committedSlot.Commitment()
-		if err != nil || commitment.ID() != commitmentID {
-			fmt.Println("WarpSyncManager.ProcessRequest: commitment == nil")
-			return
-		}
-
-		blockIDs, err := committedSlot.BlockIDs()
-		if err != nil {
-			fmt.Println("WarpSyncManager.ProcessRequest: blockIDs == nil")
-			return
-		}
-
-		roots, err := committedSlot.Roots()
-		if err != nil {
-			fmt.Println("WarpSyncManager.ProcessRequest: roots == nil")
-			return
-		}
-
-		fmt.Println("WarpSyncManager.ProcessRequest: sending response to", src, "for", commitmentID, "with", len(blockIDs), "blocks")
-
-		b.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), src)
-	}
-
-	b.isShutdown.Compute(func(isShutdown bool) bool {
+func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
+	b.shutdownEvent.Compute(func(isShutdown bool) bool {
 		if !isShutdown {
-			b.warpSyncWorkers.Submit(func() {
-				processWarpSyncRequest(commitmentID, src)
-			})
+			pool.Submit(task)
 		}
 
 		return isShutdown
 	})
 }
 
-func (b *BlockDispatcher) queueWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
-	fmt.Println(">> warpSync PROCESSRESPONSE", commitmentID)
+func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) error {
+	// TODO: check if the peer is allowed to request the warp sync
 
-	processWarpSyncResponse := func(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier]) {
-		if b.processedWarpSyncRequests.Has(commitmentID) {
-			fmt.Println("WarpSyncManager.ProcessResponse: already processed", commitmentID)
-			return
-		}
-
-		chainCommitment, exists := b.protocol.ChainManager.Commitment(commitmentID)
-		if !exists {
-			fmt.Println("WarpSyncManager.ProcessResponse: chainCommitment == nil")
-			return
-		}
-
-		targetEngine := b.targetEngine(chainCommitment)
-		if targetEngine == nil {
-			fmt.Println("WarpSyncManager.ProcessResponse: targetEngine == nil")
-			return
-		}
-
-		acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
-		for _, blockID := range blockIDs {
-			_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
-		}
-
-		if !iotago.VerifyProof(merkleProof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.Commitment().RootsID()) {
-			fmt.Println("WarpSyncManager.ProcessResponse: !iotago.VerifyProof")
-			return
-		}
-
-		b.pendingWarpSyncRequests.StopTicker(commitmentID)
-
-		b.processedWarpSyncRequests.Add(commitmentID)
-
-		fmt.Println("WarpSyncManager.ProcessResponse: PROCESS FEEDING", commitmentID.Index())
-		for _, blockID := range blockIDs {
-			targetEngine.BlockDAG.GetOrRequestBlock(blockID)
-		}
+	committedSlot, err := b.protocol.MainEngineInstance().CommittedSlot(commitmentID.Index())
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get slot %d (not committed yet)", commitmentID.Index())
 	}
 
-	b.isShutdown.Compute(func(isShutdown bool) bool {
-		if !isShutdown {
-			fmt.Println("WarpSyncManager.ProcessResponse: received response for", commitmentID)
+	commitment, err := committedSlot.Commitment()
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get commitment from slot %d", commitmentID.Index())
+	} else if commitment.ID() != commitmentID {
+		return ierrors.Wrapf(err, "commitment ID mismatch: %s != %s", commitment.ID(), commitmentID)
+	}
 
-			b.warpSyncWorkers.Submit(func() {
-				processWarpSyncResponse(commitmentID, blockIDs, merkleProof)
-			})
-		}
+	blockIDs, err := committedSlot.BlockIDs()
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get block IDs from slot %d", commitmentID.Index())
+	}
 
-		return isShutdown
+	roots, err := committedSlot.Roots()
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get roots from slot %d", commitmentID.Index())
+	}
+
+	b.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), src)
+
+	return nil
+}
+
+func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) error {
+	if b.processedWarpSyncRequests.Has(commitmentID) {
+		return nil
+	}
+
+	chainCommitment, exists := b.protocol.ChainManager.Commitment(commitmentID)
+	if !exists {
+		return ierrors.Errorf("failed to get chain commitment for %s", commitmentID)
+	}
+
+	targetEngine := b.targetEngine(chainCommitment)
+	if targetEngine == nil {
+		return ierrors.Errorf("failed to get target engine for %s", commitmentID)
+	}
+
+	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
+	for _, blockID := range blockIDs {
+		_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
+	}
+
+	if !iotago.VerifyProof(merkleProof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.Commitment().RootsID()) {
+		return ierrors.Errorf("failed to verify merkle proof for %s", commitmentID)
+	}
+
+	b.pendingWarpSyncRequests.StopTicker(commitmentID)
+
+	b.processedWarpSyncRequests.Add(commitmentID)
+
+	targetEngine.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+		block.ID()
 	})
+
+	for _, blockID := range blockIDs {
+		targetEngine.BlockDAG.GetOrRequestBlock(blockID)
+	}
+
+	return nil
 }
 
 func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
-	fmt.Println("WarpSyncManager.warpSyncIfNecessary")
-
 	if e == nil || chainCommitment == nil {
 		return
 	}
@@ -269,34 +260,18 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	minCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MinCommittableAge()
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
-	fmt.Println("WarpSyncManager.warpSyncIfNecessary: latest", latestCommitmentIndex, "chainCommitment", chainCommitment.Commitment().Index())
-
-	if chainCommitment.Commitment().Index() <= latestCommitmentIndex+maxCommittableAge {
-		fmt.Println("WarpsyncManager.warpSyncIfNecessary: too close!", chainCommitment.Commitment().Index())
-		return
-	}
-
-	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+minCommittableAge+2; slotToWarpSync++ {
-		commitmentToSync := chain.Commitment(slotToWarpSync)
-		if commitmentToSync == nil {
-			fmt.Println("WarpSyncManager.warpSyncIfNecessary: commitmentToSync == nil")
-			return
+	if chainCommitment.Commitment().Index() > latestCommitmentIndex+maxCommittableAge {
+		for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+minCommittableAge+2; slotToWarpSync++ {
+			if commitmentToSync := chain.Commitment(slotToWarpSync); commitmentToSync != nil && !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
+				b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
+			}
 		}
-
-		if b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
-			continue
-		}
-
-		fmt.Println("WarpSyncManager.warpSyncIfNecessary: WarpSyncing", commitmentToSync.ID())
-		b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
 	}
 }
 
 func (b *BlockDispatcher) injectUnsolidCommitmentBlocks(id iotago.CommitmentID) {
 	for _, tuple := range b.unsolidCommitmentBlocks.GetValues(id) {
-		if err := b.Dispatch(tuple.A, tuple.B); err != nil {
-			b.protocol.ErrorHandler()(err)
-		}
+		b.Dispatch(tuple.A, tuple.B)
 	}
 }
 
@@ -336,7 +311,7 @@ func (b *BlockDispatcher) evict(index iotago.SlotIndex) {
 }
 
 func (b *BlockDispatcher) shutdown() {
-	b.isShutdown.Compute(func(isShutdown bool) bool {
+	b.shutdownEvent.Compute(func(isShutdown bool) bool {
 		if !isShutdown {
 			b.pendingWarpSyncRequests.Shutdown()
 
