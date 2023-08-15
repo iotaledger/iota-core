@@ -24,7 +24,7 @@ export class FaucetPayload {
 
 export class TransactionPayload {
     networkId: number;
-    creationTime: number;
+    creationSlot: number;
     inputs: Array<Input>;
     inputsCommitment: string;
     outputs: Array<Output>;

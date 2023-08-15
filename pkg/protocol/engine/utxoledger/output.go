@@ -53,7 +53,7 @@ func (o *Output) OutputID() iotago.OutputID {
 	return o.outputID
 }
 
-func (o *Output) CreationTime() iotago.SlotIndex {
+func (o *Output) CreationSlot() iotago.SlotIndex {
 	return o.slotCreated
 }
 
@@ -173,8 +173,8 @@ func (o *Output) KVStorableKey() (key []byte) {
 }
 
 func (o *Output) KVStorableValue() (value []byte) {
-	ms := marshalutil.New(48)
-	ms.WriteBytes(o.blockID[:])              // 32 bytes
+	ms := marshalutil.New()
+	ms.WriteBytes(o.blockID[:])              // 40 bytes
 	ms.WriteBytes(o.slotBooked.MustBytes())  // 8 bytes
 	ms.WriteBytes(o.slotCreated.MustBytes()) // 8 bytes
 	ms.WriteBytes(o.encodedOutput)

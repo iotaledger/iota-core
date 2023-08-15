@@ -125,7 +125,7 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error
 	}
 
 	if !matchingEngineFound {
-		ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), slotCommitment.ID())
+		return ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), slotCommitment.ID())
 	}
 
 	return nil
