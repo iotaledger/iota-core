@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/labstack/gommon/bytes"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
@@ -90,6 +91,16 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
+		pruningSizeEnabled := ParamsDatabase.Size.Enabled
+		pruningTargetDatabaseSizeBytes, err := bytes.Parse(ParamsDatabase.Size.TargetSize)
+		if err != nil {
+			Component.LogPanicf("parameter %s invalid", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)))
+		}
+
+		if pruningSizeEnabled && pruningTargetDatabaseSizeBytes == 0 {
+			Component.LogPanicf("%s has to be specified if %s is enabled", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)), Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.Enabled)))
+		}
+
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
@@ -97,6 +108,9 @@ func provide(c *dig.Container) error {
 			protocol.WithStorageOptions(
 				storage.WithDBEngine(deps.DatabaseEngine),
 				storage.WithPruningDelay(iotago.EpochIndex(ParamsDatabase.PruningThreshold)),
+				storage.WithPruningSizeEnable(ParamsDatabase.Size.Enabled),
+				storage.WithPruningSizeMaxTargetSizeBytes(pruningTargetDatabaseSizeBytes),
+				storage.WithPruningSizeThresholdPercentage(ParamsDatabase.Size.ThresholdPercentage),
 				storage.WithPrunableManagerOptions(
 					prunable.WithMaxOpenDBs(ParamsDatabase.MaxOpenDBs),
 				),

@@ -35,28 +35,28 @@ type Storage struct {
 	shutdownOnce sync.Once
 	errorHandler func(error)
 
-	isPruning  bool
-	statusLock sync.RWMutex
+	isPruning   bool
+	statusLock  sync.RWMutex
+	pruningLock sync.Mutex
 
-	optsDBEngine                           hivedb.Engine
-	optsAllowedDBEngines                   []hivedb.Engine
-	optsPruningDelay                       iotago.EpochIndex
-	optPruningSizeMaxTargetSizeBytes       int64
-	optStartPruningSizeThresholdPercentage float64
-	optStopPruningSizeThresholdPercentage  float64
-	optsPrunableManagerOptions             []options.Option[prunable.PrunableSlotManager]
+	optsDBEngine                      hivedb.Engine
+	optsAllowedDBEngines              []hivedb.Engine
+	optsPruningDelay                  iotago.EpochIndex
+	optPruningSizeEnabled             bool
+	optPruningSizeMaxTargetSizeBytes  int64
+	optPruningSizeThresholdPercentage float64
+	optsPrunableManagerOptions        []options.Option[prunable.PrunableSlotManager]
 }
 
 // New creates a new storage instance with the named database version in the given directory.
 func New(directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
 	return options.Apply(&Storage{
-		dir:                                    utils.NewDirectory(directory, true),
-		errorHandler:                           errorHandler,
-		optsDBEngine:                           hivedb.EngineRocksDB,
-		optsPruningDelay:                       2,       // TODO: what's the default now?
-		optPruningSizeMaxTargetSizeBytes:       1 << 30, // 1GB, TODO: what's the default?
-		optStartPruningSizeThresholdPercentage: 0.9,     // TODO: what's the default?
-		optStopPruningSizeThresholdPercentage:  0.2,
+		dir:                               utils.NewDirectory(directory, true),
+		errorHandler:                      errorHandler,
+		optsDBEngine:                      hivedb.EngineRocksDB,
+		optsPruningDelay:                  2,       // TODO: what's the default now?
+		optPruningSizeMaxTargetSizeBytes:  1 << 30, // 1GB, TODO: what's the default?
+		optPruningSizeThresholdPercentage: 0.9,     // TODO: what's the default?
 	}, opts,
 		func(s *Storage) {
 			dbConfig := database.Config{
@@ -103,6 +103,9 @@ func (s *Storage) Size() int64 {
 }
 
 func (s *Storage) PruneByEpochIndex(index iotago.EpochIndex) {
+	s.pruningLock.Lock()
+	defer s.pruningLock.Unlock()
+
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
@@ -110,6 +113,9 @@ func (s *Storage) PruneByEpochIndex(index iotago.EpochIndex) {
 }
 
 func (s *Storage) PruneByDepth(depth iotago.EpochIndex) {
+	s.pruningLock.Lock()
+	defer s.pruningLock.Unlock()
+
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
@@ -125,6 +131,14 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) {
 
 // This is now similar to how hornet pruneBySize, by calculating the ratio of the current size to the target size then calculate the number of epochs to prune. So it's not precise.
 func (s *Storage) PruneBySize(targetSizeBytes ...int64) {
+	if !s.optPruningSizeEnabled && len(targetSizeBytes) == 0 {
+		// pruning by size deactivated
+		return
+	}
+
+	s.pruningLock.Lock()
+	defer s.pruningLock.Unlock()
+
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
