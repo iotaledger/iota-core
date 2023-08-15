@@ -3,6 +3,7 @@ package ledger
 import (
 	"io"
 
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -191,7 +192,14 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	}
 
 	// Update the Accounts ledger
-	if err = l.accountsLedger.ApplyDiff(index, accountDiffs, destroyedAccounts); err != nil {
+	// first, get the RMC corresponding to this slot
+	maxCommittableAge := l.apiProvider.APIForSlot(index).ProtocolParameters().MaxCommittableAge()
+	rmcIndex, _ := safemath.SafeSub(index, maxCommittableAge)
+	rmc, err := l.rmcManager.RMC(rmcIndex)
+	if err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to get RMC for index %d: %w", index, err)
+	}
+	if err = l.accountsLedger.ApplyDiff(index, rmc, accountDiffs, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for index %d: %w", index, err)
 	}
 
