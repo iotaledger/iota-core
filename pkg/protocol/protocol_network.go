@@ -18,12 +18,6 @@ func (p *Protocol) runNetworkProtocol() {
 
 	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks
 
-	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {
-		if err := p.BlockDispatcher.Dispatch(block, id); err != nil {
-			p.ErrorHandler()(err)
-		}
-	}, event.WithWorkerPool(wpBlocks))
-
 	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id network.PeerID) {
 		if block, exists := p.MainEngineInstance().Block(blockID); exists {
 			p.networkProtocol.SendBlock(block, id)

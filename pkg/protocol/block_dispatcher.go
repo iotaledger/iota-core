@@ -63,7 +63,7 @@ func NewBlockDispatcher(protocol *Protocol) *BlockDispatcher {
 
 		protocol.engineManager.OnEngineCreated(b.monitorLatestCommitmentUpdated)
 
-		protocol.ChainManager.Events.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
+		protocol.Events.ChainManager.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
 			chainCommitment.Solid().OnTrigger(func() {
 				b.warpSyncIfNecessary(b.targetEngine(chainCommitment), chainCommitment)
 			})
@@ -80,15 +80,22 @@ func NewBlockDispatcher(protocol *Protocol) *BlockDispatcher {
 	})
 
 	protocol.HookInitialized(func() {
+		protocol.Events.Engine.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
+			protocol.networkProtocol.RequestBlock(blockID)
+		}, event.WithWorkerPool(b.dispatchWorkers))
+
 		b.pendingWarpSyncRequests.Events.Tick.Hook(func(id iotago.CommitmentID) {
 			fmt.Println("Sending WarpSyncRequest for", id)
 			protocol.networkProtocol.SendWarpSyncRequest(id)
 		})
 
-		protocol.Events.Started.Hook(func() {
-			protocol.Events.Network.WarpSyncRequestReceived.Hook(b.queueWarpSyncRequest)
-			protocol.Events.Network.WarpSyncResponseReceived.Hook(b.queueWarpSyncResponse)
-		})
+		protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {
+			if err := b.Dispatch(block, id); err != nil {
+				protocol.ErrorHandler()(err)
+			}
+		}, event.WithWorkerPool(b.dispatchWorkers))
+		protocol.Events.Network.WarpSyncRequestReceived.Hook(b.queueWarpSyncRequest)
+		protocol.Events.Network.WarpSyncResponseReceived.Hook(b.queueWarpSyncResponse)
 	})
 
 	protocol.HookStopped(b.shutdown)
