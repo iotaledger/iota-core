@@ -125,15 +125,12 @@ func (m *Manager) ApplyDiff(
 	}
 
 	// load blocks burned in this slot
-	// TODO: move this to update slot diff
-	burns, err := m.computeBlockBurnsForSlot(slotIndex)
-	if err != nil {
-		return ierrors.Wrap(err, "could not create block burns for slot")
+	if err := m.updateSlotDiffWithBurns(slotIndex, accountDiffs); err != nil {
+		return ierrors.Wrap(err, "could not update slot diff with burns")
 	}
-	m.updateSlotDiffWithBurns(burns, accountDiffs)
 
 	// store the diff and apply it to the account vector tree, obtaining the new root
-	if err = m.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
+	if err := m.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
 		return ierrors.Wrap(err, "could not apply diff to account tree")
 	}
 
@@ -443,7 +440,11 @@ func (m *Manager) evict(index iotago.SlotIndex) {
 	m.blockBurns.Delete(index)
 }
 
-func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]iotago.Mana, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) {
+func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) error {
+	burns, err := m.computeBlockBurnsForSlot(slotIndex)
+	if err != nil {
+		return ierrors.Wrap(err, "could not create block burns for slot")
+	}
 	for id, burn := range burns {
 		accountDiff, exists := accountDiffs[id]
 		if !exists {
@@ -453,4 +454,6 @@ func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]iotago.Mana
 		accountDiff.BICChange -= iotago.BlockIssuanceCredits(burn)
 		accountDiffs[id] = accountDiff
 	}
+
+	return nil
 }
