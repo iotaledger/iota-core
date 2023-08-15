@@ -27,7 +27,7 @@ import (
 func TestProtocol_EngineSwitching(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithLivenessThreshold(1),
-		testsuite.WithMinCommittableAge(1),
+		testsuite.WithMinCommittableAge(2),
 		testsuite.WithMaxCommittableAge(4),
 		testsuite.WithEpochNearingThreshold(2),
 		testsuite.WithSlotsPerEpochExponent(3),

@@ -18,6 +18,8 @@ type ParametersRestAPI struct {
 	DebugRequestLoggerEnabled bool `default:"false" usage:"whether the debug logging for requests should be enabled"`
 	// AllowIncompleteBlock defines whether the node allows to fill in incomplete block and issue it for user.
 	AllowIncompleteBlock bool `default:"false" usage:"whether the node allows to fill in incomplete block and issue it for user"`
+	// MaxPageSize defines the maximum number of results per page.
+	MaxPageSize uint32 `default:"100" usage:"the maximum number of results per page"`
 
 	JWTAuth struct {
 		// salt used inside the JWT tokens for the REST API. Change this to a different value to invalidate JWT tokens not matching this new value
@@ -42,7 +44,7 @@ var ParamsRestAPI = &ParametersRestAPI{
 		"/api/core/v3/commitments*",
 		"/api/core/v3/outputs*",
 		"/api/core/v3/accounts*",
-		"/api/core/v3/staking*",
+		"/api/core/v3/validators*",
 		"/api/core/v3/rewards*",
 		"/api/core/v3/committee",
 		"/api/debug/v2/*",
