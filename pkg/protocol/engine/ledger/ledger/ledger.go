@@ -270,7 +270,7 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 			return nil, iotago.ErrTxTypeInvalid
 		}
 
-		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationTime, stateWithMetadata.State().Output()), nil
+		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationSlot, stateWithMetadata.State().Output()), nil
 	default:
 		panic("unexpected State type")
 	}
@@ -560,7 +560,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 			err = iotago.ErrTxTypeInvalid
 			return false
 		}
-		txCreationTime := tx.Essence.CreationTime
+		txCreationSlot := tx.Essence.CreationSlot
 
 		inputRefs, errInput := tx.Inputs()
 		if errInput != nil {
@@ -584,7 +584,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 			// output side
 			txWithMeta.Outputs().Range(func(stateMetadata mempool.OutputStateMetadata) {
-				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationTime, stateMetadata.State().Output())
+				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationSlot, stateMetadata.State().Output())
 				outputs = append(outputs, output)
 			})
 		}
