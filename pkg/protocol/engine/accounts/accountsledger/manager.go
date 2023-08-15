@@ -130,7 +130,7 @@ func (m *Manager) ApplyDiff(
 		return ierrors.Wrap(err, "could not update slot diff with burns")
 	}
 
-	for accountID, accountDiff := range accountDiffs {
+	for accountID := range accountDiffs {
 		destroyed := destroyedAccounts.Has(accountID)
 		if destroyed {
 			reconstructedAccountDiff, err := m.preserveDestroyedAccountData(accountID)
@@ -138,16 +138,20 @@ func (m *Manager) ApplyDiff(
 				return ierrors.Wrapf(err, "could not preserve destroyed account data for account %s", accountID)
 			}
 
-			accountDiff = reconstructedAccountDiff
-		}
-		err := m.slotDiff(slotIndex).Store(accountID, accountDiff, destroyed)
-		if err != nil {
-			return ierrors.Wrapf(err, "could not store diff to slot %d", slotIndex)
+			accountDiffs[accountID] = reconstructedAccountDiff
 		}
 	}
 
+	// committing the tree will modify the accountDiffs to take into account the decayed credits
 	if err := m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
 		return ierrors.Wrap(err, "could not commit account tree")
+	}
+
+	for accountID, accountDiff := range accountDiffs {
+		err := m.slotDiff(slotIndex).Store(accountID, accountDiff, destroyedAccounts.Has(accountID))
+		if err != nil {
+			return ierrors.Wrapf(err, "could not store diff to slot %d", slotIndex)
+		}
 	}
 
 	// set the index where the tree is now at
@@ -407,16 +411,22 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		}
 
 		if diffChange.BICChange != 0 || !exists {
-			decayedCredits := iotago.Mana(diffChange.BICChange)
+			var decayedPreviousCredits iotago.Mana
 			// decay the credits to the current slot if the account exists
 			if exists {
-				decayedCredits, err = m.apiProvider.APIForSlot(index).ManaDecayProvider().StoredManaWithDecay(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateTime, index)
+				decayedPreviousCredits, err = m.apiProvider.APIForSlot(index).ManaDecayProvider().StoredManaWithDecay(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateTime, index)
 				if err != nil {
 					return ierrors.Wrapf(err, "can't retrieve account, could not decay credits for account (%s) in slot (%d)", accountData.ID, index)
 				}
 			}
 
-			accountData.Credits.Set(iotago.BlockIssuanceCredits(decayedCredits), index)
+			// update the account data diff taking into account the decay, the modified diff will be stored in the calling
+			// ApplyDiff function, to be able to properly rollback the account to a previous state taking into account the
+			// applied decay.
+			decayedChange := accountData.Credits.Value - iotago.BlockIssuanceCredits(decayedPreviousCredits)
+			diffChange.BICChange -= decayedChange
+
+			accountData.Credits.Update(diffChange.BICChange, index)
 		}
 
 		// update the expiry slot of the account if it changed
