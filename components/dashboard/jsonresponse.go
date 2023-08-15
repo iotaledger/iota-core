@@ -276,7 +276,6 @@ type SlotDetailsResponse struct {
 	CumulativeWeight uint64   `json:"cumulativeWeight"`
 	CreatedOutputs   []string `json:"createdOutputs"`
 	SpentOutputs     []string `json:"spentOutputs"`
-	// TODO: might add roots of different trees here
 }
 
 func NewSlotDetails(commitment *model.Commitment, diffs *utxoledger.SlotDiff) *SlotDetailsResponse {

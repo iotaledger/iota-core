@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/labstack/echo/v4"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
@@ -12,12 +13,12 @@ import (
 func getOutput(c echo.Context) (*utxoledger.Output, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to parse output ID param: %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
 	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to get output: %s from the Ledger", outputID.String())
 	}
 
 	return output, nil
@@ -26,12 +27,12 @@ func getOutput(c echo.Context) (*utxoledger.Output, error) {
 func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadataResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to parse output ID param: %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
 	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to get output: %s from the Ledger", outputID.String())
 	}
 
 	if spent != nil {
@@ -56,7 +57,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 	if includedSlotIndex <= latestCommitment.Index() {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedSlotIndex)
 		if err != nil {
-			return nil, err
+			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
 		}
 		resp.IncludedCommitmentID = includedCommitment.ID()
 	}
@@ -80,7 +81,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 	if includedSlotIndex <= latestCommitment.Index() {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedSlotIndex)
 		if err != nil {
-			return nil, err
+			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
 		}
 		resp.IncludedCommitmentID = includedCommitment.ID()
 	}
@@ -89,7 +90,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 	if spentSlotIndex <= latestCommitment.Index() {
 		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(spentSlotIndex)
 		if err != nil {
-			return nil, err
+			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
 		}
 		resp.CommitmentIDSpent = spentCommitment.ID()
 	}

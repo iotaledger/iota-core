@@ -32,6 +32,12 @@ const (
 
 	// ParameterPeerID is used to identify a peer.
 	ParameterPeerID = "peerID"
+
+	// QueryParameterPageSize is used to specify the page size.
+	QueryParameterPageSize = "pageSize"
+
+	// QueryParameterCursor is used to specify the the point from which the response should continue for paginater results.
+	QueryParameterCursor = "cursor"
 )
 
 func ParsePeerIDParam(c echo.Context) (peer.ID, error) {

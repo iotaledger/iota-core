@@ -43,7 +43,6 @@ type wsclient struct {
 }
 
 func runWebSocketStreams(component *app.Component) {
-	// todo connect when protocol is ready
 	process := func(msg interface{}) {
 		switch x := msg.(type) {
 		case float64:
