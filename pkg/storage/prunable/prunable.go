@@ -60,10 +60,10 @@ func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
 	// prune prunable_epoch
 	start := lo.Return1(p.manager.LastPrunedEpoch()) + 1
 	for currentIndex := start; currentIndex <= epoch; currentIndex++ {
-		p.decidedUpgradeSignals.Prune(epoch)
-		p.poolRewards.Prune(epoch)
-		p.poolStats.Prune(epoch)
-		p.committee.Prune(epoch)
+		p.decidedUpgradeSignals.Prune(currentIndex)
+		p.poolRewards.Prune(currentIndex)
+		p.poolStats.Prune(currentIndex)
+		p.committee.Prune(currentIndex)
 	}
 
 	// prune prunable_slot
