@@ -457,7 +457,7 @@ func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIn
 }
 
 func (i *BlockIssuer) issueBlock(block *model.Block) error {
-	if err := i.protocol.ProcessOwnBlock(block); err != nil {
+	if err := i.protocol.IssueBlock(block); err != nil {
 		return err
 	}
 	i.events.BlockIssued.Trigger(block)
