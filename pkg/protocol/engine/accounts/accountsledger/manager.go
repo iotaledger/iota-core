@@ -414,7 +414,7 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		if diffChange.BICChange != 0 || !exists {
 			// decay the credits to the current slot if the account exists
 			if exists {
-				decayedPreviousCredits, err := m.apiProvider.APIForSlot(index).ManaDecayProvider().StoredManaWithDecay(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateTime, index)
+				decayedPreviousCredits, err := m.apiProvider.APIForSlot(index).ManaDecayProvider().ManaWithDecay(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateTime, index)
 				if err != nil {
 					return ierrors.Wrapf(err, "can't retrieve account, could not decay credits for account (%s) in slot (%d)", accountData.ID, index)
 				}
