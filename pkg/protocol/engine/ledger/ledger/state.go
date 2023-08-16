@@ -8,7 +8,7 @@ import (
 type ExecutionOutput struct {
 	outputID     iotago.OutputID
 	output       iotago.Output
-	creationTime iotago.SlotIndex
+	creationSlot iotago.SlotIndex
 }
 
 func (o *ExecutionOutput) StateID() iotago.Identifier {
@@ -27,6 +27,6 @@ func (o *ExecutionOutput) Output() iotago.Output {
 	return o.output
 }
 
-func (o *ExecutionOutput) CreationTime() iotago.SlotIndex {
-	return o.creationTime
+func (o *ExecutionOutput) CreationSlot() iotago.SlotIndex {
+	return o.creationSlot
 }

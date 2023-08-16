@@ -39,7 +39,6 @@ type CommitmentFilter struct {
 
 func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter] {
 	return module.Provide(func(e *engine.Engine) commitmentfilter.CommitmentFilter {
-		// TODO: check the accounts manager directly rather than loading the commitment from storage.
 		c := New(e, opts...)
 		e.HookConstructed(func() {
 			c.commitmentFunc = e.Storage.Commitments().Load

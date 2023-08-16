@@ -525,9 +525,9 @@ func WithAllotments(allotments iotago.Allotments) options.Option[builder.Transac
 	}
 }
 
-func WithCreationTime(creationTime iotago.SlotIndex) options.Option[builder.TransactionBuilder] {
+func WithCreationSlot(creationSlot iotago.SlotIndex) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
-		txBuilder.SetCreationTime(creationTime)
+		txBuilder.SetCreationSlot(creationSlot)
 	}
 }
 

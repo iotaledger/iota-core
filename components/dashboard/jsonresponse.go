@@ -120,7 +120,7 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 type Transaction struct {
 	TransactionID    string                  `json:"txId"`
 	NetworkID        iotago.NetworkID        `json:"networkId"`
-	CreationTime     iotago.SlotIndex        `json:"creationTime"`
+	CreationSlot     iotago.SlotIndex        `json:"creationSlot"`
 	Inputs           []*Input                `json:"inputs"`
 	InputsCommitment iotago.InputsCommitment `json:"inputsCommitment"`
 	Outputs          []*Output               `json:"outputs"`
@@ -162,7 +162,7 @@ func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
 
 	return &Transaction{
 		NetworkID:    iotaTx.Essence.NetworkID,
-		CreationTime: iotaTx.Essence.CreationTime,
+		CreationSlot: iotaTx.Essence.CreationSlot,
 		Inputs:       inputs,
 		Outputs:      outputs,
 		Unlocks:      unlockBlocks,
@@ -276,7 +276,6 @@ type SlotDetailsResponse struct {
 	CumulativeWeight uint64   `json:"cumulativeWeight"`
 	CreatedOutputs   []string `json:"createdOutputs"`
 	SpentOutputs     []string `json:"spentOutputs"`
-	// TODO: might add roots of different trees here
 }
 
 func NewSlotDetails(commitment *model.Commitment, diffs *utxoledger.SlotDiff) *SlotDetailsResponse {

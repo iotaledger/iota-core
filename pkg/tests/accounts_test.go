@@ -147,7 +147,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithInputs(inputForNewAccount),
 		testsuite.WithAccountInput(destroyedAccountInput, true),
 		testsuite.WithOutputs(append(newAccountOutputs, destructionOutputs...)),
-		testsuite.WithCreationTime(slotIndexBlock2),
+		testsuite.WithCreationSlot(slotIndexBlock2),
 	))
 
 	block2 := ts.IssueBlockAtSlotWithOptions("block2", slotIndexBlock2, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx2, blockfactory.WithStrongParents(latestParent.ID()))
@@ -218,7 +218,7 @@ func Test_TransitionAccount(t *testing.T) {
 		}),
 		testsuite.WithInputs(inputForNewDelegation),
 		testsuite.WithOutputs(newDelegationOutputs),
-		testsuite.WithCreationTime(slotIndexBlock3),
+		testsuite.WithCreationSlot(slotIndexBlock3),
 	))
 
 	block3 := ts.IssueBlockAtSlotWithOptions("block3", slotIndexBlock3, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx3, blockfactory.WithStrongParents(latestParent.ID()))
