@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -17,6 +18,9 @@ import (
 type PrunableSlotManager struct {
 	openDBs      *cache.Cache[iotago.EpochIndex, *database.DBInstance]
 	openDBsMutex syncutils.Mutex
+
+	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
+	lastPrunedMutex syncutils.RWMutex
 
 	dbConfig     database.Config
 	errorHandler func(error)
@@ -28,10 +32,11 @@ type PrunableSlotManager struct {
 
 func NewPrunableSlotManager(dbConfig database.Config, errorHandler func(error), opts ...options.Option[PrunableSlotManager]) *PrunableSlotManager {
 	return options.Apply(&PrunableSlotManager{
-		optsMaxOpenDBs: 10,
-		dbConfig:       dbConfig,
-		errorHandler:   errorHandler,
-		dbSizes:        shrinkingmap.New[iotago.EpochIndex, int64](),
+		optsMaxOpenDBs:  10,
+		dbConfig:        dbConfig,
+		errorHandler:    errorHandler,
+		dbSizes:         shrinkingmap.New[iotago.EpochIndex, int64](),
+		lastPrunedEpoch: model.NewEvictionIndex[iotago.EpochIndex](),
 	}, opts, func(m *PrunableSlotManager) {
 		m.openDBs = cache.New[iotago.EpochIndex, *database.DBInstance](m.optsMaxOpenDBs)
 		m.openDBs.SetEvictCallback(func(baseIndex iotago.EpochIndex, db *database.DBInstance) {
@@ -47,7 +52,19 @@ func NewPrunableSlotManager(dbConfig database.Config, errorHandler func(error), 
 	})
 }
 
+// IsTooOld checks if the index is in a pruned epoch.
+func (m *PrunableSlotManager) IsTooOld(index iotago.EpochIndex) (isTooOld bool) {
+	m.lastPrunedMutex.RLock()
+	defer m.lastPrunedMutex.RUnlock()
+
+	return index < m.lastPrunedEpoch.NextIndex()
+}
+
 func (m *PrunableSlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) kvstore.KVStore {
+	if m.IsTooOld(index) {
+		return nil
+	}
+
 	kv := m.getDBInstance(index).KVStore()
 	withRealm, err := kv.WithExtendedRealm(realm)
 	if err != nil {
@@ -57,9 +74,17 @@ func (m *PrunableSlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) 
 	return withRealm
 }
 
-func (m *PrunableSlotManager) PruneUntilEpoch(start, end iotago.EpochIndex) {
-	for currentIndex := start; currentIndex <= end; currentIndex++ {
+func (m *PrunableSlotManager) PruneUntilEpoch(index iotago.EpochIndex) {
+	m.lastPrunedMutex.Lock()
+	defer m.lastPrunedMutex.Unlock()
+
+	if index < m.lastPrunedEpoch.NextIndex() {
+		return
+	}
+
+	for currentIndex := m.lastPrunedEpoch.NextIndex(); currentIndex <= index; currentIndex++ {
 		m.prune(currentIndex)
+		m.lastPrunedEpoch.MarkEvicted(currentIndex)
 	}
 }
 
@@ -97,20 +122,29 @@ func (m *PrunableSlotManager) PrunableSlotStorageSize() int64 {
 	return sum
 }
 
-func (m *PrunableSlotManager) RestoreFromDisk() iotago.EpochIndex {
+func (m *PrunableSlotManager) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
+	m.lastPrunedMutex.RLock()
+	defer m.lastPrunedMutex.RUnlock()
+
+	return m.lastPrunedEpoch.Index()
+}
+
+func (m *PrunableSlotManager) RestoreFromDisk() {
+	m.lastPrunedMutex.Lock()
+	defer m.lastPrunedMutex.Unlock()
+
 	dbInfos := getSortedDBInstancesFromDisk(m.dbConfig.Directory)
 
 	// There are no dbInstances on disk -> nothing to restore.
 	if len(dbInfos) == 0 {
-		return 0
+		return
 	}
 
-	var lastPrunedEpoch iotago.EpochIndex
 	// Set the maxPruned epoch to the baseIndex-1 of the oldest dbInstance.
 	if dbInfos[0].baseIndex > 0 {
-		lastPrunedEpoch = dbInfos[0].baseIndex - 1
+		m.lastPrunedEpoch.MarkEvicted(dbInfos[0].baseIndex - 1)
 	} else {
-		lastPrunedEpoch = 0
+		m.lastPrunedEpoch.MarkEvicted(0)
 	}
 
 	// Open all the dbInstances (perform health checks) and add them to the openDBs cache. Also fills the dbSizes map (when evicted from the cache).
@@ -118,7 +152,7 @@ func (m *PrunableSlotManager) RestoreFromDisk() iotago.EpochIndex {
 		m.getDBInstance(dbInfo.baseIndex)
 	}
 
-	return lastPrunedEpoch
+	return
 }
 
 // getDBInstance returns the DB instance for the given epochIndex or creates a new one if it does not yet exist.

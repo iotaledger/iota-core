@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/dig"
@@ -56,9 +55,6 @@ var (
 
 	blocksPerSlot         *shrinkingmap.ShrinkingMap[iotago.SlotIndex, []*blocks.Block]
 	blocksPrunableStorage *prunable.PrunableSlotManager
-
-	lastPrunedEpoch iotago.EpochIndex
-	prunedMutex     sync.RWMutex
 )
 
 type dependencies struct {
@@ -101,11 +97,7 @@ func configure() error {
 			return
 		}
 
-		prunedMutex.Lock()
-		defer prunedMutex.Unlock()
-
-		blocksPrunableStorage.PruneUntilEpoch(lastPrunedEpoch, epoch-iotago.EpochIndex(ParamsDebugAPI.PruningThreshold))
-		lastPrunedEpoch = epoch - iotago.EpochIndex(ParamsDebugAPI.PruningThreshold)
+		blocksPrunableStorage.PruneUntilEpoch(epoch - iotago.EpochIndex(ParamsDebugAPI.PruningThreshold))
 
 	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", 1)))
 
