@@ -2,6 +2,7 @@ package accountsledger
 
 import (
 	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -127,16 +128,32 @@ func (m *Manager) ApplyDiff(
 	}
 
 	// load blocks burned in this slot
-	// TODO: move this to update slot diff
-	burns, err := m.computeBlockBurnsForSlot(slotIndex, rmc)
-	if err != nil {
-		return ierrors.Wrap(err, "could not create block burns for slot")
+	if err := m.updateSlotDiffWithBurns(slotIndex, accountDiffs, rmc); err != nil {
+		return ierrors.Wrap(err, "could not update slot diff with burns")
 	}
-	m.updateSlotDiffWithBurns(burns, accountDiffs)
 
-	// store the diff and apply it to the account vector tree, obtaining the new root
-	if err = m.applyDiffs(slotIndex, accountDiffs, destroyedAccounts); err != nil {
-		return ierrors.Wrap(err, "could not apply diff to account tree")
+	for accountID := range accountDiffs {
+		destroyed := destroyedAccounts.Has(accountID)
+		if destroyed {
+			reconstructedAccountDiff, err := m.preserveDestroyedAccountData(accountID)
+			if err != nil {
+				return ierrors.Wrapf(err, "could not preserve destroyed account data for account %s", accountID)
+			}
+
+			accountDiffs[accountID] = reconstructedAccountDiff
+		}
+	}
+
+	// committing the tree will modify the accountDiffs to take into account the decayed credits
+	if err := m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
+		return ierrors.Wrap(err, "could not commit account tree")
+	}
+
+	for accountID, accountDiff := range accountDiffs {
+		err := m.slotDiff(slotIndex).Store(accountID, accountDiff, destroyedAccounts.Has(accountID))
+		if err != nil {
+			return ierrors.Wrapf(err, "could not store diff to slot %d", slotIndex)
+		}
 	}
 
 	// set the index where the tree is now at
@@ -295,11 +312,29 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		accountData.AddPublicKeys(diffChange.PubKeysRemoved...)
 		accountData.RemovePublicKeys(diffChange.PubKeysAdded...)
 
-		// TODO: add safemath package, check for overflows in testcases
-		accountData.ValidatorStake = iotago.BaseToken(int64(accountData.ValidatorStake) - diffChange.ValidatorStakeChange)
-		accountData.DelegationStake = iotago.BaseToken(int64(accountData.DelegationStake) - diffChange.DelegationStakeChange)
-		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) - diffChange.StakeEndEpochChange)
-		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) - diffChange.FixedCostChange)
+		validatorStake, err := safemath.SafeSub(int64(accountData.ValidatorStake), diffChange.ValidatorStakeChange)
+		if err != nil {
+			return false, ierrors.Wrapf(err, "can't retrieve account, validator stake underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffIndex, accountData.ValidatorStake, diffChange.ValidatorStakeChange)
+		}
+		accountData.ValidatorStake = iotago.BaseToken(validatorStake)
+
+		delegationStake, err := safemath.SafeSub(int64(accountData.DelegationStake), diffChange.DelegationStakeChange)
+		if err != nil {
+			return false, ierrors.Wrapf(err, "can't retrieve account, delegation stake underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffIndex, accountData.DelegationStake, diffChange.DelegationStakeChange)
+		}
+		accountData.DelegationStake = iotago.BaseToken(delegationStake)
+
+		stakeEpochEnd, err := safemath.SafeSub(int64(accountData.StakeEndEpoch), diffChange.StakeEndEpochChange)
+		if err != nil {
+			return false, ierrors.Wrapf(err, "can't retrieve account, stake end epoch underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffIndex, accountData.StakeEndEpoch, diffChange.StakeEndEpochChange)
+		}
+		accountData.StakeEndEpoch = iotago.EpochIndex(stakeEpochEnd)
+
+		fixedCost, err := safemath.SafeSub(int64(accountData.FixedCost), diffChange.FixedCostChange)
+		if err != nil {
+			return false, ierrors.Wrapf(err, "can't retrieve account, fixed cost underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffIndex, accountData.FixedCost, diffChange.FixedCostChange)
+		}
+		accountData.FixedCost = iotago.Mana(fixedCost)
 
 		// collected to see if an account was destroyed between slotIndex and b.latestCommittedSlot index.
 		wasDestroyed = wasDestroyed || destroyed
@@ -357,33 +392,6 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex, rmc iotag
 	return burns, nil
 }
 
-func (m *Manager) applyDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
-	// Load diffs storage for the slot. The storage can never be nil (pruned) because we are just committing the slot.
-	diffStore := m.slotDiff(slotIndex)
-	for accountID, accountDiff := range accountDiffs {
-		destroyed := destroyedAccounts.Has(accountID)
-		if destroyed {
-			// TODO: should this diff be done in the same place as other diffs? it feels kind of out of place here
-			reconstructedAccountDiff, err := m.preserveDestroyedAccountData(accountID)
-			if err != nil {
-				return ierrors.Wrapf(err, "could not preserve destroyed account data for account %s", accountID)
-			}
-
-			accountDiff = reconstructedAccountDiff
-		}
-		err := diffStore.Store(accountID, accountDiff, destroyed)
-		if err != nil {
-			return ierrors.Wrapf(err, "could not store diff to slot %d", slotIndex)
-		}
-	}
-
-	if err := m.commitAccountTree(slotIndex, accountDiffs, destroyedAccounts); err != nil {
-		return ierrors.Wrap(err, "could not commit account tree")
-	}
-
-	return nil
-}
-
 func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
@@ -406,8 +414,18 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		}
 
 		if diffChange.BICChange != 0 || !exists {
-			// TODO: this needs to be decayed for (index - prevIndex) because update index is changed so it's impossible to use new decay
-			// //
+			// decay the credits to the current slot if the account exists
+			if exists {
+				decayedPreviousCredits, err := m.apiProvider.APIForSlot(index).ManaDecayProvider().ManaWithDecay(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateTime, index)
+				if err != nil {
+					return ierrors.Wrapf(err, "can't retrieve account, could not decay credits for account (%s) in slot (%d)", accountData.ID, index)
+				}
+
+				// update the account data diff taking into account the decay, the modified diff will be stored in the calling
+				// ApplyDiff function to be able to properly rollback the account to a previous slot.
+				diffChange.BICChange -= accountData.Credits.Value - iotago.BlockIssuanceCredits(decayedPreviousCredits)
+			}
+
 			accountData.Credits.Update(diffChange.BICChange, index)
 		}
 
@@ -424,11 +442,29 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		accountData.AddPublicKeys(diffChange.PubKeysAdded...)
 		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
 
-		// TODO: add safemath package, check for overflows in testcases
-		accountData.ValidatorStake = iotago.BaseToken(int64(accountData.ValidatorStake) + diffChange.ValidatorStakeChange)
-		accountData.DelegationStake = iotago.BaseToken(int64(accountData.DelegationStake) + diffChange.DelegationStakeChange)
-		accountData.StakeEndEpoch = iotago.EpochIndex(int64(accountData.StakeEndEpoch) + diffChange.StakeEndEpochChange)
-		accountData.FixedCost = iotago.Mana(int64(accountData.FixedCost) + diffChange.FixedCostChange)
+		validatorStake, err := safemath.SafeAdd(int64(accountData.ValidatorStake), diffChange.ValidatorStakeChange)
+		if err != nil {
+			return ierrors.Wrapf(err, "can't retrieve account, validator stake overflow for account (%s) in slot (%d): %d + %d", accountData.ID, index, accountData.ValidatorStake, diffChange.ValidatorStakeChange)
+		}
+		accountData.ValidatorStake = iotago.BaseToken(validatorStake)
+
+		delegationStake, err := safemath.SafeAdd(int64(accountData.DelegationStake), diffChange.DelegationStakeChange)
+		if err != nil {
+			return ierrors.Wrapf(err, "can't retrieve account, delegation stake overflow for account (%s) in slot (%d): %d + %d", accountData.ID, index, accountData.DelegationStake, diffChange.DelegationStakeChange)
+		}
+		accountData.DelegationStake = iotago.BaseToken(delegationStake)
+
+		stakeEndEpoch, err := safemath.SafeAdd(int64(accountData.StakeEndEpoch), diffChange.StakeEndEpochChange)
+		if err != nil {
+			return ierrors.Wrapf(err, "can't retrieve account, stake end epoch overflow for account (%s) in slot (%d): %d + %d", accountData.ID, index, accountData.StakeEndEpoch, diffChange.StakeEndEpochChange)
+		}
+		accountData.StakeEndEpoch = iotago.EpochIndex(stakeEndEpoch)
+
+		fixedCost, err := safemath.SafeAdd(int64(accountData.FixedCost), diffChange.FixedCostChange)
+		if err != nil {
+			return ierrors.Wrapf(err, "can't retrieve account, validator fixed cost overflow for account (%s) in slot (%d): %d + %d", accountData.ID, index, accountData.FixedCost, diffChange.FixedCostChange)
+		}
+		accountData.FixedCost = iotago.Mana(fixedCost)
 
 		if err := m.accountsTree.Set(accountID, accountData); err != nil {
 			return ierrors.Wrapf(err, "could not set account (%s) in accounts tree", accountID)
@@ -446,7 +482,11 @@ func (m *Manager) evict(index iotago.SlotIndex) {
 	m.blockBurns.Delete(index)
 }
 
-func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]iotago.Mana, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) {
+func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, rmc iotago.Mana) error {
+	burns, err := m.computeBlockBurnsForSlot(slotIndex, rmc)
+	if err != nil {
+		return ierrors.Wrap(err, "could not create block burns for slot")
+	}
 	for id, burn := range burns {
 		accountDiff, exists := accountDiffs[id]
 		if !exists {
@@ -456,4 +496,6 @@ func (m *Manager) updateSlotDiffWithBurns(burns map[iotago.AccountID]iotago.Mana
 		accountDiff.BICChange -= iotago.BlockIssuanceCredits(burn)
 		accountDiffs[id] = accountDiff
 	}
+
+	return nil
 }
