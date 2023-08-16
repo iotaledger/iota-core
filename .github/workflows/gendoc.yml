@@ -16,7 +16,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version-file: 'tools/gendoc/go.mod'
-          cache-dependency-path: 'tools/gendoc/go.sum'
+          cache: false
 
       - name: Print Go version
         run: go version
