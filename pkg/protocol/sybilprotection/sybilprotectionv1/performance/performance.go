@@ -87,7 +87,10 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	} else {
 		updatedPerformance.BlockIssuedCount++
 	}
-	updatedPerformance.HighestSupportedVersion = validatorBlock.HighestSupportedVersion
+	updatedPerformance.HighestSupportedVersionAndHash = iotago.VersionAndHash{
+		Version: validatorBlock.HighestSupportedVersion,
+		Hash:    validatorBlock.ProtocolParametersHash,
+	}
 
 	err = validatorSlotPerformanceStore.Store(block.ProtocolBlock().IssuerID, updatedPerformance)
 	if err != nil {

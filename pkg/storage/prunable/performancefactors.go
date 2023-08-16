@@ -4,60 +4,41 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // VlidatorSlotPerformance represent the performance factors of a validator for a given slot.
 type VlidatorSlotPerformance struct {
 	slot  iotago.SlotIndex
 	store kvstore.KVStore
+
+	apiProvider api.Provider
 }
 
 type ValidatorPerformance struct {
 	// works if ValidatorBlocksPerSlot is less than 32 because we use it as bit vector
 	SlotActivityVector uint32
 	// can be uint8 because max count per slot is maximally ValidatorBlocksPerSlot + 1
-	BlockIssuedCount        uint8
-	HighestSupportedVersion iotago.Version
+	BlockIssuedCount               uint8
+	HighestSupportedVersionAndHash iotago.VersionAndHash
 }
 
-func (p *ValidatorPerformance) Bytes() []byte {
-	m := marshalutil.MarshalUtil{}
-	m.WriteUint32(p.SlotActivityVector)
-	m.WriteUint8(p.BlockIssuedCount)
-	m.WriteByte(byte(p.HighestSupportedVersion))
-
-	return m.Bytes()
-}
-
-func (p *ValidatorPerformance) FromBytes(bytes []byte) (int, error) {
-	m := marshalutil.New(bytes)
-	av, err := m.ReadUint32()
+func ValidatorPerformanceFromBytes(bytes []byte, slotAPI iotago.API) (*ValidatorPerformance, int, error) {
+	p := &ValidatorPerformance{}
+	offset, err := slotAPI.Decode(bytes, p)
 	if err != nil {
-		return 0, err
+		return nil, 0, ierrors.Wrap(err, "failed to decode validator performance")
 	}
-	p.SlotActivityVector = av
-	count, err := m.ReadUint8()
-	if err != nil {
-		return 0, err
-	}
-	p.BlockIssuedCount = count
-
-	v, err := m.ReadByte()
-	if err != nil {
-		return 0, err
-	}
-	p.HighestSupportedVersion = iotago.Version(v)
-
-	return m.ReadOffset(), nil
+	return p, offset, nil
 }
 
 // NewPerformanceFactors is a constructor for the VlidatorSlotPerformance.
-func NewPerformanceFactors(slot iotago.SlotIndex, store kvstore.KVStore) *VlidatorSlotPerformance {
+func NewPerformanceFactors(slot iotago.SlotIndex, store kvstore.KVStore, apiProvider api.Provider) *VlidatorSlotPerformance {
 	return &VlidatorSlotPerformance{
-		slot:  slot,
-		store: store,
+		slot:        slot,
+		store:       store,
+		apiProvider: apiProvider,
 	}
 }
 
@@ -70,23 +51,26 @@ func (p *VlidatorSlotPerformance) Load(accountID iotago.AccountID) (pf *Validato
 
 		return nil, ierrors.Wrapf(err, "failed to get performance factor for account %s", accountID)
 	}
-	pf = &ValidatorPerformance{}
-	_, err = pf.FromBytes(performanceFactorsBytes)
+
+	validatorPerformance, _, err := ValidatorPerformanceFromBytes(performanceFactorsBytes, p.apiProvider.APIForSlot(p.slot))
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to deserialize performance factor for account %s", accountID)
 	}
-
-	return pf, nil
+	return validatorPerformance, nil
 }
 
 func (p *VlidatorSlotPerformance) Store(accountID iotago.AccountID, pf *ValidatorPerformance) error {
-	return p.store.Set(lo.PanicOnErr(accountID.Bytes()), pf.Bytes())
+	bytes, err := p.apiProvider.APIForSlot(p.slot).Encode(pf)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to serialize performance factor for account %s", accountID)
+	}
+	return p.store.Set(lo.PanicOnErr(accountID.Bytes()), bytes)
 }
 
 // ForEachPerformanceFactor iterates over all saved validators.
 // Note that this stream function won't call the consumer function for inactive validators,
 // so better to use the load over every member of the committee if needed.
-func (p *VlidatorSlotPerformance) ForEachPerformanceFactor(consumer func(accountID iotago.AccountID, pf *ValidatorPerformance) error) error {
+func (p *VlidatorSlotPerformance) ForEachPerformanceFactor(consumer func(accountID iotago.AccountID, vp *ValidatorPerformance) error) error {
 	var innerErr error
 	if err := p.store.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
 		accountID, _, err := iotago.IdentifierFromBytes(key)
@@ -94,14 +78,13 @@ func (p *VlidatorSlotPerformance) ForEachPerformanceFactor(consumer func(account
 			innerErr = err
 			return false
 		}
-
-		pf := &ValidatorPerformance{}
-		if _, err = pf.FromBytes(value); err != nil {
+		vp, _, err := ValidatorPerformanceFromBytes(value, p.apiProvider.APIForSlot(p.slot))
+		if err != nil {
 			innerErr = err
 			return false
 		}
 
-		return consumer(accountID, pf) == nil
+		return consumer(accountID, vp) == nil
 	}); err != nil {
 		return ierrors.Wrapf(err, "failed to stream performance factors for slot %s", p.slot)
 	}

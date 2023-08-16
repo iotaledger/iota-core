@@ -84,7 +84,7 @@ func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *VlidatorSlotPerfor
 		return nil
 	}
 
-	return NewPerformanceFactors(slot, store)
+	return NewPerformanceFactors(slot, store, p.apiProvider)
 }
 
 func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *UpgradeSignals {

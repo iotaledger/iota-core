@@ -23,7 +23,7 @@ type TestSuite struct {
 	accounts             map[string]iotago.AccountID
 	latestCommittedEpoch iotago.EpochIndex
 
-	API iotago.API
+	apiProvider api.Provider
 
 	Instance *Tracker
 }
@@ -36,9 +36,9 @@ func NewTestSuite(t *testing.T) *TestSuite {
 	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 3)
 
 	ts := &TestSuite{
-		T:        t,
-		accounts: make(map[string]iotago.AccountID),
-		API:      iotago.V3API(iotago.NewV3ProtocolParameters()),
+		T:           t,
+		accounts:    make(map[string]iotago.AccountID),
+		apiProvider: apiProvider,
 	}
 	ts.InitRewardManager()
 
@@ -52,7 +52,7 @@ func (t *TestSuite) InitRewardManager() {
 			prunableStores[index] = mapdb.NewMapDB()
 		}
 
-		p := prunable.NewPerformanceFactors(index, prunableStores[index])
+		p := prunable.NewPerformanceFactors(index, prunableStores[index], t.apiProvider)
 
 		return p
 	}
@@ -60,7 +60,7 @@ func (t *TestSuite) InitRewardManager() {
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
 	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, t.latestCommittedEpoch, api.SingleVersionProvider(t.API))
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, t.latestCommittedEpoch, t.apiProvider)
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -128,13 +128,15 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 }
 
 func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochIndex iotago.EpochIndex, performanceFactor uint64) {
-	startSlot := t.API.TimeProvider().EpochStart(epochIndex)
-	endSlot := t.API.TimeProvider().EpochEnd(epochIndex)
+	startSlot := t.apiProvider.APIForEpoch(epochIndex).TimeProvider().EpochStart(epochIndex)
+	// TODO change params instad of hand typing here, also how to make it faster without shortening the epoch length?
+	//endSlot := t.apiProvider.APIForEpoch(epochIndex).TimeProvider().EpochEnd(epochIndex)
+	endSlot := startSlot + 10
 	for slot := startSlot; slot <= endSlot; slot++ {
 		for i := uint64(0); i < performanceFactor; i++ {
 			block := tpkg.RandBasicBlockWithIssuerAndBurnedMana(accountID, 10)
-			block.IssuingTime = t.API.TimeProvider().SlotStartTime(slot)
-			modelBlock, err := model.BlockFromBlock(block, t.API)
+			block.IssuingTime = t.apiProvider.APIForEpoch(epochIndex).TimeProvider().SlotStartTime(slot)
+			modelBlock, err := model.BlockFromBlock(block, t.apiProvider.APIForEpoch(epochIndex))
 			t.Instance.TrackValidationBlock(blocks.NewBlock(modelBlock))
 
 			require.NoError(t.T, err)
