@@ -19,7 +19,7 @@ func issueValidatorBlock(ctx context.Context) {
 
 	// Use 'defer' because nextBroadcast is updated during function execution, and the value at the end needs to be used.
 	defer func() {
-		executor.ExecuteAt(accountID, func() { issueValidatorBlock(ctx) }, nextBroadcast)
+		executor.ExecuteAt(validatorAccount.ID(), func() { issueValidatorBlock(ctx) }, nextBroadcast)
 	}()
 
 	if !ParamsValidator.IgnoreBootstrapped && !engineInstance.IsBootstrapped() {
@@ -36,6 +36,7 @@ func issueValidatorBlock(ctx context.Context) {
 	}
 
 	modelBlock, err := deps.BlockIssuer.CreateValidationBlock(ctx,
+		validatorAccount,
 		blockfactory.WithValidationBlockHeaderOptions(
 			blockfactory.WithIssuingTime(blockIssuingTime),
 			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
@@ -49,7 +50,7 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	if !engineInstance.SybilProtection.SeatManager().Committee(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(accountID) {
+	if !engineInstance.SybilProtection.SeatManager().Committee(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(validatorAccount.ID()) {
 		// update nextBroadcast value here, so that this updated value is used in the `defer`
 		// callback to schedule issuing of the next block at a different interval than for committee members
 		nextBroadcast = blockIssuingTime.Add(ParamsValidator.CandidateBroadcastInterval)

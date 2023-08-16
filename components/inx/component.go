@@ -2,16 +2,19 @@ package inx
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
+	"github.com/iotaledger/hive.go/crypto"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func init() {
@@ -29,8 +32,9 @@ func init() {
 }
 
 var (
-	Component *app.Component
-	deps      dependencies
+	Component          *app.Component
+	deps               dependencies
+	blockIssuerAccount blockfactory.Account
 )
 
 type dependencies struct {
@@ -54,6 +58,7 @@ func provide(c *dig.Container) error {
 }
 
 func configure() error {
+	blockIssuerAccount = accountFromParam(ParamsINX.BlockIssuerAccount, ParamsINX.BlockIssuerPrivateKey)
 
 	return nil
 }
@@ -71,4 +76,17 @@ func run() error {
 	}
 
 	return nil
+}
+
+func accountFromParam(accountHex, privateKey string) blockfactory.Account {
+	accountID, err := iotago.IdentifierFromHexString(accountHex)
+	if err != nil {
+		panic(fmt.Sprintln("invalid accountID hex string", err))
+	}
+	privKey, err := crypto.ParseEd25519PrivateKeyFromString(privateKey)
+	if err != nil {
+		panic(fmt.Sprintln("invalid ed25519 private key string", err))
+	}
+
+	return blockfactory.NewEd25519Account(accountID, privKey)
 }

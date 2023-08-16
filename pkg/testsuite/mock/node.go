@@ -108,7 +108,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 	n.hookEvents()
 	n.hookLogging(failOnBlockFiltered)
 
-	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
+	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
 	n.ctx, n.ctxCancel = context.WithCancel(context.Background())
 
@@ -474,7 +474,7 @@ func (n *Node) SetHighestSupportedVersion(version iotago.Version) {
 }
 
 func (n *Node) CreateValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
-	modelBlock, err := n.blockIssuer.CreateValidationBlock(ctx, opts...)
+	modelBlock, err := n.blockIssuer.CreateValidationBlock(ctx, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), opts...)
 	require.NoError(n.Testing, err)
 
 	modelBlock.ID().RegisterAlias(alias)
@@ -483,7 +483,7 @@ func (n *Node) CreateValidationBlock(ctx context.Context, alias string, opts ...
 }
 
 func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BasicBlockParams]) *blocks.Block {
-	modelBlock, err := n.blockIssuer.CreateBlock(ctx, opts...)
+	modelBlock, err := n.blockIssuer.CreateBlock(ctx, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), opts...)
 	require.NoError(n.Testing, err)
 
 	modelBlock.ID().RegisterAlias(alias)

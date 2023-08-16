@@ -2,7 +2,6 @@ package blockfactory
 
 import (
 	"context"
-	"crypto/ed25519"
 	"time"
 
 	"github.com/iotaledger/hive.go/core/safemath"
@@ -38,7 +37,6 @@ type BlockIssuer struct {
 
 	workerPool *workerpool.WorkerPool
 
-	Account  Account
 	protocol *protocol.Protocol
 
 	optsTipSelectionTimeout       time.Duration
@@ -48,12 +46,11 @@ type BlockIssuer struct {
 	optsRateSetterEnabled       bool
 }
 
-func New(p *protocol.Protocol, account Account, opts ...options.Option[BlockIssuer]) *BlockIssuer {
+func New(p *protocol.Protocol, opts ...options.Option[BlockIssuer]) *BlockIssuer {
 	return options.Apply(&BlockIssuer{
 		events:                        NewEvents(),
 		workerPool:                    p.Workers.CreatePool("BlockIssuer"),
 		protocol:                      p,
-		Account:                       account,
 		optsIncompleteBlockAccepted:   false,
 		optsRateSetterEnabled:         false,
 		optsTipSelectionTimeout:       5 * time.Second,
@@ -67,7 +64,7 @@ func (i *BlockIssuer) Shutdown() {
 	i.workerPool.ShutdownComplete.Wait()
 }
 
-func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options.Option[ValidatorBlockParams]) (*model.Block, error) {
+func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount Account, opts ...options.Option[ValidatorBlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&ValidatorBlockParams{}, opts)
 
 	if blockParams.BlockHeader.References == nil {
@@ -79,7 +76,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 		blockParams.BlockHeader.References = references
 	}
 
-	if err := i.setDefaultBlockParams(blockParams.BlockHeader); err != nil {
+	if err := i.setDefaultBlockParams(blockParams.BlockHeader, issuerAccount); err != nil {
 		return nil, err
 	}
 
@@ -125,7 +122,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 	blockBuilder.HighestSupportedVersion(*blockParams.HighestSupportedVersion)
 	blockBuilder.ProtocolParametersHash(*blockParams.ProtocolParametersHash)
 
-	blockBuilder.Sign(i.Account.ID(), i.Account.PrivateKey())
+	blockBuilder.Sign(issuerAccount.ID(), issuerAccount.PrivateKey())
 
 	block, err := blockBuilder.Build()
 	if err != nil {
@@ -152,7 +149,7 @@ func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams) (iotago.API, e
 }
 
 // CreateBlock creates a new block with the options.
-func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[BasicBlockParams]) (*model.Block, error) {
+func (i *BlockIssuer) CreateBlock(ctx context.Context, issuerAccount Account, opts ...options.Option[BasicBlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BasicBlockParams{}, opts)
 
 	if blockParams.BlockHeader.References == nil {
@@ -163,7 +160,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Ba
 		blockParams.BlockHeader.References = references
 	}
 
-	if err := i.setDefaultBlockParams(blockParams.BlockHeader); err != nil {
+	if err := i.setDefaultBlockParams(blockParams.BlockHeader, issuerAccount); err != nil {
 		return nil, err
 	}
 
@@ -204,7 +201,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[Ba
 
 	blockBuilder.Payload(blockParams.Payload)
 
-	blockBuilder.Sign(i.Account.ID(), i.Account.PrivateKey())
+	blockBuilder.Sign(issuerAccount.ID(), issuerAccount.PrivateKey())
 
 	block, err := blockBuilder.Build()
 	if err != nil {
@@ -269,7 +266,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	}
 }
 
-func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock) (iotago.BlockID, error) {
+func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock, optIssuerAccount ...Account) (iotago.BlockID, error) {
 	// if anything changes, need to make a new signature
 	var resign bool
 
@@ -333,11 +330,11 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	if iotaBlock.IssuerID.Empty() || resign {
-		if i.optsIncompleteBlockAccepted {
-			iotaBlock.IssuerID = i.Account.ID()
+		if i.optsIncompleteBlockAccepted && len(optIssuerAccount) > 0 {
+			issuerAccount := optIssuerAccount[0]
+			iotaBlock.IssuerID = issuerAccount.ID()
 
-			prvKey := i.Account.PrivateKey()
-			signature, signatureErr := iotaBlock.Sign(apiForVesion, iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
+			signature, signatureErr := iotaBlock.Sign(apiForVesion, iotago.NewAddressKeysForEd25519Address(issuerAccount.Address().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
 			if signatureErr != nil {
 				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
 			}
@@ -369,7 +366,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	return modelBlock.ID(), nil
 }
 
-func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams) error {
+func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, issuerAccount Account) error {
 	if blockParams.IssuingTime == nil {
 		issuingTime := time.Now().UTC()
 		blockParams.IssuingTime = &issuingTime
@@ -389,7 +386,9 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams) erro
 	}
 
 	if blockParams.Issuer == nil {
-		blockParams.Issuer = NewEd25519Account(i.Account.ID(), i.Account.PrivateKey())
+		blockParams.Issuer = NewEd25519Account(issuerAccount.ID(), issuerAccount.PrivateKey())
+	} else if blockParams.Issuer.ID() != issuerAccount.ID() {
+		return ierrors.Errorf("provided issuer account %s, but issuer provided in the block params is different %s", issuerAccount.ID(), blockParams.Issuer.ID())
 	}
 
 	if err := i.validateReferences(*blockParams.IssuingTime, blockParams.SlotCommitment.Index, blockParams.References); err != nil {

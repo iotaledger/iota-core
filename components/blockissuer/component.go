@@ -60,7 +60,7 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(deps innerDependencies) *blockfactory.BlockIssuer {
-		return blockfactory.New(deps.Protocol, accountFromParam(ParamsBlockIssuer.IssuerAccount, ParamsBlockIssuer.PrivateKey),
+		return blockfactory.New(deps.Protocol,
 			blockfactory.WithTipSelectionTimeout(ParamsBlockIssuer.TipSelectionTimeout),
 			blockfactory.WithTipSelectionRetryInterval(ParamsBlockIssuer.TipSelectionRetryInterval),
 			blockfactory.WithIncompleteBlockAccepted(restapi.ParamsRestAPI.AllowIncompleteBlock),
@@ -71,7 +71,7 @@ func provide(c *dig.Container) error {
 
 func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
-		Component.LogInfof("Starting BlockIssuer with AccountID: %s", deps.BlockIssuer.Account.ID())
+		Component.LogInfof("Starting BlockIssuer")
 		<-ctx.Done()
 		deps.BlockIssuer.Shutdown()
 		Component.LogInfo("Stopping BlockIssuer... done")
