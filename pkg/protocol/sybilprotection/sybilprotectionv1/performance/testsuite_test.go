@@ -29,6 +29,12 @@ type TestSuite struct {
 }
 
 func NewTestSuite(t *testing.T) *TestSuite {
+	apiProvider := api.NewEpochBasedProvider()
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 0)
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 1)
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 2)
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 3)
+
 	ts := &TestSuite{
 		T:        t,
 		accounts: make(map[string]iotago.AccountID),

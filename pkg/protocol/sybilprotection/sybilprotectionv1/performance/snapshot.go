@@ -223,7 +223,11 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 			if err := pWriter.WriteValue("account id", accountID); err != nil {
 				return ierrors.Wrapf(err, "unable to write account id %s for slot %d", accountID, currentSlot)
 			}
-			if err := pWriter.WriteBytes(pf.Bytes()); err != nil {
+			bytes, err := t.apiProvider.APIForSlot(currentSlot).Encode(pf)
+			if err != nil {
+				return ierrors.Wrapf(err, "unable to encode performance factor for accountID %s and slot index %d", accountID, currentSlot)
+			}
+			if err = pWriter.WriteBytes(bytes); err != nil {
 				return ierrors.Wrapf(err, "unable to write performance factor for accountID %s and slot index %d", accountID, currentSlot)
 			}
 			accountsCount++
