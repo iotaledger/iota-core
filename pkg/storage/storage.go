@@ -119,8 +119,8 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) {
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
-	latestCommittedIndex := s.Settings().LatestCommitment().Index()
-	start := s.Settings().APIProvider().APIForSlot(latestCommittedIndex).TimeProvider().EpochFromSlot(latestCommittedIndex)
+	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
+	start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
 	if start < depth {
 		s.errorHandler(ierrors.Errorf("pruning depth %d is greater than the current epoch %d", depth, start))
 		return
@@ -154,7 +154,7 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) {
 		return
 	}
 
-	latestEpoch := s.Settings().APIProvider().CurrentAPI().TimeProvider().EpochFromSlot(s.Settings().LatestCommitment().Index())
+	latestEpoch := s.Settings().APIProvider().CurrentAPI().TimeProvider().EpochFromSlot(s.Settings().LatestFinalizedSlot())
 	lastPrunedEpoch := lo.Return1(s.prunable.LastPrunedEpoch())
 
 	pruningRange := latestEpoch - lastPrunedEpoch
@@ -162,6 +162,7 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) {
 	epochDiff := math.Ceil(float64(pruningRange) * prunedDatabaseSizeBytes / float64(currentSize))
 
 	s.prunable.PruneUntilEpoch(latestEpoch - iotago.EpochIndex(epochDiff))
+
 }
 
 // Shutdown shuts down the storage.
