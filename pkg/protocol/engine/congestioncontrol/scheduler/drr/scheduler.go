@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -17,17 +18,19 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
+type Deficit int64
+
 type Scheduler struct {
 	events *scheduler.Events
 
-	quantumFunc func(iotago.AccountID) (iotago.Mana, error)
+	quantumFunc func(iotago.AccountID) (Deficit, error)
 
 	apiProvider api.Provider
 
 	buffer      *BufferQueue
 	bufferMutex syncutils.RWMutex
 
-	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, iotago.WorkScore]
+	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, Deficit]
 
 	tokenBucket      float64
 	lastScheduleTime time.Time
@@ -49,8 +52,8 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			s.blockCache = e.BlockCache
 			e.Events.Scheduler.LinkTo(s.events)
 			e.Ledger.HookInitialized(func() {
-				// Mana retrieve function gets the account's Mana and returns the quantum for that account
-				s.quantumFunc = func(accountID iotago.AccountID) (iotago.Mana, error) {
+				// quantum retrieve function gets the account's Mana and returns the quantum for that account
+				s.quantumFunc = func(accountID iotago.AccountID) (Deficit, error) {
 					manaSlot := e.Storage.Settings().LatestCommitment().Index()
 					mana, err := e.Ledger.ManaManager().GetManaOnAccount(accountID, manaSlot)
 					if err != nil {
@@ -59,10 +62,10 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 
 					minMana := s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MinMana
 					if mana < minMana {
-						return mana, ierrors.Errorf("account %s has insufficient Mana for block to be scheduled: account Mana %d, min Mana %d", accountID, mana, minMana)
+						return 0, ierrors.Errorf("account %s has insufficient Mana for block to be scheduled: account Mana %d, min Mana %d", accountID, mana, minMana)
 					}
 
-					return mana / minMana, nil
+					return Deficit(mana / minMana), nil
 				}
 			})
 			s.TriggerConstructed()
@@ -83,7 +86,7 @@ func New(apiProvider api.Provider, opts ...options.Option[Scheduler]) *Scheduler
 		&Scheduler{
 			events:           scheduler.NewEvents(),
 			lastScheduleTime: time.Now(),
-			deficits:         shrinkingmap.New[iotago.AccountID, iotago.WorkScore](),
+			deficits:         shrinkingmap.New[iotago.AccountID, Deficit](),
 			apiProvider:      apiProvider,
 		}, opts,
 	)
@@ -167,7 +170,7 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 		return false
 	}
 
-	return deficit >= work+s.buffer.IssuerQueue(accountID).Work()
+	return deficit >= s.deficitFromWork(work+s.buffer.IssuerQueue(accountID).Work())
 }
 
 func (s *Scheduler) AddBlock(block *blocks.Block) {
@@ -280,7 +283,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	// remove the block from the buffer and adjust issuer's deficit
 	block := s.buffer.PopFront()
 	issuerID := block.ProtocolBlock().IssuerID
-	err := s.updateDeficit(issuerID, int64(-block.WorkScore()))
+	err := s.updateDeficit(issuerID, -s.deficitFromWork(block.WorkScore()))
 	if err != nil {
 		// if something goes wrong with deficit update, drop the block instead of scheduling it.
 		block.SetDropped()
@@ -289,8 +292,8 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	s.blockChan <- block
 }
 
-func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
-	rounds := int64(math.MaxInt64)
+func (s *Scheduler) selectIssuer(start *IssuerQueue) (Deficit, *IssuerQueue) {
+	rounds := s.maxDeficit()
 	var schedulingIssuer *IssuerQueue
 
 	for q := start; ; {
@@ -324,7 +327,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 				break
 			}
 
-			remainingDeficit := int64(block.WorkScore()) - int64(deficit)
+			remainingDeficit := s.deficitFromWork(block.WorkScore()) - deficit
 			// calculate how many rounds we need to skip to accumulate enough deficit.
 			quantum, err := s.quantumFunc(issuerID)
 			if err != nil {
@@ -335,7 +338,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (int64, *IssuerQueue) {
 				break
 			}
 
-			r := (remainingDeficit + int64(quantum) - 1) / int64(quantum) // round up division result
+			r := (remainingDeficit + quantum - 1) / quantum // round up division result
 			// find the first issuer that will be allowed to schedule a block
 			if r < rounds {
 				rounds = r
@@ -375,7 +378,7 @@ func (s *Scheduler) removeIssuer(q *IssuerQueue, err error) {
 	s.buffer.RemoveIssuer(q.IssuerID())
 }
 
-func (s *Scheduler) getDeficit(accountID iotago.AccountID) (iotago.WorkScore, error) {
+func (s *Scheduler) getDeficit(accountID iotago.AccountID) (Deficit, error) {
 	d, exists := s.deficits.Get(accountID)
 	if !exists {
 		_, err := s.quantumFunc(accountID)
@@ -383,53 +386,63 @@ func (s *Scheduler) getDeficit(accountID iotago.AccountID) (iotago.WorkScore, er
 		if err != nil {
 			return 0, ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
 		}
-		// load with max deficit if the issuer has Mana but has been removed from the deficits map
-		return s.apiProvider.CurrentAPI().MaxBlockWork(), nil
+		// load with max deficit if the issuer has sufficient Mana but has been removed from the deficits map
+		return s.maxDeficit(), nil
 	}
 
 	return d, nil
 }
 
-func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta int64) error {
-	var err error
-	s.deficits.Compute(accountID, func(currentValue iotago.WorkScore, exists bool) iotago.WorkScore {
+func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) error {
+	var updateErr error
+	s.deficits.Compute(accountID, func(currentValue Deficit, exists bool) Deficit {
 		if !exists {
-			_, err = s.quantumFunc(accountID)
+			_, err := s.quantumFunc(accountID)
 			// quantumFunc returns error if mana is less than MinMana or the Mana can not be retrieved for the account.
 			if err != nil {
-				err = ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
+				updateErr = ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
 				return 0
 			}
 
 			// load with max deficit if the issuer has Mana but has been removed from the deficits map
-			return s.apiProvider.CurrentAPI().MaxBlockWork()
+			return s.maxDeficit()
 		}
 
-		// TODO: use safemath package to prevent underflow
-		if int64(currentValue)+delta < 0 {
-			err = ierrors.Errorf("tried to decrease deficit to a negative value %d for issuer %s", int64(currentValue)+delta, accountID)
+		newDeficit, err := safemath.SafeAdd(currentValue, delta)
+		if err != nil {
+			// overflow, set to max deficit
+			return s.maxDeficit()
+		}
+		if newDeficit < 0 {
+			updateErr = ierrors.Errorf("deficit for issuer %s decreased below zero", accountID)
 			return 0
 		}
 
-		return lo.Min(iotago.WorkScore(int64(currentValue)+delta), s.apiProvider.CurrentAPI().MaxBlockWork())
+		return newDeficit
 	})
 
-	if err != nil {
+	if updateErr != nil {
 		s.deficits.Delete(accountID)
 
-		return err
+		return updateErr
 	}
 
 	return nil
 }
 
-func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds int64) error {
+func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds Deficit) error {
 	quantum, err := s.quantumFunc(issuerID)
 	if err != nil {
 		return err
 	}
 
-	return s.updateDeficit(issuerID, int64(quantum)*rounds)
+	delta, err := safemath.SafeMul(quantum, rounds)
+	if err != nil {
+		// overflow, set to max deficit
+		delta = s.maxDeficit()
+	}
+
+	return s.updateDeficit(issuerID, delta)
 }
 
 func (s *Scheduler) isEligible(block *blocks.Block) (eligible bool) {
@@ -479,4 +492,13 @@ func (s *Scheduler) updateChildrenWithoutLocking(block *blocks.Block) {
 			s.tryReady(childBlock)
 		}
 	}
+}
+
+func (s *Scheduler) maxDeficit() Deficit {
+	return Deficit(math.MaxInt64)
+}
+
+func (s *Scheduler) deficitFromWork(work iotago.WorkScore) Deficit {
+	deficitScaleFactor := s.maxDeficit() / Deficit(s.apiProvider.CurrentAPI().MaxBlockWork())
+	return Deficit(work) * deficitScaleFactor
 }
