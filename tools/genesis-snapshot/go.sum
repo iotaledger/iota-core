@@ -49,6 +49,7 @@ github.com/iotaledger/hive.go/stringify v0.0.0-20230803080824-b9183942b168 h1:Op
 github.com/iotaledger/hive.go/stringify v0.0.0-20230803080824-b9183942b168/go.mod h1:l/F3cA/+67QdNj+sohv2v4HhmsdOcWScoA+sVYoAE4c=
 github.com/iotaledger/iota.go/v4 v4.0.0-20230810150756-f4780f58482f h1:lC/R0pEYBWNgM2ns0dYolqUm3lxKBxC040ze/7t3XIc=
 github.com/iotaledger/iota.go/v4 v4.0.0-20230810150756-f4780f58482f/go.mod h1:BGmYQp0ZX6OidxsNzH+GbwF2oc4wbsCSNHVnt0P+vl0=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230814093119-c16d2582b004/go.mod h1:BGmYQp0ZX6OidxsNzH+GbwF2oc4wbsCSNHVnt0P+vl0=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=

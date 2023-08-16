@@ -15,6 +15,7 @@ import (
 
 // threshold from opts
 
+// everything lives in bucket of epoch granularity
 // block: prunable              |     slot finalized
 // performance factors: prunable|     1 epoch
 // attestations: prunable       |     slot finalized
@@ -22,6 +23,7 @@ import (
 // roots: prunable              |     slot finalized
 // retainer: prunable           |     1 epoch?
 
+// semiPermanent storage: prepended with epoch index, and pruned by deleting the desired epochs individually
 // protocol upgrades: prunable  |     7 epochs
 // pool stats: move to prunable        |     1 year
 // rewards: move to prunable           |     1 year
