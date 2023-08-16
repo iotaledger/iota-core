@@ -271,7 +271,7 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 
 func (b *BlockDispatcher) injectUnsolidCommitmentBlocks(id iotago.CommitmentID) {
 	for _, tuple := range b.unsolidCommitmentBlocks.GetValues(id) {
-		b.Dispatch(tuple.A, tuple.B)
+		b.protocol.HandleError(b.Dispatch(tuple.A, tuple.B))
 	}
 }
 
