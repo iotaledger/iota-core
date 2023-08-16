@@ -32,6 +32,7 @@ type Manager struct {
 	// at the latest committed slot, it is updated on the slot commitment.
 	accountsTree ads.Map[iotago.AccountID, *accounts.AccountData]
 
+	// TODO: add in memory shrink version of the slot diffs
 	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
 	slotDiff func(iotago.SlotIndex) *prunable.AccountDiffs
 

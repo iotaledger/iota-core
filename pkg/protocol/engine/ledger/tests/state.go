@@ -8,14 +8,14 @@ import (
 type MockedState struct {
 	id           iotago.OutputID
 	output       *MockedOutput
-	creationTime iotago.SlotIndex
+	creationSlot iotago.SlotIndex
 }
 
 func NewMockedState(transactionID iotago.TransactionID, index uint16) *MockedState {
 	return &MockedState{
 		id:           iotago.OutputIDFromTransactionIDAndIndex(transactionID, index),
 		output:       &MockedOutput{},
-		creationTime: iotago.SlotIndex(0),
+		creationSlot: iotago.SlotIndex(0),
 	}
 }
 
@@ -35,8 +35,8 @@ func (m *MockedState) Output() iotago.Output {
 	return m.output
 }
 
-func (m *MockedState) CreationTime() iotago.SlotIndex {
-	return m.creationTime
+func (m *MockedState) CreationSlot() iotago.SlotIndex {
+	return m.creationSlot
 }
 
 func (m *MockedState) String() string {

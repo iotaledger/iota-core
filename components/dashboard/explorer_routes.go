@@ -12,8 +12,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	"github.com/iotaledger/iota-core/pkg/retainer"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/hexutil"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 // SearchResult defines the struct of the SearchResult.
@@ -84,16 +86,15 @@ func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 
 	cachedBlock, _ := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID)
 
-	// TODO: metadata instead, or retainer
-	// blockMetadata, exists := deps.Retainer.BlockMetadata(blockID)
-	// if !exists {
-	// 	return nil, ierrors.Wrapf(ErrNotFound, "block metadata %s", blockID.Base58())
-	// }
+	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "block metadata %s", blockID.ToHex())
+	}
 
-	return createExplorerBlock(block, cachedBlock), nil
+	return createExplorerBlock(block, cachedBlock, blockMetadata), nil
 }
 
-func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *ExplorerBlock {
+func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata *retainer.BlockMetadata) *ExplorerBlock {
 	iotaBlk := block.ProtocolBlock()
 
 	sigBytes, err := iotaBlk.Signature.Encode()
@@ -151,14 +152,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *Explore
 
 			return ""
 		}(),
-		CommitmentID: iotaBlk.SlotCommitmentID.ToHex(),
-		// TODO: remove from explorer or add link to a separate route
-		// Commitment: CommitmentResponse{
-		//	Index:            uint64(iotaBlk.SlotCommitmentID.Index()),
-		//	PrevID:           iotaBlk.SlotCommitment.PrevID.ToHex(),
-		//	RootsID:          iotaBlk.SlotCommitment.RootsID.ToHex(),
-		//	CumulativeWeight: iotaBlk.SlotCommitment.CumulativeWeight,
-		// },
+		CommitmentID:        iotaBlk.SlotCommitmentID.ToHex(),
 		LatestConfirmedSlot: uint64(iotaBlk.LatestFinalizedSlot),
 	}
 
@@ -181,6 +175,17 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block) *Explore
 		t.ConflictIDs = lo.Map(cachedBlock.ConflictIDs().ToSlice(), func(conflictID iotago.TransactionID) string {
 			return conflictID.String()
 		})
+	} else {
+		switch metadata.BlockState {
+		case apimodels.BlockStateConfirmed, apimodels.BlockStateFinalized:
+			t.Solid = true
+			t.Booked = true
+			t.Acceptance = true
+			t.Scheduled = true
+			t.Confirmation = true
+		case apimodels.BlockStateFailed, apimodels.BlockStateRejected:
+			t.ObjectivelyInvalid = true
+		}
 	}
 
 	return t

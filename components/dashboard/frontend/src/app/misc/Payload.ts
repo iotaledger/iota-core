@@ -24,7 +24,7 @@ export class FaucetPayload {
 
 export class TransactionPayload {
     networkId: number;
-    creationTime: number;
+    creationSlot: number;
     inputs: Array<Input>;
     inputsCommitment: string;
     outputs: Array<Output>;
@@ -58,7 +58,6 @@ export class UnlockBlock {
     type: string;
     referencedIndex: number;
     signatureType: number;
-    // TODO: make it any and add struct for other types of signature.
     signature: SignatureEd25519;
 }
 
