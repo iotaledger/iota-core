@@ -44,11 +44,12 @@ func (e *EpochKVStore) PruneUntilEpoch(epoch iotago.EpochIndex) error {
 	e.lastPrunedMutex.Lock()
 	defer e.lastPrunedMutex.Unlock()
 
-	if epoch < e.lastPrunedEpoch.NextIndex() {
+	minStartEpoch := e.lastPrunedEpoch.NextIndex() + e.pruningDelay
+	if epoch < minStartEpoch {
 		return ierrors.Errorf("try to prune epoch index %d before last pruned epoch %d", epoch, lo.Return1(e.lastPrunedEpoch.Index()))
 	}
 
-	for currentIndex := e.lastPrunedEpoch.NextIndex(); currentIndex <= epoch; currentIndex++ {
+	for currentIndex := minStartEpoch; currentIndex <= epoch; currentIndex++ {
 		if err := e.prune(currentIndex); err != nil {
 			return err
 		}
@@ -58,10 +59,6 @@ func (e *EpochKVStore) PruneUntilEpoch(epoch iotago.EpochIndex) error {
 }
 
 func (e *EpochKVStore) prune(epoch iotago.EpochIndex) error {
-	if epoch < e.pruningDelay {
-		return ierrors.Errorf("epoch index %d is smaller than pruning delay %d", epoch, e.pruningDelay)
-	}
-
 	targetIndex := epoch - e.pruningDelay
 	err := e.kv.DeletePrefix(targetIndex.MustBytes())
 	if err != nil {
