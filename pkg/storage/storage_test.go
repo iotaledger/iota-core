@@ -1,6 +1,13 @@
 package storage_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/storage"
+	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/stretchr/testify/require"
+)
 
 func TestStorage_Pruning(t *testing.T) {
 	tf := NewTestFramework(t)
@@ -11,6 +18,24 @@ func TestStorage_Pruning(t *testing.T) {
 }
 
 func TestStorage_PruneByEpochIndex(t *testing.T) {
+	tf := NewTestFramework(t, storage.WithPruningDelay(1))
+	defer tf.Shutdown()
+
+	totalEpochs := 10
+	tf.GeneratePermanentData(10 * MB)
+	for i := 1; i <= totalEpochs; i++ {
+		tf.GeneratePrunableData(iotago.EpochIndex(i), 10*MB)
+		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
+	}
+
+	tf.Instance.PruneByEpochIndex(8)
+
+	require.Equal(t, 7, lo.Return1(tf.Instance.LastPrunedEpoch()))
+	require.Equal(t, 0, tf.Instance.Committee().LastPrunedEpoch())
+	require.Equal(t, 0, tf.Instance.PoolStats().LastPrunedEpoch())
+	require.Equal(t, 1, tf.Instance.DecidedUpgradeSignals().LastPrunedEpoch())
+	// TODO: get rewards last pruned epoch
+
 	// want to prune to a certain epoch index
 	// need to check that the pruned epochs are not accessible anymore. specifically:
 	//  - check all slot based storages

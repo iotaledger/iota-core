@@ -163,6 +163,7 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) {
 
 	s.prunable.PruneUntilEpoch(latestEpoch - iotago.EpochIndex(epochDiff))
 
+	// what if permanent is really large? how to prune it?
 }
 
 // Shutdown shuts down the storage.
