@@ -4,6 +4,8 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -11,22 +13,38 @@ type Store[V any] struct {
 	realm        kvstore.Realm
 	kv           *kvstore.TypedStore[iotago.EpochIndex, V]
 	pruningDelay iotago.EpochIndex
+
+	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
+	lastPrunedMutex syncutils.RWMutex
 }
 
 func NewStore[V any](realm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex, vToBytes kvstore.ObjectToBytes[V], bytesToV kvstore.BytesToObject[V]) *Store[V] {
 	kv = lo.PanicOnErr(kv.WithExtendedRealm(realm))
 
 	return &Store[V]{
-		realm:        realm,
-		kv:           kvstore.NewTypedStore(kv, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, vToBytes, bytesToV),
-		pruningDelay: pruningDelay,
+		realm:           realm,
+		kv:              kvstore.NewTypedStore(kv, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, vToBytes, bytesToV),
+		pruningDelay:    pruningDelay,
+		lastPrunedEpoch: model.NewEvictionIndex[iotago.EpochIndex](),
 	}
 }
 
+func (s *Store[V]) isTooOld(epoch iotago.EpochIndex) bool {
+	s.lastPrunedMutex.RLock()
+	defer s.lastPrunedMutex.RUnlock()
+
+	return epoch < lo.Return1(s.lastPrunedEpoch.Index())
+}
+
 func (s *Store[V]) Load(epoch iotago.EpochIndex) (V, error) {
+	var zeroValue V
+
+	if s.isTooOld(epoch) {
+		return zeroValue, ierrors.Errorf("epoch %d is too old", epoch)
+	}
+
 	value, err := s.kv.Get(epoch)
 	if err != nil {
-		var zeroValue V
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return zeroValue, nil
 		}
@@ -38,6 +56,10 @@ func (s *Store[V]) Load(epoch iotago.EpochIndex) (V, error) {
 }
 
 func (s *Store[V]) Store(epoch iotago.EpochIndex, value V) error {
+	if s.isTooOld(epoch) {
+		return ierrors.Errorf("epoch %d is too old", epoch)
+	}
+
 	return s.kv.Set(epoch, value)
 }
 
@@ -74,12 +96,39 @@ func (s *Store[V]) StreamBytes(consumer func([]byte, []byte) error) error {
 	return innerErr
 }
 
-func (s *Store[V]) Prune(epochIndex iotago.EpochIndex) error {
-	if epochIndex <= s.pruningDelay {
+func (s *Store[V]) PruneUntilEpoch(epoch iotago.EpochIndex) error {
+	s.lastPrunedMutex.RLock()
+	start := s.lastPrunedEpoch.NextIndex()
+	s.lastPrunedMutex.RUnlock()
+
+	for currentIndex := start; currentIndex <= epoch; currentIndex++ {
+		if err := s.prune(currentIndex); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Store[V]) prune(epoch iotago.EpochIndex) error {
+	if s.isTooOld(epoch) {
+		return ierrors.Errorf("epoch %d is too old to prune", epoch)
+	}
+
+	s.lastPrunedMutex.Lock()
+	defer s.lastPrunedMutex.Unlock()
+
+	if epoch <= s.pruningDelay {
 		return nil
 	}
 
-	targetIndex := epochIndex - s.pruningDelay
+	targetIndex := epoch - s.pruningDelay
+	err := s.kv.DeletePrefix(targetIndex.MustBytes())
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to prune epoch store for realm %v", s.realm)
+	}
 
-	return s.kv.DeletePrefix(targetIndex.MustBytes())
+	s.lastPrunedEpoch.MarkEvicted(targetIndex)
+
+	return nil
 }
