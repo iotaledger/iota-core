@@ -165,7 +165,7 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 
 // LatestRootBlocks returns the latest root blocks.
 func (s *State) LatestRootBlocks() iotago.BlockIDs {
-	rootBlocks := s.latestRootBlocks.ToSlice()
+	rootBlocks := s.latestRootBlocks.Elements()
 	if len(rootBlocks) == 0 {
 		return iotago.BlockIDs{iotago.EmptyBlockID()}
 	}
