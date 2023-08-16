@@ -36,6 +36,8 @@ type SybilProtection struct {
 
 	performanceTracker *performance.Tracker
 
+	errHandler func(error)
+
 	optsInitialCommittee    *account.Accounts
 	optsSeatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]
 
@@ -57,10 +59,11 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 
 				e.HookConstructed(func() {
 					o.ledger = e.Ledger
+					o.errHandler = e.ErrorHandler("SybilProtection")
 
 					latestCommitedSlot := e.Storage.Settings().LatestCommitment().Index()
 					latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommitedSlot).TimeProvider().EpochFromSlot(latestCommitedSlot)
-					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, latestCommittedEpoch, e)
+					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, latestCommittedEpoch, e, o.errHandler)
 					o.lastCommittedSlot = latestCommitedSlot
 
 					if o.optsInitialCommittee != nil {
@@ -334,8 +337,7 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 			return err
 		}
 		if !exists {
-			// TODO: instead of panic, we should return an error here
-			panic(ierrors.Errorf("account of committee candidate does not exist: %s", candidate))
+			o.errHandler(ierrors.Errorf("account of committee candidate does not exist: %s", candidate))
 		}
 
 		weightedCandidates.Set(candidate, &account.Pool{
@@ -346,8 +348,7 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 
 		return nil
 	}); err != nil {
-		// TODO: instead of panic, we should return an error here
-		panic(err)
+		o.errHandler(err)
 	}
 
 	newCommittee := o.seatManager.RotateCommittee(nextEpoch, weightedCandidates)
@@ -356,8 +357,7 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 	// FIXME: weightedCommittee returned by the PoA sybil protection does not have stake specified, which will cause problems during rewards calculation.
 	err := o.performanceTracker.RegisterCommittee(nextEpoch, weightedCommittee)
 	if err != nil {
-		// TODO: instead of panic, we should return an error here
-		panic(ierrors.Wrap(err, "failed to register committee for epoch"))
+		o.errHandler(ierrors.Wrap(err, "failed to register committee for epoch"))
 	}
 
 	return weightedCommittee

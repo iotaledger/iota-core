@@ -78,7 +78,6 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
 }
 
 func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *VlidatorSlotPerformance {
-	// TODO: make sure that the minimum pruning delay for this is at least 1 epoch, otherwise we won't be able to calculate the reward pools
 	store := p.manager.Get(slot, kvstore.Realm{performanceFactorsPrefix})
 	if store == nil {
 		return nil
@@ -88,7 +87,6 @@ func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *VlidatorSlotPerfor
 }
 
 func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *UpgradeSignals {
-	// TODO: make sure that the minimum pruning delay for this is at least 1 epoch, otherwise we won't be able to properly determine the upgrade signals.
 	store := p.manager.Get(slot, kvstore.Realm{upgradeSignalsPrefix})
 	if store == nil {
 		return nil

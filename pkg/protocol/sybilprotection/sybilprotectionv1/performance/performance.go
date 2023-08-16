@@ -26,6 +26,8 @@ type Tracker struct {
 
 	apiProvider api.Provider
 
+	errHandler func(error)
+
 	performanceFactorsMutex syncutils.RWMutex
 	mutex                   syncutils.RWMutex
 }
@@ -37,6 +39,7 @@ func NewTracker(
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.VlidatorSlotPerformance,
 	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider api.Provider,
+	errHandler func(error),
 ) *Tracker {
 	return &Tracker{
 		rewardBaseStore: rewardsBaseStore,
@@ -55,6 +58,7 @@ func NewTracker(
 		validatorSlotPerformanceFunc: performanceFactorsFunc,
 		latestAppliedEpoch:           latestAppliedEpoch,
 		apiProvider:                  apiProvider,
+		errHandler:                   errHandler,
 	}
 }
 
@@ -77,8 +81,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	validatorSlotPerformanceStore := t.validatorSlotPerformanceFunc(block.ID().Index())
 	validatorPerformance, err := validatorSlotPerformanceStore.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
-		// TODO replace panic with errors in the future, like triggering an error event
-		panic(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
+		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 	updatedPerformance := t.updateSlotPerformanceBitMap(validatorPerformance, block.ID().Index(), block.ProtocolBlock().IssuingTime)
 	if updatedPerformance.BlockIssuedCount == validatorBlocksPerSlot {
@@ -94,8 +97,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 
 	err = validatorSlotPerformanceStore.Store(block.ProtocolBlock().IssuerID, updatedPerformance)
 	if err != nil {
-		// TODO replace panic with errors in the future, like triggering an error event
-		panic(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
+		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 }
 

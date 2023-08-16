@@ -66,7 +66,7 @@ func blockIssuance(_ echo.Context) (*apimodels.IssuanceBlockHeaderResponse, erro
 }
 
 func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
-	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV1, echo.MIMEApplicationJSON)
+	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV2, echo.MIMEApplicationJSON)
 	if err != nil {
 		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 	}
@@ -90,7 +90,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 
-	case httpserver.MIMEApplicationVendorIOTASerializerV1:
+	case httpserver.MIMEApplicationVendorIOTASerializerV2:
 		version, _, err := iotago.VersionFromBytes(bytes)
 		if err != nil {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
