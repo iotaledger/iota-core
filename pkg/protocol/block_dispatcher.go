@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/iotaledger/hive.go/ads"
@@ -11,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/buffer"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -23,7 +21,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-// BlockDispatcher is a component that is responsible for dispatching blocks to the correct engine instance.
+// BlockDispatcher is a component that is responsible for dispatching blocks to the correct engine instance or triggering a warp sync.
 type BlockDispatcher struct {
 	// protocol is the protocol instance that is using this BlockDispatcher instance.
 	protocol *Protocol
@@ -70,10 +68,10 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error
 	slotCommitment := b.protocol.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
 	if !slotCommitment.Solid().Get() {
 		if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
-			return ierrors.Errorf("protocol Dispatch failed. chain is not solid and could not add to unsolid slotCommitment buffer: slotcommitment: %s, block ID: %s", slotCommitment.ID(), block.ID())
+			return ierrors.Errorf("failed to add block %s to unsolid commitment buffer", block.ID())
 		}
 
-		return ierrors.Errorf("protocol Dispatch failed. chain is not solid: slotcommitment: %s, block ID: %s", slotCommitment.ID(), block.ID())
+		return ierrors.Errorf("failed to dispatch block %s: slot commitment %s is not solid", block.ID(), slotCommitment.ID())
 	}
 
 	matchingEngineFound := false
@@ -88,31 +86,34 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error
 	}
 
 	if !matchingEngineFound {
-		return ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), slotCommitment.ID())
+		return ierrors.Errorf("failed to dispatch block %s: no matching engine found", block.ID())
 	}
 
 	return nil
 }
 
-func (b *BlockDispatcher) ShutdownEvent() reactive.Event {
-	return b.shutdownEvent
-}
-
 func (b *BlockDispatcher) initEngineMonitoring() {
-	b.monitorLatestCommitmentUpdated(b.protocol.mainEngine)
+	b.monitorLatestEngineCommitment(b.protocol.mainEngine)
 
-	b.protocol.engineManager.OnEngineCreated(b.monitorLatestCommitmentUpdated)
+	b.protocol.engineManager.OnEngineCreated(b.monitorLatestEngineCommitment)
 
 	b.protocol.Events.ChainManager.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
 		chainCommitment.Solid().OnTrigger(func() {
-			b.injectUnsolidCommitmentBlocks(chainCommitment.Commitment().ID())
-			b.warpSyncIfNecessary(b.targetEngine(chainCommitment), chainCommitment)
+			b.runTask(func() {
+				b.injectUnsolidCommitmentBlocks(chainCommitment.Commitment().ID())
+			}, b.dispatchWorkers)
+
+			b.runTask(func() {
+				b.warpSyncIfNecessary(b.targetEngine(chainCommitment), chainCommitment)
+			}, b.warpSyncWorkers)
 		})
 	})
 
 	b.protocol.Events.Engine.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-		b.injectUnsolidCommitmentBlocks(commitment.ID())
-	}, event.WithWorkerPool(b.dispatchWorkers))
+		b.runTask(func() {
+			b.injectUnsolidCommitmentBlocks(commitment.ID())
+		}, b.dispatchWorkers)
+	})
 
 	b.protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(b.evict)
 }
@@ -159,16 +160,10 @@ func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Bl
 	}
 
 	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
-	latestCommitment := engine.Storage.Settings().LatestCommitment()
+	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
 
-	shouldProcess := block.ID().Index() > latestCommitment.Index()+2*maxCommittableAge && slotCommitmentID.Index() > latestCommitment.Index()
-
-	if shouldProcess {
-		fmt.Println(">> Should process: latest", latestCommitment.Index(), "committing to", slotCommitmentID.Index(), "MCA", maxCommittableAge)
-	}
-
-	return shouldProcess
+	return block.ID().Index() > latestCommitmentIndex+2*maxCommittableAge && slotCommitmentID.Index() > latestCommitmentIndex
 }
 
 func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
@@ -291,17 +286,13 @@ func (b *BlockDispatcher) targetEngine(commitment *chainmanager.ChainCommitment)
 	return nil
 }
 
-func (b *BlockDispatcher) monitorLatestCommitmentUpdated(engineInstance *engine.Engine) {
+func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.Engine) {
 	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-		fmt.Println(">> monitorLatestCommitmentUpdated Committed", commitment.Index())
-		chainCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID())
-		if !exists {
-			return
+		if chainCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID()); exists {
+			b.processedWarpSyncRequests.Delete(commitment.ID())
+
+			b.warpSyncIfNecessary(engineInstance, chainCommitment)
 		}
-
-		b.processedWarpSyncRequests.Delete(commitment.ID())
-
-		b.warpSyncIfNecessary(engineInstance, chainCommitment)
 	}).Unhook)
 }
 
