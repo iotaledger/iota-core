@@ -410,12 +410,13 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) err
 
 		newDeficit, err := safemath.SafeAdd(currentValue, delta)
 		if err != nil {
+			// if underflow, update error
+			if delta < 0 {
+				updateErr = ierrors.Errorf("deficit for issuer %s decreased below zero", accountID)
+				return 0
+			}
 			// overflow, set to max deficit
 			return s.maxDeficit()
-		}
-		if newDeficit < 0 {
-			updateErr = ierrors.Errorf("deficit for issuer %s decreased below zero", accountID)
-			return 0
 		}
 
 		return newDeficit
