@@ -61,7 +61,7 @@ func (c *ChainCommitment) Chain() (chain *Chain) {
 	return c.chain
 }
 
-func (c *ChainCommitment) Solid() reactive.Event {
+func (c *ChainCommitment) SolidEvent() reactive.Event {
 	return c.solid
 }
 

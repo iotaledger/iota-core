@@ -33,7 +33,7 @@ func NewChain(forkingPoint *ChainCommitment) (fork *Chain) {
 }
 
 func (c *Chain) IsSolid() reactive.Event {
-	return c.ForkingPoint.Solid()
+	return c.ForkingPoint.SolidEvent()
 }
 
 func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *ChainCommitment) {

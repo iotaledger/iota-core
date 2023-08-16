@@ -66,7 +66,7 @@ func NewBlockDispatcher(protocol *Protocol) *BlockDispatcher {
 
 func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error {
 	slotCommitment := b.protocol.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
-	if !slotCommitment.Solid().Get() {
+	if !slotCommitment.SolidEvent().WasTriggered() {
 		if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
 			return ierrors.Errorf("failed to add block %s to unsolid commitment buffer", block.ID())
 		}
@@ -98,7 +98,7 @@ func (b *BlockDispatcher) initEngineMonitoring() {
 	b.protocol.engineManager.OnEngineCreated(b.monitorLatestEngineCommitment)
 
 	b.protocol.Events.ChainManager.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
-		chainCommitment.Solid().OnTrigger(func() {
+		chainCommitment.SolidEvent().OnTrigger(func() {
 			b.runTask(func() {
 				b.injectUnsolidCommitmentBlocks(chainCommitment.Commitment().ID())
 			}, b.dispatchWorkers)
