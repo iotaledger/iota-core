@@ -180,10 +180,11 @@ func New(
 
 				// Only mark any pruning indexes if we loaded a non-genesis snapshot
 				if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-					e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
-					if index, pruned := e.Storage.LastPrunedEpoch(); pruned {
-						e.Events.StoragePruned.Trigger(index)
-					}
+					// TODO: check whether this is still necessary
+					// e.Storage.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
+					// if index, pruned := e.Storage.LastPrunedEpoch(); pruned {
+					// 	e.Events.StoragePruned.Trigger(index)
+					// }
 				}
 
 				if err := e.Storage.Settings().SetSnapshotImported(); err != nil {
@@ -192,7 +193,7 @@ func New(
 
 			} else {
 				// Restore from Disk
-				e.Storage.Prunable.RestoreFromDisk()
+				e.Storage.RestoreFromDisk()
 				e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
 
 				if err := e.Attestations.RestoreFromDisk(); err != nil {
@@ -495,7 +496,8 @@ func (e *Engine) setupBlockRequester() {
 
 func (e *Engine) setupPruning() {
 	e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		e.Storage.PruneUntilSlot(index)
+		// TODO: this needs to check whether we can prune
+		// e.Storage.PruneUntilSlot(index)
 	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))
 }
 

@@ -73,7 +73,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 		return NewManager(
 			latestCommitment.Index(),
 			latestCommitment.CumulativeWeight(),
-			e.Storage.Prunable.Attestations,
+			e.Storage.Attestations,
 			e.SybilProtection.SeatManager().Committee,
 			e,
 		)

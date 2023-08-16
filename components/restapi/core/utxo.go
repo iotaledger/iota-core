@@ -54,7 +54,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 
 	includedSlotIndex := output.SlotBooked()
 	if includedSlotIndex <= latestCommitment.Index() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedSlotIndex)
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +78,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 
 	includedSlotIndex := spent.Output().SlotBooked()
 	if includedSlotIndex <= latestCommitment.Index() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedSlotIndex)
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +87,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 
 	spentSlotIndex := spent.SlotIndexSpent()
 	if spentSlotIndex <= latestCommitment.Index() {
-		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(spentSlotIndex)
+		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
 		if err != nil {
 			return nil, err
 		}

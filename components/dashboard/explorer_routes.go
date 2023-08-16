@@ -253,7 +253,7 @@ func getSlotDetailsByID(c echo.Context) error {
 		return err
 	}
 
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(commitmentID.Index())
+	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index())
 	if err != nil {
 		return err
 	}

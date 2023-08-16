@@ -77,8 +77,8 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 	return module.Provide(func(e *engine.Engine) upgrade.Orchestrator {
 		o := NewOrchestrator(
 			e.ErrorHandler("upgradegadget"),
-			e.Storage.Prunable.DecidedUpgradeSignals(),
-			e.Storage.Prunable.UpgradeSignals,
+			e.Storage.DecidedUpgradeSignals(),
+			e.Storage.UpgradeSignals,
 			e.Storage.Settings().APIProvider(),
 			e.Storage.Settings().StoreFutureProtocolParametersHash,
 			e.Storage.Settings().APIProvider().VersionsAndProtocolParametersHash,

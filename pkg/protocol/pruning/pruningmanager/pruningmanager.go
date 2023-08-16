@@ -70,7 +70,7 @@ func NewProvider(opts ...options.Option[Manager]) module.Provider[*engine.Engine
 
 		e.Events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
 			// This is wrong, this prune the entire slot
-			p.db.Prunable.PruneUntilSlot(slotIndex)
+			// p.db.Prunable.PruneUntilSlot(slotIndex)
 		}, asyncOpt)
 
 		p.TriggerInitialized()

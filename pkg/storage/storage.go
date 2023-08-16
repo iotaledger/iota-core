@@ -27,10 +27,10 @@ type Storage struct {
 	dir *utils.Directory
 
 	// Permanent is the section of the storage that is maintained forever (holds the current ledger state).
-	*permanent.Permanent
+	permanent *permanent.Permanent
 
 	// Prunable is the section of the storage that is pruned regularly (holds the history of the ledger state).
-	*prunable.Prunable
+	prunable *prunable.Prunable
 
 	shutdownOnce sync.Once
 	errorHandler func(error)
@@ -66,8 +66,8 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 				PrefixHealth: []byte{storePrefixHealth},
 			}
 
-			s.Permanent = permanent.New(dbConfig, errorHandler)
-			s.Prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPruningDelay, s.Settings().APIProvider(), errorHandler, s.optsPrunableManagerOptions...)
+			s.permanent = permanent.New(dbConfig, errorHandler)
+			s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPruningDelay, s.Settings().APIProvider(), errorHandler, s.optsPrunableManagerOptions...)
 		})
 }
 
@@ -90,16 +90,16 @@ func (s *Storage) Directory() string {
 
 // PrunableDatabaseSize returns the size of the underlying prunable databases.
 func (s *Storage) PrunableDatabaseSize() int64 {
-	return s.Prunable.Size()
+	return s.prunable.Size()
 }
 
 // PermanentDatabaseSize returns the size of the underlying permanent database and files.
 func (s *Storage) PermanentDatabaseSize() int64 {
-	return s.Permanent.Size()
+	return s.permanent.Size()
 }
 
 func (s *Storage) Size() int64 {
-	return s.Permanent.Size() + s.Prunable.Size()
+	return s.PermanentDatabaseSize() + s.PrunableDatabaseSize()
 }
 
 func (s *Storage) PruneByEpochIndex(index iotago.EpochIndex) {
@@ -109,7 +109,7 @@ func (s *Storage) PruneByEpochIndex(index iotago.EpochIndex) {
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
-	s.Prunable.PruneUntilEpoch(index)
+	s.prunable.PruneUntilEpoch(index)
 }
 
 func (s *Storage) PruneByDepth(depth iotago.EpochIndex) {
@@ -126,7 +126,7 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) {
 		return
 	}
 
-	s.Prunable.PruneUntilEpoch(start - depth)
+	s.prunable.PruneUntilEpoch(start - depth)
 	// double check permanent Ledger
 }
 
@@ -149,24 +149,25 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) {
 	}
 
 	currentSize := s.Size()
+	// No need to prune. The database is already smaller than the target size.
 	if targetDatabaseSizeBytes < 0 || currentSize < targetDatabaseSizeBytes {
 		return
 	}
 
 	latestEpoch := s.Settings().APIProvider().CurrentAPI().TimeProvider().EpochFromSlot(s.Settings().LatestCommitment().Index())
-	lastPrunedEpoch := lo.Return1(s.LastPrunedEpoch())
+	lastPrunedEpoch := lo.Return1(s.prunable.LastPrunedEpoch())
 
 	pruningRange := latestEpoch - lastPrunedEpoch
 	prunedDatabaseSizeBytes := float64(targetDatabaseSizeBytes) * (1.0 - s.optPruningSizeThresholdPercentage)
 	epochDiff := math.Ceil(float64(pruningRange) * prunedDatabaseSizeBytes / float64(currentSize))
 
-	s.Prunable.PruneUntilEpoch(latestEpoch - iotago.EpochIndex(epochDiff))
+	s.prunable.PruneUntilEpoch(latestEpoch - iotago.EpochIndex(epochDiff))
 }
 
 // Shutdown shuts down the storage.
 func (s *Storage) Shutdown() {
 	s.shutdownOnce.Do(func() {
-		s.Permanent.Shutdown()
-		s.Prunable.Shutdown()
+		s.permanent.Shutdown()
+		s.prunable.Shutdown()
 	})
 }
