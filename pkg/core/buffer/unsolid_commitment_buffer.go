@@ -101,7 +101,7 @@ func (u *UnsolidCommitmentBuffer[V]) GetValues(commitmentID iotago.CommitmentID)
 
 	if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Index()); blockBufferForCommitments != nil {
 		if buffer, exists := blockBufferForCommitments.Get(commitmentID); exists {
-			return buffer.Elements()
+			return buffer.ToSlice()
 		}
 	}
 
@@ -115,7 +115,7 @@ func (u *UnsolidCommitmentBuffer[V]) GetValuesAndEvict(commitmentID iotago.Commi
 	var values []V
 	if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Index()); blockBufferForCommitments != nil {
 		if buffer, exists := blockBufferForCommitments.Get(commitmentID); exists {
-			values = buffer.Elements()
+			values = buffer.ToSlice()
 		}
 	}
 
