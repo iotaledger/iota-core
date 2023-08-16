@@ -489,6 +489,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			accountID := createdAccount.AccountID
 			if accountID.Empty() {
 				accountID = iotago.AccountIDFromOutputID(outputID)
+				l.events.AccountCreated.Trigger(accountID)
 			}
 
 			createdAccounts[accountID] = createdOutput

@@ -70,8 +70,24 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			})
 			s.TriggerConstructed()
 			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
-				s.AddBlock(block)
-				s.selectBlockToScheduleWithLocking()
+				if _, isBasic := block.BasicBlock(); isBasic {
+					s.AddBlock(block)
+					s.selectBlockToScheduleWithLocking()
+				} else { // immediately schedule validator blocks for now. TODO: implement scheduling for validator blocks issue #236
+					s.events.BlockScheduled.Trigger(block)
+				}
+			})
+			e.Events.Ledger.AccountCreated.Hook(func(accountID iotago.AccountID) {
+				s.bufferMutex.Lock()
+				defer s.bufferMutex.Unlock()
+
+				s.createIssuer(accountID)
+			})
+			e.Events.Ledger.AccountDestroyed.Hook(func(accountID iotago.AccountID) {
+				s.bufferMutex.Lock()
+				defer s.bufferMutex.Unlock()
+
+				s.removeIssuer(accountID, ierrors.New("account destroyed"))
 			})
 
 			e.HookInitialized(s.Start)
@@ -165,8 +181,8 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 	for _, block := range blocks {
 		work += block.WorkScore()
 	}
-	deficit, err := s.getDeficit(accountID)
-	if err != nil {
+	deficit, exists := s.deficits.Get(accountID)
+	if !exists {
 		return false
 	}
 
@@ -177,7 +193,17 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	droppedBlocks, err := s.buffer.Submit(block, s.quantumFunc)
+	issuerID := block.ProtocolBlock().IssuerID
+	issuerQueue, err := s.buffer.GetIssuerQueue(issuerID)
+	if err != nil {
+		// this should only ever happen if the issuer has been removed due to insufficient Mana.
+		// if Mana is now sufficient again, we can add the issuer again.
+		if _, err := s.quantumFunc(issuerID); err == nil {
+			issuerQueue = s.createIssuer(issuerID)
+		}
+	}
+
+	droppedBlocks, err := s.buffer.Submit(block, issuerQueue, s.quantumFunc)
 	// error submitting indicates that the block was already submitted so we do nothing else.
 	if err != nil {
 		return
@@ -257,8 +283,9 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	if rounds > 0 {
 		// increment every issuer's deficit for the required number of rounds
 		for q := start; ; {
-			if err := s.incrementDeficit(q.IssuerID(), rounds); err != nil {
-				s.removeIssuer(q, err)
+			issuerID := q.IssuerID()
+			if err := s.incrementDeficit(issuerID, rounds); err != nil {
+				s.removeIssuer(issuerID, err)
 				q = s.buffer.Current()
 			} else {
 				q = s.buffer.Next()
@@ -273,8 +300,9 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	}
 	// increment the deficit for all issuers before schedulingIssuer one more time
 	for q := start; q != schedulingIssuer; q = s.buffer.Next() {
-		if err := s.incrementDeficit(q.IssuerID(), 1); err != nil {
-			s.removeIssuer(q, err)
+		issuerID := q.IssuerID()
+		if err := s.incrementDeficit(issuerID, 1); err != nil {
+			s.removeIssuer(issuerID, err)
 
 			return
 		}
@@ -318,13 +346,9 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (Deficit, *IssuerQueue) {
 			issuerID := block.ProtocolBlock().IssuerID
 
 			// compute how often the deficit needs to be incremented until the block can be scheduled
-			deficit, err := s.getDeficit(issuerID)
-			if err != nil {
-				// no deficit exists for this issuer queue, so remove it
-				s.removeIssuer(q, err)
-				issuerRemoved = true
-
-				break
+			deficit, exists := s.deficits.Get(issuerID)
+			if !exists {
+				panic("deficit not found for issuer")
 			}
 
 			remainingDeficit := s.deficitFromWork(block.WorkScore()) - deficit
@@ -332,7 +356,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (Deficit, *IssuerQueue) {
 			quantum, err := s.quantumFunc(issuerID)
 			if err != nil {
 				// if quantum, can't be retrieved, we need to remove this issuer.
-				s.removeIssuer(q, err)
+				s.removeIssuer(issuerID, err)
 				issuerRemoved = true
 
 				break
@@ -361,7 +385,8 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue) (Deficit, *IssuerQueue) {
 	return rounds, schedulingIssuer
 }
 
-func (s *Scheduler) removeIssuer(q *IssuerQueue, err error) {
+func (s *Scheduler) removeIssuer(issuerID iotago.AccountID, err error) {
+	q := s.buffer.IssuerQueue(issuerID)
 	q.submitted.ForEach(func(id iotago.BlockID, block *blocks.Block) bool {
 		block.SetDropped()
 		s.events.BlockDropped.Trigger(block, err)
@@ -375,23 +400,23 @@ func (s *Scheduler) removeIssuer(q *IssuerQueue, err error) {
 		s.events.BlockDropped.Trigger(block, err)
 	}
 
-	s.buffer.RemoveIssuer(q.IssuerID())
+	s.deficits.Delete(issuerID)
+
+	s.buffer.RemoveIssuer(issuerID)
 }
 
-func (s *Scheduler) getDeficit(accountID iotago.AccountID) (Deficit, error) {
-	d, exists := s.deficits.Get(accountID)
-	if !exists {
-		_, err := s.quantumFunc(accountID)
-		// quantumFunc returns error if mana is less than MinMana or the Mana can not be retrieved for the account.
-		if err != nil {
-			return 0, ierrors.Wrapf(err, "could not get deficit for issuer %s", accountID)
-		}
-		// load with max deficit if the issuer has sufficient Mana but has been removed from the deficits map
-		return s.maxDeficit(), nil
-	}
+func (s *Scheduler) createIssuer(accountID iotago.AccountID) *IssuerQueue {
+	issuerQueue := s.buffer.CreateIssuerQueue(accountID)
+	s.deficits.Set(accountID, 0)
 
-	return d, nil
+	return issuerQueue
 }
+
+// addExistingIssuer adds an existing issuer to the scheduler with Max deficit. This is for an optimisation where we remove max deficit issuers which have been inactive for some time.
+// func (s *Scheduler) addExistingIssuer(accountID iotago.AccountID) {
+// 	s.buffer.CreateIssuerQueue(accountID)
+// 	s.deficits.Set(accountID, s.maxDeficit())
+// }
 
 func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) error {
 	var updateErr error
@@ -423,7 +448,7 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) err
 	})
 
 	if updateErr != nil {
-		s.deficits.Delete(accountID)
+		s.removeIssuer(accountID, updateErr)
 
 		return updateErr
 	}
@@ -500,6 +525,7 @@ func (s *Scheduler) maxDeficit() Deficit {
 }
 
 func (s *Scheduler) deficitFromWork(work iotago.WorkScore) Deficit {
+	// max workscore block should occupy the full range of the deficit
 	deficitScaleFactor := s.maxDeficit() / Deficit(s.apiProvider.CurrentAPI().MaxBlockWork())
 	return Deficit(work) * deficitScaleFactor
 }

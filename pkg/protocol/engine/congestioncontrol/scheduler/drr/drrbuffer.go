@@ -65,30 +65,30 @@ func (b *BufferQueue) IssuerQueue(issuerID iotago.AccountID) *IssuerQueue {
 	return issuerQueue
 }
 
-func (b *BufferQueue) GetOrCreateIssuerQueue(issuerID iotago.AccountID) (*IssuerQueue, error) {
-	element, issuerActive := b.activeIssuers.Get(issuerID)
-	if issuerActive {
-		issuerQueue, isIQ := element.Value.(*IssuerQueue)
-		if !isIQ {
-			return nil, ierrors.New("buffer contains elements that are not issuer queues")
-		}
-
-		return issuerQueue, nil
-	}
+func (b *BufferQueue) CreateIssuerQueue(issuerID iotago.AccountID) *IssuerQueue {
 	issuerQueue := NewIssuerQueue(issuerID)
 	b.activeIssuers.Set(issuerID, b.ringInsert(issuerQueue))
 
+	return issuerQueue
+}
+
+func (b *BufferQueue) GetIssuerQueue(issuerID iotago.AccountID) (*IssuerQueue, error) {
+	element, issuerActive := b.activeIssuers.Get(issuerID)
+	if !issuerActive {
+		return nil, ierrors.New("issuer queue does not exist")
+	}
+	issuerQueue, isIQ := element.Value.(*IssuerQueue)
+	if !isIQ {
+		return nil, ierrors.New("buffer contains elements that are not issuer queues")
+	}
+
+	// issuer queue exists
 	return issuerQueue, nil
 }
 
 // Submit submits a block. Return blocks dropped from the scheduler to make room for the submitted block.
-// The submitted block can also be returned as dropped if the issuer does not have enough access mana.
-func (b *BufferQueue) Submit(blk *blocks.Block, quantumFunc func(iotago.AccountID) (Deficit, error)) (elements []*blocks.Block, err error) {
-	issuerID := blk.ProtocolBlock().IssuerID
-	issuerQueue, err := b.GetOrCreateIssuerQueue(issuerID)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "could not get or create issuer queue for issuer %s", issuerID)
-	}
+// The submitted block can also be returned as dropped if the issuer does not have enough mana.
+func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantumFunc func(iotago.AccountID) (Deficit, error)) (elements []*blocks.Block, err error) {
 
 	// first we submit the block, and if it turns out that the issuer doesn't have enough bandwidth to submit, it will be removed by dropTail
 	if !issuerQueue.Submit(blk) {
