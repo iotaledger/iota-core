@@ -36,6 +36,13 @@ func (s *Store[V]) isTooOld(epoch iotago.EpochIndex) bool {
 	return epoch < lo.Return1(s.lastPrunedEpoch.Index())
 }
 
+func (s *Store[V]) LastPrunedEpoch() iotago.EpochIndex {
+	s.lastPrunedMutex.RLock()
+	defer s.lastPrunedMutex.RUnlock()
+
+	return lo.Return1(s.lastPrunedEpoch.Index())
+}
+
 func (s *Store[V]) Load(epoch iotago.EpochIndex) (V, error) {
 	var zeroValue V
 
