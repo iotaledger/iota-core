@@ -57,6 +57,8 @@ func (p *Prunable) RestoreFromDisk() {
 	p.pruningMutex.Lock()
 	p.lastPrunedEpoch.MarkEvicted(lastPrunedEpoch)
 	p.pruningMutex.Unlock()
+
+	// what is the last pruned epoch for semiPermanentDB?
 }
 
 // IsTooOld checks if the index is in a pruned epoch.
@@ -89,12 +91,10 @@ func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) {
 	// prune prunable_epoch
 	// defaultPruningDelay is larger than the threshold
 	// default should be maximum, the other thresholds should be minimum
-	for currentIndex := start; currentIndex <= epoch; currentIndex++ {
-		p.decidedUpgradeSignals.Prune(currentIndex)
-		p.poolRewards.Prune(currentIndex)
-		p.poolStats.Prune(currentIndex)
-		p.committee.Prune(currentIndex)
-	}
+	p.decidedUpgradeSignals.PruneUntilEpoch(epoch)
+	p.poolRewards.PruneUntilEpoch(epoch)
+	p.poolStats.PruneUntilEpoch(epoch)
+	p.committee.PruneUntilEpoch(epoch)
 }
 
 func (p *Prunable) Size() int64 {
