@@ -97,11 +97,14 @@ func (s *Store[V]) StreamBytes(consumer func([]byte, []byte) error) error {
 }
 
 func (s *Store[V]) PruneUntilEpoch(epoch iotago.EpochIndex) error {
-	s.lastPrunedMutex.RLock()
-	start := s.lastPrunedEpoch.NextIndex()
-	s.lastPrunedMutex.RUnlock()
+	s.lastPrunedMutex.Lock()
+	defer s.lastPrunedMutex.Unlock()
 
-	for currentIndex := start; currentIndex <= epoch; currentIndex++ {
+	if epoch < s.lastPrunedEpoch.NextIndex() {
+		return ierrors.Errorf("try to prune epoch index %d before last pruned epoch %d", epoch, lo.Return1(s.lastPrunedEpoch.Index()))
+	}
+
+	for currentIndex := s.lastPrunedEpoch.NextIndex(); currentIndex <= epoch; currentIndex++ {
 		if err := s.prune(currentIndex); err != nil {
 			return err
 		}
@@ -111,13 +114,6 @@ func (s *Store[V]) PruneUntilEpoch(epoch iotago.EpochIndex) error {
 }
 
 func (s *Store[V]) prune(epoch iotago.EpochIndex) error {
-	if s.isTooOld(epoch) {
-		return ierrors.Errorf("epoch %d is too old to prune", epoch)
-	}
-
-	s.lastPrunedMutex.Lock()
-	defer s.lastPrunedMutex.Unlock()
-
 	if epoch <= s.pruningDelay {
 		return nil
 	}
