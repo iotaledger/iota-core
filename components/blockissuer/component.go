@@ -2,17 +2,14 @@ package blockissuer
 
 import (
 	"context"
-	"fmt"
 
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/crypto"
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func init() {
@@ -37,19 +34,6 @@ type dependencies struct {
 	dig.In
 
 	BlockIssuer *blockfactory.BlockIssuer
-}
-
-func accountFromParam(accountHex, privateKey string) blockfactory.Account {
-	accountID, err := iotago.IdentifierFromHexString(accountHex)
-	if err != nil {
-		panic(fmt.Sprintln("invalid accountID hex string", err))
-	}
-	privKey, err := crypto.ParseEd25519PrivateKeyFromString(privateKey)
-	if err != nil {
-		panic(fmt.Sprintln("invalid ed25519 private key string", err))
-	}
-
-	return blockfactory.NewEd25519Account(accountID, privKey)
 }
 
 func provide(c *dig.Container) error {

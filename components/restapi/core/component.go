@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -9,7 +8,6 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/crypto"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/metricstracker"
@@ -18,7 +16,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 const (
@@ -164,7 +161,7 @@ func configure() error {
 		AddFeature("allowIncompleteBlock")
 	}
 
-	blockIssuerAccount = accountFromParam(restapi.ParamsRestAPI.BlockIssuerAccount, restapi.ParamsRestAPI.BlockIssuerPrivateKey)
+	blockIssuerAccount = blockfactory.AccountFromParams(restapi.ParamsRestAPI.BlockIssuerAccount, restapi.ParamsRestAPI.BlockIssuerPrivateKey)
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
 		resp := info()
@@ -402,17 +399,4 @@ func responseByHeader(c echo.Context, obj any) error {
 
 		return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, j)
 	}
-}
-
-func accountFromParam(accountHex, privateKey string) blockfactory.Account {
-	accountID, err := iotago.IdentifierFromHexString(accountHex)
-	if err != nil {
-		panic(fmt.Sprintln("invalid accountID hex string", err))
-	}
-	privKey, err := crypto.ParseEd25519PrivateKeyFromString(privateKey)
-	if err != nil {
-		panic(fmt.Sprintln("invalid ed25519 private key string", err))
-	}
-
-	return blockfactory.NewEd25519Account(accountID, privKey)
 }

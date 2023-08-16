@@ -2,14 +2,12 @@ package validator
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 	"time"
 
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/crypto"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/iota-core/components/blockissuer"
@@ -49,7 +47,7 @@ type dependencies struct {
 }
 
 func run() error {
-	validatorAccount = accountFromParam(ParamsValidator.Account, ParamsValidator.PrivateKey)
+	validatorAccount = blockfactory.AccountFromParams(ParamsValidator.Account, ParamsValidator.PrivateKey)
 
 	executor = timed.NewTaskExecutor[iotago.AccountID](1)
 
@@ -93,17 +91,4 @@ func checkValidatorStatus(ctx context.Context) {
 		// If the account becomes a validator, start issue validator blocks.
 		executor.ExecuteAfter(validatorAccount.ID(), func() { issueValidatorBlock(ctx) }, ParamsValidator.CommitteeBroadcastInterval)
 	}
-}
-
-func accountFromParam(accountHex, privateKey string) blockfactory.Account {
-	accountID, err := iotago.IdentifierFromHexString(accountHex)
-	if err != nil {
-		panic(fmt.Sprintln("invalid accountID hex string", err))
-	}
-	privKey, err := crypto.ParseEd25519PrivateKeyFromString(privateKey)
-	if err != nil {
-		panic(fmt.Sprintln("invalid ed25519 private key string", err))
-	}
-
-	return blockfactory.NewEd25519Account(accountID, privKey)
 }
