@@ -8,7 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -21,14 +24,14 @@ const (
 	KB       = 1024 * B
 	MB       = 1024 * KB
 	GB       = 1024 * MB
-
-	dataSize = 8192
 )
 
 type TestFramework struct {
 	t           *testing.T
 	Instance    *storage.Storage
 	apiProvider api.Provider
+
+	uniqueKeyCounter uint64
 }
 
 func NewTestFramework(t *testing.T, storageOpts ...options.Option[storage.Storage]) *TestFramework {
@@ -46,14 +49,14 @@ func NewTestFramework(t *testing.T, storageOpts ...options.Option[storage.Storag
 	}
 }
 
-func (f *TestFramework) Shutdown() {
-	f.Instance.Shutdown()
+func (t *TestFramework) Shutdown() {
+	t.Instance.Shutdown()
 }
 
-func (f *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64) {
-	initialStorageSize := f.Instance.PrunableDatabaseSize()
+func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64) {
+	initialStorageSize := t.Instance.PrunableDatabaseSize()
 
-	apiForEpoch := f.apiProvider.APIForEpoch(epoch)
+	apiForEpoch := t.apiProvider.APIForEpoch(epoch)
 	endSlot := apiForEpoch.TimeProvider().EpochEnd(epoch)
 
 	var createdBytes int64
@@ -65,71 +68,109 @@ func (f *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 		}, apiForEpoch)
 
 		modelBlock, err := model.BlockFromBlock(block, apiForEpoch)
-		require.NoError(f.t, err)
+		require.NoError(t.t, err)
 
-		err = f.Instance.Prunable.Blocks(endSlot).Store(modelBlock)
-		require.NoError(f.t, err)
+		err = t.Instance.Prunable.Blocks(endSlot).Store(modelBlock)
+		require.NoError(t.t, err)
 
 		createdBytes += int64(len(modelBlock.Data()))
 		createdBytes += iotago.SlotIdentifierLength
 	}
 
-	f.AssertPrunableSizeGreater(initialStorageSize + size)
+	t.AssertPrunableSizeGreater(initialStorageSize + size)
 
-	fmt.Printf("> created %d MB of bucket prunable data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, f.Instance.PermanentDatabaseSize()/MB, f.Instance.PrunableDatabaseSize()/MB)
+	fmt.Printf("> created %d MB of bucket prunable data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
 }
 
-func (f *TestFramework) GenerateSemiPermanentData(epoch iotago.EpochIndex, size int64) {
-	// TODO:
-	//  3. generate data of some size in in semi-permanent storage: for all individual storages
+func (t *TestFramework) GenerateSemiPermanentData(epoch iotago.EpochIndex) {
+	rewardsKV := lo.PanicOnErr(t.Instance.Prunable.Rewards(epoch).WithExtendedRealm(uint64ToBytes(epoch)))
+	poolStatsStore := t.Instance.Prunable.PoolStats()
+	decidedUpgradeSignalsStore := t.Instance.Prunable.DecidedUpgradeSignals()
+	committeeStore := t.Instance.Prunable.Committee()
 
-}
-
-func (f *TestFramework) GeneratePermanentData(size int64) {
-	initialStorageSize := f.Instance.PermanentDatabaseSize()
-
-	// Use as dummy to generate some data.
-	kv := f.Instance.Permanent.Ledger()
-
-	var count uint64
+	var err error
 	var createdBytes int64
-	for createdBytes < size {
 
-		key := make([]byte, 8)
-		binary.LittleEndian.PutUint64(key, count)
-		err := kv.Set(key, tpkg.RandBytes(dataSize))
-		require.NoError(f.t, err)
-
-		createdBytes += int64(dataSize) + 8 // for key
-		count++
+	for i := 0; i < 200; i++ {
+		createdBytes += t.storeRandomData(rewardsKV, 32)
 	}
 
-	require.NoError(f.t, kv.Flush())
+	poolStatsModel := &model.PoolsStats{
+		TotalStake:          1,
+		TotalValidatorStake: 2,
+		ProfitMargin:        3,
+	}
+	err = poolStatsStore.Store(epoch, poolStatsModel)
+	require.NoError(t.t, err)
+	createdBytes += int64(len(lo.PanicOnErr(poolStatsModel.Bytes()))) + 8 // for epoch key
 
-	f.AssertPermanentSizeGreater(initialStorageSize + size)
-	fmt.Printf("> created %d MB of permanent data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, f.Instance.PermanentDatabaseSize()/MB, f.Instance.PrunableDatabaseSize()/MB)
+	versionAndHash := model.VersionAndHash{
+		Version: 1,
+		Hash:    iotago.Identifier{2},
+	}
+	err = decidedUpgradeSignalsStore.Store(epoch, versionAndHash)
+	require.NoError(t.t, err)
+	createdBytes += int64(len(lo.PanicOnErr(versionAndHash.Bytes()))) + 8 // for epoch key
+
+	accounts := account.NewAccounts()
+	accounts.Set(tpkg.RandAccountID(), &account.Pool{})
+	err = committeeStore.Store(epoch, accounts)
+	require.NoError(t.t, err)
+	createdBytes += int64(len(lo.PanicOnErr(accounts.Bytes()))) + 8 // for epoch key
 }
 
-func (f *TestFramework) AssertStorageSizeGreater(expected int64) {
-	require.GreaterOrEqual(f.t, f.Instance.Size(), expected)
+func (t *TestFramework) GeneratePermanentData(size int64) {
+	initialStorageSize := t.Instance.PermanentDatabaseSize()
+
+	// Use as dummy to generate some data.
+	kv := t.Instance.Permanent.Ledger()
+
+	var createdBytes int64
+	for createdBytes < size {
+		createdBytes += t.storeRandomData(kv, 8192)
+	}
+
+	require.NoError(t.t, kv.Flush())
+
+	t.AssertPermanentSizeGreater(initialStorageSize + size)
+	fmt.Printf("> created %d MB of permanent data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
 }
 
-func (f *TestFramework) AssertPrunableSizeGreater(expected int64) {
-	require.GreaterOrEqual(f.t, f.Instance.PrunableDatabaseSize(), expected)
+func (t *TestFramework) storeRandomData(kv kvstore.KVStore, size int64) int64 {
+	err := kv.Set(uint64ToBytes(t.uniqueKeyCounter), tpkg.RandBytes(int(size)))
+	require.NoError(t.t, err)
+
+	t.uniqueKeyCounter++
+
+	return size + 8 // for key
 }
 
-func (f *TestFramework) AssertPermanentSizeGreater(expected int64) {
-	require.GreaterOrEqual(f.t, f.Instance.PermanentDatabaseSize(), expected)
+func uint64ToBytes[V ~uint64](v V) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, uint64(v))
+	return b
 }
 
-func (f *TestFramework) AssertStorageSizeBelow(expected int64) {
-	require.LessOrEqual(f.t, f.Instance.Size(), expected)
+func (t *TestFramework) AssertStorageSizeGreater(expected int64) {
+	require.GreaterOrEqual(t.t, t.Instance.Size(), expected)
 }
 
-func (f *TestFramework) AssertPrunedUntil(expectedPrunedUntil iotago.EpochIndex, expectedHasPruned bool) {
-	lastPruned, hasPruned := f.Instance.LastPrunedEpoch()
-	require.Equal(f.t, expectedHasPruned, hasPruned)
-	require.Equal(f.t, expectedPrunedUntil, lastPruned)
+func (t *TestFramework) AssertPrunableSizeGreater(expected int64) {
+	require.GreaterOrEqual(t.t, t.Instance.PrunableDatabaseSize(), expected)
+}
+
+func (t *TestFramework) AssertPermanentSizeGreater(expected int64) {
+	require.GreaterOrEqual(t.t, t.Instance.PermanentDatabaseSize(), expected)
+}
+
+func (t *TestFramework) AssertStorageSizeBelow(expected int64) {
+	require.LessOrEqual(t.t, t.Instance.Size(), expected)
+}
+
+func (t *TestFramework) AssertPrunedUntil(expectedPrunedUntil iotago.EpochIndex, expectedHasPruned bool) {
+	lastPruned, hasPruned := t.Instance.LastPrunedEpoch()
+	require.Equal(t.t, expectedHasPruned, hasPruned)
+	require.Equal(t.t, expectedPrunedUntil, lastPruned)
 
 	// TODO: make sure that all the epochs until this point are actually pruned and files deleted
 	//   -> for semi permanent storage we need to make sure that correct pruning delays are adhered to, should probably be specified (in the test) and tested accordingly
