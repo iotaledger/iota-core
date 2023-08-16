@@ -422,8 +422,7 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 				// update the account data diff taking into account the decay, the modified diff will be stored in the calling
 				// ApplyDiff function to be able to properly rollback the account to a previous state taking into account the
 				// applied decay.
-				decayedChange := accountData.Credits.Value - iotago.BlockIssuanceCredits(decayedPreviousCredits)
-				diffChange.BICChange -= decayedChange
+				diffChange.BICChange -= accountData.Credits.Value - iotago.BlockIssuanceCredits(decayedPreviousCredits)
 			}
 
 			accountData.Credits.Update(diffChange.BICChange, index)
