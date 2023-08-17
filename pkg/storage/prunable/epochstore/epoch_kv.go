@@ -29,6 +29,13 @@ func NewEpochKVStore(realm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotag
 	}
 }
 
+func (e *EpochKVStore) RestoreLastPrunedEpoch(epoch iotago.EpochIndex) {
+	e.lastPrunedMutex.Lock()
+	defer e.lastPrunedMutex.Unlock()
+
+	e.lastPrunedEpoch.MarkEvicted(epoch)
+}
+
 func (e *EpochKVStore) LastPrunedEpoch() (iotago.EpochIndex, bool) {
 	e.lastPrunedMutex.RLock()
 	defer e.lastPrunedMutex.RUnlock()

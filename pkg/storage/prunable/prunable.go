@@ -49,7 +49,12 @@ func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider a
 func (p *Prunable) RestoreFromDisk() {
 	p.prunableSlotStore.RestoreFromDisk()
 
-	// TODO: what is the last pruned epoch for semiPermanentDB? -> set based on latest pruning epoch of buckets
+	// set lastPrunedEpoch based on latest pruning epoch of buckets
+	lastPrunedEpoch := lo.Return1(p.prunableSlotStore.LastPrunedEpoch())
+	p.decidedUpgradeSignals.RestoreLastPrunedEpoch(lastPrunedEpoch)
+	p.poolRewards.RestoreLastPrunedEpoch(lastPrunedEpoch)
+	p.poolStats.RestoreLastPrunedEpoch(lastPrunedEpoch)
+	p.committee.RestoreLastPrunedEpoch(lastPrunedEpoch)
 }
 
 func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) {

@@ -36,6 +36,13 @@ func (s *Store[V]) isTooOld(epoch iotago.EpochIndex) bool {
 	return epoch < lo.Return1(s.lastPrunedEpoch.Index())
 }
 
+func (s *Store[V]) RestoreLastPrunedEpoch(epoch iotago.EpochIndex) {
+	s.lastPrunedMutex.Lock()
+	defer s.lastPrunedMutex.Unlock()
+
+	s.lastPrunedEpoch.MarkEvicted(epoch)
+}
+
 func (s *Store[V]) LastPrunedEpoch() (iotago.EpochIndex, bool) {
 	s.lastPrunedMutex.RLock()
 	defer s.lastPrunedMutex.RUnlock()
