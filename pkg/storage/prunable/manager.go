@@ -71,18 +71,20 @@ func (m *PrunableSlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) 
 	return lo.PanicOnErr(kv.WithExtendedRealm(realm)), nil
 }
 
-func (m *PrunableSlotManager) PruneUntilEpoch(index iotago.EpochIndex) {
+func (m *PrunableSlotManager) PruneUntilEpoch(index iotago.EpochIndex) error {
 	m.lastPrunedMutex.Lock()
 	defer m.lastPrunedMutex.Unlock()
 
 	if index < m.lastPrunedEpoch.NextIndex() {
-		return
+		return ErrNoPruningNeeded
 	}
 
 	for currentIndex := m.lastPrunedEpoch.NextIndex(); currentIndex <= index; currentIndex++ {
 		m.prune(currentIndex)
 		m.lastPrunedEpoch.MarkEvicted(currentIndex)
 	}
+
+	return nil
 }
 
 func (m *PrunableSlotManager) Shutdown() {

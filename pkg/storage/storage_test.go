@@ -5,7 +5,9 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStorage_Pruning(t *testing.T) {
@@ -57,7 +59,10 @@ func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
 
-	tf.Instance.PruneByEpochIndex(7)
+	// TODO: set lastFinalizedEpoch
+	err := tf.Instance.PruneByEpochIndex(7)
+	require.ErrorContains(t, err, prunable.ErrNoPruningNeeded.Error())
+
 	tf.AssertPrunedUntil(
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),
@@ -86,6 +91,23 @@ func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
 }
 
 func TestStorage_PruneBySize(t *testing.T) {
+	tf := NewTestFramework(t,
+		storage.WithPruningDelay(2),
+		storage.WithPruningSizeEnable(true),
+		storage.WithPruningSizeMaxTargetSizeBytes(10*MB))
+	defer tf.Shutdown()
+
+	// TODO: set lastFinalizedEpoch
+	totalEpochs := 14
+	tf.GeneratePermanentData(5 * MB)
+	for i := 1; i <= totalEpochs; i++ {
+		tf.GeneratePrunableData(iotago.EpochIndex(i), 100*KB)
+		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
+	}
+
+	tf.Instance.PruneBySize(4 * MB)
+
+	require.LessOrEqual(t, tf.Instance.Size(), 4*MB)
 	// need to add some stuff to permanent storage for multiple epochs
 	// need to add some stuff to prunable bucket and semipermanent storages for multiple epochs
 

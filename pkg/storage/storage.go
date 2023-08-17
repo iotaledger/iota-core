@@ -101,21 +101,27 @@ func (s *Storage) Size() int64 {
 	return s.PermanentDatabaseSize() + s.PrunableDatabaseSize()
 }
 
-func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) {
+func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
 
-	// TODO: check for last finalized epoch
+	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
+	start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
+	if start < epoch {
+		err := ierrors.Wrapf(prunable.ErrNotEnoughHistory, "pruning epoch %d is larger than the current epoch %d in PruneByEpochIndex", epoch, start)
+		s.errorHandler(err)
+		return err
+	}
 
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
-	s.prunable.PruneUntilEpoch(epoch)
+	return s.prunable.PruneUntilEpoch(epoch)
 
 	// TODO: call ledger pruning
 }
 
-func (s *Storage) PruneByDepth(depth iotago.EpochIndex) {
+func (s *Storage) PruneByDepth(depth iotago.EpochIndex) error {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
 
@@ -125,17 +131,18 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) {
 	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
 	start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
 	if start < depth {
-		s.errorHandler(ierrors.Errorf("pruning depth %d is greater than the current epoch %d", depth, start))
-		return
+		err := ierrors.Wrapf(prunable.ErrNotEnoughHistory, "pruning depth %d is greater than the current epoch %d in PruneByDepth", depth, start)
+		s.errorHandler(err)
+		return err
 	}
 
-	s.prunable.PruneUntilEpoch(start - depth)
+	return s.prunable.PruneUntilEpoch(start - depth)
 }
 
-func (s *Storage) PruneBySize(targetSizeBytes ...int64) {
+func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
 	if !s.optPruningSizeEnabled && len(targetSizeBytes) == 0 {
 		// pruning by size deactivated
-		return
+		return prunable.ErrNoPruningNeeded
 	}
 
 	s.pruningLock.Lock()
@@ -152,7 +159,7 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) {
 	currentSize := s.Size()
 	// No need to prune. The database is already smaller than the target size.
 	if targetDatabaseSizeBytes < 0 || currentSize < targetDatabaseSizeBytes {
-		return
+		return prunable.ErrNoPruningNeeded
 	}
 
 	latestEpoch := s.Settings().APIProvider().CurrentAPI().TimeProvider().EpochFromSlot(s.Settings().LatestFinalizedSlot())
@@ -160,10 +167,10 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) {
 	targetEpoch, err := s.prunable.EpochToPrunedBySize(bytesToPrune, latestEpoch)
 	if err != nil {
 		s.errorHandler(err)
-		return
+		return err
 	}
 
-	s.prunable.PruneUntilEpoch(targetEpoch)
+	return s.prunable.PruneUntilEpoch(targetEpoch)
 	// Note: what if permanent is too big -> log error?
 }
 

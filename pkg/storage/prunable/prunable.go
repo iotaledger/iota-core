@@ -16,7 +16,10 @@ import (
 )
 
 var (
-	ErrEpochPruned = ierrors.New("epoch pruned")
+	ErrEpochPruned      = ierrors.New("epoch pruned")
+	ErrNotEnoughHistory = ierrors.New("not enough history")
+	ErrNoPruningNeeded  = ierrors.New("no pruning needed")
+	ErrPruningAborted   = ierrors.New("pruning was aborted")
 )
 
 type Prunable struct {
@@ -65,14 +68,16 @@ func (p *Prunable) RestoreFromDisk() {
 	p.committee.RestoreLastPrunedEpoch(lastPrunedEpoch)
 }
 
-func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) {
+func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) error {
 	// No need to prune.
 	if epoch < p.defaultPruningDelay {
-		return
+		return ErrNoPruningNeeded
 	}
 
 	// prune prunable_slot
-	p.prunableSlotStore.PruneUntilEpoch(epoch - p.defaultPruningDelay)
+	if err := p.prunableSlotStore.PruneUntilEpoch(epoch - p.defaultPruningDelay); err != nil {
+		p.errorHandler(err)
+	}
 
 	// prune prunable_epoch: each component has its own pruning delay based on max(individualPruningDelay, defaultPruningDelay)
 	if err := p.decidedUpgradeSignals.PruneUntilEpoch(epoch); err != nil {
@@ -90,6 +95,8 @@ func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) {
 	if err := p.committee.PruneUntilEpoch(epoch); err != nil {
 		p.errorHandler(err)
 	}
+
+	return nil
 }
 
 func (p *Prunable) Size() int64 {
@@ -146,7 +153,7 @@ func (p *Prunable) EpochToPrunedBySize(targetSize int64, latestFinalizedEpoch io
 	}
 
 	// TODO: do we return error here, or prune as much as we could
-	return 0, ierrors.Errorf("failed to prune to target size %d", targetSize)
+	return 0, ErrNotEnoughHistory
 }
 
 func (p *Prunable) semiPermanentDBSizeByEpoch(epoch iotago.EpochIndex) (int64, error) {
