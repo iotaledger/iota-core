@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
+	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -17,11 +18,12 @@ import (
 type Prunable struct {
 	defaultPruningDelay iotago.EpochIndex
 	apiProvider         api.Provider
-	dbConfig            database.Config
 	prunableSlotStore   *PrunableSlotManager
 	errorHandler        func(error)
 
+	semiPermanentDBConfig database.Config
 	semiPermanentDB       *database.DBInstance
+
 	decidedUpgradeSignals *epochstore.Store[model.VersionAndHash]
 	poolRewards           *epochstore.EpochKVStore
 	poolStats             *epochstore.Store[*model.PoolsStats]
@@ -29,15 +31,17 @@ type Prunable struct {
 }
 
 func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[PrunableSlotManager]) *Prunable {
-	semiPermanentDB := database.NewDBInstance(dbConfig)
+	dir := utils.NewDirectory(dbConfig.Directory, true)
+	semiPermanentDBConfig := dbConfig.WithDirectory(dir.PathWithCreate("semipermanent"))
+	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig)
 
 	return &Prunable{
-		dbConfig:            dbConfig,
 		defaultPruningDelay: pruningDelay,
 		apiProvider:         apiProvider,
 		errorHandler:        errorHandler,
 		prunableSlotStore:   NewPrunableSlotManager(dbConfig, errorHandler, opts...),
 
+		semiPermanentDBConfig: semiPermanentDBConfig,
 		semiPermanentDB:       semiPermanentDB,
 		decidedUpgradeSignals: epochstore.NewStore(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, semiPermanentDB.KVStore(), lo.Max(pruningDelayDecidedUpgradeSignals, pruningDelay), model.VersionAndHash.Bytes, model.VersionAndHashFromBytes),
 		poolRewards:           epochstore.NewEpochKVStore(kvstore.Realm{epochPrefixPoolRewards}, semiPermanentDB.KVStore(), lo.Max(pruningDelayPoolRewards, pruningDelay)),
@@ -85,9 +89,9 @@ func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) {
 }
 
 func (p *Prunable) Size() int64 {
-	semiSize, err := ioutils.FolderSize(p.dbConfig.Directory)
+	semiSize, err := ioutils.FolderSize(p.semiPermanentDBConfig.Directory)
 	if err != nil {
-		p.errorHandler(ierrors.Wrapf(err, "get semiPermanentDB failed for %s", p.dbConfig.Directory))
+		p.errorHandler(ierrors.Wrapf(err, "get semiPermanentDB failed for %s", p.semiPermanentDBConfig.Directory))
 	}
 
 	return p.prunableSlotStore.PrunableSlotStorageSize() + semiSize
