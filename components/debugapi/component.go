@@ -120,9 +120,12 @@ func configure() error {
 			}
 
 			epoch := deps.Protocol.APIForSlot(block.ID().Index()).TimeProvider().EpochFromSlot(block.ID().Index())
-			blockStore := blocksPrunableStorage.Get(epoch, []byte{1})
+			blockStore, err := blocksPrunableStorage.Get(epoch, []byte{1})
+			if err != nil {
+				panic(err)
+			}
 
-			err := blockStore.Set(lo.PanicOnErr(block.ID().Bytes()), lo.PanicOnErr(json.Marshal(BlockMetadataResponseFromBlock(block))))
+			err = blockStore.Set(lo.PanicOnErr(block.ID().Bytes()), lo.PanicOnErr(json.Marshal(BlockMetadataResponseFromBlock(block))))
 			if err != nil {
 				panic(err)
 			}
@@ -145,7 +148,10 @@ func configure() error {
 		}
 
 		epoch := deps.Protocol.APIForSlot(blockID.Index()).TimeProvider().EpochFromSlot(blockID.Index())
-		blockStore := blocksPrunableStorage.Get(epoch, []byte{1})
+		blockStore, err := blocksPrunableStorage.Get(epoch, []byte{1})
+		if err != nil {
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
 
 		blockJSON, err := blockStore.Get(lo.PanicOnErr(blockID.Bytes()))
 		if err != nil {
