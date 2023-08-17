@@ -71,7 +71,10 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 		modelBlock, err := model.BlockFromBlock(block, apiForEpoch)
 		require.NoError(t.t, err)
 
-		err = t.Instance.Blocks(endSlot).Store(modelBlock)
+		blockStore, err := t.Instance.Blocks(endSlot)
+		require.NoError(t.t, err)
+
+		err = blockStore.Store(modelBlock)
 		require.NoError(t.t, err)
 
 		createdBytes += int64(len(modelBlock.Data()))
