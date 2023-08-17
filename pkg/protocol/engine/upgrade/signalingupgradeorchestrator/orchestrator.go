@@ -58,7 +58,7 @@ type Orchestrator struct {
 	lastCommittedSlot iotago.SlotIndex
 
 	latestSignals             *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *model.SignaledBlock]
-	upgradeSignalsPerSlotFunc func(slot iotago.SlotIndex) *slotstore.Store[account.SeatIndex, *model.SignaledBlock]
+	upgradeSignalsPerSlotFunc func(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error)
 	decidedUpgradeSignals     *epochstore.Store[model.VersionAndHash]
 
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error
@@ -110,7 +110,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 
 func NewOrchestrator(errorHandler func(error),
 	decidedUpgradeSignals *epochstore.Store[model.VersionAndHash],
-	upgradeSignalsFunc func(slot iotago.SlotIndex) *slotstore.Store[account.SeatIndex, *model.SignaledBlock],
+	upgradeSignalsFunc func(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error),
 	apiProvider api.Provider,
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error,
 	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error),
@@ -197,7 +197,11 @@ func (o *Orchestrator) Commit(slot iotago.SlotIndex) (iotago.Identifier, error) 
 		signaledBlockPerSeat := latestSignalsForSlot.AsMap()
 
 		// Store upgrade signals for this slot.
-		upgradeSignals := o.upgradeSignalsPerSlotFunc(slot)
+		upgradeSignals, err := o.upgradeSignalsPerSlotFunc(slot)
+		if err != nil {
+			o.errorHandler(ierrors.Wrapf(err, "failed to get upgrade signals for slot %d", slot))
+			return nil
+		}
 		for seat, signaledBlock := range signaledBlockPerSeat {
 			if err := upgradeSignals.Store(seat, signaledBlock); err != nil {
 				o.errorHandler(ierrors.Wrapf(err, "failed to store upgrade signals %d:%v", seat, signaledBlock))

@@ -94,8 +94,8 @@ func (t *TestFramework) RequireStorageRootBlocks(expected ...string) {
 	expectedRootBlocks := t.RootBlocks(expected...)
 
 	for blockID, commitmentID := range expectedRootBlocks {
-		rootBlockStorage := t.prunableStorage.RootBlocks(blockID.Index())
-		require.NotNil(t.Testing, rootBlockStorage)
+		rootBlockStorage, err := t.prunableStorage.RootBlocks(blockID.Index())
+		require.NoError(t.Testing, err)
 
 		loadedCommitmentID, err := rootBlockStorage.Load(blockID)
 		require.NoError(t.Testing, err)

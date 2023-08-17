@@ -303,8 +303,8 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		})
 		require.NoError(n.Testing, err)
 
-		rootsStorage := instance.Storage.Roots(details.Commitment.ID().Index())
-		require.NotNilf(n.Testing, rootsStorage, "roots storage for slot %d not found", details.Commitment.Index())
+		rootsStorage, err := instance.Storage.Roots(details.Commitment.ID().Index())
+		require.NoError(n.Testing, err, "roots storage for slot %d not found", details.Commitment.Index())
 		roots, err := rootsStorage.Load(details.Commitment.ID())
 		require.NoError(n.Testing, err)
 

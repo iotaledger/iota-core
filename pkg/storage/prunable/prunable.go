@@ -15,6 +15,10 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
+var (
+	ErrEpochPruned = ierrors.New("epoch pruned")
+)
+
 type Prunable struct {
 	defaultPruningDelay iotago.EpochIndex
 	apiProvider         api.Provider

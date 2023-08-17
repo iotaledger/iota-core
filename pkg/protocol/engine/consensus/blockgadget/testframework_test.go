@@ -43,13 +43,13 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		SeatManager: mock.NewManualPOA(),
 	}
 
-	evictionState := eviction.NewState(mapdb.NewMapDB(), func(index iotago.SlotIndex) *slotstore.Store[iotago.BlockID, iotago.CommitmentID] {
+	evictionState := eviction.NewState(mapdb.NewMapDB(), func(index iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
 		return slotstore.NewStore(index, mapdb.NewMapDB(),
 			iotago.SlotIdentifier.Bytes,
 			iotago.SlotIdentifierFromBytes,
 			iotago.SlotIdentifier.Bytes,
 			iotago.SlotIdentifierFromBytes,
-		)
+		), nil
 	})
 
 	t.blockCache = blocks.New(evictionState, api.SingleVersionProvider(tpkg.TestAPI))

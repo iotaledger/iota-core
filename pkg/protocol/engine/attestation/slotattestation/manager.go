@@ -54,7 +54,7 @@ type Manager struct {
 
 	futureAttestations  *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
 	pendingAttestations *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
-	bucketedStorage     func(index iotago.SlotIndex) kvstore.KVStore // contains committed attestations
+	bucketedStorage     func(index iotago.SlotIndex) (kvstore.KVStore, error) // contains committed attestations
 
 	lastCommittedSlot    iotago.SlotIndex
 	lastCumulativeWeight uint64
@@ -83,7 +83,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 func NewManager(
 	lastCommittedSlot iotago.SlotIndex,
 	lastCumulativeWeight uint64,
-	bucketedStorage func(index iotago.SlotIndex) kvstore.KVStore,
+	bucketedStorage func(index iotago.SlotIndex) (kvstore.KVStore, error),
 	committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts,
 	apiProvider api.Provider,
 ) *Manager {

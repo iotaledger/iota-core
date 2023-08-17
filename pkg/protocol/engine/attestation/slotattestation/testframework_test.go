@@ -50,10 +50,10 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		issuerByAlias:       shrinkingmap.New[string, *issuer](),
 	}
 
-	bucketedStorage := func(index iotago.SlotIndex) kvstore.KVStore {
+	bucketedStorage := func(index iotago.SlotIndex) (kvstore.KVStore, error) {
 		return lo.Return1(t.bucketedStorage.GetOrCreate(index, func() kvstore.KVStore {
 			return mapdb.NewMapDB()
-		}))
+		})), nil
 	}
 
 	committeeFunc := func(index iotago.SlotIndex) *account.SeatedAccounts {

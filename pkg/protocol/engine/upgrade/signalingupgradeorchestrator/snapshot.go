@@ -39,7 +39,10 @@ func (o *Orchestrator) Import(reader io.ReadSeeker) error {
 		return ierrors.Wrapf(err, "failed to import upgrade signals for slot %d", slot)
 	}
 
-	upgradeSignals := o.upgradeSignalsPerSlotFunc(slot)
+	upgradeSignals, err := o.upgradeSignalsPerSlotFunc(slot)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get upgrade signals for slot %d", slot)
+	}
 	for seat, signaledBlock := range upgradeSignalMap {
 		if err := upgradeSignals.Store(seat, signaledBlock); err != nil {
 			o.errorHandler(ierrors.Wrapf(err, "failed to store upgrade signals %d:%v", seat, signaledBlock))
@@ -87,7 +90,10 @@ func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 	if err := stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		var exportedCount uint64
 
-		upgradeSignals := o.upgradeSignalsPerSlotFunc(targetSlot)
+		upgradeSignals, err := o.upgradeSignalsPerSlotFunc(targetSlot)
+		if err != nil {
+			return 0, ierrors.Wrapf(err, "failed to get upgrade signals for target slot %d", targetSlot)
+		}
 		if err := upgradeSignals.StreamBytes(func(seatBytes []byte, signaledBlockBytes []byte) error {
 			if err := stream.Write(writer, seatBytes); err != nil {
 				return ierrors.Wrap(err, "failed to write seat")

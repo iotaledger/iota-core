@@ -261,10 +261,13 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 		return nil, false
 	}
 
-	s := e.Storage.Blocks(id.Index())
-	if s == nil {
+	s, err := e.Storage.Blocks(id.Index())
+	if err != nil {
+		e.errorHandler(ierrors.Wrap(err, "failed to get block storage"))
+
 		return nil, false
 	}
+
 	modelBlock, err := s.Load(id)
 	if err != nil {
 		e.errorHandler(ierrors.Wrap(err, "failed to load block from storage"))
@@ -423,9 +426,10 @@ func (e *Engine) setupBlockStorage() {
 	wp := e.Workers.CreatePool("BlockStorage", 1) // Using just 1 worker to avoid contention
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		store := e.Storage.Blocks(block.ID().Index())
-		if store == nil {
+		store, err := e.Storage.Blocks(block.ID().Index())
+		if err != nil {
 			e.errorHandler(ierrors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
+			return
 		}
 
 		if err := store.Store(block.ModelBlock()); err != nil {
@@ -475,7 +479,7 @@ func (e *Engine) setupBlockRequester() {
 		if block.ID().Index() < e.startupAvailableBlocksWindow {
 			// We shortcut requesting blocks that are in the storage in case we did shut down and restart.
 			// We can safely ignore all errors.
-			if blockStorage := e.Storage.Blocks(block.ID().Index()); blockStorage != nil {
+			if blockStorage, err := e.Storage.Blocks(block.ID().Index()); err == nil {
 				if storedBlock, _ := blockStorage.Load(block.ID()); storedBlock != nil {
 					// We need to attach the block to the DAG in a separate worker pool to avoid a deadlock with the block cache
 					// as the BlockMissing event is triggered within a GetOrCreate call.

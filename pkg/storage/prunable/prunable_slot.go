@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
@@ -24,25 +25,25 @@ const (
 	slotPrefixRetainer
 )
 
-func (p *Prunable) getKVStoreFromSlot(slot iotago.SlotIndex, prefix kvstore.Realm) kvstore.KVStore {
+func (p *Prunable) getKVStoreFromSlot(slot iotago.SlotIndex, prefix kvstore.Realm) (kvstore.KVStore, error) {
 	epoch := p.apiProvider.APIForSlot(slot).TimeProvider().EpochFromSlot(slot)
 
 	return p.prunableSlotStore.Get(epoch, byteutils.ConcatBytes(slot.MustBytes(), prefix))
 }
 
-func (p *Prunable) Blocks(slot iotago.SlotIndex) *slotstore.Blocks {
-	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixBlocks})
-	if kv == nil {
-		return nil
+func (p *Prunable) Blocks(slot iotago.SlotIndex) (*slotstore.Blocks, error) {
+	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixBlocks})
+	if err != nil {
+		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get blocks with slot %d", slot)
 	}
 
-	return slotstore.NewBlocks(slot, kv, p.apiProvider.APIForSlot(slot))
+	return slotstore.NewBlocks(slot, kv, p.apiProvider.APIForSlot(slot)), nil
 }
 
-func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *slotstore.Store[iotago.BlockID, iotago.CommitmentID] {
-	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRootBlocks})
-	if kv == nil {
-		return nil
+func (p *Prunable) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
+	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRootBlocks})
+	if err != nil {
+		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get root blocks with slot %d", slot)
 	}
 
 	return slotstore.NewStore(slot, kv,
@@ -50,26 +51,26 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *slotstore.Store[iotago.Blo
 		iotago.SlotIdentifierFromBytes,
 		iotago.SlotIdentifier.Bytes,
 		iotago.SlotIdentifierFromBytes,
-	)
+	), nil
 }
 
-func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
+func (p *Prunable) Attestations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
 	return p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixAttestations})
 }
 
-func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *slotstore.AccountDiffs {
-	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixAccountDiffs})
-	if kv == nil {
-		return nil
+func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) (*slotstore.AccountDiffs, error) {
+	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixAccountDiffs})
+	if err != nil {
+		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get account diffs with slot %d", slot)
 	}
 
-	return slotstore.NewAccountDiffs(slot, kv, p.apiProvider.APIForSlot(slot))
+	return slotstore.NewAccountDiffs(slot, kv, p.apiProvider.APIForSlot(slot)), nil
 }
 
-func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64] {
-	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixPerformanceFactors})
-	if kv == nil {
-		return nil
+func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, uint64], error) {
+	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixPerformanceFactors})
+	if err != nil {
+		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get performance factors with slot %d", slot)
 	}
 
 	uint64Bytes := func(value uint64) ([]byte, error) {
@@ -96,12 +97,12 @@ func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *slotstore.Store[io
 		iotago.IdentifierFromBytes,
 		uint64Bytes,
 		uint64FromBytes,
-	)
+	), nil
 }
-func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *slotstore.Store[account.SeatIndex, *model.SignaledBlock] {
-	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixUpgradeSignals})
-	if kv == nil {
-		return nil
+func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error) {
+	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixUpgradeSignals})
+	if err != nil {
+		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get upgrade signals with slot %d", slot)
 	}
 
 	apiForSlot := p.apiProvider.APIForSlot(slot)
@@ -113,13 +114,13 @@ func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *slotstore.Store[accoun
 			return s.Bytes(apiForSlot)
 		},
 		model.SignaledBlockFromBytesFunc(apiForSlot),
-	)
+	), nil
 }
 
-func (p *Prunable) Roots(slot iotago.SlotIndex) *slotstore.Store[iotago.CommitmentID, *iotago.Roots] {
-	kv := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRoots})
-	if kv == nil {
-		return nil
+func (p *Prunable) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.CommitmentID, *iotago.Roots], error) {
+	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRoots})
+	if err != nil {
+		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get roots with slot %d", slot)
 	}
 
 	apiForSlot := p.apiProvider.APIForSlot(slot)
@@ -141,14 +142,14 @@ func (p *Prunable) Roots(slot iotago.SlotIndex) *slotstore.Store[iotago.Commitme
 		iotago.SlotIdentifierFromBytes,
 		rootsBytes,
 		rootsFromBytes,
-	)
+	), nil
 }
 
-func (p *Prunable) Retainer(slot iotago.SlotIndex) *slotstore.Retainer {
-	store := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRetainer})
-	if store == nil {
-		return nil
+func (p *Prunable) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
+	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRetainer})
+	if err != nil {
+		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get retainer with slot %d", slot)
 	}
 
-	return slotstore.NewRetainer(slot, store)
+	return slotstore.NewRetainer(slot, kv), nil
 }

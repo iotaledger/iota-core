@@ -35,7 +35,7 @@ type Manager struct {
 
 	// TODO: add in memory shrink version of the slot diffs
 	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
-	slotDiff func(iotago.SlotIndex) *slotstore.AccountDiffs
+	slotDiff func(iotago.SlotIndex) (*slotstore.AccountDiffs, error)
 
 	// block is a function that returns a block from the cache or from the database.
 	block func(id iotago.BlockID) (*blocks.Block, bool)
@@ -48,7 +48,7 @@ type Manager struct {
 func New(
 	apiProvider api.Provider,
 	blockFunc func(id iotago.BlockID) (*blocks.Block, bool),
-	slotDiffFunc func(iotago.SlotIndex) *slotstore.AccountDiffs,
+	slotDiffFunc func(iotago.SlotIndex) (*slotstore.AccountDiffs, error),
 	accountsStore kvstore.KVStore,
 ) *Manager {
 	return &Manager{
@@ -92,8 +92,8 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 }
 
 func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountID) (*model.AccountDiff, bool, error) {
-	s := m.slotDiff(index)
-	if s == nil {
+	s, err := m.slotDiff(index)
+	if err != nil {
 		return nil, false, ierrors.Errorf("slot %d already pruned", index)
 	}
 
@@ -150,7 +150,12 @@ func (m *Manager) ApplyDiff(
 	}
 
 	for accountID, accountDiff := range accountDiffs {
-		err := m.slotDiff(slotIndex).Store(accountID, accountDiff, destroyedAccounts.Has(accountID))
+		s, err := m.slotDiff(slotIndex)
+		if err != nil {
+			return ierrors.Wrapf(err, "could not load slot diff for slot %d", slotIndex)
+		}
+
+		err = s.Store(accountID, accountDiff, destroyedAccounts.Has(accountID))
 		if err != nil {
 			return ierrors.Wrapf(err, "could not store diff to slot %d", slotIndex)
 		}
@@ -279,8 +284,8 @@ func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iot
 func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetIndex iotago.SlotIndex) (wasDestroyed bool, err error) {
 	// to reach targetIndex, we need to rollback diffs from the current latestCommittedSlot down to targetIndex + 1
 	for diffIndex := m.latestCommittedSlot; diffIndex > targetIndex; diffIndex-- {
-		diffStore := m.slotDiff(diffIndex)
-		if diffStore == nil {
+		diffStore, err := m.slotDiff(diffIndex)
+		if err != nil {
 			return false, ierrors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
 		}
 

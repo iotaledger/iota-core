@@ -63,14 +63,14 @@ func NewTestSuite(test *testing.T) *TestSuite {
 
 func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
-	slotDiffFunc := func(index iotago.SlotIndex) *slotstore.AccountDiffs {
+	slotDiffFunc := func(index iotago.SlotIndex) (*slotstore.AccountDiffs, error) {
 		if _, exists := prunableStores[index]; !exists {
 			prunableStores[index] = mapdb.NewMapDB()
 		}
 
 		p := slotstore.NewAccountDiffs(index, prunableStores[index], tpkg.TestAPI)
 
-		return p
+		return p, nil
 	}
 
 	blockFunc := func(id iotago.BlockID) (*blocks.Block, bool) {

@@ -29,35 +29,35 @@ func (s *Storage) Committee() *epochstore.Store[*account.Accounts] {
 	return s.prunable.Committee()
 }
 
-func (s *Storage) Blocks(slot iotago.SlotIndex) *slotstore.Blocks {
+func (s *Storage) Blocks(slot iotago.SlotIndex) (*slotstore.Blocks, error) {
 	return s.prunable.Blocks(slot)
 }
 
-func (s *Storage) RootBlocks(slot iotago.SlotIndex) *slotstore.Store[iotago.BlockID, iotago.CommitmentID] {
+func (s *Storage) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
 	return s.prunable.RootBlocks(slot)
 }
 
-func (s *Storage) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
+func (s *Storage) Attestations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
 	return s.prunable.Attestations(slot)
 }
 
-func (s *Storage) AccountDiffs(slot iotago.SlotIndex) *slotstore.AccountDiffs {
+func (s *Storage) AccountDiffs(slot iotago.SlotIndex) (*slotstore.AccountDiffs, error) {
 	return s.prunable.AccountDiffs(slot)
 }
 
-func (s *Storage) PerformanceFactors(slot iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64] {
+func (s *Storage) PerformanceFactors(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, uint64], error) {
 	return s.prunable.PerformanceFactors(slot)
 }
 
-func (s *Storage) UpgradeSignals(slot iotago.SlotIndex) *slotstore.Store[account.SeatIndex, *model.SignaledBlock] {
+func (s *Storage) UpgradeSignals(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error) {
 	return s.prunable.UpgradeSignals(slot)
 }
 
-func (s *Storage) Roots(slot iotago.SlotIndex) *slotstore.Store[iotago.CommitmentID, *iotago.Roots] {
+func (s *Storage) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.CommitmentID, *iotago.Roots], error) {
 	return s.prunable.Roots(slot)
 }
 
-func (s *Storage) Retainer(slot iotago.SlotIndex) *slotstore.Retainer {
+func (s *Storage) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
 	return s.prunable.Retainer(slot)
 }
 

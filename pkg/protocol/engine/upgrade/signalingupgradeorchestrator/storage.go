@@ -15,7 +15,10 @@ func (o *Orchestrator) RestoreFromDisk(slot iotago.SlotIndex) error {
 
 	// Load latest signals into cache into the next slot (necessary so that we have the correct information when we commit that slot).
 	latestSignals := o.latestSignals.Get(slot+1, true)
-	upgradeSignals := o.upgradeSignalsPerSlotFunc(slot)
+	upgradeSignals, err := o.upgradeSignalsPerSlotFunc(slot)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get upgrade signals for slot %d", slot)
+	}
 	if err := upgradeSignals.Stream(func(seat account.SeatIndex, signaledBlock *model.SignaledBlock) error {
 		latestSignals.Set(seat, signaledBlock)
 

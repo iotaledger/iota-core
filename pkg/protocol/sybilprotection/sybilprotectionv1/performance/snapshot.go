@@ -88,7 +88,10 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "unable to read accounts count for slot index %d", slotIndex)
 		}
 
-		performanceFactors := t.performanceFactorsFunc(slotIndex)
+		performanceFactors, err := t.performanceFactorsFunc(slotIndex)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to get performance factors for slot index %d", slotIndex)
+		}
 		for j := uint64(0); j < accountsCount; j++ {
 			var accountID iotago.AccountID
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
@@ -219,7 +222,11 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 			return ierrors.Wrapf(err, "unable to write pf accounts count for slot index %d", currentSlot)
 		}
 		// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
-		if err := t.performanceFactorsFunc(currentSlot).Stream(func(accountID iotago.AccountID, pf uint64) error {
+		performanceFactors, err := t.performanceFactorsFunc(currentSlot)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to get performance factors for slot index %d", currentSlot)
+		}
+		if err := performanceFactors.Stream(func(accountID iotago.AccountID, pf uint64) error {
 			if err := pWriter.WriteValue("account id", accountID); err != nil {
 				return ierrors.Wrapf(err, "unable to write account id %s for slot %d", accountID, currentSlot)
 			}

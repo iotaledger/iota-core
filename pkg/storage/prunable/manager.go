@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -60,18 +61,14 @@ func (m *PrunableSlotManager) IsTooOld(index iotago.EpochIndex) (isTooOld bool) 
 	return index < m.lastPrunedEpoch.NextIndex()
 }
 
-func (m *PrunableSlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) kvstore.KVStore {
+func (m *PrunableSlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) (kvstore.KVStore, error) {
 	if m.IsTooOld(index) {
-		return nil
+		return nil, ierrors.Wrapf(ErrEpochPruned, "epoch %d", index)
 	}
 
 	kv := m.getDBInstance(index).KVStore()
-	withRealm, err := kv.WithExtendedRealm(realm)
-	if err != nil {
-		panic(err)
-	}
 
-	return withRealm
+	return lo.PanicOnErr(kv.WithExtendedRealm(realm)), nil
 }
 
 func (m *PrunableSlotManager) PruneUntilEpoch(index iotago.EpochIndex) {

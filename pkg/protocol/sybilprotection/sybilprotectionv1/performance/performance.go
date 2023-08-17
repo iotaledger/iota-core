@@ -19,7 +19,7 @@ type Tracker struct {
 	poolStatsStore           *epochstore.Store[*model.PoolsStats]
 	committeeStore           *epochstore.Store[*account.Accounts]
 
-	performanceFactorsFunc func(slot iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64]
+	performanceFactorsFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, uint64], error)
 	latestAppliedEpoch     iotago.EpochIndex
 
 	apiProvider api.Provider
@@ -34,7 +34,7 @@ func NewTracker(
 	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) kvstore.KVStore,
 	poolStatsStore *epochstore.Store[*model.PoolsStats],
 	committeeStore *epochstore.Store[*account.Accounts],
-	performanceFactorsFunc func(slot iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64],
+	performanceFactorsFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, uint64], error),
 	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider api.Provider,
 	errHandler func(error),
@@ -44,9 +44,9 @@ func NewTracker(
 		poolStatsStore:           poolStatsStore,
 		committeeStore:           committeeStore,
 		performanceFactorsFunc:   performanceFactorsFunc,
-		latestAppliedEpoch:     latestAppliedEpoch,
+		latestAppliedEpoch:       latestAppliedEpoch,
 		apiProvider:              apiProvider,
-		errHandler:             errHandler,
+		errHandler:               errHandler,
 	}
 }
 
@@ -66,7 +66,11 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	t.performanceFactorsMutex.Lock()
 	defer t.performanceFactorsMutex.Unlock()
 
-	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
+	performanceFactors, err := t.performanceFactorsFunc(block.ID().Index())
+	if err != nil {
+		t.errHandler(ierrors.Errorf("failed to load performance factor for slot %s", block.ID().Index()))
+		return
+	}
 	pf, err := performanceFactors.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
@@ -105,8 +109,8 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
 		intermediateFactors := make([]uint64, 0, epochEndSlot+1-epochStartSlot)
 		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
-			performanceFactorStorage := t.performanceFactorsFunc(slot)
-			if performanceFactorStorage == nil {
+			performanceFactorStorage, err := t.performanceFactorsFunc(slot)
+			if err != nil {
 				intermediateFactors = append(intermediateFactors, 0)
 				continue
 			}

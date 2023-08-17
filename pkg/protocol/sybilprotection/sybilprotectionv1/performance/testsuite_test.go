@@ -54,7 +54,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 
 func (t *TestSuite) InitRewardManager() {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
-	performanceFactorFunc := func(index iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64] {
+	performanceFactorFunc := func(index iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, uint64], error) {
 		if _, exists := prunableStores[index]; !exists {
 			prunableStores[index] = mapdb.NewMapDB()
 		}
@@ -85,7 +85,7 @@ func (t *TestSuite) InitRewardManager() {
 			uint64FromBytes,
 		)
 
-		return p
+		return p, nil
 	}
 
 	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), 0)

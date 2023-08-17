@@ -54,7 +54,10 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 	t.Eventually(func() error {
 		for _, node := range nodes {
 
-			accountsDiffStorage := node.Protocol.MainEngineInstance().Storage.AccountDiffs(index)
+			accountsDiffStorage, err := node.Protocol.MainEngineInstance().Storage.AccountDiffs(index)
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertAccountDiff: %s: failed to load accounts diff for slot %d", node.Name, index)
+			}
 
 			if has, err := accountsDiffStorage.Has(accountID); err != nil {
 				return ierrors.Wrapf(err, "AssertAccountDiff: %s: failed to load accounts diff for slot %d", node.Name, index)

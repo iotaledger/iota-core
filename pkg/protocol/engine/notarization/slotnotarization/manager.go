@@ -205,8 +205,8 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	rootsStorage := m.storage.Roots(index)
-	if rootsStorage == nil {
+	rootsStorage, err := m.storage.Roots(index)
+	if err != nil {
 		m.errorHandler(ierrors.Wrapf(err, "failed get roots storage for commitment %s", newModelCommitment.ID()))
 		return false
 	}

@@ -113,7 +113,7 @@ func New(
 	accountsStore kvstore.KVStore,
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
-	slotDiffFunc func(iotago.SlotIndex) *slotstore.AccountDiffs,
+	slotDiffFunc func(iotago.SlotIndex) (*slotstore.AccountDiffs, error),
 	apiProvider api.Provider,
 	sybilProtection sybilprotection.SybilProtection,
 	errorHandler func(error),

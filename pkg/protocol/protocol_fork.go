@@ -39,9 +39,9 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 		return
 	}
 
-	rootsStorage := mainEngine.Storage.Roots(commitmentID.Index())
-	if rootsStorage == nil {
-		p.ErrorHandler()(ierrors.Errorf("failed to load roots for commitment %s", commitmentID))
+	rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Index())
+	if err != nil {
+		p.ErrorHandler()(ierrors.Errorf("failed to get roots storage for commitment %s", commitmentID))
 		return
 	}
 	roots, err := rootsStorage.Load(commitmentID)
