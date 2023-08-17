@@ -32,7 +32,7 @@ func NewChain(forkingPoint *ChainCommitment) (fork *Chain) {
 	return c
 }
 
-func (c *Chain) IsSolid() reactive.Event {
+func (c *Chain) SolidEvent() reactive.Event {
 	return c.ForkingPoint.SolidEvent()
 }
 
