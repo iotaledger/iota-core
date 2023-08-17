@@ -85,15 +85,20 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 				l.memPool.PublishCommitmentState(scd.Commitment.Commitment())
 			})
 
-			e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+			pruneUTXOLedger := func(epoch iotago.EpochIndex) {
 				l.utxoLedger.WriteLockLedger()
 				defer l.utxoLedger.WriteUnlockLedger()
 
-				// TODO: do we want to delay the pruning of the spent ledger state? We can't export pruned slots anyway.
-				if err := l.utxoLedger.PruneSlotIndexWithoutLocking(index); err != nil {
-					l.errorHandler(ierrors.Wrapf(err, "failed to prune ledger for index %d", index))
+				start := e.APIForEpoch(epoch).TimeProvider().EpochStart(epoch)
+				end := e.APIForEpoch(epoch).TimeProvider().EpochEnd(epoch)
+
+				for slot := start; slot <= end; slot++ {
+					if err := l.utxoLedger.PruneSlotIndexWithoutLocking(slot); err != nil {
+						l.errorHandler(ierrors.Wrapf(err, "failed to prune ledger for slot %d", slot))
+					}
 				}
-			})
+			}
+			e.Storage.SetLedgerPruningFunc(pruneUTXOLedger)
 
 			l.TriggerConstructed()
 			l.TriggerInitialized()

@@ -27,7 +27,8 @@ type Storage struct {
 	dir *utils.Directory
 
 	// Permanent is the section of the storage that is maintained forever (holds the current ledger state).
-	permanent *permanent.Permanent
+	permanent         *permanent.Permanent
+	ledgerPruningFunc func(epoch iotago.EpochIndex)
 
 	// Prunable is the section of the storage that is pruned regularly (holds the history of the ledger state).
 	prunable *prunable.Prunable
@@ -102,14 +103,18 @@ func (s *Storage) Size() int64 {
 	return s.PermanentDatabaseSize() + s.PrunableDatabaseSize()
 }
 
-func (s *Storage) PruneByEpochIndex(index iotago.EpochIndex) {
+func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
+
+	// TODO: check for last finalized epoch
 
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
-	s.prunable.PruneUntilEpoch(index)
+	s.prunable.PruneUntilEpoch(epoch)
+
+	// TODO: call ledger pruning
 }
 
 func (s *Storage) PruneByDepth(depth iotago.EpochIndex) {
