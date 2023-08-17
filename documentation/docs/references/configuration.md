@@ -151,16 +151,17 @@ Example:
 
 ## <a id="restapi"></a> 5. RestAPI
 
-| Name                        | Description                                                                                    | Type    | Default value                                                                                                                                                                                           |
-| --------------------------- | ---------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| enabled                     | Whether the REST API plugin is enabled                                                         | boolean | true                                                                                                                                                                                                    |
-| bindAddress                 | The bind address on which the REST API listens on                                              | string  | "0.0.0.0:8080"                                                                                                                                                                                          |
-| publicRoutes                | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes<br/>/api/core/v3/info<br/>/api/core/v3/blocks\*<br/>/api/core/v3/transactions\*<br/>/api/core/v3/commitments\*<br/>/api/core/v3/outputs\*<br/>/api/debug/v2/\*<br/>/api/indexer/v1/\* |
-| protectedRoutes             | The HTTP REST routes which need to be called with authorization. Wildcards using \* are allowed | array   | /api/\*                                                                                                                                                                                                  |
-| debugRequestLoggerEnabled   | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                   |
-| allowIncompleteBlock        | Whether the node allows to fill in incomplete block and issue it for user                      | boolean | false                                                                                                                                                                                                   |
-| [jwtAuth](#restapi_jwtauth) | Configuration for jwtAuth                                                                      | object  |                                                                                                                                                                                                         |
-| [limits](#restapi_limits)   | Configuration for limits                                                                       | object  |                                                                                                                                                                                                         |
+| Name                        | Description                                                                                    | Type    | Default value                                                                                                                                                                                                                                                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| enabled                     | Whether the REST API plugin is enabled                                                         | boolean | true                                                                                                                                                                                                                                                                                                                 |
+| bindAddress                 | The bind address on which the REST API listens on                                              | string  | "0.0.0.0:8080"                                                                                                                                                                                                                                                                                                       |
+| publicRoutes                | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes<br/>/api/core/v3/info<br/>/api/core/v3/blocks\*<br/>/api/core/v3/transactions\*<br/>/api/core/v3/commitments\*<br/>/api/core/v3/outputs\*<br/>/api/core/v3/accounts\*<br/>/api/core/v3/validators\*<br/>/api/core/v3/rewards\*<br/>/api/core/v3/committee<br/>/api/debug/v2/\*<br/>/api/indexer/v2/\* |
+| protectedRoutes             | The HTTP REST routes which need to be called with authorization. Wildcards using \* are allowed | array   | /api/\*                                                                                                                                                                                                                                                                                                               |
+| debugRequestLoggerEnabled   | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                                                                                                                                |
+| allowIncompleteBlock        | Whether the node allows to fill in incomplete block and issue it for user                      | boolean | false                                                                                                                                                                                                                                                                                                                |
+| maxPageSize                 | The maximum number of results per page                                                         | uint    | 100                                                                                                                                                                                                                                                                                                                  |
+| [jwtAuth](#restapi_jwtauth) | Configuration for jwtAuth                                                                      | object  |                                                                                                                                                                                                                                                                                                                      |
+| [limits](#restapi_limits)   | Configuration for limits                                                                       | object  |                                                                                                                                                                                                                                                                                                                      |
 
 ### <a id="restapi_jwtauth"></a> JwtAuth
 
@@ -190,14 +191,19 @@ Example:
         "/api/core/v3/transactions*",
         "/api/core/v3/commitments*",
         "/api/core/v3/outputs*",
+        "/api/core/v3/accounts*",
+        "/api/core/v3/validators*",
+        "/api/core/v3/rewards*",
+        "/api/core/v3/committee",
         "/api/debug/v2/*",
-        "/api/indexer/v1/*"
+        "/api/indexer/v2/*"
       ],
       "protectedRoutes": [
         "/api/*"
       ],
       "debugRequestLoggerEnabled": false,
       "allowIncompleteBlock": false,
+      "maxPageSize": 100,
       "jwtAuth": {
         "salt": "IOTA"
       },
@@ -293,6 +299,8 @@ Example:
 | Name                 | Description                                                                                | Type   | Default value |
 | -------------------- | ------------------------------------------------------------------------------------------ | ------ | ------------- |
 | maxAllowedClockDrift | The maximum drift our wall clock can have to future blocks being received from the network | string | "5s"          |
+| minCommittableAge    | The minimum age of a commitment or commitment input, relative to block issuance time       | uint   | 6             |
+| maxCommittableAge    | The maximum age of a commitment or commitment input, relative to block issuance time       | uint   | 12            |
 
 ### <a id="protocol_basetoken"></a> BaseToken
 
@@ -315,7 +323,9 @@ Example:
         "depth": 5
       },
       "filter": {
-        "maxAllowedClockDrift": "5s"
+        "maxAllowedClockDrift": "5s",
+        "minCommittableAge": 6,
+        "maxCommittableAge": 12
       },
       "baseToken": {
         "name": "Shimmer",
@@ -355,22 +365,24 @@ Example:
   }
 ```
 
-## <a id="activity"></a> 11. Activity
+## <a id="validator"></a> 11. Validator
 
-| Name               | Description                                                                                                | Type    | Default value |
-| ------------------ | ---------------------------------------------------------------------------------------------------------- | ------- | ------------- |
-| enabled            | Whether the Activity component is enabled                                                                  | boolean | true          |
-| broadcastInterval  | The interval at which the node will broadcast its activity block                                           | string  | "2s"          |
-| parentsCount       | The number of parents that node will choose for its activity blocks                                        | int     | 8             |
-| ignoreBootstrapped | Whether the Activity component should start issuing activity blocks before the main engine is bootstrapped | boolean | false         |
+| Name                       | Description                                                                                                  | Type    | Default value |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------- |
+| enabled                    | Whether the Validator component is enabled                                                                   | boolean | true          |
+| committeeBroadcastInterval | The interval at which the node will broadcast its committee validator block                                  | string  | "2s"          |
+| candidateBroadcastInterval | The interval at which the node will broadcast its candidate validator block                                  | string  | "30m"         |
+| parentsCount               | The number of parents that node will choose for its validator blocks                                         | int     | 8             |
+| ignoreBootstrapped         | Whether the Validator component should start issuing validator blocks before the main engine is bootstrapped | boolean | false         |
 
 Example:
 
 ```json
   {
-    "activity": {
+    "validator": {
       "enabled": true,
-      "broadcastInterval": "2s",
+      "committeeBroadcastInterval": "2s",
+      "candidateBroadcastInterval": "30m",
       "parentsCount": 8,
       "ignoreBootstrapped": false
     }
@@ -419,7 +431,31 @@ Example:
   }
 ```
 
-## <a id="inx"></a> 13. Inx
+## <a id="metrics"></a> 13. Metrics
+
+| Name            | Description                                          | Type    | Default value  |
+| --------------- | ---------------------------------------------------- | ------- | -------------- |
+| enabled         | Whether the Metrics component is enabled             | boolean | true           |
+| bindAddress     | Bind address on which the Prometheus exporter server | string  | "0.0.0.0:9311" |
+| goMetrics       | Include go metrics                                   | boolean | false          |
+| processMetrics  | Include process metrics                              | boolean | false          |
+| promhttpMetrics | Include promhttp metrics                             | boolean | false          |
+
+Example:
+
+```json
+  {
+    "metrics": {
+      "enabled": true,
+      "bindAddress": "0.0.0.0:9311",
+      "goMetrics": false,
+      "processMetrics": false,
+      "promhttpMetrics": false
+    }
+  }
+```
+
+## <a id="inx"></a> 14. Inx
 
 | Name        | Description                                            | Type    | Default value    |
 | ----------- | ------------------------------------------------------ | ------- | ---------------- |
