@@ -330,7 +330,7 @@ func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
 }
 
 func aboveWarpSyncThreshold(slot iotago.SlotIndex, latestCommitmentIndex iotago.SlotIndex, maxCommittableAge iotago.SlotIndex) bool {
-	return slot > latestCommitmentIndex+maxCommittableAge
+	return slot > latestCommitmentIndex+2*maxCommittableAge
 }
 
 // WarpSyncRetryInterval is the interval in which a warp sync request is retried.
