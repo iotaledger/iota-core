@@ -51,6 +51,8 @@ type Block struct {
 
 	modelBlock *model.Block
 	rootBlock  *rootBlock
+
+	workScore iotago.WorkScore
 }
 
 type rootBlock struct {
@@ -70,6 +72,7 @@ func (r *rootBlock) String() string {
 
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
+
 	return &Block{
 		witnesses:             ds.NewSet[account.SeatIndex](),
 		conflictIDs:           ds.NewSet[iotago.TransactionID](),
@@ -78,6 +81,7 @@ func NewBlock(data *model.Block) *Block {
 		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
 		modelBlock:            data,
 		accepted:              reactive.NewVariable[bool](),
+		workScore:             data.WorkScore(),
 	}
 }
 
@@ -647,7 +651,5 @@ func (b *Block) ModelBlock() *model.Block {
 }
 
 func (b *Block) WorkScore() iotago.WorkScore {
-	// TODO: enable work score calculate from iota.go
-	return iotago.WorkScore(1)
-
+	return b.workScore
 }

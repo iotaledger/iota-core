@@ -56,6 +56,9 @@ type TestSuite struct {
 	optsRMCDecrease            iotago.Mana
 	optsRMCIncreaseThreshold   iotago.WorkScore
 	optsRMCDecreaseThreshold   iotago.WorkScore
+	optsSchedulerRate          iotago.WorkScore
+	optsMinMana                iotago.Mana
+	optsMaxBufferSize          uint32
 	optsAccounts               []snapshotcreator.AccountDetails
 	optsSnapshotOptions        []options.Option[snapshotcreator.Options]
 	optsWaitFor                time.Duration
@@ -69,6 +72,7 @@ type TestSuite struct {
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
+	var schedulerRate iotago.WorkScore = 100000
 	return options.Apply(&TestSuite{
 		Testing:                             testingT,
 		fakeTesting:                         &testing.T{},
@@ -90,9 +94,11 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsRMCMin:                 500,
 		optsRMCIncrease:            500,
 		optsRMCDecrease:            500,
-		// TODO: add scheduler param to increase/decrease threshold expression with issue #264
-		optsRMCIncreaseThreshold: 0.8 * 10,
-		optsRMCDecreaseThreshold: 0.2 * 10,
+		optsRMCIncreaseThreshold:   8 * schedulerRate,
+		optsRMCDecreaseThreshold:   5 * schedulerRate,
+		optsSchedulerRate:          schedulerRate,
+		optsMinMana:                1,
+		optsMaxBufferSize:          100 * iotago.MaxBlockSize,
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 		t.API = iotago.V3API(
@@ -120,12 +126,15 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsMaxCommittableAge,
 					t.optsEpochNearingThreshold,
 				),
-				iotago.WithRMCOptions(
+				iotago.WithCongestionControlOptions(
 					t.optsRMCMin,
 					t.optsRMCIncrease,
 					t.optsRMCDecrease,
 					t.optsRMCIncreaseThreshold,
 					t.optsRMCDecreaseThreshold,
+					t.optsSchedulerRate,
+					t.optsMinMana,
+					t.optsMaxBufferSize,
 				),
 				iotago.WithStakingOptions(1),
 			),
