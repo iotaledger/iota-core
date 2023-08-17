@@ -1,12 +1,10 @@
 package storage
 
 import (
-	"math"
 	"sync"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
@@ -132,10 +130,8 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) {
 	}
 
 	s.prunable.PruneUntilEpoch(start - depth)
-	// double check permanent Ledger
 }
 
-// This is now similar to how hornet pruneBySize, by calculating the ratio of the current size to the target size then calculate the number of epochs to prune. So it's not precise.
 func (s *Storage) PruneBySize(targetSizeBytes ...int64) {
 	if !s.optPruningSizeEnabled && len(targetSizeBytes) == 0 {
 		// pruning by size deactivated
@@ -160,15 +156,15 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) {
 	}
 
 	latestEpoch := s.Settings().APIProvider().CurrentAPI().TimeProvider().EpochFromSlot(s.Settings().LatestFinalizedSlot())
-	lastPrunedEpoch := lo.Return1(s.prunable.LastPrunedEpoch())
+	bytesToPrune := currentSize - int64(float64(targetDatabaseSizeBytes)*s.optPruningSizeThresholdPercentage)
+	targetEpoch, err := s.prunable.EpochToPrunedBySize(bytesToPrune, latestEpoch)
+	if err != nil {
+		s.errorHandler(err)
+		return
+	}
 
-	pruningRange := latestEpoch - lastPrunedEpoch
-	prunedDatabaseSizeBytes := float64(targetDatabaseSizeBytes) * (1.0 - s.optPruningSizeThresholdPercentage)
-	epochDiff := math.Ceil(float64(pruningRange) * prunedDatabaseSizeBytes / float64(currentSize))
-
-	s.prunable.PruneUntilEpoch(latestEpoch - iotago.EpochIndex(epochDiff))
-
-	// what if permanent is really large? how to prune it?
+	s.prunable.PruneUntilEpoch(targetEpoch)
+	// Note: what if permanent is too big -> log error?
 }
 
 // Shutdown shuts down the storage.
@@ -180,6 +176,7 @@ func (s *Storage) Shutdown() {
 }
 
 func (s *Storage) Flush() {
+	// TODO: when to trigger flush?
 	s.permanent.Flush()
 	s.prunable.Flush()
 }

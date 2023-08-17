@@ -194,6 +194,25 @@ func (m *PrunableSlotManager) prune(dbBaseIndex iotago.EpochIndex) {
 	m.dbSizes.Delete(dbBaseIndex)
 }
 
+func (m *PrunableSlotManager) BucketSize(epoch iotago.EpochIndex) (int64, error) {
+	size, exists := m.dbSizes.Get(epoch)
+	if exists {
+		return size, nil
+	}
+
+	_, exists = m.openDBs.Get(epoch)
+	if !exists {
+		return 0, ierrors.Errorf("bucket does not exists: %d", epoch)
+	}
+
+	size, err := dbPrunableDirectorySize(m.dbConfig.Directory, epoch)
+	if err != nil {
+		return 0, ierrors.Wrapf(err, "dbPrunableDirectorySize failed for %s: %s", m.dbConfig.Directory, epoch)
+	}
+
+	return size, nil
+}
+
 func (m *PrunableSlotManager) Flush() error {
 	m.openDBsMutex.RLock()
 	defer m.openDBsMutex.RUnlock()

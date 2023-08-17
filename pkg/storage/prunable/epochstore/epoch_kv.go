@@ -54,6 +54,19 @@ func (e *EpochKVStore) GetEpoch(epoch iotago.EpochIndex) kvstore.KVStore {
 	return lo.PanicOnErr(e.kv.WithExtendedRealm(epoch.MustBytes()))
 }
 
+// GetPrunableEpoch returns the KVStore for the given epoch with pruningDelay if it is prunable.
+func (e *EpochKVStore) GetPrunableEpoch(epoch iotago.EpochIndex) kvstore.KVStore {
+	e.lastPrunedMutex.RLock()
+	defer e.lastPrunedMutex.RUnlock()
+
+	minStartEpoch := e.lastPrunedEpoch.NextIndex() + e.pruningDelay
+	if epoch < minStartEpoch {
+		return nil
+	}
+
+	return e.GetEpoch(epoch - e.pruningDelay)
+}
+
 func (e *EpochKVStore) PruneUntilEpoch(epoch iotago.EpochIndex) error {
 	e.lastPrunedMutex.Lock()
 	defer e.lastPrunedMutex.Unlock()
