@@ -238,8 +238,7 @@ func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Bl
 	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
 
-	// TODO: REALLY 2x?
-	return block.ID().Index() > latestCommitmentIndex+2*maxCommittableAge && slotCommitmentID.Index() > latestCommitmentIndex
+	return block.ID().Index() > latestCommitmentIndex+maxCommittableAge && slotCommitmentID.Index() > latestCommitmentIndex
 }
 
 // warpSyncIfNecessary checks if a warp sync is necessary and starts the process if that is the case.
