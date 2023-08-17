@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -47,11 +46,9 @@ func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id network.Pe
 }
 
 func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, merkleProofBytes []byte, id network.PeerID) {
-	fmt.Println("RECEIVED WARP RESPONSE PACKET")
 	p.workerPool.Submit(func() {
 		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
 		if err != nil {
-			fmt.Println("ERROR: ", err)
 			p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize commitmentID in warp sync response"), id)
 
 			return
@@ -59,7 +56,6 @@ func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsByte
 
 		var blockIDs iotago.BlockIDs
 		if _, err = p.apiProvider.APIForSlot(commitmentID.Index()).Decode(blockIDsBytes, &blockIDs, serix.WithValidation()); err != nil {
-			fmt.Println("ERROR: ", err)
 			p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize block ids"), id)
 
 			return
@@ -67,7 +63,6 @@ func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsByte
 
 		merkleProof := new(merklehasher.Proof[iotago.Identifier])
 		if err = json.Unmarshal(merkleProofBytes, merkleProof); err != nil {
-			fmt.Println("ERROR: ", err)
 			p.Events.Error.Trigger(ierrors.Wrapf(err, "failed to deserialize merkle proof when receiving waprsync response for commitment %s", commitmentID), id)
 
 			return

@@ -495,7 +495,6 @@ func (e *Engine) setupBlockRequester() {
 				}
 			}
 		}
-		// TODO: ONLY START REQUESTING WHEN NOT IN WARPSYNC RANGE (or just not attach outside)?
 		e.BlockRequester.StartTicker(block.ID())
 	})
 	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
