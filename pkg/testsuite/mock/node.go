@@ -251,6 +251,10 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		fmt.Printf("%s > [%s] Scheduler.BlockScheduled: %s\n", n.Name, engineName, block.ID())
 	})
 
+	events.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Scheduler.BlockEnqueued: %s\n", n.Name, engineName, block.ID())
+	})
+
 	events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Scheduler.BlockSkipped: %s\n", n.Name, engineName, block.ID())
 	})

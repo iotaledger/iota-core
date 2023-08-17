@@ -87,13 +87,13 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	return manager
 }
 
-func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[string]*AccountActions) {
+func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana, actions map[string]*AccountActions) {
 	slotDetails := newSlotData()
 	t.slotData.Set(slotIndex, slotDetails)
 
 	// Commit an empty diff if no actions specified.
 	if len(actions) == 0 {
-		err := t.Instance.ApplyDiff(slotIndex, make(map[iotago.AccountID]*prunable.AccountDiff), ds.NewSet[iotago.AccountID]())
+		err := t.Instance.ApplyDiff(slotIndex, rmc, make(map[iotago.AccountID]*prunable.AccountDiff), ds.NewSet[iotago.AccountID]())
 		require.NoError(t.T, err)
 		return
 	}
@@ -103,9 +103,9 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 		accountID := t.AccountID(alias, true)
 
 		// Apply the burns to the manager.
-		slotDetails.Burns[accountID] = lo.Sum(action.Burns...)
-		for _, burn := range action.Burns {
-			block := t.createBlockWithBurn(accountID, slotIndex, burn)
+		slotDetails.Burns[accountID] = iotago.Mana(action.NumBlocks) * rmc // this line assumes that the workscore of all block is 1
+		for i := 0; i < action.NumBlocks; i++ {
+			block := t.createBlockWithRMC(accountID, slotIndex, rmc)
 			t.blocks.Get(slotIndex, true).Set(block.ID(), block)
 			t.Instance.TrackBlock(block)
 		}
@@ -140,7 +140,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 			FixedCostChange:       action.FixedCostChange,
 		}
 
-		if action.TotalAllotments+lo.Sum(action.Burns...) != 0 || !exists {
+		if action.TotalAllotments+iotago.Mana(action.NumBlocks)*rmc != 0 || !exists { // this line assumes that workscore of all blocks is 1
 			prevAccountFields.BICUpdatedAt = slotIndex
 		}
 
@@ -178,12 +178,12 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, actions map[str
 		diffs[accountID] = diff.Clone()
 	}
 
-	err := t.Instance.ApplyDiff(slotIndex, diffs, slotDetails.DestroyedAccounts.Clone())
+	err := t.Instance.ApplyDiff(slotIndex, rmc, diffs, slotDetails.DestroyedAccounts.Clone())
 	require.NoError(t.T, err)
 }
 
-func (t *TestSuite) createBlockWithBurn(accountID iotago.AccountID, index iotago.SlotIndex, burn iotago.Mana) *blocks.Block {
-	innerBlock := tpkg.RandBasicBlockWithIssuerAndBurnedMana(accountID, burn)
+func (t *TestSuite) createBlockWithRMC(accountID iotago.AccountID, index iotago.SlotIndex, rmc iotago.Mana) *blocks.Block {
+	innerBlock := tpkg.RandBasicBlockWithIssuerAndRMC(accountID, rmc)
 	innerBlock.IssuingTime = tpkg.TestAPI.TimeProvider().SlotStartTime(index)
 	modelBlock, err := model.BlockFromBlock(innerBlock, tpkg.TestAPI)
 
@@ -333,7 +333,7 @@ func (t *TestSuite) PublicKeys(pubKeys []string, createIfNotExists bool) []ed255
 
 type AccountActions struct {
 	TotalAllotments iotago.Mana
-	Burns           []iotago.Mana
+	NumBlocks       int
 	Destroyed       bool
 	AddedKeys       []string
 	RemovedKeys     []string

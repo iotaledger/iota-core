@@ -2,17 +2,15 @@ package accountsledger_test
 
 import (
 	"testing"
-
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestManager_Scenario1(t *testing.T) {
 	ts := NewTestSuite(t)
 
-	ts.ApplySlotActions(1, map[string]*AccountActions{
+	ts.ApplySlotActions(1, 5, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 10,
-			Burns:           []iotago.Mana{5},
+			NumBlocks:       1,
 			AddedKeys:       []string{"A.P1"},
 
 			NewOutputID: "A1",
@@ -28,10 +26,10 @@ func TestManager_Scenario1(t *testing.T) {
 		},
 	})
 
-	ts.ApplySlotActions(2, map[string]*AccountActions{
+	ts.ApplySlotActions(2, 15, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 30,
-			Burns:           []iotago.Mana{15},
+			NumBlocks:       1,
 			AddedKeys:       []string{"A.P2"},
 
 			NewOutputID: "A2",
@@ -51,10 +49,10 @@ func TestManager_Scenario1(t *testing.T) {
 func TestManager_Scenario2(t *testing.T) {
 	ts := NewTestSuite(t)
 
-	ts.ApplySlotActions(1, map[string]*AccountActions{
+	ts.ApplySlotActions(1, 5, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 10,
-			Burns:           []iotago.Mana{5},
+			NumBlocks:       1,
 			AddedKeys:       []string{"A.P1"},
 
 			NewOutputID: "A1",
@@ -70,7 +68,7 @@ func TestManager_Scenario2(t *testing.T) {
 		},
 	})
 
-	ts.ApplySlotActions(2, nil)
+	ts.ApplySlotActions(2, 0, nil)
 	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
 		"A": {
 			BICUpdatedTime: 1,
@@ -80,10 +78,10 @@ func TestManager_Scenario2(t *testing.T) {
 		},
 	})
 
-	ts.ApplySlotActions(3, map[string]*AccountActions{
+	ts.ApplySlotActions(3, 15, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 30,
-			Burns:           []iotago.Mana{15},
+			NumBlocks:       1,
 			AddedKeys:       []string{"A.P2"},
 
 			NewOutputID: "A2",
@@ -102,10 +100,10 @@ func TestManager_Scenario2(t *testing.T) {
 
 func TestManager_Scenario3(t *testing.T) {
 	ts := NewTestSuite(t)
-	ts.ApplySlotActions(1, map[string]*AccountActions{
+	ts.ApplySlotActions(1, 5, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 10,
-			Burns:           []iotago.Mana{5},
+			NumBlocks:       1,
 			AddedKeys:       []string{"A.P1"},
 
 			NewOutputID: "A1",
@@ -121,7 +119,7 @@ func TestManager_Scenario3(t *testing.T) {
 		},
 	})
 
-	ts.ApplySlotActions(2, map[string]*AccountActions{
+	ts.ApplySlotActions(2, 0, map[string]*AccountActions{
 		"A": {
 			Destroyed: true,
 		},
@@ -138,10 +136,10 @@ func TestManager_Scenario3(t *testing.T) {
 func TestManager_Scenario4(t *testing.T) {
 	ts := NewTestSuite(t)
 
-	ts.ApplySlotActions(1, map[string]*AccountActions{
+	ts.ApplySlotActions(1, 5, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 10,
-			Burns:           []iotago.Mana{5},
+			NumBlocks:       1,
 			AddedKeys:       []string{"A.P1"},
 
 			NewOutputID: "A1",
@@ -157,7 +155,7 @@ func TestManager_Scenario4(t *testing.T) {
 		},
 	})
 
-	ts.ApplySlotActions(2, nil)
+	ts.ApplySlotActions(2, 0, nil)
 	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
 		"A": {
 			BICUpdatedTime: 1,
@@ -167,9 +165,9 @@ func TestManager_Scenario4(t *testing.T) {
 		},
 	})
 
-	ts.ApplySlotActions(3, map[string]*AccountActions{
+	ts.ApplySlotActions(3, 5, map[string]*AccountActions{
 		"A": { // zero out the account data before removal
-			Burns:       []iotago.Mana{5},
+			NumBlocks:   1,
 			RemovedKeys: []string{"A.P1"},
 
 			NewOutputID: "A2",
@@ -185,7 +183,7 @@ func TestManager_Scenario4(t *testing.T) {
 		},
 	})
 
-	ts.ApplySlotActions(4, map[string]*AccountActions{
+	ts.ApplySlotActions(4, 0, map[string]*AccountActions{
 		"A": {
 			Destroyed: true,
 		},
@@ -202,10 +200,10 @@ func TestManager_Scenario4(t *testing.T) {
 
 func TestManager_Scenario5(t *testing.T) {
 	ts := NewTestSuite(t)
-	ts.ApplySlotActions(1, map[string]*AccountActions{
+	ts.ApplySlotActions(1, 5, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 5,
-			Burns:           []iotago.Mana{5},
+			NumBlocks:       1,
 			AddedKeys:       []string{"A1", "A2"},
 
 			NewOutputID: "A1",
@@ -221,10 +219,10 @@ func TestManager_Scenario5(t *testing.T) {
 		},
 	})
 
-	ts.ApplySlotActions(2, map[string]*AccountActions{
+	ts.ApplySlotActions(2, 5, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 5,
-			Burns:           []iotago.Mana{5},
+			NumBlocks:       1,
 			AddedKeys:       []string{"A3", "A4"},
 			Destroyed:       true,
 		},

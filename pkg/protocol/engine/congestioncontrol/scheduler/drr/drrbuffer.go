@@ -65,30 +65,30 @@ func (b *BufferQueue) IssuerQueue(issuerID iotago.AccountID) *IssuerQueue {
 	return issuerQueue
 }
 
-func (b *BufferQueue) GetOrCreateIssuerQueue(issuerID iotago.AccountID) (*IssuerQueue, error) {
-	element, issuerActive := b.activeIssuers.Get(issuerID)
-	if issuerActive {
-		issuerQueue, isIQ := element.Value.(*IssuerQueue)
-		if !isIQ {
-			return nil, ierrors.New("buffer contains elements that are not issuer queues")
-		}
-
-		return issuerQueue, nil
-	}
+func (b *BufferQueue) CreateIssuerQueue(issuerID iotago.AccountID) *IssuerQueue {
 	issuerQueue := NewIssuerQueue(issuerID)
 	b.activeIssuers.Set(issuerID, b.ringInsert(issuerQueue))
 
+	return issuerQueue
+}
+
+func (b *BufferQueue) GetIssuerQueue(issuerID iotago.AccountID) (*IssuerQueue, error) {
+	element, issuerActive := b.activeIssuers.Get(issuerID)
+	if !issuerActive {
+		return nil, ierrors.New("issuer queue does not exist")
+	}
+	issuerQueue, isIQ := element.Value.(*IssuerQueue)
+	if !isIQ {
+		return nil, ierrors.New("buffer contains elements that are not issuer queues")
+	}
+
+	// issuer queue exists
 	return issuerQueue, nil
 }
 
 // Submit submits a block. Return blocks dropped from the scheduler to make room for the submitted block.
-// The submitted block can also be returned as dropped if the issuer does not have enough access mana.
-func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.AccountID) (iotago.Mana, error)) (elements []*blocks.Block, err error) {
-	issuerID := blk.ProtocolBlock().IssuerID
-	issuerQueue, err := b.GetOrCreateIssuerQueue(issuerID)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "could not get or create issuer queue for issuer %s", issuerID)
-	}
+// The submitted block can also be returned as dropped if the issuer does not have enough mana.
+func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantumFunc func(iotago.AccountID) (Deficit, error)) (elements []*blocks.Block, err error) {
 
 	// first we submit the block, and if it turns out that the issuer doesn't have enough bandwidth to submit, it will be removed by dropTail
 	if !issuerQueue.Submit(blk) {
@@ -99,13 +99,13 @@ func (b *BufferQueue) Submit(blk *blocks.Block, manaRetriever func(iotago.Accoun
 
 	// if max buffer size exceeded, drop from tail of the longest mana-scaled queue
 	if b.Size() > b.maxBuffer {
-		return b.dropTail(manaRetriever), nil
+		return b.dropTail(quantumFunc), nil
 	}
 
 	return nil, nil
 }
 
-func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (iotago.Mana, error)) (droppedBlocks []*blocks.Block) {
+func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) (Deficit, error)) (droppedBlocks []*blocks.Block) {
 	start := b.Current()
 	ringStart := b.ring
 	// remove as many blocks as necessary to stay within max buffer size
@@ -115,9 +115,9 @@ func (b *BufferQueue) dropTail(manaRetriever func(iotago.AccountID) (iotago.Mana
 		maxScale := math.Inf(-1)
 		var maxIssuerID iotago.AccountID
 		for q := start; ; {
-			issuerMana, err := manaRetriever(q.IssuerID())
+			issuerQuantum, err := quantumFunc(q.IssuerID())
 			if err == nil {
-				if scale := float64(q.Work()) / float64(issuerMana); scale > maxScale {
+				if scale := float64(q.Work()) / float64(issuerQuantum); scale > maxScale {
 					maxScale = scale
 					maxIssuerID = q.IssuerID()
 				}
