@@ -161,7 +161,12 @@ func configure() error {
 			return err
 		}
 
-		return httpserver.JSONResponse(c, http.StatusOK, resp)
+		j, err := deps.Protocol.CurrentAPI().JSONEncode(resp)
+		if err != nil {
+			return err
+		}
+
+		return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, j)
 	})
 
 	routeGroup.GET(RouteChainManagerAllChainsDot, func(c echo.Context) error {

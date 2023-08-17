@@ -1,6 +1,7 @@
 package retainer
 
 import (
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -21,12 +22,16 @@ type (
 	FinalizedSlotFunc       func() iotago.SlotIndex
 )
 
+const MaxStakersResponsesCacheNum = 10
+
 // Retainer keeps and resolves all the information needed in the API and INX.
 type Retainer struct {
 	store                   RetainerFunc
 	latestCommittedSlotFunc LatestCommittedSlotFunc
 	finalizedSlotFunc       FinalizedSlotFunc
 	errorHandler            func(error)
+
+	stakersResponses *shrinkingmap.ShrinkingMap[uint32, []*apimodels.ValidatorResponse]
 
 	workers *workerpool.Group
 
@@ -37,6 +42,7 @@ func New(workers *workerpool.Group, retainerFunc RetainerFunc, latestCommittedSl
 	return &Retainer{
 		workers:                 workers,
 		store:                   retainerFunc,
+		stakersResponses:        shrinkingmap.New[uint32, []*apimodels.ValidatorResponse](),
 		latestCommittedSlotFunc: latestCommittedSlotFunc,
 		finalizedSlotFunc:       finalizedSlotFunc,
 		errorHandler:            errorHandler,
@@ -158,6 +164,24 @@ func (r *Retainer) RetainBlockFailure(blockID iotago.BlockID, failureCode apimod
 func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, err error) {
 	if err := r.store(blockID.Index()).StoreTransactionFailure(blockID, determineTxFailureReason(err)); err != nil {
 		r.errorHandler(ierrors.Wrap(err, "failed to store transaction failure in retainer"))
+	}
+}
+
+func (r *Retainer) RegisteredValidatorsCache(index uint32) ([]*apimodels.ValidatorResponse, bool) {
+	return r.stakersResponses.Get(index)
+}
+
+func (r *Retainer) RetainRegisteredValidatorsCache(index uint32, resp []*apimodels.ValidatorResponse) {
+	r.stakersResponses.Set(index, resp)
+	if r.stakersResponses.Size() > MaxStakersResponsesCacheNum {
+		keys := r.stakersResponses.Keys()
+		minKey := index + 1
+		for _, key := range keys {
+			if key < minKey {
+				minKey = key
+			}
+		}
+		r.stakersResponses.Delete(minKey)
 	}
 }
 

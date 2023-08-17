@@ -25,7 +25,8 @@ import (
 type TestSuite struct {
 	T *testing.T
 
-	accounts map[string]iotago.AccountID
+	accounts             map[string]iotago.AccountID
+	latestCommittedEpoch iotago.EpochIndex
 
 	API iotago.API
 
@@ -91,7 +92,7 @@ func (t *TestSuite) InitRewardManager() {
 	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
 
-	t.Instance = NewTracker(rewardsStore.GetEpoch, poolStatsStore, committeeStore, performanceFactorFunc, api.SingleVersionProvider(t.API))
+	t.Instance = NewTracker(rewardsStore.GetEpoch, poolStatsStore, committeeStore, performanceFactorFunc, t.latestCommittedEpoch, api.SingleVersionProvider(t.API), func(err error) {})
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -126,6 +127,7 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 	}
 
 	t.Instance.ApplyEpoch(epochIndex, committee)
+	t.latestCommittedEpoch = epochIndex
 }
 
 func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
@@ -147,10 +149,10 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 		aux := (((1 << 31) * action.PoolStake) / totalStake) + ((2 << 31) * action.ValidatorStake / totalValidatorsStake)
 		aux2 := uint64(aux) * targetRewardPerEpoch * performanceFactor
 		expectedRewardWithFixedCost := iotago.Mana(aux2 >> 40)
-		actualValidatorReward, err := t.Instance.ValidatorReward(accountID, actions[alias].ValidatorStake, epochIndex, epochIndex)
+		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID, actions[alias].ValidatorStake, epochIndex, epochIndex)
 		require.NoError(t.T, err)
 		delegatorStake := actions[alias].PoolStake - actions[alias].ValidatorStake
-		actualDelegatorReward, err := t.Instance.DelegatorReward(accountID, delegatorStake, epochIndex, epochIndex)
+		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, delegatorStake, epochIndex, epochIndex)
 		require.NoError(t.T, err)
 		fmt.Printf("expected: %d, actual: %d\n", expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
 		// TODO: require.EqualValues(t.T, expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
@@ -179,12 +181,12 @@ func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[s
 		delegatorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
 		validatorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
 		for aliasAccount := range epochActions {
-			reward, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epochIndex, epochIndex)
+			reward, _, _, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epochIndex, epochIndex)
 			require.NoError(t.T, err)
 			delegatorRewardPerAccount[epochIndex][aliasAccount] = reward
 		}
 		for aliasAccount := range epochActions {
-			reward, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true), 1, epochIndex, epochIndex)
+			reward, _, _, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true), 1, epochIndex, epochIndex)
 			require.NoError(t.T, err)
 			validatorRewardPerAccount[epochIndex][aliasAccount] = reward
 		}

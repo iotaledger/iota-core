@@ -26,30 +26,35 @@ func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	return iotago.Identifier(t.rewardsMap(epochIndex).Root())
 }
 
-func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, error) {
+func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
 	var validatorReward iotago.Mana
 
-	// TODO: the epoch should be returned by the reward calculations and we should only loop until the current epoch, not epochEnd
+	// limit looping to committed epochs
+	if epochEnd > t.latestAppliedEpoch {
+		epochEnd = t.latestAppliedEpoch
+	}
+
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
 		rewardsForAccountInEpoch, exists, err := t.rewardsForAccount(validatorID, epochIndex)
 		if err != nil {
-			return 0, ierrors.Wrapf(err, "failed to get rewards for account %s in epoch %d", validatorID, epochIndex)
+			return 0, 0, 0, ierrors.Wrapf(err, "failed to get rewards for account %s in epoch %d", validatorID, epochIndex)
 		}
 
-		if !exists {
-			continue
-		}
+		if !exists || rewardsForAccountInEpoch.PoolStake == 0 {
+			// updating epoch start for beginning epochs without the reward
+			if epochIndex < epochEnd && epochStart == epochIndex {
+				epochStart = epochIndex + 1
+			}
 
-		if rewardsForAccountInEpoch.PoolStake == 0 {
 			continue
 		}
 
 		poolStats, err := t.poolStatsStore.Load(epochIndex)
 		if err != nil {
-			return 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator accountID %s", epochIndex, validatorID)
+			return 0, 0, 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 		if poolStats == nil {
 			return 0, ierrors.Errorf("pool stats for epoch %d and validator accountID %s are nil", epochIndex, validatorID)
@@ -64,39 +69,44 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
 		decayedEpochRewards, err2 := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
 		if err2 != nil {
-			return 0, ierrors.Wrapf(err2, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
+			return 0, 0, 0, ierrors.Wrapf(err2, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 
 		validatorReward += decayedEpochRewards
 	}
 
-	return validatorReward, nil
+	return validatorReward, epochStart, epochEnd, nil
 }
 
-func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, error) {
+func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
 	var delegatorsReward iotago.Mana
 
-	// TODO: the epoch should be returned by the reward calculations and we should only loop until the current epoch, not epochEnd
+	// limit looping to committed epochs
+	if epochEnd > t.latestAppliedEpoch {
+		epochEnd = t.latestAppliedEpoch
+	}
+
 	for epochIndex := epochStart; epochIndex <= epochEnd; epochIndex++ {
 		rewardsForAccountInEpoch, exists, err := t.rewardsForAccount(validatorID, epochIndex)
 		if err != nil {
-			return 0, ierrors.Wrapf(err, "failed to get rewards for account %s in epoch %d", validatorID, epochIndex)
+			return 0, 0, 0, ierrors.Wrapf(err, "failed to get rewards for account %s in epoch %d", validatorID, epochIndex)
 		}
 
-		if !exists {
-			continue
-		}
+		if !exists || rewardsForAccountInEpoch.PoolStake == 0 {
+			// updating epoch start for beginning epochs without the reward
+			if epochStart == epochIndex {
+				epochStart = epochIndex + 1
+			}
 
-		if rewardsForAccountInEpoch.PoolStake == 0 {
 			continue
 		}
 
 		poolStats, err := t.poolStatsStore.Load(epochIndex)
 		if err != nil {
-			return 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator account ID %s", epochIndex, validatorID)
+			return 0, 0, 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator account ID %s", epochIndex, validatorID)
 		}
 		if poolStats == nil {
 			return 0, ierrors.Errorf("pool stats for epoch %d and validator accountID %s are nil", epochIndex, validatorID)
@@ -109,13 +119,13 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 		decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
 		decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
 		if err != nil {
-			return 0, ierrors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
+			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
 
 		delegatorsReward += decayedEpochRewards
 	}
 
-	return delegatorsReward, nil
+	return delegatorsReward, epochStart, epochEnd, nil
 }
 
 func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) ads.Map[iotago.AccountID, *model.PoolRewards] {

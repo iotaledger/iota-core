@@ -20,8 +20,11 @@ type Tracker struct {
 	committeeStore           *epochstore.Store[*account.Accounts]
 
 	performanceFactorsFunc func(slot iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64]
+	latestAppliedEpoch     iotago.EpochIndex
 
 	apiProvider api.Provider
+
+	errHandler func(error)
 
 	performanceFactorsMutex syncutils.RWMutex
 	mutex                   syncutils.RWMutex
@@ -32,14 +35,18 @@ func NewTracker(
 	poolStatsStore *epochstore.Store[*model.PoolsStats],
 	committeeStore *epochstore.Store[*account.Accounts],
 	performanceFactorsFunc func(slot iotago.SlotIndex) *slotstore.Store[iotago.AccountID, uint64],
+	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider api.Provider,
+	errHandler func(error),
 ) *Tracker {
 	return &Tracker{
 		rewardsStorePerEpochFunc: rewardsStorePerEpochFunc,
 		poolStatsStore:           poolStatsStore,
 		committeeStore:           committeeStore,
 		performanceFactorsFunc:   performanceFactorsFunc,
+		latestAppliedEpoch:     latestAppliedEpoch,
 		apiProvider:              apiProvider,
+		errHandler:             errHandler,
 	}
 }
 
@@ -62,8 +69,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	performanceFactors := t.performanceFactorsFunc(block.ID().Index())
 	pf, err := performanceFactors.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
-		// TODO replace panic with errors in the future, like triggering an error event
-		panic(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
+		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 
 	// TODO: store highest supported version per validator?
@@ -71,8 +77,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 
 	err = performanceFactors.Store(block.ProtocolBlock().IssuerID, pf+1)
 	if err != nil {
-		// TODO replace panic with errors in the future, like triggering an error event
-		panic(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
+		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 }
 
@@ -128,10 +133,19 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	if err := rewardsTree.Commit(); err != nil {
 		panic(ierrors.Wrapf(err, "failed to commit rewards for epoch %d", epoch))
 	}
+
+	t.latestAppliedEpoch = epoch
 }
 
 func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
-	// TODO: we should choose candidates we tracked performance for
+	// TODO: we should choose candidates we tracked performance for, only active
+
+	return ds.NewSet[iotago.AccountID]()
+}
+
+// ValidatorCandidates returns the registered validator candidates for the given epoch.
+func (t *Tracker) ValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
+	// TODO: we should choose candidates we tracked performance for no matter if they were active
 
 	return ds.NewSet[iotago.AccountID]()
 }

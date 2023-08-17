@@ -18,9 +18,9 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 	inputSet := iotagovm.InputSet{}
 	for _, inputState := range inputStates {
-		inputSet[inputState.OutputID()] = iotagovm.OutputWithCreationTime{
+		inputSet[inputState.OutputID()] = iotagovm.OutputWithCreationSlot{
 			Output:       inputState.Output(),
-			CreationTime: inputState.CreationTime(),
+			CreationSlot: inputState.CreationSlot(),
 		}
 	}
 	resolvedInputs := iotagovm.ResolvedInputs{
@@ -77,7 +77,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 				accountID = iotago.AccountIDFromOutputID(outputID)
 			}
 
-			reward, rewardErr := l.sybilProtection.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			reward, _, _, rewardErr := l.sybilProtection.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimStakingReward, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			}
@@ -95,7 +95,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 				delegationEnd = l.apiProvider.APIForSlot(commitmentInput.Index).TimeProvider().EpochFromSlot(commitmentInput.Index) - iotago.EpochIndex(1)
 			}
 
-			reward, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
+			reward, _, _, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimDelegationReward, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}
@@ -106,7 +106,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	resolvedInputs.RewardsInputSet = rewardInputSet
 
 	// TODO: in which slot is this transaction?
-	api := l.apiProvider.APIForSlot(tx.Essence.CreationTime)
+	api := l.apiProvider.APIForSlot(tx.Essence.CreationSlot)
 
 	vmParams := &iotagovm.Params{
 		API: api,
@@ -125,7 +125,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		created = append(created, &ExecutionOutput{
 			outputID:     outputID,
 			output:       output,
-			creationTime: tx.Essence.CreationTime,
+			creationSlot: tx.Essence.CreationSlot,
 		})
 	}
 

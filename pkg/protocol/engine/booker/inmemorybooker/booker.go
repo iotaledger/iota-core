@@ -95,7 +95,6 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	}
 
 	if transactionMetadata == nil {
-		// TODO: if the block fails here it never goes further in the flow, so is it orphaned? should we store err to the retainer?
 		b.retainBlockFailure(block.ID(), apimodels.BlockFailurePayloadInvalid)
 
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())

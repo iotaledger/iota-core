@@ -48,9 +48,9 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		}
 		minDeposit := m.apiProvider.CurrentAPI().ProtocolParameters().RentStructure().MinDeposit(output.Output())
 		if output.BaseTokenAmount() <= minDeposit {
-			mana = accounts.NewMana(output.StoredMana(), 0, output.CreationTime())
+			mana = accounts.NewMana(output.StoredMana(), 0, output.CreationSlot())
 		} else {
-			mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.CreationTime())
+			mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.CreationSlot())
 		}
 
 		m.manaVectorCache.Put(accountID, mana)
@@ -62,14 +62,14 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 
 	manaDecayProvider := m.apiProvider.CurrentAPI().ManaDecayProvider()
 	// apply decay to stored Mana and potential that was added on last update
-	manaStored, err := manaDecayProvider.StoredManaWithDecay(mana.Value(), mana.UpdateTime(), currentSlot)
+	manaStored, err := manaDecayProvider.ManaWithDecay(mana.Value(), mana.UpdateTime(), currentSlot)
 	if err != nil {
 		return 0, err
 	}
 	updatedValue := manaStored
 
 	// get newly generated potential since last update and apply decay
-	manaPotential, err := manaDecayProvider.PotentialManaWithDecay(mana.ExcessBaseTokens(), mana.UpdateTime(), currentSlot)
+	manaPotential, err := manaDecayProvider.ManaGenerationWithDecay(mana.ExcessBaseTokens(), mana.UpdateTime(), currentSlot)
 	if err != nil {
 		return 0, err
 	}

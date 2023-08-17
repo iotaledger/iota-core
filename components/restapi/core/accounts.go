@@ -1,16 +1,25 @@
 package core
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
+	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+)
+
+const (
+	DefaultPageSize                = 50
+	RequestsMemoryCacheGranularity = 10
+	MaxRequestedSlotAge            = 10
 )
 
 func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
@@ -21,62 +30,101 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 
 	slotIndex := deps.Protocol.SyncManager.LatestCommitment().Index()
 
-	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
+	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to get account: %s form the Ledger", accountID.ToHex())
 	}
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
 	}
+	rmcSlot, err := safemath.SafeSub(slotIndex, deps.Protocol.APIForSlot(slotIndex).ProtocolParameters().MaxCommittableAge())
+	if err != nil {
+		rmcSlot = 0
+	}
+	rmc, err := deps.Protocol.CandidateEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get RMC for slot: %d", rmcSlot)
+	}
 
 	return &apimodels.CongestionResponse{
 		SlotIndex:            slotIndex,
-		Ready:                false, // TODO: update after scheduler is implemented
-		ReferenceManaCost:    0,     // TODO: update after RMC is implemented
-		BlockIssuanceCredits: account.Credits.Value,
+		Ready:                deps.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(accountID),
+		ReferenceManaCost:    rmc,
+		BlockIssuanceCredits: acc.Credits.Value,
 	}, nil
 }
 
-func staking() (*apimodels.AccountStakingListResponse, error) {
-	resp := &apimodels.AccountStakingListResponse{
-		Stakers: make([]*apimodels.ValidatorResponse, 0),
+func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
+	var err error
+	pageSize := restapi.ParamsRestAPI.MaxPageSize
+	if len(c.QueryParam(restapipkg.QueryParameterPageSize)) > 0 {
+		pageSize, err = httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.QueryParameterPageSize)
+		}
+		if pageSize > restapi.ParamsRestAPI.MaxPageSize {
+			pageSize = restapi.ParamsRestAPI.MaxPageSize
+		}
 	}
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
-	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
-
-	activeValidators, err := deps.Protocol.MainEngineInstance().SybilProtection.EligibleValidators(nextEpoch)
-	if err != nil {
-		return nil, err
+	// no cursor provided will be the first request
+	requestedSlotIndex := latestCommittedSlot
+	var cursorIndex uint32
+	if len(c.QueryParam(restapipkg.QueryParameterCursor)) != 0 {
+		requestedSlotIndex, cursorIndex, err = httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.QueryParameterCursor)
+		}
 	}
 
-	for _, accountData := range activeValidators {
-		resp.Stakers = append(resp.Stakers, &apimodels.ValidatorResponse{
-			AccountID:                      accountData.ID,
-			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
-			ValidatorStake:                 accountData.ValidatorStake,
-			FixedCost:                      accountData.FixedCost,
-			StakingEpochEnd:                accountData.StakeEndEpoch,
-			LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
-		})
+	// do not respond to really old requests
+	if requestedSlotIndex+MaxRequestedSlotAge < latestCommittedSlot {
+		return nil, ierrors.Errorf("request is too old, request started at %d, latest committed slot index is %d", requestedSlotIndex, latestCommittedSlot)
+	}
+
+	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
+
+	slotRange := uint32(requestedSlotIndex / RequestsMemoryCacheGranularity)
+	registeredValidators, exists := deps.Protocol.MainEngineInstance().Retainer.RegisteredValidatorsCache(slotRange)
+	if !exists {
+		registeredValidators, err = deps.Protocol.MainEngineInstance().SybilProtection.OrderedRegisteredCandidateValidatorsList(nextEpoch)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to get ordered registered validators list for epoch %d", nextEpoch)
+		}
+		deps.Protocol.MainEngineInstance().Retainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
+	}
+
+	page := registeredValidators[cursorIndex : cursorIndex+pageSize]
+	resp := &apimodels.ValidatorsResponse{
+		Validators: page,
+		PageSize:   pageSize,
+	}
+	// this is the last page
+	if int(cursorIndex+pageSize) > len(registeredValidators) {
+		resp.Cursor = ""
+	} else {
+		resp.Cursor = fmt.Sprintf("%d,%d", slotRange, cursorIndex+pageSize)
 	}
 
 	return resp, nil
 }
 
-func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
+func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterAccountID)
 	}
 	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
 
 	accountData, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to get account: %s form the Ledger", accountID.ToHex())
 	}
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
+	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
+	active := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, nextEpoch)
 
 	return &apimodels.ValidatorResponse{
 		AccountID:                      accountID,
@@ -84,6 +132,7 @@ func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 		ValidatorStake:                 accountData.ValidatorStake,
 		StakingEpochEnd:                accountData.StakeEndEpoch,
 		FixedCost:                      accountData.FixedCost,
+		Active:                         active,
 		LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
 	}, nil
 }
@@ -91,7 +140,7 @@ func stakingByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterOutputID)
 	}
 
 	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
@@ -100,6 +149,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	}
 
 	var reward iotago.Mana
+	var actualStart, actualEnd iotago.EpochIndex
 	switch utxoOutput.OutputType() {
 	case iotago.OutputAccount:
 		//nolint:forcetypeassert
@@ -113,7 +163,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 		stakingFeature := feature.(*iotago.StakingFeature)
 
 		// check if the account is a validator
-		reward, err = deps.Protocol.MainEngineInstance().SybilProtection.ValidatorReward(
+		reward, actualStart, actualEnd, err = deps.Protocol.MainEngineInstance().SybilProtection.ValidatorReward(
 			accountOutput.AccountID,
 			stakingFeature.StakedAmount,
 			stakingFeature.StartEpoch,
@@ -123,7 +173,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	case iotago.OutputDelegation:
 		//nolint:forcetypeassert
 		delegationOutput := utxoOutput.Output().(*iotago.DelegationOutput)
-		reward, err = deps.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
+		reward, actualStart, actualEnd, err = deps.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
 			delegationOutput.ValidatorID,
 			delegationOutput.DelegatedAmount,
 			delegationOutput.StartEpoch,
@@ -134,12 +184,9 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 		return nil, ierrors.Wrapf(err, "failed to calculate reward for output %s", outputID)
 	}
 
-	// TODO: the epoch should be returned by the reward calculations
-	latestCommittedSlot := deps.Protocol.SyncManager.LatestCommitment().Index()
-	latestRewardsReadyEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
-
 	return &apimodels.ManaRewardsResponse{
-		EpochIndex: latestRewardsReadyEpoch,
+		EpochStart: actualStart,
+		EpochEnd:   actualEnd,
 		Rewards:    reward,
 	}, nil
 }

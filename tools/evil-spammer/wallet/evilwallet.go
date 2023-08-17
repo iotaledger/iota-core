@@ -289,7 +289,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	})
 
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
-	txBuilder.SetCreationTime(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
+	txBuilder.SetCreationSlot(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
 
 	tx, err := txBuilder.Build(e.faucet.AddressSigner(faucetAddr))
 	if err != nil {
@@ -736,7 +736,7 @@ func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[io
 		inputPrivateKey, _ := wallet.KeyPair(index)
 		walletKeys[i] = iotago.AddressKeys{Address: addr, Keys: inputPrivateKey}
 	}
-	txBuilder.SetCreationTime(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
+	txBuilder.SetCreationSlot(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
 
 	return txBuilder.Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 }

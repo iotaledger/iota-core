@@ -16,8 +16,8 @@ type OutputState interface {
 	// Output returns the underlying Output of the State.
 	Output() iotago.Output
 
-	// CreationTime returns the slot when the State was created.
-	CreationTime() iotago.SlotIndex
+	// CreationSlot returns the slot when the State was created.
+	CreationSlot() iotago.SlotIndex
 }
 
 type ContextState interface {

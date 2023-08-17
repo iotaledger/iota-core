@@ -55,13 +55,11 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil && candidateEngineInstance.ChainID() == fork.ForkingPoint.ID() {
-		// TODO: log instead of error
 		p.ErrorHandler()(ierrors.Errorf("we are already processing the fork at forkingPoint %s", fork.ForkingPoint.ID()))
 		return
 	}
 
 	if p.MainEngineInstance().ChainID() == fork.ForkingPoint.ID() {
-		// TODO: log instead of error
 		p.ErrorHandler()(ierrors.Errorf("we already switched our main engine to the fork at forkingPoint %s", fork.ForkingPoint.ID()))
 		return
 	}
