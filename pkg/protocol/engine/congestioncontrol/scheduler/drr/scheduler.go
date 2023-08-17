@@ -325,9 +325,6 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	// remove the block from the buffer and adjust issuer's deficit
 	block := s.buffer.PopFront()
 	issuerID := block.ProtocolBlock().IssuerID
-	// if def, _ := s.deficits.Get(issuerID); def < s.deficitFromWork(block.WorkScore()) {
-	// 	fmt.Printf("deficit = %d, block work = %d\n", def, s.deficitFromWork(block.WorkScore()))
-	// }
 	err := s.updateDeficit(issuerID, -s.deficitFromWork(block.WorkScore()))
 	if err != nil {
 		// if something goes wrong with deficit update, drop the block instead of scheduling it.
@@ -381,17 +378,20 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex)
 				break
 			}
 
-			r, err := safemath.SafeDiv(remainingDeficit, quantum)
+			denom, err := safemath.SafeAdd(remainingDeficit, quantum-1)
+			if err != nil {
+				denom = s.maxDeficit()
+			}
+			r, err := safemath.SafeDiv(denom, quantum)
 			if err != nil {
 				panic("quantum = 0")
 			}
 
 			// find the first issuer that will be allowed to schedule a block
 			if r < rounds {
-				rounds = r + 1
+				rounds = r
 				schedulingIssuer = q
 			}
-			// fmt.Printf("remaining deficit %d, deficit %d, quantum %d, block work score %d, block deficit %d, rounds %d\n", remainingDeficit, deficit, quantum, block.WorkScore(), s.deficitFromWork(block.WorkScore()), r)
 
 			break
 		}
@@ -405,9 +405,6 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex)
 			break
 		}
 	}
-	// if rounds <= 0 && schedulingIssuer != nil {
-	// 	fmt.Println("0 rounds needed")
-	// }
 
 	return rounds, schedulingIssuer
 }
@@ -430,7 +427,6 @@ func (s *Scheduler) removeIssuer(issuerID iotago.AccountID, err error) {
 	s.deficits.Delete(issuerID)
 
 	s.buffer.RemoveIssuer(issuerID)
-	// fmt.Println("issuer removed")
 }
 
 func (s *Scheduler) createIssuer(accountID iotago.AccountID) *IssuerQueue {
@@ -464,9 +460,6 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) err
 			// overflow, set to max deficit
 			return s.maxDeficit()
 		}
-		if newDeficit < 0 {
-			panic("should not be possible to have deficit < 0")
-		}
 
 		return lo.Min(newDeficit, s.maxDeficit())
 	})
@@ -481,12 +474,10 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) err
 }
 
 func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds Deficit, slotIndex iotago.SlotIndex) error {
-	// fmt.Printf("incrementing deficit for %d rounds\n", rounds)
 	quantum, err := s.quantumFunc(issuerID, slotIndex)
 	if err != nil {
 		return err
 	}
-	// fmt.Printf("using quantum %d", quantum)
 
 	delta, err := safemath.SafeMul(quantum, rounds)
 	if err != nil {
@@ -509,8 +500,6 @@ func (s *Scheduler) isReady(block *blocks.Block) bool {
 			// if parents are evicted and orphaned (not root blocks), or have not been received yet they will not exist.
 			// if parents are evicted, they will be returned as root blocks with scheduled==true here.
 			ready = false
-			// fmt.Printf("parent block %s is not ready for block %s\n", parentBlock.ID(), block.ID())
-			// fmt.Printf("enqueued = %s\n", parentBlock.IsEnqueued())
 
 			return
 		}
