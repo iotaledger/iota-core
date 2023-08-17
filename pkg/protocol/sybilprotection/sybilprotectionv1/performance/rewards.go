@@ -57,7 +57,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
-
+		profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
 		unDecayedEpochRewards := uint64(rewardsForAccountInEpoch.FixedCost) +
 			decreaseAccuracy(poolStats.ProfitMargin*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent) +
 			decreaseAccuracy(increasedAccuracyComplement(poolStats.ProfitMargin, profitMarginExponent)*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent)*
@@ -159,8 +159,8 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 }
 
 // calculateProfitMargin calculates the profit margin of the pool by firstly increasing the accuracy of the given value, so the profit margin is moved to the power of 2^accuracyShift.
-func calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken) uint64 {
-	return uint64(increaseAccuracy(totalValidatorsStake, profitMarginExponent) / (totalValidatorsStake + totalPoolStake))
+func (t *Tracker) calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken, epoch iotago.EpochIndex) uint64 {
+	return uint64(increasedAccuracy(totalValidatorsStake, t.apiProvider.APIForEpoch(epoch).ProtocolParameters().RewardsParameters().ProfitMarginExponent) / (totalValidatorsStake + totalPoolStake))
 }
 
 // increaseAccuracy shifts the bits of the given value to the left by the given amount, so that the value is moved to the power of 2^accuracyShift.

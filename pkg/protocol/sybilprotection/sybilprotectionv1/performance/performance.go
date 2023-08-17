@@ -84,9 +84,9 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 	updatedPerformance := t.updateSlotPerformanceBitMap(validatorPerformance, block.ID().Index(), block.ProtocolBlock().IssuingTime)
-	if updatedPerformance.BlockIssuedCount == validatorBlocksPerSlot {
+	if updatedPerformance.BlockIssuedCount == t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot {
 		// no need to store larger number and we can fit into uint8
-		updatedPerformance.BlockIssuedCount = validatorBlocksPerSlot + 1
+		updatedPerformance.BlockIssuedCount = t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot + 1
 	} else {
 		updatedPerformance.BlockIssuedCount++
 	}
@@ -111,7 +111,7 @@ func (t *Tracker) updateSlotPerformanceBitMap(pf *prunable.ValidatorPerformance,
 
 // subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validatorBlocksPerSlot equal parts.
 func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int {
-	valBlocksNum := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).ProtocolParameters().ValidatorBlocksPerSlot()
+	valBlocksNum := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
 	subslotDur := time.Duration(t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
 	slotStart := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotStartTime(slot)
 
@@ -126,7 +126,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	epochStartSlot := timeProvider.EpochStart(epoch)
 	epochEndSlot := timeProvider.EpochEnd(epoch)
 
-	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
+	profitMargin := t.calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake(), epoch)
 	poolsStats := &PoolsStats{
 		TotalStake:          committee.TotalStake(),
 		TotalValidatorStake: committee.TotalValidatorStake(),
@@ -205,7 +205,8 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 	return c, true
 }
 
-func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*prunable.ValidatorPerformance) uint64 {
+// aggregatePerformanceFactors calculates epoch performance factor of a validator based on its performance in each slot by summing up all active subslots.
+func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*prunable.ValidatorPerformance, epoch iotago.EpochIndex) uint64 {
 	if len(slotActivityVector) == 0 {
 		return 0
 	}
