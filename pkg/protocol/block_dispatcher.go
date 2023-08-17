@@ -21,7 +21,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-// BlockDispatcher is a component that is responsible for dispatching blocks to the correct engine instance or triggering a warp sync.
+// BlockDispatcher is a component that is responsible for dispatching blocks to the correct engine instance or
+// triggering a warp sync.
 type BlockDispatcher struct {
 	// protocol is the protocol instance that is using this BlockDispatcher instance.
 	protocol *Protocol
@@ -64,6 +65,7 @@ func NewBlockDispatcher(protocol *Protocol) *BlockDispatcher {
 	return b
 }
 
+// Dispatch dispatches the given block to the correct engine instance.
 func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error {
 	slotCommitment := b.protocol.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
 	if !slotCommitment.SolidEvent().WasTriggered() {
@@ -92,6 +94,7 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error
 	return nil
 }
 
+// initEngineMonitoring initializes the automatic monitoring of the engine instances.
 func (b *BlockDispatcher) initEngineMonitoring() {
 	b.monitorLatestEngineCommitment(b.protocol.mainEngine)
 
@@ -118,6 +121,7 @@ func (b *BlockDispatcher) initEngineMonitoring() {
 	b.protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(b.evict)
 }
 
+// initNetworkConnection initializes the network connection of the BlockDispatcher instance.
 func (b *BlockDispatcher) initNetworkConnection() {
 	b.protocol.Events.Engine.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
 		b.runTask(func() {
@@ -150,32 +154,7 @@ func (b *BlockDispatcher) initNetworkConnection() {
 	})
 }
 
-// inWarpSyncRange returns whether the given block should be processed by the BlockDispatcher instance instead of the engine.
-//
-// This is the case if the block is more than a warp sync threshold ahead of the latest commitment while also committing
-// to an unknown slot that can potentially be warp synced.
-func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Block) bool {
-	if engine.BlockRequester.HasTicker(block.ID()) {
-		return false
-	}
-
-	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
-	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
-	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
-
-	return block.ID().Index() > latestCommitmentIndex+2*maxCommittableAge && slotCommitmentID.Index() > latestCommitmentIndex
-}
-
-func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
-	b.shutdownEvent.Compute(func(isShutdown bool) bool {
-		if !isShutdown {
-			pool.Submit(task)
-		}
-
-		return isShutdown
-	})
-}
-
+// processWarpSyncRequest processes a WarpSync request.
 func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) error {
 	// TODO: check if the peer is allowed to request the warp sync
 
@@ -206,6 +185,7 @@ func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentI
 	return nil
 }
 
+// processWarpSyncResponse processes a WarpSync response.
 func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) error {
 	if b.processedWarpSyncRequests.Has(commitmentID) {
 		return nil
@@ -245,6 +225,24 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 	return nil
 }
 
+// inWarpSyncRange returns whether the given block should be processed by a warp sync process.
+//
+// This is the case if the block is more than a warp sync threshold ahead of the latest commitment while also committing
+// to a new slot that can be warp synced.
+func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Block) bool {
+	if engine.BlockRequester.HasTicker(block.ID()) {
+		return false
+	}
+
+	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
+	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
+	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
+
+	// TODO: REALLY 2x?
+	return block.ID().Index() > latestCommitmentIndex+2*maxCommittableAge && slotCommitmentID.Index() > latestCommitmentIndex
+}
+
+// warpSyncIfNecessary checks if a warp sync is necessary and starts the process if that is the case.
 func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
 	if e == nil || chainCommitment == nil {
 		return
@@ -256,6 +254,7 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
 	if chainCommitment.Commitment().Index() > latestCommitmentIndex+maxCommittableAge {
+		// TODO: DO WE NEED +2 here?
 		for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+minCommittableAge+2; slotToWarpSync++ {
 			if commitmentToSync := chain.Commitment(slotToWarpSync); commitmentToSync != nil && !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
 				b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
@@ -264,12 +263,15 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	}
 }
 
+// injectUnsolidCommitmentBlocks injects the unsolid blocks for the given commitment ID into the correct engine
+// instance.
 func (b *BlockDispatcher) injectUnsolidCommitmentBlocks(id iotago.CommitmentID) {
 	for _, tuple := range b.unsolidCommitmentBlocks.GetValues(id) {
 		b.protocol.HandleError(b.Dispatch(tuple.A, tuple.B))
 	}
 }
 
+// targetEngine returns the engine instance that should be used for the given commitment.
 func (b *BlockDispatcher) targetEngine(commitment *chainmanager.ChainCommitment) *engine.Engine {
 	if chain := commitment.Chain(); chain != nil {
 		chainID := chain.ForkingPoint.Commitment().ID()
@@ -286,6 +288,8 @@ func (b *BlockDispatcher) targetEngine(commitment *chainmanager.ChainCommitment)
 	return nil
 }
 
+// monitorLatestEngineCommitment monitors the latest commitment of the given engine instance and triggers a warp sync if
+// necessary.
 func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.Engine) {
 	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		if chainCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID()); exists {
@@ -296,11 +300,14 @@ func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.E
 	}).Unhook)
 }
 
+// evict evicts all elements from the unsolid commitment blocks buffer and the pending warp sync requests that are older
+// than the given index.
 func (b *BlockDispatcher) evict(index iotago.SlotIndex) {
 	b.pendingWarpSyncRequests.EvictUntil(index)
 	b.unsolidCommitmentBlocks.EvictUntil(index)
 }
 
+// shutdown shuts down the BlockDispatcher instance.
 func (b *BlockDispatcher) shutdown() {
 	b.shutdownEvent.Compute(func(isShutdown bool) bool {
 		if !isShutdown {
@@ -314,6 +321,16 @@ func (b *BlockDispatcher) shutdown() {
 	})
 }
 
-const (
-	WarpSyncRetryInterval = 1 * time.Minute
-)
+// runTask runs the given task on the given worker pool if the BlockDispatcher instance is not shutdown.
+func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
+	b.shutdownEvent.Compute(func(isShutdown bool) bool {
+		if !isShutdown {
+			pool.Submit(task)
+		}
+
+		return isShutdown
+	})
+}
+
+// WarpSyncRetryInterval is the interval in which a warp sync request is retried.
+const WarpSyncRetryInterval = 1 * time.Minute
