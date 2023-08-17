@@ -238,7 +238,7 @@ func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Bl
 	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
 
-	return block.ID().Index() > latestCommitmentIndex+maxCommittableAge+1 && slotCommitmentID.Index() > latestCommitmentIndex
+	return aboveWarpSyncThreshold(block.ID().Index(), latestCommitmentIndex, maxCommittableAge) && slotCommitmentID.Index() > latestCommitmentIndex
 }
 
 // warpSyncIfNecessary checks if a warp sync is necessary and starts the process if that is the case.
@@ -249,12 +249,10 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 
 	chain := chainCommitment.Chain()
 	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
-	minCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MinCommittableAge()
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
-	if chainCommitment.Commitment().Index() > latestCommitmentIndex+maxCommittableAge {
-		// TODO: DO WE NEED +2 here?
-		for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+minCommittableAge+2; slotToWarpSync++ {
+	if aboveWarpSyncThreshold(chainCommitment.Commitment().Index(), latestCommitmentIndex, maxCommittableAge) {
+		for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+maxCommittableAge; slotToWarpSync++ {
 			if commitmentToSync := chain.Commitment(slotToWarpSync); commitmentToSync != nil && !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
 				b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
 			}
@@ -329,6 +327,10 @@ func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
 
 		return isShutdown
 	})
+}
+
+func aboveWarpSyncThreshold(slot iotago.SlotIndex, latestCommitmentIndex iotago.SlotIndex, maxCommittableAge iotago.SlotIndex) bool {
+	return slot > latestCommitmentIndex+maxCommittableAge
 }
 
 // WarpSyncRetryInterval is the interval in which a warp sync request is retried.
