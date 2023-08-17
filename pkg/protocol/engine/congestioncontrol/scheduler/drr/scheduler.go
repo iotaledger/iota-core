@@ -384,7 +384,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex)
 			}
 			r, err := safemath.SafeDiv(denom, quantum)
 			if err != nil {
-				panic("quantum = 0")
+				panic(err)
 			}
 
 			// find the first issuer that will be allowed to schedule a block
@@ -435,12 +435,6 @@ func (s *Scheduler) createIssuer(accountID iotago.AccountID) *IssuerQueue {
 
 	return issuerQueue
 }
-
-// addExistingIssuer adds an existing issuer to the scheduler with Max deficit. This is for an optimisation where we remove max deficit issuers which have been inactive for some time.
-// func (s *Scheduler) addExistingIssuer(accountID iotago.AccountID) {
-// 	s.buffer.CreateIssuerQueue(accountID)
-// 	s.deficits.Set(accountID, s.maxDeficit())
-// }
 
 func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) error {
 	var updateErr error
@@ -539,7 +533,7 @@ func (s *Scheduler) updateChildrenWithoutLocking(block *blocks.Block) {
 }
 
 func (s *Scheduler) maxDeficit() Deficit {
-	return Deficit(1000000000)
+	return Deficit(math.MaxInt64 / 2)
 }
 
 func (s *Scheduler) deficitFromWork(work iotago.WorkScore) Deficit {
