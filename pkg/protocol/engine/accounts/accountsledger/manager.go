@@ -391,7 +391,7 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns ma
 	return burns, nil
 }
 
-func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
+func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*model.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
 		// remove a destroyed account, no need to update with diffs
@@ -481,7 +481,7 @@ func (m *Manager) evict(index iotago.SlotIndex) {
 	m.blockBurns.Delete(index)
 }
 
-func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) error {
+func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*model.AccountDiff) error {
 	burns, err := m.computeBlockBurnsForSlot(slotIndex)
 	if err != nil {
 		return ierrors.Wrap(err, "could not create block burns for slot")
