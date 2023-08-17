@@ -93,3 +93,9 @@ func (p *Permanent) Size() int64 {
 func (p *Permanent) Shutdown() {
 	p.store.Close()
 }
+
+func (p *Permanent) Flush() {
+	if err := p.store.KVStore().Flush(); err != nil {
+		p.errorHandler(err)
+	}
+}

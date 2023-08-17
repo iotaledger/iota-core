@@ -9,8 +9,12 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (s *Storage) Rewards(epoch iotago.EpochIndex) kvstore.KVStore {
-	return s.prunable.Rewards(epoch)
+func (s *Storage) RewardsForEpoch(epoch iotago.EpochIndex) kvstore.KVStore {
+	return s.prunable.RewardsForEpoch(epoch)
+}
+
+func (s *Storage) Rewards() *epochstore.EpochKVStore {
+	return s.prunable.Rewards()
 }
 
 func (s *Storage) PoolStats() *epochstore.Store[*model.PoolsStats] {

@@ -36,11 +36,11 @@ func (s *Store[V]) isTooOld(epoch iotago.EpochIndex) bool {
 	return epoch < lo.Return1(s.lastPrunedEpoch.Index())
 }
 
-func (s *Store[V]) LastPrunedEpoch() iotago.EpochIndex {
+func (s *Store[V]) LastPrunedEpoch() (iotago.EpochIndex, bool) {
 	s.lastPrunedMutex.RLock()
 	defer s.lastPrunedMutex.RUnlock()
 
-	return lo.Return1(s.lastPrunedEpoch.Index())
+	return s.lastPrunedEpoch.Index()
 }
 
 func (s *Store[V]) Load(epoch iotago.EpochIndex) (V, error) {
@@ -108,8 +108,9 @@ func (s *Store[V]) PruneUntilEpoch(epoch iotago.EpochIndex) error {
 	defer s.lastPrunedMutex.Unlock()
 
 	minStartEpoch := s.lastPrunedEpoch.NextIndex() + s.pruningDelay
+	// No need to prune.
 	if epoch < minStartEpoch {
-		return ierrors.Errorf("try to prune epoch index %d before last pruned epoch %d", epoch, lo.Return1(s.lastPrunedEpoch.Index()))
+		return nil
 	}
 
 	for currentIndex := minStartEpoch; currentIndex <= epoch; currentIndex++ {

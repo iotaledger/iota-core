@@ -173,3 +173,8 @@ func (s *Storage) Shutdown() {
 		s.prunable.Shutdown()
 	})
 }
+
+func (s *Storage) Flush() {
+	s.permanent.Flush()
+	s.prunable.Flush()
+}

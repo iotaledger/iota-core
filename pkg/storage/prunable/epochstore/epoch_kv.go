@@ -29,11 +29,11 @@ func NewEpochKVStore(realm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotag
 	}
 }
 
-func (e *EpochKVStore) LastPrunedEpoch() iotago.EpochIndex {
+func (e *EpochKVStore) LastPrunedEpoch() (iotago.EpochIndex, bool) {
 	e.lastPrunedMutex.RLock()
 	defer e.lastPrunedMutex.RUnlock()
 
-	return lo.Return1(e.lastPrunedEpoch.Index())
+	return e.lastPrunedEpoch.Index()
 }
 
 func (e *EpochKVStore) GetEpoch(epoch iotago.EpochIndex) kvstore.KVStore {
@@ -52,8 +52,9 @@ func (e *EpochKVStore) PruneUntilEpoch(epoch iotago.EpochIndex) error {
 	defer e.lastPrunedMutex.Unlock()
 
 	minStartEpoch := e.lastPrunedEpoch.NextIndex() + e.pruningDelay
+	// No need to prune.
 	if epoch < minStartEpoch {
-		return ierrors.Errorf("try to prune epoch index %d before last pruned epoch %d", epoch, lo.Return1(e.lastPrunedEpoch.Index()))
+		return nil
 	}
 
 	for currentIndex := minStartEpoch; currentIndex <= epoch; currentIndex++ {

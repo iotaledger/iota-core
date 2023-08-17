@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -77,13 +78,14 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 		createdBytes += iotago.SlotIdentifierLength
 	}
 
+	t.Instance.Flush()
 	t.AssertPrunableSizeGreater(initialStorageSize + size)
 
 	fmt.Printf("> created %d MB of bucket prunable data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
 }
 
 func (t *TestFramework) GenerateSemiPermanentData(epoch iotago.EpochIndex) {
-	rewardsKV := t.Instance.Rewards(epoch)
+	rewardsKV := t.Instance.RewardsForEpoch(epoch)
 	poolStatsStore := t.Instance.PoolStats()
 	decidedUpgradeSignalsStore := t.Instance.DecidedUpgradeSignals()
 	committeeStore := t.Instance.Committee()
@@ -117,6 +119,8 @@ func (t *TestFramework) GenerateSemiPermanentData(epoch iotago.EpochIndex) {
 	err = committeeStore.Store(epoch, accounts)
 	require.NoError(t.t, err)
 	createdBytes += int64(len(lo.PanicOnErr(accounts.Bytes()))) + 8 // for epoch key
+
+	t.Instance.Flush()
 }
 
 func (t *TestFramework) GeneratePermanentData(size int64) {
@@ -130,7 +134,7 @@ func (t *TestFramework) GeneratePermanentData(size int64) {
 		createdBytes += t.storeRandomData(kv, 8192)
 	}
 
-	require.NoError(t.t, kv.Flush())
+	t.Instance.Flush()
 
 	t.AssertPermanentSizeGreater(initialStorageSize + size)
 	fmt.Printf("> created %d MB of permanent data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
@@ -167,11 +171,26 @@ func (t *TestFramework) AssertStorageSizeBelow(expected int64) {
 	require.LessOrEqual(t.t, t.Instance.Size(), expected)
 }
 
-func (t *TestFramework) AssertPrunedUntil(expectedPrunedUntil iotago.EpochIndex, expectedHasPruned bool) {
-	// lastPruned, hasPruned := t.Instance.LastPrunedEpoch()
-	// require.Equal(t.t, expectedHasPruned, hasPruned)
-	// require.Equal(t.t, expectedPrunedUntil, lastPruned)
+func (t *TestFramework) AssertPrunedUntil(
+	expectedPrunable *types.Tuple[int, bool],
+	expectedDecidedUpgrades *types.Tuple[int, bool],
+	expectedPoolStats *types.Tuple[int, bool],
+	expectedCommittee *types.Tuple[int, bool],
+	expectedRewards *types.Tuple[int, bool]) {
+
+	t.assertPrunedState(expectedPrunable, t.Instance.LastPrunedEpoch, "prunable")
+	t.assertPrunedState(expectedPoolStats, t.Instance.PoolStats().LastPrunedEpoch, "pool stats")
+	t.assertPrunedState(expectedDecidedUpgrades, t.Instance.DecidedUpgradeSignals().LastPrunedEpoch, "decided upgrades")
+	t.assertPrunedState(expectedCommittee, t.Instance.Committee().LastPrunedEpoch, "committee")
+	t.assertPrunedState(expectedRewards, t.Instance.Rewards().LastPrunedEpoch, "rewards")
 
 	// TODO: make sure that all the epochs until this point are actually pruned and files deleted
-	//   -> for semi permanent storage we need to make sure that correct pruning delays are adhered to, should probably be specified (in the test) and tested accordingly
+	//   -> for semi permanent storage we need to make sure that data is actually deleted from DB
+	//   -> for permanent storage we need to make sure that everything from the ledger is deleted for the given epoch/slots
+}
+
+func (t *TestFramework) assertPrunedState(expected *types.Tuple[int, bool], prunedStateFunc func() (iotago.EpochIndex, bool), name string) {
+	lastPruned, hasPruned := prunedStateFunc()
+	require.EqualValuesf(t.t, expected.A, lastPruned, "%s: expected %d, got %d", name, expected.A, lastPruned)
+	require.EqualValuesf(t.t, expected.B, hasPruned, "%s: expected %v, got %v", name, expected.B, hasPruned)
 }

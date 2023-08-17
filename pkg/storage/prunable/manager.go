@@ -17,7 +17,7 @@ import (
 
 type PrunableSlotManager struct {
 	openDBs      *cache.Cache[iotago.EpochIndex, *database.DBInstance]
-	openDBsMutex syncutils.Mutex
+	openDBsMutex syncutils.RWMutex
 
 	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
 	lastPrunedMutex syncutils.RWMutex
@@ -195,4 +195,18 @@ func (m *PrunableSlotManager) prune(dbBaseIndex iotago.EpochIndex) {
 
 	// Delete the db size since we pruned the whole directory
 	m.dbSizes.Delete(dbBaseIndex)
+}
+
+func (m *PrunableSlotManager) Flush() error {
+	m.openDBsMutex.RLock()
+	defer m.openDBsMutex.RUnlock()
+
+	var err error
+	m.openDBs.Each(func(epoch iotago.EpochIndex, db *database.DBInstance) {
+		if err = db.KVStore().Flush(); err != nil {
+			return
+		}
+	})
+
+	return err
 }

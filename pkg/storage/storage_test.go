@@ -3,10 +3,9 @@ package storage_test
 import (
 	"testing"
 
-	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStorage_Pruning(t *testing.T) {
@@ -17,35 +16,73 @@ func TestStorage_Pruning(t *testing.T) {
 	tf.GeneratePrunableData(1, 100*MB)
 }
 
-func TestStorage_PruneByEpochIndex(t *testing.T) {
+func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
 	tf := NewTestFramework(t, storage.WithPruningDelay(1))
 	defer tf.Shutdown()
 
 	totalEpochs := 10
 	tf.GeneratePermanentData(10 * MB)
 	for i := 1; i <= totalEpochs; i++ {
-		tf.GeneratePrunableData(iotago.EpochIndex(i), 10*MB)
+		tf.GeneratePrunableData(iotago.EpochIndex(i), 10*KB)
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
 
+	tf.Instance.PruneByEpochIndex(7)
+	tf.AssertPrunedUntil(
+		types.NewTuple(6, true),
+		types.NewTuple(0, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+	)
+
 	tf.Instance.PruneByEpochIndex(8)
+	tf.AssertPrunedUntil(
+		types.NewTuple(7, true),
+		types.NewTuple(1, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+	)
+}
 
-	require.Equal(t, 7, lo.Return1(tf.Instance.LastPrunedEpoch()))
-	require.Equal(t, 0, tf.Instance.Committee().LastPrunedEpoch())
-	require.Equal(t, 0, tf.Instance.PoolStats().LastPrunedEpoch())
-	require.Equal(t, 1, tf.Instance.DecidedUpgradeSignals().LastPrunedEpoch())
-	// TODO: get rewards last pruned epoch
+func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
+	tf := NewTestFramework(t, storage.WithPruningDelay(10))
+	defer tf.Shutdown()
 
-	// want to prune to a certain epoch index
-	// need to check that the pruned epochs are not accessible anymore. specifically:
-	//  - check all slot based storages
-	//  - check for each epoch based storage specifically which epoch should or shouldn't be pruned
+	totalEpochs := 14
+	tf.GeneratePermanentData(10 * MB)
+	for i := 1; i <= totalEpochs; i++ {
+		tf.GeneratePrunableData(iotago.EpochIndex(i), 10*KB)
+		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
+	}
 
-	// defaultPruningDelay < pruningDelay of epoch storages
-	//  1. if pruning at > defaultPruningDelay, buckets should be pruned but not epoch storages
-	//  2. if pruning at >= pruningDelay of epoch storages, buckets and epoch storages should be pruned
+	tf.Instance.PruneByEpochIndex(7)
+	tf.AssertPrunedUntil(
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+	)
 
-	// defaultPruningDelay >= pruningDelay of epoch storages
+	tf.Instance.PruneByEpochIndex(10)
+	tf.AssertPrunedUntil(
+		types.NewTuple(0, true),
+		types.NewTuple(0, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+	)
+
+	tf.Instance.PruneByEpochIndex(12)
+	tf.AssertPrunedUntil(
+		types.NewTuple(2, true),
+		types.NewTuple(2, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+	)
 }
 
 func TestStorage_PruneBySize(t *testing.T) {

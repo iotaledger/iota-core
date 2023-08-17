@@ -22,8 +22,12 @@ const (
 	pruningDelayCommittee             = 365
 )
 
-func (p *Prunable) Rewards(epoch iotago.EpochIndex) kvstore.KVStore {
+func (p *Prunable) RewardsForEpoch(epoch iotago.EpochIndex) kvstore.KVStore {
 	return p.poolRewards.GetEpoch(epoch)
+}
+
+func (p *Prunable) Rewards() *epochstore.EpochKVStore {
+	return p.poolRewards
 }
 
 func (p *Prunable) PoolStats() *epochstore.Store[*model.PoolsStats] {
