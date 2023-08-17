@@ -133,7 +133,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 		StakingEpochEnd:                accountData.StakeEndEpoch,
 		FixedCost:                      accountData.FixedCost,
 		Active:                         active,
-		LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
+		LatestSupportedProtocolVersion: accountData.LatestSupportedProtocolVersion,
 	}, nil
 }
 

@@ -1,12 +1,16 @@
 package accountsledger
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -24,6 +28,9 @@ type Manager struct {
 	// blockBurns keep tracks of the block issues up to the LatestCommittedSlot. They are used to deduct the burned
 	// amount from the account's credits upon slot commitment.
 	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.BlockID]]
+
+	// latestSupportedVersionSignals keep tracks of the latest supported protocol versions supported by validators.
+	latestSupportedVersionSignals *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, iotago.Version]
 
 	// latestCommittedSlot is where the Account tree is kept at.
 	latestCommittedSlot iotago.SlotIndex
@@ -51,8 +58,9 @@ func New(
 	accountsStore kvstore.KVStore,
 ) *Manager {
 	return &Manager{
-		apiProvider: apiProvider,
-		blockBurns:  shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
+		apiProvider:                   apiProvider,
+		blockBurns:                    shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
+		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, iotago.Version](),
 		accountsTree: ads.NewMap(accountsStore,
 			iotago.Identifier.Bytes,
 			iotago.IdentifierFromBytes,
@@ -79,7 +87,7 @@ func (m *Manager) SetLatestCommittedSlot(index iotago.SlotIndex) {
 	m.latestCommittedSlot = index
 }
 
-// TrackBlock adds the block to the blockBurns set to deduct the burn from credits upon slot commitment.
+// TrackBlock adds the block to the blockBurns set to deduct the burn from credits upon slot commitment and updates latest supported version of a validator block.
 func (m *Manager) TrackBlock(block *blocks.Block) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -88,6 +96,12 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 		return ds.NewSet[iotago.BlockID]()
 	})
 	set.Add(block.ID())
+
+	if validationBlock, isValidationBlock := block.ValidationBlock(); isValidationBlock {
+		m.latestSupportedVersionSignals.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue iotago.Version, exists bool) iotago.Version {
+			return lo.Max(currentValue, validationBlock.HighestSupportedVersion)
+		})
+	}
 }
 
 func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountID) (*prunable.AccountDiff, bool, error) {
@@ -131,6 +145,8 @@ func (m *Manager) ApplyDiff(
 	if err := m.updateSlotDiffWithBurns(slotIndex, accountDiffs, rmc); err != nil {
 		return ierrors.Wrap(err, "could not update slot diff with burns")
 	}
+
+	m.updateSlotDiffWithVersionSignals(slotIndex, accountDiffs)
 
 	for accountID := range accountDiffs {
 		destroyed := destroyedAccounts.Has(accountID)
@@ -336,6 +352,12 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		}
 		accountData.FixedCost = iotago.Mana(fixedCost)
 
+		latestSupportedProtocolVersion, err := safemath.SafeSub(int8(accountData.LatestSupportedProtocolVersion), diffChange.LatestSupportedProtocolVersionChange)
+		if err != nil {
+			return false, ierrors.Wrapf(err, "can't retrieve account, latest supported protocol version underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffIndex, accountData.LatestSupportedProtocolVersion, diffChange.LatestSupportedProtocolVersionChange)
+		}
+		accountData.LatestSupportedProtocolVersion = iotago.Version(latestSupportedProtocolVersion)
+
 		// collected to see if an account was destroyed between slotIndex and b.latestCommittedSlot index.
 		wasDestroyed = wasDestroyed || destroyed
 	}
@@ -369,6 +391,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 	slotDiff.DelegationStakeChange = -int64(accountData.DelegationStake)
 	slotDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
 	slotDiff.FixedCostChange = -int64(accountData.FixedCost)
+	slotDiff.LatestSupportedProtocolVersionChange = -int8(accountData.LatestSupportedProtocolVersion)
 
 	return slotDiff, err
 }
@@ -390,6 +413,15 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex, rmc iotag
 	}
 
 	return burns, nil
+}
+
+func (m *Manager) computeLatestSupportedVersionsForSlot(slotIndex iotago.SlotIndex) (latestSupportedVersions map[iotago.AccountID]iotago.Version) {
+	signalsStorage := m.latestSupportedVersionSignals.Get(slotIndex)
+	if signalsStorage == nil {
+		return nil
+	}
+
+	return signalsStorage.AsMap()
 }
 
 func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
@@ -466,6 +498,13 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		}
 		accountData.FixedCost = iotago.Mana(fixedCost)
 
+		fmt.Println("latest", accountData.LatestSupportedProtocolVersion)
+		latestSupportedProtocolVersion, err := safemath.SafeAdd(uint8(accountData.LatestSupportedProtocolVersion), uint8(diffChange.LatestSupportedProtocolVersionChange))
+		if err != nil {
+			return ierrors.Wrapf(err, "can't retrieve account, validator latest supported version overflow for account (%s) in slot (%d): %d + %d", accountData.ID, index, accountData.LatestSupportedProtocolVersion, diffChange.LatestSupportedProtocolVersionChange)
+		}
+		accountData.LatestSupportedProtocolVersion = iotago.Version(latestSupportedProtocolVersion)
+
 		if err := m.accountsTree.Set(accountID, accountData); err != nil {
 			return ierrors.Wrapf(err, "could not set account (%s) in accounts tree", accountID)
 		}
@@ -480,6 +519,7 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 
 func (m *Manager) evict(index iotago.SlotIndex) {
 	m.blockBurns.Delete(index)
+	m.latestSupportedVersionSignals.Evict(index)
 }
 
 func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, rmc iotago.Mana) error {
@@ -498,4 +538,17 @@ func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDif
 	}
 
 	return nil
+}
+
+func (m *Manager) updateSlotDiffWithVersionSignals(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) {
+	for id, version := range m.computeLatestSupportedVersionsForSlot(slotIndex) {
+		accountDiff, exists := accountDiffs[id]
+		if !exists {
+			accountDiff = prunable.NewAccountDiff()
+			accountDiffs[id] = accountDiff
+		}
+
+		accountDiff.LatestSupportedProtocolVersionChange = int8(version)
+		accountDiffs[id] = accountDiff
+	}
 }

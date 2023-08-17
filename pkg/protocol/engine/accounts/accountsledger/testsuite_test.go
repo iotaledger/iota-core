@@ -134,10 +134,11 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 			PreviousUpdatedTime: prevAccountFields.BICUpdatedAt,
 			NewExpirySlot:       prevAccountFields.ExpirySlot,
 
-			DelegationStakeChange: action.DelegationStakeChange,
-			ValidatorStakeChange:  action.ValidatorStakeChange,
-			StakeEndEpochChange:   action.StakeEndEpochChange,
-			FixedCostChange:       action.FixedCostChange,
+			DelegationStakeChange:                action.DelegationStakeChange,
+			ValidatorStakeChange:                 action.ValidatorStakeChange,
+			StakeEndEpochChange:                  action.StakeEndEpochChange,
+			FixedCostChange:                      action.FixedCostChange,
+			LatestSupportedProtocolVersionChange: action.LatestSupportedProtocolVersionChange,
 		}
 
 		if action.TotalAllotments+iotago.Mana(action.NumBlocks)*rmc != 0 || !exists { // this line assumes that workscore of all blocks is 1
@@ -243,6 +244,8 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 	require.Equal(t.T, expectedState.ValidatorStake, actualState.ValidatorStake, "slotIndex: %d, accountID %s: expected ValidatorStake: %d, actual: %d", slotIndex, accountID, expectedState.ValidatorStake, actualState.ValidatorStake)
 	require.Equal(t.T, expectedState.FixedCost, actualState.FixedCost, "slotIndex: %d, accountID %s: expected FixedCost: %d, actual: %d", slotIndex, accountID, expectedState.FixedCost, actualState.FixedCost)
 	require.Equal(t.T, expectedState.DelegationStake, actualState.DelegationStake, "slotIndex: %d, accountID %s: expected DelegationStake: %d, actual: %d", slotIndex, accountID, expectedState.DelegationStake, actualState.DelegationStake)
+	require.Equal(t.T, expectedState.LatestSupportedProtocolVersion, actualState.LatestSupportedProtocolVersion, "slotIndex: %d, accountID %s: expected LatestSupportedProtocolVersion: %d, actual: %d", slotIndex, accountID, expectedState.LatestSupportedProtocolVersion, actualState.LatestSupportedProtocolVersion)
+
 }
 
 func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
@@ -338,9 +341,10 @@ type AccountActions struct {
 	AddedKeys       []string
 	RemovedKeys     []string
 
-	ValidatorStakeChange int64
-	StakeEndEpochChange  int64
-	FixedCostChange      int64
+	ValidatorStakeChange                 int64
+	StakeEndEpochChange                  int64
+	FixedCostChange                      int64
+	LatestSupportedProtocolVersionChange int8
 
 	DelegationStakeChange int64
 
@@ -354,10 +358,11 @@ type AccountState struct {
 	OutputID string
 	PubKeys  []string
 
-	ValidatorStake  iotago.BaseToken
-	DelegationStake iotago.BaseToken
-	FixedCost       iotago.Mana
-	StakeEndEpoch   iotago.EpochIndex
+	ValidatorStake                 iotago.BaseToken
+	DelegationStake                iotago.BaseToken
+	FixedCost                      iotago.Mana
+	StakeEndEpoch                  iotago.EpochIndex
+	LatestSupportedProtocolVersion iotago.Version
 
 	Destroyed bool
 }

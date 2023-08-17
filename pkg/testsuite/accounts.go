@@ -118,6 +118,10 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 			if !cmp.Equal(accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected delegation stake change epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange, accountID, index)
 			}
+
+			if !cmp.Equal(accountDiff.LatestSupportedProtocolVersionChange, actualAccountDiff.LatestSupportedProtocolVersionChange) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange, accountID, index)
+			}
 		}
 
 		return nil

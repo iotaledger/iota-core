@@ -31,10 +31,11 @@ func TestManager_Import_Export(t *testing.T) {
 			TotalAllotments: 0,
 			AddedKeys:       []string{"D.P1"},
 
-			ValidatorStakeChange:  20,
-			DelegationStakeChange: 20,
-			FixedCostChange:       10,
-			StakeEndEpochChange:   10,
+			ValidatorStakeChange:                 20,
+			DelegationStakeChange:                20,
+			FixedCostChange:                      10,
+			StakeEndEpochChange:                  10,
+			LatestSupportedProtocolVersionChange: 1,
 
 			NewOutputID: "D1",
 		},
@@ -54,14 +55,15 @@ func TestManager_Import_Export(t *testing.T) {
 			OutputID:       "B1",
 		},
 		"D": {
-			BICUpdatedTime:  1,
-			BICAmount:       0,
-			PubKeys:         []string{"D.P1"},
-			OutputID:        "D1",
-			ValidatorStake:  20,
-			DelegationStake: 20,
-			FixedCost:       10,
-			StakeEndEpoch:   10,
+			BICUpdatedTime:                 1,
+			BICAmount:                      0,
+			PubKeys:                        []string{"D.P1"},
+			OutputID:                       "D1",
+			ValidatorStake:                 20,
+			DelegationStake:                20,
+			FixedCost:                      10,
+			StakeEndEpoch:                  10,
+			LatestSupportedProtocolVersion: 1,
 		},
 	})
 
@@ -80,7 +82,8 @@ func TestManager_Import_Export(t *testing.T) {
 			NewOutputID: "B2",
 		},
 		"D": { // update only delegation stake
-			DelegationStakeChange: -5,
+			DelegationStakeChange:                -5,
+			LatestSupportedProtocolVersionChange: 2,
 		},
 	})
 
@@ -98,14 +101,15 @@ func TestManager_Import_Export(t *testing.T) {
 			OutputID:       "B2",
 		},
 		"D": {
-			BICUpdatedTime:  1,
-			BICAmount:       0,
-			PubKeys:         []string{"D.P1"},
-			OutputID:        "D1",
-			ValidatorStake:  20,
-			DelegationStake: 15,
-			FixedCost:       10,
-			StakeEndEpoch:   10,
+			BICUpdatedTime:                 1,
+			BICAmount:                      0,
+			PubKeys:                        []string{"D.P1"},
+			OutputID:                       "D1",
+			ValidatorStake:                 20,
+			DelegationStake:                15,
+			FixedCost:                      10,
+			StakeEndEpoch:                  10,
+			LatestSupportedProtocolVersion: 3,
 		},
 	})
 
@@ -128,10 +132,11 @@ func TestManager_Import_Export(t *testing.T) {
 			NewOutputID: "C1",
 		},
 		"D": {
-			ValidatorStakeChange:  40,
-			DelegationStakeChange: -10,
-			StakeEndEpochChange:   8,
-			FixedCostChange:       -2,
+			ValidatorStakeChange:                 40,
+			DelegationStakeChange:                -10,
+			StakeEndEpochChange:                  8,
+			FixedCostChange:                      -2,
+			LatestSupportedProtocolVersionChange: 0,
 
 			NewOutputID: "D2",
 		},
@@ -156,14 +161,15 @@ func TestManager_Import_Export(t *testing.T) {
 			OutputID:       "C1",
 		},
 		"D": {
-			BICUpdatedTime:  1,
-			BICAmount:       0,
-			PubKeys:         []string{"D.P1"},
-			OutputID:        "D2",
-			ValidatorStake:  60,
-			DelegationStake: 5,
-			FixedCost:       8,
-			StakeEndEpoch:   18,
+			BICUpdatedTime:                 1,
+			BICAmount:                      0,
+			PubKeys:                        []string{"D.P1"},
+			OutputID:                       "D2",
+			ValidatorStake:                 60,
+			DelegationStake:                5,
+			FixedCost:                      8,
+			StakeEndEpoch:                  18,
+			LatestSupportedProtocolVersion: 3,
 		},
 	})
 

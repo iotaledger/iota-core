@@ -37,27 +37,29 @@ type AccountDiff struct {
 	PubKeysAdded   []ed25519.PublicKey
 	PubKeysRemoved []ed25519.PublicKey
 
-	ValidatorStakeChange  int64
-	DelegationStakeChange int64
-	StakeEndEpochChange   int64
-	FixedCostChange       int64
+	ValidatorStakeChange                 int64
+	DelegationStakeChange                int64
+	StakeEndEpochChange                  int64
+	FixedCostChange                      int64
+	LatestSupportedProtocolVersionChange int8
 }
 
 // NewAccountDiff creates a new AccountDiff instance.
 func NewAccountDiff() *AccountDiff {
 	return &AccountDiff{
-		BICChange:             0,
-		PreviousUpdatedTime:   0,
-		NewExpirySlot:         0,
-		PreviousExpirySlot:    0,
-		NewOutputID:           iotago.EmptyOutputID,
-		PreviousOutputID:      iotago.EmptyOutputID,
-		PubKeysAdded:          make([]ed25519.PublicKey, 0),
-		PubKeysRemoved:        make([]ed25519.PublicKey, 0),
-		ValidatorStakeChange:  0,
-		DelegationStakeChange: 0,
-		StakeEndEpochChange:   0,
-		FixedCostChange:       0,
+		BICChange:                            0,
+		PreviousUpdatedTime:                  0,
+		NewExpirySlot:                        0,
+		PreviousExpirySlot:                   0,
+		NewOutputID:                          iotago.EmptyOutputID,
+		PreviousOutputID:                     iotago.EmptyOutputID,
+		PubKeysAdded:                         make([]ed25519.PublicKey, 0),
+		PubKeysRemoved:                       make([]ed25519.PublicKey, 0),
+		ValidatorStakeChange:                 0,
+		DelegationStakeChange:                0,
+		StakeEndEpochChange:                  0,
+		FixedCostChange:                      0,
+		LatestSupportedProtocolVersionChange: 0,
 	}
 }
 
@@ -83,24 +85,26 @@ func (d AccountDiff) Bytes() ([]byte, error) {
 	m.WriteInt64(d.DelegationStakeChange)
 	m.WriteInt64(d.FixedCostChange)
 	m.WriteUint64(uint64(d.StakeEndEpochChange))
+	m.WriteInt8(d.LatestSupportedProtocolVersionChange)
 
 	return m.Bytes(), nil
 }
 
 func (d *AccountDiff) Clone() *AccountDiff {
 	return &AccountDiff{
-		BICChange:             d.BICChange,
-		PreviousUpdatedTime:   d.PreviousUpdatedTime,
-		NewExpirySlot:         d.NewExpirySlot,
-		PreviousExpirySlot:    d.PreviousExpirySlot,
-		NewOutputID:           d.NewOutputID,
-		PreviousOutputID:      d.PreviousOutputID,
-		PubKeysAdded:          lo.CopySlice(d.PubKeysAdded),
-		PubKeysRemoved:        lo.CopySlice(d.PubKeysRemoved),
-		ValidatorStakeChange:  d.ValidatorStakeChange,
-		DelegationStakeChange: d.DelegationStakeChange,
-		FixedCostChange:       d.FixedCostChange,
-		StakeEndEpochChange:   d.StakeEndEpochChange,
+		BICChange:                            d.BICChange,
+		PreviousUpdatedTime:                  d.PreviousUpdatedTime,
+		NewExpirySlot:                        d.NewExpirySlot,
+		PreviousExpirySlot:                   d.PreviousExpirySlot,
+		NewOutputID:                          d.NewOutputID,
+		PreviousOutputID:                     d.PreviousOutputID,
+		PubKeysAdded:                         lo.CopySlice(d.PubKeysAdded),
+		PubKeysRemoved:                       lo.CopySlice(d.PubKeysRemoved),
+		ValidatorStakeChange:                 d.ValidatorStakeChange,
+		DelegationStakeChange:                d.DelegationStakeChange,
+		FixedCostChange:                      d.FixedCostChange,
+		StakeEndEpochChange:                  d.StakeEndEpochChange,
+		LatestSupportedProtocolVersionChange: d.LatestSupportedProtocolVersionChange,
 	}
 }
 
@@ -176,6 +180,11 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 		return offset, ierrors.Wrap(err, "unable to read new stake end epoch in the diff")
 	}
 	offset += 8
+
+	if err = binary.Read(reader, binary.LittleEndian, &d.LatestSupportedProtocolVersionChange); err != nil {
+		return offset, ierrors.Wrap(err, "unable to read latest supported version change in the diff")
+	}
+	offset++
 
 	return offset, nil
 }

@@ -24,23 +24,25 @@ type AccountData struct {
 	OutputID   iotago.OutputID
 	PubKeys    ds.Set[ed25519.PublicKey]
 
-	ValidatorStake  iotago.BaseToken
-	DelegationStake iotago.BaseToken
-	FixedCost       iotago.Mana
-	StakeEndEpoch   iotago.EpochIndex
+	ValidatorStake                 iotago.BaseToken
+	DelegationStake                iotago.BaseToken
+	FixedCost                      iotago.Mana
+	StakeEndEpoch                  iotago.EpochIndex
+	LatestSupportedProtocolVersion iotago.Version
 }
 
 func NewAccountData(id iotago.AccountID, opts ...options.Option[AccountData]) *AccountData {
 	return options.Apply(&AccountData{
-		ID:              id,
-		Credits:         &BlockIssuanceCredits{},
-		ExpirySlot:      0,
-		OutputID:        iotago.EmptyOutputID,
-		PubKeys:         ds.NewSet[ed25519.PublicKey](),
-		ValidatorStake:  0,
-		DelegationStake: 0,
-		FixedCost:       0,
-		StakeEndEpoch:   0,
+		ID:                             id,
+		Credits:                        &BlockIssuanceCredits{},
+		ExpirySlot:                     0,
+		OutputID:                       iotago.EmptyOutputID,
+		PubKeys:                        ds.NewSet[ed25519.PublicKey](),
+		ValidatorStake:                 0,
+		DelegationStake:                0,
+		FixedCost:                      0,
+		StakeEndEpoch:                  0,
+		LatestSupportedProtocolVersion: 0,
 	}, opts)
 }
 
@@ -76,10 +78,11 @@ func (a *AccountData) Clone() *AccountData {
 		OutputID:   a.OutputID,
 		PubKeys:    keyCopy,
 
-		ValidatorStake:  a.ValidatorStake,
-		DelegationStake: a.DelegationStake,
-		FixedCost:       a.FixedCost,
-		StakeEndEpoch:   a.StakeEndEpoch,
+		ValidatorStake:                 a.ValidatorStake,
+		DelegationStake:                a.DelegationStake,
+		FixedCost:                      a.FixedCost,
+		StakeEndEpoch:                  a.StakeEndEpoch,
+		LatestSupportedProtocolVersion: a.LatestSupportedProtocolVersion,
 	}
 }
 
@@ -162,6 +165,11 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	}
 	bytesConsumed += 8
 
+	if err := binary.Read(reader, binary.LittleEndian, &(a.LatestSupportedProtocolVersion)); err != nil {
+		return bytesConsumed, ierrors.Wrapf(err, "unable to read latest supported protocol version for accountID %s", a.ID)
+	}
+	bytesConsumed++
+
 	return bytesConsumed, nil
 }
 
@@ -184,6 +192,7 @@ func (a AccountData) Bytes() ([]byte, error) {
 	m.WriteUint64(uint64(a.DelegationStake))
 	m.WriteUint64(uint64(a.FixedCost))
 	m.WriteUint64(uint64(a.StakeEndEpoch))
+	m.WriteByte(byte(a.LatestSupportedProtocolVersion))
 
 	return m.Bytes(), nil
 }
@@ -235,5 +244,11 @@ func WithFixedCost(fixedCost iotago.Mana) options.Option[AccountData] {
 func WithStakeEndEpoch(stakeEndEpoch iotago.EpochIndex) options.Option[AccountData] {
 	return func(a *AccountData) {
 		a.StakeEndEpoch = stakeEndEpoch
+	}
+}
+
+func WithLatestSupportedProtocolVersion(version iotago.Version) options.Option[AccountData] {
+	return func(a *AccountData) {
+		a.LatestSupportedProtocolVersion = version
 	}
 }
