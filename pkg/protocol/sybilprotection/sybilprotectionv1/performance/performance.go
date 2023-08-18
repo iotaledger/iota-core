@@ -15,7 +15,7 @@ import (
 )
 
 type Tracker struct {
-	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) kvstore.KVStore
+	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error)
 	poolStatsStore           *epochstore.Store[*model.PoolsStats]
 	committeeStore           *epochstore.Store[*account.Accounts]
 
@@ -31,7 +31,7 @@ type Tracker struct {
 }
 
 func NewTracker(
-	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) kvstore.KVStore,
+	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error),
 	poolStatsStore *epochstore.Store[*model.PoolsStats],
 	committeeStore *epochstore.Store[*account.Accounts],
 	performanceFactorsFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, uint64], error),
@@ -104,7 +104,10 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		panic(ierrors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
-	rewardsTree := t.rewardsMap(epoch)
+	rewardsTree, err := t.rewardsMap(epoch)
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to create rewards tree for epoch %d", epoch))
+	}
 
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
 		intermediateFactors := make([]uint64, 0, epochEndSlot+1-epochStartSlot)

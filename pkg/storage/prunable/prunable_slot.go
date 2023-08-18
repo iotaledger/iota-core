@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -34,7 +35,7 @@ func (p *Prunable) getKVStoreFromSlot(slot iotago.SlotIndex, prefix kvstore.Real
 func (p *Prunable) Blocks(slot iotago.SlotIndex) (*slotstore.Blocks, error) {
 	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixBlocks})
 	if err != nil {
-		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get blocks with slot %d", slot)
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get blocks with slot %d", slot)
 	}
 
 	return slotstore.NewBlocks(slot, kv, p.apiProvider.APIForSlot(slot)), nil
@@ -43,7 +44,7 @@ func (p *Prunable) Blocks(slot iotago.SlotIndex) (*slotstore.Blocks, error) {
 func (p *Prunable) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
 	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRootBlocks})
 	if err != nil {
-		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get root blocks with slot %d", slot)
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get root blocks with slot %d", slot)
 	}
 
 	return slotstore.NewStore(slot, kv,
@@ -61,7 +62,7 @@ func (p *Prunable) Attestations(slot iotago.SlotIndex) (kvstore.KVStore, error) 
 func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) (*slotstore.AccountDiffs, error) {
 	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixAccountDiffs})
 	if err != nil {
-		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get account diffs with slot %d", slot)
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get account diffs with slot %d", slot)
 	}
 
 	return slotstore.NewAccountDiffs(slot, kv, p.apiProvider.APIForSlot(slot)), nil
@@ -70,7 +71,7 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) (*slotstore.AccountDiffs,
 func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, uint64], error) {
 	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixPerformanceFactors})
 	if err != nil {
-		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get performance factors with slot %d", slot)
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get performance factors with slot %d", slot)
 	}
 
 	uint64Bytes := func(value uint64) ([]byte, error) {
@@ -102,7 +103,7 @@ func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) (*slotstore.Store[i
 func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error) {
 	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixUpgradeSignals})
 	if err != nil {
-		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get upgrade signals with slot %d", slot)
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get upgrade signals with slot %d", slot)
 	}
 
 	apiForSlot := p.apiProvider.APIForSlot(slot)
@@ -120,7 +121,7 @@ func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) (*slotstore.Store[accou
 func (p *Prunable) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.CommitmentID, *iotago.Roots], error) {
 	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRoots})
 	if err != nil {
-		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get roots with slot %d", slot)
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get roots with slot %d", slot)
 	}
 
 	apiForSlot := p.apiProvider.APIForSlot(slot)
@@ -148,7 +149,7 @@ func (p *Prunable) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.Commitm
 func (p *Prunable) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
 	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRetainer})
 	if err != nil {
-		return nil, ierrors.Wrapf(ErrEpochPruned, "could not get retainer with slot %d", slot)
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get retainer with slot %d", slot)
 	}
 
 	return slotstore.NewRetainer(slot, kv), nil

@@ -15,13 +15,6 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-var (
-	ErrEpochPruned      = ierrors.New("epoch pruned")
-	ErrNotEnoughHistory = ierrors.New("not enough history")
-	ErrNoPruningNeeded  = ierrors.New("no pruning needed")
-	ErrPruningAborted   = ierrors.New("pruning was aborted")
-)
-
 type Prunable struct {
 	defaultPruningDelay iotago.EpochIndex
 	apiProvider         api.Provider
@@ -61,17 +54,18 @@ func (p *Prunable) RestoreFromDisk() {
 	p.prunableSlotStore.RestoreFromDisk()
 
 	// set lastPrunedEpoch based on latest pruning epoch of buckets
-	lastPrunedEpoch := lo.Return1(p.prunableSlotStore.LastPrunedEpoch())
-	p.decidedUpgradeSignals.RestoreLastPrunedEpoch(lastPrunedEpoch)
-	p.poolRewards.RestoreLastPrunedEpoch(lastPrunedEpoch)
-	p.poolStats.RestoreLastPrunedEpoch(lastPrunedEpoch)
-	p.committee.RestoreLastPrunedEpoch(lastPrunedEpoch)
+	// TODO: can't simply mark as evicted even if it's epoch 0. Maybe we need to store the last pruned slot in the settings.
+	//  lastPrunedEpoch := lo.Return1(p.prunableSlotStore.LastPrunedEpoch())
+	// p.decidedUpgradeSignals.RestoreLastPrunedEpoch(lastPrunedEpoch)
+	// p.poolRewards.RestoreLastPrunedEpoch(lastPrunedEpoch)
+	// p.poolStats.RestoreLastPrunedEpoch(lastPrunedEpoch)
+	// p.committee.RestoreLastPrunedEpoch(lastPrunedEpoch)
 }
 
 func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) error {
 	// No need to prune.
 	if epoch < p.defaultPruningDelay {
-		return ErrNoPruningNeeded
+		return database.ErrNoPruningNeeded
 	}
 
 	// prune prunable_slot
@@ -153,7 +147,7 @@ func (p *Prunable) EpochToPrunedBySize(targetSize int64, latestFinalizedEpoch io
 	}
 
 	// TODO: do we return error here, or prune as much as we could
-	return 0, ErrNotEnoughHistory
+	return 0, database.ErrNotEnoughHistory
 }
 
 func (p *Prunable) semiPermanentDBSizeByEpoch(epoch iotago.EpochIndex) (int64, error) {

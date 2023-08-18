@@ -22,7 +22,7 @@ const (
 	pruningDelayCommittee             = 365
 )
 
-func (p *Prunable) RewardsForEpoch(epoch iotago.EpochIndex) kvstore.KVStore {
+func (p *Prunable) RewardsForEpoch(epoch iotago.EpochIndex) (kvstore.KVStore, error) {
 	return p.poolRewards.GetEpoch(epoch)
 }
 

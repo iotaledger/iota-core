@@ -19,11 +19,16 @@ var (
 	finalRewardScalingExponent uint64 = 40
 )
 
-func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
+func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) (iotago.Identifier, error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	return iotago.Identifier(t.rewardsMap(epochIndex).Root())
+	m, err := t.rewardsMap(epochIndex)
+	if err != nil {
+		return iotago.Identifier{}, err
+	}
+
+	return iotago.Identifier(m.Root()), nil
 }
 
 func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
@@ -128,17 +133,26 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 	return delegatorsReward, epochStart, epochEnd, nil
 }
 
-func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) ads.Map[iotago.AccountID, *model.PoolRewards] {
-	return ads.NewMap(t.rewardsStorePerEpochFunc(epochIndex),
+func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) (ads.Map[iotago.AccountID, *model.PoolRewards], error) {
+	kv, err := t.rewardsStorePerEpochFunc(epochIndex)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get rewards store for epoch %d", epochIndex)
+	}
+
+	return ads.NewMap(kv,
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
 		(*model.PoolRewards).Bytes,
 		model.PoolRewardsFromBytes,
-	)
+	), nil
 }
 
 func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *model.PoolRewards, exists bool, err error) {
-	return t.rewardsMap(epochIndex).Get(accountID)
+	m, err := t.rewardsMap(epochIndex)
+	if err != nil {
+		return nil, false, err
+	}
+	return m.Get(accountID)
 }
 
 func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, fixedCost iotago.Mana, performanceFactor uint64) iotago.Mana {

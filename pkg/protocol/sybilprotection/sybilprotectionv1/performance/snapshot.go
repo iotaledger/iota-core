@@ -124,7 +124,10 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "unable to read epoch index")
 		}
 
-		rewardsTree := t.rewardsMap(epochIndex)
+		rewardsTree, err := t.rewardsMap(epochIndex)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to get rewards tree for epoch index %d", epochIndex)
+		}
 
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
@@ -263,7 +266,10 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 	}
 	// TODO: make sure to adjust this loop if we add pruning later.
 	for epoch := targetEpoch; epoch > iotago.EpochIndex(0); epoch-- {
-		rewardsTree := t.rewardsMap(epoch)
+		rewardsTree, err := t.rewardsMap(epoch)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to get rewards tree for epoch index %d", epoch)
+		}
 
 		// if the tree was not present in storage we can skip this epoch and the previous ones, as we never stored any rewards
 		if !rewardsTree.WasRestoredFromStorage() {

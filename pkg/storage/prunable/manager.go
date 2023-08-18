@@ -63,7 +63,7 @@ func (m *PrunableSlotManager) IsTooOld(index iotago.EpochIndex) (isTooOld bool) 
 
 func (m *PrunableSlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) (kvstore.KVStore, error) {
 	if m.IsTooOld(index) {
-		return nil, ierrors.Wrapf(ErrEpochPruned, "epoch %d", index)
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "epoch %d", index)
 	}
 
 	kv := m.getDBInstance(index).KVStore()
@@ -76,7 +76,7 @@ func (m *PrunableSlotManager) PruneUntilEpoch(index iotago.EpochIndex) error {
 	defer m.lastPrunedMutex.Unlock()
 
 	if index < m.lastPrunedEpoch.NextIndex() {
-		return ErrNoPruningNeeded
+		return database.ErrNoPruningNeeded
 	}
 
 	for currentIndex := m.lastPrunedEpoch.NextIndex(); currentIndex <= index; currentIndex++ {
