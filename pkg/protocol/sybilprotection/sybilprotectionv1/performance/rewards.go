@@ -45,15 +45,16 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
+
 		profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
-		unDecayedEpochRewards := uint64(rewardsForAccountInEpoch.FixedCost) +
-			scaleDownWithExponent(poolStats.ProfitMargin*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent) +
-			scaleDownWithExponent(increasedAccuracyComplement(poolStats.ProfitMargin, profitMarginExponent)*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent)*
-				uint64(stakeAmount)/
-				uint64(rewardsForAccountInEpoch.PoolStake)
+		profitMarginComplement := scaleUpComplement(poolStats.ProfitMargin, profitMarginExponent)
+		profitMarginFactor := scaleDownWithExponent(poolStats.ProfitMargin*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent)
+		residualValidatorFactor := scaleDownWithExponent(iotago.Mana(profitMarginComplement)*rewardsForAccountInEpoch.PoolRewards, profitMarginExponent) * iotago.Mana(stakeAmount) / iotago.Mana(rewardsForAccountInEpoch.PoolStake)
+
+		unDecayedEpochRewards := rewardsForAccountInEpoch.FixedCost + iotago.Mana(profitMarginFactor) + residualValidatorFactor
 
 		decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
-		decayedEpochRewards, err2 := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		decayedEpochRewards, err2 := decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
 		if err2 != nil {
 			return 0, 0, 0, ierrors.Wrapf(err2, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
@@ -94,13 +95,14 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator account ID %s", epochIndex, validatorID)
 		}
+
 		profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
-		unDecayedEpochRewards := scaleDownWithExponent(increasedAccuracyComplement(poolStats.ProfitMargin, profitMarginExponent)*uint64(rewardsForAccountInEpoch.PoolRewards), profitMarginExponent) *
-			uint64(delegatedAmount) /
-			uint64(rewardsForAccountInEpoch.PoolStake)
+		profitMarginComplement := scaleUpComplement(poolStats.ProfitMargin, profitMarginExponent)
+
+		unDecayedEpochRewards := scaleDownWithExponent(iotago.Mana(profitMarginComplement)*rewardsForAccountInEpoch.PoolRewards, profitMarginExponent) * iotago.Mana(delegatedAmount) / iotago.Mana(rewardsForAccountInEpoch.PoolStake)
 
 		decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
-		decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
+		decayedEpochRewards, err := decayProvider.RewardsWithDecay(unDecayedEpochRewards, epochIndex, epochEnd)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
@@ -172,8 +174,8 @@ func scaleDownWithExponent[V iotago.BaseToken | iotago.Mana | uint64](val V, shi
 	return val >> shift
 }
 
-// increasedAccuracyComplement returns the 'shifted' completition to "one" for the shifted value where one is the 2^accuracyShift.
-func increasedAccuracyComplement[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint8) V {
+// scaleUpComplement returns the 'shifted' completition to "one" for the shifted value where one is the 2^accuracyShift.
+func scaleUpComplement[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint8) V {
 	// it should never overflow for val=profit margin, if profit margin was previously scaled with scaleUpWithExponent.
 	return (1 << shift) - val
 }
