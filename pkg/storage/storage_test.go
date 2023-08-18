@@ -1,7 +1,6 @@
 package storage_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,7 +25,8 @@ func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
 	tf.SetLatestFinalizedEpoch(9)
 
 	// 7 > default pruning delay 1, should prune
-	fmt.Println(tf.Instance.PruneByEpochIndex(7))
+	err := tf.Instance.PruneByEpochIndex(7)
+	require.NoError(t, err)
 	tf.AssertPrunedUntil(
 		types.NewTuple(6, true),
 		types.NewTuple(0, true),
@@ -36,7 +36,8 @@ func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
 	)
 
 	// 8 > default pruning delay 1, should prune
-	tf.Instance.PruneByEpochIndex(8)
+	err = tf.Instance.PruneByEpochIndex(8)
+	require.NoError(t, err)
 	tf.AssertPrunedUntil(
 		types.NewTuple(7, true),
 		types.NewTuple(1, true),
