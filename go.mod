@@ -9,20 +9,20 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/app v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/autopeering v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/constraints v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/ds v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/lo v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/logger v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230817124507-83988a14d80d
+	github.com/iotaledger/hive.go/ads v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/app v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/autopeering v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/ds v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/lo v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/logger v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230817121204-7ee2cb82d3d9
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230817121204-7ee2cb82d3d9
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230811070302-53cce5ce9e7c
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230801163327-a72de1469de7
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230817100419-87dc40e5a760
@@ -148,7 +148,7 @@ require (
 	go.uber.org/fx v1.20.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
-	golang.org/x/exp v0.0.0-20230724220655-d98519c11495 // indirect
+	golang.org/x/exp v0.0.0-20230810033253-352e893a4cad // indirect
 	golang.org/x/image v0.9.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
