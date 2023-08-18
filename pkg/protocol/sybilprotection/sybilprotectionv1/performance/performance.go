@@ -164,7 +164,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 		if err := rewardsTree.Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
-			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(validatorPerformances)),
+			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(validatorPerformances, epoch)),
 			FixedCost:   pool.FixedCost,
 		}); err != nil {
 			panic(ierrors.Wrapf(err, "failed to set rewards for account %s", accountID))
@@ -217,7 +217,7 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*prunable.Val
 		// we reward not only total number of blocks issued, but also regularity based on block timestamp
 		slotPerformanceFactor := bits.OnesCount32(pf.SlotActivityVector)
 
-		if pf.BlockIssuedCount > validatorBlocksPerSlot {
+		if pf.BlockIssuedCount > t.apiProvider.APIForEpoch(epoch).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot {
 			// we harshly punish validators that issue any blocks more than allowed
 			return 0
 		}
