@@ -122,6 +122,9 @@ func (p *Prunable) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
 
 func (p *Prunable) EpochToPrunedBySize(targetSize int64, latestFinalizedEpoch iotago.EpochIndex) (iotago.EpochIndex, error) {
 	lastPrunedEpoch := lo.Return1(p.prunableSlotStore.LastPrunedEpoch())
+	if latestFinalizedEpoch < p.defaultPruningDelay {
+		return 0, database.ErrNoPruningNeeded
+	}
 
 	var sum int64
 	for i := lastPrunedEpoch + 1; i <= latestFinalizedEpoch-p.defaultPruningDelay; i++ {
