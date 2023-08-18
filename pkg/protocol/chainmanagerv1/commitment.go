@@ -29,7 +29,7 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 	c := &Commitment{
 		Commitment: commitment,
 
-		chain:                               reactive.NewVariable[*Chain](trapdoor),
+		chain:                               reactive.NewVariable[*Chain](),
 		solid:                               reactive.NewEvent(),
 		verified:                            reactive.NewEvent(),
 		parentVerified:                      reactive.NewEvent(),
