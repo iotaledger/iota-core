@@ -86,21 +86,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 				l.memPool.PublishCommitmentState(scd.Commitment.Commitment())
 			})
 
-			pruneUTXOLedger := func(epoch iotago.EpochIndex) {
-				l.utxoLedger.WriteLockLedger()
-				defer l.utxoLedger.WriteUnlockLedger()
-
-				start := e.APIForEpoch(epoch).TimeProvider().EpochStart(epoch)
-				end := e.APIForEpoch(epoch).TimeProvider().EpochEnd(epoch)
-
-				for slot := start; slot <= end; slot++ {
-					if err := l.utxoLedger.PruneSlotIndexWithoutLocking(slot); err != nil {
-						l.errorHandler(ierrors.Wrapf(err, "failed to prune ledger for slot %d", slot))
-					}
-				}
-			}
-			e.Storage.SetLedgerPruningFunc(pruneUTXOLedger)
-
 			l.TriggerConstructed()
 			l.TriggerInitialized()
 		})
@@ -110,7 +95,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 }
 
 func New(
-	utxoStore,
+	utxoLedger *utxoledger.Manager,
 	accountsStore kvstore.KVStore,
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
@@ -124,7 +109,7 @@ func New(
 		apiProvider:      apiProvider,
 		accountsLedger:   accountsledger.New(apiProvider, blocksFunc, slotDiffFunc, accountsStore),
 		rmcManager:       rmc.NewManager(apiProvider, commitmentLoader),
-		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
+		utxoLedger:       utxoLedger,
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
 		errorHandler:     errorHandler,

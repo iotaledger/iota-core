@@ -138,7 +138,7 @@ func (t *TestFramework) GeneratePermanentData(size int64) {
 	initialStorageSize := t.Instance.PermanentDatabaseSize()
 
 	// Use as dummy to generate some data.
-	kv := t.Instance.Ledger()
+	kv := t.Instance.Ledger().KVStore()
 
 	var createdBytes int64
 	for createdBytes < size {

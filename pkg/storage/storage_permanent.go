@@ -2,8 +2,8 @@ package storage
 
 import (
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func (s *Storage) Settings() *permanent.Settings {
@@ -24,10 +24,6 @@ func (s *Storage) LatestNonEmptySlot(optRealm ...byte) kvstore.KVStore {
 }
 
 // Ledger returns the ledger storage (or a specialized sub-storage if a realm is provided).
-func (s *Storage) Ledger(optRealm ...byte) kvstore.KVStore {
-	return s.permanent.Ledger(optRealm...)
-}
-
-func (s *Storage) SetLedgerPruningFunc(ledgerPruningFunc func(epoch iotago.EpochIndex)) {
-	s.ledgerPruningFunc = ledgerPruningFunc
+func (s *Storage) Ledger() *utxoledger.Manager {
+	return s.permanent.UTXOLedger()
 }
