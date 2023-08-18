@@ -67,31 +67,31 @@ func (p *Prunable) RestoreFromDisk() {
 	}
 }
 
-func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) error {
+func (p *Prunable) Prune(epoch iotago.EpochIndex) error {
 	// No need to prune.
-	if epoch <= p.defaultPruningDelay {
+	if epoch < p.defaultPruningDelay {
 		return database.ErrNoPruningNeeded
 	}
 
 	// prune prunable_slot
-	if err := p.prunableSlotStore.PruneUntilEpoch(epoch - p.defaultPruningDelay); err != nil {
+	if err := p.prunableSlotStore.Prune(epoch - p.defaultPruningDelay); err != nil {
 		p.errorHandler(err)
 	}
 
 	// prune prunable_epoch: each component has its own pruning delay based on max(individualPruningDelay, defaultPruningDelay)
-	if err := p.decidedUpgradeSignals.PruneUntilEpoch(epoch); err != nil {
+	if err := p.decidedUpgradeSignals.Prune(epoch); err != nil {
 		p.errorHandler(err)
 	}
 
-	if err := p.poolRewards.PruneUntilEpoch(epoch); err != nil {
+	if err := p.poolRewards.Prune(epoch); err != nil {
 		p.errorHandler(err)
 	}
 
-	if err := p.poolStats.PruneUntilEpoch(epoch); err != nil {
+	if err := p.poolStats.Prune(epoch); err != nil {
 		p.errorHandler(err)
 	}
 
-	if err := p.committee.PruneUntilEpoch(epoch); err != nil {
+	if err := p.committee.Prune(epoch); err != nil {
 		p.errorHandler(err)
 	}
 

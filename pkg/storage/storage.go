@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
@@ -114,6 +115,7 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
 
+	// try to prune epoch from the future
 	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
 	start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
 	if start < epoch {
@@ -122,10 +124,24 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 		return err
 	}
 
+	// try to prune old epoch
+	lastPrunedEpoch := lo.Return1(s.prunable.LastPrunedEpoch())
+	if epoch <= lastPrunedEpoch {
+		err := ierrors.Wrapf(database.ErrNoPruningNeeded, "pruning epoch %d is smaller than the last pruned epoch %d in pruneUntilEpoch", epoch, lastPrunedEpoch)
+		s.errorHandler(err)
+		return err
+	}
+
+	if epoch < s.optsPruningDelay {
+		err := ierrors.Wrapf(database.ErrNoPruningNeeded, "pruning epoch %d is smaller than the pruning delay %d in pruneUntilEpoch", epoch, lastPrunedEpoch)
+		s.errorHandler(err)
+		return err
+	}
+
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
-	return s.prunable.PruneUntilEpoch(epoch)
+	return s.pruneUntilEpoch(epoch)
 
 	// TODO: call ledger pruning
 }
@@ -145,7 +161,7 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) error {
 		return err
 	}
 
-	return s.prunable.PruneUntilEpoch(start - depth)
+	return s.pruneUntilEpoch(start - depth)
 }
 
 func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
@@ -180,8 +196,17 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
 		return err
 	}
 
-	return s.prunable.PruneUntilEpoch(targetEpoch)
+	return s.pruneUntilEpoch(targetEpoch)
 	// Note: what if permanent is too big -> log error?
+}
+
+func (s *Storage) pruneUntilEpoch(epoch iotago.EpochIndex) error {
+	lastPrunedEpoch, _ := s.prunable.LastPrunedEpoch()
+	for currentIndex := lastPrunedEpoch; currentIndex <= epoch; currentIndex++ {
+		s.prunable.Prune(currentIndex)
+	}
+
+	return nil
 }
 
 // Shutdown shuts down the storage.

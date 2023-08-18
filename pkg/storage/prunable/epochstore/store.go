@@ -147,26 +147,16 @@ func (s *Store[V]) streamEpochs(consumer func(epoch iotago.EpochIndex) error) er
 	return nil
 }
 
-func (s *Store[V]) PruneUntilEpoch(epoch iotago.EpochIndex) error {
+func (s *Store[V]) Prune(epoch iotago.EpochIndex) error {
 	s.lastPrunedMutex.Lock()
 	defer s.lastPrunedMutex.Unlock()
 
-	minStartEpoch := s.lastPrunedEpoch.NextIndex() + s.pruningDelay
+	minStartEpoch := lo.Return1(s.lastPrunedEpoch.Index()) + s.pruningDelay
 	// No need to prune.
 	if epoch < minStartEpoch {
 		return nil
 	}
 
-	for currentIndex := minStartEpoch; currentIndex <= epoch; currentIndex++ {
-		if err := s.prune(currentIndex); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *Store[V]) prune(epoch iotago.EpochIndex) error {
 	targetIndex := epoch - s.pruningDelay
 	err := s.kv.DeletePrefix(targetIndex.MustBytes())
 	if err != nil {

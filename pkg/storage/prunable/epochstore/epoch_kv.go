@@ -100,26 +100,16 @@ func (e *EpochKVStore) streamEpochs(consumer func(epoch iotago.EpochIndex) error
 	return nil
 }
 
-func (e *EpochKVStore) PruneUntilEpoch(epoch iotago.EpochIndex) error {
+func (e *EpochKVStore) Prune(epoch iotago.EpochIndex) error {
 	e.lastPrunedMutex.Lock()
 	defer e.lastPrunedMutex.Unlock()
 
-	minStartEpoch := e.lastPrunedEpoch.NextIndex() + e.pruningDelay
+	minStartEpoch := lo.Return1(e.lastPrunedEpoch.Index()) + e.pruningDelay
 	// No need to prune.
 	if epoch < minStartEpoch {
 		return nil
 	}
 
-	for currentIndex := minStartEpoch; currentIndex <= epoch; currentIndex++ {
-		if err := e.prune(currentIndex); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (e *EpochKVStore) prune(epoch iotago.EpochIndex) error {
 	targetIndex := epoch - e.pruningDelay
 	err := e.kv.DeletePrefix(targetIndex.MustBytes())
 	if err != nil {

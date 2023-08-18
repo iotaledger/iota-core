@@ -71,22 +71,6 @@ func (m *PrunableSlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) 
 	return lo.PanicOnErr(kv.WithExtendedRealm(realm)), nil
 }
 
-func (m *PrunableSlotManager) PruneUntilEpoch(index iotago.EpochIndex) error {
-	m.lastPrunedMutex.Lock()
-	defer m.lastPrunedMutex.Unlock()
-
-	if index < m.lastPrunedEpoch.NextIndex() {
-		return database.ErrNoPruningNeeded
-	}
-
-	for currentIndex := m.lastPrunedEpoch.NextIndex(); currentIndex <= index; currentIndex++ {
-		m.prune(currentIndex)
-		m.lastPrunedEpoch.MarkEvicted(currentIndex)
-	}
-
-	return nil
-}
-
 func (m *PrunableSlotManager) Shutdown() {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
@@ -175,23 +159,33 @@ func (m *PrunableSlotManager) getDBInstance(index iotago.EpochIndex) (db *databa
 	return db
 }
 
-func (m *PrunableSlotManager) prune(dbBaseIndex iotago.EpochIndex) {
+func (m *PrunableSlotManager) Prune(epoch iotago.EpochIndex) error {
+	m.lastPrunedMutex.Lock()
+	defer m.lastPrunedMutex.Unlock()
+
+	if epoch < lo.Return1(m.lastPrunedEpoch.Index()) {
+		return ierrors.Wrapf(database.ErrNoPruningNeeded, "epoch %d is already pruned", epoch)
+	}
+
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
-	db, exists := m.openDBs.Get(dbBaseIndex)
+	db, exists := m.openDBs.Get(epoch)
 	if exists {
 		db.Close()
 
-		m.openDBs.Remove(dbBaseIndex)
+		m.openDBs.Remove(epoch)
 	}
 
-	if err := os.RemoveAll(dbPathFromIndex(m.dbConfig.Directory, dbBaseIndex)); err != nil {
+	if err := os.RemoveAll(dbPathFromIndex(m.dbConfig.Directory, epoch)); err != nil {
 		panic(err)
 	}
 
 	// Delete the db size since we pruned the whole directory
-	m.dbSizes.Delete(dbBaseIndex)
+	m.dbSizes.Delete(epoch)
+	m.lastPrunedEpoch.MarkEvicted(epoch)
+
+	return nil
 }
 
 func (m *PrunableSlotManager) BucketSize(epoch iotago.EpochIndex) (int64, error) {
