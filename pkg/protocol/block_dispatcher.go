@@ -110,7 +110,11 @@ func (b *BlockDispatcher) initEngineMonitoring() {
 			}, b.dispatchWorkers)
 
 			b.runTask(func() {
-				b.warpSyncIfNecessary(b.targetEngine(chainCommitment), chainCommitment)
+				// warpsync only if the observed commitment is at least two commitments ahead.
+				targetEngine := b.targetEngine(chainCommitment)
+				if targetEngine != nil && chainCommitment.Commitment().Index() > targetEngine.Storage.Settings().LatestCommitment().Index()+1 {
+					b.warpSync(targetEngine, chainCommitment)
+				}
 			}, b.warpSyncWorkers)
 		})
 	})
@@ -244,8 +248,8 @@ func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Bl
 	return block.ID().Index() > latestCommitmentIndex+maxCommittableAge
 }
 
-// warpSyncIfNecessary checks if a warp sync is necessary and starts the process if that is the case.
-func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
+// warpSync triggers warp sync from the latest committed slot up to the warpsync window.
+func (b *BlockDispatcher) warpSync(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
 	if e == nil || chainCommitment == nil {
 		return
 	}
@@ -255,11 +259,9 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	warpSyncWindowSize := lo.Cond(maxCommittableAge > b.optWarpSyncWindowSize, maxCommittableAge, b.optWarpSyncWindowSize)
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
-	if chainCommitment.Commitment().Index() > latestCommitmentIndex+1 {
-		for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+warpSyncWindowSize; slotToWarpSync++ {
-			if commitmentToSync := chain.Commitment(slotToWarpSync); commitmentToSync != nil && !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
-				b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
-			}
+	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+warpSyncWindowSize; slotToWarpSync++ {
+		if commitmentToSync := chain.Commitment(slotToWarpSync); commitmentToSync != nil && !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
+			b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
 		}
 	}
 }
@@ -295,8 +297,7 @@ func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.E
 	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		if chainCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID()); exists {
 			b.processedWarpSyncRequests.Delete(commitment.ID())
-
-			b.warpSyncIfNecessary(engineInstance, chainCommitment)
+			b.warpSync(engineInstance, chainCommitment)
 		}
 	}).Unhook)
 }
