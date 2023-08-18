@@ -12,6 +12,7 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 h1:8UrgZ3GkP4i/CLijOJx79Yu+etly
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0/go.mod h1:v57UDF4pDQJcEfFUCRop3lJL149eHGSe9Jvczhzjo/0=
 github.com/ethereum/go-ethereum v1.12.0 h1:bdnhLPtqETd4m3mS8BGMNvBTf36bO5bx/hxE2zljOa0=
 github.com/ethereum/go-ethereum v1.12.0/go.mod h1:/oo2X/dZLJjf2mJ6YT9wcWxa4nNJDBKDBU6sFIpx1Gs=
+github.com/ethereum/go-ethereum v1.12.2/go.mod h1:1cRAEV+rp/xX0zraSCBnu9Py3HQ+geRMj3HdR+k0wfI=
 github.com/fjl/memsize v0.0.1 h1:+zhkb+dhUgx0/e+M8sF0QqiouvMQUiKR+QYvdxIOKcQ=
 github.com/golang/protobuf v1.5.0/go.mod h1:FsONVRAS9T7sI+LIUmWTfcYkHO4aIWwzhcaSAoJOfIk=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
@@ -35,6 +36,7 @@ github.com/iotaledger/hive.go/crypto v0.0.0-20230817124507-83988a14d80d h1:ggHDv
 github.com/iotaledger/hive.go/crypto v0.0.0-20230817124507-83988a14d80d/go.mod h1:dh01lKrdkIqN5O/NqNIW+IsbZFR/+Pst6rcLbVkhe9Q=
 github.com/iotaledger/hive.go/ds v0.0.0-20230817124507-83988a14d80d h1:usox/ZLeIDMBs0vyxzxZ4gmqSAGtPEKHF7ss6A/5/R0=
 github.com/iotaledger/hive.go/ds v0.0.0-20230817124507-83988a14d80d/go.mod h1:x6uTxewNdOkYUs/Pd123A98Qv8iIIl1UUoB8jmF7nfA=
+github.com/iotaledger/hive.go/ds v0.0.0-20230818002409-9755559b5ff6/go.mod h1:x6uTxewNdOkYUs/Pd123A98Qv8iIIl1UUoB8jmF7nfA=
 github.com/iotaledger/hive.go/ierrors v0.0.0-20230817124507-83988a14d80d h1:HvTox3m7aBI4c7iIOqPHFPEIbGh9nBg4plq+MguQy3E=
 github.com/iotaledger/hive.go/ierrors v0.0.0-20230817124507-83988a14d80d/go.mod h1:aMfXyyUB+ODjZB2Q1CdSUSWIFbhvIWnVlBZWkJ2T0Uw=
 github.com/iotaledger/hive.go/kvstore v0.0.0-20230817124507-83988a14d80d h1:c+tEbtsVysxgtiRHGC/LxaH73p3vRoHu13NKgQLTzMw=

@@ -10,7 +10,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/iotaledger/hive.go/app v0.0.0-20230817124507-83988a14d80d
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230817124507-83988a14d80d
-	github.com/iotaledger/hive.go/ds v0.0.0-20230817124507-83988a14d80d
+	github.com/iotaledger/hive.go/ds v0.0.0-20230818002409-9755559b5ff6
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230817124507-83988a14d80d
 	github.com/iotaledger/hive.go/lo v0.0.0-20230817124507-83988a14d80d
 	github.com/iotaledger/hive.go/logger v0.0.0-20230817124507-83988a14d80d
@@ -28,7 +28,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
-	github.com/ethereum/go-ethereum v1.12.0 // indirect
+	github.com/ethereum/go-ethereum v1.12.2 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
