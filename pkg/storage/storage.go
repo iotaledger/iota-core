@@ -114,13 +114,13 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
 
-	// latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
-	// start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
-	// if start < epoch {
-	// 	err := ierrors.Wrapf(prunable.ErrNotEnoughHistory, "pruning epoch %d is larger than the current epoch %d in PruneByEpochIndex", epoch, start)
-	// 	s.errorHandler(err)
-	// 	return err
-	// }
+	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
+	start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
+	if start < epoch {
+		err := ierrors.Wrapf(database.ErrNotEnoughHistory, "pruning epoch %d is larger than the current epoch %d in PruneByEpochIndex", epoch, start)
+		s.errorHandler(err)
+		return err
+	}
 
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
@@ -171,7 +171,8 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
 		return database.ErrNoPruningNeeded
 	}
 
-	latestEpoch := s.Settings().APIProvider().CurrentAPI().TimeProvider().EpochFromSlot(s.Settings().LatestFinalizedSlot())
+	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
+	latestEpoch := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
 	bytesToPrune := currentSize - int64(float64(targetDatabaseSizeBytes)*s.optPruningSizeThresholdPercentage)
 	targetEpoch, err := s.prunable.EpochToPrunedBySize(bytesToPrune, latestEpoch)
 	if err != nil {

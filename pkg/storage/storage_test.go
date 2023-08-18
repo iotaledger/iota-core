@@ -13,7 +13,7 @@ import (
 )
 
 func TestStorage_Pruning(t *testing.T) {
-	tf := NewTestFramework(t)
+	tf := NewTestFramework(t, "")
 	defer tf.Shutdown()
 
 	tf.GeneratePermanentData(100 * MB)
@@ -25,7 +25,7 @@ func TestStorage_Pruning(t *testing.T) {
 }
 
 func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
-	tf := NewTestFramework(t, storage.WithPruningDelay(1))
+	tf := NewTestFramework(t, "", storage.WithPruningDelay(1))
 	defer tf.Shutdown()
 
 	totalEpochs := 10
@@ -34,9 +34,10 @@ func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
 		tf.GeneratePrunableData(iotago.EpochIndex(i), 10*KB)
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
-	// TODO: create convenience method for setting latest finalized epoch in test framework
-	tf.Instance.Settings().SetLatestFinalizedSlot(8)
 
+	tf.SetLatestFinalizedEpoch(9)
+
+	// 7 > default pruning delay 1, should prune
 	fmt.Println(tf.Instance.PruneByEpochIndex(7))
 	tf.AssertPrunedUntil(
 		types.NewTuple(6, true),
@@ -46,6 +47,7 @@ func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
 		types.NewTuple(0, false),
 	)
 
+	// 8 > default pruning delay 1, should prune
 	tf.Instance.PruneByEpochIndex(8)
 	tf.AssertPrunedUntil(
 		types.NewTuple(7, true),
@@ -57,7 +59,7 @@ func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
 }
 
 func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
-	tf := NewTestFramework(t, storage.WithPruningDelay(10))
+	tf := NewTestFramework(t, "", storage.WithPruningDelay(10))
 	defer tf.Shutdown()
 
 	totalEpochs := 14
@@ -67,7 +69,9 @@ func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
 
-	// TODO: set lastFinalizedEpoch
+	tf.SetLatestFinalizedEpoch(13)
+
+	// 7 < default pruning delay 10, should NOT prune
 	err := tf.Instance.PruneByEpochIndex(7)
 	require.ErrorContains(t, err, database.ErrNoPruningNeeded.Error())
 
@@ -79,7 +83,10 @@ func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
 		types.NewTuple(0, false),
 	)
 
-	tf.Instance.PruneByEpochIndex(10)
+	// 10 == default pruning delay 10, should NOT prune
+	err = tf.Instance.PruneByEpochIndex(10)
+	require.ErrorContains(t, err, database.ErrNoPruningNeeded.Error())
+
 	tf.AssertPrunedUntil(
 		types.NewTuple(0, true),
 		types.NewTuple(0, true),
@@ -88,6 +95,7 @@ func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
 		types.NewTuple(0, false),
 	)
 
+	// 12 > default pruning delay 10, should prune
 	tf.Instance.PruneByEpochIndex(12)
 	tf.AssertPrunedUntil(
 		types.NewTuple(2, true),
@@ -99,25 +107,33 @@ func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
 }
 
 func TestStorage_PruneBySize(t *testing.T) {
-	tf := NewTestFramework(t,
+	tf := NewTestFramework(t, "",
 		storage.WithPruningDelay(2),
 		storage.WithPruningSizeEnable(true),
 		storage.WithPruningSizeMaxTargetSizeBytes(10*MB))
 	defer tf.Shutdown()
 
-	// TODO: set lastFinalizedEpoch
 	totalEpochs := 14
 	tf.GeneratePermanentData(5 * MB)
 	for i := 1; i <= totalEpochs; i++ {
-		tf.GeneratePrunableData(iotago.EpochIndex(i), 100*KB)
+		tf.GeneratePrunableData(iotago.EpochIndex(i), 120*KB)
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
 
-	tf.Instance.PruneBySize(4 * MB)
+	tf.SetLatestFinalizedEpoch(13)
 
-	require.LessOrEqual(t, tf.Instance.Size(), 4*MB)
-	// need to add some stuff to permanent storage for multiple epochs
-	// need to add some stuff to prunable bucket and semipermanent storages for multiple epochs
+	// db size < target size 10 MB, should NOT prune
+	err := tf.Instance.PruneBySize()
+	require.ErrorContains(t, err, database.ErrNoPruningNeeded.Error())
+
+	// prunable can't reached to pruned bytes size, should NOT prune
+	err = tf.Instance.PruneBySize(4 * MB)
+	require.ErrorContains(t, err, database.ErrNotEnoughHistory.Error())
+
+	// prunable can reached to pruned bytes size, should prune
+	err = tf.Instance.PruneBySize(7 * MB)
+	require.NoError(t, err)
+	require.LessOrEqual(t, tf.Instance.Size(), 7*MB)
 
 	// execute goroutine that monitors the size of the database and prunes if necessary
 
@@ -126,5 +142,33 @@ func TestStorage_PruneBySize(t *testing.T) {
 }
 
 func TestStorage_RestoreFromDisk(t *testing.T) {
+	tf := NewTestFramework(t, "", storage.WithPruningDelay(1))
 
+	totalEpochs := 370
+	tf.GeneratePermanentData(5 * MB)
+	for i := 1; i <= totalEpochs; i++ {
+		tf.GeneratePrunableData(iotago.EpochIndex(i), 1*B)
+		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
+	}
+
+	tf.SetLatestFinalizedEpoch(366)
+	tf.Instance.PruneByEpochIndex(366)
+	tf.AssertPrunedUntil(
+		types.NewTuple(365, true),
+		types.NewTuple(359, true),
+		types.NewTuple(1, true),
+		types.NewTuple(1, true),
+		types.NewTuple(1, true),
+	)
+
+	restoreDir := tf.BaseDir()
+	tf.Shutdown()
+
+	// restore from disk
+	tf = NewTestFramework(t, restoreDir, storage.WithPruningDelay(1))
+	tf.Instance.RestoreFromDisk()
+
+	epoch, pruned := tf.Instance.LastPrunedEpoch()
+	require.Equal(t, iotago.EpochIndex(365), epoch)
+	require.True(t, pruned)
 }

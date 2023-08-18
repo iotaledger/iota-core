@@ -40,12 +40,16 @@ type TestFramework struct {
 	uniqueKeyCounter uint64
 }
 
-func NewTestFramework(t *testing.T, storageOpts ...options.Option[storage.Storage]) *TestFramework {
+func NewTestFramework(t *testing.T, base string, storageOpts ...options.Option[storage.Storage]) *TestFramework {
 	errorHandler := func(err error) {
-		t.Error(err)
+		t.Log(err)
 	}
 
-	baseDir := t.TempDir()
+	baseDir := base
+	if baseDir == "" {
+		baseDir = t.TempDir()
+	}
+
 	instance := storage.New(baseDir, 0, errorHandler, storageOpts...)
 	require.NoError(t, instance.Settings().StoreProtocolParametersForStartEpoch(iotago.NewV3ProtocolParameters(), 0))
 
@@ -60,6 +64,15 @@ func NewTestFramework(t *testing.T, storageOpts ...options.Option[storage.Storag
 
 func (t *TestFramework) Shutdown() {
 	t.Instance.Shutdown()
+}
+
+func (t *TestFramework) BaseDir() string {
+	return t.baseDir
+}
+
+func (t *TestFramework) SetLatestFinalizedEpoch(epoch iotago.EpochIndex) {
+	endSlot := t.Instance.Settings().APIProvider().CurrentAPI().TimeProvider().EpochEnd(epoch)
+	t.Instance.Settings().SetLatestFinalizedSlot(endSlot)
 }
 
 func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64) {
