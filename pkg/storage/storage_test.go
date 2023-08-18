@@ -1,13 +1,15 @@
 package storage_test
 
 import (
+	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/iota-core/pkg/storage"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStorage_Pruning(t *testing.T) {
@@ -16,6 +18,10 @@ func TestStorage_Pruning(t *testing.T) {
 
 	tf.GeneratePermanentData(100 * MB)
 	tf.GeneratePrunableData(1, 100*MB)
+	tf.GeneratePrunableData(2, 100*MB)
+	for i := 0; i < 100; i++ {
+		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
+	}
 }
 
 func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
@@ -28,8 +34,10 @@ func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
 		tf.GeneratePrunableData(iotago.EpochIndex(i), 10*KB)
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
+	// TODO: create convenience method for setting latest finalized epoch in test framework
+	tf.Instance.Settings().SetLatestFinalizedSlot(8)
 
-	tf.Instance.PruneByEpochIndex(7)
+	fmt.Println(tf.Instance.PruneByEpochIndex(7))
 	tf.AssertPrunedUntil(
 		types.NewTuple(6, true),
 		types.NewTuple(0, true),
@@ -61,7 +69,7 @@ func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
 
 	// TODO: set lastFinalizedEpoch
 	err := tf.Instance.PruneByEpochIndex(7)
-	require.ErrorContains(t, err, prunable.ErrNoPruningNeeded.Error())
+	require.ErrorContains(t, err, database.ErrNoPruningNeeded.Error())
 
 	tf.AssertPrunedUntil(
 		types.NewTuple(0, false),
