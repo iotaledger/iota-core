@@ -141,7 +141,9 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
-	return s.pruneUntilEpoch(epoch)
+	s.pruneUntilEpoch(epoch)
+
+	return nil
 
 	// TODO: call ledger pruning
 }
@@ -161,7 +163,7 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) error {
 		return err
 	}
 
-	return s.pruneUntilEpoch(start - depth)
+	return s.PruneByEpochIndex(start - depth)
 }
 
 func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
@@ -196,17 +198,17 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
 		return err
 	}
 
-	return s.pruneUntilEpoch(targetEpoch)
+	s.pruneUntilEpoch(targetEpoch)
+
+	return nil
 	// Note: what if permanent is too big -> log error?
 }
 
-func (s *Storage) pruneUntilEpoch(epoch iotago.EpochIndex) error {
+func (s *Storage) pruneUntilEpoch(epoch iotago.EpochIndex) {
 	lastPrunedEpoch, _ := s.prunable.LastPrunedEpoch()
 	for currentIndex := lastPrunedEpoch; currentIndex <= epoch; currentIndex++ {
 		s.prunable.Prune(currentIndex)
 	}
-
-	return nil
 }
 
 // Shutdown shuts down the storage.
