@@ -64,7 +64,7 @@ func (p *Prunable) RestoreFromDisk() {
 
 func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) error {
 	// No need to prune.
-	if epoch < p.defaultPruningDelay {
+	if epoch <= p.defaultPruningDelay {
 		return database.ErrNoPruningNeeded
 	}
 
@@ -141,12 +141,12 @@ func (p *Prunable) EpochToPrunedBySize(targetSize int64, latestFinalizedEpoch io
 		sum += bucketSize
 
 		if sum >= targetSize {
-			return i, nil
+			return i + p.defaultPruningDelay, nil
 		}
 	}
 
 	if sum >= targetSize {
-		return latestFinalizedEpoch - p.defaultPruningDelay, nil
+		return latestFinalizedEpoch, nil
 	}
 
 	// TODO: do we return error here, or prune as much as we could
