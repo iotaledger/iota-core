@@ -54,6 +54,7 @@ func (p *Prunable) RestoreFromDisk() {
 	p.prunableSlotStore.RestoreFromDisk()
 
 	// TODO: revisit AssertPrunedUntil after this is fixed.
+	// TODO: check semi lastPrunedIndex in TestStorage_RestoreFromDisk
 
 	// set lastPrunedEpoch based on latest pruning epoch of buckets
 	// TODO: can't simply mark as evicted even if it's epoch 0. Maybe we need to store the last pruned slot in the settings.
