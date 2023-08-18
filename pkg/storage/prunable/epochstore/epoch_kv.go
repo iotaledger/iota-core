@@ -39,11 +39,26 @@ func (e *EpochKVStore) isTooOld(epoch iotago.EpochIndex) bool {
 	return hasPruned && epoch <= prunedEpoch
 }
 
-func (e *EpochKVStore) RestoreLastPrunedEpoch(epoch iotago.EpochIndex) {
+func (e *EpochKVStore) RestoreLastPrunedEpoch() error {
 	e.lastPrunedMutex.Lock()
 	defer e.lastPrunedMutex.Unlock()
 
-	e.lastPrunedEpoch.MarkEvicted(epoch)
+	var lowestEpoch *iotago.EpochIndex
+	if err := e.streamEpochs(func(epoch iotago.EpochIndex) error {
+		if lowestEpoch == nil || epoch < *lowestEpoch {
+			lowestEpoch = &epoch
+		}
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if lowestEpoch != nil {
+		e.lastPrunedEpoch.MarkEvicted(*lowestEpoch)
+	}
+
+	return nil
 }
 
 func (e *EpochKVStore) LastPrunedEpoch() (iotago.EpochIndex, bool) {
@@ -72,6 +87,29 @@ func (e *EpochKVStore) GetPrunableEpoch(epoch iotago.EpochIndex) kvstore.KVStore
 	}
 
 	return lo.Return1(e.GetEpoch(epoch - e.pruningDelay))
+}
+
+func (e *EpochKVStore) streamEpochs(consumer func(epoch iotago.EpochIndex) error) error {
+	var innerErr error
+	if storageErr := e.kv.IterateKeys(kvstore.EmptyPrefix, func(epochBytes []byte) (advance bool) {
+		epoch, _, err := iotago.EpochIndexFromBytes(epochBytes)
+		if err != nil {
+			innerErr = ierrors.Wrapf(err, "failed to parse epoch index from bytes %v", epochBytes)
+			return false
+		}
+
+		innerErr = consumer(epoch)
+
+		return innerErr == nil
+	}); storageErr != nil {
+		return ierrors.Wrap(storageErr, "failed to iterate over epochs")
+	}
+
+	if innerErr != nil {
+		return ierrors.Wrap(innerErr, "failed to stream epochs")
+	}
+
+	return nil
 }
 
 func (e *EpochKVStore) PruneUntilEpoch(epoch iotago.EpochIndex) error {

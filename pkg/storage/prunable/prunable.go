@@ -53,13 +53,18 @@ func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider a
 func (p *Prunable) RestoreFromDisk() {
 	p.prunableSlotStore.RestoreFromDisk()
 
-	// set lastPrunedEpoch based on latest pruning epoch of buckets
-	// TODO: can't simply mark as evicted even if it's epoch 0. Maybe we need to store the last pruned slot in the settings.
-	//  lastPrunedEpoch := lo.Return1(p.prunableSlotStore.LastPrunedEpoch())
-	// p.decidedUpgradeSignals.RestoreLastPrunedEpoch(lastPrunedEpoch)
-	// p.poolRewards.RestoreLastPrunedEpoch(lastPrunedEpoch)
-	// p.poolStats.RestoreLastPrunedEpoch(lastPrunedEpoch)
-	// p.committee.RestoreLastPrunedEpoch(lastPrunedEpoch)
+	if err := p.decidedUpgradeSignals.RestoreLastPrunedEpoch(); err != nil {
+		p.errorHandler(err)
+	}
+	if err := p.poolRewards.RestoreLastPrunedEpoch(); err != nil {
+		p.errorHandler(err)
+	}
+	if err := p.poolStats.RestoreLastPrunedEpoch(); err != nil {
+		p.errorHandler(err)
+	}
+	if err := p.committee.RestoreLastPrunedEpoch(); err != nil {
+		p.errorHandler(err)
+	}
 }
 
 func (p *Prunable) PruneUntilEpoch(epoch iotago.EpochIndex) error {

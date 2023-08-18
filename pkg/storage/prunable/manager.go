@@ -150,8 +150,6 @@ func (m *PrunableSlotManager) RestoreFromDisk() {
 	for _, dbInfo := range dbInfos {
 		m.getDBInstance(dbInfo.baseIndex)
 	}
-
-	return
 }
 
 // getDBInstance returns the DB instance for the given epochIndex or creates a new one if it does not yet exist.
